@@ -30,12 +30,10 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
             // spicy messages -- new blocks
             if let Message::Text(message) = message {
                 if let Ok(parsed) = json::parse(&message) {
-                    println!("\n{:?}\n\n", parsed["payload"]["data"]["newBlock"]);
+                    println!("\n{:?}\n\n", parsed["payload"]["data"]["newBlock"].pretty(1));
                 } else {
                     println!("Got Message:\n{:?}\n", message);
                 }
-            } else {
-                println!("Got Message:\n{:?}\n", message);
             }
         }
     }
