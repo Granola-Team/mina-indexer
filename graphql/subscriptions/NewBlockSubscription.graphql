@@ -39,9 +39,13 @@ subscription NewBlockSubscription {
       base64
     },
     transactions {
-      feeTransfer,
+      feeTransfer {
+        recipient,
+        fee,
+        type
+      },
       coinbase,
-      coinbaseReceiverAccount,
+      coinbaseReceiverAccount { publicKey, token },
       userCommands {
         __typename,
         source { publicKey, token },
