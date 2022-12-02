@@ -34,15 +34,15 @@ pub async fn graphql_websocket(url: &str) -> Result<TokioTlsWebSocketConnection,
         "Sec-WebSocket-Protocol",
         HeaderValue::from_str("graphql-transport-ws")?,
     );
-    println!("Request: {:?}\n\n\n", request);
+    log::debug!("Request: {:?}", request);
 
     // Connect to the GQL server with TLS
     let https: AsyncTlsConnector = TlsConnector::new()?.into();
     let (connection, _) =
         async_tungstenite::tokio::connect_async_with_tls_connector(request, Some(https))
             .await
-            .expect(&format!("unable to connect to {:?}\n", url));
-    println!("Connection: {:?}\n\n\n", connection);
+            .expect(&format!("unable to connect to {:?}", url));
+    log::debug!("Connection: {:?}", connection);
 
     let (sink, stream) = connection.split();
     Ok(TokioTlsWebSocketConnection { sink, stream })
