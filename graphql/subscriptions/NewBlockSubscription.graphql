@@ -1,12 +1,58 @@
 subscription NewBlockSubscription {
   newBlock {
+    creatorAccount {
+      publicKey,
+      token,
+    },
+    winnerAccount {
+      publicKey,
+      token,
+    },
     stateHash,
+    stateHashField
+    protocolState {
+      previousStateHash,
+      blockchainState {
+        utcDate, snarkedLedgerHash,
+        stagedLedgerHash, stagedLedgerProofEmitted
+      },
+      consensusState {
+        blockHeight, epochCount,
+        slot, slotSinceGenesis
+        minWindowDensity, lastVrfOutput,
+        totalCurrency, hasAncestorInSameCheckpointWindow,
+        stakingEpochData {
+          seed, startCheckpoint, lockCheckpoint, epochLength,
+          ledger {
+            hash, totalCurrency
+          },
+        },
+        nextEpochData {
+          seed, startCheckpoint, lockCheckpoint, epochLength,
+          ledger {
+            hash, totalCurrency
+          },
+        },
+      },
+    },
+    protocolStateProof {
+      base64
+    },
     transactions {
+      feeTransfer,
+      coinbase,
+      coinbaseReceiverAccount,
       userCommands {
         __typename,
-        source { publicKey },
-        kind, id,nonce, memo, amount
+        source { publicKey, token },
+        receiver { publicKey, token },
+        kind, id, nonce, memo, amount
       }
     },
+    snarkJobs {
+      prover,
+      fee,
+      workIds
+    }
   }
 }
