@@ -22,7 +22,6 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
         r#"{"type":"connection_ack","id":null,"payload":null}"#,
     ));
     while let Some(message) = conn.stream.next().await {
-        println!("Got Message:\n{:?}\n", message);
         if let Ok(message) = message {
             if connection_ack_msg == message {
                 continue; // ignore
@@ -32,12 +31,9 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
             if let Message::Text(message) = message {
                 if let Ok(parsed) = json::parse(&message) {
                     println!("\n{:?}\n\n", parsed["payload"]["data"]["newBlock"].pretty(1));
-                    // println!("\n{:?}\n\n", message);
                 } else {
                     println!("Got Message:\n{:?}\n", message);
                 }
-            } else {
-                println!("Got Message:\n{:?}\n", message);
             }
         }
     }
