@@ -16,7 +16,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Output one block from the MINA GQL to
+/// Pretty print the next block from the daemon
 pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), Box<dyn Error>> {
     conn.stream.next().await.unwrap()?;
     if let Some(message) = conn.stream.next().await {
