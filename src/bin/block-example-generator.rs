@@ -19,12 +19,11 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 /// Output one block from the MINA GQL to
 pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), Box<dyn Error>> {
     conn.stream.next().await.unwrap()?;
-    conn.stream.next().await.unwrap()?;
     if let Some(message) = conn.stream.next().await {
         if let Ok(Message::Text(message)) = message {
             if let Ok(json) = json::parse(&message) {
-                if let Ok(_block) = serde_json::from_str::<Block>(&json.pretty(1)) {
-                    println!("{}", json.pretty(1));
+                if let Ok(_block) = serde_json::from_str::<Block>(&json["payload"]["data"]["newBlock"].pretty(1)) {
+                    println!("{}", json["payload"]["data"]["newBlock"].pretty(1));
                 }
             }
         }
