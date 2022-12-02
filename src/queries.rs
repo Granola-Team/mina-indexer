@@ -16,7 +16,7 @@ pub async fn mina_daemon_ws_init(
             "#
         .to_string(),
     );
-    println!(
+    log::debug!(
         "Sending connection_init message:\n{:?}\n",
         connection_init_msg
     );
@@ -28,7 +28,7 @@ pub async fn mina_daemon_ws_init(
             "#,
         SUBSCRIPTION_QUERY
     ));
-    println!("Sending subscription:\n{:?}\n", subscription_start_msg);
+    log::debug!("Sending subscription:\n{:?}\n", subscription_start_msg);
     conn.sink.feed(subscription_start_msg).await?;
     conn.sink.flush().await?;
     Ok(())

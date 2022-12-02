@@ -8,16 +8,23 @@ name = "block-listener"
 test = false
 bench = false
 
+[[bin]]
+name = "block-example-generator"
+test = false
+bench = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async_executors = { version = "*", features = ["tokio_tp"] }
 async-tungstenite = { version = "0.16.1", features = ["tokio-native-tls"] }
+env_logger = "*"
 futures = "*"
 futures-util = "*"
 cynic = { version = "1.0.0" }
 graphql-ws-client = { version = "0.2.0", default-features = false, features = ["client-cynic"] }
 json = "*"
+log = "*"
 native-tls = "*"
 serde = "*"
 serde_derive = "*"

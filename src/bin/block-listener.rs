@@ -23,9 +23,9 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
     ));
     while let Some(message) = conn.stream.next().await {
         if let Ok(message) = message {
-            println!("Message Recieved!...");
+            log::info!("Message Recieved...");
             if connection_ack_msg == message {
-                println!("{:?}", message);
+                log::debug!("{:?}", message);
                 continue; // ignore
             }
 
@@ -35,11 +35,11 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
                     // println!("\n{:?}\n\n", parsed["payload"]["data"]["newBlock"].pretty(1));
                     let pretty = parsed["payload"]["data"]["newBlock"].pretty(1);
                     match serde_json::from_str::<Block>(&pretty) {
-                        Ok(block) => println!("{:?}", block),
-                        Err(err) => {println!("{:?}", err); println!("{:?}", pretty)},
+                        Ok(block) => log::info!("{:?}", block),
+                        Err(err) => {log::error!("{:?}", err); log::debug!("{:?}", pretty)},
                     }
                 } else {
-                    println!("Got Message:\n{:?}\n", message);
+                    log::debug!("Message:{:?}", message);
                 }
             }
         }
