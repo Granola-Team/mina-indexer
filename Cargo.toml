@@ -1,0 +1,30 @@
+[package]
+name = "mina-indexer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "block-listener"
+test = false
+bench = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async_executors = { version = "*", features = ["tokio_tp"] }
+async-tungstenite = { version = "0.16.1", features = ["tokio-native-tls"] }
+futures = "*"
+futures-util = "*"
+cynic = { version = "1.0.0" }
+graphql-ws-client = { version = "0.2.0", default-features = false, features = ["client-cynic"] }
+json = "*"
+native-tls = "*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+tokio-stream = "*"
+tokio-native-tls = "*"
+
+[dependencies.tokio]
+version = "*"
+features = ["full"]

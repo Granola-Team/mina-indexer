@@ -1,0 +1,12 @@
+subscription NewBlockSubscription {
+  newBlock {
+    stateHash,
+    transactions {
+      userCommands {
+        __typename,
+        source { publicKey },
+        kind, id,nonce, memo, amount
+      }
+    },
+  }
+}
