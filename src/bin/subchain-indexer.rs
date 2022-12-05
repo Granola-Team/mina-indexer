@@ -3,7 +3,9 @@ use futures::prelude::*;
 use mina_indexer::{
     constants::GRAPHQL_URL,
     queries::mina_daemon_ws_init,
-    websocket::{graphql_websocket, TokioTlsWebSocketConnection}, Block
+    subchain::SubchainContext,
+    websocket::{graphql_websocket, TokioTlsWebSocketConnection},
+    Block,
 };
 use std::error::Error;
 
@@ -16,31 +18,34 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Receive blocks from GQL and print them out!
+/// Process blocks from GQL using SubchainIndexer, print the longest chain
 pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), Box<dyn Error>> {
     let connection_ack_msg = Message::Text(String::from(
         r#"{"type":"connection_ack","id":null,"payload":null}"#,
     ));
 
+    let mut subchain_ctx = SubchainContext::new();
 
     while let Some(message) = conn.stream.next().await {
         if let Ok(message) = message {
             log::info!("Message Recieved...");
             if connection_ack_msg == message {
                 log::debug!("{:?}", message);
-                continue; // ignore
+                continue;
             }
 
-            // spicy messages -- new blocks
             if let Message::Text(message) = message {
                 if let Ok(parsed) = json::parse(&message) {
-                    // println!("\n{:?}\n\n", parsed["payload"]["data"]["newBlock"].pretty(1));
-                    let pretty = parsed["payload"]["data"]["newBlock"].pretty(1);
-                    match serde_json::from_str::<Block>(&pretty) {
+                    let json = &parsed["payload"]["data"]["newBlock"];
+                    match serde_json::from_str::<Block>(&json.dump()) {
                         Ok(block) => {
-                            println!("{:?}", block);
-                        },
-                        Err(err) => {log::error!("{:?}", err); log::debug!("{:?}", pretty)},
+                            subchain_ctx.recv_block(block);
+                            println!("{:?}", subchain_ctx.longest_chain());
+                        }
+                        Err(err) => {
+                            log::error!("{:?}", err);
+                            log::debug!("{:?}", json.pretty(1))
+                        }
                     }
                 } else {
                     log::debug!("Message:{:?}", message);
