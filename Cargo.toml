@@ -13,6 +13,11 @@ name = "block-example-generator"
 test = false
 bench = false
 
+[[bin]]
+name = "subchain-indexer"
+test = false
+bench = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -26,6 +31,7 @@ graphql-ws-client = { version = "0.2.0", default-features = false, features = ["
 json = "*"
 log = "*"
 native-tls = "*"
+rose_tree = "0.3.0"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"

@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 pub mod constants;
 pub mod websocket;
 pub mod queries;
+pub mod subchain;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub struct Block {
