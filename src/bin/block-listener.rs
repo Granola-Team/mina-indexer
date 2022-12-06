@@ -3,7 +3,8 @@ use futures::prelude::*;
 use mina_indexer::{
     constants::GRAPHQL_URL,
     queries::mina_daemon_ws_init,
-    websocket::{graphql_websocket, TokioTlsWebSocketConnection}, Block
+    websocket::{graphql_websocket, TokioTlsWebSocketConnection},
+    Block,
 };
 use std::error::Error;
 
@@ -22,7 +23,6 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
         r#"{"type":"connection_ack","id":null,"payload":null}"#,
     ));
 
-
     while let Some(message) = conn.stream.next().await {
         if let Ok(message) = message {
             log::info!("Message Recieved...");
@@ -39,8 +39,11 @@ pub async fn socket_loop(conn: &mut TokioTlsWebSocketConnection) -> Result<(), B
                     match serde_json::from_str::<Block>(&pretty) {
                         Ok(block) => {
                             println!("{:?}", block);
-                        },
-                        Err(err) => {log::error!("{:?}", err); log::debug!("{:?}", pretty)},
+                        }
+                        Err(err) => {
+                            log::error!("{:?}", err);
+                            log::debug!("{:?}", pretty)
+                        }
                     }
                 } else {
                     log::debug!("Message:{:?}", message);
