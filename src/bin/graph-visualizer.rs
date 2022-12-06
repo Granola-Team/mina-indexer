@@ -10,7 +10,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     while let Some(message) = block_stream.next().await {
         if let Some(block) = message {
             subchain_indexer.add_block(block);
-            println!("{}", subchain_indexer.as_dot();
+            println!("{}", subchain_indexer.as_dot());
         }
     }
     Ok(())
