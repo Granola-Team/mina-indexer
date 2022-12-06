@@ -4,7 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 use crate::Block;
 
 type StateHash = String;
-type BlockReference = std::rc::Rc<crate::Block>;
+type BlockReference = std::rc::Rc<Block>;
 type GraphIndices = Vec<NodeIndex<u32>>;
 type StateHashGraphIndexMap = HashMap<StateHash, NodeIndex<u32>>;
 type SubchainGraph = Graph<BlockReference, StateHash>;
