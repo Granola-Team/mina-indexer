@@ -1,9 +1,12 @@
-use serde::{Serialize, Deserialize};
+use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
+pub mod block_stream;
 pub mod constants;
-pub mod websocket;
 pub mod queries;
 pub mod subchain;
+pub mod websocket;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub struct Block {
@@ -12,7 +15,7 @@ pub struct Block {
     #[serde(rename = "winnerAccount")]
     winner_account: Account,
     #[serde(rename = "stateHash")]
-    state_hash: String,
+    pub state_hash: String,
     #[serde(rename = "stateHashField")]
     state_hash_field: String,
     #[serde(rename = "protocolState")]
@@ -22,6 +25,16 @@ pub struct Block {
     transactions: Transactions,
     #[serde(rename = "snarkJobs")]
     snark_jobs: Vec<SnarkJob>,
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Block[{}]",
+            self.state_hash[(self.state_hash.len() - 5)..].to_string()
+        )
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
@@ -50,7 +63,7 @@ pub struct BlockchainState {
     #[serde(rename = "stagedLedgerHash")]
     staged_ledger_hash: String,
     #[serde(rename = "stagedLedgerProofEmitted")]
-    staged_ledger_proof_emitted: bool
+    staged_ledger_proof_emitted: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
@@ -97,7 +110,7 @@ pub struct LedgerState {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub struct ProtocolStateProof {
-    base64: String
+    base64: String,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
@@ -127,7 +140,7 @@ pub struct UserCommand {
     kind: String,
     id: String,
     memo: String,
-    amount: String
+    amount: String,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
