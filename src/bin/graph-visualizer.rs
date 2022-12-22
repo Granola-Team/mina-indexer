@@ -1,5 +1,5 @@
 use mina_indexer::{block_stream::BlockStream, constants::GRAPHQL_URL, subchain::SubchainIndexer};
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::{fs::File, io::{AsyncWriteExt, AsyncSeekExt}};
 
 use std::{error::Error, env};
 
@@ -12,6 +12,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let mut dot_file = File::create(&output_file).await?;
     while let Some(message) = block_stream.next().await {
         if let Some(block) = message {
+            dot_file.rewind().await?;
             subchain_indexer.add_block(block);
             dot_file.write_all(&subchain_indexer.as_dot().into_bytes()).await?;
         }
