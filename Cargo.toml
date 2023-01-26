@@ -27,12 +27,12 @@ bench = false
 
 [dependencies]
 async_executors = { version = "*", features = ["tokio_tp"] }
-async-tungstenite = { version = "0.16.1", features = ["tokio-native-tls"] }
-cynic = { version = "1.0.0" }
+async-tungstenite = { version = "0.19.0", features = ["tokio-native-tls"] }
+cynic = { version = "2.2.4" }
 env_logger = "*"
 futures = "*"
 futures-util = "*"
-graphql-ws-client = { version = "0.2.0", default-features = false, features = ["client-cynic"] }
+graphql-ws-client = { version = "0.3.0", default-features = false, features = ["client-cynic"] }
 json = "*"
 log = "*"
 native-tls = "*"

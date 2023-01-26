@@ -24,7 +24,7 @@ impl SubchainIndexer {
         }
     }
 
-    pub fn as_dot(&self) -> String {
+    pub fn to_dot(&self) -> String {
         use petgraph::dot::Dot;
         Dot::new(&self.chain_graph).to_string()
     }
