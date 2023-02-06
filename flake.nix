@@ -26,10 +26,13 @@
           rustc = rust;
         };
 
-        dependencies = with pkgs; [
-          pkg-config
+        runtimeDependencies = with pkgs; [
           openssl
         ];
+
+        buildDependencies = with pkgs; [
+          pkg-config
+        ] + runtimeDependencies;
 
         devDependencies = with pkgs; [
           rust
@@ -50,8 +53,8 @@
               lockFile = ./Cargo.lock;
             };
 
-            nativeBuildInputs = dependencies;
-            buildInputs = dependencies;
+            nativeBuildInputs = buildDependencies;
+            buildInputs = runtimeDependencies;
           };
 
           default = mina-indexer;
