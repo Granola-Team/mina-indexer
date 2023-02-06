@@ -25,18 +25,40 @@
           cargo = rust;
           rustc = rust;
         };
+
+        dependencies = with pkgs; [
+          pkg-config
+          openssl
+        ];
+
+        devDependencies = with pkgs; [
+          rust
+          rust-analyzer
+          rnix-lsp
+          nixpkgs-fmt
+        ] ++ dependencies;
       in
       with pkgs;
       {
-        devShells.default = mkShell {
-          buildInputs = [
-            rust rust-analyzer
-            rnix-lsp
-            nixpkgs-fmt
-            openssl
-            pkg-config
-          ];
+        packages = flake-utils.lib.flattenTree rec {
+          mina-indexer = rustPlatform.buildRustPackage rec {
+            pname = "mina-indexer";
+            version = "0.1.1";
 
+            src = ./.;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
+
+            nativeBuildInputs = dependencies;
+            buildInputs = dependencies;
+          };
+
+          default = mina-indexer;
+        };
+
+        devShells.default = mkShell {
+          buildInputs = devDependencies;
           shellHook = ''
           '';
         };
