@@ -32,7 +32,7 @@
 
         buildDependencies = with pkgs; [
           pkg-config
-        ] + runtimeDependencies;
+        ] ++ runtimeDependencies;
 
         devDependencies = with pkgs; [
           rust
@@ -40,13 +40,15 @@
           rnix-lsp
           nixpkgs-fmt
         ] ++ dependencies;
+
+        cargo-toml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
       in
       with pkgs;
       {
         packages = flake-utils.lib.flattenTree rec {
           mina-indexer = rustPlatform.buildRustPackage rec {
-            pname = "mina-indexer";
-            version = "0.1.1";
+            pname = cargo-toml.package.name;
+            version = cargo-toml.package.version;
 
             src = ./.;
             cargoLock = {
