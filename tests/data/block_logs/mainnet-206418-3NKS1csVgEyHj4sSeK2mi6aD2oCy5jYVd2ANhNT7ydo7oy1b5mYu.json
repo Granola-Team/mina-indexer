@@ -1,0 +1,855 @@
+{
+  "scheduled_time": "1670913845397",
+  "protocol_state": {
+    "previous_state_hash": "3NLQvNuni4QwDxvBYJc37nnNizXUQEUw7BodU8q66t8FRKkjU4u8",
+    "body": {
+      "genesis_state_hash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
+      "blockchain_state": {
+        "staged_ledger_hash": {
+          "non_snark": {
+            "ledger_hash": "jxeS7pUeNkvLCUKhHeqgWgLyyJQe9R9q2SvonMcf9PnT8XNLZYb",
+            "aux_hash": "V7Cj3NuYkMH9qeGjjgx1r7SmZVS8yFaJ9wXKniny5PUF6EEDRL",
+            "pending_coinbase_aux": "X3dVGuiZCi942Mw4wnsUa2ss69ezbc1xgLNEthaPaCdCmbDRhx"
+          },
+          "pending_coinbase_hash": "2mzk4HZZpV8JwqrhfW3jDcHVw22kubdqqXJVtNpAxP8saZfJLg2M"
+        },
+        "snarked_ledger_hash": "jwBAajyGPYDLigNnD4YpmATM4s1iCdzncGcEQrSbbTs3Phf3Y7T",
+        "genesis_ledger_hash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+        "snarked_next_available_token": "2",
+        "timestamp": "1670913720000"
+      },
+      "consensus_state": {
+        "blockchain_length": "206418",
+        "epoch_count": "42",
+        "min_window_density": "14",
+        "sub_window_densities": [
+          "2",
+          "4",
+          "5",
+          "3",
+          "2",
+          "4",
+          "2",
+          "4",
+          "3",
+          "2",
+          "1"
+        ],
+        "last_vrf_output": "lrparIyDAggDn9vwYM_xctLCKHBWcYFzWf1EBUwVAgA=",
+        "total_currency": "983950732840039233",
+        "curr_global_slot": {
+          "slot_number": "305414",
+          "slots_per_epoch": "7140"
+        },
+        "global_slot_since_genesis": "305414",
+        "staking_epoch_data": {
+          "ledger": {
+            "hash": "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH",
+            "total_currency": "975801772840039233"
+          },
+          "seed": "2vbmVpF8ZRESNZLmnJysdea66nDbzNkqe5i2aZi93GHYDoH3WTfK",
+          "start_checkpoint": "3NKvDjn9VnmQHbRZKdcUuaNW7dahymVXwXjrjmFBLBYTauSm9RkL",
+          "lock_checkpoint": "3NLiPaN1MN7aQgv7ccSCztX9YYjWCrA3a2xe4eeTPVT4hF78susP",
+          "epoch_length": "4673"
+        },
+        "next_epoch_data": {
+          "ledger": {
+            "hash": "jxRhDLj6Q62jjRDNS2yYtDu6yHziPx6yLNXvPdgMfZaF3NFvJic",
+            "total_currency": "980460892840039233"
+          },
+          "seed": "2vbp9Rd29Xvvyhyg1J2cUbhWF58UG8YLzzQCUy9kTLrN3BcRGnfR",
+          "start_checkpoint": "3NKoGG8i9Hg1yxVz3VY2VzKzfL6vr7tjWcVg7B4B122cASbPQT7b",
+          "lock_checkpoint": "3NKBVBodo4sbgCPmqYFgQDap6ATxrBh9Ra3LQuTrrVs2vwt1wCYk",
+          "epoch_length": "3455"
+        },
+        "has_ancestor_in_same_checkpoint_window": true,
+        "block_stake_winner": "B62qrSbdso96pKAHdpMTTe1AC4QDGUYvW87vaEPdyAjWLdhryZivTvv",
+        "block_creator": "B62qqBdM9mcTk1otWiRPfBBF3uJ51BRGH67GG23HakzfhcmDNjwUYVw",
+        "coinbase_receiver": "B62qqBdM9mcTk1otWiRPfBBF3uJ51BRGH67GG23HakzfhcmDNjwUYVw",
+        "supercharge_coinbase": false
+      },
+      "constants": {
+        "k": "290",
+        "slots_per_epoch": "7140",
+        "slots_per_sub_window": "7",
+        "delta": "0",
+        "genesis_state_timestamp": "1615939200000"
+      }
+    }
+  },
+  "protocol_state_proof": "AQEBAQEBAQEBAQABAfy3j2M0LeLYZAH8CujB8HItYQsAAQH8iAsjofAyr5cB_DiWISegR5JiAAEB_K-hFypbLH-MAfyOykU_tKslqQABAAEB_LPHX-GV58pSAfx-_WKWt63KaQABAIOxk_jzUFkly267ZQXEf0Vgcl7TrKwo0Elz2OozshoQAQAjoBHc9x5ZN-5rfPn94wOV3OIUn-QU2pR4LVThvmLvCwEAAQH83dG5UiuL2bYB_EKESQUomLTiAAEBAQEAAQH8AFJiAfcbTqIB_EI8gpWo_3fPAAEBAAEB_FdnphGN8zxUAfzFhMjgIBsijAABAQABAfzSYLZwdqxr5QH88kfUuNd_TkIAAQEAAQH8msM63G8GOxgB_HEFblNnABRPAAEBAAEB_Jogq7AxqwbkAfyKeeLNlAi9jAABAQABAfw68wGv70x1MAH8QXg93TlRcWoAAQEAAQH8UeHohDL13aIB_OsT_MC2C9RgAAEBAAEB_BS0sRcjKPtZAfwjL6ZMBBAswwABAQABAfzjEpHGDq6nkAH8W3Blg45RaV4AAQEAAQH8dHeneJ92e18B_H7q0fvMPljnAAEBAAEB_BDbsRLJA1I0Afw8Z1oQH0NMuwABAQABAfznkhGbLMnn4AH8BgM5P7MwTsIAAQEAAQH80QOjiGRiA0QB_MyEHSiQrS8GAAEBAAEB_KTwdOlQmlnNAfx6D0r-_szClwABAQABAfy9wXGFKkBOOgH819NJU1SJMnMAAQEAAQH8Y7bkVsdvnwkB_Lrni6OXtwFZAAEBAAEB_KYmPLloSEh-AfwEh0lEfcub4wABAQABAfyWrL_i3agi2AH8D3v60xM271gAAAEAAQEB_JCCmycqzk5yAfxwsh4RyARwmQH8wTx99T4Z6wcB_BZ505Z0BCc7AAGxW0Cimdo6BHMCBPBXFaPVYJQzm_VdBta2JHerwLpyGB2sSX-yNTHWrp_pluRmiBUOK9qSjqP3qynJOL4bapkEAQEBAQEBAAEB_Fz-W_aoW7I5Afw5NAjRx4zrNgABAQABAfwd4R5jubZlnwH8xCrxo0teycMAAQEAAQH8Yo9FJScYsp0B_IfCBxAXr3grAAEBAAEB_BQ3tYOK1Up1AfyE5cQbu5yYKgABAQABAfxVkwsyP3Ze2wH8agBNInFqm50AAQEAAQH80nCgtCNpu3IB_LtMQBj4BRf6AAEBAAEB_PffRE0e31BlAfwREzMaIwl_CgABAQABAfwLcf4jUJlXtwH8HluPljbDghsAAQEAAQH8qP5Orb5rpZkB_ADtn6_XnqXsAAEBAAEB_FLGlNz_nh29AfwJml8L27_2IgABAQABAfwSoh3DOaO5EAH8uINPYcUeQ2MAAQEAAQH8BIyhtjQwIiUB_CBZSWF-_ZfXAAEBAAEB_MY7SNzDnznnAfzKgJ9DmekL1AABAQABAfwg8JNBmuJPYQH8rWu-51AKG_4AAQEAAQH8i6hv817JxbUB_KSABph0NZUOAAEBAAEB_L5bl-Wvo4VpAfzCra6l_ffHZgABAQABAfx9AnVlSB8GjgH8eOySeuJkQOEAAAEBAQEBAAEB_JwocWhXTPwxAfxiLOG39mrReAABAQABAfwplceqCnNgnAH80OBxh1rnvAoAAQEAAQH8Yia5rqw1JJgB_KnSHVqWVebLAAEBAAEB_M9-KRPxd8L8AfyPBia5C8498AABAQABAfydRQW4REumNQH8OcWhw_6IYloAAQEAAQH8HBDuGipo1GIB_DWm-yLyWeLgAAEBAAEB_HdL27v6qALWAfzHZ6ynsSAVCAABAQABAfzzWWCQ94iZfQH8vbuhSroAbx8AAQEAAQH8Cnl3EVC7KjEB_P6sxhqaiTEQAAEBAAEB_H39Us5oiilJAfy50-uG9AOUGAABAQABAfyzG35_ankDywH8oM41B0aEvmMAAQEAAQH8C24uIBuqbzAB_DKeRM0zOpfYAAEBAAEB_L4-Udm8e-yGAfzDUZYFkNDHTwABAQABAfwOTeNYwL-LmgH8mBKWrk5okw8AAQEAAQH8C3_8hm6CxiYB_Bfvz7xD51gEAAEBAAEB_C2wUURnPpNrAfzAjaU-hTytJAABAQABAfyrxzX4_HRwlQH8yZzuZHxptnwAAAABAAECXXo9Ljkr_8XectOZerrqEDB2ZWKK2yBDsx1NKWbYsAX1pV7a3fXsbO48-XVB65qSYmUMz6CykIV5VEPar0XMPK2BZ09LuOtw1o6LBlA7hizg-_ahLv6MzG1UbIgomCMzV6iOHdI1cnohhBu7Im6c8D3BK81nl_hvAOaPGGToDDcBAgEBAQEAAQH8qmrfZ2rGhxwB_I8YKW1A2hm3AAEBAAEB_CZEXdEMr_eRAfw_EqKp-UrdlAABAQABAfxLOGY6_QY5zAH86D9K5tGWhaUAAQEAAQH8wq4n9HZGIUEB_BjJZQsHm3SeAAEBAAEB_FQDBqd_kmEdAfyZVzort4PvtQABAQABAfyP4pv1NB0BgQH8bQJXiko1fdQAAQEAAQH8Y0gXzRBPGVQB_Kfl3WV54XYCAAEBAAEB_JTL5IEzUwp2AfwNeEyAxqwcZQABAQABAfwWSymTG9AD3QH8XC7g7aryVV0AAQEAAQH8LheyhVE6PuAB_MLPGVyqR88bAAEBAAEB_HN_4sXdMX7wAfx4MZ55HOs3xAABAQABAfxKLLe3JA2vVwH8ZXqcD057CmAAAQEAAQH8pSM0jhrlLCsB_CJl0ojVHBKhAAEBAAEB_MqeWRwQwOmYAfyrnwtsIiVRxwABAQABAfzDoOKhjxtOBAH8NKbEMk1jfJsAAQEAAQH8yHxojlRq1gUB_FTAPbrpuVhjAAEBAAEB_GVCvfyUJ3-WAfwMBc8beiKIvwABAQABAfzAVO8-zCBmmQH85fq2blYpN9YAAAEBAQEAAQH8DMVpym0zoQgB_IuGEn36D_DDAAEBAAEB_IkAs_6a1ot7AfwRKLlqjdLzswABAQABAfzBBzWGcLjPcwH8nOfrwyXsm3IAAQEAAQH8JU-rVyi2WwoB_PKA6zqDmK-xAAEBAAEB_Lkqp1a0cHOtAfz8nvHVI_lPNgABAQABAfwAfC-OYhyHWQH8h8wmonP2x5wAAQEAAQH8r_K2nh2CVCMB_H71ffbRa7nVAAEBAAEB_PaGkKDQ93sUAfxoKiRAzmJeYgABAQABAfwOrVYyYxvGrwH8--EfoRBygAkAAQEAAQH8kUGsyr4eWPkB_KbJtz6Z1R5XAAEBAAEB_L3DZM2jUE6qAfxoxf7BCucU2AABAQABAfxt3l6C36wdsgH8pQfbxReiCP4AAQEAAQH8f6rm6dYPToIB_Cx_uU6YOvb8AAEBAAEB_MoEG3EriDHDAfwpJq62x6w5kQABAQABAfzvUYH9R48P3AH8h5U7xEN6qQAAAQEAAQH8vzKG0R7YOGAB_KsFqqJwvLP5AAEBAAEB_FpHr-Xg0nWUAfz20sOuAqfL0QABAQABAfwEfC359g94vgH8VOL7MpFYPeEAAAEBAQGrUrq5cwTrJo1LSWzLJUnIu2RET8bXlfSdpdpzDvK1CgEBxqeE7jXz0uFrY4y0S_r5CucUQXsgMtDBnIm8S67pMAEBAcCGAeBtX_d5cixCyAYlrRLj61f0w-qNxZ32iagNijU6AQGqMbBjOlBhM7qE3gu5zmCxvNSPSchb3xJEiNiwWL0uNwEFIRVdtm2oX-zslWHVsuu6zShnBW1H6P5Lxq4GGojl4QFZE0erzdlMUoK4eWuM8vj-XNtp9fx-1HESBPEv_AjsCLKbPwXmVQL2Obf4iHhTkIS0YzyqER9JWMG6a4vKu1I4w5CdKMKiPkjc-ar2g11W5PbkWYBeovxuSU1eb3E-UxOQ07JLTS5zl_8aT5cWiAZhApDaAlWEwtgxrHDmFxdSOgEBXPFC3RcsAtT0Fb5D6daMWjL_97zfV3Tb0ZwYWDUEpy8BAQBUHd4ZM5UFSQixJ6_pyo26DEzQBZTh-9eiICFfADgEAQFM6kly34DXegYURb80rU_IUINslRBkyJcVtmPqwi0zEQEBAWofgZGmT3Nbi85dp5lyRptcG7T4lCoGC_P9lc7m1xsgAQGnGemkZIV_XMLMHzVHT5jlFJ8j3ZCjLqoGK8jqft0oJQEBofZhHy3Q4t7NoJ2Asxjm163EQnl3ly6qPh1RxhKHODMBAea6UXoYajcvBd1v_WDfgFe3JWwzpx_ZAjh4mH1-Ym0DAQWwC1RrDvOej1PuLf25sPamFbky1dVm8qUKwUwAcM5ODkuoUjrqFFSo2QF76B-mSYgPaDtJFyc1qVflSMPe9UUCDLXIj4QdJwQQBYcF7q3m98ZvyP70vg4XE-mua7SgHjOkYKRb7kYJ0EQb_pkes8doe2hsWuHJiDVlCgIqboq6Ccr28UxpEqdAwcqM6P568Q-uZMSBw_6XmoqpFzAwAdUpAQFSDDLyAQIJS9cFMj_IvbSUyzPOyKXg0q7NvFOoy_TZHAEBCDqRvOXGHy8ERkYo7KwgwZ215sx1ob1KrDADg1x1RSgBAbX26tUEfwo9hFfGdt6fIX3PUpvuhY4lkV6KqcOWcwY0AcyBQh2tNerVPcY37na0x_HEs4fhfOz03Q895Cwa5ycDAJKvPekangvaLqnuVmsAohFCgl8JNHyUL-6Uegf8LB8BAQEBAQHB0BprBHQqZdx1aSk-yP3_XZFpTQfB2pUMzcojCJtzAGrgY1iIsfO4rpcmuAN61DIrXkKmn3iuq-egJs9A_58kAQEB3pys36-1_6PxpzoPNvYONgRAPSlycySSVgREA0dIfw5fxpTbeaRAt8vAPapicWcBqju6mSrloZ2loRjrYl61LQEBAazFel1Qv0msbVEm87TUQOCV9V-fW06oMWGkWks_EtgaseVp6HadUJYxXI23eZE65DY9WE37E05x8hf4PdErSjcBAQFNOR0WlSTOOj4Vzdq-pGU3FNCd_lLAadEKOD10HxKsOYEUCVPnbpK7p-nFEvdWlaidgcRHTc4cqcHyO71sW04rAQEFAQGt3dUZuNj6HTw3v5XiOfqtP5u2QqUAr2IShfIfn-NgG2LhEvk9GbObdD1ZWtFfkgEbxnbXX1jiZWIMeMpN0GQaAQGkqKYiCPcN4FWxDKey_7SDU1P-_gnWY2wRonu9A2joGJOYO_UTeZCy6H-DW0TDM-0inBgZnz0xKKOaYO93pAsmAQHMw0s58H8L2QuXueFpqtdIviIvm8uyjMoRTjxJ-txuKCrowL5wc2w_o6_OfmKVphRx-B9Xro65yWKSntYGr703AQEduHjXGDbVr9LqsVJi7QwcZ-Df0mHc-mMegq4V40V7PFSsMQQqmdVHpxRBtnhhl1iv3NEUPecA_aU6JcKhNGsJAQFAPtGeIFU-BQip_3lLGwr6peqjA6vVKSpQ8yZg1tn-APbO6-VgYBV8YcUlum_JGUaTkJCcRCfj_FxDAKkftuIDAQEO8o6IF-QoNA0yfL_i5Op3R-jM0HgkqCsx109PJb6AKp8ZRH0grGQAY7pirQuRd9HqfOi8NbG-3H67mRhxGPUrAQEBEYupL59EpWl2GiH91_ryN0Ut40uGG5ML6F2y5prDDQooP4Hxa6biegRjcrPvcZnFE6D7AjUYTl33r4PcnFH3Rhf9AV5bzVuuvzWvUbSKCjUCyaPEdZXjBfs6tqDlJ-tyNgZszOKsm7Srv7G1TmpoWjZc1tZo_0tZzENJ9i9zkschZBGGch5J9mZaxJeMFt0BI5ORC37W-1SLK6pxoe-yRzI8Q8TEfwZQ22_WtyxjXm99MbZeCdg-y8mE7b_QQUaKPlbgL_o04r6Leyiq0bmk2HeKMG28-_48UrIoWsyV7pEDjbnTNf0bYruJoLW4OeHfiXXfdzOa6X7DBvWr4JKJcxPN-v8_yzcKXi2dq67gWALJTM8XJcD8SaBiBkVWUbnxFFbiiuShLUoRf6DceLl-wAUviznzjQvTc9IhWfz6kDMvNZ-gjRJ7R64iV6qZ_aHzYpo1lIyUiHp0aFKlWyAbiCdGg0zUCdXOnpzewjRxgZBupbC-8gEk6oubvmU5oODKIHejQqpVFZOMGiaOPJqCmou1LjWD9_KgXJTf4GvqiQERLhjIJDmp0rgidFpBh4opJvbEs1AwFgrstPdmkNZxSgxVP_jZMebcw9M9sRPErdXJOFqTrx0fz-x6qum2dozbGjtMTMxX0qyk9_WwQNP9rR8Zc-EVQFkULDXIJYJ7N2IrNvnxlv0ryhb4ro02V1fotQ_k_XhN91kJWmLZW8qpMRb8u-hY3dQSoWrVgkrWJuIPqqHMoWePwz9SIiMnOYDSNjokTeUAkPUTpxtezH3pAsaeTJucKq_9yYPmFbHfNn8_ZYTVmQfIjAJQbUyHp_zwlMdGUvHinUQCW3OXvSg9ihSxvhfygTN-TUf3joOc4AMvY23P9htk77Zld6wCajSiBbogVUHjnCI00lYYhs6s5ms9K5DkFE9W1R9trlPjJH4S8D0BoDR51dop-wH8ngAX5a_vg6XncVsDjimXUJpx5ROwtAd_bQabgdYLtcNYOg8ndzvVeM6Gt4otcgt6wpFeL1ZFHsYiibyMqeJMSTn7Us1_NwkOyVGPvW0x-KueDG0KKw01tG-68oXrTgGzD1sUN5ubFuqncxVDmUSgAOHJdxXRt2v9X4t679-DLvexWXzIN8R69P6ujIjJOVTPpv7cN6aueTfVuh3x65KUR_vqBxR2Si6HoB9KSOIUvcKZnQktf8ed7KFryb5UO2jCtBYLX1kXvtwnSMJG_5fOvlfQnQRxgt99AAc0U2WphmpZvX8sGVdX_sTHzreiWOj1h8YTL7EZLMSrdK324YbF-lWGhc0DKTCWLZMHDZcIvdZgpD82eHCaNu7B7W9uSy9sINNfuNCTJLxlDR8lbZEzO66hQi9fDfJyq8b08E8FNXJEBXqagIzLQKPvUe7yjg2Lb73wGpzUZnKtetzRTzSLvX68Meq3RxXY0DzBOjRfO9n-Kyw8pmBbhSQL6J9selZMBq7cZk-iZSB7CDSPUzF7o_g0QRr-d2DrOr5koBJgYi-LUHtuPgVOI8KeMwkqpk7zkH5RBmlkH2wp16H-qB2Na5PqixKae2-t3bTFE1OM9NizPBAjN8Cs4kDWBubig0aAMR-dp82rsGoTuzzwf8cxmfnEbipQ5xWTtgWXcc24gzb07v6w0nS7nKpAp-aZw24LDpJqFCA2yPrWZG68foBlErk7CO1HMbLzV4_uxYclVTRfK2gFSbBo4OXk2FeivmpJCnro2bd5Ft2q1f215XG-YMEwZCd9zFnD6vI94oYAwxMBkCk5WM-wlslnKp33J0AtSZo5FvZs1xZL5JS__3Ep994wqxANLFQI40CXumCR9fSnM48Yl378ZA-pWkBCWqgGa3Ium6zUOfRzKOcfRclD0Nrjcx7_LxQAXDrrpMu5eexxa1HfQP8FObqkCs52wJvrvri9LVK-3ER2a0dPgM-aUmsWs9mXu9QDjK682RHWCE_zO-YeOPtWl-_hm7UZXihiiwwqpoRLE62vVifMWc4Jkvoyzxupuc3z2wvMvhxvm3m42DI8k_mbk9DHeISaahAfwsHKAgtnbINhXCiTEcJ_nX565lUen6aUL8uBYur1dXYthBk_qc9cO1cihf1A8kqrI7igqOQtGtYFpDw2-Jd9R-gdxhRjxZ1PF4NE6LoObBRBObtxaQXOY-NJmnZrilC1upjtB2UiPClkZi8nznN-wWrSbdLIxrHnblrCvZwPdgxZNLwGBDNQEW04qauc3zczFHH6hCGil13uPoXN7DExnNX1qg_YXh4syD4pWPsR8TYLdEWSSoa3N41qfhMjPB3-4PzuNJX8rh-o5EFPBOjN9Nmq7zUwzxec3a4qLsrDU2wpWnccxEuXh4v1V4lXcgzltxKpGFVnTY3KjjVhnWr5g53cPS3gD-XtEE5CKsYDHN9l1VKQNEv5y611NBXU8tSOXHgkK6cmhVFkhPAOYrx_2YYswpveKTytYKvI15AnL6RCf0sL3bX-OhO_U0L0Yw0HFx6BstB7cGZvjjyGz7TPUoBp0QJWMQixV075D5SlmSkbw9aJjOmuCkdQSJNY37oEUid0HHJK0K_UHMVc-L9xaxMeK5_oUN2ZPWXuu3b6fphogRw65Cq5IMFoA-IJT4H9E1rGUMJJtHQP6OhKyDjAOLsSDgczrE33j29k_kk4ePAeqQjCrHUhGHHYIObrNYpn3LEoBFKGA2qyJxWvA99fT6kMH83054P2s7tNV3P_pV-yC6oAhBZQaFppUkxaQibjCcpGKxgEcvIsr2_tMiuq-i25giVj0UrkPofOq0sf49BfzjKXxHPSZB4Os_mx_W8cEqu5AKDXe-BZ2sKjBL7q-cqiw56d_7ZQmWFs8iPbE9JIWKcJfqFlGSA34xOxKslkLMKvhht-9CJ0J8jQ7pEvJfWgzw2Tg-7AMpKlG3u7UUJiGS-2cT-XKeItTyrLhKxCZw-hJBWGFjgdszzwz6C-d__syC7_vV1hvpd3GQT1W2yWVL8K0WqfAzQKEbiANwH3T9mZUR7Z0OQTr3PIvBZKGRblzQRN2H1Lzp2ohco-pkuNvYSZJoCg_Wrn54f8Fg3xloXsIk2lN3z8ZgKK72J0O8N3rlQDU3Plea5Izk8WNKeLikAWOQB4K1DbQdSB1ECnvgc_aIvMWANIoNKYu6mHj1CkehEBAQED_JrchINXvzZWeFVEuQpUI7s5eJTykvV5ttOf1hm0PAEBvq55Il4M1-Ug8NUfPrEqplbDM30rTzbyA0YZw7ivXisBAfiS-4SXHNNtrNk81KET9j2GSik-X8IgNX6OBGu0TM8BAQHG8uHwiVJUpu4arPBj0qC4abFcRZw4lYYtuKSjUfbYCAEF9vZXOwLQ-teGwARrB_JwGvtWHb4cmI9gkt2GxIrheiAFphPXM0du53UYJas7J2LyItu_6NwLiFXKv4yZNPojEjJC4sEt-gjl3yThCdryanjbg-0bwqjw9KPYm4bp1yocL9A069n4Iej_40bI07eyxVmYyK7ysu-R3yH8kFEiZDt4sQ1sLZfpEpl05rfCY4HrYvfDctTVR4flHR2wd9iIOQEBxn_E7SKNJ3MyrxzJWFuHUkmNskfZvz4o7AkiSRkV5AYBAWlET1MaZ8X0H7lE7bQuqGy4ojHEIULtJnJVbDe-jQgKAQEgpdUvB9UzzCPGFsLH2cHae3T7Mk4va8u5f_zlL3sDHQEBAY6IQyINARz4oOJpJtPQTWVuMjmAN2UvITlQ7LzE4VIhAQG1E-QPfnKj4X3Y6VFKYMUB4wNQm1jmluWRZolZ9vZbJgEBPKOdMMkU7Y5fXpzEnKkpnQ56oR35AW6gw3epHXNeLSQBAWa0yNzMeTBi4ek1m7U_b8Xd5VYB0mPKuH81wE3aplsnAQWIojU3K2HNYYlKZ_HM3TPHp2ejnfAztMBplxUv9pamFy6rFKvFWw3uDK-UMKjKIop4n9AsLkohw3ztjOhJvVIiOWvxTQT7y5x4TdttPCcXdzlHgWCYLxUc7OCnuUgkzT6jYHhNqTSDVXMslB-refVfi2yi4Sa9qk9h7vBgj3ZnIC_27fxyTEdQrajthxq4HW6qYcdM4lSubiq5roc5FicAAQGCz5DEcuN3LoeewgkRZeru1smAJ3s6uHXzOLwdveQrAgEBKx2kKJAm7zgU_yX7DnFZlboK3kAF-R-M1xVXyZ3OcAoBAbh2PMAGL2Dkmw1DoW0QYUFdPqTfedIHQYV9GX65v8E9",
+  "staged_ledger_diff": {
+    "diff": [
+      {
+        "completed_works": [],
+        "commands": [
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.2001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qrzWiSSrH4nWueurwbCqKQ5X7hhjy59gGvFiTv5unxLxc9mUU5s9",
+                    "nonce": "3",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Stake_delegation",
+                    [
+                      "Set_delegate",
+                      {
+                        "delegator": "B62qrzWiSSrH4nWueurwbCqKQ5X7hhjy59gGvFiTv5unxLxc9mUU5s9",
+                        "new_delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
+                      }
+                    ]
+                  ]
+                },
+                "signer": "B62qrzWiSSrH4nWueurwbCqKQ5X7hhjy59gGvFiTv5unxLxc9mUU5s9",
+                "signature": "7mXAfhjXaVtL8x1BXo2bo7pNGqXsYwDgovML1NzrnxmnGfgWoGWNKwmBhzfSL6B77KRLQW4QLC3e2iYYkBSMTPVo1YUqsRvi"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "1096311000000",
+                "source_balance": "1096311000000",
+                "receiver_balance": "1104686899999"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.03",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
+                    "nonce": "89226",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
+                      "receiver_pk": "B62qqWsjtcmLW9Pra8Uc9s1bCPwTgfDvNurBYKdfKEGkxuTDQotsppk",
+                      "token_id": "1",
+                      "amount": "6176891900"
+                    }
+                  ]
+                },
+                "signer": "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
+                "signature": "7mXEeFYu3pRX61tp5vxXVcQ3d2pacvZiDCwv5AW1XX9LovbUXYpBH26aN4z5hJHz3BL3peauRzFQXy821KwKhpbf21Y1wrAV"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "3155872154633274",
+                "source_balance": "3155872154633274",
+                "receiver_balance": "6176891900"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.03",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qpWaQoQoPL5AGta7Hz2DgJ9CJonpunjzCGTdw8KiCCD1hX8fNHuR",
+                    "nonce": "25485",
+                    "valid_until": "4294967295",
+                    "memo": "E4YVe5YCtgSZuaBo1RiwHFWqtPzV6Eur8xG6JnbzEigit5nZKobQG"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qpWaQoQoPL5AGta7Hz2DgJ9CJonpunjzCGTdw8KiCCD1hX8fNHuR",
+                      "receiver_pk": "B62qohugNjRmpX7jJ8dZrxxoHu5KFT9JZ7znhVsqLUBmjen2Qf5tJSP",
+                      "token_id": "1",
+                      "amount": "50049500000"
+                    }
+                  ]
+                },
+                "signer": "B62qpWaQoQoPL5AGta7Hz2DgJ9CJonpunjzCGTdw8KiCCD1hX8fNHuR",
+                "signature": "7mX4kRzP7nLAEjP2VW1NirTkjj4gKokWnMszHU9Jpcu9SWWcJCMY6U9YqFRaT8Cg4femWreq4xRMVZqs5tpfeiyBybbqi23g"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "24330142351474664",
+                "source_balance": "24330142351474664",
+                "receiver_balance": "250885313712"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.0101",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qqckAQCmsPMuLyfB1GEXw9uZViRtE7NQEqZKQQWdUqRwktR77p28",
+                    "nonce": "4",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Stake_delegation",
+                    [
+                      "Set_delegate",
+                      {
+                        "delegator": "B62qqckAQCmsPMuLyfB1GEXw9uZViRtE7NQEqZKQQWdUqRwktR77p28",
+                        "new_delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
+                      }
+                    ]
+                  ]
+                },
+                "signer": "B62qqckAQCmsPMuLyfB1GEXw9uZViRtE7NQEqZKQQWdUqRwktR77p28",
+                "signature": "7mXUhq1sMvyBmfcpTMTfzegyWm2jfQh4ZTh7fTscAyFnm7FWTk5PPM229MpQeAakeVFe42W8gdu4i6QnSKJSUKv9iDS59krZ"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "617175452060",
+                "source_balance": "617175452060",
+                "receiver_balance": "1104686899999"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.0075",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qoXQhp63oNsLSN9Dy7wcF3PzLmdBnnin2rTnNWLbpgF7diABciU6",
+                    "nonce": "25455",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qoXQhp63oNsLSN9Dy7wcF3PzLmdBnnin2rTnNWLbpgF7diABciU6",
+                      "receiver_pk": "B62qkiF5CTjeiuV1HSx4SpEytjiCptApsvmjiHHqkb1xpAgVuZTtR14",
+                      "token_id": "1",
+                      "amount": "87500000"
+                    }
+                  ]
+                },
+                "signer": "B62qoXQhp63oNsLSN9Dy7wcF3PzLmdBnnin2rTnNWLbpgF7diABciU6",
+                "signature": "7mXTS8zwCQ9yZgHoGj1iKmtRtxqVa3DwNJgum26xzopfj2rVa5uXh7ZRXpdAm8eYpBu51WXnfsCsXfnQN2NJ4b7XssHYE4NQ"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837604204485",
+                "source_balance": "36837604204485",
+                "receiver_balance": "121953438523713"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.006600001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qp69bsgUNySCY2wEYDCrRN3gdMB6cDSZGBucTzc9vUUH4jUoDSED",
+                    "nonce": "26366",
+                    "valid_until": "4294967295",
+                    "memo": "E4Yxu8shUhP1SMV5fUoGZb4sqEPREUCLErpYVJMQD1pY5iuocbibr"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qp69bsgUNySCY2wEYDCrRN3gdMB6cDSZGBucTzc9vUUH4jUoDSED",
+                      "receiver_pk": "B62qnJ3zFub6A17fbHzcixWZbV9a99qdeFfQnQwZABH37NtraiUR2gv",
+                      "token_id": "1",
+                      "amount": "88886110"
+                    }
+                  ]
+                },
+                "signer": "B62qp69bsgUNySCY2wEYDCrRN3gdMB6cDSZGBucTzc9vUUH4jUoDSED",
+                "signature": "7mXNtQCC6AdkVKP37ecBWc9gm6j8QNUXJVccjmFXYk3Dtm4KhQqmrPhziPQwzWyr2yLmrDPnwjPvMwusY2kDAxu5G2uVhNZf"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837599409070",
+                "source_balance": "36837599409070",
+                "receiver_balance": "731375341371"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.006500001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qnXy1f75qq8c6HS2Am88Gk6UyvTHK3iSYh4Hb3nD6DS2eS6wZ4or",
+                    "nonce": "26647",
+                    "valid_until": "4294967295",
+                    "memo": "E4Yxu8shUhP1SMV5fUoGZb4sqEPREUCLErpYVJMQD1pY5iuocbibr"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qnXy1f75qq8c6HS2Am88Gk6UyvTHK3iSYh4Hb3nD6DS2eS6wZ4or",
+                      "receiver_pk": "B62qqJ1AqK3YQmEEALdJeMw49438Sh6zuQ5cNWUYfCgRsPkduFE2uLU",
+                      "token_id": "1",
+                      "amount": "88986110"
+                    }
+                  ]
+                },
+                "signer": "B62qnXy1f75qq8c6HS2Am88Gk6UyvTHK3iSYh4Hb3nD6DS2eS6wZ4or",
+                "signature": "7mXNLtuFs2jDb8EKzcY1Gxe5Uk51HNKqTddnyAsLhpxiQc3L9yh92GT9aGhpoqc1XcMA8Yo6AtvuBGyEbpKkVN11B4SZe5py"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837630992394",
+                "source_balance": "36837630992394",
+                "receiver_balance": "497921202894"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.0065",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                    "nonce": "43160",
+                    "valid_until": "4294967295",
+                    "memo": "E4YvxPhU2fXZvSLeTBN7tZVrA2FmxyqWfxr6eXJfpdgQ4VLQuW7Ub"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                      "receiver_pk": "B62qjdk4R6rjtrJpWypvMcpNMdfyqgxHEAz88UnzbMK4TzELiGbhQ97",
+                      "token_id": "1",
+                      "amount": "50000000"
+                    }
+                  ]
+                },
+                "signer": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                "signature": "7mXJfdRDUcYDKPy2V2GoB53TEtVtH6vDkqPExkxHJeAQdjtg5ybiBGu6zehSWZzLe5uzhcNHMuKtDP1iHmdLnnBmf36mNhHf"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837682187779",
+                "source_balance": "36837682187779",
+                "receiver_balance": "2963606538225"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.0065",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                    "nonce": "43161",
+                    "valid_until": "4294967295",
+                    "memo": "E4YvxPhU2fXZvSLeTBN7tZVrA2FmxyqWfxr6eXJfpdgQ4VLQuW7Ub"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                      "receiver_pk": "B62qjdk4R6rjtrJpWypvMcpNMdfyqgxHEAz88UnzbMK4TzELiGbhQ97",
+                      "token_id": "1",
+                      "amount": "50000000"
+                    }
+                  ]
+                },
+                "signer": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                "signature": "7mXA9KszMDKFw4hTztrYfDvrrfiR9Xy5FWAkZDnJxCgoJPx3kuvtjt3TTiSc9rQ58gWZmcac2uheWiYoJSho63QFwr3sfUpy"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837625687779",
+                "source_balance": "36837625687779",
+                "receiver_balance": "2963656538225"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.0051",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qpLST3UC1rpVT6SHfB7wqW2iQgiopFAGfrcovPgLjgfpDUN2LLeg",
+                    "nonce": "25222",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qpLST3UC1rpVT6SHfB7wqW2iQgiopFAGfrcovPgLjgfpDUN2LLeg",
+                      "receiver_pk": "B62qkiF5CTjeiuV1HSx4SpEytjiCptApsvmjiHHqkb1xpAgVuZTtR14",
+                      "token_id": "1",
+                      "amount": "90000000"
+                    }
+                  ]
+                },
+                "signer": "B62qpLST3UC1rpVT6SHfB7wqW2iQgiopFAGfrcovPgLjgfpDUN2LLeg",
+                "signature": "7mXFMv3bjaqt8VAJxnnWet3L8UouJXYvygBa9DboVcJLXyjC4LnNSiuxo7kKUCSDx8PYwvUcRN6KgD4oxxJe6c5X8MHY6jm1"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837679708348",
+                "source_balance": "36837679708348",
+                "receiver_balance": "121953528523713"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.003",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                    "nonce": "30667",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                      "receiver_pk": "B62qoVxygiYzqRCj4taZDbRJGY6xLvuzoiLdY5CpGm7L9Tz5cj2Qr6i",
+                      "token_id": "1",
+                      "amount": "27800000"
+                    }
+                  ]
+                },
+                "signer": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                "signature": "7mXXexq4FqRxhueWwmgP2v8o4P6QAy9QyFToPfrqC5dScrX165aCmZ9NRXZyxHGoxg3HiwKDEentmHQVNrKs4biGKMffap2e"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837721841422",
+                "source_balance": "36837721841422",
+                "receiver_balance": "52087648843192"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.003",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                    "nonce": "30668",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                      "receiver_pk": "B62qoVxygiYzqRCj4taZDbRJGY6xLvuzoiLdY5CpGm7L9Tz5cj2Qr6i",
+                      "token_id": "1",
+                      "amount": "27800000"
+                    }
+                  ]
+                },
+                "signer": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                "signature": "7mXV1YCC4PvzpsQjUpeDnfvZGw5HYKbULL3WNNumEJGJd6qqKXpZMVzdEF1xMrzb6DdKZmWK6jjCpV257JoePQ4tWgLpgJSn"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837691041422",
+                "source_balance": "36837691041422",
+                "receiver_balance": "52087676643192"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.003",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                    "nonce": "30669",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                      "receiver_pk": "B62qoVxygiYzqRCj4taZDbRJGY6xLvuzoiLdY5CpGm7L9Tz5cj2Qr6i",
+                      "token_id": "1",
+                      "amount": "27800000"
+                    }
+                  ]
+                },
+                "signer": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                "signature": "7mXJL1UAyChtryeXtSH1qpqFwGBixw8ZNwkSXMEujmonm2AMjdeGY1oMsHr1KqHZCp6EPYRZ9jyoP2KieCJ8gUxAEDBqQ8Ny"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837660241422",
+                "source_balance": "36837660241422",
+                "receiver_balance": "52087704443192"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.003",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                    "nonce": "30670",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                      "receiver_pk": "B62qoVxygiYzqRCj4taZDbRJGY6xLvuzoiLdY5CpGm7L9Tz5cj2Qr6i",
+                      "token_id": "1",
+                      "amount": "27800000"
+                    }
+                  ]
+                },
+                "signer": "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
+                "signature": "7mXGbV7PjCQ5cUh5refD1Zg8uTuAWWqJ4Kpc2QSSiWtPS94iiuffzkfMq6ARtYCcyE8im5UAk64YizHFQYtZ7ZGi6LzL3eNK"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "36837629441422",
+                "source_balance": "36837629441422",
+                "receiver_balance": "52087732243192"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                    "nonce": "292757",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                      "token_id": "1",
+                      "amount": "1000"
+                    }
+                  ]
+                },
+                "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "signature": "7mXBsbJqZpDvjRUqecbKe9UAF9oBLqEqV4s5Nq3ANsFfZtGjaPrDoiCfmbYz3wCxJtASYybPmvBriMQagApykMS1b7sqeq2X"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "801308165921",
+                "source_balance": "801308165921",
+                "receiver_balance": "1006526858"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                    "nonce": "292758",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                      "token_id": "1",
+                      "amount": "1000"
+                    }
+                  ]
+                },
+                "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "signature": "7mX5zq3kHS3gVhH5wakstFvuzg56MFJz6thoQXjeD5Fh358usc5gm6azRNrTBGnHqhyLxPNfNfpoCTRzv1YQUnk8qEYMNt99"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "801307164921",
+                "source_balance": "801307164921",
+                "receiver_balance": "1006527858"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                    "nonce": "292759",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                      "token_id": "1",
+                      "amount": "1000"
+                    }
+                  ]
+                },
+                "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "signature": "7mXLSk7dFEzLb8EnwpinbfJCsLKqdvoKQAmH2M21ufGNFHLjcUPUC1f1SbAQj5QajEY45tSTrVda3mPcAbRnRV21sWYCjWzk"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "801306163921",
+                "source_balance": "801306163921",
+                "receiver_balance": "1006528858"
+              }
+            ]
+          },
+          {
+            "data": [
+              "Signed_command",
+              {
+                "payload": {
+                  "common": {
+                    "fee": "0.001",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                    "nonce": "292760",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                  },
+                  "body": [
+                    "Payment",
+                    {
+                      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                      "token_id": "1",
+                      "amount": "1000"
+                    }
+                  ]
+                },
+                "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "signature": "7mX66DreJ8wooieM3JQtKx7TJzz8JnTrTN7bLCowGa6GTiubGyYgVwfybzdMJTz2qgyuyon44Km6vz2dTHHz3WbVG95k8z5g"
+              }
+            ],
+            "status": [
+              "Applied",
+              {
+                "fee_payer_account_creation_fee_paid": null,
+                "receiver_account_creation_fee_paid": null,
+                "created_token": null
+              },
+              {
+                "fee_payer_balance": "801305162921",
+                "source_balance": "801305162921",
+                "receiver_balance": "1006529858"
+              }
+            ]
+          }
+        ],
+        "coinbase": [
+          "One",
+          null
+        ],
+        "internal_command_balances": [
+          [
+            "Coinbase",
+            {
+              "coinbase_receiver_balance": "25083722038458",
+              "fee_transfer_receiver_balance": null
+            }
+          ],
+          [
+            "Fee_transfer",
+            {
+              "receiver1_balance": "25084046938460",
+              "receiver2_balance": null
+            }
+          ]
+        ]
+      },
+      null
+    ]
+  },
+  "delta_transition_chain_proof": [
+    "jxUdbwtnNLRWGmjTUGDMsk1zDKJDdVwKKxCK923hcqRKgetrm5W",
+    []
+  ]
+}

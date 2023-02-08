@@ -1,0 +1,41 @@
+{
+    "data": [
+        "Signed_command",
+        {
+            "payload": {
+                "common": {
+                    "fee": "0.01",
+                    "fee_token": "1",
+                    "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                    "nonce": "12645",
+                    "valid_until": "4294967295",
+                    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                },
+                "body": [
+                    "Payment",
+                    {
+                        "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                        "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                        "token_id": "1",
+                        "amount": "1000"
+                    }
+                ]
+            },
+            "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+            "signature": "7mX59RJnJWgXTJGifvXnnNVR7tJsvtTpFxAU5YJPhiA7VfrV6H7gWFvHSMZzHk8gxfqPFAXwWj8AN1gXP7fLETAcKuZEDCgk"
+        }
+    ],
+    "status": [
+        "Applied",
+        {
+            "fee_payer_account_creation_fee_paid": null,
+            "receiver_account_creation_fee_paid": null,
+            "created_token": null
+        },
+        {
+            "fee_payer_balance": "1312367371000",
+            "source_balance": "1312367371000",
+            "receiver_balance": "23040757729000"
+        }
+    ]
+}
