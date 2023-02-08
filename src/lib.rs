@@ -3,6 +3,7 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 pub mod block_stream;
+pub mod blocks;
 pub mod constants;
 pub mod queries;
 pub mod subchain;
