@@ -39,7 +39,7 @@
           rust-analyzer
           rnix-lsp
           nixpkgs-fmt
-        ] ++ dependencies;
+        ] ++ buildDependencies;
 
         cargo-toml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
       in
