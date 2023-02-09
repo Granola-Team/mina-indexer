@@ -32,7 +32,7 @@
 
         buildDependencies = with pkgs; [
           pkg-config
-        ] ++ runtimeDependencies;
+        ] ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ] ++ runtimeDependencies;
 
         devDependencies = with pkgs; [
           rust
