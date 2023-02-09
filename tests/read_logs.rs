@@ -26,7 +26,7 @@ async fn test_block_deserialization() {
         let value = mina_indexer::blocks::read_block_log(&Path::new(&entry_path))
             .await
             .expect("block log deserializes from JSON");
-        
+
         dbg!(&value["protocol_state"]["previous_state_hash"]);
     }
 }
@@ -41,5 +41,4 @@ async fn test_logs_processor() {
     while let Some(block_log) = logs_processor.next_log().await.expect("no errors produced") {
         dbg!(block_log.log_name, logs_processor.logs_processed);
     }
-
 }
