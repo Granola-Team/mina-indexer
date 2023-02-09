@@ -25,18 +25,45 @@
           cargo = rust;
           rustc = rust;
         };
+
+        runtimeDependencies = with pkgs; [
+          openssl
+        ];
+
+        buildDependencies = with pkgs; [
+          pkg-config
+        ] ++ runtimeDependencies;
+
+        devDependencies = with pkgs; [
+          rust
+          rust-analyzer
+          rnix-lsp
+          nixpkgs-fmt
+        ] ++ dependencies;
+
+        cargo-toml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
       in
       with pkgs;
       {
-        devShells.default = mkShell {
-          buildInputs = [
-            rust rust-analyzer
-            rnix-lsp
-            nixpkgs-fmt
-            openssl
-            pkg-config
-          ];
+        packages = flake-utils.lib.flattenTree rec {
+          mina-indexer = rustPlatform.buildRustPackage rec {
+            pname = cargo-toml.package.name;
+            version = cargo-toml.package.version;
 
+            src = ./.;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
+
+            nativeBuildInputs = buildDependencies;
+            buildInputs = runtimeDependencies;
+          };
+
+          default = mina-indexer;
+        };
+
+        devShells.default = mkShell {
+          buildInputs = devDependencies;
           shellHook = ''
           '';
         };
