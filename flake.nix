@@ -21,6 +21,10 @@
 
         rust = pkgs.rust-bin.fromRustupToolchainFile ./toolchain.toml;
 
+        buildInputs = with pkgs; runtimeDependencies
+                                 ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ]
+                                 ++ lib.optionals stdenv.isLinux [];
+
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rust;
           rustc = rust;
@@ -32,7 +36,7 @@
 
         buildDependencies = with pkgs; [
           pkg-config
-        ] ++ runtimeDependencies;
+        ] ++ buildInputs;
 
         devDependencies = with pkgs; [
           rust
