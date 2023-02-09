@@ -4,7 +4,7 @@ use mina_indexer::blocks::LogsProcessor;
 
 #[tokio::test]
 async fn test_block_deserialization() {
-    let block_logs_prefix = "./tests/data/logs_raw";
+    let block_logs_prefix = "./tests/data/block_logs";
     let mut blocks_dir = tokio::fs::read_dir(block_logs_prefix)
         .await
         .expect("testing logs dir exists");
@@ -33,7 +33,7 @@ async fn test_block_deserialization() {
 
 #[tokio::test]
 async fn test_logs_processor() {
-    let block_logs_prefix = "./tests/data/logs_raw";
+    let block_logs_prefix = "./tests/data/block_logs";
     let mut logs_processor = LogsProcessor::new(block_logs_prefix)
         .await
         .expect("logs processor initializes successfully");
