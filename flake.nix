@@ -12,7 +12,7 @@
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, flake-compat, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "x86_64-windows" ] (system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
@@ -25,18 +25,45 @@
           cargo = rust;
           rustc = rust;
         };
+
+        runtimeDependencies = with pkgs; [
+          openssl
+        ];
+
+        buildDependencies = with pkgs; [
+          pkg-config
+        ] ++ runtimeDependencies;
+
+        devDependencies = with pkgs; [
+          rust
+          rust-analyzer
+          rnix-lsp
+          nixpkgs-fmt
+        ] ++ dependencies;
+
+        cargo-toml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
       in
       with pkgs;
       {
-        devShells.default = mkShell {
-          buildInputs = [
-            rust rust-analyzer
-            rnix-lsp
-            nixpkgs-fmt
-            openssl
-            pkg-config
-          ];
+        packages = flake-utils.lib.flattenTree rec {
+          mina-indexer = rustPlatform.buildRustPackage rec {
+            pname = cargo-toml.package.name;
+            version = cargo-toml.package.version;
 
+            src = ./.;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
+
+            nativeBuildInputs = buildDependencies;
+            buildInputs = runtimeDependencies;
+          };
+
+          default = mina-indexer;
+        };
+
+        devShells.default = mkShell {
+          buildInputs = devDependencies;
           shellHook = ''
           '';
         };
