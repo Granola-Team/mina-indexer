@@ -31,7 +31,7 @@ impl AccountUpdate {
 }
 
 impl Account {
-    pub fn new_empty(public_key: String) -> Self {
+    pub fn empty(public_key: String) -> Self {
         Account {
             public_key,
             balance: 0,
@@ -53,6 +53,7 @@ impl Account {
     }
 }
 
+#[derive(Default)]
 pub struct Ledger {
     accounts: HashMap<PublicKey, Account>,
 }
@@ -128,7 +129,7 @@ impl LedgerDiff {
         accounts_created.append(
             &mut vec![block_stake_winner, block_creator, coinbase_receiver.clone()]
                 .into_iter()
-                .map(|public_key| Account::new_empty(public_key))
+                .map(|public_key| Account::empty(public_key))
                 .collect(),
         );
 
