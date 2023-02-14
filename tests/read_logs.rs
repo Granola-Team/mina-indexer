@@ -1,44 +1,13 @@
-use std::path::Path;
-
-use mina_indexer::blocks::LogsProcessor;
+use mina_indexer::block_log::{reader::{filesystem_json::FilesystemJSONReader, BlockLogReader}};
 
 #[tokio::test]
-async fn test_block_deserialization() {
-    let block_logs_prefix = "./tests/data/block_logs";
-    let mut blocks_dir = tokio::fs::read_dir(block_logs_prefix)
-        .await
-        .expect("testing logs dir exists");
-    while let Some(entry) = blocks_dir
-        .next_entry()
-        .await
-        .expect("reading logs dir shouldn't cause IO error")
-    {
-        let entry_type = entry.file_type().await.expect("entry has a file type");
-        assert!(entry_type.is_file());
-        let entry_name = entry
-            .file_name()
-            .to_str()
-            .expect("file name exists")
-            .to_string();
-        let entry_path = format!("{}/{}", block_logs_prefix, entry_name);
-        println!("attempting to parse block log at {:?}", entry_path);
+async fn block_logs_parse_correctly() {
+    let logs_dir = "./tests/data/block_logs";
+    let mut logs_reader = FilesystemJSONReader::new(logs_dir)
+        .await.expect("io error on new block log reader");
 
-        let value = mina_indexer::blocks::read_block_log(&Path::new(&entry_path))
-            .await
-            .expect("block log deserializes from JSON");
-
-        dbg!(&value["protocol_state"]["previous_state_hash"]);
-    }
-}
-
-#[tokio::test]
-async fn test_logs_processor() {
-    let block_logs_prefix = "./tests/data/block_logs";
-    let mut logs_processor = LogsProcessor::new(block_logs_prefix)
-        .await
-        .expect("logs processor initializes successfully");
-
-    while let Some(block_log) = logs_processor.next_log().await.expect("no errors produced") {
-        dbg!(block_log.log_name, logs_processor.logs_processed);
+    while let Some(block_log) = logs_reader.next_log()
+        .await.expect("io error on next_log()") {
+        dbg!(block_log.state_hash);
     }
 }
