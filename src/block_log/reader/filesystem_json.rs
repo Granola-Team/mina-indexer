@@ -11,7 +11,7 @@ pub enum LogError {
 
 pub struct FilesystemJSONReader {
     dir_handle: ReadDir,
-    pub logs_processed: u128,
+    pub logs_processed: u64,
 }
 
 impl FilesystemJSONReader {
