@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde_json::Value;
+use std::path::PathBuf;
 use tokio::fs::{File, ReadDir};
 use tokio::io::AsyncReadExt;
 
@@ -49,10 +49,10 @@ impl FilesystemJSONReader {
                     continue;
                 }
 
-                if let (Some(log_name), Some(extension)) = 
-                    ( fragments.get(0).map(|str| str.to_owned())
-                    , fragments.get(1).map(|str| str.to_owned()))
-                {
+                if let (Some(log_name), Some(extension)) = (
+                    fragments.get(0).map(|str| str.to_owned()),
+                    fragments.get(1).map(|str| str.to_owned()),
+                ) {
                     if extension != "json" {
                         continue;
                     }
@@ -74,8 +74,8 @@ impl FilesystemJSONReader {
 
     pub async fn read_block_log(log_path: PathBuf) -> Result<Value, LogError> {
         let mut log_file = File::open(log_path)
-        .await
-        .map_err(|err| LogError::IOError(err))?;
+            .await
+            .map_err(|err| LogError::IOError(err))?;
         let mut contents = Vec::new();
 
         log_file
