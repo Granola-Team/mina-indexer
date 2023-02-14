@@ -4,22 +4,7 @@ version = "0.1.1"
 edition = "2021"
 
 [[bin]]
-name = "block-listener"
-test = false
-bench = false
-
-[[bin]]
-name = "block-example-generator"
-test = false
-bench = false
-
-[[bin]]
-name = "subchain-indexer"
-test = false
-bench = false
-
-[[bin]]
-name = "graph-visualizer"
+name = "mina-indexer"
 test = false
 bench = false
 
@@ -27,16 +12,12 @@ bench = false
 
 [dependencies]
 async_executors = { version = "0.6.0", features = ["tokio_tp"] }
-async-tungstenite = { version = "0.19.0", features = ["tokio-native-tls"] }
-cynic = { version = "2.2.4" }
+async-trait = "0.1.64"
 env_logger = "0.10.0"
 futures = "0.3.26"
 futures-util = "0.3.26"
-graphql-ws-client = { version = "0.3.0", default-features = false, features = ["client-cynic"] }
-json = "0.12.4"
 log = "0.4.17"
 native-tls = "0.2.11"
-petgraph = "0.6.2"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 serde_json = {version = "1.0.92", features = [ "raw_value" ] }
