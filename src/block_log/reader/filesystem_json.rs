@@ -1,11 +1,14 @@
 use serde_json::Value;
 use std::path::PathBuf;
+use thiserror::Error;
 use tokio::fs::{File, ReadDir};
 use tokio::io::AsyncReadExt;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum LogError {
+    #[error("I/O Error: {0}")]
     IOError(std::io::Error),
+    #[error("JSON Error: {0}")]
     JSONError(serde_json::Error),
 }
 
