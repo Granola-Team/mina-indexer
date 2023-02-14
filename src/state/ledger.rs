@@ -11,7 +11,7 @@ pub struct Account {
 }
 
 pub struct AccountUpdate {
-    from: Option<PublicKey>, // need to change to Option<PublicKey> as block rewards are not paid from an account
+    from: Option<PublicKey>,
     to: PublicKey,
     amount: u64,
 }
