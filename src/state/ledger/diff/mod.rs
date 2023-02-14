@@ -1,100 +1,14 @@
-use std::collections::HashMap;
-
 use crate::block_log::BlockLog;
 
-pub type PublicKey = String;
+use account::AccountDiff;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Account {
-    public_key: String,
-    balance: u64,
-}
+use super::{account::Account, transaction::Transaction};
 
-pub struct AccountUpdate {
-    from: Option<PublicKey>,
-    to: PublicKey,
-    amount: u64,
-}
-
-impl AccountUpdate {
-    pub fn from_coinbase(coinbase_receiver: PublicKey, supercharge_coinbase: bool) -> Self {
-        let amount = match supercharge_coinbase {
-            true => 1440,
-            false => 720,
-        } * (1e9 as u64);
-        AccountUpdate {
-            from: None,
-            to: coinbase_receiver,
-            amount,
-        }
-    }
-}
-
-impl Account {
-    pub fn empty(public_key: String) -> Self {
-        Account {
-            public_key,
-            balance: 0,
-        }
-    }
-
-    pub fn from_deduction(pre: Self, amount: u64) -> Self {
-        Account {
-            public_key: pre.public_key.clone(),
-            balance: pre.balance - amount,
-        }
-    }
-
-    pub fn from_deposit(pre: Self, amount: u64) -> Self {
-        Account {
-            public_key: pre.public_key.clone(),
-            balance: pre.balance + amount,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct Ledger {
-    accounts: HashMap<PublicKey, Account>,
-}
-
-impl Ledger {
-    pub fn new() -> Self {
-        Ledger {
-            accounts: HashMap::new(),
-        }
-    }
-
-    // should this be a mutable update or immutable?
-    pub fn apply_diff(&mut self, diff: LedgerDiff) -> bool {
-        diff.accounts_created.into_iter().for_each(|account| {
-            if let None = self.accounts.get(&account.public_key) {
-                self.accounts.insert(account.public_key.clone(), account);
-            }
-        });
-
-        let mut success = true; // change this to a Result<(), CustomError> so we can know exactly where this failed
-        diff.account_updates.into_iter().for_each(|update| {
-            if let Some(to_pre) = self.accounts.remove(&update.to) {
-                if let Some(from) = update.from {
-                    if let Some(from_pre) = self.accounts.remove(&from) {
-                        let from_post = Account::from_deduction(from_pre, update.amount);
-                        self.accounts.insert(from, from_post);
-                    }
-                }
-                let to_post = Account::from_deposit(to_pre, update.amount);
-                self.accounts.insert(update.to, to_post);
-            } else {
-                success = false;
-            }
-        });
-        success
-    }
-}
+pub mod account;
 
 pub struct LedgerDiff {
-    accounts_created: Vec<Account>,
-    account_updates: Vec<AccountUpdate>,
+    pub accounts_created: Vec<Account>,
+    pub account_updates: Vec<AccountDiff>,
 }
 
 impl LedgerDiff {
@@ -124,7 +38,7 @@ impl LedgerDiff {
         let supercharge_coinbase = consensus_state.get("supercharge_coinbase")?.as_bool()?;
 
         let coinbase_update =
-            AccountUpdate::from_coinbase(coinbase_receiver.clone(), supercharge_coinbase);
+            AccountDiff::from_coinbase(coinbase_receiver.clone(), supercharge_coinbase);
 
         accounts_created.append(
             &mut vec![block_stake_winner, block_creator, coinbase_receiver.clone()]
@@ -145,7 +59,7 @@ impl LedgerDiff {
             .get("commands")?
             .as_array()?;
 
-        let mut account_updates_fees: Vec<AccountUpdate> = commands
+        let mut account_updates_fees: Vec<AccountDiff> = commands
             .iter()
             .map(|command| {
                 let payload_common = command
@@ -163,16 +77,24 @@ impl LedgerDiff {
 
                 let fee_payer = payload_common.get("fee_payer_pk")?.as_str()?.to_string();
 
-                Some(AccountUpdate {
-                    from: Some(fee_payer),
-                    to: coinbase_receiver.clone(),
-                    amount: fee,
-                })
+                Some(vec![
+                    AccountDiff {
+                        public_key: fee_payer,
+                        amount: fee,
+                        update_type: account::UpdateType::Deduction,
+                    },
+                    AccountDiff {
+                        public_key: coinbase_receiver.clone(),
+                        amount: fee,
+                        update_type: account::UpdateType::Deposit,
+                    },
+                ])
             })
             .flatten() // filter out None results
+            .flatten()
             .collect();
 
-        let mut account_udpates_payments: Vec<AccountUpdate> = commands
+        let mut account_udpates_payments: Vec<AccountDiff> = commands
             .iter()
             .map(|command| {
                 let payload_body = command
@@ -194,12 +116,15 @@ impl LedgerDiff {
 
                 let amount = payload_body.get("amount")?.as_u64()?;
 
-                Some(AccountUpdate {
-                    from: Some(source_pk),
-                    to: receiver_pk,
+                let transaction = Transaction {
+                    source: source_pk,
+                    receiver: receiver_pk,
                     amount,
-                })
+                };
+
+                Some(AccountDiff::from_transaction(transaction))
             })
+            .flatten()
             .flatten()
             .collect();
 
