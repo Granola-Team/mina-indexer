@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 use crate::state::ledger::{transaction::Transaction, PublicKey};
 
 
@@ -38,5 +40,40 @@ impl AccountDiff {
             amount,
             update_type: UpdateType::Deposit,
         }
+    }
+
+    pub fn from_commands_fees(coinbase_receiver: PublicKey, commands: &[Value]) -> Vec<AccountDiff> {
+        commands.iter()
+            .map(|command| {
+                let payload_common = command
+                    .as_object()?
+                    .get("data")?
+                    .as_array()?
+                    .get(1)?
+                    .as_object()?
+                    .get("payload")?
+                    .as_object()?
+                    .get("common")?
+                    .as_object()?;
+
+                    let fee = (payload_common.get("fee")?.as_f64()? * 1000000000.0) as u64;
+                    let fee_payer = payload_common.get("fee_payer_pk")?.as_str()?.to_string();
+
+                    Some(vec![
+                        AccountDiff {
+                            public_key: fee_payer,
+                            amount: fee,
+                            update_type: crate::state::ledger::diff::account::UpdateType::Deduction,
+                        },
+                        AccountDiff {
+                            public_key: coinbase_receiver.clone(),
+                            amount: fee,
+                            update_type: crate::state::ledger::diff::account::UpdateType::Deposit,
+                        },
+                    ])
+            })
+            .flatten()
+            .flatten()
+            .collect()
     }
 }

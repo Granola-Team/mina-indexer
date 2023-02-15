@@ -3,6 +3,7 @@ use std::collections::HashMap;
 pub type PublicKey = String;
 
 pub mod account;
+pub mod coinbase;
 pub mod diff;
 pub mod transaction;
 
