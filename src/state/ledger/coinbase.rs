@@ -1,11 +1,11 @@
 use crate::block_log::BlockLog;
 
-use super::{PublicKey, diff::account::AccountDiff};
+use super::{diff::account::AccountDiff, PublicKey};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Coinbase {
     pub receiver: PublicKey,
-    supercharge: bool
+    supercharge: bool,
 }
 
 impl Coinbase {
@@ -27,7 +27,10 @@ impl Coinbase {
 
         let supercharge = consensus_state.get("supercharge_coinbase")?.as_bool()?;
 
-        Some(Coinbase { receiver, supercharge })
+        Some(Coinbase {
+            receiver,
+            supercharge,
+        })
     }
 
     pub fn as_account_diff(self) -> AccountDiff {

@@ -2,12 +2,14 @@ use serde_json::Value;
 
 use crate::state::ledger::{transaction::Transaction, PublicKey};
 
-
+// add delegations later
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UpdateType {
     Deposit,
     Deduction,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct AccountDiff {
     pub public_key: String,
     pub amount: u64,
@@ -42,8 +44,12 @@ impl AccountDiff {
         }
     }
 
-    pub fn from_commands_fees(coinbase_receiver: PublicKey, commands: &[Value]) -> Vec<AccountDiff> {
-        commands.iter()
+    pub fn from_commands_fees(
+        coinbase_receiver: PublicKey,
+        commands: &[Value],
+    ) -> Vec<AccountDiff> {
+        commands
+            .iter()
             .map(|command| {
                 let payload_common = command
                     .as_object()?
@@ -56,21 +62,21 @@ impl AccountDiff {
                     .get("common")?
                     .as_object()?;
 
-                    let fee = (payload_common.get("fee")?.as_f64()? * 1000000000.0) as u64;
-                    let fee_payer = payload_common.get("fee_payer_pk")?.as_str()?.to_string();
+                let fee = (payload_common.get("fee")?.as_f64()? * 1000000000.0) as u64;
+                let fee_payer = payload_common.get("fee_payer_pk")?.as_str()?.to_string();
 
-                    Some(vec![
-                        AccountDiff {
-                            public_key: fee_payer,
-                            amount: fee,
-                            update_type: crate::state::ledger::diff::account::UpdateType::Deduction,
-                        },
-                        AccountDiff {
-                            public_key: coinbase_receiver.clone(),
-                            amount: fee,
-                            update_type: crate::state::ledger::diff::account::UpdateType::Deposit,
-                        },
-                    ])
+                Some(vec![
+                    AccountDiff {
+                        public_key: fee_payer,
+                        amount: fee,
+                        update_type: crate::state::ledger::diff::account::UpdateType::Deduction,
+                    },
+                    AccountDiff {
+                        public_key: coinbase_receiver.clone(),
+                        amount: fee,
+                        update_type: crate::state::ledger::diff::account::UpdateType::Deposit,
+                    },
+                ])
             })
             .flatten()
             .flatten()

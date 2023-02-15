@@ -1,4 +1,4 @@
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 
 use crate::state::ledger::PublicKey;
 
@@ -9,7 +9,7 @@ pub struct BlockLog {
     pub json: Value,
 }
 
-fn get_consensus_state(block_log: &BlockLog) -> Option<Map<String,Value>> {
+fn get_consensus_state(block_log: &BlockLog) -> Option<Map<String, Value>> {
     block_log
         .json
         .as_object()?
@@ -18,30 +18,29 @@ fn get_consensus_state(block_log: &BlockLog) -> Option<Map<String,Value>> {
         .get("body")?
         .as_object()?
         .get("consensus_state")?
-        .as_object().cloned()
+        .as_object()
+        .cloned()
 }
 
-fn get_block_creator(consensus_state: &Map<String,Value>) -> Option<PublicKey> {
-    Some(consensus_state
-        .get("block_creator")?
-        .as_str()?
-        .to_string()
+fn get_block_creator(consensus_state: &Map<String, Value>) -> Option<PublicKey> {
+    Some(consensus_state.get("block_creator")?.as_str()?.to_string())
+}
+
+fn get_block_stake_winner(consensus_state: &Map<String, Value>) -> Option<PublicKey> {
+    Some(
+        consensus_state
+            .get("block_stake_winner")?
+            .as_str()?
+            .to_string(),
     )
 }
 
-fn get_block_stake_winner(consensus_state: &Map<String,Value>) -> Option<PublicKey> {
-    Some(consensus_state
-        .get("block_stake_winner")?
-        .as_str()?
-        .to_string()
-    )
-}
-
-fn get_coinbase_receiver(consensus_state: &Map<String,Value>) -> Option<PublicKey> {
-    Some(consensus_state
-        .get("coinbase_receiver")?
-        .as_str()?
-        .to_string()
+fn get_coinbase_receiver(consensus_state: &Map<String, Value>) -> Option<PublicKey> {
+    Some(
+        consensus_state
+            .get("coinbase_receiver")?
+            .as_str()?
+            .to_string(),
     )
 }
 
@@ -72,9 +71,10 @@ pub fn public_keys_seen(block_log: &BlockLog) -> Vec<PublicKey> {
             public_keys.push(coinbase_receiver);
         }
     }
-    
+
     if let Some(commands) = get_block_commands(&block_log) {
-        commands.iter()
+        commands
+            .iter()
             .map(|command| {
                 let payload_body = command
                     .as_object()?
@@ -89,12 +89,10 @@ pub fn public_keys_seen(block_log: &BlockLog) -> Vec<PublicKey> {
                     .get(1)?
                     .as_object()?;
 
-
                 let source_pk = payload_body.get("source_pk")?.as_str()?.to_string();
                 let receiver_pk = payload_body.get("receiver_pk")?.as_str()?.to_string();
-                
-                Some(vec![source_pk, receiver_pk])
 
+                Some(vec![source_pk, receiver_pk])
             })
             .flatten()
             .flatten()

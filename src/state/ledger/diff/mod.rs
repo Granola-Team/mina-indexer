@@ -1,8 +1,8 @@
-use crate::block_log::{BlockLog, public_keys_seen, get_block_commands};
+use crate::block_log::{get_block_commands, public_keys_seen, BlockLog};
 
 use account::AccountDiff;
 
-use super::{account::Account, transaction::Transaction, coinbase::Coinbase};
+use super::{account::Account, coinbase::Coinbase, transaction::Transaction};
 
 pub mod account;
 
@@ -14,33 +14,35 @@ pub struct LedgerDiff {
 impl LedgerDiff {
     /// the deserialization used by the types used by this function has a lot of room for improvement
     pub fn fom_block_log(block_log: BlockLog) -> Option<Self> {
+        // [A] fallible deserialization function doesn't specify if it fails because it couldn't read a block or because there weren't any of the requested data in a block
         let coinbase = Coinbase::from_block_log(&block_log)?;
         let coinbase_update = coinbase.clone().as_account_diff();
 
-        let commands = get_block_commands(&block_log)?;
+        let commands = get_block_commands(&block_log)?; // [A]
 
-        let transactions = Transaction::from_commands(&commands);
-        let mut account_updates_fees: Vec<AccountDiff> = AccountDiff::from_commands_fees(coinbase.receiver.clone(), &commands);
-        let mut account_updates_transactions = transactions
+        let transactions = Transaction::from_commands(&commands); // [A]
+        let mut account_diffs_fees: Vec<AccountDiff> =
+            AccountDiff::from_commands_fees(coinbase.receiver.clone(), &commands); // [A]
+        let mut account_diffs_transactions = transactions
             .iter()
             .cloned()
             .map(|transaction| AccountDiff::from_transaction(transaction))
             .flatten()
             .collect();
 
-        let mut account_updates = Vec::new();
-        account_updates.append(&mut account_updates_fees);
-        account_updates.append(&mut account_updates_transactions);
-        account_updates.push(coinbase_update);
+        let mut account_diffs = Vec::new();
+        account_diffs.append(&mut account_diffs_fees);
+        account_diffs.append(&mut account_diffs_transactions);
+        account_diffs.push(coinbase_update);
 
-        let accounts_created = public_keys_seen(&block_log)
+        let accounts_created = public_keys_seen(&block_log) // [A]
             .into_iter()
             .map(|public_key| Account::empty(public_key))
             .collect();
 
         Some(LedgerDiff {
             accounts_created,
-            account_updates,
+            account_updates: account_diffs,
         })
     }
 
