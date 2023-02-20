@@ -83,13 +83,13 @@ enum AccountCommand {
 enum LedgerCommand {
     /// TODO Staking ledger data
     Staking {},
-    
+
     /// TODO Stage ledger data
     Staged {},
-    
+
     /// TODO Snarked legder data
     Snarked {},
-    
+
     /// TODO Next epoch ledger data
     NextEpoch {},
 }
@@ -139,7 +139,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 // TODO check not already running
                 println!("Starting mina-indexer with logs dir {:?}", logs_dir);
             }
-            IndexerCommand::Dump { command} => {
+            IndexerCommand::Dump { command } => {
                 println!("=== Dump ===");
                 if let Some(cmd) = command {
                     println!("{:?}", cmd);
@@ -159,7 +159,6 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(cmd) = command {
                     println!("{:?}", cmd);
                 }
-
             }
             IndexerCommand::Voting { command } => {
                 println!("=== Voting ===");
