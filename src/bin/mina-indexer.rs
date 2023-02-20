@@ -137,27 +137,27 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             IndexerCommand::Run { logs_dir } => {
                 println!("=== Run ===");
                 // TODO check not already running
-                println!("Starting mina-indexer with logs dir {:?}", logs_dir);
+                println!("Starting mina-indexer with logs dir {logs_dir:?}");
             }
             IndexerCommand::Dump { command } => {
                 println!("=== Dump ===");
                 if let Some(cmd) = command {
-                    println!("{:?}", cmd);
+                    println!("{cmd:?}");
                 }
             }
             IndexerCommand::Account { command } => {
                 println!("=== Account ===");
                 if let Some(AccountCommand::Balance { pub_key }) = command {
-                    println!("Balance for {:?}", pub_key);
+                    println!("Balance for {pub_key:?}");
                 } else if let Some(AccountCommand::Delegation { pub_key }) = command {
-                    println!("Delegation for {:?}", pub_key);
+                    println!("Delegation for {pub_key:?}");
                     // TODO get delegation from indexer state
                 }
             }
             IndexerCommand::Ledger { command } => {
                 println!("=== Ledger ===");
                 if let Some(cmd) = command {
-                    println!("{:?}", cmd);
+                    println!("{cmd:?}");
                 }
             }
             IndexerCommand::Voting { command } => {
@@ -165,10 +165,10 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(cmd) = command {
                     match cmd {
                         VotingCommand::Result { mips } => {
-                            println!("Result of mip {:?}", mips);
+                            println!("Result of mip {mips:?}");
                         }
                         cmd => {
-                            println!("{:?}", cmd);
+                            println!("{cmd:?}");
                         }
                     }
                 }
@@ -176,7 +176,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             IndexerCommand::Config { logs_dir } => {
                 println!("=== Config ===");
                 if let Some(logs) = logs_dir {
-                    println!("Logs dir {:?}", logs);
+                    println!("Logs dir {logs:?}");
                 }
             }
             IndexerCommand::Status {} => {

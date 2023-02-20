@@ -25,7 +25,7 @@ impl Ledger {
     // should this be a mutable update or immutable?
     pub fn apply_diff(&mut self, diff: LedgerDiff) -> bool {
         diff.accounts_created.into_iter().for_each(|account| {
-            if let None = self.accounts.get(&account.public_key) {
+            if self.accounts.get(&account.public_key).is_none() {
                 self.accounts.insert(account.public_key.clone(), account);
             }
         });
