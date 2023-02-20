@@ -4,11 +4,10 @@ use clap::{Parser, Subcommand};
 use mina_indexer::state::ledger::PublicKey;
 
 // TODO autocomplete args
-// TODO default args
-// TODO config file
 
 #[derive(Parser, Debug)]
-#[command(name = "mina-indexer", author, version, about, long_about = None)]
+#[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
+Efficiently index and query the Mina blockchain"))]
 struct Cli {
     /// Supply a command
     #[command(subcommand)]
@@ -17,75 +16,50 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum IndexerCommand {
+    /// Run the indexer
+    Run {
+        /// Start indexing logs from <PATH>
+        #[arg(short, long, value_name = "PATH")]
+        logs_dir: PathBuf,
+    },
+
     /// Query account data
     Account {
-        /// Account-related commands
+        /// Account commands
         #[command(subcommand)]
         command: Option<AccountCommand>,
     },
 
-    /// Query block data
-    Block {
-        /// Block-related commands
-        #[command(subcommand)]
-        command: Option<BlockCommand>,
-    },
-
-    /// Query chain data
-    Chain {
-        /// Chain-related commands
-        #[command(subcommand)]
-        command: Option<ChainCommand>,
-    },
-
-    /// Query consensus data
-    Consensus {
-        /// Consensus-related commands
-        #[command(subcommand)]
-        command: Option<ConsensusCommand>,
-    },
-
     /// Query ledger data
     Ledger {
-        /// Ledger-related commands
+        /// Ledger commands
         #[command(subcommand)]
         command: Option<LedgerCommand>,
     },
 
-    /// Query zkapp data
-    Zkapp {
-        /// Zkapp-related commands
-        #[command(subcommand)]
-        command: Option<ZkappCommand>,
-    },
-
     /// Query voting data
     Voting {
-        /// Voting-related commands
+        /// Voting commands
         #[command(subcommand)]
         command: Option<VotingCommand>,
+    },
+
+    /// Dump the current store
+    Dump {
+        /// Dump commands
+        #[command(subcommand)]
+        command: Option<DumpCommand>,
     },
 
     /// Configuration settings
     Config {
         /// Set logs directory
         #[arg(short, long, value_name = "PATH")]
-        log_dir: Option<PathBuf>,
-
-        /// Set config file path
-        #[arg(short, long, value_name = "PATH")]
-        config_file: Option<PathBuf>,
+        logs_dir: Option<PathBuf>,
     },
 
-    /// Start the indexer
-    Start {},
-
-    /// Run tests
-    Test {
-        /// Run provided tests
-        #[arg(short, long)]
-        paths: PathBuf,
-    },
+    /// Status of the indexer
+    Status {},
 }
 
 #[derive(Subcommand, Debug)]
@@ -94,121 +68,64 @@ enum AccountCommand {
     Balance {
         /// Get account balance
         #[arg(short, long)]
-        pub_key: Option<PublicKey>,
+        pub_key: PublicKey,
     },
 
     /// Account delegation
     Delegation {
         /// Get account delegation
         #[arg(short, long)]
-        pub_key: Option<PublicKey>,
+        pub_key: PublicKey,
     },
-
-    /// Account transactions back to boundary
-    Transactions {
-        /// Get account transactions
-        #[arg(short, long)]
-        pub_key: Option<PublicKey>,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum BlockCommand {
-    /// Check canonical status
-    Canonical {
-        /// Get the slot number
-        #[arg(short, long)]
-        block_hash: Option<String>,
-    },
-
-    /// Highest block we know about
-    Highest {},
-
-    /// Get the boundary before which we don't keep constructed blocks
-    Boundary {},
-
-    // TODO
-}
-
-#[derive(Subcommand, Debug)]
-enum ChainCommand {
-    /// Chain network
-    Network {
-        /// Choose the network: mainnet, berkeley, etc.
-        #[arg(short, long)]
-        name: String,
-    },
-
-    /// Best known tip
-    BestTip {},
-
-    /// Global slot since genesis
-    GlobalSlotSinceGenesis {},
-
-    // TODO
-}
-
-#[derive(Subcommand, Debug)]
-enum ConsensusCommand {
-    /// Minimum window density
-    MinWindowDensity {},
-    
-    // TODO
 }
 
 #[derive(Subcommand, Debug)]
 enum LedgerCommand {
-    /// Staking ledger data
+    /// TODO Staking ledger data
     Staking {},
     
-    /// Stage ledger data
+    /// TODO Stage ledger data
     Staged {},
     
-    /// Snarked legder data
+    /// TODO Snarked legder data
     Snarked {},
     
-    /// Next epoch ledger data
+    /// TODO Next epoch ledger data
     NextEpoch {},
-    
-    // TODO
-}
-
-#[derive(Subcommand, Debug)]
-enum ZkappCommand {
-    /// Network commands
-    Network {        
-        /// Choose the network: mainnet, berkeley, devnet, etc.
-        #[arg(short, long)]
-        name: String,
-    },
-
-    /// State commands
-    State {
-        /// Get on-chain state
-        #[arg(short, long)]
-        pub_key: PublicKey,
-    },
-
-    // TODO
 }
 
 #[derive(Subcommand, Debug)]
 enum VotingCommand {
-    /// List active MIPs
+    /// List of active MIPs
     Active {},
 
-    /// List complete MIPs
+    /// List of complete MIPs
     Complete {},
 
-    /// List proposed MIPs
+    /// List of proposed MIPs
     Propose {},
 
     /// Voting results of specified MIPs
     Result {
-        /// Name of MIP
-        #[arg(long)]
-        mip: String,
+        /// Names of MIPs
+        #[arg(short, long)]
+        mips: Vec<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum DumpCommand {
+    /// Dump everything in the store
+    All {},
+
+    /// Dump the blocks
+    Blocks {},
+
+    /// Dump the ledgers
+    Ledgers {},
+
+    /// Dump the voting data
+    Voting {},
 }
 
 #[tokio::main]
@@ -217,8 +134,16 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 
     if let Some(arguments) = &args.command {
         match arguments {
-            IndexerCommand::Start {} => {
-                println!("=== Start ===");
+            IndexerCommand::Run { logs_dir } => {
+                println!("=== Run ===");
+                // TODO check not already running
+                println!("Starting mina-indexer with logs dir {:?}", logs_dir);
+            }
+            IndexerCommand::Dump { command} => {
+                println!("=== Dump ===");
+                if let Some(cmd) = command {
+                    println!("{:?}", cmd);
+                }
             }
             IndexerCommand::Account { command } => {
                 println!("=== Account ===");
@@ -226,119 +151,38 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                     println!("Balance for {:?}", pub_key);
                 } else if let Some(AccountCommand::Delegation { pub_key }) = command {
                     println!("Delegation for {:?}", pub_key);
-                }
-            }
-            IndexerCommand::Block { command } => {
-                println!("=== Block ===");
-                if let Some(cmd) = command {
-                    match cmd {
-                        BlockCommand::Boundary {} => {
-                            println!("Boundary");
-                        }
-                        BlockCommand::Canonical { block_hash } => {
-                            println!("Canonical.block_hash = {:?}", block_hash);
-                        }
-                        BlockCommand::Highest {} => {
-                            println!("Highest");
-                        }
-                    }
-                }
-            }
-            IndexerCommand::Chain { command } => {
-                println!("=== Chain ===");
-                if let Some(cmd) = command {
-                    match cmd {
-                        ChainCommand::BestTip {} => {
-                            println!("BestTip");
-                        }
-                        ChainCommand::GlobalSlotSinceGenesis {} => {
-                            println!("GlobalSlotSinceGenesis");
-                        }
-                        ChainCommand::Network { name } => {
-                            println!("Network.name = {:?}", name);
-                        }
-                    }
-                }
-            }
-            IndexerCommand::Consensus { command } => {
-                println!("=== Consensus ===");
-                println!("{:?}", command);
-                if let Some(cmd) = command {
-                    match cmd {
-                        ConsensusCommand::MinWindowDensity {  } => {
-                            println!("{:?}", cmd)
-                        },
-                    }
+                    // TODO get delegation from indexer state
                 }
             }
             IndexerCommand::Ledger { command } => {
                 println!("=== Ledger ===");
-                println!("{:?}", command);
                 if let Some(cmd) = command {
-                    match cmd {
-                        LedgerCommand::Staking {} => {
-                            println!("{:?}", cmd)
-                        },
-                        LedgerCommand::Staged {} => {
-                            println!("{:?}", cmd)
-                        },
-                        LedgerCommand::Snarked {} => {
-                            println!("{:?}", cmd)  
-                        },
-                        LedgerCommand::NextEpoch {} => {
-                            println!("{:?}", cmd)
-                        },
-                    }
+                    println!("{:?}", cmd);
                 }
 
-            }
-            IndexerCommand::Zkapp { command } => {
-                println!("=== Zkapp ===");
-                if let Some(cmd) = command {
-                    match cmd {
-                        ZkappCommand::Network { name } => {
-                            println!("network = {:?}", name);
-                        }
-                        ZkappCommand::State { pub_key } => {
-                            println!("address = {:?}", pub_key);
-                        }
-                    }
-                }
             }
             IndexerCommand::Voting { command } => {
                 println!("=== Voting ===");
                 if let Some(cmd) = command {
                     match cmd {
-                        VotingCommand::Active {} => {
-                            println!("Active");
+                        VotingCommand::Result { mips } => {
+                            println!("Result of mip {:?}", mips);
                         }
-                        VotingCommand::Complete {} => {
-                            println!("Complete");
-                        }
-                        VotingCommand::Propose {} => {
-                            println!("Propose");
-                        }
-                        VotingCommand::Result { mip } => {
-                            println!("Result of mip {}", mip);
+                        cmd => {
+                            println!("{:?}", cmd);
                         }
                     }
                 }
             }
-            IndexerCommand::Config { log_dir, config_file } => {
+            IndexerCommand::Config { logs_dir } => {
                 println!("=== Config ===");
-                let pair = (log_dir, config_file);
-                if let (Some(logs), Some(config)) = pair {
-                    println!("Logs {:?}", logs);
-                    println!("Config file {:?}", config);
-                } else if let (Some(logs), _) = pair {
-                    println!("Logs {:?}", logs);
-                } else if let (_, Some(config)) = pair {
-                    println!("Config file {:?}", config);
+                if let Some(logs) = logs_dir {
+                    println!("Logs dir {:?}", logs);
                 }
             }
-            IndexerCommand::Test { paths } => {
-                println!("=== Test ===");
-                println!("{:?}", paths);
+            IndexerCommand::Status {} => {
+                println!("=== Status ===");
+                println!("Query the status of the indexer");
             }
         }
     }
