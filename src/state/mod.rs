@@ -52,5 +52,5 @@ pub struct State {
     pub store: Store,
     pub status: Status,
     pub dangling: DanglingBranches, // HashSet<Branch>
-    pub reflog: RefLog, // Vec<StateUpdate>
+    pub reflog: RefLog,             // Vec<StateUpdate>
 }
