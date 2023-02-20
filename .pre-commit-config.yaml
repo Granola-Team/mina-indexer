@@ -2,7 +2,7 @@ repos:
   - repo: https://github.com/kamadorueda/alejandra
     rev: 3.0.0
     hooks:
-      - id: alejandra
+      - id: alejandra-system
 
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
