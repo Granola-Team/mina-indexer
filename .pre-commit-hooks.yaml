@@ -1,0 +1,7 @@
+- id: nextest
+  name: nextest
+  description: Run test suite with cargo-nextest
+  entry: cargo nextest
+  language: system
+  types: [rust]
+  args: ["run"]
