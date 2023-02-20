@@ -53,7 +53,5 @@ impl Ledger {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn ledger_apply_diff() {
-
-    }
+    fn ledger_apply_diff() {}
 }

@@ -52,16 +52,19 @@ mod tests {
 
     #[tokio::test]
     async fn from_block_log_deserializes() {
-        let mut log_file = File::open(BLOCK_LOG_PATH)
-            .await.expect("block log exists");
+        let mut log_file = File::open(BLOCK_LOG_PATH).await.expect("block log exists");
         let mut contents = Vec::new();
         log_file
             .read_to_end(&mut contents)
-            .await.expect("block log doesn't IO Error");
+            .await
+            .expect("block log doesn't IO Error");
         let str = unsafe { std::str::from_utf8_unchecked(&contents) };
         let json: Value = serde_json::from_str(str).expect("block log parses into a Value");
 
-        let block_log = BlockLog { state_hash: BLOCK_LOG_STATE_HASH.to_string(), json };
+        let block_log = BlockLog {
+            state_hash: BLOCK_LOG_STATE_HASH.to_string(),
+            json,
+        };
 
         Coinbase::from_block_log(&block_log).expect("coinbase deserializes");
     }

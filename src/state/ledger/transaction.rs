@@ -67,8 +67,14 @@ mod tests {
         let transactions = Transaction::from_commands(&commands);
         assert_eq!(transactions.len(), 1);
         let transaction = transactions.get(0).expect("transaction 0 exists");
-        assert_eq!(transaction.source, "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".to_string());
-        assert_eq!(transaction.receiver, "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM".to_string());
+        assert_eq!(
+            transaction.source,
+            "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".to_string()
+        );
+        assert_eq!(
+            transaction.receiver,
+            "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM".to_string()
+        );
         assert_eq!(transaction.amount, 1000);
     }
 }
