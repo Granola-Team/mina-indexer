@@ -49,3 +49,11 @@ impl Ledger {
         success
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ledger_apply_diff() {
+
+    }
+}
