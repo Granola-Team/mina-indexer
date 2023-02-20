@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/kamadorueda/alejandra
+    rev: 3.0.0
+    hooks:
+      - id: alejandra
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: master
+    hooks:
+    -   id: fmt
+    -   id: cargo-check
