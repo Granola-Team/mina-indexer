@@ -34,11 +34,12 @@
           pkg-config
         ] ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ] ++ runtimeDependencies;
 
-        devDependencies = with pkgs; [
+        developmentDependencies = with pkgs; [
           rust
           rust-analyzer
           rnix-lsp
           nixpkgs-fmt
+          pre-commit
         ] ++ buildDependencies;
 
         cargo-toml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
@@ -63,7 +64,7 @@
         };
 
         devShells.default = mkShell {
-          buildInputs = devDependencies;
+          buildInputs = developmentDependencies;
           shellHook = ''
           '';
         };
