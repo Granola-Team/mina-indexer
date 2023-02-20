@@ -49,9 +49,8 @@
             rust
             rust-analyzer
             rnix-lsp
-            nixpkgs-fmt
-            pre-commit
             alejandra
+            pre-commit
           ]
           ++ buildDependencies;
 
