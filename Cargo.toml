@@ -24,6 +24,7 @@ serde_derive = "1.0.152"
 serde_json = {version = "1.0.92", features = [ "raw_value" ] }
 tokio-stream = "0.1.11"
 tokio-native-tls = "0.3.0"
+clap = { version = "4.1.4", features = [ "derive" ] }
 thiserror = "1.0.38"
 
 [dependencies.tokio]
