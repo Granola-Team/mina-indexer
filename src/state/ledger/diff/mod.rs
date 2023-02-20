@@ -20,14 +20,13 @@ impl LedgerDiff {
 
         let commands = get_block_commands(&block_log)?; // [A]
 
-        let transactions = Transaction::from_commands(&commands); // [A]
+        let transactions = Transaction::from_commands(commands); // [A]
         let mut account_diffs_fees: Vec<AccountDiff> =
-            AccountDiff::from_commands_fees(coinbase.receiver.clone(), &commands); // [A]
+            AccountDiff::from_commands_fees(coinbase.receiver, commands); // [A]
         let mut account_diffs_transactions = transactions
             .iter()
             .cloned()
-            .map(|transaction| AccountDiff::from_transaction(transaction))
-            .flatten()
+            .flat_map(AccountDiff::from_transaction)
             .collect();
 
         let mut account_diffs = Vec::new();
@@ -37,7 +36,7 @@ impl LedgerDiff {
 
         let accounts_created = public_keys_seen(&block_log) // [A]
             .into_iter()
-            .map(|public_key| Account::empty(public_key))
+            .map(Account::empty)
             .collect();
 
         Some(LedgerDiff {

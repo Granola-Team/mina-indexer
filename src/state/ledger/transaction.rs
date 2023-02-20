@@ -13,7 +13,7 @@ impl Transaction {
     pub fn from_commands(commands: &[Value]) -> Vec<Self> {
         commands
             .iter()
-            .map(|command| {
+            .filter_map(|command| {
                 let payload_body = command
                     .as_object()?
                     .get("data")?
@@ -26,8 +26,6 @@ impl Transaction {
                     .as_array()?
                     .get(1)?
                     .as_object()?;
-
-                dbg!(payload_body);
 
                 let source_pk = payload_body.get("source_pk")?.as_str()?.to_string();
 
@@ -42,7 +40,6 @@ impl Transaction {
                     amount,
                 })
             })
-            .flatten()
             .collect()
     }
 }

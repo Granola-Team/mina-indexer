@@ -21,7 +21,7 @@ impl FilesystemJSONReader {
     pub async fn new(logs_dir: &str) -> Result<Self, LogError> {
         tokio::fs::read_dir(logs_dir)
             .await
-            .map_err(|io_error| LogError::IOError(io_error))
+            .map_err(LogError::IOError)
             .map(|dir_handle| FilesystemJSONReader {
                 dir_handle,
                 logs_processed: 0,
@@ -34,12 +34,9 @@ impl FilesystemJSONReader {
             .dir_handle
             .next_entry()
             .await
-            .map_err(|io_error| LogError::IOError(io_error))?
+            .map_err(LogError::IOError)?
         {
-            let file_type = next_entry
-                .file_type()
-                .await
-                .map_err(|io_error| LogError::IOError(io_error))?;
+            let file_type = next_entry.file_type().await.map_err(LogError::IOError)?;
 
             if !file_type.is_file() {
                 continue;
@@ -53,7 +50,7 @@ impl FilesystemJSONReader {
                 }
 
                 if let (Some(log_name), Some(extension)) = (
-                    fragments.get(0).map(|str| str.to_owned()),
+                    fragments.first().map(|str| str.to_owned()),
                     fragments.get(1).map(|str| str.to_owned()),
                 ) {
                     if extension != "json" {
@@ -76,19 +73,17 @@ impl FilesystemJSONReader {
     }
 
     pub async fn read_block_log(log_path: PathBuf) -> Result<Value, LogError> {
-        let mut log_file = File::open(log_path)
-            .await
-            .map_err(|err| LogError::IOError(err))?;
+        let mut log_file = File::open(log_path).await.map_err(LogError::IOError)?;
         let mut contents = Vec::new();
 
         log_file
             .read_to_end(&mut contents)
             .await
-            .map_err(|err| LogError::IOError(err))?;
+            .map_err(LogError::IOError)?;
 
         let str = unsafe { std::str::from_utf8_unchecked(&contents) };
 
-        let block_log = serde_json::from_str(str).map_err(|err| LogError::JSONError(err))?;
+        let block_log = serde_json::from_str(str).map_err(LogError::JSONError)?;
 
         Ok(block_log)
     }

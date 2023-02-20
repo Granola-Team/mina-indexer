@@ -50,7 +50,7 @@ impl AccountDiff {
     ) -> Vec<AccountDiff> {
         commands
             .iter()
-            .map(|command| {
+            .filter_map(|command| {
                 let payload_common = command
                     .as_object()?
                     .get("data")?
@@ -78,7 +78,6 @@ impl AccountDiff {
                     },
                 ])
             })
-            .flatten()
             .flatten()
             .collect()
     }

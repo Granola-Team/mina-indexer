@@ -60,7 +60,7 @@ pub fn get_block_commands(block_log: &BlockLog) -> Option<&Vec<Value>> {
 
 pub fn public_keys_seen(block_log: &BlockLog) -> Vec<PublicKey> {
     let mut public_keys = Vec::new();
-    if let Some(consensus_state) = get_consensus_state(&block_log) {
+    if let Some(consensus_state) = get_consensus_state(block_log) {
         if let Some(block_stake_winner) = get_block_stake_winner(&consensus_state) {
             public_keys.push(block_stake_winner);
         }
@@ -72,10 +72,10 @@ pub fn public_keys_seen(block_log: &BlockLog) -> Vec<PublicKey> {
         }
     }
 
-    if let Some(commands) = get_block_commands(&block_log) {
+    if let Some(commands) = get_block_commands(block_log) {
         commands
             .iter()
-            .map(|command| {
+            .filter_map(|command| {
                 let payload_body = command
                     .as_object()?
                     .get("data")?
@@ -94,7 +94,6 @@ pub fn public_keys_seen(block_log: &BlockLog) -> Vec<PublicKey> {
 
                 Some(vec![source_pk, receiver_pk])
             })
-            .flatten()
             .flatten()
             .for_each(|public_key| {
                 public_keys.push(public_key);
