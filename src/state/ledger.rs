@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hasher};
 
 use crate::block_log::BlockLog;
 
@@ -10,6 +10,7 @@ pub struct Account {
     balance: u64,
 }
 
+#[derive(Debug)]
 pub struct AccountUpdate {
     from: Option<PublicKey>,
     to: PublicKey,
@@ -53,9 +54,18 @@ impl Account {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Ledger {
     accounts: HashMap<PublicKey, Account>,
+}
+
+impl std::hash::Hash for Ledger {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for (pk, account) in self.accounts.iter() {
+            pk.hash(state);
+            account.hash(state);
+        }
+    }
 }
 
 impl Ledger {
