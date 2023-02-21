@@ -9,3 +9,14 @@ repos:
     hooks:
     -   id: fmt
     -   id: cargo-check
+    -   id: clippy
+
+  - repo: local
+    hooks:
+    - id: nextest
+      name: nextest
+      description: Run test suite with cargo-nextest
+      entry: cargo nextest
+      language: system
+      types: [rust]
+      args: ["run"]

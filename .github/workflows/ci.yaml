@@ -51,11 +51,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
 
-      - name: Test
-        uses: actions-rs/cargo@v1
+      - name: Run cargo-nextest
+        uses: taiki-e/install-action@nextest
         with:
-          command: test
-          args: --workspace
+          command: nextest
+          args: run --all-features --profile ci
 
       - name: Release build
         uses: actions-rs/cargo@v1

@@ -51,6 +51,7 @@
             rnix-lsp
             alejandra
             pre-commit
+            cargo-nextest
           ]
           ++ buildDependencies;
 
