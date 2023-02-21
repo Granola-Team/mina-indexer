@@ -3,6 +3,7 @@ use serde_json::{Map, Value};
 use crate::state::ledger::PublicKey;
 
 pub mod reader;
+pub mod scanner;
 
 pub struct BlockLog {
     pub state_hash: String,
