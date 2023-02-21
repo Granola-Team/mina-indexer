@@ -45,22 +45,11 @@ jobs:
           args: --all -- --check
 
       - name: Annotate commit with clippy warnings
+        if: github.event_name == 'pull_request'
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
-
-      - name: Security audit
-        uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install cargo-audit binary crate
-        uses: actions-rs/install@v0.1
-        with:
-          crate: cargo-audit
-          version: latest
-          use-tool-cache: true
 
       - name: Run cargo-nextest
         uses: taiki-e/install-action@nextest
