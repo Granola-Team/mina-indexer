@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use mina_indexer::state::ledger::PublicKey;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -64,19 +63,19 @@ enum IndexerCommand {
 
 #[derive(Subcommand, Debug)]
 enum AccountCommand {
-    /// Account balance
-    Balance {
-        /// Get account balance
-        #[arg(short, long)]
-        pub_key: PublicKey,
-    },
+    // /// Account balance
+    // Balance {
+    //     /// Get account balance
+    //     #[arg(short, long)]
+    //     pub_key: PublicKey,
+    // },
 
-    /// Account delegation
-    Delegation {
-        /// Get account delegation
-        #[arg(short, long)]
-        pub_key: PublicKey,
-    },
+    // /// Account delegation
+    // Delegation {
+    //     /// Get account delegation
+    //     #[arg(short, long)]
+    //     pub_key: PublicKey,
+    // },
 }
 
 #[derive(Subcommand, Debug)]
@@ -145,14 +144,14 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                     println!("{cmd:?}");
                 }
             }
-            IndexerCommand::Account { command } => {
+            IndexerCommand::Account { command: _command } => {
                 println!("=== Account ===");
-                if let Some(AccountCommand::Balance { pub_key }) = command {
-                    println!("Balance for {pub_key:?}");
-                } else if let Some(AccountCommand::Delegation { pub_key }) = command {
-                    println!("Delegation for {pub_key:?}");
-                    // TODO get delegation from indexer state
-                }
+                // if let Some(AccountCommand::Balance { pub_key }) = command {
+                //     println!("Balance for {pub_key:?}");
+                // } else if let Some(AccountCommand::Delegation { pub_key }) = command {
+                //     println!("Delegation for {pub_key:?}");
+                //     // TODO get delegation from indexer state
+                // }
             }
             IndexerCommand::Ledger { command } => {
                 println!("=== Ledger ===");
