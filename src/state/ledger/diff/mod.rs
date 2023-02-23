@@ -1,6 +1,6 @@
 use account::AccountDiff;
 
-use crate::block_log::PrecomputedBlock;
+use crate::precomputed_block::PrecomputedBlock;
 
 use super::{coinbase::Coinbase, transaction::Command, PublicKey};
 

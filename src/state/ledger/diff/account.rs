@@ -4,7 +4,7 @@ use mina_serialization_types::{
 };
 
 use crate::{
-    block_log::PrecomputedBlock,
+    precomputed_block::PrecomputedBlock,
     state::ledger::{transaction::Command, PublicKey},
 };
 
