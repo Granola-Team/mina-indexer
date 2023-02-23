@@ -1,2 +1,2 @@
-pub mod block_log;
+pub mod precomputed_block;
 pub mod state;

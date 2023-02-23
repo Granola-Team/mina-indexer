@@ -1,77 +1,84 @@
-use serde_json::Value;
+use mina_serialization_types::{
+    staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation, UserCommand},
+    v1::PublicKeyV1,
+};
 
-use super::PublicKey;
+use crate::precomputed_block::PrecomputedBlock;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Transaction {
-    pub source: PublicKey,
-    pub receiver: PublicKey,
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum TransactionType {
+    Payment,
+    Delegation,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Payment {
+    pub source: PublicKeyV1,
+    pub receiver: PublicKeyV1,
     pub amount: u64,
 }
 
-impl Transaction {
-    pub fn from_commands(commands: &[Value]) -> Vec<Self> {
-        commands
-            .iter()
-            .filter_map(|command| {
-                let payload_body = command
-                    .as_object()?
-                    .get("data")?
-                    .as_array()?
-                    .get(1)?
-                    .as_object()?
-                    .get("payload")?
-                    .as_object()?
-                    .get("body")?
-                    .as_array()?
-                    .get(1)?
-                    .as_object()?;
-
-                let source_pk = payload_body.get("source_pk")?.as_str()?.to_string();
-
-                let receiver_pk = payload_body.get("receiver_pk")?.as_str()?.to_string();
-
-                // parse better
-                let amount = payload_body.get("amount")?.as_str()?.parse::<u64>().ok()?;
-
-                Some(Transaction {
-                    source: source_pk,
-                    receiver: receiver_pk,
-                    amount,
-                })
-            })
-            .collect()
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Delegation {
+    pub delegator: PublicKeyV1,
+    pub delegate: PublicKeyV1,
 }
 
-#[cfg(test)]
-mod tests {
-    use serde_json::Value;
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Command {
+    Payment(Payment),
+    Delegation(Delegation),
+}
 
-    use super::Transaction;
-
-    const COMMANDS_WITH_ONE_TRANSACTION_JSON: &'static str =
-        include_str!("../../../tests/data/commands/commands_with_one_transaction.json");
-
-    #[test]
-    fn transaction_from_commands_deserializes() {
-        let commands: Vec<Value> =
-            serde_json::from_str::<Value>(COMMANDS_WITH_ONE_TRANSACTION_JSON)
-                .expect("json is valid")
-                .as_array()
-                .expect("json is an array")
-                .to_owned();
-        let transactions = Transaction::from_commands(&commands);
-        assert_eq!(transactions.len(), 1);
-        let transaction = transactions.get(0).expect("transaction 0 exists");
-        assert_eq!(
-            transaction.source,
-            "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".to_string()
-        );
-        assert_eq!(
-            transaction.receiver,
-            "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM".to_string()
-        );
-        assert_eq!(transaction.amount, 1000);
+impl Command {
+    // i say i say now this is a thiccy
+    pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
+        precomputed_block
+            .staged_ledger_diff
+            .diff
+            .clone()
+            .inner()
+            .0
+            .inner()
+            .inner()
+            .commands
+            .iter()
+            .map(
+                |command| match command.clone().inner().data.inner().inner() {
+                    UserCommand::SignedCommand(signed_command) => match signed_command
+                        .inner()
+                        .inner()
+                        .payload
+                        .inner()
+                        .inner()
+                        .body
+                        .inner()
+                        .inner()
+                    {
+                        SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+                            let source = payment_payload.clone().inner().inner().source_pk;
+                            let receiver = payment_payload.clone().inner().inner().receiver_pk;
+                            let amount = payment_payload.inner().inner().amount.inner().inner();
+                            Self::Payment(Payment {
+                                source,
+                                receiver,
+                                amount,
+                            })
+                        }
+                        SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
+                            match delegation_payload.inner() {
+                                StakeDelegation::SetDelegate {
+                                    delegator,
+                                    new_delegate,
+                                } => Self::Delegation(Delegation {
+                                    delegate: new_delegate,
+                                    delegator,
+                                }),
+                            }
+                        }
+                    },
+                },
+            )
+            .collect()
     }
 }
