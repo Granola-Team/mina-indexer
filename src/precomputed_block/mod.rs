@@ -44,6 +44,7 @@ pub struct BlockLog {
     delta_transition_chain_proof: DeltaTransitionChainProofJson,
 }
 
+#[derive(Debug)]
 pub struct PrecomputedBlock {
     pub state_hash: String,
     pub scheduled_time: String,
@@ -54,7 +55,7 @@ pub struct PrecomputedBlock {
 }
 
 impl PrecomputedBlock {
-    pub fn from_log_contents(log_contents: BlockLogContents) -> Option<Self> {
+    pub fn from_log_contents(log_contents: BlockLogContents) -> Result<Self, serde_json::Error> {
         let state_hash = log_contents.state_hash;
         let BlockLog {
             scheduled_time,
@@ -62,8 +63,8 @@ impl PrecomputedBlock {
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
-        } = serde_json::from_slice(&log_contents.contents).ok()?;
-        Some(Self {
+        } = serde_json::from_slice(&log_contents.contents)?;
+        Ok(Self {
             state_hash,
             scheduled_time,
             protocol_state: protocol_state.into(),
@@ -171,7 +172,14 @@ impl LogEntryProcessor {
         // parse precomputed blocks from log contents in parallel
         log_contents_vec
             .into_par_iter()
-            .filter_map(PrecomputedBlock::from_log_contents)
+            .flat_map(|log_contents| {
+                let state_hash = log_contents.state_hash.clone();
+                let result = PrecomputedBlock::from_log_contents(log_contents);
+                if result.is_err() {
+                    dbg!(state_hash, &result);
+                }
+                result
+            })
             .collect()
     }
 }
