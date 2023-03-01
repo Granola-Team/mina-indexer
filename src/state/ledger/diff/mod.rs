@@ -2,7 +2,7 @@ use account::AccountDiff;
 
 use crate::precomputed_block::PrecomputedBlock;
 
-use super::{coinbase::Coinbase, transaction::Command, PublicKey};
+use super::{coinbase::Coinbase, command::Command, PublicKey};
 
 pub mod account;
 
