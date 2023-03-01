@@ -5,7 +5,7 @@ use mina_serialization_types::{
 
 use crate::{
     precomputed_block::PrecomputedBlock,
-    state::ledger::{transaction::Command, PublicKey},
+    state::ledger::{command::Command, PublicKey},
 };
 
 // add delegations later

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 pub mod account;
 pub mod coinbase;
+pub mod command;
 pub mod diff;
-pub mod transaction;
 
 use account::Account;
 use diff::LedgerDiff;
