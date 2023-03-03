@@ -13,7 +13,6 @@ elements (PostgreSQL database, Mina daemon, 'mina-archive' process)
 with a system that consumes the precomputed blocks by the Mina daemon
 to generate an index for which we can efficiently query.
 
-
 ## Warning
 
 The Mina Indexer project is in constant development and is in an alpha
@@ -34,7 +33,6 @@ Build (install [nix](#about-the-development-environment) first)
 ```sh
 nix develop
 nix build
-export PATH=./result/bin:$PATH
 ```
 
 Run `mina-indexer` using logs from `PATH`

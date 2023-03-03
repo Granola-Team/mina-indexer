@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::precomputed_block::{
-    scanner::LogScanner, BlockLog, LogEntryProcessor, PrecomputedBlock,
+    scanner::LogScanner, BlockLog, LogEntryProcessor
 };
 use tokio::io::AsyncReadExt;
 
