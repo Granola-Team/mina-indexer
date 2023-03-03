@@ -78,6 +78,7 @@
           devShells.default = mkShell {
             buildInputs = developmentDependencies;
             shellHook = ''
+              export PATH=./result/bin:$PATH
             '';
           };
         }
