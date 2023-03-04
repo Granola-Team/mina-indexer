@@ -32,7 +32,7 @@ Build (install [nix](#about-the-development-environment) first)
 
 ```sh
 nix develop
-nix build
+nix build '.?submodules=1'
 ```
 
 Run `mina-indexer` using logs from `PATH`
