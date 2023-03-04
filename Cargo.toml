@@ -28,7 +28,7 @@ clap = { version = "4.1.4", features = [ "derive" ] }
 thiserror = "1.0.38"
 glob = "0.3.1"
 rayon = "1.6.1"
-mina-serialization-types = { git = "https://github.com/MinaProtocol/mina-rs", version = "0.1.0" }
+mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", version = "0.1.0" }
 
 [dependencies.tokio]
 version = "1.25.0"

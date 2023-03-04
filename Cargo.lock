@@ -182,7 +182,6 @@ dependencies = [
 [[package]]
 name = "bin-prot"
 version = "0.1.0"
-source = "git+https://github.com/MinaProtocol/mina-rs#8f3f41ca6bfaadf898baa75a4849295177f26aaf"
 dependencies = [
  "byteorder",
  "num",
@@ -811,7 +810,6 @@ dependencies = [
 [[package]]
 name = "mina-curves"
 version = "0.1.0"
-source = "git+https://github.com/o1-labs/proof-systems?rev=86f75976859fe9131c6e1db81511ce4d3127d8fa#86f75976859fe9131c6e1db81511ce4d3127d8fa"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -820,13 +818,12 @@ dependencies = [
 [[package]]
 name = "mina-hasher"
 version = "0.1.0"
-source = "git+https://github.com/o1-labs/proof-systems?rev=86f75976859fe9131c6e1db81511ce4d3127d8fa#86f75976859fe9131c6e1db81511ce4d3127d8fa"
 dependencies = [
  "ark-ff",
  "bitvec",
  "mina-curves",
+ "mina-poseidon",
  "o1-utils",
- "oracle",
  "serde",
 ]
 
@@ -856,9 +853,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "mina-poseidon"
+version = "0.1.0"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "mina-curves",
+ "o1-utils",
+ "once_cell",
+ "rand",
+ "rayon",
+ "serde",
+ "serde_with",
+]
+
+[[package]]
 name = "mina-serialization-types"
 version = "0.1.0"
-source = "git+https://github.com/MinaProtocol/mina-rs#8f3f41ca6bfaadf898baa75a4849295177f26aaf"
 dependencies = [
  "base64",
  "bin-prot",
@@ -878,7 +890,6 @@ dependencies = [
 [[package]]
 name = "mina-serialization-types-macros"
 version = "0.1.0"
-source = "git+https://github.com/MinaProtocol/mina-rs#8f3f41ca6bfaadf898baa75a4849295177f26aaf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -888,7 +899,6 @@ dependencies = [
 [[package]]
 name = "mina-signer"
 version = "0.1.0"
-source = "git+https://github.com/o1-labs/proof-systems?rev=86f75976859fe9131c6e1db81511ce4d3127d8fa#86f75976859fe9131c6e1db81511ce4d3127d8fa"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -957,6 +967,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand",
 ]
 
 [[package]]
@@ -1023,7 +1034,6 @@ dependencies = [
 [[package]]
 name = "o1-utils"
 version = "0.1.0"
-source = "git+https://github.com/o1-labs/proof-systems?rev=86f75976859fe9131c6e1db81511ce4d3127d8fa#86f75976859fe9131c6e1db81511ce4d3127d8fa"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -1032,6 +1042,10 @@ dependencies = [
  "bcs",
  "hex",
  "num-bigint",
+ "num-integer",
+ "num-traits",
+ "rand",
+ "rand_core",
  "rayon",
  "serde",
  "serde_with",
@@ -1094,23 +1108,6 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
-]
-
-[[package]]
-name = "oracle"
-version = "0.1.0"
-source = "git+https://github.com/o1-labs/proof-systems?rev=86f75976859fe9131c6e1db81511ce4d3127d8fa#86f75976859fe9131c6e1db81511ce4d3127d8fa"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "mina-curves",
- "o1-utils",
- "once_cell",
- "rand",
- "rayon",
- "serde",
- "serde_with",
 ]
 
 [[package]]
@@ -1238,7 +1235,6 @@ dependencies = [
 [[package]]
 name = "proof-systems"
 version = "0.1.0"
-source = "git+https://github.com/MinaProtocol/mina-rs#8f3f41ca6bfaadf898baa75a4849295177f26aaf"
 dependencies = [
  "anyhow",
  "ark-ff",
@@ -1751,7 +1747,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "versioned"
 version = "0.1.0"
-source = "git+https://github.com/MinaProtocol/mina-rs#8f3f41ca6bfaadf898baa75a4849295177f26aaf"
 dependencies = [
  "serde",
 ]

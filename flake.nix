@@ -78,6 +78,7 @@
           devShells.default = mkShell {
             buildInputs = developmentDependencies;
             shellHook = ''
+              git submodule update --init --recursive
               export PATH=./result/bin:$PATH
             '';
           };
