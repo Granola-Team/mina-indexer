@@ -1,6 +1,0 @@
-[submodule "mina-rs"]
-	path = mina-rs
-	url = https://github.com/MinaProtocol/mina-rs
-[submodule "proof-systems"]
-	path = proof-systems
-	url = https://github.com/o1-labs/proof-systems
