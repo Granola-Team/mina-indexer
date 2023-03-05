@@ -4,68 +4,73 @@ use std::{
 };
 
 use glob::{glob, Paths};
+use tokio::io::AsyncReadExt;
 
-pub enum ScannerRecursion {
-    Flat,
+use crate::precomputed_block::{BlockLogContents, PrecomputedBlock};
+
+pub enum SearchRecursion {
+    None,
     Recursive,
-    //Depth(usize),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct BlockLogEntry {
-    pub state_hash: String,
+pub struct BlockParser {
     pub log_path: PathBuf,
-}
-
-pub struct LogScanner {
-    pub base_dir: PathBuf,
-    pub recursion: ScannerRecursion,
+    pub recursion: SearchRecursion,
     paths: Paths,
 }
 
-impl LogScanner {
-    pub fn new(base_dir: &Path) -> Self {
-        Self::new_internal(base_dir, ScannerRecursion::Flat)
+impl BlockParser {
+    pub fn new(log_path: &Path) -> Self {
+        Self::new_internal(log_path, SearchRecursion::None)
     }
 
-    pub fn new_recursive(base_dir: &Path) -> Self {
-        Self::new_internal(base_dir, ScannerRecursion::Recursive)
+    pub fn new_recursive(log_path: &Path) -> Self {
+        Self::new_internal(log_path, SearchRecursion::Recursive)
     }
 
-    // pub fn with_depth(base_dir: &Path, max_depth: usize) -> Self {
-    //     Self::new_internal(base_dir, ScannerRecursion::Depth(max_depth))
+    // pub fn with_depth(log_path: &Path, max_depth: usize) -> Self {
+    //     Self::new_internal(log_path, SearchRecursion::Depth(max_depth))
     // }
 
-    fn new_internal(base_dir: &Path, recursion: ScannerRecursion) -> Self {
+    fn new_internal(log_path: &Path, recursion: SearchRecursion) -> Self {
         let pattern = match &recursion {
-            ScannerRecursion::Flat => format!("{}/*.json", base_dir.display()),
-            ScannerRecursion::Recursive => format!("{}/**/*.json", base_dir.display()),
+            SearchRecursion::None => format!("{}/*.json", log_path.display()),
+            SearchRecursion::Recursive => format!("{}/**/*.json", log_path.display()),
             // ScannerRecursion::Depth(max_depth) => todo!(),
         };
-        let base_dir = base_dir.to_owned();
+        let log_path = log_path.to_owned();
         let paths = glob(&pattern).expect("Failed to read glob pattern");
         Self {
-            base_dir,
+            log_path,
             recursion,
             paths,
         }
     }
 
-    pub fn log_files(self) -> impl Iterator<Item = BlockLogEntry> {
-        self.paths
-            .into_iter()
-            .filter_map(|path| path.ok())
-            .filter(|path_buf| has_state_hash_and_json_filetype(path_buf))
-            .filter_map(log_path_to_log_entry)
-    }
-}
+    pub async fn next(&mut self) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
+        if let Some(next) = self.paths.next() {
+            let next_path = next?;
+            if has_state_hash_and_json_filetype(&next_path) {
+                let state_hash =
+                    get_state_hash(next_path.file_name().expect("filename already checked"))
+                        .expect("state hash already checked");
 
-fn log_path_to_log_entry(log_path: PathBuf) -> Option<BlockLogEntry> {
-    let state_hash = get_state_hash(log_path.file_name()?)?;
-    Some(BlockLogEntry {
-        state_hash,
-        log_path,
-    })
+                let mut log_file = tokio::fs::File::open(&next_path).await?;
+                let mut log_file_contents = Vec::new();
+
+                log_file.read_to_end(&mut log_file_contents).await?;
+
+                let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
+                    state_hash,
+                    contents: log_file_contents,
+                })?;
+
+                return Ok(Some(precomputed_block));
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 /// extract a state hash from an OS file name

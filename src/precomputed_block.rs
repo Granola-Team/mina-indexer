@@ -9,30 +9,9 @@ use mina_serialization_types::{
 };
 use serde::{Deserialize, Serialize};
 
-pub mod scanner;
-
-use tokio::io::AsyncReadExt;
-
-use self::scanner::BlockLogEntry;
-
 pub struct BlockLogContents {
-    state_hash: String,
-    contents: Vec<u8>,
-}
-
-impl BlockLogContents {
-    pub async fn from_entry(entry: BlockLogEntry) -> Result<Self, anyhow::Error> {
-        let state_hash = entry.state_hash;
-        let mut log_file = tokio::fs::File::open(&entry.log_path).await?;
-        let mut contents = Vec::new();
-
-        log_file.read_to_end(&mut contents).await?;
-
-        Ok(Self {
-            state_hash,
-            contents,
-        })
-    }
+    pub(crate) state_hash: String,
+    pub(crate) contents: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -146,40 +125,5 @@ impl PrecomputedBlock {
         });
 
         public_keys
-    }
-}
-
-pub struct LogEntryProcessor {
-    log_entries: Vec<BlockLogEntry>,
-}
-
-use rayon::prelude::*;
-impl LogEntryProcessor {
-    pub fn new(entries_iter: Box<dyn Iterator<Item = BlockLogEntry>>) -> Self {
-        let log_entries = entries_iter.collect();
-        Self { log_entries }
-    }
-
-    pub async fn parse_log_entries(self) -> Vec<PrecomputedBlock> {
-        // read contents of log file into a vector in sequence
-        let mut log_contents_vec = Vec::new();
-        for entry in self.log_entries {
-            let log_contents_result = BlockLogContents::from_entry(entry).await;
-            if let Ok(log_contents) = log_contents_result {
-                log_contents_vec.push(log_contents);
-            }
-        }
-        // parse precomputed blocks from log contents in parallel
-        log_contents_vec
-            .into_par_iter()
-            .flat_map(|log_contents| {
-                let state_hash = log_contents.state_hash.clone();
-                let result = PrecomputedBlock::from_log_contents(log_contents);
-                if result.is_err() {
-                    dbg!(state_hash, &result);
-                }
-                result
-            })
-            .collect()
     }
 }
