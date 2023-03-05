@@ -842,7 +842,6 @@ dependencies = [
  "log",
  "mina-serialization-types",
  "native-tls",
- "rayon",
  "serde",
  "serde_derive",
  "serde_json",
