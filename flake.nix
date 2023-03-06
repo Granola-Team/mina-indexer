@@ -35,6 +35,9 @@
 
         runtimeDependencies = with pkgs; [
           openssl
+          llvmPackages.libclang
+          llvmPackages.libcxxClang
+          clang
         ];
 
         buildDependencies = with pkgs;
@@ -55,6 +58,9 @@
           ]
           ++ buildDependencies;
 
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
+
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
         with pkgs; {
@@ -70,6 +76,11 @@
 
               nativeBuildInputs = buildDependencies;
               buildInputs = runtimeDependencies;
+
+              preBuild = ''
+                export LIBCLANG_PATH="${LIBCLANG_PATH}"
+                export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
+              '';
             };
 
             default = mina-indexer;
@@ -79,7 +90,9 @@
             buildInputs = developmentDependencies;
             shellHook = ''
               git submodule update --init --recursive
-              export PATH=./result/bin:$PATH
+              export PATH=.$out/bin:$PATH
+              export LIBCLANG_PATH="${LIBCLANG_PATH}"
+              export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
             '';
           };
         }

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use mina_indexer::block_parser::BlockParser;
+use mina_indexer::block::parser::BlockParser;
 
 #[tokio::test]
 async fn block_parser_parses_representative_sample() {
