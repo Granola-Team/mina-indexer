@@ -1,7 +1,13 @@
+use std::collections::HashSet;
+
+use crate::block::BlockHash;
+
+use self::branch::Branch;
+
 pub mod ledger;
 // pub mod best_tip;
 // pub mod block;
-// pub mod branch;
+pub mod branch;
 // pub mod store;
 // pub mod voting;
 
@@ -12,21 +18,6 @@ pub mod ledger;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Head {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Block {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct BlockHash {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Branch {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Branches {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Leaves {}
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Store {}
@@ -40,15 +31,13 @@ pub struct DanglingBranches {}
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct StateUpdate {}
 
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct RefLog {}
+pub type RefLog = Vec<StateUpdate>;
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct State {
     pub root: BlockHash,
     pub head: Head,
-    pub leaves: Leaves,
-    pub branches: Branches,
+    pub branches: HashSet<Branch>,
     pub store: Store,
     pub status: Status,
     pub dangling: DanglingBranches, // HashSet<Branch>
