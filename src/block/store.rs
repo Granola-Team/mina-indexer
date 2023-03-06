@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::precomputed::PrecomputedBlock;
 
+#[derive(Debug)]
 pub struct BlockStore {
     db_path: PathBuf,
     database: rocksdb::DB,

@@ -38,6 +38,7 @@
           llvmPackages.libclang
           llvmPackages.libcxxClang
           clang
+          zstd
         ];
 
         buildDependencies = with pkgs;
@@ -89,7 +90,7 @@
           devShells.default = mkShell {
             buildInputs = developmentDependencies;
             shellHook = ''
-              git submodule update --init --recursive
+              git submodule update --init --recursive --remote
               export PATH=.$out/bin:$PATH
               export LIBCLANG_PATH="${LIBCLANG_PATH}"
               export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
