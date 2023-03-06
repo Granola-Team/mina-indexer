@@ -15,7 +15,7 @@ pub type Path = Vec<Block>;
 
 pub type Leaves = HashMap<NodeId, Leaf<Block>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Leaf<T> {
     data: T,
     depth: usize,
@@ -35,7 +35,7 @@ impl Branch {
         })
     }
 
-    pub fn try_add_block(&mut self, block: Block) -> Result<(), anyhow::Error> {
+    pub fn try_add_block(&mut self, block: &Block) -> Result<(), anyhow::Error> {
         let mut to_remove = None;
         for (node_id, Leaf { data, depth }) in self.leaves.iter() {
             if block.parent_hash == data.state_hash {
@@ -44,7 +44,7 @@ impl Branch {
                     .insert(Node::new(block.clone()), InsertBehavior::UnderNode(node_id))?;
 
                 let parent_id = node_id.clone();
-                let leaf = Leaf::new(block, *depth + 1);
+                let leaf = Leaf::new(block.clone(), *depth + 1);
                 to_remove = Some((parent_id, (child_id, leaf)));
                 break; // block will only have one parent
             }

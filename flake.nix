@@ -38,6 +38,7 @@
           llvmPackages.libclang
           llvmPackages.libcxxClang
           clang
+          zstd
         ];
 
         buildDependencies = with pkgs;
