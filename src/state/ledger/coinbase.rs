@@ -1,4 +1,4 @@
-use crate::precomputed_block::PrecomputedBlock;
+use crate::block::precomputed::PrecomputedBlock;
 
 use super::{diff::account::AccountDiff, PublicKey};
 

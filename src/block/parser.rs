@@ -6,7 +6,7 @@ use std::{
 use glob::{glob, Paths};
 use tokio::io::AsyncReadExt;
 
-use crate::precomputed_block::{BlockLogContents, PrecomputedBlock};
+use super::precomputed::{BlockLogContents, PrecomputedBlock};
 
 pub enum SearchRecursion {
     None,

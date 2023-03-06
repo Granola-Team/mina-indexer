@@ -3,7 +3,7 @@ use mina_serialization_types::{
     v1::PublicKeyV1,
 };
 
-use crate::precomputed_block::PrecomputedBlock;
+use crate::block::precomputed::PrecomputedBlock;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TransactionType {
