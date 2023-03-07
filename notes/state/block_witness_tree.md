@@ -17,10 +17,10 @@ The idea is that sufficient consensus is built around a canonical chain so we on
   - the corresponding blocks are stored in separate hash-keyed data structure (e.g. hash map)
 - **leaf** represents a view of reality and contains a concrete, up-to-date ledger, the result of unfolding its path
 
-![](./block_witness_tree-zoom_in.png)
+![](./block_witness_tree/block_witness_tree-zoom_in.png)
 
 ## Evolution
 
 As time progresses and the indexer parses more block logs, block hashes are added to the *block witness tree*, the root updates, and non-canonical in-memory blocks are pruned (among other things orthogonal to the block witness tree)
 
-![](./block_witness_tree-branch_evolution.png)
+![](./block_witness_tree/block_witness_tree-branch_evolution.png)
