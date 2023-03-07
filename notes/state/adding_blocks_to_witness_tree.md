@@ -2,8 +2,8 @@
 
 Here's a visualization of a general block witness tree (drawn horizontally, slot numbers increase to the right)
 
-<!-- TODO include witness tree with dangling branches -->
-  
+<img src="./adding_blocks_to_witness_tree/generic_block_witness_tree.png" alt="generic-block-witness-tree" width="500"/>
+
 There are several scenarios which can occur while adding a block to the witness tree. They fall broadly into two categories, *simple* and *complex*, each with several subcategories.
 
 For reference, the `Branch` and `Leaf` data structures are something like
@@ -39,7 +39,7 @@ The incoming block is a *child of a leaf block* in the main branch and not a par
 - head and root are updated if necessary
 - dangling branches are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/simple_proper_main_branch_extension.png" alt="simple-proper-main-extension" width="500"/>
 
 #### Simple improper main branch extension
 
@@ -50,7 +50,7 @@ The incoming block is a *child of a non-leaf block* in the main branch and not a
 - head and root are updated if necessary
 - dangling branches are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/simple_improper_main_extension.png" alt="simple-improper-main-extension" width="500"/>
 
 ### Simple dangling branch extensions
 
@@ -64,7 +64,7 @@ The incoming block is a *child of a leaf block* in a dangling branch and not a p
 - new leaf is appended to an existing path in the dangling branch's paths
 - root and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/simple_proper_forward_dangling_extension.png" alt="simple-proper-forward-dangling-extension" width="500"/>
 
 #### Simple proper backward dangling branch extension
 
@@ -73,7 +73,7 @@ The incoming block is the *parent of the base block* in a dangling branch and no
 - new base is prepended to all existing paths in the dangling branch
 - head, root, and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/simple_proper_backward_dangling_extension.png" alt="simple-proper-backward-dangling-extension" width="500"/>
 
 #### Simple improper dangling branch extension
 
@@ -83,7 +83,7 @@ Similar to the simple improper extension of the main branch, the incoming block 
 - new path is appended to the dangling branch's paths
 - head, root, and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/simple_improper_dangling_extension.png" alt="simple-improper-dangling-extension" width="500"/>
 
 ### Other simple extensions
 
@@ -96,7 +96,7 @@ The incoming block is *not a parent or child of any block in the witness tree*, 
 - new dangling branch appended to existing dangling branches
 - head, root, and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/new_dangling_branch.png" alt="new-dangling-branch" width="500"/>
 
 #### Incoming block can bypass the witness tree
 
@@ -104,8 +104,6 @@ The incoming block has a *lower height than our current root* or is a *child of 
 
 - witness tree is unchanged
 - block is added to the store
-
-<!-- TODO picture -->
 
 ## Complex Extensions
 
@@ -127,7 +125,7 @@ Note: It is not possible for the block to be a parent of a non-base dangling bra
 - the dangling branches are dropped
 - root and head are updated if necessary
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/complex_proper_main_extension.png" alt="complex-proper-main-extension" width="500"/>
 
 #### Complex improper main branch extension
 
@@ -139,7 +137,7 @@ The incoming block is a *child of a main branch non-leaf block and a parent of o
 - the dangling branches are dropped
 - root and head are updated if necessary
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/complex_improper_main_extension.png" alt="complex-improper-main-extension" width="500"/>
 
 ### Complex dangling branch extensions
 
@@ -152,7 +150,7 @@ The incoming block is a *child of a dangling branch's leaf and a parent of one o
 - the upper dangling branches are dropped
 - root, head, and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/complex_proper_dangling_extension.png" alt="complex-proper-dangling-extension" width="500"/>
 
 #### Complex improper dangling branch extension
 
@@ -163,4 +161,4 @@ The incoming block is a *child of a dangling branch's non-leaf block and a paren
 - the upper dangling branches are dropped
 - root, head, and main branch are unchanged
 
-<!-- TODO picture -->
+<img src="./adding_blocks_to_witness_tree/complex_improper_dangling_extension.png" alt="complex-improper-dangling-extension" width="500"/>
