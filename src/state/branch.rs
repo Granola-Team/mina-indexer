@@ -65,7 +65,7 @@ impl Branch {
             if BlockHash::from_bytes(block.protocol_state.previous_state_hash.clone().inner())
                 == node.data().state_hash
             {
-                let new_block = Block::from_precomputed(block, node.data().slot + 1);
+                let new_block = Block::from_precomputed(block, node.data().height + 1);
                 let new_leaf = Leaf::new(new_block.clone());
                 let new_node_id = self
                     .branches

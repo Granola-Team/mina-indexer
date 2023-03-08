@@ -4,13 +4,11 @@ pub mod parser;
 pub mod precomputed;
 pub mod store;
 
-// block
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
-    pub slot: u32,
-    // TODO block
+    pub height: u32,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -40,7 +38,7 @@ impl Block {
         Self {
             parent_hash,
             state_hash,
-            slot,
+            height: slot,
         }
     }
 }
