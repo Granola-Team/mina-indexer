@@ -53,16 +53,16 @@ impl Branch {
         let root_node_id = self
             .branches
             .root_node_id()
-            .expect("branch always has a root node");
+            .expect("root_node_id guaranteed by constructor");
         for node_id in self
             .branches
             .traverse_level_order_ids(root_node_id)
-            .expect("no node id error")
+            .expect("root_node_id is valid")
         {
             let node = self
                 .branches
                 .get(&node_id)
-                .expect("node_id received from iterator, is valid");
+                .expect("node_id comes from branches iterator, cannot be invalid");
 
             if BlockHash::from_bytes(block.protocol_state.previous_state_hash.clone().inner())
                 == node.data().state_hash
@@ -72,7 +72,7 @@ impl Branch {
                 let new_node_id = self
                     .branches
                     .insert(Node::new(new_block), InsertBehavior::UnderNode(&node_id))
-                    .expect("node_id received from iterator, is valid");
+                    .expect("node_id comes from branches iterator, cannot be invalid");
 
                 branch_update = Some(BranchUpdate {
                     base_node_id: node_id,
