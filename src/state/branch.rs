@@ -4,27 +4,43 @@ use id_tree::{InsertBehavior, Node, NodeId, Tree};
 
 use crate::block::Block;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Branch {
     pub root: Block,
-    pub branches: Tree<Block>,
+    pub branches: Tree<Leaf>,
     pub leaves: Leaves,
 }
 
 pub type Path = Vec<Block>;
 
-pub type Leaves = HashMap<NodeId, Leaf<Block>>;
+pub type Leaves = HashMap<NodeId, Leaf>;
 
 #[derive(Debug, Clone)]
-pub struct Leaf<T> {
-    data: T,
+pub struct Leaf {
+    data: Block,
     depth: usize,
+    //ledger: T
+    // add ledger diff here on dangling, ledger on rooted
 } // leaf tracks depth in tree, gives longest path easily
+
+// TODO: switch to using Node { block, depth } and Leaf { node, ledger[diff] } or an enum?
+
+// pub type RootedLeaf = Leaf<Ledger>;
+// pub type DanglingLeaf = Leaf<LedgerDiff>;
+
+pub struct BranchUpdate {
+    base_node_id: NodeId,
+    new_node_id: NodeId,
+    new_leaf: Leaf,
+}
 
 impl Branch {
     pub fn new(root: Block) -> Result<Self, anyhow::Error> {
         let mut branches = Tree::new();
-        let root_id = branches.insert(Node::new(root.clone()), InsertBehavior::AsRoot)?;
+        let root_id = branches.insert(
+            Node::new(Leaf::new(root.clone(), 0)),
+            InsertBehavior::AsRoot,
+        )?;
 
         let mut leaves = HashMap::new();
         leaves.insert(root_id, Leaf::new(root.clone(), 0));
@@ -35,41 +51,52 @@ impl Branch {
         })
     }
 
-    pub fn try_add_block(&mut self, block: &Block) -> Result<(), anyhow::Error> {
-        let mut to_remove = None;
-        for (node_id, Leaf { data, depth }) in self.leaves.iter() {
-            if block.parent_hash == data.state_hash {
-                let child_id = self
+    pub fn simple_extension(&mut self, block: Block) {
+        let mut branch_update = None;
+        let root_node_id = self
+            .branches
+            .root_node_id()
+            .expect("branch always has a root node");
+        for node_id in self
+            .branches
+            .traverse_level_order_ids(root_node_id)
+            .expect("no node id error")
+        {
+            let node = self
+                .branches
+                .get(&node_id)
+                .expect("node_id received from iterator, is valid");
+
+            if block.parent_hash == node.data().data.state_hash {
+                let new_leaf = Leaf::new(block, node.data().depth + 1);
+                let new_node_id = self
                     .branches
-                    .insert(Node::new(block.clone()), InsertBehavior::UnderNode(node_id))?;
+                    .insert(
+                        Node::new(new_leaf.clone()),
+                        InsertBehavior::UnderNode(&node_id),
+                    )
+                    .expect("node_id received from iterator, is valid");
 
-                let parent_id = node_id.clone();
-                let leaf = Leaf::new(block.clone(), *depth + 1);
-                to_remove = Some((parent_id, (child_id, leaf)));
-                break; // block will only have one parent
+                branch_update = Some(BranchUpdate {
+                    base_node_id: node_id,
+                    new_node_id,
+                    new_leaf,
+                });
+                break;
             }
         }
 
-        if let Some((parent_id, (child_id, leaf))) = to_remove {
-            self.leaves.remove(&parent_id);
-            self.leaves.insert(child_id, leaf);
-        }
-
-        Ok(())
-    }
-
-    pub fn longest_path(&self) -> Path {
-        let mut longest_path = Vec::new();
-        if let Some((node_id, leaf)) = self.leaves.iter().max() {
-            let mut node = self.branches.get(node_id).unwrap();
-            longest_path.push(leaf.data.clone());
-            while let Some(parent_id) = node.parent() {
-                node = self.branches.get(parent_id).unwrap();
-                longest_path.push(node.data().clone());
+        if let Some(BranchUpdate {
+            base_node_id,
+            new_node_id,
+            new_leaf,
+        }) = branch_update
+        {
+            self.leaves.insert(new_node_id, new_leaf);
+            if self.leaves.contains_key(&base_node_id) {
+                self.leaves.remove(&base_node_id);
             }
         }
-        longest_path.reverse();
-        longest_path
     }
 }
 
@@ -85,23 +112,23 @@ impl PartialEq for Branch {
 }
 impl Eq for Branch {}
 
-impl<T> Leaf<T> {
-    pub fn new(data: T, depth: usize) -> Self {
+impl Leaf {
+    pub fn new(data: Block, depth: usize) -> Self {
         Self { data, depth }
     }
 }
-impl<T> PartialEq for Leaf<T> {
+impl PartialEq for Leaf {
     fn eq(&self, other: &Self) -> bool {
         self.depth == other.depth
     }
 }
-impl<T> Eq for Leaf<T> {}
-impl<T> PartialOrd for Leaf<T> {
+impl Eq for Leaf {}
+impl PartialOrd for Leaf {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.depth.partial_cmp(&other.depth)
     }
 }
-impl<T> Ord for Leaf<T> {
+impl Ord for Leaf {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.depth.cmp(&other.depth)
     }
