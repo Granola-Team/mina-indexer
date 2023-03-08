@@ -22,8 +22,6 @@ pub struct Leaf {
     // add ledger diff here on dangling, ledger on rooted
 } // leaf tracks depth in tree, gives longest path easily
 
-// TODO: switch to using Node { block, depth } and Leaf { node, ledger[diff] } or an enum?
-
 // pub type RootedLeaf = Leaf<Ledger>;
 // pub type DanglingLeaf = Leaf<LedgerDiff>;
 
