@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use id_tree::{InsertBehavior, Node, NodeId, Tree};
 
-use crate::block::Block;
+use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 
 #[derive(Debug, Clone)]
 pub struct Branch {
     pub root: Block,
-    pub branches: Tree<Leaf>,
+    pub branches: Tree<Block>,
     pub leaves: Leaves,
 }
 
@@ -17,8 +17,7 @@ pub type Leaves = HashMap<NodeId, Leaf>;
 
 #[derive(Debug, Clone)]
 pub struct Leaf {
-    data: Block,
-    depth: usize,
+    pub block: Block,
     //ledger: T
     // add ledger diff here on dangling, ledger on rooted
 } // leaf tracks depth in tree, gives longest path easily
@@ -35,15 +34,13 @@ pub struct BranchUpdate {
 }
 
 impl Branch {
-    pub fn new(root: Block) -> Result<Self, anyhow::Error> {
+    pub fn new(root_precomputed: &PrecomputedBlock) -> Result<Self, anyhow::Error> {
+        let root = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
-        let root_id = branches.insert(
-            Node::new(Leaf::new(root.clone(), 0)),
-            InsertBehavior::AsRoot,
-        )?;
+        let root_id = branches.insert(Node::new(root.clone()), InsertBehavior::AsRoot)?;
 
         let mut leaves = HashMap::new();
-        leaves.insert(root_id, Leaf::new(root.clone(), 0));
+        leaves.insert(root_id, Leaf::new(root.clone()));
         Ok(Self {
             root,
             branches,
@@ -51,7 +48,7 @@ impl Branch {
         })
     }
 
-    pub fn simple_extension(&mut self, block: Block) {
+    pub fn simple_extension(&mut self, block: &PrecomputedBlock) {
         let mut branch_update = None;
         let root_node_id = self
             .branches
@@ -67,14 +64,14 @@ impl Branch {
                 .get(&node_id)
                 .expect("node_id received from iterator, is valid");
 
-            if block.parent_hash == node.data().data.state_hash {
-                let new_leaf = Leaf::new(block, node.data().depth + 1);
+            if BlockHash::from_bytes(block.protocol_state.previous_state_hash.clone().inner())
+                == node.data().state_hash
+            {
+                let new_block = Block::from_precomputed(block, node.data().slot + 1);
+                let new_leaf = Leaf::new(new_block.clone());
                 let new_node_id = self
                     .branches
-                    .insert(
-                        Node::new(new_leaf.clone()),
-                        InsertBehavior::UnderNode(&node_id),
-                    )
+                    .insert(Node::new(new_block), InsertBehavior::UnderNode(&node_id))
                     .expect("node_id received from iterator, is valid");
 
                 branch_update = Some(BranchUpdate {
@@ -100,36 +97,8 @@ impl Branch {
     }
 }
 
-impl std::hash::Hash for Branch {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.root.hash(state);
-    }
-}
-impl PartialEq for Branch {
-    fn eq(&self, other: &Self) -> bool {
-        self.root == other.root && self.branches == other.branches && self.leaves == other.leaves
-    }
-}
-impl Eq for Branch {}
-
 impl Leaf {
-    pub fn new(data: Block, depth: usize) -> Self {
-        Self { data, depth }
-    }
-}
-impl PartialEq for Leaf {
-    fn eq(&self, other: &Self) -> bool {
-        self.depth == other.depth
-    }
-}
-impl Eq for Leaf {}
-impl PartialOrd for Leaf {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.depth.partial_cmp(&other.depth)
-    }
-}
-impl Ord for Leaf {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.depth.cmp(&other.depth)
+    pub fn new(data: Block) -> Self {
+        Self { block: data }
     }
 }

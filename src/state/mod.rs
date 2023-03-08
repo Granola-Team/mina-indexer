@@ -1,4 +1,4 @@
-use crate::block::{store::BlockStore, Block};
+use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
 use self::branch::{Branch, Path};
 
@@ -40,7 +40,10 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(root: Block, blocks_path: &std::path::Path) -> Result<Self, anyhow::Error> {
+    pub fn new(
+        root: &PrecomputedBlock,
+        blocks_path: &std::path::Path,
+    ) -> Result<Self, anyhow::Error> {
         let best_chain = Vec::new();
         let root_branch = Branch::new(root)?;
         let dangling_branches = Vec::new();
