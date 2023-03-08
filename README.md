@@ -3,19 +3,24 @@
 ![CI Workflow](https://github.com/Granola-Team/mina-indexer/actions/workflows/ci.yaml/badge.svg)
 ![Audit Workflow](https://github.com/Granola-Team/mina-indexer/actions/workflows/audit.yaml/badge.svg)
 
-The Mina indexer is an improvement and simplification over the
-software that is collectively called "[archive
+The Mina indexer ("indexer") is a simplified, and improved version of
+the software collectively called the "[archive
 node](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive)"
 in the Mina codebase.
 
-The Mina indexer replaces the archive node trio of architectural
-elements (PostgreSQL database, Mina daemon, 'mina-archive' process)
-with a system that consumes the precomputed blocks by the Mina daemon
-to generate an index for which we can efficiently query.
+The indexer replaces the archive node trio of architectural elements
+(Postgres database, Mina daemon, "mina-archiver" process) with a
+system that reconstitutes the network’s historical state solely from
+the precomputed blocks logged from the Mina daemon.
+
+![High Level Architecture](notes/architecture/indexer_components.png)
+
+The indexer's primary goals are to be easier to operate and maintain
+while being a superset of the data available in the archive node.
 
 ## Warning
 
-The Mina Indexer project is in constant development and is in an alpha
+The indexer project is in constant development and is in an alpha
 state. Functionality and API definitions will be in flux and are
 subject to change without notice. With that being said, happy hacking!
 
