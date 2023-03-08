@@ -9,7 +9,7 @@ pub mod store;
 pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
-    pub global_slot: u32,
+    pub slot: u32,
     // TODO block
 }
 
@@ -26,7 +26,7 @@ impl BlockHash {
 }
 
 impl Block {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
+    pub fn from_precomputed(precomputed_block: &PrecomputedBlock, slot: u32) -> Self {
         let parent_hash = BlockHash::from_bytes(
             precomputed_block
                 .protocol_state
@@ -37,11 +37,10 @@ impl Block {
         let state_hash = BlockHash {
             block_hash: precomputed_block.state_hash.clone(),
         };
-        let global_slot = 0;
         Self {
             parent_hash,
             state_hash,
-            global_slot,
+            slot,
         }
     }
 }
