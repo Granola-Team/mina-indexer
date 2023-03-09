@@ -56,3 +56,23 @@ impl State {
         })
     }
 }
+
+pub enum ExtensionType {
+    DanglingSimpleForward,
+    DanglingSimpleReverse,
+    DanglingComplex,
+    RootSimple,
+    RootComplex,
+}
+
+impl State {
+    pub fn add_block(&mut self, precomputed_block: &PrecomputedBlock) -> Option<ExtensionType> {
+        // forward extension on root branch
+        if let Some(_new_node_id) = self.root_branch.simple_extension(precomputed_block) {
+            for _dangling_branch in self.dangling_branches.iter_mut() {}
+            return Some(ExtensionType::RootSimple);
+        }
+
+        None
+    }
+}

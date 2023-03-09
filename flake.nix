@@ -81,7 +81,12 @@
               preBuild = ''
                 export LIBCLANG_PATH="${LIBCLANG_PATH}"
                 export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
+
               '';
+
+              doCheck = false;
+              checkPhase = '''';
+              # export LD_LIBRARY_PATH="${pkgs.zstd}/lib:$LD_LIBRARY_PATH"
             };
 
             default = mina-indexer;

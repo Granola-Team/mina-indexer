@@ -46,7 +46,7 @@ impl Branch {
         })
     }
 
-    pub fn simple_extension(&mut self, block: &PrecomputedBlock) {
+    pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<NodeId> {
         let mut branch_update = None;
         let root_node_id = self
             .branches
@@ -87,11 +87,13 @@ impl Branch {
             new_leaf,
         }) = branch_update
         {
-            self.leaves.insert(new_node_id, new_leaf);
+            self.leaves.insert(new_node_id.clone(), new_leaf);
             if self.leaves.contains_key(&base_node_id) {
                 self.leaves.remove(&base_node_id);
             }
+            return Some(new_node_id);
         }
+        None
     }
 }
 
