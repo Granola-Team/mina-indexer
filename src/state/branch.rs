@@ -29,6 +29,7 @@ pub struct BranchUpdate {
     base_node_id: NodeId,
     new_node_id: NodeId,
     new_leaf: Leaf,
+    // TODO do we need leaf updates too?
 }
 
 impl Branch {
@@ -62,7 +63,7 @@ impl Branch {
                 .get(&node_id)
                 .expect("node_id comes from branches iterator, cannot be invalid");
 
-            if BlockHash::from_bytes(block.protocol_state.previous_state_hash.clone().inner())
+            if BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone())
                 == node.data().state_hash
             {
                 let new_block = Block::from_precomputed(block, node.data().slot + 1);
