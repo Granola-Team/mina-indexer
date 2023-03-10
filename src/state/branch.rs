@@ -95,6 +95,65 @@ impl Branch {
         }
         None
     }
+
+    pub fn merge_on(&mut self, junction_id: &NodeId, other: &mut Self) {
+        let mut merge_id_map = HashMap::new();
+        // associate the incoming tree's root node id with it's new id in the base tree
+        let incoming_root_id = other
+            .branches
+            .root_node_id()
+            .expect("branch always has root node");
+        let incoming_root_data = other
+            .branches
+            .get(incoming_root_id)
+            .expect("incoming_root_id valid, branch always has root node")
+            .data();
+        let new_node_id = self
+            .branches
+            .insert(
+                Node::new(incoming_root_data.clone()),
+                InsertBehavior::UnderNode(junction_id),
+            )
+            .expect("merge_on called with valid junction_id");
+        merge_id_map.insert(incoming_root_id, new_node_id);
+        for old_node_id in other
+            .branches
+            .traverse_level_order_ids(incoming_root_id)
+            .expect("incoming_root_id guaranteed by root_id() call")
+        {
+            let under_node_id = merge_id_map
+                .get(&old_node_id)
+                .expect("guaranteed by call structure");
+            let children_ids = other
+                .branches
+                .children_ids(&old_node_id)
+                .expect("old_node_id valid");
+            let mut merge_id_map_inserts = Vec::new();
+            for child_id in children_ids {
+                let child_node_data = other.branches.get(child_id).expect("child_id valid").data();
+                let new_child_id = self
+                    .branches
+                    .insert(
+                        Node::new(child_node_data.clone()),
+                        InsertBehavior::UnderNode(under_node_id),
+                    )
+                    .expect("under_node_id guaranteed by call structure");
+                merge_id_map_inserts.push((child_id, new_child_id));
+            }
+            for (child_id, new_child_id) in merge_id_map_inserts {
+                merge_id_map.insert(child_id, new_child_id);
+            }
+        }
+
+        if let Some(_leaf) = self.leaves.get(junction_id) {
+            self.leaves.remove(junction_id);
+        }
+        for (node_id, leaf) in other.leaves.iter() {
+            if let Some(new_node_id) = merge_id_map.get(node_id) {
+                self.leaves.insert(new_node_id.clone(), leaf.clone());
+            }
+        }
+    }
 }
 
 impl Leaf {
