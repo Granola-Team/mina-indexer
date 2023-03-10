@@ -34,7 +34,7 @@ impl BlockHash {
 }
 
 impl Block {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock, slot: u32) -> Self {
+    pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
         let state_hash = BlockHash {
@@ -43,7 +43,7 @@ impl Block {
         Self {
             parent_hash,
             state_hash,
-            height: slot,
+            height,
         }
     }
 }
