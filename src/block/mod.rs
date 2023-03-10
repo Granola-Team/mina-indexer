@@ -11,8 +11,6 @@ pub mod store;
 pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
-    // TODO do we need height and global_slot?
-    // if we do, I think we need to change our serde stuff to parse the "consensus_state" object too
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]

@@ -7,7 +7,7 @@ pub mod ledger;
 
 #[derive(Debug)]
 pub struct State {
-    pub best_chain: Path, // TODO do we need to store the best_chain or just the best leaf?
+    pub best_chain: Path,
     pub root_branch: Branch,
     pub dangling_branches: Vec<Branch>,
     pub store: BlockStore,
