@@ -33,11 +33,10 @@
           rustc = rust;
         };
 
-        runtimeDependencies = with pkgs;
-          [
-            openssl
-            zstd
-          ];
+        runtimeDependencies = with pkgs; [
+          openssl
+          zstd
+        ];
 
         buildDependencies = with pkgs;
           [
@@ -60,10 +59,9 @@
 
         LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         BINDGEN_EXTRA_CLANG_ARGS =
-          if pkgs.stdenv.isDarwin then
-            "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
-          else
-            "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
+          if pkgs.stdenv.isDarwin
+          then "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
+          else "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
@@ -84,6 +82,7 @@
               preBuild = ''
                 export LIBCLANG_PATH="${LIBCLANG_PATH}"
                 export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
+
               '';
               doCheck = false;
             };
