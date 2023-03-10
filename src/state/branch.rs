@@ -154,6 +154,31 @@ impl Branch {
             }
         }
     }
+
+    pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) {
+        let new_block = Block::from_precomputed(precomputed_block, 0);
+        let new_root_id = self
+            .branches
+            .insert(Node::new(new_block.clone()), InsertBehavior::AsRoot)
+            .expect("insert as root always succeeds");
+        self.root = new_block;
+        let child_ids: Vec<NodeId> = self
+            .branches
+            .traverse_level_order_ids(&new_root_id)
+            .expect("new_root_id received from .insert() call, is valid")
+            .collect();
+        for node_id in child_ids {
+            let node = self
+                .branches
+                .get_mut(&node_id)
+                .expect("node_id from iterator, cannot be invalid");
+            if node_id != new_root_id {
+                let mut block = node.data().clone();
+                block.height += 1;
+                node.replace_data(block);
+            }
+        }
+    }
 }
 
 impl Leaf {
