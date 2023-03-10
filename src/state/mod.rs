@@ -2,34 +2,8 @@ use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
 use self::branch::{Branch, Path};
 
-pub mod ledger;
-// pub mod best_tip;
-// pub mod block;
 pub mod branch;
-// pub mod store;
-// pub mod voting;
-
-// use self::head::Head;
-// use self::block::{Block, BlockHash};
-// use self::branch::{Branches, Leaves};
-// use self::store::Store;
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Head {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Store {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Status {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct DanglingBranches {}
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct StateUpdate {}
-
-pub type RefLog = Vec<StateUpdate>;
+pub mod ledger;
 
 #[derive(Debug)]
 pub struct State {
