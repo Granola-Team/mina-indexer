@@ -58,6 +58,7 @@ impl State {
 }
 
 pub enum ExtensionType {
+    DanglingNew,
     DanglingSimpleForward,
     DanglingSimpleReverse,
     DanglingComplex,
@@ -71,10 +72,11 @@ pub enum ExtensionDirection {
 }
 
 impl State {
-    pub fn add_block(&mut self, precomputed_block: &PrecomputedBlock) -> Option<ExtensionType> {
+    pub fn add_block(&mut self, precomputed_block: &PrecomputedBlock) -> ExtensionType {
         // forward extension on root branch
         if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
             let mut branches_to_remove = Vec::new();
+            // check if new block connects to a dangling branch
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 if precomputed_block.state_hash == dangling_branch.root.parent_hash.block_hash {
                     self.root_branch.merge_on(&new_node_id, dangling_branch);
@@ -83,12 +85,14 @@ impl State {
             }
 
             if !branches_to_remove.is_empty() {
+                // if the root branch is newly connected to dangling branches
                 for index_to_remove in branches_to_remove {
                     self.dangling_branches.remove(index_to_remove);
                 }
-                return Some(ExtensionType::RootComplex);
+                return ExtensionType::RootComplex;
             } else {
-                return Some(ExtensionType::RootSimple);
+                // if there aren't any branches that are connected
+                return ExtensionType::RootSimple;
             }
         }
 
@@ -109,12 +113,14 @@ impl State {
                 break;
             }
 
+            // simple forward
             if let Some(new_node_id) = dangling_branch.simple_extension(precomputed_block) {
                 extension = Some((index, new_node_id, ExtensionDirection::Forward));
                 break;
             }
         }
 
+        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
         if let Some((extended_branch_index, new_node_id, direction)) = extension {
             let mut branches_to_update = Vec::new();
             for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
@@ -134,15 +140,18 @@ impl State {
                     self.dangling_branches.remove(dangling_branch_index);
                 }
                 self.dangling_branches.push(extended_branch);
-                return Some(ExtensionType::DanglingComplex);
+                return ExtensionType::DanglingComplex;
             } else {
-                return Some(match direction {
+                return match direction {
                     ExtensionDirection::Forward => ExtensionType::DanglingSimpleForward,
                     ExtensionDirection::Reverse => ExtensionType::DanglingSimpleReverse,
-                });
+                };
             }
         }
 
-        None
+        // block is added as a new dangling branch
+        self.dangling_branches
+            .push(Branch::new(precomputed_block).expect("cannot fail"));
+        ExtensionType::DanglingNew
     }
 }
