@@ -1,4 +1,4 @@
-use mina_serialization_types::{v1::HashV1, common::Base58EncodableVersionedType, version_bytes};
+use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 
 use self::precomputed::PrecomputedBlock;
 
@@ -27,19 +27,18 @@ impl BlockHash {
     }
 
     pub fn from_hashv1(hashv1: HashV1) -> Self {
-        let versioned: Base58EncodableVersionedType<{version_bytes::STATE_HASH}, _> = hashv1.into();
-        Self { block_hash: versioned.to_base58_string().unwrap() }
+        let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
+            hashv1.into();
+        Self {
+            block_hash: versioned.to_base58_string().unwrap(),
+        }
     }
 }
 
 impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let parent_hash = BlockHash::from_hashv1(
-            precomputed_block
-                .protocol_state
-                .previous_state_hash
-                .clone(),
-        );
+        let parent_hash =
+            BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
         let state_hash = BlockHash {
             block_hash: precomputed_block.state_hash.clone(),
         };

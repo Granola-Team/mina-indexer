@@ -2,8 +2,8 @@ use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
 use self::branch::{Branch, Path};
 
-pub mod ledger;
 pub mod branch;
+pub mod ledger;
 
 #[derive(Debug)]
 pub struct State {
