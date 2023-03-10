@@ -130,8 +130,20 @@ impl Branch {
                 .children_ids(&old_node_id)
                 .expect("old_node_id valid");
             let mut merge_id_map_inserts = Vec::new();
+            let junction_height = self
+                .branches
+                .get(&junction_id)
+                .expect("junction node exists in self")
+                .data()
+                .height;
             for child_id in children_ids {
-                let child_node_data = other.branches.get(child_id).expect("child_id valid").data();
+                let mut child_node_data = other
+                    .branches
+                    .get(child_id)
+                    .expect("child_id valid")
+                    .data()
+                    .clone();
+                child_node_data.height += junction_height;
                 let new_child_id = self
                     .branches
                     .insert(
