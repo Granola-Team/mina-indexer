@@ -59,7 +59,11 @@
           ++ buildDependencies;
 
         LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include";
+        BINDGEN_EXTRA_CLANG_ARGS =
+          if pkgs.stdenv.isDarwin then
+            "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
+          else
+            "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
