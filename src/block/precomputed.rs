@@ -23,7 +23,7 @@ pub struct BlockLog {
     delta_transition_chain_proof: DeltaTransitionChainProofJson,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrecomputedBlock {
     pub state_hash: String,
     pub scheduled_time: String,

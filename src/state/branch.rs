@@ -29,11 +29,12 @@ pub struct BranchUpdate {
     base_node_id: NodeId,
     new_node_id: NodeId,
     new_leaf: Leaf,
+    // TODO do we need leaf updates too?
 }
 
 impl Branch {
     pub fn new(root_precomputed: &PrecomputedBlock) -> Result<Self, anyhow::Error> {
-        let root = Block::from_precomputed(root_precomputed, 0);
+        let root = Block::from_precomputed(root_precomputed);
         let mut branches = Tree::new();
         let root_id = branches.insert(Node::new(root.clone()), InsertBehavior::AsRoot)?;
 
@@ -62,10 +63,10 @@ impl Branch {
                 .get(&node_id)
                 .expect("node_id comes from branches iterator, cannot be invalid");
 
-            if BlockHash::from_bytes(block.protocol_state.previous_state_hash.clone().inner())
+            if BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone())
                 == node.data().state_hash
             {
-                let new_block = Block::from_precomputed(block, node.data().slot + 1);
+                let new_block = Block::from_precomputed(block);
                 let new_leaf = Leaf::new(new_block.clone());
                 let new_node_id = self
                     .branches
