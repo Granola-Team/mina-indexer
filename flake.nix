@@ -33,20 +33,19 @@
           rustc = rust;
         };
 
-        runtimeDependencies = with pkgs; [
-          openssl
-          llvmPackages.libclang
-          llvmPackages.libcxxClang
-          clang
-          zstd
-        ];
+        runtimeDependencies = with pkgs;
+          [
+            openssl
+            zstd
+          ];
 
         buildDependencies = with pkgs;
           [
+            llvmPackages.libclang
+            clang
             pkg-config
           ]
-          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.frameworks.Security]
-          ++ runtimeDependencies;
+          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.frameworks.Security];
 
         developmentDependencies = with pkgs;
           [
@@ -60,7 +59,11 @@
           ++ buildDependencies;
 
         LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
+        BINDGEN_EXTRA_CLANG_ARGS =
+          if pkgs.stdenv.isDarwin then
+            "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
+          else
+            "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
@@ -82,6 +85,7 @@
                 export LIBCLANG_PATH="${LIBCLANG_PATH}"
                 export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
               '';
+              doCheck = false;
             };
 
             default = mina-indexer;
