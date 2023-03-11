@@ -44,7 +44,8 @@
             clang
             pkg-config
           ]
-          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.frameworks.Security];
+          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.frameworks.Security]
+          ++ runtimeDependencies;
 
         developmentDependencies = with pkgs;
           [
