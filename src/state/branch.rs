@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use id_tree::{InsertBehavior, Node, NodeId, Tree};
+use id_tree::{InsertBehavior::*, Node, NodeId, Tree};
 
 use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 
@@ -28,15 +28,14 @@ pub struct Leaf {
 pub struct BranchUpdate {
     base_node_id: NodeId,
     new_node_id: NodeId,
-    new_leaf: Leaf,
-    // TODO do we need leaf updates too?
+    new_leaf: Option<Leaf>,
 }
 
 impl Branch {
     pub fn new(root_precomputed: &PrecomputedBlock) -> Result<Self, anyhow::Error> {
         let root = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
-        let root_id = branches.insert(Node::new(root.clone()), InsertBehavior::AsRoot)?;
+        let root_id = branches.insert(Node::new(root.clone()), AsRoot)?;
 
         let mut leaves = HashMap::new();
         leaves.insert(root_id, Leaf::new(root.clone()));
@@ -63,20 +62,43 @@ impl Branch {
                 .get(&node_id)
                 .expect("node_id comes from branches iterator, cannot be invalid");
 
-            if BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone())
-                == node.data().state_hash
-            {
+            // incoming block is a child of node
+            let incoming_prev_hash =
+                BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone());
+            if incoming_prev_hash == node.data().state_hash {
                 let new_block = Block::from_precomputed(block, node.data().height + 1);
-                let new_leaf = Leaf::new(new_block.clone());
+                let new_leaf = Some(Leaf::new(new_block.clone()));
                 let new_node_id = self
                     .branches
-                    .insert(Node::new(new_block), InsertBehavior::UnderNode(&node_id))
+                    .insert(Node::new(new_block), UnderNode(&node_id))
                     .expect("node_id comes from branches iterator, cannot be invalid");
 
                 branch_update = Some(BranchUpdate {
                     base_node_id: node_id,
                     new_node_id,
                     new_leaf,
+                });
+                break;
+            }
+            // incoming block is the parent of node => increment heights of old tree blocks
+            let incoming_state_hash = BlockHash {
+                block_hash: block.state_hash.clone(),
+            };
+            if incoming_state_hash == node.data().parent_hash {
+                let mut new_branch = Branch::new(block).expect("new root");
+                let new_node_id = new_branch
+                    .branches
+                    .traverse_level_order_ids(&new_branch.branches.root_node_id().unwrap())
+                    .unwrap()
+                    .next()
+                    .expect("There is a root node");
+                new_branch.merge_on(&new_node_id, self);
+                *self = new_branch;
+
+                branch_update = Some(BranchUpdate {
+                    base_node_id: node_id,
+                    new_node_id: new_node_id.clone().to_owned(),
+                    new_leaf: None,
                 });
                 break;
             }
@@ -88,9 +110,19 @@ impl Branch {
             new_leaf,
         }) = branch_update
         {
-            self.leaves.insert(new_node_id.clone(), new_leaf);
-            if self.leaves.contains_key(&base_node_id) {
-                self.leaves.remove(&base_node_id);
+            match new_leaf {
+                Some(leaf) => {
+                    self.leaves.insert(new_node_id.clone(), leaf);
+                    if self.leaves.contains_key(&base_node_id) {
+                        self.leaves.remove(&base_node_id);
+                    }
+                }
+                None => {
+                    let mut leaves = self.leaves.iter_mut();
+                    while let Some((_, leaf)) = leaves.next() {
+                        leaf.block.height += 1;
+                    }
+                }
             }
             return Some(new_node_id);
         }
@@ -113,7 +145,7 @@ impl Branch {
             .branches
             .insert(
                 Node::new(incoming_root_data.clone()),
-                InsertBehavior::UnderNode(junction_id),
+                UnderNode(junction_id),
             )
             .expect("merge_on called with valid junction_id");
         merge_id_map.insert(incoming_root_id, new_node_id);
@@ -143,13 +175,10 @@ impl Branch {
                     .expect("child_id valid")
                     .data()
                     .clone();
-                child_node_data.height += junction_height;
+                child_node_data.height += junction_height + 1;
                 let new_child_id = self
                     .branches
-                    .insert(
-                        Node::new(child_node_data.clone()),
-                        InsertBehavior::UnderNode(under_node_id),
-                    )
+                    .insert(Node::new(child_node_data.clone()), UnderNode(under_node_id))
                     .expect("under_node_id guaranteed by call structure");
                 merge_id_map_inserts.push((child_id, new_child_id));
             }
@@ -172,7 +201,7 @@ impl Branch {
         let new_block = Block::from_precomputed(precomputed_block, 0);
         let new_root_id = self
             .branches
-            .insert(Node::new(new_block.clone()), InsertBehavior::AsRoot)
+            .insert(Node::new(new_block.clone()), AsRoot)
             .expect("insert as root always succeeds");
         self.root = new_block;
         let child_ids: Vec<NodeId> = self
