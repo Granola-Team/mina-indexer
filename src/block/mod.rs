@@ -1,4 +1,5 @@
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
+use std::fmt::{Debug, Formatter, Result};
 
 use self::precomputed::PrecomputedBlock;
 
@@ -6,14 +7,14 @@ pub mod parser;
 pub mod precomputed;
 pub mod store;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone)]
 pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
     pub height: u32,
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone)]
 pub struct BlockHash {
     pub block_hash: String,
 }
@@ -45,5 +46,21 @@ impl Block {
             state_hash,
             height,
         }
+    }
+}
+
+impl Debug for Block {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(
+            f,
+            "\nBlock {{\n  height: {:?},\n  state:  {:?},\n parent:  {:?} }}",
+            self.height, self.state_hash, self.parent_hash
+        )
+    }
+}
+
+impl Debug for BlockHash {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "BlockHash {{ {:?} }}", self.block_hash)
     }
 }
