@@ -88,16 +88,18 @@ impl Branch {
                 let mut new_branch = Branch::new(block).expect("new root");
                 let new_node_id = new_branch
                     .branches
-                    .traverse_level_order_ids(&new_branch.branches.root_node_id().unwrap())
+                    .traverse_level_order_ids(
+                        new_branch.branches.root_node_id().expect("new_branch root"),
+                    )
                     .unwrap()
                     .next()
-                    .expect("There is a root node");
+                    .expect("root node");
                 new_branch.merge_on(&new_node_id, self);
                 *self = new_branch;
 
                 branch_update = Some(BranchUpdate {
                     base_node_id: node_id,
-                    new_node_id: new_node_id.clone().to_owned(),
+                    new_node_id: new_node_id.to_owned(),
                     new_leaf: None,
                 });
                 break;
@@ -118,8 +120,8 @@ impl Branch {
                     }
                 }
                 None => {
-                    let mut leaves = self.leaves.iter_mut();
-                    while let Some((_, leaf)) = leaves.next() {
+                    let leaves = self.leaves.iter_mut();
+                    for (_, leaf) in leaves.into_iter() {
                         leaf.block.height += 1;
                     }
                 }
@@ -164,7 +166,7 @@ impl Branch {
             let mut merge_id_map_inserts = Vec::new();
             let junction_height = self
                 .branches
-                .get(&junction_id)
+                .get(junction_id)
                 .expect("junction node exists in self")
                 .data()
                 .height;
