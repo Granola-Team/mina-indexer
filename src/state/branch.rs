@@ -85,17 +85,7 @@ impl Branch {
                 block_hash: block.state_hash.clone(),
             };
             if incoming_state_hash == node.data().parent_hash {
-                let mut new_branch = Branch::new(block).expect("new root");
-                let new_node_id = new_branch
-                    .branches
-                    .traverse_level_order_ids(
-                        new_branch.branches.root_node_id().expect("new_branch root"),
-                    )
-                    .unwrap()
-                    .next()
-                    .expect("root node");
-                new_branch.merge_on(&new_node_id, self);
-                *self = new_branch;
+                let new_node_id = self.new_root(block);
 
                 branch_update = Some(BranchUpdate {
                     base_node_id: node_id,
@@ -199,7 +189,7 @@ impl Branch {
         }
     }
 
-    pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) {
+    pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) -> NodeId {
         let new_block = Block::from_precomputed(precomputed_block, 0);
         let new_root_id = self
             .branches
@@ -222,6 +212,7 @@ impl Branch {
                 node.replace_data(block);
             }
         }
+        new_root_id
     }
 }
 
