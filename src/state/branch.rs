@@ -85,11 +85,9 @@ impl Branch {
                 block_hash: block.state_hash.clone(),
             };
             if incoming_state_hash == node.data().parent_hash {
-                let new_node_id = self.new_root(block);
-
                 branch_update = Some(BranchUpdate {
                     base_node_id: node_id,
-                    new_node_id: new_node_id.to_owned(),
+                    new_node_id: self.new_root(block),
                     new_leaf: None,
                 });
                 break;
@@ -111,7 +109,7 @@ impl Branch {
                 }
                 None => {
                     let leaves = self.leaves.iter_mut();
-                    for (_, leaf) in leaves.into_iter() {
+                    for (_, leaf) in leaves {
                         leaf.block.height += 1;
                     }
                 }
