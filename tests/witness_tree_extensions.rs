@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock, Block, BlockHash},
-    state::branch::Branch,
+    state::branch::{Branch, Leaf},
 };
 
 fn previous_state_hash_string(block: &PrecomputedBlock) -> String {
@@ -12,7 +12,7 @@ fn previous_state_hash_string(block: &PrecomputedBlock) -> String {
 
 // extend a branch with a new leaf
 #[tokio::test]
-async fn simple_foward_extension() {
+async fn simple_forward_extension_one_leaf() {
     //      0
     // 0 => |
     //      1
@@ -133,7 +133,7 @@ async fn simple_foward_extension() {
 
 // extend a branch with the root's parent
 #[tokio::test]
-async fn root_branch_backward_extension() {
+async fn simple_backward_extension() {
     //      1
     // 0 => |
     //      0
@@ -171,9 +171,16 @@ async fn root_branch_backward_extension() {
             .expect("before: root = leaf")
             .block;
 
-        println!("Before root: {:?}", before_root);
+        println!("=== Before tree === ");
+        println!(
+            "Before leaves map: {:?}",
+            before_leaves
+                .clone()
+                .iter()
+                .collect::<Vec<(&NodeId, &Leaf)>>()
+        );
 
-        // before root is also a leaf
+        // root is also a leaf
         assert_eq!(before_root_block, before_leaf_block);
 
         // extend the branch with a parent of the root
@@ -195,11 +202,22 @@ async fn root_branch_backward_extension() {
 
         let mut w = String::new();
         before_branches.write_formatted(&mut w).unwrap();
-        println!("Before tree:{}", w);
+        println!("{}", w);
+
+        println!("=== After tree ===");
+        println!(
+            "After leaves map: {:?}",
+            after_leaves
+                .clone()
+                .iter()
+                .collect::<Vec<(&NodeId, &Leaf)>>()
+                .iter()
+                .map(|(n, l)| (n, l.block.clone()))
+        );
 
         let mut w = String::new();
         after_branches.write_formatted(&mut w).unwrap();
-        println!("After tree:{}", w);
+        println!("{}", w);
 
         // extension-specific checks
         // before root has no children
@@ -223,11 +241,6 @@ async fn root_branch_backward_extension() {
                 .get(after_child)
                 .expect("There should be a leaf block")
                 .block
-        );
-        println!("After root: {:?}", after_root);
-        println!(
-            "After leaf: {:?}",
-            after_leaves.get(after_child).unwrap().block.clone()
         );
 
         // branch root should match the tree's root
@@ -256,9 +269,16 @@ async fn root_branch_backward_extension() {
 }
 
 // TODO simple improper extension
-// 0      0
-// | =>  / \
-// 1    1   2
+//      0          0
+//      |    =>   / \
+//      1        1   2
+
+// TODO simple_forward_extension_many_leaves
+//      0          0
+//     / \        / \
+//    1   2  =>  1   2
+//                   |
+//                   3
 
 // TODO add dangling block to branch
 // TODO complex extensions
