@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  CI:
+  nextest:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -21,37 +21,20 @@ jobs:
           - ubuntu-latest
         rust:
           - stable
-          - beta
-          - nightly
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           submodules: recursive
 
-      - name: Setup toolchain
+      - name: Setup Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt, clippy
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --package mina-indexer -- --check
-
-      - name: Annotate commit with clippy warnings
-        if: github.event_name == 'pull_request'
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
 
       - name: Run cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -60,6 +43,81 @@ jobs:
           args: run --all-features --profile ci
 
       - name: Release build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features
+
+  rustfmt:
+    runs-on: ${{ matrix.os }}
+      strategy:
+        matrix:
+          os:
+            - ubuntu-latest
+          rust:
+            - stable
+    
+    steps:
+      - name: Setup Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Rustfmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --package mina-indexer -- --check
+
+  clippy:
+    steps:
+      - name: Setup Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: clippy
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Clippy
+        if: github.event_name == 'pull_request'
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        rust:
+          - stable
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+
+      - name: Release Build
         uses: actions-rs/cargo@v1
         with:
           command: build
