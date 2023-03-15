@@ -12,16 +12,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+runs-on: ${{ matrix.os }}
+  strategy:
+    matrix:
+      os:
+        - ubuntu-latest
+      rust:
+        - stable
+
 jobs:
   nextest:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-        rust:
-          - stable
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -49,14 +49,6 @@ jobs:
           args: --release --all-features
 
   rustfmt:
-    runs-on: ${{ matrix.os }}
-      strategy:
-        matrix:
-          os:
-            - ubuntu-latest
-          rust:
-            - stable
-    
     steps:
       - name: Setup Toolchain
         uses: actions-rs/toolchain@v1
@@ -96,14 +88,6 @@ jobs:
           args: --all-features
 
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-        rust:
-          - stable
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
