@@ -28,7 +28,7 @@ pub struct Leaf {
 pub struct BranchUpdate {
     base_node_id: NodeId,
     new_node_id: NodeId,
-    new_leaf: Option<Leaf>,
+    new_leaf: Leaf,
 }
 
 impl Branch {
@@ -67,7 +67,7 @@ impl Branch {
                 BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone());
             if incoming_prev_hash == node.data().state_hash {
                 let new_block = Block::from_precomputed(block, node.data().height + 1);
-                let new_leaf = Some(Leaf::new(new_block.clone()));
+                let new_leaf = Leaf::new(new_block.clone());
                 let new_node_id = self
                     .branches
                     .insert(Node::new(new_block), UnderNode(&node_id))
@@ -80,18 +80,6 @@ impl Branch {
                 });
                 break;
             }
-            // incoming block is the parent of node => increment heights of old tree blocks
-            let incoming_state_hash = BlockHash {
-                block_hash: block.state_hash.clone(),
-            };
-            if incoming_state_hash == node.data().parent_hash {
-                branch_update = Some(BranchUpdate {
-                    base_node_id: node_id,
-                    new_node_id: self.new_root(block),
-                    new_leaf: None,
-                });
-                break;
-            }
         }
 
         if let Some(BranchUpdate {
@@ -100,20 +88,11 @@ impl Branch {
             new_leaf,
         }) = branch_update
         {
-            match new_leaf {
-                Some(leaf) => {
-                    self.leaves.insert(new_node_id.clone(), leaf);
-                    if self.leaves.contains_key(&base_node_id) {
-                        self.leaves.remove(&base_node_id);
-                    }
-                }
-                None => {
-                    let leaves = self.leaves.iter_mut();
-                    for (_, leaf) in leaves {
-                        leaf.block.height += 1;
-                    }
-                }
+            self.leaves.insert(new_node_id.clone(), new_leaf);
+            if self.leaves.contains_key(&base_node_id) {
+                self.leaves.remove(&base_node_id);
             }
+
             return Some(new_node_id);
         }
         None
@@ -209,6 +188,9 @@ impl Branch {
                 block.height += 1;
                 node.replace_data(block);
             }
+        }
+        for (_, leaf) in self.leaves.iter_mut() {
+            leaf.block.height += 1;
         }
         new_root_id
     }
