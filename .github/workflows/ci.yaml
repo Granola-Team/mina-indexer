@@ -47,6 +47,13 @@ jobs:
           args: --release --all-features
 
   rustfmt:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        rust:
+          - stable
     steps:
       - name: Setup Toolchain
         uses: actions-rs/toolchain@v1
@@ -66,6 +73,13 @@ jobs:
           args: --package mina-indexer -- --check
 
   clippy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        rust:
+          - stable
     steps:
       - name: Setup Toolchain
         uses: actions-rs/toolchain@v1
@@ -86,6 +100,13 @@ jobs:
           args: --all-features
 
   build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        rust:
+          - stable
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
