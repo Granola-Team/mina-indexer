@@ -1,7 +1,7 @@
 # Mina Indexer
 
-![CI Workflow](https://github.com/Granola-Team/mina-indexer/actions/workflows/ci.yaml/badge.svg)
-![Audit Workflow](https://github.com/Granola-Team/mina-indexer/actions/workflows/audit.yaml/badge.svg)
+[![Build Status](https://github.com/Granola-Team/mina-indexer/actions/workflows/ci.yaml/badge.svg)](https://github.com/Granola-Team/mina-indexer/actions/workflows/ci.yaml)
+[![Audit Status](https://github.com/Granola-Team/mina-indexer/actions/workflows/audit.yaml/badge.svg)](https://github.com/Granola-Team/mina-indexer/actions/workflows/audit.yaml)
 
 The Mina indexer ("indexer") is a simplified, and improved version of
 the software collectively called the "[archive
