@@ -12,13 +12,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-runs-on: ${{ matrix.os }}
-  strategy:
-    matrix:
-      os:
-        - ubuntu-latest
-      rust:
-        - stable
+# runs-on: ${{ matrix.os }}
+#   strategy:
+#     matrix:
+#       os:
+#         - ubuntu-latest
+#       rust:
+#         - stable
 
 jobs:
   nextest:
