@@ -1,6 +1,9 @@
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
-use self::branch::{Branch, Path};
+use self::{
+    branch::{Branch, Path},
+    ledger::{diff::LedgerDiff, Ledger},
+};
 
 pub mod branch;
 pub mod ledger;
@@ -8,8 +11,8 @@ pub mod ledger;
 #[derive(Debug)]
 pub struct State {
     pub best_chain: Path,
-    pub root_branch: Branch,
-    pub dangling_branches: Vec<Branch>,
+    pub root_branch: Branch<Ledger>,
+    pub dangling_branches: Vec<Branch<LedgerDiff>>,
     pub store: BlockStore,
 }
 
@@ -19,7 +22,7 @@ impl State {
         blocks_path: &std::path::Path,
     ) -> Result<Self, anyhow::Error> {
         let best_chain = Vec::new();
-        let root_branch = Branch::new(root)?;
+        let root_branch = Branch::new_rooted(root);
         let dangling_branches = Vec::new();
         let store = BlockStore::new(blocks_path)?;
         Ok(Self {
@@ -124,8 +127,13 @@ impl State {
         }
 
         // block is added as a new dangling branch
-        self.dangling_branches
-            .push(Branch::new(precomputed_block).expect("cannot fail"));
+        self.dangling_branches.push(
+            Branch::new(
+                precomputed_block,
+                LedgerDiff::fom_precomputed_block(precomputed_block),
+            )
+            .expect("cannot fail"),
+        );
         ExtensionType::DanglingNew
     }
 }

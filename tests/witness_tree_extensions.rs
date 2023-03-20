@@ -25,24 +25,24 @@ async fn simple_forward_extension_one_leaf() {
             root_block.state_hash,
             "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
         );
-        let tree1 = Branch::new(&root_block).expect("Branch creation error");
+        let tree1 = Branch::new_rooted(&root_block);
 
         // before extension quantities
         let before_root = tree1.root;
         let before_branches = tree1.branches;
         let before_root_id = before_branches.root_node_id().unwrap();
         let before_leaves = tree1.leaves;
-        let before_root_block = before_branches.get(&before_root_id).unwrap().data();
+        let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
         let before_leaf_block = &before_leaves
             .get(&before_root_id)
             .expect("before: root = leaf")
             .block;
 
         // before root is also a leaf
-        assert_eq!(before_root_block, before_leaf_block);
+        assert_eq!(&before_root_leaf.block, before_leaf_block);
 
         // extend the branch with a child of the root
-        let mut tree2 = Branch::new(&root_block).expect("Branch creation error");
+        let mut tree2 = Branch::new_rooted(&root_block);
         let mut child_block: PrecomputedBlock = block_parser
             .next()
             .await
@@ -68,11 +68,11 @@ async fn simple_forward_extension_one_leaf() {
         let after_branches = tree2.branches;
         let after_leaves = tree2.leaves;
         let after_root_id = after_branches.root_node_id().unwrap();
-        let after_root_block = after_branches.get(&after_root_id).unwrap().data();
+        let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
 
         // branch root should match the tree's root
-        assert_eq!(&before_root, before_root_block);
-        assert_eq!(&after_root, after_root_block);
+        assert_eq!(before_root, before_root_leaf.block);
+        assert_eq!(&after_root, &after_root_leaf.block);
 
         let mut w = String::new();
         before_branches.write_formatted(&mut w).unwrap();
@@ -158,14 +158,14 @@ async fn simple_backward_extension() {
                 .expect("IO Error on block_parser")
                 .expect("Ran out of logs to parse");
         }
-        let tree1 = Branch::new(&old_root_block).expect("Branch creation error");
+        let tree1 = Branch::new_rooted(&old_root_block);
 
         // before extension quantities
         let before_root = tree1.root;
         let before_branches = tree1.branches;
         let before_root_id = before_branches.root_node_id().unwrap();
         let before_leaves = tree1.leaves;
-        let before_root_block = before_branches.get(&before_root_id).unwrap().data();
+        let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
         let before_leaf_block = &before_leaves
             .get(&before_root_id)
             .expect("before: root = leaf")
@@ -177,14 +177,14 @@ async fn simple_backward_extension() {
             before_leaves
                 .clone()
                 .iter()
-                .collect::<Vec<(&NodeId, &Leaf)>>()
+                .collect::<Vec<(&NodeId, &Leaf<_>)>>()
         );
 
         // root is also a leaf
-        assert_eq!(before_root_block, before_leaf_block);
+        assert_eq!(&before_root_leaf.block, before_leaf_block);
 
         // extend the branch with a parent of the root
-        let mut tree2 = Branch::new(&old_root_block).expect("Branch creation error");
+        let mut tree2 = Branch::new_rooted(&old_root_block);
         assert_eq!(
             old_root_block.state_hash,
             "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
@@ -198,7 +198,7 @@ async fn simple_backward_extension() {
         let after_branches = tree2.branches;
         let after_leaves = tree2.leaves;
         let after_root_id = after_branches.root_node_id().unwrap();
-        let after_root_block = after_branches.get(&after_root_id).unwrap().data();
+        let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
 
         let mut w = String::new();
         before_branches.write_formatted(&mut w).unwrap();
@@ -210,7 +210,7 @@ async fn simple_backward_extension() {
             after_leaves
                 .clone()
                 .iter()
-                .collect::<Vec<(&NodeId, &Leaf)>>()
+                .collect::<Vec<(&NodeId, &Leaf<_>)>>()
                 .iter()
                 .map(|(n, l)| (n, l.block.clone()))
         );
@@ -244,8 +244,8 @@ async fn simple_backward_extension() {
         );
 
         // branch root should match the tree's root
-        assert_eq!(&before_root, before_root_block);
-        assert_eq!(&after_root, after_root_block);
+        assert_eq!(&before_root, &before_root_leaf.block);
+        assert_eq!(&after_root, &after_root_leaf.block);
 
         // root shouldn't change
         assert_ne!(before_root, after_root);
