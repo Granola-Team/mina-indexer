@@ -36,7 +36,7 @@ pub struct BranchUpdate<T> {
 
 impl Branch<Ledger> {
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
-        let new_ledger = Ledger::new();
+        let new_ledger = Ledger::from_diff(LedgerDiff::fom_precomputed_block(root_precomputed));
         Branch::new(root_precomputed, new_ledger).unwrap()
     }
 }
