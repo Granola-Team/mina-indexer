@@ -1,7 +1,7 @@
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
 use self::{
-    branch::{Branch, Path},
+    branch::{Branch, RootedLeaf},
     ledger::{diff::LedgerDiff, Ledger},
 };
 
@@ -10,7 +10,7 @@ pub mod ledger;
 
 #[derive(Debug)]
 pub struct State {
-    pub best_chain: Path,
+    pub best_chain: Vec<RootedLeaf>,
     pub root_branch: Branch<Ledger>,
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     pub store: BlockStore,
@@ -61,6 +61,8 @@ impl State {
                 }
             }
 
+            // should be the only place we need this call
+            self.best_chain = self.root_branch.longest_chain();
             if !branches_to_remove.is_empty() {
                 // if the root branch is newly connected to dangling branches
                 for index_to_remove in branches_to_remove {

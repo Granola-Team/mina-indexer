@@ -226,6 +226,29 @@ where
         }
         new_root_id
     }
+
+    pub fn longest_chain(&self) -> Vec<Leaf<T>> {
+        let mut longest_chain = Vec::new();
+        let mut highest_leaf = None;
+        for (node_id, leaf) in self.leaves.iter() {
+            match highest_leaf {
+                Some((_node_id, height)) => {
+                    if leaf.block.height > height {
+                        highest_leaf = Some((node_id, leaf.block.height));
+                    }
+                }
+                None => highest_leaf = Some((node_id, leaf.block.height)),
+            }
+        }
+
+        if let Some((node_id, _height)) = highest_leaf {
+            for node in self.branches.ancestors(node_id).expect("node_id is valid") {
+                longest_chain.push(node.data().clone());
+            }
+        }
+
+        longest_chain
+    }
 }
 
 impl<T> Leaf<T> {
