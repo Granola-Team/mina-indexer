@@ -38,7 +38,7 @@ impl From<PublicKey> for PublicKeyV1 {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct Ledger {
     accounts: HashMap<PublicKey, Account>,
 }
@@ -82,5 +82,36 @@ impl Ledger {
             }
         });
         success
+    }
+}
+
+pub trait ExtendWithLedgerDiff {
+    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self;
+    fn from_diff(ledger_diff: LedgerDiff) -> Self;
+}
+
+impl ExtendWithLedgerDiff for Ledger {
+    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
+        let mut ledger = self;
+        ledger.apply_diff(ledger_diff);
+        ledger
+    }
+
+    fn from_diff(ledger_diff: LedgerDiff) -> Self {
+        let mut ledger = Ledger::new();
+        ledger.apply_diff(ledger_diff);
+        ledger
+    }
+}
+
+impl ExtendWithLedgerDiff for LedgerDiff {
+    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
+        let mut to_extend = self;
+        to_extend.append(ledger_diff);
+        to_extend
+    }
+
+    fn from_diff(ledger_diff: LedgerDiff) -> Self {
+        ledger_diff
     }
 }

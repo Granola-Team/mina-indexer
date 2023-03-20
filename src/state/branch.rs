@@ -4,41 +4,55 @@ use id_tree::{InsertBehavior::*, Node, NodeId, Tree};
 
 use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 
+use crate::state::ledger::ExtendWithLedgerDiff;
+
+use super::ledger::{diff::LedgerDiff, Ledger};
+
 #[derive(Debug, Clone)]
-pub struct Branch {
+pub struct Branch<T> {
     pub root: Block,
-    pub branches: Tree<Block>,
-    pub leaves: Leaves,
+    pub branches: Tree<Leaf<T>>,
+    pub leaves: Leaves<T>,
 }
 
 pub type Path = Vec<Block>;
 
-pub type Leaves = HashMap<NodeId, Leaf>;
+pub type Leaves<T> = HashMap<NodeId, Leaf<T>>;
 
 #[derive(Debug, Clone)]
-pub struct Leaf {
+pub struct Leaf<T> {
     pub block: Block,
-    //ledger: T
-    // add ledger diff here on dangling, ledger on rooted
+    ledger: T, // add ledger diff here on dangling, ledger on rooted
 } // leaf tracks depth in tree, gives longest path easily
 
-// pub type RootedLeaf = Leaf<Ledger>;
-// pub type DanglingLeaf = Leaf<LedgerDiff>;
+pub type RootedLeaf = Leaf<Ledger>;
+pub type DanglingLeaf = Leaf<LedgerDiff>;
 
-pub struct BranchUpdate {
+pub struct BranchUpdate<T> {
     base_node_id: NodeId,
     new_node_id: NodeId,
-    new_leaf: Leaf,
+    new_leaf: Leaf<T>,
 }
 
-impl Branch {
-    pub fn new(root_precomputed: &PrecomputedBlock) -> Result<Self, anyhow::Error> {
+impl Branch<Ledger> {
+    pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
+        let new_ledger = Ledger::new();
+        Branch::new(root_precomputed, new_ledger).unwrap()
+    }
+}
+
+impl<T> Branch<T>
+where
+    T: ExtendWithLedgerDiff + Clone,
+{
+    pub fn new(root_precomputed: &PrecomputedBlock, ledger: T) -> Result<Self, anyhow::Error> {
         let root = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
-        let root_id = branches.insert(Node::new(root.clone()), AsRoot)?;
+        let root_leaf = Leaf::new(root.clone(), ledger);
+        let root_id = branches.insert(Node::new(root_leaf.clone()), AsRoot)?;
 
         let mut leaves = HashMap::new();
-        leaves.insert(root_id, Leaf::new(root.clone()));
+        leaves.insert(root_id, root_leaf);
         Ok(Self {
             root,
             branches,
@@ -65,12 +79,17 @@ impl Branch {
             // incoming block is a child of node
             let incoming_prev_hash =
                 BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone());
-            if incoming_prev_hash == node.data().state_hash {
-                let new_block = Block::from_precomputed(block, node.data().height + 1);
-                let new_leaf = Leaf::new(new_block.clone());
+            if incoming_prev_hash == node.data().block.state_hash {
+                let new_block = Block::from_precomputed(block, node.data().block.height + 1);
+                let new_ledger = node
+                    .data()
+                    .ledger
+                    .clone()
+                    .extend_with_diff(LedgerDiff::fom_precomputed_block(block));
+                let new_leaf = Leaf::new(new_block, new_ledger);
                 let new_node_id = self
                     .branches
-                    .insert(Node::new(new_block), UnderNode(&node_id))
+                    .insert(Node::new(new_leaf.clone()), UnderNode(&node_id))
                     .expect("node_id comes from branches iterator, cannot be invalid");
 
                 branch_update = Some(BranchUpdate {
@@ -98,7 +117,7 @@ impl Branch {
         None
     }
 
-    pub fn merge_on(&mut self, junction_id: &NodeId, other: &mut Self) {
+    pub fn merge_on(&mut self, junction_id: &NodeId, other: &mut Branch<LedgerDiff>) {
         let mut merge_id_map = HashMap::new();
         // associate the incoming tree's root node id with it's new id in the base tree
         let incoming_root_id = other
@@ -110,12 +129,13 @@ impl Branch {
             .get(incoming_root_id)
             .expect("incoming_root_id valid, branch always has root node")
             .data();
+        let incoming_leaf = Leaf::new(
+            incoming_root_data.block.clone(),
+            ExtendWithLedgerDiff::from_diff(incoming_root_data.ledger.clone()),
+        );
         let new_node_id = self
             .branches
-            .insert(
-                Node::new(incoming_root_data.clone()),
-                UnderNode(junction_id),
-            )
+            .insert(Node::new(incoming_leaf), UnderNode(junction_id))
             .expect("merge_on called with valid junction_id");
         merge_id_map.insert(incoming_root_id, new_node_id);
         for old_node_id in other
@@ -136,6 +156,7 @@ impl Branch {
                 .get(junction_id)
                 .expect("junction node exists in self")
                 .data()
+                .block
                 .height;
             for child_id in children_ids {
                 let mut child_node_data = other
@@ -144,10 +165,14 @@ impl Branch {
                     .expect("child_id valid")
                     .data()
                     .clone();
-                child_node_data.height += junction_height + 1;
+                child_node_data.block.height += junction_height + 1;
+                let new_child_node_data = Leaf::new(
+                    child_node_data.block,
+                    ExtendWithLedgerDiff::from_diff(child_node_data.ledger),
+                );
                 let new_child_id = self
                     .branches
-                    .insert(Node::new(child_node_data.clone()), UnderNode(under_node_id))
+                    .insert(Node::new(new_child_node_data), UnderNode(under_node_id))
                     .expect("under_node_id guaranteed by call structure");
                 merge_id_map_inserts.push((child_id, new_child_id));
             }
@@ -161,16 +186,23 @@ impl Branch {
         }
         for (node_id, leaf) in other.leaves.iter() {
             if let Some(new_node_id) = merge_id_map.get(node_id) {
-                self.leaves.insert(new_node_id.clone(), leaf.clone());
+                let new_leaf = Leaf::new(
+                    leaf.block.clone(),
+                    ExtendWithLedgerDiff::from_diff(leaf.ledger.clone()),
+                );
+                self.leaves.insert(new_node_id.clone(), new_leaf);
             }
         }
     }
 
     pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) -> NodeId {
         let new_block = Block::from_precomputed(precomputed_block, 0);
+        let new_ledger =
+            ExtendWithLedgerDiff::from_diff(LedgerDiff::fom_precomputed_block(precomputed_block));
+        let new_leaf = Leaf::new(new_block.clone(), new_ledger);
         let new_root_id = self
             .branches
-            .insert(Node::new(new_block.clone()), AsRoot)
+            .insert(Node::new(new_leaf), AsRoot)
             .expect("insert as root always succeeds");
         self.root = new_block;
         let child_ids: Vec<NodeId> = self
@@ -185,7 +217,7 @@ impl Branch {
                 .expect("node_id from iterator, cannot be invalid");
             if node_id != new_root_id {
                 let mut block = node.data().clone();
-                block.height += 1;
+                block.block.height += 1;
                 node.replace_data(block);
             }
         }
@@ -196,8 +228,11 @@ impl Branch {
     }
 }
 
-impl Leaf {
-    pub fn new(data: Block) -> Self {
-        Self { block: data }
+impl<T> Leaf<T> {
+    pub fn new(data: Block, ledger: T) -> Self {
+        Self {
+            block: data,
+            ledger,
+        }
     }
 }
