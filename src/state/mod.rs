@@ -2,7 +2,7 @@ use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
 
 use self::{
     branch::{Branch, RootedLeaf},
-    ledger::{diff::LedgerDiff, Ledger},
+    ledger::{command::Command, diff::LedgerDiff, Ledger},
 };
 
 pub mod branch;
@@ -137,5 +137,15 @@ impl State {
             .expect("cannot fail"),
         );
         ExtensionType::DanglingNew
+    }
+
+    pub fn chain_commands(&self) -> Vec<Command> {
+        self.best_chain
+            .iter()
+            .map(|leaf| leaf.block.state_hash.clone())
+            .flat_map(|state_hash| self.store.get_block(&state_hash.block_hash))
+            .flatten()
+            .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
+            .collect()
     }
 }
