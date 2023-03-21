@@ -38,6 +38,19 @@ impl From<PublicKey> for PublicKeyV1 {
     }
 }
 
+impl ExtendWithLedgerDiff for LedgerMock {
+    fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
+        LedgerMock {}
+    }
+
+    fn from_diff(_ledger_diff: LedgerDiff) -> Self {
+        LedgerMock {}
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct LedgerMock {}
+
 #[derive(Default, Clone, Debug)]
 pub struct Ledger {
     accounts: HashMap<PublicKey, Account>,
