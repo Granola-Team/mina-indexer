@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock, Block, BlockHash},
-    state::branch::{Branch, Leaf},
+    state::{
+        branch::{Branch, Leaf},
+        ledger::LedgerMock,
+    },
 };
 
 fn previous_state_hash_string(block: &PrecomputedBlock) -> String {
@@ -25,7 +28,7 @@ async fn simple_forward_extension_one_leaf() {
             root_block.state_hash,
             "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
         );
-        let tree1 = Branch::new_rooted(&root_block);
+        let tree1 = Branch::new(&root_block, LedgerMock {}).unwrap();
 
         // before extension quantities
         let before_root = tree1.root;
@@ -42,7 +45,7 @@ async fn simple_forward_extension_one_leaf() {
         assert_eq!(&before_root_leaf.block, before_leaf_block);
 
         // extend the branch with a child of the root
-        let mut tree2 = Branch::new_rooted(&root_block);
+        let mut tree2 = Branch::new(&root_block, LedgerMock {}).unwrap();
         let mut child_block: PrecomputedBlock = block_parser
             .next()
             .await
