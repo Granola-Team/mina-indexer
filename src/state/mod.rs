@@ -36,7 +36,7 @@ impl State {
     pub fn new(
         root: &PrecomputedBlock,
         blocks_path: Option<&std::path::Path>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> anyhow::Result<Self> {
         let store = blocks_path.map(|path| BlockStore::new(path).unwrap());
         // genesis block => make new root_branch
         if root.state_hash == BlockHash::previous_state_hash(root).block_hash {
