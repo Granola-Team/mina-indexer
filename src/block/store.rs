@@ -9,7 +9,7 @@ pub struct BlockStore {
 }
 
 impl BlockStore {
-    pub fn new(path: &Path) -> Result<Self, anyhow::Error> {
+    pub fn new(path: &Path) -> anyhow::Result<Self> {
         let database_opts = rocksdb::Options::default();
         let database = rocksdb::DB::open(&database_opts, path)?;
         Ok(Self {
@@ -18,14 +18,14 @@ impl BlockStore {
         })
     }
 
-    pub fn add_block(&self, block: &PrecomputedBlock) -> Result<(), anyhow::Error> {
+    pub fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         let key = block.state_hash.as_bytes();
         let value = bcs::to_bytes(&block)?;
         self.database.put(key, value)?;
         Ok(())
     }
 
-    pub fn get_block(&self, state_hash: &str) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
+    pub fn get_block(&self, state_hash: &str) -> anyhow::Result<Option<PrecomputedBlock>> {
         let key = state_hash.as_bytes();
         if let Some(bytes) = self.database.get(key)? {
             let precomputed_block = bcs::from_bytes(&bytes)?;
