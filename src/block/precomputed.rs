@@ -34,7 +34,7 @@ pub struct PrecomputedBlock {
 }
 
 impl PrecomputedBlock {
-    pub fn from_log_contents(log_contents: BlockLogContents) -> Result<Self, serde_json::Error> {
+    pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
         let BlockLog {
             scheduled_time,

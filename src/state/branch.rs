@@ -35,6 +35,7 @@ pub struct BranchUpdate<T> {
 }
 
 impl Branch<Ledger> {
+    // only the genesis block should work here
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
         let new_ledger = Ledger::from_diff(LedgerDiff::fom_precomputed_block(root_precomputed));
         Branch::new(root_precomputed, new_ledger).unwrap()
@@ -48,15 +49,11 @@ impl Branch<LedgerDiff> {
     }
 }
 
-fn previous_state_hash(block: &PrecomputedBlock) -> BlockHash {
-    BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone())
-}
-
 impl<T> Branch<T>
 where
     T: ExtendWithLedgerDiff + Clone,
 {
-    pub fn new(root_precomputed: &PrecomputedBlock, ledger: T) -> Result<Self, anyhow::Error> {
+    pub fn new(root_precomputed: &PrecomputedBlock, ledger: T) -> anyhow::Result<Self> {
         let root = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
         let root_leaf = Leaf::new(root.clone(), ledger);
@@ -92,7 +89,7 @@ where
                 .expect("node_id comes from branches iterator, cannot be invalid");
 
             // incoming block is a child of node
-            let incoming_prev_hash = previous_state_hash(block);
+            let incoming_prev_hash = BlockHash::previous_state_hash(block);
             if incoming_prev_hash == node.data().block.state_hash {
                 let new_block = Block::from_precomputed(block, node.data().block.height + 1);
                 let new_ledger = node
