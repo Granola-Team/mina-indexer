@@ -1,41 +1,28 @@
-use crate::block::{precomputed::PrecomputedBlock, store::BlockStore};
+use crate::block::{precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash};
 
-use self::branch::{Branch, Path};
+use self::{
+    branch::{Branch, Leaf, RootedLeaf},
+    ledger::{command::Command, diff::LedgerDiff, Ledger},
+};
 
 pub mod branch;
 pub mod ledger;
 
 #[derive(Debug)]
 pub struct State {
-    pub best_chain: Path,
-    pub root_branch: Branch,
-    pub dangling_branches: Vec<Branch>,
-    pub store: BlockStore,
+    pub best_chain: Vec<RootedLeaf>,
+    pub root_branch: Option<Branch<Ledger>>,
+    pub dangling_branches: Vec<Branch<LedgerDiff>>,
+    pub store: Option<BlockStore>,
 }
 
-impl State {
-    pub fn new(
-        root: &PrecomputedBlock,
-        blocks_path: &std::path::Path,
-    ) -> Result<Self, anyhow::Error> {
-        let best_chain = Vec::new();
-        let root_branch = Branch::new(root)?;
-        let dangling_branches = Vec::new();
-        let store = BlockStore::new(blocks_path)?;
-        Ok(Self {
-            best_chain,
-            root_branch,
-            dangling_branches,
-            store,
-        })
-    }
-}
-
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExtensionType {
     DanglingNew,
     DanglingSimpleForward,
     DanglingSimpleReverse,
     DanglingComplex,
+    RootNew,
     RootSimple,
     RootComplex,
 }
@@ -46,27 +33,57 @@ pub enum ExtensionDirection {
 }
 
 impl State {
+    pub fn new(
+        root: &PrecomputedBlock,
+        blocks_path: Option<&std::path::Path>,
+    ) -> Result<Self, anyhow::Error> {
+        let store = blocks_path.map(|path| BlockStore::new(path).unwrap());
+        // genesis block => make new root_branch
+        if root.state_hash == BlockHash::previous_state_hash(root).block_hash {
+            // TODO get genesis ledger
+            let genesis_ledger = Ledger::default();
+            let block = Block::from_precomputed(root, 1);
+            Ok(Self {
+                best_chain: Vec::from([Leaf::new(block, genesis_ledger)]),
+                root_branch: Some(Branch::<Ledger>::new_rooted(root)),
+                dangling_branches: Vec::new(),
+                store,
+            })
+        } else {
+            Ok(Self {
+                best_chain: Vec::new(),
+                root_branch: None,
+                dangling_branches: Vec::from([Branch::<LedgerDiff>::new_rooted(root)]),
+                store,
+            })
+        }
+    }
+
     pub fn add_block(&mut self, precomputed_block: &PrecomputedBlock) -> ExtensionType {
         // forward extension on root branch
-        if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
-            let mut branches_to_remove = Vec::new();
-            // check if new block connects to a dangling branch
-            for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
-                if precomputed_block.state_hash == dangling_branch.root.parent_hash.block_hash {
-                    self.root_branch.merge_on(&new_node_id, dangling_branch);
-                    branches_to_remove.push(index);
+        if let Some(mut root_branch) = self.root_branch.clone() {
+            if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
+                let mut branches_to_remove = Vec::new();
+                // check if new block connects to a dangling branch
+                for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
+                    if precomputed_block.state_hash == dangling_branch.root.parent_hash.block_hash {
+                        root_branch.merge_on(&new_node_id, dangling_branch);
+                        branches_to_remove.push(index);
+                    }
                 }
-            }
 
-            if !branches_to_remove.is_empty() {
-                // if the root branch is newly connected to dangling branches
-                for index_to_remove in branches_to_remove {
-                    self.dangling_branches.remove(index_to_remove);
+                // should be the only place we need this call
+                self.best_chain = root_branch.longest_chain();
+                if !branches_to_remove.is_empty() {
+                    // if the root branch is newly connected to dangling branches
+                    for index_to_remove in branches_to_remove {
+                        self.dangling_branches.remove(index_to_remove);
+                    }
+                    return ExtensionType::RootComplex;
+                } else {
+                    // if there aren't any branches that are connected
+                    return ExtensionType::RootSimple;
                 }
-                return ExtensionType::RootComplex;
-            } else {
-                // if there aren't any branches that are connected
-                return ExtensionType::RootSimple;
             }
         }
 
@@ -124,8 +141,28 @@ impl State {
         }
 
         // block is added as a new dangling branch
-        self.dangling_branches
-            .push(Branch::new(precomputed_block).expect("cannot fail"));
+        self.dangling_branches.push(
+            Branch::new(
+                precomputed_block,
+                LedgerDiff::fom_precomputed_block(precomputed_block),
+            )
+            .expect("cannot fail"),
+        );
         ExtensionType::DanglingNew
+    }
+
+    pub fn chain_commands(&self) -> Vec<Command> {
+        self.best_chain
+            .iter()
+            .map(|leaf| leaf.block.state_hash.clone())
+            .flat_map(|state_hash| {
+                self.store
+                    .as_ref()
+                    .unwrap()
+                    .get_block(&state_hash.block_hash)
+            })
+            .flatten()
+            .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
+            .collect()
     }
 }

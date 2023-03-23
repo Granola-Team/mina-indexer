@@ -32,6 +32,10 @@ impl BlockHash {
             block_hash: versioned.to_base58_string().unwrap(),
         }
     }
+
+    pub fn previous_state_hash(block: &PrecomputedBlock) -> Self {
+        Self::from_hashv1(block.protocol_state.previous_state_hash.clone())
+    }
 }
 
 impl Block {
