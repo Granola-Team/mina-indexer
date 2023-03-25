@@ -47,7 +47,7 @@ impl BlockParser {
         }
     }
 
-    pub async fn next(&mut self) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
+    pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next) = self.paths.next() {
             let next_path = next?;
             if has_state_hash_and_json_filetype(&next_path) {

@@ -3,23 +3,16 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock, Block, BlockHash},
-    state::{
-        branch::{Branch, Leaf},
-        ledger::LedgerMock,
-    },
+    state::{branch::Leaf, ExtensionType, State},
 };
-
-fn previous_state_hash_string(block: &PrecomputedBlock) -> String {
-    BlockHash::from_hashv1(block.protocol_state.previous_state_hash.clone()).block_hash
-}
 
 // extend a branch with a new leaf
 #[tokio::test]
-async fn simple_forward_extension_one_leaf() {
+async fn dangling_simple_forward_extension_one_leaf() {
     //      0
     // 0 => |
     //      1
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("../tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir);
 
     // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
@@ -28,13 +21,13 @@ async fn simple_forward_extension_one_leaf() {
             root_block.state_hash,
             "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
         );
-        let tree1 = Branch::new(&root_block, LedgerMock {}).unwrap();
+        let mut state = State::new(&root_block, None).unwrap();
 
         // before extension quantities
-        let before_root = tree1.root;
-        let before_branches = tree1.branches;
+        let before_root = state.dangling_branches.get(0).unwrap().root.clone();
+        let before_branches = state.dangling_branches.get(0).unwrap().branches.clone();
         let before_root_id = before_branches.root_node_id().unwrap();
-        let before_leaves = tree1.leaves;
+        let before_leaves = state.dangling_branches.get(0).unwrap().leaves.clone();
         let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
         let before_leaf_block = &before_leaves
             .get(&before_root_id)
@@ -45,13 +38,13 @@ async fn simple_forward_extension_one_leaf() {
         assert_eq!(&before_root_leaf.block, before_leaf_block);
 
         // extend the branch with a child of the root
-        let mut tree2 = Branch::new(&root_block, LedgerMock {}).unwrap();
+        // let mut state2 = State::new(&root_block, None).unwrap();
         let mut child_block: PrecomputedBlock = block_parser
             .next()
             .await
             .expect("IO Error on block_parser")
             .unwrap();
-        while previous_state_hash_string(&child_block) != root_block.state_hash {
+        while BlockHash::previous_state_hash(&child_block).block_hash != root_block.state_hash {
             child_block = block_parser
                 .next()
                 .await
@@ -62,14 +55,14 @@ async fn simple_forward_extension_one_leaf() {
             child_block.state_hash,
             "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
         );
-        tree2
-            .simple_extension(&child_block)
-            .expect("new leaf should be inserted");
+
+        // DanglingNew extension  type
+        assert_eq!(state.add_block(&child_block), ExtensionType::DanglingNew);
 
         // after extension quantities
-        let after_root = tree2.root;
-        let after_branches = tree2.branches;
-        let after_leaves = tree2.leaves;
+        let after_root = state.dangling_branches.get(0).unwrap().root.clone();
+        let after_branches = state.dangling_branches.get(0).unwrap().branches.clone();
+        let after_leaves = state.dangling_branches.get(0).unwrap().leaves.clone();
         let after_root_id = after_branches.root_node_id().unwrap();
         let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
 
@@ -134,17 +127,18 @@ async fn simple_forward_extension_one_leaf() {
     }
 }
 
-// extend a branch with the root's parent
+/// extend a branch backwards with the root's parent
 #[tokio::test]
 async fn simple_backward_extension() {
     //      1
     // 0 => |
     //      0
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("../tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir);
 
     // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     if let Some(new_root_block) = block_parser.next().await.expect("IO Error on block_parser") {
+        // get the block we want
         assert_eq!(
             new_root_block.state_hash,
             "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
@@ -154,20 +148,23 @@ async fn simple_backward_extension() {
             .await
             .expect("IO Error on block_parser")
             .unwrap();
-        while previous_state_hash_string(&old_root_block) != new_root_block.state_hash {
+        while BlockHash::previous_state_hash(&old_root_block).block_hash
+            != new_root_block.state_hash
+        {
             old_root_block = block_parser
                 .next()
                 .await
                 .expect("IO Error on block_parser")
                 .expect("Ran out of logs to parse");
         }
-        let tree1 = Branch::new_rooted(&old_root_block);
+        // state is created with the child of the next block
+        let mut state = State::new(&old_root_block, None).unwrap();
 
         // before extension quantities
-        let before_root = tree1.root;
-        let before_branches = tree1.branches;
+        let before_root = state.dangling_branches.get(0).unwrap().root.clone();
+        let before_branches = state.dangling_branches.get(0).unwrap().branches.clone();
         let before_root_id = before_branches.root_node_id().unwrap();
-        let before_leaves = tree1.leaves;
+        let before_leaves = state.dangling_branches.get(0).unwrap().leaves.clone();
         let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
         let before_leaf_block = &before_leaves
             .get(&before_root_id)
@@ -187,21 +184,23 @@ async fn simple_backward_extension() {
         assert_eq!(&before_root_leaf.block, before_leaf_block);
 
         // extend the branch with a parent of the root
-        let mut tree2 = Branch::new_rooted(&old_root_block);
+        let extension_type1 = state.add_block(&old_root_block);
         assert_eq!(
             old_root_block.state_hash,
             "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
         );
-        tree2
-            .simple_extension(&new_root_block)
-            .expect("new root should be inserted");
+        assert_eq!(extension_type1, ExtensionType::DanglingNew);
+        let extension_type2 = state.add_block(&new_root_block);
 
         // after extension quantities
-        let after_root = tree2.root;
-        let after_branches = tree2.branches;
-        let after_leaves = tree2.leaves;
+        let after_root = state.dangling_branches.get(0).unwrap().root.clone();
+        let after_branches = state.dangling_branches.get(0).unwrap().branches.clone();
+        let after_leaves = state.dangling_branches.get(0).unwrap().leaves.clone();
         let after_root_id = after_branches.root_node_id().unwrap();
         let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
+
+        // simple reverse extension of a dangling branch
+        assert_eq!(extension_type2, ExtensionType::DanglingSimpleReverse);
 
         let mut w = String::new();
         before_branches.write_formatted(&mut w).unwrap();
@@ -271,17 +270,5 @@ async fn simple_backward_extension() {
     }
 }
 
-// TODO simple improper extension
-//      0          0
-//      |    =>   / \
-//      1        1   2
-
-// TODO simple_forward_extension_many_leaves
-//      0          0
-//     / \        / \
-//    1   2  =>  1   2
-//                   |
-//                   3
-
-// TODO add dangling block to branch
-// TODO complex extensions
+// TODO genesis block => RootNew
+// TODO more complex test scenarios

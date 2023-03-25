@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Error};
 
 pub mod account;
 pub mod coinbase;
@@ -64,7 +64,7 @@ impl Ledger {
     }
 
     // should this be a mutable update or immutable?
-    pub fn apply_diff(&mut self, diff: LedgerDiff) -> bool {
+    pub fn apply_diff(&mut self, diff: LedgerDiff) -> anyhow::Result<()> {
         diff.public_keys_seen.into_iter().for_each(|public_key| {
             if self.accounts.get(&public_key).is_none() {
                 self.accounts
@@ -72,7 +72,7 @@ impl Ledger {
             }
         });
 
-        let mut success = true; // change this to a Result<(), CustomError> so we can know exactly where this failed
+        let mut success = Ok(());
         diff.account_diffs.into_iter().for_each(|diff| {
             if let Some(account_before) = self.accounts.remove(&diff.public_key().into()) {
                 let account_after = match &diff {
@@ -91,7 +91,7 @@ impl Ledger {
                 self.accounts
                     .insert(diff.public_key().into(), account_after);
             } else {
-                success = false;
+                success = Err(anyhow::Error::new(Error::default()));
             }
         });
         success
@@ -106,13 +106,17 @@ pub trait ExtendWithLedgerDiff {
 impl ExtendWithLedgerDiff for Ledger {
     fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
         let mut ledger = self;
-        ledger.apply_diff(ledger_diff);
+        ledger
+            .apply_diff(ledger_diff)
+            .expect("diff applied successfully");
         ledger
     }
 
     fn from_diff(ledger_diff: LedgerDiff) -> Self {
         let mut ledger = Ledger::new();
-        ledger.apply_diff(ledger_diff);
+        ledger
+            .apply_diff(ledger_diff)
+            .expect("diff applied successfully");
         ledger
     }
 }
