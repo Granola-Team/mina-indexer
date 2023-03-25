@@ -122,11 +122,6 @@ async fn simple_proper_extension() {
     assert!(!after_leaves.contains_key(after_root_id));
 }
 
-// TODO simple improper extension
-//      0          0
-//      |    =>   / \
-//      1        1   2
-
 // TODO simple_forward_extension_many_leaves
 //      0          0
 //     / \        / \
