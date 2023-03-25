@@ -8,7 +8,7 @@ use crate::state::ledger::ExtendWithLedgerDiff;
 
 use super::ledger::{diff::LedgerDiff, Ledger};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Branch<T> {
     pub root: Block,
     pub branches: Tree<Leaf<T>>,
@@ -268,6 +268,23 @@ impl<T> Leaf<T> {
             block: data,
             ledger,
         }
+    }
+}
+
+impl<T> std::fmt::Debug for Branch<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut tree = String::new();
+        self.branches.write_formatted(&mut tree).unwrap();
+        write!(
+            f,
+            "Branch {{\n  root: {:?}\n  leaves: {:?}\n  branches:\n  {:?} }}",
+            self.root,
+            self.leaves.values().collect::<Vec<&Leaf<T>>>(),
+            tree
+        )
     }
 }
 
