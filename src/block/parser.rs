@@ -20,30 +20,31 @@ pub struct BlockParser {
 }
 
 impl BlockParser {
-    pub fn new(log_path: &Path) -> Self {
+    pub fn new(log_path: &Path) -> anyhow::Result<Self> {
         Self::new_internal(log_path, SearchRecursion::None)
     }
 
-    pub fn new_recursive(log_path: &Path) -> Self {
+    pub fn new_recursive(log_path: &Path) -> anyhow::Result<Self> {
         Self::new_internal(log_path, SearchRecursion::Recursive)
     }
 
-    // pub fn with_depth(log_path: &Path, max_depth: usize) -> Self {
-    //     Self::new_internal(log_path, SearchRecursion::Depth(max_depth))
-    // }
-
-    fn new_internal(log_path: &Path, recursion: SearchRecursion) -> Self {
-        let pattern = match &recursion {
-            SearchRecursion::None => format!("{}/*.json", log_path.display()),
-            SearchRecursion::Recursive => format!("{}/**/*.json", log_path.display()),
-            // ScannerRecursion::Depth(max_depth) => todo!(),
-        };
-        let log_path = log_path.to_owned();
-        let paths = glob(&pattern).expect("Failed to read glob pattern");
-        Self {
-            log_path,
-            recursion,
-            paths,
+    fn new_internal(log_path: &Path, recursion: SearchRecursion) -> anyhow::Result<Self> {
+        if log_path.exists() {
+            let pattern = match &recursion {
+                SearchRecursion::None => format!("{}/*.json", log_path.display()),
+                SearchRecursion::Recursive => format!("{}/**/*.json", log_path.display()),
+            };
+            let log_path = log_path.to_owned();
+            let paths = glob(&pattern).expect("Failed to read glob pattern");
+            Ok(Self {
+                log_path,
+                recursion,
+                paths,
+            })
+        } else {
+            Err(anyhow::Error::msg(format!(
+                "[BlockPasrser::new_internal] log_path: {log_path:?} does not exist!"
+            )))
         }
     }
 
@@ -70,6 +71,26 @@ impl BlockParser {
         }
 
         Ok(None)
+    }
+
+    #[async_recursion::async_recursion]
+    pub async fn get_precomputed_block(
+        &mut self,
+        state_hash: &str,
+    ) -> anyhow::Result<PrecomputedBlock> {
+        match self.next().await.unwrap() {
+            None => Err(anyhow::Error::msg(format!(
+                "[BlockPasrser::get_precomputed_block] state_hash: {state_hash} does not exist in {:?}!",
+                self.log_path
+            ))),
+            Some(precomputed) => Ok(
+                if precomputed.state_hash == state_hash {
+                    precomputed
+                } else {
+                    self.get_precomputed_block(state_hash).await.unwrap()
+                }
+            ),
+        }
     }
 }
 
