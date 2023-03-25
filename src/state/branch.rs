@@ -19,7 +19,7 @@ pub type Path = Vec<Block>;
 
 pub type Leaves<T> = HashMap<NodeId, Leaf<T>>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Leaf<T> {
     pub block: Block,
     ledger: T, // add ledger diff here on dangling, ledger on rooted
@@ -268,5 +268,15 @@ impl<T> Leaf<T> {
             block: data,
             ledger,
         }
+    }
+}
+
+// only display the underlying block
+impl<T> std::fmt::Debug for Leaf<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.block)
     }
 }
