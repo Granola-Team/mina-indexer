@@ -12,6 +12,7 @@ async fn simple_proper_forward_extension() {
     //      0
     // 0 => |
     //      1
+
     let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
@@ -102,19 +103,13 @@ async fn simple_proper_forward_extension() {
 
     // after extension quantities
     let after_root = &state.dangling_branches.get(0).unwrap().root;
-    let after_branches = &state.dangling_branches.get(0).unwrap().branches;
-    let after_leaves = &state.dangling_branches.get(0).unwrap().leaves;
-    let after_root_id = after_branches.root_node_id().unwrap();
+    let branches1 = &state.dangling_branches.get(0).unwrap().branches;
+    let leaves1 = &state.dangling_branches.get(0).unwrap().leaves;
+    let after_root_id = branches1.root_node_id().unwrap();
     let after_root_leaf = {
-        let child_ids: Vec<&NodeId> = after_branches
-            .children_ids(&after_root_id)
-            .unwrap()
-            .collect();
+        let child_ids: Vec<&NodeId> = branches1.children_ids(&after_root_id).unwrap().collect();
         assert_eq!(child_ids.len(), 1);
-        after_branches
-            .get(child_ids.get(0).unwrap())
-            .unwrap()
-            .data()
+        branches1.get(child_ids.get(0).unwrap()).unwrap().data()
     };
 
     // branch root should still match the root of the dangling branch
@@ -139,7 +134,7 @@ async fn simple_proper_forward_extension() {
             .block
     );
 
-    println!("After tree:\n{:?}", after_branches);
+    println!("After tree:\n{:?}", branches1);
 
     assert_eq!(
         after_root_leaf.block,
@@ -153,7 +148,7 @@ async fn simple_proper_forward_extension() {
     assert_eq!(state.dangling_branches.get(0).unwrap().branches.height(), 2);
 
     // after root isn't a leaf
-    assert!(!after_leaves.contains_key(after_root_id));
+    assert!(!leaves1.contains_key(after_root_id));
 }
 
 /// Extends a branch with a new leaf
@@ -162,6 +157,7 @@ async fn simple_improper_forward_extension() {
     // 0      0
     // | =>  / \
     // 1    1   2
+
     let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
@@ -250,9 +246,9 @@ async fn simple_improper_forward_extension() {
 
     // after extension quantities
     let after_root = &state.dangling_branches.get(0).unwrap().root;
-    let after_branches = &state.dangling_branches.get(0).unwrap().branches;
-    let after_leaves = &state.dangling_branches.get(0).unwrap().leaves;
-    let after_root_id = after_branches.root_node_id().unwrap();
+    let branches1 = &state.dangling_branches.get(0).unwrap().branches;
+    let leaves1 = &state.dangling_branches.get(0).unwrap().leaves;
+    let after_root_id = branches1.root_node_id().unwrap();
 
     // branch root should match the tree's root
     assert_eq!(
@@ -274,7 +270,7 @@ async fn simple_improper_forward_extension() {
     );
 
     // after root has one child
-    let after_children = after_branches
+    let after_children = branches1
         .children_ids(&after_root_id)
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
@@ -287,27 +283,21 @@ async fn simple_improper_forward_extension() {
     let after_child2_block = Block::from_precomputed(&child2, 1);
 
     // child1 is a leaf
-    assert_eq!(
-        after_child1_block,
-        after_leaves.get(after_child1).unwrap().block
-    );
+    assert_eq!(after_child1_block, leaves1.get(after_child1).unwrap().block);
 
     // child2 is a leaf
-    assert_eq!(
-        after_child2_block,
-        after_leaves.get(after_child2).unwrap().block
-    );
+    assert_eq!(after_child2_block, leaves1.get(after_child2).unwrap().block);
 
     println!(
         "After leaves: {:?}",
-        after_leaves.values().collect::<Vec<&Leaf<LedgerDiff>>>()
+        leaves1.values().collect::<Vec<&Leaf<LedgerDiff>>>()
     );
 
     // root shouldn't change
     assert_eq!(&before_root, after_root);
 
     // after root isn't a leaf
-    assert!(!after_leaves.contains_key(after_root_id));
+    assert!(!leaves1.contains_key(after_root_id));
 }
 
 /// extend a branch backwards with the root's parent
@@ -316,9 +306,11 @@ async fn simple_backward_extension() {
     //      1
     // 0 => |
     //      0
+
     let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
+    // *** parent ***
     // new_root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let new_root_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
@@ -329,6 +321,8 @@ async fn simple_backward_extension() {
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
+    // *** child ***
+    // new_root_block = mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
     let old_root_block = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await
@@ -338,10 +332,11 @@ async fn simple_backward_extension() {
         "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
     );
 
-    // ------------------------------------------------
-    // initialize state with old_root_block (the child)
-    // ------------------------------------------------
+    // ----------------
+    // initialize state
+    // ----------------
 
+    // child becomes the root of the 0th dangling branch
     let mut state = State::new(&old_root_block, None).unwrap();
 
     // before extension quantities
@@ -365,42 +360,34 @@ async fn simple_backward_extension() {
         .block
         .clone();
 
+    assert_eq!(before_root, before_root_leaf);
     assert_eq!(before_leaves.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().branches.height(), 1);
-
     println!(
         "=== Before tree ===\n{:?}",
         state.dangling_branches.get(0).unwrap()
     );
-    // root is also a leaf
-    // assert_eq!(&before_root_leaf.block, before_leaf_block);
 
     // extend the branch with new_root_block (the parent)
-    let extension_type2 = state.add_block(&new_root_block);
-    assert_eq!(extension_type2, ExtensionType::DanglingSimpleReverse);
+    let extension_type = state.add_block(&new_root_block);
+    assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // after extension quantities
     let after_root = &state.dangling_branches.get(0).unwrap().root;
-    let after_branches = &state.dangling_branches.get(0).unwrap().branches;
-    let after_leaves = &state.dangling_branches.get(0).unwrap().leaves;
-    let after_root_id = after_branches.root_node_id().unwrap();
-    let after_root_block = after_branches
-        .get(&after_root_id)
-        .unwrap()
-        .data()
-        .block
-        .clone();
+    let branches1 = &state.dangling_branches.get(0).unwrap().branches;
+    let leaves1 = &state.dangling_branches.get(0).unwrap().leaves;
+    let after_root_id = branches1.root_node_id().unwrap();
+    let after_root_block = branches1.get(&after_root_id).unwrap().data().block.clone();
 
-    assert_eq!(after_leaves.len(), 1);
-    assert_eq!(after_branches.height(), 2);
-
+    assert_eq!(leaves1.len(), 1);
+    assert_eq!(branches1.height(), 2);
     println!(
         "=== After tree ===\n{:?}",
         &state.dangling_branches.get(0).unwrap()
     );
 
     // after root has one child
-    let after_children = after_branches
+    let after_children = branches1
         .children_ids(&after_root_id)
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
@@ -410,28 +397,150 @@ async fn simple_backward_extension() {
     let after_child_block = Block::from_precomputed(&old_root_block, 1);
     assert_eq!(
         after_child_block,
-        after_leaves
+        leaves1
             .get(after_child)
             .expect("There should be a leaf block")
             .block
     );
 
-    // branch root should match the tree's root
-    assert_eq!(before_root, before_root_leaf);
+    // root checks
+    assert_ne!(&before_root, after_root);
     assert_eq!(after_root, &after_root_block);
 
-    // root should change
-    assert_ne!(&before_root, after_root);
-
-    // before root is a leaf
-    // after root isn't a leaf
-    let leaves: Vec<&Block> = after_leaves.iter().map(|(_, x)| &x.block).collect();
+    // leaf checks
+    let leaves: Vec<&Block> = leaves1.iter().map(|(_, x)| &x.block).collect();
     let leaf = leaves.get(0).unwrap();
 
-    // height diffs, hashes agree
+    // height differs, hashes agree
     assert_eq!(leaf.height, 1 + before_root.height);
     assert_eq!(leaf.state_hash, before_root.state_hash);
     assert_eq!(leaf.parent_hash, before_root.parent_hash);
+}
+
+/// create multiple dangling branches
+#[tokio::test]
+async fn multiple_dangling_branches() {
+    // 0 => 0 1 (two separate branches)
+
+    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+
+    // root0_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
+    let root0_block = block_parser
+        .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
+        .await
+        .unwrap();
+    assert_eq!(
+        root0_block.state_hash,
+        "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
+    );
+
+    // root1_block = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
+    let root1_block = block_parser
+        .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
+        .await
+        .unwrap();
+    assert_eq!(
+        root1_block.state_hash,
+        "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
+    );
+
+    // ----------------
+    // initialize state
+    // ----------------
+
+    // root0_block will the be the root of the 0th dangling_branch
+    let mut state = State::new(&root0_block, None).unwrap();
+
+    // 1 dangling branch
+    // - height = 1
+    // - 1 leaf
+    assert_eq!(state.dangling_branches.len(), 1);
+    state
+        .dangling_branches
+        .iter()
+        .for_each(|tree| assert_eq!(tree.branches.height(), 1));
+    state
+        .dangling_branches
+        .iter()
+        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+
+    // before extension quantities
+    let root0 = state.dangling_branches.get(0).unwrap().root.clone();
+    let root_leaf0 = state
+        .dangling_branches
+        .get(0)
+        .unwrap()
+        .leaves
+        .get(
+            state
+                .dangling_branches
+                .get(0)
+                .unwrap()
+                .branches
+                .root_node_id()
+                .unwrap(),
+        )
+        .unwrap()
+        .block
+        .clone();
+
+    // root == leaf
+    assert_eq!(root0, root_leaf0);
+    println!(
+        "=== Dangling Branch 0 ===\n{:?}",
+        state.dangling_branches.get(0).unwrap()
+    );
+
+    // ---------
+    // add block
+    // ---------
+
+    // make a new dangling branch
+    let extension_type = state.add_block(&root1_block);
+    assert_eq!(extension_type, ExtensionType::DanglingNew);
+
+    // 2 dangling branches
+    // - each height = 1
+    // - each has 1 leaf
+    assert_eq!(state.dangling_branches.len(), 2);
+    state
+        .dangling_branches
+        .iter()
+        .for_each(|tree| assert_eq!(tree.branches.height(), 1));
+    state
+        .dangling_branches
+        .iter()
+        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+
+    // after extension quantities
+    let root1 = &state.dangling_branches.get(1).unwrap().root;
+    let branches1 = &state.dangling_branches.get(1).unwrap().branches;
+    let branch_root1 = &branches1
+        .get(&branches1.root_node_id().unwrap())
+        .unwrap()
+        .data()
+        .block;
+    let root_leaf1 = &state
+        .dangling_branches
+        .get(1)
+        .unwrap()
+        .leaves
+        .get(branches1.root_node_id().unwrap())
+        .unwrap()
+        .block
+        .clone();
+
+    // root == leaf
+    assert_eq!(root1, root_leaf1);
+    println!(
+        "\n=== Dangling Branch 1 ===\n{:?}",
+        &state.dangling_branches.get(1).unwrap()
+    );
+
+    // branch root should match the tree's root
+    assert_eq!(root1, branch_root1);
+    assert!(false);
 }
 
 // TODO more complex test scenarios
