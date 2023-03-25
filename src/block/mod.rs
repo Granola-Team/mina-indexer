@@ -1,5 +1,4 @@
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
-use std::fmt::{Debug, Formatter, Result};
 
 use self::precomputed::PrecomputedBlock;
 
@@ -53,18 +52,18 @@ impl Block {
     }
 }
 
-impl Debug for Block {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(
-            f,
-            "\nBlock {{\n  height: {:?},\n  state:  {:?},\n parent:  {:?} }}",
-            self.height, self.state_hash, self.parent_hash
-        )
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "Block {{")?;
+        writeln!(f, "  height:  {},", self.height)?;
+        writeln!(f, "  state:   {:?},", self.state_hash)?;
+        writeln!(f, "  parent:  {:?},", self.parent_hash)
     }
 }
 
-impl Debug for BlockHash {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+impl std::fmt::Debug for BlockHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "BlockHash {{ {:?} }}", self.block_hash)
     }
 }

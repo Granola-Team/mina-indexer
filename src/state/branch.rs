@@ -271,6 +271,7 @@ impl<T> Leaf<T> {
     }
 }
 
+// only display the underlying tree
 impl<T> std::fmt::Debug for Branch<T>
 where
     T: std::fmt::Debug,
@@ -278,13 +279,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
         self.branches.write_formatted(&mut tree).unwrap();
-        write!(
-            f,
-            "Branch {{\n  root: {:?}\n  leaves: {:?}\n  branches:\n  {:?} }}",
-            self.root,
-            self.leaves.values().collect::<Vec<&Leaf<T>>>(),
-            tree
-        )
+        writeln!(f, "Branches").unwrap();
+        write!(f, "{:?}", tree)
     }
 }
 
