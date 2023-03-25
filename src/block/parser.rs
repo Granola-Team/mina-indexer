@@ -73,6 +73,8 @@ impl BlockParser {
         Ok(None)
     }
 
+    /// get the precomputed block with supplied hash
+    /// it must exist ahead of the current block parser file
     #[async_recursion::async_recursion]
     pub async fn get_precomputed_block(
         &mut self,
@@ -80,16 +82,19 @@ impl BlockParser {
     ) -> anyhow::Result<PrecomputedBlock> {
         match self.next().await.unwrap() {
             None => Err(anyhow::Error::msg(format!(
-                "[BlockPasrser::get_precomputed_block] state_hash: {state_hash} does not exist in {:?}!",
+                "
+[BlockPasrser::get_precomputed_block]
+    Looking in log path: {:?}
+    Did not find state hash: {state_hash}
+    It may have been skipped unintentionally!
+    BlockParser::next() does not exactly follow filename order!",
                 self.log_path
             ))),
-            Some(precomputed) => Ok(
-                if precomputed.state_hash == state_hash {
-                    precomputed
-                } else {
-                    self.get_precomputed_block(state_hash).await.unwrap()
-                }
-            ),
+            Some(precomputed) => Ok(if precomputed.state_hash == state_hash {
+                precomputed
+            } else {
+                self.get_precomputed_block(state_hash).await.unwrap()
+            }),
         }
     }
 }
