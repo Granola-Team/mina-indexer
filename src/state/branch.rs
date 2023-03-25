@@ -280,7 +280,7 @@ where
         let mut tree = String::new();
         self.branches.write_formatted(&mut tree).unwrap();
         writeln!(f, "Branch").unwrap();
-        write!(f, "{:?}", tree)
+        write!(f, "{tree:?}")
     }
 }
 
