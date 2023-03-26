@@ -7,7 +7,7 @@ use mina_indexer::{
 
 /// Extends multiple dangling branches
 #[tokio::test]
-async fn test() {
+async fn extension() {
     // ----- Dangling branches -----
     //    Before    |      After
     // ---------- indices ------------
@@ -116,13 +116,9 @@ async fn test() {
         .dangling_branches
         .iter()
         .for_each(|tree| assert_eq!(tree.branches.height(), 3));
-    state
-        .dangling_branches
-        .iter()
-        .enumerate()
-        .for_each(|(_, tree)| {
-            assert_eq!(tree.leaves.len(), 1);
-        });
+    state.dangling_branches.iter().for_each(|tree| {
+        assert_eq!(tree.leaves.len(), 1);
+    });
 
     // after extension quantities
     let root0 = &state.dangling_branches.get(0).unwrap().root;

@@ -1,2 +1,2 @@
-mod block_tests;
-mod state_tests;
+mod block;
+mod state;

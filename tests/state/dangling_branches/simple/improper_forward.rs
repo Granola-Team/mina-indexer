@@ -8,7 +8,7 @@ use mina_indexer::{
 
 /// Extends a branch with a new leaf
 #[tokio::test]
-async fn test() {
+async fn extension() {
     // 0      0
     // | =>  / \
     // 1    1   2
