@@ -8,7 +8,7 @@ use mina_indexer::{
 
 /// Extends a branch backwards with the root's parent
 #[tokio::test]
-async fn test() {
+async fn extension() {
     // ----- Dangling Branches -----
     //   Before  |    After
     // -----------------------------

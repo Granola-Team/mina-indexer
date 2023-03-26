@@ -1,2 +1,0 @@
-mod simple_improper_extension;
-mod simple_proper_extension;

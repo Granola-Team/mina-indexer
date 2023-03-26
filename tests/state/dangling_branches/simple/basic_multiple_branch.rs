@@ -7,7 +7,7 @@ use mina_indexer::{
 
 /// Creates multiple dangling branches
 #[tokio::test]
-async fn test() {
+async fn extensions() {
     // ----- Dangling branches -----
     //    Before   |    After
     // -----------------------------

@@ -1,6 +1,8 @@
-// TODO simple_improper_extension
+// TODO simple_improper::extension
+
+/// Extends the root branch from a non-leaf block
 #[tokio::test]
-async fn test() {
+async fn extension() {
     // ----- Dangling Branches -----
     //   Before  |   After
     // ------- indices ------
