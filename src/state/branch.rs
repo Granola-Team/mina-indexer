@@ -8,7 +8,7 @@ use crate::state::ledger::ExtendWithLedgerDiff;
 
 use super::ledger::{diff::LedgerDiff, Ledger};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Branch<T> {
     pub root: Block,
     pub branches: Tree<Leaf<T>>,
@@ -19,7 +19,7 @@ pub type Path = Vec<Block>;
 
 pub type Leaves<T> = HashMap<NodeId, Leaf<T>>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Leaf<T> {
     pub block: Block,
     ledger: T, // add ledger diff here on dangling, ledger on rooted
@@ -35,6 +35,7 @@ pub struct BranchUpdate<T> {
 }
 
 impl Branch<Ledger> {
+    // only the genesis block should work here
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
         let new_ledger = Ledger::from_diff(LedgerDiff::fom_precomputed_block(root_precomputed));
         Branch::new(root_precomputed, new_ledger).unwrap()
@@ -267,5 +268,28 @@ impl<T> Leaf<T> {
             block: data,
             ledger,
         }
+    }
+}
+
+// only display the underlying tree
+impl<T> std::fmt::Debug for Branch<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut tree = String::new();
+        self.branches.write_formatted(&mut tree).unwrap();
+        writeln!(f, "Branch").unwrap();
+        write!(f, "{tree:?}")
+    }
+}
+
+// only display the underlying block
+impl<T> std::fmt::Debug for Leaf<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.block)
     }
 }
