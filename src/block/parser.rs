@@ -43,7 +43,7 @@ impl BlockParser {
             })
         } else {
             Err(anyhow::Error::msg(format!(
-                "[BlockPasrser::new_internal] log_path: {log_path:?} does not exist!"
+                "[BlockPasrser::new_internal] log path {log_path:?} does not exist!"
             )))
         }
     }
@@ -52,6 +52,8 @@ impl BlockParser {
         if let Some(next) = self.paths.next() {
             let next_path = next?;
             if has_state_hash_and_json_filetype(&next_path) {
+                let blockchain_length =
+                    get_blockchain_length(next_path.file_name().expect("filename already checked"));
                 let state_hash =
                     get_state_hash(next_path.file_name().expect("filename already checked"))
                         .expect("state hash already checked");
@@ -63,6 +65,7 @@ impl BlockParser {
 
                 let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
                     state_hash,
+                    blockchain_length,
                     contents: log_file_contents,
                 })?;
 
@@ -115,6 +118,17 @@ fn get_state_hash(file_name: &OsStr) -> Option<String> {
     Some(state_hash.to_string())
 }
 
+/// extract a blockchain length from an OS file name
+fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
+    file_name
+        .to_str()?
+        .split('-')
+        .fold(None, |acc, x| match x.parse::<u32>() {
+            Err(_) => acc,
+            Ok(x) => Some(x),
+        })
+}
+
 fn has_state_hash_and_json_filetype(path: &Path) -> bool {
     let file_name = path.file_name();
     if let Some(file_name) = file_name {
@@ -132,7 +146,7 @@ fn has_state_hash_and_json_filetype(path: &Path) -> bool {
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
 
-    use super::has_state_hash_and_json_filetype;
+    use super::{get_blockchain_length, has_state_hash_and_json_filetype};
 
     const FILENAMES_VALID: [&'static str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -168,6 +182,17 @@ mod tests {
         "mainnet.json",
         "mainnet-195769-.json",
     ];
+
+    #[test]
+    fn blockchain_lengths() {
+        Vec::from(FILENAMES_VALID)
+            .into_iter()
+            .map(OsString::from)
+            .map(|x| get_blockchain_length(&x))
+            .for_each(|x| {
+                println!("{:?}", x);
+            });
+    }
 
     #[test]
     fn invalid_filenames_are_false() {

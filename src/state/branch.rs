@@ -25,9 +25,6 @@ pub struct Leaf<T> {
     ledger: T, // add ledger diff here on dangling, ledger on rooted
 } // leaf tracks depth in tree, gives longest path easily
 
-pub type RootedLeaf = Leaf<Ledger>;
-pub type DanglingLeaf = Leaf<LedgerDiff>;
-
 pub struct BranchUpdate<T> {
     base_node_id: NodeId,
     new_node_id: NodeId,
@@ -169,6 +166,14 @@ where
                 .data()
                 .block
                 .height;
+            let junction_length = self
+                .branches
+                .get(junction_id)
+                .expect("junction node exists in self")
+                .data()
+                .block
+                .blockchain_length
+                .unwrap_or(0);
             for child_id in children_ids {
                 let mut child_node_data = other
                     .branches
@@ -177,6 +182,10 @@ where
                     .data()
                     .clone();
                 child_node_data.block.height += junction_height + 1;
+                if child_node_data.block.blockchain_length.is_none() {
+                    child_node_data.block.blockchain_length =
+                        Some(junction_length + child_node_data.block.height - junction_height)
+                }
                 let new_child_node_data = Leaf::new(
                     child_node_data.block,
                     ExtendWithLedgerDiff::from_diff(child_node_data.ledger),

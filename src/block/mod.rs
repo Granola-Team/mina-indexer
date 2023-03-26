@@ -11,25 +11,22 @@ pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
     pub height: u32,
+    pub blockchain_length: Option<u32>,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
-pub struct BlockHash {
-    pub block_hash: String,
-}
+pub struct BlockHash(pub String);
 
 impl BlockHash {
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         let block_hash = unsafe { String::from_utf8_unchecked(Vec::from(bytes)) };
-        Self { block_hash }
+        Self(block_hash)
     }
 
     pub fn from_hashv1(hashv1: HashV1) -> Self {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
-        Self {
-            block_hash: versioned.to_base58_string().unwrap(),
-        }
+        Self(versioned.to_base58_string().unwrap())
     }
 
     pub fn previous_state_hash(block: &PrecomputedBlock) -> Self {
@@ -41,13 +38,12 @@ impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = BlockHash {
-            block_hash: precomputed_block.state_hash.clone(),
-        };
+        let state_hash = BlockHash(precomputed_block.state_hash.clone());
         Self {
             parent_hash,
             state_hash,
             height,
+            blockchain_length: precomputed_block.blockchain_length,
         }
     }
 }
@@ -56,6 +52,7 @@ impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "\nBlock")?;
         writeln!(f, "    height:  {},", self.height)?;
+        writeln!(f, "    length:  {:?},", self.blockchain_length)?;
         writeln!(f, "    state:   {:?},", self.state_hash)?;
         writeln!(f, "    parent:  {:?},", self.parent_hash)
     }
@@ -63,6 +60,6 @@ impl std::fmt::Debug for Block {
 
 impl std::fmt::Debug for BlockHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "BlockHash {{ {:?} }}", self.block_hash)
+        write!(f, "BlockHash {{ {:?} }}", self.0)
     }
 }
