@@ -183,10 +183,8 @@ where
                     .clone();
                 child_node_data.block.height += junction_height + 1;
                 if child_node_data.block.blockchain_length.is_none() {
-                    child_node_data.block.blockchain_length = child_node_data
-                        .block
-                        .blockchain_length
-                        .map(|x| x + junction_length)
+                    child_node_data.block.blockchain_length =
+                        Some(junction_length + child_node_data.block.height - junction_height)
                 }
                 let new_child_node_data = Leaf::new(
                     child_node_data.block,
