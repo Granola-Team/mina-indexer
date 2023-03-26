@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use mina_indexer::block::parser::BlockParser;
 
 #[tokio::test]
-async fn block_parser_parses_representative_sample() {
+async fn parses_representative_sample() {
     let sample_dir = PathBuf::from("./tests/data/beautified_logs");
     let mut block_parser = BlockParser::new(&sample_dir).unwrap();
     let mut logs_processed = 0;

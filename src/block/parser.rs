@@ -184,8 +184,15 @@ mod tests {
     ];
 
     #[test]
-    fn blockchain_lengths() {
+    fn blockchain_lengths_valid_or_default_none() {
         Vec::from(FILENAMES_VALID)
+            .into_iter()
+            .map(OsString::from)
+            .map(|x| get_blockchain_length(&x))
+            .for_each(|x| {
+                println!("{:?}", x);
+            });
+        Vec::from(FILENAMES_INVALID)
             .into_iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
@@ -195,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_filenames_are_false() {
+    fn invalid_filenames_have_invalid_state_hash_or_non_json_extension() {
         Vec::from(FILENAMES_INVALID)
             .into_iter()
             .map(OsString::from)
@@ -212,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_filenames_are_true() {
+    fn valid_filenames_have_valid_state_hash_and_json_extension() {
         Vec::from(FILENAMES_VALID)
             .into_iter()
             .map(OsString::from)

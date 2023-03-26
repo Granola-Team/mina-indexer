@@ -8,7 +8,7 @@ use mina_indexer::{
 
 // extend a branch with a new leaf
 #[tokio::test]
-async fn simple_proper_extension() {
+async fn test() {
     //      0
     // 0 => |
     //      1
@@ -121,13 +121,3 @@ async fn simple_proper_extension() {
     // after root isn't a leaf
     assert!(!after_leaves.contains_key(after_root_id));
 }
-
-// TODO simple_forward_extension_many_leaves
-//      0          0
-//     / \        / \
-//    1   2  =>  1   2
-//                   |
-//                   3
-
-// TODO add dangling block to branch
-// TODO complex extensions
