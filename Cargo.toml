@@ -31,6 +31,7 @@ mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", ve
 rocksdb = "0.20.1"
 bcs = "0.1.5"
 id_tree = "1.8.0"
+async-recursion = "1.0.4"
 
 [dependencies.tokio]
 version = "1.25.0"
