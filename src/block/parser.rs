@@ -43,7 +43,7 @@ impl BlockParser {
             })
         } else {
             Err(anyhow::Error::msg(format!(
-                "[BlockPasrser::new_internal] log path {log_path:?} does not exist!"
+                "[BlockParser::new_internal] log path {log_path:?} does not exist!"
             )))
         }
     }
