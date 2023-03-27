@@ -51,7 +51,7 @@ impl BlockParser {
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next) = self.paths.next() {
             let next_path = next?;
-            if has_state_hash_and_json_filetype(&next_path) {
+            if is_valid_block_file(&next_path) {
                 let blockchain_length =
                     get_blockchain_length(next_path.file_name().expect("filename already checked"));
                 let state_hash =
@@ -129,7 +129,7 @@ fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
         })
 }
 
-fn has_state_hash_and_json_filetype(path: &Path) -> bool {
+fn is_valid_block_file(path: &Path) -> bool {
     let file_name = path.file_name();
     if let Some(file_name) = file_name {
         get_state_hash(file_name).is_some()
@@ -146,7 +146,7 @@ fn has_state_hash_and_json_filetype(path: &Path) -> bool {
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
 
-    use super::{get_blockchain_length, has_state_hash_and_json_filetype};
+    use super::{get_blockchain_length, is_valid_block_file};
 
     const FILENAMES_VALID: [&'static str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -209,7 +209,7 @@ mod tests {
             .map(|os_string| {
                 (
                     os_string.clone(),
-                    has_state_hash_and_json_filetype(&PathBuf::from(os_string)),
+                    is_valid_block_file(&PathBuf::from(os_string)),
                 )
             })
             .for_each(|(os_string, result)| {
@@ -226,7 +226,7 @@ mod tests {
             .map(|os_string| {
                 (
                     os_string.clone(),
-                    has_state_hash_and_json_filetype(&PathBuf::from(os_string)),
+                    is_valid_block_file(&PathBuf::from(os_string)),
                 )
             })
             .for_each(|(os_string, result)| {
