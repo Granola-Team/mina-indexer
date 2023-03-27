@@ -125,28 +125,49 @@ where
         None
     }
 
-    pub fn merge_on(&mut self, junction_id: &NodeId, other: &mut Branch<LedgerDiff>) {
+    pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch<LedgerDiff>) {
         let mut merge_id_map = HashMap::new();
         // associate the incoming tree's root node id with it's new id in the base tree
-        let incoming_root_id = other
+        let incoming_root_id = incoming
             .branches
             .root_node_id()
             .expect("branch always has root node");
-        let incoming_root_data = other
+        let mut incoming_root_data = incoming
             .branches
             .get(incoming_root_id)
             .expect("incoming_root_id valid, branch always has root node")
-            .data();
-        let incoming_leaf = Leaf::new(
+            .data()
+            .clone();
+        let junction_height = self
+            .branches
+            .get(junction_id)
+            .expect("junction node exists in self")
+            .data()
+            .block
+            .height;
+        let junction_length = self
+            .branches
+            .get(junction_id)
+            .expect("junction node exists in self")
+            .data()
+            .block
+            .blockchain_length
+            .unwrap_or(0);
+        // adjust the height of the incoming branch's root block
+        incoming_root_data.block.height = junction_height + 1;
+        if incoming_root_data.block.blockchain_length.is_none() {
+            incoming_root_data.block.blockchain_length = Some(junction_length + 1)
+        }
+        let incoming_branch_root = Leaf::new(
             incoming_root_data.block.clone(),
-            ExtendWithLedgerDiff::from_diff(incoming_root_data.ledger.clone()),
+            ExtendWithLedgerDiff::from_diff(incoming_root_data.ledger),
         );
         let new_node_id = self
             .branches
-            .insert(Node::new(incoming_leaf), UnderNode(junction_id))
+            .insert(Node::new(incoming_branch_root), UnderNode(junction_id))
             .expect("merge_on called with valid junction_id");
         merge_id_map.insert(incoming_root_id, new_node_id);
-        for old_node_id in other
+        for old_node_id in incoming
             .branches
             .traverse_level_order_ids(incoming_root_id)
             .expect("incoming_root_id guaranteed by root_id() call")
@@ -154,28 +175,13 @@ where
             let under_node_id = merge_id_map
                 .get(&old_node_id)
                 .expect("guaranteed by call structure");
-            let children_ids = other
+            let children_ids = incoming
                 .branches
                 .children_ids(&old_node_id)
                 .expect("old_node_id valid");
             let mut merge_id_map_inserts = Vec::new();
-            let junction_height = self
-                .branches
-                .get(junction_id)
-                .expect("junction node exists in self")
-                .data()
-                .block
-                .height;
-            let junction_length = self
-                .branches
-                .get(junction_id)
-                .expect("junction node exists in self")
-                .data()
-                .block
-                .blockchain_length
-                .unwrap_or(0);
             for child_id in children_ids {
-                let mut child_node_data = other
+                let mut child_node_data = incoming
                     .branches
                     .get(child_id)
                     .expect("child_id valid")
@@ -184,7 +190,7 @@ where
                 child_node_data.block.height += junction_height + 1;
                 if child_node_data.block.blockchain_length.is_none() {
                     child_node_data.block.blockchain_length =
-                        Some(junction_length + child_node_data.block.height - junction_height)
+                        Some(junction_length + child_node_data.block.height + 1 - junction_height)
                 }
                 let new_child_node_data = Leaf::new(
                     child_node_data.block,
@@ -201,15 +207,17 @@ where
             }
         }
 
-        if let Some(_leaf) = self.leaves.get(junction_id) {
-            self.leaves.remove(junction_id);
-        }
-        for (node_id, leaf) in other.leaves.iter() {
+        self.leaves.remove(junction_id);
+        for (node_id, leaf) in incoming.leaves.iter() {
             if let Some(new_node_id) = merge_id_map.get(node_id) {
-                let new_leaf = Leaf::new(
-                    leaf.block.clone(),
-                    ExtendWithLedgerDiff::from_diff(leaf.ledger.clone()),
-                );
+                let mut block = incoming.leaves.get(node_id).unwrap().block.clone();
+                block.height += junction_height + 1;
+                if block.blockchain_length.is_none() {
+                    block.blockchain_length =
+                        Some(junction_length + block.height + 1 - junction_height)
+                }
+                let new_leaf =
+                    Leaf::new(block, ExtendWithLedgerDiff::from_diff(leaf.ledger.clone()));
                 self.leaves.insert(new_node_id.clone(), new_leaf);
             }
         }
@@ -288,8 +296,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
         self.branches.write_formatted(&mut tree).unwrap();
-        writeln!(f, "Branch").unwrap();
-        write!(f, "{tree:?}")
+        writeln!(f, "Branch {{").unwrap();
+        write!(f, "{tree}}}")
     }
 }
 
