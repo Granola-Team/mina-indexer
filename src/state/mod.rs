@@ -198,15 +198,17 @@ impl State {
             }
 
             if !branches_to_update.is_empty() {
+                // remove one
                 let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
-                for dangling_branch_index in branches_to_update {
-                    let index = if extended_branch_index < dangling_branch_index {
-                        dangling_branch_index - 1
+                for (n, dangling_branch_index) in branches_to_update.iter().enumerate() {
+                    let index = if extended_branch_index < *dangling_branch_index {
+                        dangling_branch_index - n - 1
                     } else {
-                        dangling_branch_index
+                        *dangling_branch_index
                     };
                     let branch_to_update = self.dangling_branches.get_mut(index).unwrap();
                     extended_branch.merge_on(&new_node_id, branch_to_update);
+                    // remove one for each index we see, i.e. n
                     self.dangling_branches.remove(index);
                 }
                 self.dangling_branches.push(extended_branch);
