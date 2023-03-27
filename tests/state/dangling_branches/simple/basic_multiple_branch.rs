@@ -78,10 +78,8 @@ async fn extensions() {
 
     // root == leaf
     assert_eq!(root0, root_leaf0);
-    println!(
-        "=== Dangling Branch 0 ===\n{:?}",
-        state.dangling_branches.get(0).unwrap()
-    );
+    println!("=== Before Branch 0 ===");
+    println!("{:?}", state.dangling_branches.get(0).unwrap().branches);
 
     // ---------
     // add block
@@ -124,10 +122,11 @@ async fn extensions() {
 
     // root == leaf
     assert_eq!(root1, root_leaf1);
-    println!(
-        "\n=== Dangling Branch 1 ===\n{:?}",
-        &state.dangling_branches.get(1).unwrap()
-    );
+
+    println!("\n=== After Branch 0 ===");
+    println!("{:?}", &state.dangling_branches.get(0).unwrap());
+    println!("\n=== After Branch 1 ===");
+    println!("{:?}", &state.dangling_branches.get(1).unwrap());
 
     // branch root should match the tree's root
     assert_eq!(root1, branch_root1);
