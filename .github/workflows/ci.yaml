@@ -40,12 +40,6 @@ jobs:
           command: nextest
           args: run --all-features --profile ci
 
-      - name: Release build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features
-
   Rustfmt:
     runs-on: ${{ matrix.os }}
     strategy:
