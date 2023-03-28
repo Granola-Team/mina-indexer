@@ -8,11 +8,17 @@ use self::{
 pub mod branch;
 pub mod ledger;
 
+/// Rooted forest of precomputed block summaries (`root_branch` and `dangling_branches`)
+/// with
 #[derive(Debug)]
 pub struct State {
+    /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
+    /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Option<Branch<Ledger>>,
+    /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
+    /// Block database
     pub store: Option<BlockStore>,
 }
 
