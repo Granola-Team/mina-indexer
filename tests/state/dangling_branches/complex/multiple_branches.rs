@@ -167,11 +167,8 @@ async fn extension() {
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
 
     assert_eq!(
-        leaves0
-            .iter()
-            .map(|x| &x.state_hash.0)
-            .collect::<HashSet<&String>>(),
-        HashSet::from([&leaf0.state_hash.0, &leaf1.state_hash.0])
+        leaves0.iter().collect::<HashSet<&&Block>>(),
+        HashSet::from([&&leaf0, &&leaf1])
     );
 
     println!("=== After Branch 0 ===");
