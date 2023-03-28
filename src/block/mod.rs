@@ -50,11 +50,14 @@ impl Block {
 
 impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "\nBlock")?;
-        writeln!(f, "    height:  {},", self.height)?;
-        writeln!(f, "    length:  {:?},", self.blockchain_length)?;
-        writeln!(f, "    state:   {:?},", self.state_hash)?;
-        writeln!(f, "    parent:  {:?},", self.parent_hash)
+        write!(
+            f,
+            "Block {{ height: {}, len: {}, state: {}, parent: {} }}",
+            self.height,
+            self.blockchain_length.unwrap_or(0),
+            &self.state_hash.0[0..12],
+            &self.parent_hash.0[0..12]
+        )
     }
 }
 

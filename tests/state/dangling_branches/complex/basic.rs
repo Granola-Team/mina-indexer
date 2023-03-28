@@ -5,7 +5,7 @@ use mina_indexer::{
     state::{ExtensionType, State},
 };
 
-/// Extends multiple dangling branches
+/// Merges two dangling branches
 #[tokio::test]
 async fn extension() {
     // ----- Dangling branches -----
@@ -75,7 +75,7 @@ async fn extension() {
         .branches
         .write_formatted(&mut tree)
         .unwrap();
-    println!("{tree:?}");
+    println!("{tree}");
 
     println!("=== Before Branch 1 ===");
     let mut tree = String::new();
@@ -86,7 +86,7 @@ async fn extension() {
         .branches
         .write_formatted(&mut tree)
         .unwrap();
-    println!("{tree:?}");
+    println!("{tree}");
 
     // 2 dangling branches
     // - each height = 1
@@ -139,7 +139,7 @@ async fn extension() {
 
     assert_eq!(leaves0.get(0).unwrap().state_hash.0, leaf_block.state_hash);
 
-    println!("=== Before Branch 0 ===");
+    println!("=== After Branch 0 ===");
     let mut tree = String::new();
     state
         .dangling_branches
@@ -148,7 +148,7 @@ async fn extension() {
         .branches
         .write_formatted(&mut tree)
         .unwrap();
-    println!("{tree:?}");
+    println!("{tree}");
 
     // branch root should match the tree's root
     assert_eq!(root0, branch_root0);
