@@ -48,7 +48,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        state.add_block(&child1),
+        state.add_block(&child1).unwrap(),
         ExtensionType::DanglingSimpleForward
     );
     assert_eq!(
@@ -82,7 +82,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        state.add_block(&child2),
+        state.add_block(&child2).unwrap(),
         ExtensionType::DanglingSimpleForward
     );
     assert_eq!(

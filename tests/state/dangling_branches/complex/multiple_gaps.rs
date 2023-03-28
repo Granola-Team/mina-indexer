@@ -70,11 +70,11 @@ async fn extension() {
     let mut state = State::new(&root_block, None).unwrap();
 
     // other in branch 1
-    let extension_type = state.add_block(&other_block);
+    let extension_type = state.add_block(&other_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // leaf in brach 2
-    let extension_type = state.add_block(&leaf_block);
+    let extension_type = state.add_block(&leaf_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 3 dangling branches
@@ -128,7 +128,7 @@ async fn extension() {
     // ----------------
 
     // merges branch 2 into 0
-    let extension_type = state.add_block(&middle_block);
+    let extension_type = state.add_block(&middle_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingComplex);
 
     println!("=== After Branch 0 ===");

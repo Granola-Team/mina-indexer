@@ -86,7 +86,7 @@ async fn extensions() {
     // ---------
 
     // make a new dangling branch
-    let extension_type = state.add_block(&root1_block);
+    let extension_type = state.add_block(&root1_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 2 dangling branches

@@ -64,8 +64,12 @@ impl State {
         }
     }
 
-    pub fn add_block(&mut self, precomputed_block: &PrecomputedBlock) -> ExtensionType {
+    pub fn add_block(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<ExtensionType> {
         // forward extension on root branch
+        // TODO put heights of root and the highest leaf in Branch
         if let Some(mut root_branch) = self.root_branch.clone() {
             if let Some(max_length) = root_branch
                 .leaves
@@ -81,9 +85,18 @@ impl State {
                         for (index, dangling_branch) in
                             self.dangling_branches.iter_mut().enumerate()
                         {
+                            // incoming block is the parent of the dangling branch root
                             if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
                                 root_branch.merge_on(&new_node_id, dangling_branch);
                                 branches_to_remove.push(index);
+                            }
+
+                            // if the block is already in the dangling branch, error out
+                            if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                                return Err(anyhow::Error::msg(format!(
+                                    "Block present with state hash: {:?}",
+                                    precomputed_block.state_hash.clone()
+                                )));
                             }
                         }
 
@@ -94,10 +107,10 @@ impl State {
                             for index_to_remove in branches_to_remove {
                                 self.dangling_branches.remove(index_to_remove);
                             }
-                            return ExtensionType::RootComplex;
+                            return Ok(ExtensionType::RootComplex);
                         } else {
                             // if there aren't any branches that are connected
-                            return ExtensionType::RootSimple;
+                            return Ok(ExtensionType::RootSimple);
                         }
                     }
                 }
@@ -140,6 +153,14 @@ impl State {
                                 extension = Some((index, new_node_id, ExtensionDirection::Forward));
                                 break;
                             }
+
+                            // if the block is already in a dangling branch, error out
+                            if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                                return Err(anyhow::Error::msg(format!(
+                                    "Block present with state hash: {:?}",
+                                    precomputed_block.state_hash.clone()
+                                )));
+                            }
                         }
                     } else {
                         // we don't know the blockchain_length for the incoming block, so we can't discriminate
@@ -157,6 +178,14 @@ impl State {
                                 ExtensionDirection::Reverse,
                             ));
                             break;
+                        }
+
+                        // if the block is already in a dangling branch, error out
+                        if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                            return Err(anyhow::Error::msg(format!(
+                                "Block present with state hash: {:?}",
+                                precomputed_block.state_hash.clone(),
+                            )));
                         }
 
                         // simple forward
@@ -182,6 +211,14 @@ impl State {
                             ExtensionDirection::Reverse,
                         ));
                         break;
+                    }
+
+                    // if the block is already in a dangling branch, error out
+                    if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                        return Err(anyhow::Error::msg(format!(
+                            "Block present with state hash: {:?}",
+                            precomputed_block.state_hash.clone()
+                        )));
                     }
 
                     // simple forward
@@ -218,11 +255,11 @@ impl State {
                     self.dangling_branches.remove(index);
                 }
                 self.dangling_branches.push(extended_branch);
-                return ExtensionType::DanglingComplex;
+                return Ok(ExtensionType::DanglingComplex);
             } else {
                 return match direction {
-                    ExtensionDirection::Forward => ExtensionType::DanglingSimpleForward,
-                    ExtensionDirection::Reverse => ExtensionType::DanglingSimpleReverse,
+                    ExtensionDirection::Forward => Ok(ExtensionType::DanglingSimpleForward),
+                    ExtensionDirection::Reverse => Ok(ExtensionType::DanglingSimpleReverse),
                 };
             }
         }
@@ -235,7 +272,7 @@ impl State {
             )
             .expect("cannot fail"),
         );
-        ExtensionType::DanglingNew
+        Ok(ExtensionType::DanglingNew)
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
