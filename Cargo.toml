@@ -29,6 +29,8 @@ rocksdb = "0.20.1"
 bcs = "0.1.5"
 id_tree = "1.8.0"
 async-recursion = "1.0.4"
+watchexec = "2.3.0"
+async-priority-channel = "0.1.0"
 
 [dependencies.tokio]
 version = "1.25.0"

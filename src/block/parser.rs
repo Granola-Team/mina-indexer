@@ -1,12 +1,12 @@
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use glob::{glob, Paths};
 use tokio::io::AsyncReadExt;
 
-use super::precomputed::{BlockLogContents, PrecomputedBlock};
+use super::{
+    get_blockchain_length, get_state_hash, is_valid_block_file,
+    precomputed::{BlockLogContents, PrecomputedBlock},
+};
 
 pub enum SearchRecursion {
     None,
@@ -100,45 +100,36 @@ impl BlockParser {
             }),
         }
     }
-}
 
-/// extract a state hash from an OS file name
-fn get_state_hash(file_name: &OsStr) -> Option<String> {
-    let last_part = file_name.to_str()?.split('-').last()?.to_string();
-    if last_part.starts_with('.') {
-        return None;
-    }
-    if !last_part.starts_with("3N") {
-        return None;
-    }
-    let state_hash = last_part.split('.').next()?;
-    if state_hash.contains('.') {
-        return None;
-    }
-    Some(state_hash.to_string())
-}
+    pub async fn parse_file(&mut self, filename: &Path) -> anyhow::Result<PrecomputedBlock> {
+        if is_valid_block_file(filename) {
+            let blockchain_length =
+                get_blockchain_length(filename.file_name().expect("filename already checked"));
+            let state_hash =
+                get_state_hash(filename.file_name().expect("filename already checked"))
+                    .expect("state hash already checked");
 
-/// extract a blockchain length from an OS file name
-fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
-    file_name
-        .to_str()?
-        .split('-')
-        .fold(None, |acc, x| match x.parse::<u32>() {
-            Err(_) => acc,
-            Ok(x) => Some(x),
-        })
-}
+            let mut log_file = tokio::fs::File::open(&filename).await?;
+            let mut log_file_contents = Vec::new();
 
-fn is_valid_block_file(path: &Path) -> bool {
-    let file_name = path.file_name();
-    if let Some(file_name) = file_name {
-        get_state_hash(file_name).is_some()
-            && file_name
-                .to_str()
-                .map(|file_name| file_name.ends_with(".json"))
-                .unwrap_or(false)
-    } else {
-        false
+            log_file.read_to_end(&mut log_file_contents).await?;
+
+            let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
+                state_hash,
+                blockchain_length,
+                contents: log_file_contents,
+            })?;
+
+            Ok(precomputed_block)
+        } else {
+            Err(anyhow::Error::msg(format!(
+                "
+[BlockParser::parse_file]
+    Could not find valid block!
+    {:} is not a valid Precomputed Block",
+                filename.display()
+            )))
+        }
     }
 }
 
@@ -146,7 +137,7 @@ fn is_valid_block_file(path: &Path) -> bool {
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
 
-    use super::{get_blockchain_length, is_valid_block_file};
+    use crate::block::{get_blockchain_length, is_valid_block_file};
 
     const FILENAMES_VALID: [&'static str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
