@@ -45,9 +45,9 @@ impl BlockReceiver {
         })
     }
 
-    pub async fn load_directory(&mut self, directory: &Path) -> Option<anyhow::Error> {
+    pub async fn load_directory(&mut self, directory: &Path) -> anyhow::Result<()> {
         if !directory.is_dir() {
-            return Some(anyhow::Error::msg(format!(
+            return Err(anyhow::Error::msg(format!(
                 "
 [BlockPasrserReceiver::load_directory]
     Adding directory {:} to the watched directories
@@ -59,13 +59,13 @@ impl BlockReceiver {
 
         let mut wkd = WorkingData::default();
         wkd.pathset = vec![directory.into()];
-        self.worker_command_sender.send(wkd).err()?;
+        self.worker_command_sender.send(wkd).err().unwrap();
 
         match BlockParser::new(directory) {
             Ok(block_parser) => self.parsers.push(block_parser),
-            Err(e) => return Some(e),
+            Err(err) => return Err(err),
         }
-        None
+        Ok(())
     }
 
     pub async fn recv(&mut self) -> Option<Result<PrecomputedBlock, anyhow::Error>> {
