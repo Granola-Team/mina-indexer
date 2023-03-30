@@ -10,7 +10,10 @@ use tokio::sync::{
 use watchexec::{
     error::RuntimeError,
     event::{
-        filekind::{CreateKind, FileEventKind::Create},
+        filekind::{
+            CreateKind,
+            FileEventKind::{Create, Modify},
+        },
         Event, Priority, Tag,
     },
     fs::{worker, WorkingData},
@@ -84,7 +87,11 @@ impl BlockReceiver {
                         if event
                             .tags
                             .iter()
-                            .any(|signal| matches!(signal, Tag::FileEventKind(Create(CreateKind::File))))
+                            .any(|signal|
+                                matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
+                                ||
+                                matches!(signal, Tag::FileEventKind(Modify(_)))
+                            )
                         {
                             let mut path_and_filetype = None;
                             for tag in event.tags.iter() {
