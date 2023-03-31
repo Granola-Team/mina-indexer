@@ -7,15 +7,14 @@ use tokio::{
     process::Command,
 };
 
-const TEST_DIR: &'static str = "./receiver_tests";
-const TEST_BLOCK_PATH: &'static str = "./tests/data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
-const TEST_BLOCK: &'static str = include_str!(
-    "../data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
-);
-
 #[tokio::test]
-async fn receiver_detects_new_block_written() {
-    create_dir(TEST_DIR).await.unwrap();
+async fn detects_new_block_written() {
+    const TEST_DIR: &'static str = "./receiver_write_test";
+    const TEST_BLOCK: &'static str = include_str!(
+        "../data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
+    );
+
+    create_dir(TEST_DIR).await.unwrap_or(());
 
     let test_dir_path = PathBuf::from(TEST_DIR);
 
@@ -36,8 +35,12 @@ async fn receiver_detects_new_block_written() {
 }
 
 #[tokio::test]
-async fn receiver_detects_new_block_copied() {
-    create_dir(TEST_DIR).await.unwrap();
+async fn detects_new_block_copied() {
+    const TEST_DIR: &'static str = "./receiver_copy_test";
+    const TEST_BLOCK_PATH: &'static str = "./tests/data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
+
+    create_dir(TEST_DIR).await.unwrap_or(());
+
     let test_dir_path = PathBuf::from(TEST_DIR);
 
     let mut block_receiver = BlockReceiver::new().await.unwrap();

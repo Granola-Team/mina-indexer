@@ -73,7 +73,7 @@ impl BlockReceiver {
         Ok(())
     }
 
-    pub async fn recv(&mut self) -> Option<Result<PrecomputedBlock, anyhow::Error>> {
+    pub async fn recv(&mut self) -> Option<anyhow::Result<PrecomputedBlock>> {
         loop {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
