@@ -72,14 +72,14 @@ async fn extension() {
     // add leaf0
     // ---------
 
-    let extension_type = state.add_block(&leaf0_block);
+    let extension_type = state.add_block(&leaf0_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ---------
     // add leaf1
     // ---------
 
-    let extension_type = state.add_block(&leaf1_block);
+    let extension_type = state.add_block(&leaf1_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 3 dangling branches
@@ -132,7 +132,7 @@ async fn extension() {
     // add middle block
     // ----------------
 
-    let extension_type = state.add_block(&middle_block);
+    let extension_type = state.add_block(&middle_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingComplex);
 
     // 1 dangling branch

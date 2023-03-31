@@ -97,7 +97,7 @@ async fn extension() {
     // add child block
     // ---------------
     assert_eq!(
-        state.add_block(&child_block),
+        state.add_block(&child_block).unwrap(),
         ExtensionType::DanglingSimpleForward
     );
 
@@ -134,7 +134,7 @@ async fn extension() {
             .block
     );
 
-    println!("After tree:\n{:?}", branches1);
+    println!("After tree:\n{branches1:?}");
 
     assert_eq!(
         after_root_leaf.block,

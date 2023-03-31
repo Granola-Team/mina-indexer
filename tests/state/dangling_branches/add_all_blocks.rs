@@ -19,7 +19,7 @@ async fn extension() {
         let mut state = State::new(&precomputed_block, None).unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
-            state.add_block(&precomputed_block);
+            state.add_block(&precomputed_block).unwrap();
             n += 1;
         }
 

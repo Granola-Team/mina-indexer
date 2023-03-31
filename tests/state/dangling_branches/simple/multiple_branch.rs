@@ -81,7 +81,7 @@ async fn extensions() {
     // add child 10
     // ------------
 
-    let extension_type = state.add_block(&child10_block);
+    let extension_type = state.add_block(&child10_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!(
@@ -110,21 +110,21 @@ async fn extensions() {
     // add child 0
     // -----------
 
-    let extension_type = state.add_block(&child0_block);
+    let extension_type = state.add_block(&child0_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
     // ----------
     // add root 1
     // ----------
 
-    let extension_type = state.add_block(&root1_block);
+    let extension_type = state.add_block(&root1_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // ------------
     // add child 11
     // ------------
 
-    let extension_type = state.add_block(&child11_block);
+    let extension_type = state.add_block(&child11_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
     // 2 dangling branches

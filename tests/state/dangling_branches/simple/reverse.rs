@@ -78,7 +78,7 @@ async fn extension() {
     );
 
     // extend the branch with new_root_block (the parent)
-    let extension_type = state.add_block(&new_root_block);
+    let extension_type = state.add_block(&new_root_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // after extension quantities
