@@ -10,7 +10,10 @@ use tokio::sync::{
 use watchexec::{
     error::RuntimeError,
     event::{
-        filekind::{CreateKind, FileEventKind::Create},
+        filekind::{
+            CreateKind,
+            FileEventKind::{Create, Modify},
+        },
         Event, Priority, Tag,
     },
     fs::{worker, WorkingData},
@@ -34,7 +37,9 @@ impl BlockReceiver {
         let (er_s, worker_error_receiver) = mpsc::channel(64);
         let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());
 
-        worker(wd_r, er_s, ev_s).await?;
+        tokio::spawn(async {
+            worker(wd_r, er_s, ev_s).await.unwrap();
+        });
 
         let parsers = Vec::new();
         Ok(BlockReceiver {
@@ -59,7 +64,7 @@ impl BlockReceiver {
 
         let mut wkd = WorkingData::default();
         wkd.pathset = vec![directory.into()];
-        self.worker_command_sender.send(wkd).err().unwrap();
+        self.worker_command_sender.send_replace(wkd);
 
         match BlockParser::new(directory) {
             Ok(block_parser) => self.parsers.push(block_parser),
@@ -69,32 +74,43 @@ impl BlockReceiver {
     }
 
     pub async fn recv(&mut self) -> Option<Result<PrecomputedBlock, anyhow::Error>> {
-        if let Some(error) = self.worker_error_receiver.recv().await {
-            return Some(Err(error.into()));
-        }
-
-        if let Ok((event, _priority)) = self.worker_event_receiver.recv().await {
-            if event
-                .tags
-                .iter()
-                .any(|signal| matches!(signal, Tag::FileEventKind(Create(CreateKind::File))))
-            {
-                let mut path_and_filetype = None;
-                for tag in event.tags.iter() {
-                    match tag {
-                        watchexec::event::Tag::Path { path, file_type } => {
-                            path_and_filetype = Some((path, file_type))
-                        }
-                        _ => continue,
+        loop {
+            tokio::select! {
+                error_fut = self.worker_error_receiver.recv() => {
+                    if let Some(error) = error_fut {
+                        return Some(Err(error.into()));
                     }
-                }
+                    return None;
+                },
+                event_fut = self.worker_event_receiver.recv() => {
+                    if let Ok((event, _priority)) = event_fut {
+                        if event
+                            .tags
+                            .iter()
+                            .any(|signal|
+                                matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
+                                ||
+                                matches!(signal, Tag::FileEventKind(Modify(_)))
+                            )
+                        {
+                            let mut path_and_filetype = None;
+                            for tag in event.tags.iter() {
+                                match tag {
+                                    watchexec::event::Tag::Path { path, file_type } => {
+                                        path_and_filetype = Some((path, file_type))
+                                    }
+                                    _ => continue,
+                                }
+                            }
 
-                if let Some((path, Some(_filetype))) = path_and_filetype {
-                    return Some(parse_file(path.as_path()).await);
+                            if let Some((path, Some(_filetype))) = path_and_filetype {
+                                return Some(parse_file(path.as_path()).await);
+                            }
+                        }
+                    }
+                    continue;
                 }
             }
         }
-
-        None
     }
 }
