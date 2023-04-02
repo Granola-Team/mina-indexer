@@ -38,13 +38,19 @@
           zstd
         ];
 
+        frameworks = pkgs.darwin.apple_sdk.frameworks;
+
         buildDependencies = with pkgs;
           [
             llvmPackages.libclang
             clang
             pkg-config
           ]
-          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.frameworks.Security]
+          ++ lib.optionals stdenv.isDarwin
+          [
+            frameworks.Security
+            frameworks.CoreServices
+          ]
           ++ runtimeDependencies;
 
         developmentDependencies = with pkgs;
