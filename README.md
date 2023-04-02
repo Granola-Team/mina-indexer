@@ -64,11 +64,17 @@ This repository uses Nix Flakes as a development environment and build system. Y
 
 ## Building the Project
 
-Binaries for `mina-indexer` can be built by running `nix build` with Flakes enabled (see above). All binaries are output to `./result/bin`
+Binaries for `mina-indexer` can be built by running `nix build '.?submodules=1'` with Flakes enabled (see above). All binaries are output to `./result/bin`
 
 ## Entering a Development Environment
 
 You can enter a development environment by running `nix develop` at the command line. The development environment for this project takes care of installing all dependencies, compilers, and development tools (this means that you don't even need rustup installed!), including the `rust-analyzer` language server. For VSCode, we recommend the `Nix Environment Selector` extension pointed at `shell.nix` to tell your IDE about the installed tools, though you can also use direnv for this same purpose.
+
+## Running unit tests
+
+In the nix shell issue the following command to run the unit tests.
+
+`cargo nextest run`
 
 ## License (See LICENSE file for full license)
 
