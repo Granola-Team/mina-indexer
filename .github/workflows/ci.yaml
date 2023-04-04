@@ -32,7 +32,7 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-          components: rustfmt, clippy
+          components: clippy
 
       - name: Run cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -77,6 +77,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
         rust:
           - stable
     steps:
@@ -109,6 +110,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
         rust:
           - stable
     steps:
