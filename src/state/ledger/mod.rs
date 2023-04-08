@@ -8,7 +8,7 @@ pub mod diff;
 use account::Account;
 use diff::LedgerDiff;
 use mina_serialization_types::v1::PublicKeyV1;
-use mina_signer::{pubkey::PubKeyError, CompressedPubKey};
+use mina_signer::{pubkey::PubKeyError, CompressedPubKey, PubKey};
 
 #[derive(Clone)]
 pub struct PublicKey(PublicKeyV1);
@@ -53,6 +53,12 @@ impl From<PublicKeyV1> for PublicKey {
 impl From<PublicKey> for PublicKeyV1 {
     fn from(value: PublicKey) -> Self {
         value.0
+    }
+}
+
+impl From<PublicKey> for PubKey {
+    fn from(value: PublicKey) -> Self {
+        PubKey::from_address(&CompressedPubKey::from(&value.0).into_address()).unwrap()
     }
 }
 
