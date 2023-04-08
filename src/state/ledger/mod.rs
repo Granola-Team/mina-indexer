@@ -8,8 +8,9 @@ pub mod diff;
 use account::Account;
 use diff::LedgerDiff;
 use mina_serialization_types::v1::PublicKeyV1;
+use mina_signer::{pubkey::PubKeyError, CompressedPubKey};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PublicKey(PublicKeyV1);
 
 impl PartialEq for PublicKey {
@@ -20,9 +21,26 @@ impl PartialEq for PublicKey {
 
 impl Eq for PublicKey {}
 
+impl PublicKey {
+    pub fn to_address(&self) -> String {
+        CompressedPubKey::from(&self.0).into_address()
+    }
+
+    pub fn from_address(value: &str) -> Result<Self, PubKeyError> {
+        CompressedPubKey::from_address(value).map(|x| Self(PublicKeyV1::from(x)))
+    }
+}
+
 impl std::hash::Hash for PublicKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.clone().0.inner().inner().x.hash(state);
+    }
+}
+
+impl std::fmt::Debug for PublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.to_address())?;
+        Ok(())
     }
 }
 
