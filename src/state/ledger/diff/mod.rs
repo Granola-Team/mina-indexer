@@ -14,7 +14,7 @@ pub struct LedgerDiff {
 
 impl LedgerDiff {
     /// the deserialization used by the types used by this function has a lot of room for improvement
-    pub fn fom_precomputed_block(precomputed_block: &PrecomputedBlock) -> Self {
+    pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Self {
         // [A] fallible deserialization function doesn't specify if it fails because it couldn't read a block or because there weren't any of the requested data in a block
         let coinbase = Coinbase::from_precomputed_block(precomputed_block);
         let coinbase_update = coinbase.clone().as_account_diff();
