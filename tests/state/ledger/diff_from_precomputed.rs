@@ -7,7 +7,7 @@ use mina_indexer::{
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
-        PublicKey,
+        public_key::PublicKey,
     },
 };
 

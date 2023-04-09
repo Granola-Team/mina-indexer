@@ -1,66 +1,15 @@
-use std::{collections::HashMap, fmt::Error};
+use std::{collections::HashMap, fmt::Error, result::Result};
 
 pub mod account;
 pub mod coinbase;
 pub mod command;
 pub mod diff;
+pub mod public_key;
 
 use account::Account;
 use diff::LedgerDiff;
-use mina_serialization_types::v1::PublicKeyV1;
-use mina_signer::{pubkey::PubKeyError, CompressedPubKey, PubKey};
-
-#[derive(Clone)]
-pub struct PublicKey(PublicKeyV1);
-
-impl PartialEq for PublicKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for PublicKey {}
-
-impl PublicKey {
-    pub fn to_address(&self) -> String {
-        CompressedPubKey::from(&self.0).into_address()
-    }
-
-    pub fn from_address(value: &str) -> Result<Self, PubKeyError> {
-        CompressedPubKey::from_address(value).map(|x| Self(PublicKeyV1::from(x)))
-    }
-}
-
-impl std::hash::Hash for PublicKey {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.clone().0.inner().inner().x.hash(state);
-    }
-}
-
-impl std::fmt::Debug for PublicKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.to_address())?;
-        Ok(())
-    }
-}
-
-impl From<PublicKeyV1> for PublicKey {
-    fn from(value: PublicKeyV1) -> Self {
-        PublicKey(value)
-    }
-}
-
-impl From<PublicKey> for PublicKeyV1 {
-    fn from(value: PublicKey) -> Self {
-        value.0
-    }
-}
-
-impl From<PublicKey> for PubKey {
-    fn from(value: PublicKey) -> Self {
-        PubKey::from_address(&CompressedPubKey::from(&value.0).into_address()).unwrap()
-    }
-}
+use mina_signer::pubkey::PubKeyError;
+use public_key::PublicKey;
 
 impl ExtendWithLedgerDiff for LedgerMock {
     fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
@@ -75,7 +24,7 @@ impl ExtendWithLedgerDiff for LedgerMock {
 #[derive(Default, Clone, Debug)]
 pub struct LedgerMock {}
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct Ledger {
     accounts: HashMap<PublicKey, Account>,
 }
@@ -85,6 +34,40 @@ impl Ledger {
         Ledger {
             accounts: HashMap::new(),
         }
+    }
+
+    pub fn from(value: Vec<(&str, u64, Option<&str>)>) -> Result<Self, PubKeyError> {
+        let mut ledger = Ledger::new();
+        for (pubkey, balance, delgation) in value {
+            match PublicKey::from_address(pubkey) {
+                Ok(pk) => {
+                    if let Some(delegate) = delgation {
+                        match PublicKey::from_address(delegate) {
+                            Ok(delegate) => {
+                                ledger.accounts.insert(
+                                    pk.clone(),
+                                    Account {
+                                        public_key: pk,
+                                        balance,
+                                        delegate: Some(delegate),
+                                    },
+                                );
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    } else {
+                        let acct = Account {
+                            public_key: pk.clone(),
+                            balance,
+                            delegate: None,
+                        };
+                        ledger.accounts.insert(pk, acct);
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(ledger)
     }
 
     // should this be a mutable update or immutable?
@@ -119,6 +102,44 @@ impl Ledger {
             }
         });
         success
+    }
+}
+
+impl PartialEq for Ledger {
+    fn eq(&self, other: &Self) -> bool {
+        for pk in self.accounts.keys() {
+            if self.accounts.get(pk) != other.accounts.get(pk) {
+                println!(
+                    "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
+                    self.accounts.get(pk),
+                    other.accounts.get(pk)
+                );
+                return false;
+            }
+        }
+        for pk in other.accounts.keys() {
+            if self.accounts.get(pk) != other.accounts.get(pk) {
+                println!(
+                    "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
+                    self.accounts.get(pk),
+                    other.accounts.get(pk)
+                );
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for Ledger {}
+
+impl std::fmt::Debug for Ledger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "=== Ledger ===")?;
+        for account in self.accounts.values() {
+            writeln!(f, "{account:?}")?;
+        }
+        Ok(())
     }
 }
 
