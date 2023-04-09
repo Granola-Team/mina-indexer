@@ -290,6 +290,10 @@ impl<T> Leaf<T> {
             ledger,
         }
     }
+
+    pub fn get_ledger(&self) -> &T {
+        &self.ledger
+    }
 }
 
 // only display the underlying tree

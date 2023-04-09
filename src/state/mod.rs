@@ -284,6 +284,14 @@ impl State {
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()
     }
+
+    pub fn best_ledger(&self) -> Option<&Ledger> {
+        if let Some(head) = self.best_chain.last() {
+            Some(head.get_ledger())
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Debug for State {
