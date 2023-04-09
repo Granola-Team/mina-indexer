@@ -6,7 +6,7 @@ use super::{coinbase::Coinbase, command::Command, PublicKey};
 
 pub mod account;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
     pub account_diffs: Vec<AccountDiff>,
@@ -54,5 +54,15 @@ impl LedgerDiff {
         other.account_diffs.into_iter().for_each(|update| {
             self.account_diffs.push(update);
         });
+    }
+}
+
+impl std::fmt::Debug for LedgerDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "=== LedgerDiff ===")?;
+        for account_diff in self.account_diffs.iter() {
+            writeln!(f, "{account_diff:?}")?;
+        }
+        Ok(())
     }
 }
