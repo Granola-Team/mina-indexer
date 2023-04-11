@@ -8,9 +8,9 @@ use self::{
 pub mod branch;
 pub mod ledger;
 
-/// Rooted forest of precomputed block summaries (`root_branch` and `dangling_branches`)
-/// with
-#[derive(Debug)]
+/// Rooted forest of precomputed block summaries
+/// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
+/// `dangling_branches` - trees of blocks stemming from an unknown ledger state
 pub struct State {
     /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
@@ -268,7 +268,7 @@ impl State {
         self.dangling_branches.push(
             Branch::new(
                 precomputed_block,
-                LedgerDiff::fom_precomputed_block(precomputed_block),
+                LedgerDiff::from_precomputed_block(precomputed_block),
             )
             .expect("cannot fail"),
         );
@@ -283,5 +283,38 @@ impl State {
             .flatten()
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()
+    }
+
+    pub fn best_ledger(&self) -> Option<&Ledger> {
+        if let Some(head) = self.best_chain.last() {
+            Some(head.get_ledger())
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "=== State ===")?;
+
+        writeln!(f, "Root branch:")?;
+        let mut tree = String::new();
+        match self.root_branch.as_ref() {
+            None => writeln!(f, "Empty...")?,
+            Some(root_branch) => {
+                root_branch.branches.write_formatted(&mut tree)?;
+            }
+        }
+        writeln!(f, "{tree}")?;
+
+        writeln!(f, "Dangling branches:")?;
+        for (n, branch) in self.dangling_branches.iter().enumerate() {
+            writeln!(f, "Dangling branch {n}:")?;
+            let mut tree = String::new();
+            branch.branches.write_formatted(&mut tree)?;
+            write!(f, "{tree}")?;
+        }
+        Ok(())
     }
 }

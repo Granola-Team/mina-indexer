@@ -2,7 +2,7 @@ use mina_serialization_types::v1::PublicKeyV1;
 
 use super::PublicKey;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: u64,
@@ -40,5 +40,27 @@ impl Account {
             balance: pre.balance,
             delegate: Some(delegate.into()),
         }
+    }
+}
+
+impl PartialOrd for Account {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.public_key.cmp(&other.public_key))
+    }
+}
+
+impl Ord for Account {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.public_key.cmp(&other.public_key)
+    }
+}
+
+impl std::fmt::Debug for Account {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Account {{ {:?}, {}, {:?} }}",
+            self.public_key, self.balance, self.delegate
+        )
     }
 }

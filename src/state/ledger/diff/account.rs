@@ -9,26 +9,26 @@ use crate::{
 };
 
 // add delegations later
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UpdateType {
     Deposit,
     Deduction,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub struct PaymentDiff {
     pub public_key: PublicKey,
     pub amount: u64,
     pub update_type: UpdateType,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub struct DelegationDiff {
     pub delegator: PublicKey,
     pub delegate: PublicKey,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub enum AccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
@@ -125,5 +125,39 @@ impl AccountDiff {
                 },
             )
             .collect()
+    }
+}
+
+impl std::fmt::Debug for PaymentDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} | {:?} | {}",
+            self.public_key, self.update_type, self.amount
+        )
+    }
+}
+
+impl std::fmt::Debug for DelegationDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} -> {:?}", self.delegate, self.delegator)
+    }
+}
+
+impl std::fmt::Debug for AccountDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AccountDiff::Payment(pay_diff) => write!(f, "Payment: {pay_diff:?}"),
+            AccountDiff::Delegation(del_diff) => write!(f, "Delegation: {del_diff:?}"),
+        }
+    }
+}
+
+impl std::fmt::Debug for UpdateType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UpdateType::Deduction => write!(f, "Deduction"),
+            UpdateType::Deposit => write!(f, "Deposit  "),
+        }
     }
 }

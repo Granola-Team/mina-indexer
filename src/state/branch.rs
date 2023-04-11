@@ -34,14 +34,14 @@ pub struct BranchUpdate<T> {
 impl Branch<Ledger> {
     // only the genesis block should work here
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
-        let new_ledger = Ledger::from_diff(LedgerDiff::fom_precomputed_block(root_precomputed));
+        let new_ledger = Ledger::from_diff(LedgerDiff::from_precomputed_block(root_precomputed));
         Branch::new(root_precomputed, new_ledger).unwrap()
     }
 }
 
 impl Branch<LedgerDiff> {
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
-        let diff = LedgerDiff::fom_precomputed_block(root_precomputed);
+        let diff = LedgerDiff::from_precomputed_block(root_precomputed);
         Branch::new(root_precomputed, diff).unwrap()
     }
 }
@@ -93,7 +93,7 @@ where
                     .data()
                     .ledger
                     .clone()
-                    .extend_with_diff(LedgerDiff::fom_precomputed_block(block));
+                    .extend_with_diff(LedgerDiff::from_precomputed_block(block));
                 let new_leaf = Leaf::new(new_block, new_ledger);
                 let new_node_id = self
                     .branches
@@ -226,7 +226,7 @@ where
     pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) -> NodeId {
         let new_block = Block::from_precomputed(precomputed_block, 0);
         let new_ledger =
-            ExtendWithLedgerDiff::from_diff(LedgerDiff::fom_precomputed_block(precomputed_block));
+            ExtendWithLedgerDiff::from_diff(LedgerDiff::from_precomputed_block(precomputed_block));
         let new_leaf = Leaf::new(new_block.clone(), new_ledger);
         let new_root_id = self
             .branches
@@ -289,6 +289,10 @@ impl<T> Leaf<T> {
             block: data,
             ledger,
         }
+    }
+
+    pub fn get_ledger(&self) -> &T {
+        &self.ledger
     }
 }
 
