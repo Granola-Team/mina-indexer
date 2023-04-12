@@ -10,8 +10,8 @@ pub struct BlockStore {
 
 impl BlockStore {
     pub fn new(path: &Path) -> anyhow::Result<Self> {
-        let database_opts = rocksdb::Options::default();
-        let database = rocksdb::DB::open(&database_opts, path)?;
+        // let database_opts = rocksdb::Options::default();
+        let database = rocksdb::DB::open_default(path)?;
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
