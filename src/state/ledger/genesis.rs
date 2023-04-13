@@ -20,10 +20,10 @@ pub struct GenesisLedger {
     accounts: Vec<GenesisAccount>,
 }
 
-impl Into<Ledger> for GenesisLedger {
-    fn into(self) -> Ledger {
+impl From<GenesisLedger> for Ledger {
+    fn from(genesis_ledger: GenesisLedger) -> Ledger {
         let mut accounts = HashMap::new();
-        for genesis_account in self.accounts {
+        for genesis_account in genesis_ledger.accounts {
             let balance = match str::parse::<f32>(&genesis_account.balance) {
                 Ok(float) => (float * 1e9) as u64,
                 Err(_) => 0,
@@ -43,13 +43,13 @@ impl Into<Ledger> for GenesisLedger {
 
             if let Some(delegate) = genesis_account.delegate {
                 let delegate_public_key = PublicKeyV1::from(delegate);
-                if let None = accounts.get(&delegate_public_key.clone().into()) {
+                if accounts.get(&delegate_public_key.clone().into()).is_none() {
                     let account = Account::empty(delegate_public_key.clone());
                     accounts.insert(delegate_public_key.into(), account);
                 }
             }
         }
-
+        assert_eq!(genesis_ledger.num_accounts as usize, accounts.len());
         Ledger { accounts }
     }
 }
