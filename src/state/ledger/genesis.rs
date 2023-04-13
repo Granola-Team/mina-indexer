@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use mina_serialization_types::{v1::PublicKeyV1, signatures::PublicKeyJson};
-use serde::{Serialize, Deserialize};
+use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
+use serde::{Deserialize, Serialize};
 
-use super::{Ledger, account::Account};
+use super::{account::Account, Ledger};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccount {
@@ -17,7 +17,7 @@ pub struct GenesisAccount {
 pub struct GenesisLedger {
     name: String,
     num_accounts: u64,
-    accounts: Vec<GenesisAccount>
+    accounts: Vec<GenesisAccount>,
 }
 
 impl Into<Ledger> for GenesisLedger {
@@ -29,18 +29,24 @@ impl Into<Ledger> for GenesisLedger {
                 Err(_) => 0,
             };
 
-            accounts.insert(PublicKeyV1::from(genesis_account.pk.clone()).into(), Account {
-                public_key: PublicKeyV1::from(genesis_account.pk).into(),
-                delegate: genesis_account.delegate.clone().map(|delegate| PublicKeyV1::from(delegate).into()),
-                balance
-            });
+            accounts.insert(
+                PublicKeyV1::from(genesis_account.pk.clone()).into(),
+                Account {
+                    public_key: PublicKeyV1::from(genesis_account.pk).into(),
+                    delegate: genesis_account
+                        .delegate
+                        .clone()
+                        .map(|delegate| PublicKeyV1::from(delegate).into()),
+                    balance,
+                },
+            );
 
             if let Some(delegate) = genesis_account.delegate {
                 let delegate_public_key = PublicKeyV1::from(delegate);
                 if let None = accounts.get(&delegate_public_key.clone().into()) {
                     let account = Account::empty(delegate_public_key.clone());
                     accounts.insert(delegate_public_key.into(), account);
-                }                
+                }
             }
         }
 
