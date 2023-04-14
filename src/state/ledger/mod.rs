@@ -4,6 +4,7 @@ pub mod account;
 pub mod coinbase;
 pub mod command;
 pub mod diff;
+pub mod genesis;
 pub mod public_key;
 
 use account::Account;
