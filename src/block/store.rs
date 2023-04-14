@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, fmt::Display};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 use rocksdb::{DBWithThreadMode, MultiThreaded};
 use thiserror::Error;
@@ -72,7 +75,7 @@ impl BlockStoreConn {
 
 #[derive(Debug, Clone, Error)]
 pub enum BlockStoreError {
-    DBError(rocksdb::Error)
+    DBError(rocksdb::Error),
 }
 type BlockStoreResult<T> = std::result::Result<T, BlockStoreError>;
 

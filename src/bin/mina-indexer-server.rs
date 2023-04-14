@@ -4,7 +4,10 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-use mina_indexer::{block::{receiver::BlockReceiver, precomputed::PrecomputedBlock}, state::IndexerState};
+use mina_indexer::{
+    block::{precomputed::PrecomputedBlock, receiver::BlockReceiver},
+    state::IndexerState,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -73,7 +76,8 @@ async fn handle_conn(conn: LocalSocketStream, state: IndexerState) -> Result<(),
                         .get_block(&state_hash.0)
                         .unwrap()
                         .unwrap()
-                }).collect();
+                })
+                .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
         }

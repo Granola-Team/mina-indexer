@@ -286,7 +286,14 @@ impl IndexerState {
         self.best_chain
             .iter()
             .map(|leaf| leaf.block.state_hash.clone())
-            .flat_map(|state_hash| self.block_store_pool.as_ref().unwrap().get().unwrap().get_block(&state_hash.0))
+            .flat_map(|state_hash| {
+                self.block_store_pool
+                    .as_ref()
+                    .unwrap()
+                    .get()
+                    .unwrap()
+                    .get_block(&state_hash.0)
+            })
             .flatten()
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()

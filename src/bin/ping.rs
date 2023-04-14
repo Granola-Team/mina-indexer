@@ -1,7 +1,5 @@
-use futures::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-};
-use interprocess::local_socket::{tokio::LocalSocketStream};
+use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use interprocess::local_socket::tokio::LocalSocketStream;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
