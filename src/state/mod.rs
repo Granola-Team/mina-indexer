@@ -11,7 +11,7 @@ pub mod ledger;
 /// Rooted forest of precomputed block summaries
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
-pub struct State {
+pub struct IndexerState {
     /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -37,7 +37,7 @@ pub enum ExtensionDirection {
     Reverse,
 }
 
-impl State {
+impl IndexerState {
     pub fn new(
         root: &PrecomputedBlock,
         blocks_path: Option<&std::path::Path>,
@@ -294,7 +294,7 @@ impl State {
     }
 }
 
-impl std::fmt::Debug for State {
+impl std::fmt::Debug for IndexerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "=== State ===")?;
 

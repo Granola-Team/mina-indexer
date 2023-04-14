@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{ExtensionType, State},
+    state::{ExtensionType, IndexerState},
 };
 
 /// Merges three dangling branches
@@ -66,7 +66,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = State::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None).unwrap();
 
     // ---------
     // add leaf0
