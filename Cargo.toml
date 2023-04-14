@@ -45,6 +45,7 @@ async-recursion = "1.0.4"
 watchexec = "2.3.0"
 async-priority-channel = "0.1.0"
 interprocess = {version = "1.2.1", features = ["tokio", "tokio_support"]}
+r2d2 = "0.8.10"
 
 [dependencies.tokio]
 version = "1.25.0"

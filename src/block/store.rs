@@ -1,14 +1,38 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, fmt::Display};
+
+use thiserror::Error;
 
 use super::precomputed::PrecomputedBlock;
 
+#[derive(Debug, Clone)]
+pub struct BlockStore(pub PathBuf);
+
+impl r2d2::ManageConnection for BlockStore {
+    type Connection = BlockStoreConn;
+
+    type Error = BlockStoreError;
+
+    fn connect(&self) -> Result<Self::Connection, Self::Error> {
+        BlockStoreConn::new(&self.0)
+    }
+
+    fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+        conn.test_conn()?;
+        Ok(())
+    }
+
+    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-pub struct BlockStore {
+pub struct BlockStoreConn {
     db_path: PathBuf,
     database: rocksdb::DB,
 }
 
-impl BlockStore {
+impl BlockStoreConn {
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         // let database_opts = rocksdb::Options::default();
         let database = rocksdb::DB::open_default(path)?;
