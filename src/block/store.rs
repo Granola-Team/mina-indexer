@@ -1,5 +1,6 @@
 use std::{path::{Path, PathBuf}, fmt::Display};
 
+use rocksdb::{DBWithThreadMode, MultiThreaded};
 use thiserror::Error;
 
 use super::precomputed::PrecomputedBlock;
@@ -29,13 +30,13 @@ impl r2d2::ManageConnection for BlockStore {
 #[derive(Debug)]
 pub struct BlockStoreConn {
     db_path: PathBuf,
-    database: rocksdb::DB,
+    database: DBWithThreadMode<MultiThreaded>,
 }
 
 impl BlockStoreConn {
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
-        // let database_opts = rocksdb::Options::default();
-        let database = rocksdb::DB::open_default(path)?;
+    pub fn new(path: &Path) -> BlockStoreResult<Self> {
+        let database_opts = rocksdb::Options::default();
+        let database = rocksdb::DBWithThreadMode::open(&database_opts, path)?;
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
@@ -60,6 +61,12 @@ impl BlockStoreConn {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    pub fn test_conn(&mut self) -> BlockStoreResult<()> {
+        self.database.put("test", "value")?;
+        self.database.delete("test")?;
+        Ok(())
     }
 }
 
