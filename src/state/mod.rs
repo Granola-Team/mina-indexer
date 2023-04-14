@@ -1,3 +1,7 @@
+use std::path::PathBuf;
+
+use r2d2::Pool;
+
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash};
 
 use self::{
@@ -11,6 +15,7 @@ pub mod ledger;
 /// Rooted forest of precomputed block summaries
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
+#[derive(Clone)]
 pub struct IndexerState {
     /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
@@ -19,7 +24,7 @@ pub struct IndexerState {
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
-    pub store: Option<BlockStore>,
+    pub block_store_pool: Option<Pool<BlockStore>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -42,7 +47,9 @@ impl IndexerState {
         root: &PrecomputedBlock,
         blocks_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
-        let store = blocks_path.map(|path| BlockStore::new(path).unwrap());
+        let block_store_pool = blocks_path
+            .map(|path| BlockStore(PathBuf::from(path)))
+            .map(|manager| r2d2::Pool::builder().build(manager).unwrap());
         // genesis block => make new root_branch
         if root.state_hash == BlockHash::previous_state_hash(root).0 {
             // TODO get genesis ledger
@@ -52,14 +59,14 @@ impl IndexerState {
                 best_chain: Vec::from([Leaf::new(block, genesis_ledger)]),
                 root_branch: Some(Branch::<Ledger>::new_rooted(root)),
                 dangling_branches: Vec::new(),
-                store,
+                block_store_pool,
             })
         } else {
             Ok(Self {
                 best_chain: Vec::new(),
                 root_branch: None,
                 dangling_branches: Vec::from([Branch::<LedgerDiff>::new_rooted(root)]),
-                store,
+                block_store_pool,
             })
         }
     }
@@ -279,7 +286,7 @@ impl IndexerState {
         self.best_chain
             .iter()
             .map(|leaf| leaf.block.state_hash.clone())
-            .flat_map(|state_hash| self.store.as_ref().unwrap().get_block(&state_hash.0))
+            .flat_map(|state_hash| self.block_store_pool.as_ref().unwrap().get().unwrap().get_block(&state_hash.0))
             .flatten()
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()

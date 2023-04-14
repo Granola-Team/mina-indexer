@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use mina_indexer::block::{parser::BlockParser, store::BlockStore};
+use mina_indexer::block::{parser::BlockParser, store::BlockStoreConn};
 use tokio::time::Instant;
 
 #[tokio::test]
@@ -8,7 +8,7 @@ async fn rocksdb() {
     let store_dir = &PathBuf::from("./block-store-test");
     let log_dir = &PathBuf::from("./tests/data/beautified_sequential_blocks");
 
-    let db = BlockStore::new(store_dir).unwrap();
+    let db = BlockStoreConn::new(store_dir).unwrap();
     let mut bp = BlockParser::new(log_dir).unwrap();
     let mut blocks = HashMap::new();
 
