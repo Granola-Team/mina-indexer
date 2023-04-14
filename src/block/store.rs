@@ -38,3 +38,23 @@ impl BlockStore {
         &self.db_path
     }
 }
+
+#[derive(Debug, Clone, Error)]
+pub enum BlockStoreError {
+    DBError(rocksdb::Error)
+}
+type BlockStoreResult<T> = std::result::Result<T, BlockStoreError>;
+
+impl Display for BlockStoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockStoreError::DBError(err) => write!(f, "BlockStoreError: {}", err),
+        }
+    }
+}
+
+impl From<rocksdb::Error> for BlockStoreError {
+    fn from(value: rocksdb::Error) -> Self {
+        Self::DBError(value)
+    }
+}
