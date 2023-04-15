@@ -4,8 +4,6 @@ use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
-use crate::state::ledger::genesis;
-
 use super::{account::Account, Ledger};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
