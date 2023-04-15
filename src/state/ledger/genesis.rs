@@ -1,7 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
+
+use crate::state::ledger::genesis;
 
 use super::{account::Account, Ledger};
 
@@ -64,4 +67,15 @@ pub mod tests {
     pub fn genesis_ledger_deserializes() {
         let _genesis_ledger: GenesisLedger = serde_json::from_str(GENESIS_LEDGER_JSON).unwrap();
     }
+}
+
+pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisLedger> {
+    let mut genesis_ledger_file = tokio::fs::File::open(&filename).await?;
+    let mut genesis_ledger_file_contents = Vec::new();
+
+    genesis_ledger_file.read_to_end(&mut genesis_ledger_file_contents).await?;
+
+    let genesis_ledger: GenesisLedger = serde_json::from_slice(&genesis_ledger_file_contents)?;
+
+    Ok(genesis_ledger)
 }
