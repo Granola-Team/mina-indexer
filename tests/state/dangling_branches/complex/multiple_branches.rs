@@ -66,7 +66,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None, None).unwrap();
 
     // ---------
     // add leaf0

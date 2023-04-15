@@ -67,7 +67,7 @@ async fn extension() {
     // ----------
 
     // root in branch 0
-    let mut state = IndexerState::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None, None).unwrap();
 
     // other in branch 1
     let extension_type = state.add_block(&other_block).unwrap();

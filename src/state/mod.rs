@@ -6,7 +6,7 @@ use crate::block::{precomputed::PrecomputedBlock, store::BlockStore, Block, Bloc
 
 use self::{
     branch::{Branch, Leaf},
-    ledger::{command::Command, diff::LedgerDiff, Ledger},
+    ledger::{command::Command, diff::LedgerDiff, Ledger, genesis::GenesisLedger},
 };
 
 pub mod branch;
@@ -45,6 +45,7 @@ pub enum ExtensionDirection {
 impl IndexerState {
     pub fn new(
         root: &PrecomputedBlock,
+        genesis_ledger: Option<GenesisLedger>,
         blocks_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
         let block_store_pool = blocks_path
@@ -53,7 +54,10 @@ impl IndexerState {
         // genesis block => make new root_branch
         if root.state_hash == BlockHash::previous_state_hash(root).0 {
             // TODO get genesis ledger
-            let genesis_ledger = Ledger::default();
+            let genesis_ledger = match genesis_ledger {
+                Some(genesis_ledger) => genesis_ledger.into(),
+                None => Ledger::default(),
+            };
             let block = Block::from_precomputed(root, 1);
             Ok(Self {
                 best_chain: Vec::from([Leaf::new(block, genesis_ledger)]),

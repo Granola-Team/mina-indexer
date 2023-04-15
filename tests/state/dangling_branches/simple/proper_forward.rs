@@ -30,7 +30,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None, None).unwrap();
 
     // root_block is added as the root of the 0th dangling branch
     assert!(state.root_branch.is_none());

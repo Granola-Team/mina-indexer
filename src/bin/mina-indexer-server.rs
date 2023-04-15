@@ -13,6 +13,8 @@ use mina_indexer::{
 #[command(author, version, about, long_about = None)]
 struct ServerArgs {
     #[arg(short, long)]
+    genesis_ledger: PathBuf,
+    #[arg(short, long)]
     root_block: PathBuf,
     #[arg(short, long, default_value = None)]
     logs_dir: Option<PathBuf>,
@@ -23,7 +25,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = ServerArgs::parse();
     let root_block = mina_indexer::block::parse_file(&args.root_block).await?;
     let mut indexer_state =
-        mina_indexer::state::IndexerState::new(&root_block, args.logs_dir.as_deref())?;
+        mina_indexer::state::IndexerState::new(&root_block, None, args.logs_dir.as_deref())?;
     let mut block_receiver = BlockReceiver::new().await?;
 
     let listener = LocalSocketListener::bind(mina_indexer::SOCKET_NAME)?;
