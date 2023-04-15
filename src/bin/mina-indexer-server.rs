@@ -6,7 +6,7 @@ use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use mina_indexer::{
     block::{precomputed::PrecomputedBlock, receiver::BlockReceiver},
-    state::IndexerState,
+    state::{IndexerState, ledger},
 };
 
 #[derive(Parser, Debug)]
@@ -23,9 +23,17 @@ struct ServerArgs {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = ServerArgs::parse();
+    let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
+        Ok(genesis_ledger) => Some(genesis_ledger),
+        Err(e) => {
+            eprintln!("Unable to read genesis ledger at {}: {}! Using None", args.genesis_ledger.display(), e);
+            None
+        }
+    };
+
     let root_block = mina_indexer::block::parse_file(&args.root_block).await?;
     let mut indexer_state =
-        mina_indexer::state::IndexerState::new(&root_block, None, args.logs_dir.as_deref())?;
+        mina_indexer::state::IndexerState::new(&root_block, genesis_ledger, args.logs_dir.as_deref())?;
     let mut block_receiver = BlockReceiver::new().await?;
 
     let listener = LocalSocketListener::bind(mina_indexer::SOCKET_NAME)?;
