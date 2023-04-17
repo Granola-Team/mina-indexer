@@ -1,8 +1,4 @@
-use std::path::PathBuf;
-
-use r2d2::Pool;
-
-use crate::block::{precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash};
+use crate::block::{precomputed::PrecomputedBlock, store::{BlockStoreConn}, BlockHash};
 
 use self::{
     branch::{Branch, Leaf},
@@ -15,7 +11,6 @@ pub mod ledger;
 /// Rooted forest of precomputed block summaries
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
-#[derive(Clone)]
 pub struct IndexerState {
     /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
@@ -24,7 +19,7 @@ pub struct IndexerState {
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
-    pub block_store_pool: Option<Pool<BlockStore>>,
+    pub block_store: Option<BlockStoreConn>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -35,6 +30,7 @@ pub enum ExtensionType {
     DanglingComplex,
     RootSimple,
     RootComplex,
+    BlockNotAdded
 }
 
 pub enum ExtensionDirection {
@@ -44,52 +40,36 @@ pub enum ExtensionDirection {
 
 impl IndexerState {
     pub fn new(
-        root: &PrecomputedBlock,
+        root_hash: BlockHash,
         genesis_ledger: Option<GenesisLedger>,
         blocks_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
-        let block_store_pool = blocks_path
-            .map(|path| BlockStore(PathBuf::from(path)))
-            .map(|manager| r2d2::Pool::builder().build(manager).unwrap());
-        // genesis block => make new root_branch
-        if root.state_hash == BlockHash::previous_state_hash(root).0 {
-            // TODO get genesis ledger
-            let genesis_ledger = match genesis_ledger {
-                Some(genesis_ledger) => genesis_ledger.into(),
-                None => Ledger::default(),
-            };
-            let block = Block::from_precomputed(root, 1);
-            Ok(Self {
-                best_chain: Vec::from([Leaf::new(block, genesis_ledger)]),
-                root_branch: Some(Branch::<Ledger>::new_rooted(root)),
-                dangling_branches: Vec::new(),
-                block_store_pool,
-            })
-        } else {
-            Ok(Self {
-                best_chain: Vec::new(),
-                root_branch: None,
-                dangling_branches: Vec::from([Branch::<LedgerDiff>::new_rooted(root)]),
-                block_store_pool,
-            })
-        }
+        let block_store = blocks_path
+            .map(|path| BlockStoreConn::new(path).unwrap());
+        Ok(Self {
+            best_chain: Vec::new(),
+            root_branch: Some(Branch::new_genesis(root_hash, genesis_ledger)),
+            dangling_branches: Vec::new(),
+            block_store,
+        })
     }
 
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
+        self.block_store.as_mut().map(|block_store| block_store.add_block(precomputed_block));
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
-        if let Some(mut root_branch) = self.root_branch.clone() {
-            if let Some(max_length) = root_branch
+        if let Some(root_branch) = self.root_branch.as_mut() {
+            if let Some(_max_length) = root_branch
                 .leaves
                 .iter()
                 .flat_map(|(_, x)| x.block.blockchain_length)
                 .fold(None, |acc, x| acc.max(Some(x)))
             {
                 // check leaf heights first
-                if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
+                // if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
                     if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
                         let mut branches_to_remove = Vec::new();
                         // check if new block connects to a dangling branch
@@ -102,21 +82,20 @@ impl IndexerState {
                                 branches_to_remove.push(index);
                             }
 
-                            // if the block is already in the dangling branch, error out
+                            // if the block is already in the dangling branch, do nothing
                             if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Err(anyhow::Error::msg(format!(
-                                    "Block present with state hash: {:?}",
-                                    precomputed_block.state_hash.clone()
-                                )));
+                                return Ok(ExtensionType::BlockNotAdded);
                             }
                         }
 
                         // should be the only place we need this call
                         self.best_chain = root_branch.longest_chain();
                         if !branches_to_remove.is_empty() {
+                            let mut num_removed = 0;
                             // if the root branch is newly connected to dangling branches
                             for index_to_remove in branches_to_remove {
-                                self.dangling_branches.remove(index_to_remove);
+                                self.dangling_branches.remove(index_to_remove -  num_removed);
+                                num_removed += 1;
                             }
                             return Ok(ExtensionType::RootComplex);
                         } else {
@@ -124,7 +103,7 @@ impl IndexerState {
                             return Ok(ExtensionType::RootSimple);
                         }
                     }
-                }
+                // }
             }
         }
 
@@ -165,12 +144,9 @@ impl IndexerState {
                                 break;
                             }
 
-                            // if the block is already in a dangling branch, error out
+                            // if the block is already in a dangling branch, do nothing
                             if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Err(anyhow::Error::msg(format!(
-                                    "Block present with state hash: {:?}",
-                                    precomputed_block.state_hash.clone()
-                                )));
+                                return Ok(ExtensionType::BlockNotAdded);
                             }
                         }
                     } else {
@@ -191,12 +167,9 @@ impl IndexerState {
                             break;
                         }
 
-                        // if the block is already in a dangling branch, error out
+                        // if the block is already in a dangling branch, do nothing
                         if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                            return Err(anyhow::Error::msg(format!(
-                                "Block present with state hash: {:?}",
-                                precomputed_block.state_hash.clone(),
-                            )));
+                            return Ok(ExtensionType::BlockNotAdded);
                         }
 
                         // simple forward
@@ -224,12 +197,9 @@ impl IndexerState {
                         break;
                     }
 
-                    // if the block is already in a dangling branch, error out
+                    // if the block is already in a dangling branch, do nothing
                     if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Err(anyhow::Error::msg(format!(
-                            "Block present with state hash: {:?}",
-                            precomputed_block.state_hash.clone()
-                        )));
+                        return Ok(ExtensionType::BlockNotAdded);
                     }
 
                     // simple forward
@@ -291,10 +261,8 @@ impl IndexerState {
             .iter()
             .map(|leaf| leaf.block.state_hash.clone())
             .flat_map(|state_hash| {
-                self.block_store_pool
+                self.block_store
                     .as_ref()
-                    .unwrap()
-                    .get()
                     .unwrap()
                     .get_block(&state_hash.0)
             })

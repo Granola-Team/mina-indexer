@@ -17,7 +17,9 @@ impl r2d2::ManageConnection for BlockStore {
     type Error = BlockStoreError;
 
     fn connect(&self) -> Result<Self::Connection, Self::Error> {
-        BlockStoreConn::new(&self.0)
+        let mut secondary = self.0.clone();
+        secondary.push("secondary");
+        BlockStoreConn::new_read_only(&self.0, &secondary)
     }
 
     fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
@@ -37,8 +39,18 @@ pub struct BlockStoreConn {
 }
 
 impl BlockStoreConn {
-    pub fn new(path: &Path) -> BlockStoreResult<Self> {
+    pub fn new_read_only(path: &Path, secondary: &Path) -> BlockStoreResult<Self> {
         let database_opts = rocksdb::Options::default();
+        let database =
+            rocksdb::DBWithThreadMode::open_as_secondary(&database_opts, path, secondary)?;
+        Ok(Self {
+            db_path: PathBuf::from(path),
+            database,
+        })
+    }
+    pub fn new(path: &Path) -> BlockStoreResult<Self> {
+        let mut database_opts = rocksdb::Options::default();
+        database_opts.create_if_missing(true);
         let database = rocksdb::DBWithThreadMode::open(&database_opts, path)?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -54,8 +66,9 @@ impl BlockStoreConn {
     }
 
     pub fn get_block(&self, state_hash: &str) -> anyhow::Result<Option<PrecomputedBlock>> {
+        self.database.try_catch_up_with_primary().ok();
         let key = state_hash.as_bytes();
-        if let Some(bytes) = self.database.get(key)? {
+        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
             let precomputed_block = bcs::from_bytes(&bytes)?;
             return Ok(Some(precomputed_block));
         }

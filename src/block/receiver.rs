@@ -104,7 +104,10 @@ impl BlockReceiver {
                             }
 
                             if let Some((path, Some(_filetype))) = path_and_filetype {
-                                return Some(parse_file(path.as_path()).await);
+                                match parse_file(path.as_path()).await {
+                                    Ok(block) => return Some(Ok(block)),
+                                    Err(_) => continue,
+                                }
                             }
                         }
                     }

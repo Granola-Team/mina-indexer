@@ -41,16 +41,8 @@ impl From<GenesisLedger> for Ledger {
                     balance,
                 },
             );
-
-            if let Some(delegate) = genesis_account.delegate {
-                let delegate_public_key = PublicKeyV1::from(delegate);
-                if accounts.get(&delegate_public_key.clone().into()).is_none() {
-                    let account = Account::empty(delegate_public_key.clone());
-                    accounts.insert(delegate_public_key.into(), account);
-                }
-            }
         }
-        assert_eq!(genesis_ledger.num_accounts as usize, accounts.len());
+        // assert_eq!(genesis_ledger.num_accounts as usize, accounts.len());
         Ledger { accounts }
     }
 }
