@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{ExtensionType, State},
+    state::{ExtensionType, IndexerState},
 };
 
 /// Merges two dangling branches, ignore others
@@ -67,7 +67,7 @@ async fn extension() {
     // ----------
 
     // root in branch 0
-    let mut state = State::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None, None).unwrap();
 
     // other in branch 1
     let extension_type = state.add_block(&other_block).unwrap();

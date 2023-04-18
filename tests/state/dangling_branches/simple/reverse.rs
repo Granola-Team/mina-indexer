@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{ExtensionType, State},
+    state::{ExtensionType, IndexerState},
 };
 
 /// Extends a branch backwards with the root's parent
@@ -46,7 +46,7 @@ async fn extension() {
     // ----------------
 
     // child becomes the root of the 0th dangling branch
-    let mut state = State::new(&old_root_block, None).unwrap();
+    let mut state = IndexerState::new(&old_root_block, None, None).unwrap();
 
     // before extension quantities
     let before_root = state.dangling_branches.get(0).unwrap().root.clone();

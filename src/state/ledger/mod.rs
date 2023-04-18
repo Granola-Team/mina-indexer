@@ -27,7 +27,7 @@ pub struct LedgerMock {}
 
 #[derive(Default, Clone)]
 pub struct Ledger {
-    accounts: HashMap<PublicKey, Account>,
+    pub accounts: HashMap<PublicKey, Account>,
 }
 
 impl Ledger {

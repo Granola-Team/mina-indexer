@@ -1,8 +1,8 @@
-use crate::block::{precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash};
+use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 
 use self::{
     branch::{Branch, Leaf},
-    ledger::{command::Command, diff::LedgerDiff, Ledger},
+    ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
 };
 
 pub mod branch;
@@ -11,7 +11,7 @@ pub mod ledger;
 /// Rooted forest of precomputed block summaries
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
-pub struct State {
+pub struct IndexerState {
     /// Longest chain of blocks from the `root_branch`
     pub best_chain: Vec<Leaf<Ledger>>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -19,7 +19,7 @@ pub struct State {
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
-    pub store: Option<BlockStore>,
+    pub block_store: Option<BlockStoreConn>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,6 +30,7 @@ pub enum ExtensionType {
     DanglingComplex,
     RootSimple,
     RootComplex,
+    BlockNotAdded,
 }
 
 pub enum ExtensionDirection {
@@ -37,83 +38,70 @@ pub enum ExtensionDirection {
     Reverse,
 }
 
-impl State {
+impl IndexerState {
     pub fn new(
-        root: &PrecomputedBlock,
+        root_hash: BlockHash,
+        genesis_ledger: Option<GenesisLedger>,
         blocks_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
-        let store = blocks_path.map(|path| BlockStore::new(path).unwrap());
-        // genesis block => make new root_branch
-        if root.state_hash == BlockHash::previous_state_hash(root).0 {
-            // TODO get genesis ledger
-            let genesis_ledger = Ledger::default();
-            let block = Block::from_precomputed(root, 1);
-            Ok(Self {
-                best_chain: Vec::from([Leaf::new(block, genesis_ledger)]),
-                root_branch: Some(Branch::<Ledger>::new_rooted(root)),
-                dangling_branches: Vec::new(),
-                store,
-            })
-        } else {
-            Ok(Self {
-                best_chain: Vec::new(),
-                root_branch: None,
-                dangling_branches: Vec::from([Branch::<LedgerDiff>::new_rooted(root)]),
-                store,
-            })
-        }
+        let block_store = blocks_path.map(|path| BlockStoreConn::new(path).unwrap());
+        Ok(Self {
+            best_chain: Vec::new(),
+            root_branch: Some(Branch::new_genesis(root_hash, genesis_ledger)),
+            dangling_branches: Vec::new(),
+            block_store,
+        })
     }
 
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
+        self.block_store
+            .as_mut()
+            .map(|block_store| block_store.add_block(precomputed_block));
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
-        if let Some(mut root_branch) = self.root_branch.clone() {
-            if let Some(max_length) = root_branch
+        if let Some(root_branch) = self.root_branch.as_mut() {
+            if let Some(_max_length) = root_branch
                 .leaves
                 .iter()
                 .flat_map(|(_, x)| x.block.blockchain_length)
                 .fold(None, |acc, x| acc.max(Some(x)))
             {
                 // check leaf heights first
-                if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
-                    if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
-                        let mut branches_to_remove = Vec::new();
-                        // check if new block connects to a dangling branch
-                        for (index, dangling_branch) in
-                            self.dangling_branches.iter_mut().enumerate()
-                        {
-                            // incoming block is the parent of the dangling branch root
-                            if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                                root_branch.merge_on(&new_node_id, dangling_branch);
-                                branches_to_remove.push(index);
-                            }
-
-                            // if the block is already in the dangling branch, error out
-                            if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Err(anyhow::Error::msg(format!(
-                                    "Block present with state hash: {:?}",
-                                    precomputed_block.state_hash.clone()
-                                )));
-                            }
+                // if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
+                if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
+                    let mut branches_to_remove = Vec::new();
+                    // check if new block connects to a dangling branch
+                    for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
+                        // incoming block is the parent of the dangling branch root
+                        if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+                            root_branch.merge_on(&new_node_id, dangling_branch);
+                            branches_to_remove.push(index);
                         }
 
-                        // should be the only place we need this call
-                        self.best_chain = root_branch.longest_chain();
-                        if !branches_to_remove.is_empty() {
-                            // if the root branch is newly connected to dangling branches
-                            for index_to_remove in branches_to_remove {
-                                self.dangling_branches.remove(index_to_remove);
-                            }
-                            return Ok(ExtensionType::RootComplex);
-                        } else {
-                            // if there aren't any branches that are connected
-                            return Ok(ExtensionType::RootSimple);
+                        // if the block is already in the dangling branch, do nothing
+                        if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                            return Ok(ExtensionType::BlockNotAdded);
                         }
                     }
+
+                    // should be the only place we need this call
+                    self.best_chain = root_branch.longest_chain();
+                    if !branches_to_remove.is_empty() {
+                        // if the root branch is newly connected to dangling branches
+                        for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate()
+                        {
+                            self.dangling_branches.remove(index_to_remove - num_removed);
+                        }
+                        return Ok(ExtensionType::RootComplex);
+                    } else {
+                        // if there aren't any branches that are connected
+                        return Ok(ExtensionType::RootSimple);
+                    }
                 }
+                // }
             }
         }
 
@@ -154,12 +142,9 @@ impl State {
                                 break;
                             }
 
-                            // if the block is already in a dangling branch, error out
+                            // if the block is already in a dangling branch, do nothing
                             if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Err(anyhow::Error::msg(format!(
-                                    "Block present with state hash: {:?}",
-                                    precomputed_block.state_hash.clone()
-                                )));
+                                return Ok(ExtensionType::BlockNotAdded);
                             }
                         }
                     } else {
@@ -180,12 +165,9 @@ impl State {
                             break;
                         }
 
-                        // if the block is already in a dangling branch, error out
+                        // if the block is already in a dangling branch, do nothing
                         if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                            return Err(anyhow::Error::msg(format!(
-                                "Block present with state hash: {:?}",
-                                precomputed_block.state_hash.clone(),
-                            )));
+                            return Ok(ExtensionType::BlockNotAdded);
                         }
 
                         // simple forward
@@ -213,12 +195,9 @@ impl State {
                         break;
                     }
 
-                    // if the block is already in a dangling branch, error out
+                    // if the block is already in a dangling branch, do nothing
                     if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Err(anyhow::Error::msg(format!(
-                            "Block present with state hash: {:?}",
-                            precomputed_block.state_hash.clone()
-                        )));
+                        return Ok(ExtensionType::BlockNotAdded);
                     }
 
                     // simple forward
@@ -279,7 +258,7 @@ impl State {
         self.best_chain
             .iter()
             .map(|leaf| leaf.block.state_hash.clone())
-            .flat_map(|state_hash| self.store.as_ref().unwrap().get_block(&state_hash.0))
+            .flat_map(|state_hash| self.block_store.as_ref().unwrap().get_block(&state_hash.0))
             .flatten()
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()
@@ -294,7 +273,7 @@ impl State {
     }
 }
 
-impl std::fmt::Debug for State {
+impl std::fmt::Debug for IndexerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "=== State ===")?;
 

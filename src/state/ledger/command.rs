@@ -2,6 +2,7 @@ use mina_serialization_types::{
     staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation, UserCommand},
     v1::PublicKeyV1,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::block::precomputed::PrecomputedBlock;
 
@@ -11,20 +12,20 @@ pub enum TransactionType {
     Delegation,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Payment {
     pub source: PublicKeyV1,
     pub receiver: PublicKeyV1,
     pub amount: u64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Delegation {
     pub delegator: PublicKeyV1,
     pub delegate: PublicKeyV1,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
     Delegation(Delegation),

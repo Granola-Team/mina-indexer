@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{ExtensionType, State},
+    state::{ExtensionType, IndexerState},
 };
 
 /// Adds a new dangling branch and extends it with a new leaf
@@ -30,7 +30,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = State::new(&root_block, None).unwrap();
+    let mut state = IndexerState::new(&root_block, None, None).unwrap();
 
     // root_block is added as the root of the 0th dangling branch
     assert!(state.root_branch.is_none());

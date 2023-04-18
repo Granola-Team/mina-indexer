@@ -1,7 +1,8 @@
 use mina_serialization_types::v1::PublicKeyV1;
 use mina_signer::{pubkey::PubKeyError, CompressedPubKey, PubKey};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PublicKey(PublicKeyV1);
 
 impl PartialEq for PublicKey {

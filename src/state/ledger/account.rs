@@ -1,8 +1,9 @@
 use mina_serialization_types::v1::PublicKeyV1;
+use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: u64,
@@ -19,6 +20,13 @@ impl Account {
     }
 
     pub fn from_deduction(pre: Self, amount: u64) -> Self {
+        if amount > pre.balance {
+            return Account {
+                public_key: pre.public_key.clone(),
+                balance: 0,
+                delegate: pre.delegate,
+            };
+        }
         Account {
             public_key: pre.public_key.clone(),
             balance: pre.balance - amount,

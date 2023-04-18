@@ -1,17 +1,57 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+};
+
+use rocksdb::{DBWithThreadMode, MultiThreaded};
+use thiserror::Error;
 
 use super::precomputed::PrecomputedBlock;
 
-#[derive(Debug)]
-pub struct BlockStore {
-    db_path: PathBuf,
-    database: rocksdb::DB,
+#[derive(Debug, Clone)]
+pub struct BlockStore(pub PathBuf);
+
+impl r2d2::ManageConnection for BlockStore {
+    type Connection = BlockStoreConn;
+
+    type Error = BlockStoreError;
+
+    fn connect(&self) -> Result<Self::Connection, Self::Error> {
+        let mut secondary = self.0.clone();
+        secondary.push("secondary");
+        BlockStoreConn::new_read_only(&self.0, &secondary)
+    }
+
+    fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+        conn.test_conn()?;
+        Ok(())
+    }
+
+    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
+        false
+    }
 }
 
-impl BlockStore {
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
-        // let database_opts = rocksdb::Options::default();
-        let database = rocksdb::DB::open_default(path)?;
+#[derive(Debug)]
+pub struct BlockStoreConn {
+    db_path: PathBuf,
+    database: DBWithThreadMode<MultiThreaded>,
+}
+
+impl BlockStoreConn {
+    pub fn new_read_only(path: &Path, secondary: &Path) -> BlockStoreResult<Self> {
+        let database_opts = rocksdb::Options::default();
+        let database =
+            rocksdb::DBWithThreadMode::open_as_secondary(&database_opts, path, secondary)?;
+        Ok(Self {
+            db_path: PathBuf::from(path),
+            database,
+        })
+    }
+    pub fn new(path: &Path) -> BlockStoreResult<Self> {
+        let mut database_opts = rocksdb::Options::default();
+        database_opts.create_if_missing(true);
+        let database = rocksdb::DBWithThreadMode::open(&database_opts, path)?;
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
@@ -26,8 +66,9 @@ impl BlockStore {
     }
 
     pub fn get_block(&self, state_hash: &str) -> anyhow::Result<Option<PrecomputedBlock>> {
+        self.database.try_catch_up_with_primary().ok();
         let key = state_hash.as_bytes();
-        if let Some(bytes) = self.database.get(key)? {
+        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
             let precomputed_block = bcs::from_bytes(&bytes)?;
             return Ok(Some(precomputed_block));
         }
@@ -36,5 +77,33 @@ impl BlockStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    pub fn test_conn(&mut self) -> BlockStoreResult<()> {
+        self.database.put("test", "value")?;
+        self.database.delete("test")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum BlockStoreError {
+    DBError(rocksdb::Error),
+}
+type BlockStoreResult<T> = std::result::Result<T, BlockStoreError>;
+
+impl Display for BlockStoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockStoreError::DBError(err) => {
+                write!(f, "{}", format_args!("BlockStoreError: {err}"))
+            }
+        }
+    }
+}
+
+impl From<rocksdb::Error> for BlockStoreError {
+    fn from(value: rocksdb::Error) -> Self {
+        Self::DBError(value)
     }
 }
