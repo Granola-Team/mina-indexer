@@ -4,7 +4,10 @@ use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
-use super::{account::Account, Ledger};
+use super::{
+    account::{Account, Amount, Nonce},
+    Ledger,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccount {
@@ -26,8 +29,8 @@ impl From<GenesisLedger> for Ledger {
         let mut accounts = HashMap::new();
         for genesis_account in genesis_ledger.accounts {
             let balance = match str::parse::<f32>(&genesis_account.balance) {
-                Ok(float) => (float * 1e9) as u64,
-                Err(_) => 0,
+                Ok(float) => Amount((float * 1e9) as u64),
+                Err(_) => Amount::default(),
             };
 
             accounts.insert(
@@ -39,6 +42,7 @@ impl From<GenesisLedger> for Ledger {
                         .clone()
                         .map(|delegate| PublicKeyV1::from(delegate).into()),
                     balance,
+                    nonce: Nonce::default(),
                 },
             );
         }
