@@ -1,5 +1,5 @@
 use mina_serialization_types::v1::PublicKeyV1;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
 
@@ -25,7 +25,7 @@ impl Account {
                 public_key: pre.public_key.clone(),
                 balance: 0,
                 delegate: pre.delegate,
-            }
+            };
         }
         Account {
             public_key: pre.public_key.clone(),

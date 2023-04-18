@@ -1,8 +1,8 @@
-use crate::block::{precomputed::PrecomputedBlock, store::{BlockStoreConn}, BlockHash};
+use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 
 use self::{
     branch::{Branch, Leaf},
-    ledger::{command::Command, diff::LedgerDiff, Ledger, genesis::GenesisLedger},
+    ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
 };
 
 pub mod branch;
@@ -30,7 +30,7 @@ pub enum ExtensionType {
     DanglingComplex,
     RootSimple,
     RootComplex,
-    BlockNotAdded
+    BlockNotAdded,
 }
 
 pub enum ExtensionDirection {
@@ -44,8 +44,7 @@ impl IndexerState {
         genesis_ledger: Option<GenesisLedger>,
         blocks_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
-        let block_store = blocks_path
-            .map(|path| BlockStoreConn::new(path).unwrap());
+        let block_store = blocks_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
             best_chain: Vec::new(),
             root_branch: Some(Branch::new_genesis(root_hash, genesis_ledger)),
@@ -58,7 +57,9 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.block_store.as_mut().map(|block_store| block_store.add_block(precomputed_block));
+        self.block_store
+            .as_mut()
+            .map(|block_store| block_store.add_block(precomputed_block));
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
         if let Some(root_branch) = self.root_branch.as_mut() {
@@ -70,39 +71,36 @@ impl IndexerState {
             {
                 // check leaf heights first
                 // if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
-                    if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
-                        let mut branches_to_remove = Vec::new();
-                        // check if new block connects to a dangling branch
-                        for (index, dangling_branch) in
-                            self.dangling_branches.iter_mut().enumerate()
-                        {
-                            // incoming block is the parent of the dangling branch root
-                            if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                                root_branch.merge_on(&new_node_id, dangling_branch);
-                                branches_to_remove.push(index);
-                            }
-
-                            // if the block is already in the dangling branch, do nothing
-                            if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Ok(ExtensionType::BlockNotAdded);
-                            }
+                if let Some(new_node_id) = root_branch.simple_extension(precomputed_block) {
+                    let mut branches_to_remove = Vec::new();
+                    // check if new block connects to a dangling branch
+                    for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
+                        // incoming block is the parent of the dangling branch root
+                        if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+                            root_branch.merge_on(&new_node_id, dangling_branch);
+                            branches_to_remove.push(index);
                         }
 
-                        // should be the only place we need this call
-                        self.best_chain = root_branch.longest_chain();
-                        if !branches_to_remove.is_empty() {
-                            let mut num_removed = 0;
-                            // if the root branch is newly connected to dangling branches
-                            for index_to_remove in branches_to_remove {
-                                self.dangling_branches.remove(index_to_remove -  num_removed);
-                                num_removed += 1;
-                            }
-                            return Ok(ExtensionType::RootComplex);
-                        } else {
-                            // if there aren't any branches that are connected
-                            return Ok(ExtensionType::RootSimple);
+                        // if the block is already in the dangling branch, do nothing
+                        if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                            return Ok(ExtensionType::BlockNotAdded);
                         }
                     }
+
+                    // should be the only place we need this call
+                    self.best_chain = root_branch.longest_chain();
+                    if !branches_to_remove.is_empty() {
+                        // if the root branch is newly connected to dangling branches
+                        for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate()
+                        {
+                            self.dangling_branches.remove(index_to_remove - num_removed);
+                        }
+                        return Ok(ExtensionType::RootComplex);
+                    } else {
+                        // if there aren't any branches that are connected
+                        return Ok(ExtensionType::RootSimple);
+                    }
+                }
                 // }
             }
         }
@@ -260,12 +258,7 @@ impl IndexerState {
         self.best_chain
             .iter()
             .map(|leaf| leaf.block.state_hash.clone())
-            .flat_map(|state_hash| {
-                self.block_store
-                    .as_ref()
-                    .unwrap()
-                    .get_block(&state_hash.0)
-            })
+            .flat_map(|state_hash| self.block_store.as_ref().unwrap().get_block(&state_hash.0))
             .flatten()
             .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
             .collect()

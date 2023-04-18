@@ -1,4 +1,4 @@
 pub mod block;
 pub mod state;
 
-pub const SOCKET_NAME: &'static str = "@mina-indexer.sock";
+pub const SOCKET_NAME: &str = "@mina-indexer.sock";

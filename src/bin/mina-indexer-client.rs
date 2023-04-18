@@ -1,7 +1,13 @@
 use clap::Parser;
-use futures::{io::{AsyncWriteExt, BufReader}, AsyncReadExt};
+use futures::{
+    io::{AsyncWriteExt, BufReader},
+    AsyncReadExt,
+};
 use interprocess::local_socket::tokio::LocalSocketStream;
-use mina_indexer::{block::{precomputed::PrecomputedBlock, Block}, state::ledger::{account::Account}};
+use mina_indexer::{
+    block::{precomputed::PrecomputedBlock, Block},
+    state::ledger::account::Account,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -13,7 +19,7 @@ pub enum ClientCli {
 #[derive(clap::Args, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct AccountArgs {
-    public_key: String
+    public_key: String,
 }
 
 #[tokio::main]
@@ -29,14 +35,19 @@ async fn main() -> Result<(), anyhow::Error> {
             writer.write_all(b"best_chain\0").await?;
             dbg!(reader.read_to_end(&mut buffer).await?);
             let blocks: Vec<PrecomputedBlock> = bcs::from_bytes(&buffer)?;
-            blocks.iter().for_each(|block| println!("{:?}", Block::from_precomputed(block, block.blockchain_length.unwrap())));
-        },
+            blocks.iter().for_each(|block| {
+                println!(
+                    "{:?}",
+                    Block::from_precomputed(block, block.blockchain_length.unwrap())
+                )
+            });
+        }
         ClientCli::Balance(account_args) => {
             let command = format!("account_balance {}\0", account_args.public_key);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             let account: Account = bcs::from_bytes(&buffer)?;
-            println!("{:?}", account);
+            println!("{account:?}");
         }
     }
 

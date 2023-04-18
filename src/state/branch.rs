@@ -34,7 +34,12 @@ pub struct BranchUpdate<T> {
 
 impl Branch<Ledger> {
     pub fn new_genesis(root_hash: BlockHash, genesis_ledger: Option<GenesisLedger>) -> Self {
-        let genesis_block = Block { state_hash: root_hash.clone(), parent_hash: root_hash, height: 0, blockchain_length: Some(1)};
+        let genesis_block = Block {
+            state_hash: root_hash.clone(),
+            parent_hash: root_hash,
+            height: 0,
+            blockchain_length: Some(1),
+        };
         let genesis_ledger = match genesis_ledger {
             Some(genesis_ledger) => genesis_ledger.into(),
             None => Ledger::default(),
@@ -42,7 +47,9 @@ impl Branch<Ledger> {
 
         let mut branches = Tree::new();
         let root_leaf = Leaf::new(genesis_block.clone(), genesis_ledger);
-        let root_id = branches.insert(Node::new(root_leaf.clone()), AsRoot).unwrap();
+        let root_id = branches
+            .insert(Node::new(root_leaf.clone()), AsRoot)
+            .unwrap();
 
         let mut leaves = HashMap::new();
         leaves.insert(root_id, root_leaf);

@@ -10,7 +10,7 @@ async fn main() -> Result<(), anyhow::Error> {
         let conn = listener.accept().await?;
         tokio::spawn(async move {
             if let Err(e) = handle_conn(conn).await {
-                eprintln!("Error while handling connection: {}", e);
+                eprintln!("{}", format_args!("Error while handling connection: {e}"));
             }
         });
     }

@@ -5,8 +5,14 @@ use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use mina_indexer::{
-    block::{precomputed::PrecomputedBlock, receiver::BlockReceiver, store::{BlockStoreConn}, parser::BlockParser, BlockHash},
-    state::{ledger::{self, Ledger, public_key::PublicKey}, branch::Leaf},
+    block::{
+        parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
+        store::BlockStoreConn, BlockHash,
+    },
+    state::{
+        branch::Leaf,
+        ledger::{self, public_key::PublicKey, Ledger},
+    },
 };
 use uuid::Uuid;
 
@@ -29,7 +35,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Ok(genesis_ledger) => Some(genesis_ledger),
         Err(e) => {
-            eprintln!("Unable to read genesis ledger at {}: {}! Using None", args.genesis_ledger.display(), e);
+            eprintln!(
+                "Unable to read genesis ledger at {}: {}! Using None",
+                args.genesis_ledger.display(),
+                e
+            );
             None
         }
     };
@@ -37,8 +47,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let root_hash = BlockHash(args.root_hash);
     let logs_dir = args.logs_dir;
     let store_dir = args.store_dir;
-    let mut indexer_state =
-        mina_indexer::state::IndexerState::new(root_hash, genesis_ledger, store_dir.clone().as_deref())?;
+    let mut indexer_state = mina_indexer::state::IndexerState::new(
+        root_hash,
+        genesis_ledger,
+        store_dir.clone().as_deref(),
+    )?;
 
     let mut block_parser = BlockParser::new(&logs_dir.clone())?;
     while let Some(block) = block_parser.next().await? {
@@ -75,7 +88,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
                 tokio::spawn(async move {
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain).await {
-                        eprintln!("Error while handling connection: {}", e);
+                        eprintln!("{}", format_args!("Error while handling connection: {e}"));
                     }
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
@@ -84,7 +97,11 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-async fn handle_conn(conn: LocalSocketStream, db: BlockStoreConn, best_chain: Vec<Leaf<Ledger>>) -> Result<(), anyhow::Error> {
+async fn handle_conn(
+    conn: LocalSocketStream,
+    db: BlockStoreConn,
+    best_chain: Vec<Leaf<Ledger>>,
+) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(128);
@@ -100,22 +117,19 @@ async fn handle_conn(conn: LocalSocketStream, db: BlockStoreConn, best_chain: Ve
             println!("received best_chain command");
             dbg!(best_chain.clone());
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|leaf| leaf.block.state_hash)
-                .map(|state_hash| {
-                    db
-                        .get_block(&state_hash.0)
-                        .unwrap()
-                        .unwrap()
-                })
+                .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
-        },
+        }
         "account_balance" => {
             let data_buffer = buffers.next().unwrap();
-            let public_key = PublicKey::from_address(&String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?)?;
+            let public_key = PublicKey::from_address(&String::from_utf8(
+                data_buffer[..data_buffer.len() - 1].to_vec(),
+            )?)?;
             if let Some(block) = best_chain.first() {
                 let account = block.get_ledger().accounts.get(&public_key);
                 dbg!(block.get_ledger());
@@ -124,8 +138,7 @@ async fn handle_conn(conn: LocalSocketStream, db: BlockStoreConn, best_chain: Ve
                     writer.write_all(&bytes).await?;
                 }
             }
-
-        },
+        }
         _ => return Err(anyhow::Error::msg("Malformed Request")),
     }
 

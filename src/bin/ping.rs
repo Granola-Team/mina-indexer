@@ -12,7 +12,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let _read = reader.read_until(0, &mut buffer).await?;
 
     let string = String::from_utf8(buffer)?;
-    println!("{}", string);
+    println!("{string}");
 
     Ok(())
 }

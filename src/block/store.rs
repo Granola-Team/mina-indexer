@@ -95,7 +95,9 @@ type BlockStoreResult<T> = std::result::Result<T, BlockStoreError>;
 impl Display for BlockStoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BlockStoreError::DBError(err) => write!(f, "BlockStoreError: {}", err),
+            BlockStoreError::DBError(err) => {
+                write!(f, "{}", format_args!("BlockStoreError: {err}"))
+            }
         }
     }
 }

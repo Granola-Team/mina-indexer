@@ -63,7 +63,9 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisLedger> {
     let mut genesis_ledger_file = tokio::fs::File::open(&filename).await?;
     let mut genesis_ledger_file_contents = Vec::new();
 
-    genesis_ledger_file.read_to_end(&mut genesis_ledger_file_contents).await?;
+    genesis_ledger_file
+        .read_to_end(&mut genesis_ledger_file_contents)
+        .await?;
 
     let genesis_ledger: GenesisLedger = serde_json::from_slice(&genesis_ledger_file_contents)?;
 
