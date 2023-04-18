@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use mina_indexer::{block::parser::BlockParser, state::IndexerState};
+use mina_indexer::{
+    block::{parser::BlockParser, BlockHash},
+    state::IndexerState,
+};
 
 /// Adds the same block
 #[tokio::test]
@@ -21,7 +24,7 @@ async fn test() {
     // block1 = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let block1 = block0.clone();
 
-    let mut state = IndexerState::new(&block0, None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(block0.state_hash.clone()), None, None).unwrap();
 
     // precomputed blocks are obviously the same (they're clones!)
     assert_eq!(block0, block1);

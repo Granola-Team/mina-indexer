@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::{branch::Leaf, ledger::diff::LedgerDiff, ExtensionType, IndexerState},
 };
 
@@ -30,7 +30,7 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state = IndexerState::new(&root_block, None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
 
     // blocks added to 0th dangling branch
     assert_eq!(state.dangling_branches.len(), 1);

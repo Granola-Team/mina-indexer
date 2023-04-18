@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::{ExtensionType, IndexerState},
 };
 
@@ -75,7 +75,7 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(&root0_block, None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root0_block.state_hash), None, None).unwrap();
 
     // ------------
     // add child 10

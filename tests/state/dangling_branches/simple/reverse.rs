@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::{ExtensionType, IndexerState},
 };
 
@@ -46,7 +46,8 @@ async fn extension() {
     // ----------------
 
     // child becomes the root of the 0th dangling branch
-    let mut state = IndexerState::new(&old_root_block, None, None).unwrap();
+    let mut state =
+        IndexerState::new(BlockHash(old_root_block.state_hash.clone()), None, None).unwrap();
 
     // before extension quantities
     let before_root = state.dangling_branches.get(0).unwrap().root.clone();
