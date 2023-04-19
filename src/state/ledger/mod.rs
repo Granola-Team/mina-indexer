@@ -12,6 +12,8 @@ use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
 
+use self::account::{Amount, Nonce};
+
 impl ExtendWithLedgerDiff for LedgerMock {
     fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
         LedgerMock {}
@@ -37,9 +39,9 @@ impl Ledger {
         }
     }
 
-    pub fn from(value: Vec<(&str, u64, Option<&str>)>) -> Result<Self, PubKeyError> {
+    pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> Result<Self, PubKeyError> {
         let mut ledger = Ledger::new();
-        for (pubkey, balance, delgation) in value {
+        for (pubkey, balance, nonce, delgation) in value {
             match PublicKey::from_address(pubkey) {
                 Ok(pk) => {
                     if let Some(delegate) = delgation {
@@ -49,7 +51,8 @@ impl Ledger {
                                     pk.clone(),
                                     Account {
                                         public_key: pk,
-                                        balance,
+                                        balance: Amount(balance),
+                                        nonce: Nonce(nonce.unwrap_or_default()),
                                         delegate: Some(delegate),
                                     },
                                 );
@@ -59,7 +62,8 @@ impl Ledger {
                     } else {
                         let acct = Account {
                             public_key: pk.clone(),
-                            balance,
+                            balance: Amount(balance),
+                            nonce: Nonce(nonce.unwrap_or_default()),
                             delegate: None,
                         };
                         ledger.accounts.insert(pk, acct);
@@ -76,7 +80,7 @@ impl Ledger {
         diff.public_keys_seen.into_iter().for_each(|public_key| {
             if self.accounts.get(&public_key).is_none() {
                 self.accounts
-                    .insert(public_key.clone(), Account::empty(public_key.into()));
+                    .insert(public_key.clone(), Account::empty(public_key));
             }
         });
 
@@ -90,10 +94,17 @@ impl Ledger {
                                 Account::from_deposit(account_before, payment_diff.amount)
                             }
                             diff::account::UpdateType::Deduction => {
-                                Account::from_deduction(account_before, payment_diff.amount)
+                                match Account::from_deduction(
+                                    account_before.clone(),
+                                    payment_diff.amount,
+                                ) {
+                                    Some(account) => account,
+                                    None => account_before,
+                                }
                             }
                         }
                     }
+                    // TODO got this in another branch
                     diff::account::AccountDiff::Delegation(_) => todo!(),
                 };
                 self.accounts

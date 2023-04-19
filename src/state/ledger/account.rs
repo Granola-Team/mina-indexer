@@ -1,52 +1,59 @@
-use mina_serialization_types::v1::PublicKeyV1;
 use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
 
+#[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+pub struct Amount(pub u64);
+
+#[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+pub struct Nonce(pub u32);
+
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
-    pub balance: u64,
+    pub balance: Amount,
+    pub nonce: Nonce,
     pub delegate: Option<PublicKey>,
 }
 
 impl Account {
-    pub fn empty(public_key: PublicKeyV1) -> Self {
+    pub fn empty(public_key: PublicKey) -> Self {
         Account {
-            public_key: public_key.into(),
-            balance: 0,
+            public_key,
+            balance: Amount::default(),
+            nonce: Nonce::default(),
             delegate: None,
         }
     }
 
-    pub fn from_deduction(pre: Self, amount: u64) -> Self {
-        if amount > pre.balance {
-            return Account {
+    pub fn from_deduction(pre: Self, amount: u64) -> Option<Self> {
+        if amount > pre.balance.0 {
+            None
+        } else {
+            Some(Account {
                 public_key: pre.public_key.clone(),
-                balance: 0,
+                balance: Amount(pre.balance.0 - amount),
+                nonce: Nonce(pre.nonce.0 + 1),
                 delegate: pre.delegate,
-            };
-        }
-        Account {
-            public_key: pre.public_key.clone(),
-            balance: pre.balance - amount,
-            delegate: pre.delegate,
+            })
         }
     }
 
     pub fn from_deposit(pre: Self, amount: u64) -> Self {
         Account {
             public_key: pre.public_key.clone(),
-            balance: pre.balance + amount,
+            balance: Amount(pre.balance.0 + amount),
+            nonce: Nonce(pre.nonce.0 + 1),
             delegate: pre.delegate,
         }
     }
 
-    pub fn from_delegation(pre: Self, delegate: PublicKeyV1) -> Self {
+    pub fn from_delegation(pre: Self, delegate: PublicKey) -> Self {
         Account {
             public_key: pre.public_key,
             balance: pre.balance,
-            delegate: Some(delegate.into()),
+            nonce: Nonce(pre.nonce.0 + 1),
+            delegate: Some(delegate),
         }
     }
 }
@@ -67,8 +74,11 @@ impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Account {{ {:?}, {}, {:?} }}",
-            self.public_key, self.balance, self.delegate
+            "Account {{ {:?}, {}, {}, {:?} }}",
+            &self.public_key.to_address()[..15],
+            self.balance.0,
+            self.nonce.0,
+            self.delegate
         )
     }
 }

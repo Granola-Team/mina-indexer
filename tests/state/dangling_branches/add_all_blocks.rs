@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::IndexerState,
 };
 
@@ -16,7 +16,8 @@ async fn extension() {
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
-        let mut state = IndexerState::new(&precomputed_block, None, None).unwrap();
+        let mut state =
+            IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
             state.add_block(&precomputed_block).unwrap();

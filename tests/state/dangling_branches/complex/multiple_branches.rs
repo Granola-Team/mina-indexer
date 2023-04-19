@@ -1,7 +1,7 @@
 use std::{collections::HashSet, path::PathBuf};
 
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::{ExtensionType, IndexerState},
 };
 
@@ -66,7 +66,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(&root_block, None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
 
     // ---------
     // add leaf0

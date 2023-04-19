@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::BlockParser, Block, BlockHash},
     state::{ExtensionType, IndexerState},
 };
 
@@ -67,7 +67,7 @@ async fn extension() {
     // ----------
 
     // root in branch 0
-    let mut state = IndexerState::new(&root_block, None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
 
     // other in branch 1
     let extension_type = state.add_block(&other_block).unwrap();
