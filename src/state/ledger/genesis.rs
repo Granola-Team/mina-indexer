@@ -1,23 +1,43 @@
 use std::{collections::HashMap, path::Path};
 
-use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
+use mina_serialization_types::{signatures::{PublicKeyJson, SignatureJson}, v1::{PublicKeyV1, PublicKey2V1}};
 use serde::{Deserialize, Serialize};
+use time::PrimitiveDateTime;
 use tokio::io::AsyncReadExt;
 
-use super::{account::Account, Ledger};
+use super::{account::Account, Ledger, public_key::PublicKey};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisTimestamp {
+    genesis_state_timestamp: String
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisData {
+    genesis: GenesisTimestamp,
+    ledger: GenesisLedger
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccount {
     pk: PublicKeyJson,
-    sk: Option<PublicKeyJson>,
     balance: String,
     delegate: Option<PublicKeyJson>,
+    timing: Option<GenesisAccountTiming>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisAccountTiming {
+    initial_minimum_balance: String,
+    cliff_time: String,
+    cliff_amount: String,
+    vesting_period: String,
+    vesting_increment: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
     name: String,
-    num_accounts: u64,
     accounts: Vec<GenesisAccount>,
 }
 
