@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-use mina_serialization_types::{signatures::{PublicKeyJson}, v1::PublicKeyV1};
+use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
@@ -8,13 +8,13 @@ use super::{account::Account, Ledger};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
-    genesis_state_timestamp: String
+    genesis_state_timestamp: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisData {
     genesis: GenesisTimestamp,
-    ledger: GenesisLedger
+    ledger: GenesisLedger,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ pub struct GenesisAccount {
     pk: PublicKeyJson,
     balance: String,
     delegate: Option<PublicKeyJson>,
-    timing: Option<GenesisAccountTiming>
+    timing: Option<GenesisAccountTiming>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
