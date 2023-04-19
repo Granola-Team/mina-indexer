@@ -1,11 +1,10 @@
 use std::{collections::HashMap, path::Path};
 
-use mina_serialization_types::{signatures::{PublicKeyJson, SignatureJson}, v1::{PublicKeyV1, PublicKey2V1}};
+use mina_serialization_types::{signatures::{PublicKeyJson}, v1::PublicKeyV1};
 use serde::{Deserialize, Serialize};
-use time::PrimitiveDateTime;
 use tokio::io::AsyncReadExt;
 
-use super::{account::Account, Ledger, public_key::PublicKey};
+use super::{account::Account, Ledger};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {

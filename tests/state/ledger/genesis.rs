@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use mina_indexer::state::ledger::genesis::{GenesisLedger, GenesisData};
+use mina_indexer::state::ledger::genesis::GenesisData;
 use tokio::{fs::File, io::AsyncReadExt};
 
 const GENESIS_LEDGERS_PATH: &'static str = "./tests/data/genesis_ledgers";
