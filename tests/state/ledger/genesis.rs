@@ -39,11 +39,3 @@ pub async fn devnet2_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("devnet2.json").await.unwrap();
     let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).unwrap();
 }
-
-#[tokio::test]
-pub async fn test_snapps_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("test-snapps.json")
-        .await
-        .unwrap();
-    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).unwrap();
-}
