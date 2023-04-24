@@ -16,8 +16,11 @@ pub async fn read_genesis_ledger_to_string(ledger: &str) -> Result<String, anyho
 
 #[tokio::test]
 pub async fn mainnet_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("mainnet.json").await.expect("mainnet genesis ledger file exists");
-    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).expect("mainnet genesis ledger parses into GenesisData");
+    let ledger_json = read_genesis_ledger_to_string("mainnet.json")
+        .await
+        .expect("mainnet genesis ledger file exists");
+    let _genesis_ledger: GenesisData =
+        serde_json::from_str(&ledger_json).expect("mainnet genesis ledger parses into GenesisData");
 }
 
 #[tokio::test]
@@ -25,17 +28,24 @@ pub async fn berkeley_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("berkeley.json")
         .await
         .expect("berkeley genesis ledger file exists");
-    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).expect("berkeley genesis ledger parses into GenesisData");
+    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json)
+        .expect("berkeley genesis ledger parses into GenesisData");
 }
 
 #[tokio::test]
 pub async fn devnet_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("devnet.json").await.expect("devnet genesis ledger file exists");
-    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).expect("devnet genesis ledger parses into GenesisData");
+    let ledger_json = read_genesis_ledger_to_string("devnet.json")
+        .await
+        .expect("devnet genesis ledger file exists");
+    let _genesis_ledger: GenesisData =
+        serde_json::from_str(&ledger_json).expect("devnet genesis ledger parses into GenesisData");
 }
 
 #[tokio::test]
 pub async fn devnet2_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("devnet2.json").await.expect("devnet2 genesis ledger file exists");
-    let _genesis_ledger: GenesisData = serde_json::from_str(&ledger_json).expect("devnet2 genesis ledger parses into GenesisData");
+    let ledger_json = read_genesis_ledger_to_string("devnet2.json")
+        .await
+        .expect("devnet2 genesis ledger file exists");
+    let _genesis_ledger: GenesisData =
+        serde_json::from_str(&ledger_json).expect("devnet2 genesis ledger parses into GenesisData");
 }
