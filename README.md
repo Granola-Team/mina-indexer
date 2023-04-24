@@ -78,7 +78,7 @@ In the nix shell issue the following command to run the unit tests.
 
 ## License (See LICENSE file for full license)
 
-Copyright 2023 Granola Systems Inc.
+Copyright 2022-2023 Mina Foundation, Inc.
 
 Free use of this software is granted under the terms of the Mozilla
 Public License 2.0.
