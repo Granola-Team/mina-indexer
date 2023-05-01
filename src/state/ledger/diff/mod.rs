@@ -1,4 +1,5 @@
 use account::AccountDiff;
+use serde::{Serialize, Deserialize};
 
 use crate::block::precomputed::PrecomputedBlock;
 
@@ -6,7 +7,7 @@ use super::{coinbase::Coinbase, command::Command, PublicKey};
 
 pub mod account;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
     pub account_diffs: Vec<AccountDiff>,

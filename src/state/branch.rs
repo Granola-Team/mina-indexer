@@ -430,10 +430,10 @@ impl<T> PartialEq for Leaf<T> where T: PartialEq {
 mod leaf_ser_de_tests {
     use std::path::Path;
 
-    use crate::{state::ledger::Ledger, block::{Block, parse_file}};
+    use crate::{state::ledger::{Ledger, diff::LedgerDiff}, block::{Block, parse_file}};
 
     use super::Leaf;
-    use serde_test::{Token, assert_tokens};
+    use serde_test::assert_tokens;
 
     const PRECOMPUTED_BLOCK_PATH: &'static str = 
         "./tests/data/beautified_logs/mainnet-175222-3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby.json";
@@ -472,11 +472,57 @@ mod leaf_ser_de_tests {
                 Struct { name: "Ledger", len: 1 },
 
                     Str("accounts"),
-                    Map { len: std::option::Option::Some(0), },
+                    Map { len: Option::Some(0), },
                     MapEnd,
 
                 StructEnd,
             StructEnd,
         ])
+    }
+
+    #[tokio::test]
+    async fn test_ser_de_ledger_diff() {
+        let precomputed_block = parse_file(Path::new(PRECOMPUTED_BLOCK_PATH)).await.unwrap();
+        let block = Block::from_precomputed(&precomputed_block, 0);
+        let ledger = LedgerDiff { public_keys_seen: Vec::new(), account_diffs: Vec::new() };
+        let leaf = Leaf::new(block, ledger);
+
+        use serde_test::Token::*;
+        assert_tokens(&leaf, &[
+            Struct { name: "Leaf", len: 2 },
+
+                Str("block"),
+                Struct { name: "Block", len: 4 },
+
+                    Str("parent_hash"),
+                    NewtypeStruct { name: "BlockHash", },
+                    Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
+
+                    Str("state_hash"),
+                    NewtypeStruct { name: "BlockHash", },
+                    Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
+
+                    Str("height"),
+                    U32(0),
+
+                    Str("blockchain_length"),
+                    Some, U32(175222),
+
+                StructEnd,
+
+                Str("ledger"),
+                Struct { name: "LedgerDiff", len: 2 },
+
+                    Str("public_keys_seen"),
+                    Seq { len: Option::Some(0), },
+                    SeqEnd,
+
+                    Str("account_diffs"),
+                    Seq { len: Option::Some(0) },
+                    SeqEnd,
+
+                StructEnd,
+            StructEnd,
+        ]);
     }
 }
