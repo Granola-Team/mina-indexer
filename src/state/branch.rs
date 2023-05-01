@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use id_tree::{InsertBehavior::*, Node, NodeId, Tree};
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Deserialize};
 
 use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 
@@ -320,6 +323,77 @@ impl<T> Leaf<T> {
 
     pub fn get_ledger(&self) -> &T {
         &self.ledger
+    }
+}
+
+impl<T> Serialize for Leaf<T> where T: Serialize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        let mut state = serializer.serialize_struct("Leaf", 2)?;
+        state.serialize_field("block", &self.block)?;
+        state.serialize_field("ledger", &self.ledger)?;
+        state.end()
+    }
+}
+
+use std::fmt;
+use serde::de::{self, Deserializer, Visitor, SeqAccess, MapAccess};
+impl<'de, T> Deserialize<'de> for Leaf<T> where T:  Visitor<'de> + Deserialize<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de> {
+
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field { Block, Ledger }
+
+        struct LeafVisitor<T>(PhantomData<T>);
+
+        impl<'de, T> Visitor<'de> for LeafVisitor<T> where T: Visitor<'de> + Deserialize<'de> {
+            type Value = Leaf<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Leaf<T>")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Leaf<T>, V::Error> where V: SeqAccess<'de>, {
+                let block = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let ledger = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                Ok(Leaf::new(block, ledger))
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Leaf<T>, V::Error> where V: MapAccess<'de>, {
+                let mut block = None;
+                let mut ledger = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Block => {
+                            if block.is_some() {
+                                return Err(de::Error::duplicate_field("block"));
+                            }
+                            block = Some(map.next_value()?);
+                        },
+                        Field::Ledger => {
+                            if ledger.is_some() {
+                                return Err(de::Error::duplicate_field("ledger"));
+                            }
+                            ledger = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let block = block.ok_or_else(|| de::Error::missing_field("block"))?;
+                let ledger = ledger.ok_or_else(|| de::Error::missing_field("ledger"))?;
+                Ok(Leaf::new(block, ledger))
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["block", "ledger"];
+        deserializer.deserialize_struct("Leaf<T>", FIELDS, LeafVisitor(PhantomData))
     }
 }
 
