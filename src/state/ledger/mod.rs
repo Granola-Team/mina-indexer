@@ -11,6 +11,7 @@ use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
+use serde::{Serialize, Deserialize};
 
 use self::account::{Amount, Nonce};
 
@@ -27,7 +28,7 @@ impl ExtendWithLedgerDiff for LedgerMock {
 #[derive(Default, Clone, Debug)]
 pub struct LedgerMock {}
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
     pub accounts: HashMap<PublicKey, Account>,
 }

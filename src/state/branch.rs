@@ -339,7 +339,7 @@ impl<T> Serialize for Leaf<T> where T: Serialize {
 
 use std::fmt;
 use serde::de::{self, Deserializer, Visitor, SeqAccess, MapAccess};
-impl<'de, T> Deserialize<'de> for Leaf<T> where T:  Visitor<'de> + Deserialize<'de> {
+impl<'de, T> Deserialize<'de> for Leaf<T> where T: Deserialize<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de> {
@@ -350,11 +350,11 @@ impl<'de, T> Deserialize<'de> for Leaf<T> where T:  Visitor<'de> + Deserialize<'
 
         struct LeafVisitor<T>(PhantomData<T>);
 
-        impl<'de, T> Visitor<'de> for LeafVisitor<T> where T: Visitor<'de> + Deserialize<'de> {
+        impl<'de, T> Visitor<'de> for LeafVisitor<T> where T: Deserialize<'de> {
             type Value = Leaf<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct Leaf<T>")
+                formatter.write_str("struct Leaf")
             }
 
             fn visit_seq<V>(self, mut seq: V) -> Result<Leaf<T>, V::Error> where V: SeqAccess<'de>, {
@@ -393,7 +393,7 @@ impl<'de, T> Deserialize<'de> for Leaf<T> where T:  Visitor<'de> + Deserialize<'
         }
 
         const FIELDS: &'static [&'static str] = &["block", "ledger"];
-        deserializer.deserialize_struct("Leaf<T>", FIELDS, LeafVisitor(PhantomData))
+        deserializer.deserialize_struct("Leaf", FIELDS, LeafVisitor(PhantomData))
     }
 }
 
@@ -417,5 +417,66 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.block)
+    }
+}
+
+impl<T> PartialEq for Leaf<T> where T: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        self.block == other.block && self.ledger == other.ledger
+    }
+}
+
+#[cfg(test)]
+mod leaf_ser_de_tests {
+    use std::path::Path;
+
+    use crate::{state::ledger::Ledger, block::{Block, parse_file}};
+
+    use super::Leaf;
+    use serde_test::{Token, assert_tokens};
+
+    const PRECOMPUTED_BLOCK_PATH: &'static str = 
+        "./tests/data/beautified_logs/mainnet-175222-3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby.json";
+
+    #[tokio::test]
+    async fn test_ser_de_ledger() {
+        let precomputed_block = parse_file(Path::new(PRECOMPUTED_BLOCK_PATH)).await.unwrap();
+        let block = Block::from_precomputed(&precomputed_block, 0);
+        let ledger = Ledger::new();
+        let leaf = Leaf::new(block, ledger);
+
+        use serde_test::Token::*;
+        assert_tokens(&leaf, &[
+            Struct { name: "Leaf", len: 2 },
+
+                Str("block"),
+                Struct { name: "Block", len: 4 },
+
+                    Str("parent_hash"),
+                    NewtypeStruct { name: "BlockHash", },
+                    Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
+
+                    Str("state_hash"),
+                    NewtypeStruct { name: "BlockHash", },
+                    Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
+
+                    Str("height"),
+                    U32(0),
+
+                    Str("blockchain_length"),
+                    Some, U32(175222),
+
+                StructEnd,
+
+                Str("ledger"),
+                Struct { name: "Ledger", len: 1 },
+
+                    Str("accounts"),
+                    Map { len: std::option::Option::Some(0), },
+                    MapEnd,
+
+                StructEnd,
+            StructEnd,
+        ])
     }
 }
