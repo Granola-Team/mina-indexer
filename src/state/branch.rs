@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use id_tree::{InsertBehavior::*, Node, NodeId, Tree};
 use serde::ser::SerializeStruct;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 
@@ -326,10 +326,14 @@ impl<T> Leaf<T> {
     }
 }
 
-impl<T> Serialize for Leaf<T> where T: Serialize {
+impl<T> Serialize for Leaf<T>
+where
+    T: Serialize,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         let mut state = serializer.serialize_struct("Leaf", 2)?;
         state.serialize_field("block", &self.block)?;
         state.serialize_field("ledger", &self.ledger)?;
@@ -337,35 +341,52 @@ impl<T> Serialize for Leaf<T> where T: Serialize {
     }
 }
 
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::fmt;
-use serde::de::{self, Deserializer, Visitor, SeqAccess, MapAccess};
-impl<'de, T> Deserialize<'de> for Leaf<T> where T: Deserialize<'de> {
+impl<'de, T> Deserialize<'de> for Leaf<T>
+where
+    T: Deserialize<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de> {
-
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field { Block, Ledger }
+        enum Field {
+            Block,
+            Ledger,
+        }
 
         struct LeafVisitor<T>(PhantomData<T>);
 
-        impl<'de, T> Visitor<'de> for LeafVisitor<T> where T: Deserialize<'de> {
+        impl<'de, T> Visitor<'de> for LeafVisitor<T>
+        where
+            T: Deserialize<'de>,
+        {
             type Value = Leaf<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("struct Leaf")
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<Leaf<T>, V::Error> where V: SeqAccess<'de>, {
-                let block = seq.next_element()?
+            fn visit_seq<V>(self, mut seq: V) -> Result<Leaf<T>, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let block = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let ledger = seq.next_element()?
+                let ledger = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &self))?;
                 Ok(Leaf::new(block, ledger))
             }
 
-            fn visit_map<V>(self, mut map: V) -> Result<Leaf<T>, V::Error> where V: MapAccess<'de>, {
+            fn visit_map<V>(self, mut map: V) -> Result<Leaf<T>, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
                 let mut block = None;
                 let mut ledger = None;
 
@@ -376,7 +397,7 @@ impl<'de, T> Deserialize<'de> for Leaf<T> where T: Deserialize<'de> {
                                 return Err(de::Error::duplicate_field("block"));
                             }
                             block = Some(map.next_value()?);
-                        },
+                        }
                         Field::Ledger => {
                             if ledger.is_some() {
                                 return Err(de::Error::duplicate_field("ledger"));
@@ -392,7 +413,7 @@ impl<'de, T> Deserialize<'de> for Leaf<T> where T: Deserialize<'de> {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["block", "ledger"];
+        const FIELDS: &[&str] = &["block", "ledger"];
         deserializer.deserialize_struct("Leaf", FIELDS, LeafVisitor(PhantomData))
     }
 }
@@ -420,7 +441,10 @@ where
     }
 }
 
-impl<T> PartialEq for Leaf<T> where T: PartialEq {
+impl<T> PartialEq for Leaf<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.block == other.block && self.ledger == other.ledger
     }
@@ -430,12 +454,15 @@ impl<T> PartialEq for Leaf<T> where T: PartialEq {
 mod leaf_ser_de_tests {
     use std::path::Path;
 
-    use crate::{state::ledger::{Ledger, diff::LedgerDiff}, block::{Block, parse_file}};
+    use crate::{
+        block::{parse_file, Block},
+        state::ledger::{diff::LedgerDiff, Ledger},
+    };
 
     use super::Leaf;
     use serde_test::assert_tokens;
 
-    const PRECOMPUTED_BLOCK_PATH: &'static str = 
+    const PRECOMPUTED_BLOCK_PATH: &'static str =
         "./tests/data/beautified_logs/mainnet-175222-3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby.json";
 
     #[tokio::test]
@@ -446,83 +473,99 @@ mod leaf_ser_de_tests {
         let leaf = Leaf::new(block, ledger);
 
         use serde_test::Token::*;
-        assert_tokens(&leaf, &[
-            Struct { name: "Leaf", len: 2 },
-
+        assert_tokens(
+            &leaf,
+            &[
+                Struct {
+                    name: "Leaf",
+                    len: 2,
+                },
                 Str("block"),
-                Struct { name: "Block", len: 4 },
-
-                    Str("parent_hash"),
-                    NewtypeStruct { name: "BlockHash", },
-                    Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
-
-                    Str("state_hash"),
-                    NewtypeStruct { name: "BlockHash", },
-                    Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
-
-                    Str("height"),
-                    U32(0),
-
-                    Str("blockchain_length"),
-                    Some, U32(175222),
-
+                Struct {
+                    name: "Block",
+                    len: 4,
+                },
+                Str("parent_hash"),
+                NewtypeStruct { name: "BlockHash" },
+                Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
+                Str("state_hash"),
+                NewtypeStruct { name: "BlockHash" },
+                Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
+                Str("height"),
+                U32(0),
+                Str("blockchain_length"),
+                Some,
+                U32(175222),
                 StructEnd,
-
                 Str("ledger"),
-                Struct { name: "Ledger", len: 1 },
-
-                    Str("accounts"),
-                    Map { len: Option::Some(0), },
-                    MapEnd,
-
+                Struct {
+                    name: "Ledger",
+                    len: 1,
+                },
+                Str("accounts"),
+                Map {
+                    len: Option::Some(0),
+                },
+                MapEnd,
                 StructEnd,
-            StructEnd,
-        ])
+                StructEnd,
+            ],
+        )
     }
 
     #[tokio::test]
     async fn test_ser_de_ledger_diff() {
         let precomputed_block = parse_file(Path::new(PRECOMPUTED_BLOCK_PATH)).await.unwrap();
         let block = Block::from_precomputed(&precomputed_block, 0);
-        let ledger = LedgerDiff { public_keys_seen: Vec::new(), account_diffs: Vec::new() };
+        let ledger = LedgerDiff {
+            public_keys_seen: Vec::new(),
+            account_diffs: Vec::new(),
+        };
         let leaf = Leaf::new(block, ledger);
 
         use serde_test::Token::*;
-        assert_tokens(&leaf, &[
-            Struct { name: "Leaf", len: 2 },
-
+        assert_tokens(
+            &leaf,
+            &[
+                Struct {
+                    name: "Leaf",
+                    len: 2,
+                },
                 Str("block"),
-                Struct { name: "Block", len: 4 },
-
-                    Str("parent_hash"),
-                    NewtypeStruct { name: "BlockHash", },
-                    Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
-
-                    Str("state_hash"),
-                    NewtypeStruct { name: "BlockHash", },
-                    Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
-
-                    Str("height"),
-                    U32(0),
-
-                    Str("blockchain_length"),
-                    Some, U32(175222),
-
+                Struct {
+                    name: "Block",
+                    len: 4,
+                },
+                Str("parent_hash"),
+                NewtypeStruct { name: "BlockHash" },
+                Str("3NLxYEKMwRHaRaTmTEs48h2Ds1d45z5DrW3uLDtbMSQ4GCHt4zcc"),
+                Str("state_hash"),
+                NewtypeStruct { name: "BlockHash" },
+                Str("3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby"),
+                Str("height"),
+                U32(0),
+                Str("blockchain_length"),
+                Some,
+                U32(175222),
                 StructEnd,
-
                 Str("ledger"),
-                Struct { name: "LedgerDiff", len: 2 },
-
-                    Str("public_keys_seen"),
-                    Seq { len: Option::Some(0), },
-                    SeqEnd,
-
-                    Str("account_diffs"),
-                    Seq { len: Option::Some(0) },
-                    SeqEnd,
-
+                Struct {
+                    name: "LedgerDiff",
+                    len: 2,
+                },
+                Str("public_keys_seen"),
+                Seq {
+                    len: Option::Some(0),
+                },
+                SeqEnd,
+                Str("account_diffs"),
+                Seq {
+                    len: Option::Some(0),
+                },
+                SeqEnd,
                 StructEnd,
-            StructEnd,
-        ]);
+                StructEnd,
+            ],
+        );
     }
 }

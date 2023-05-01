@@ -11,7 +11,7 @@ use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use self::account::{Amount, Nonce};
 

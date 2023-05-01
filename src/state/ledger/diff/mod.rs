@@ -1,5 +1,5 @@
 use account::AccountDiff;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::block::precomputed::PrecomputedBlock;
 

@@ -2,7 +2,7 @@ use mina_serialization_types::{
     staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand},
     v1::PublicKeyV1,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     block::precomputed::PrecomputedBlock,

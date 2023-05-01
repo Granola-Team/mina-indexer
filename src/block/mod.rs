@@ -1,7 +1,7 @@
 use std::{ffi::OsStr, path::Path};
 
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
 use self::precomputed::{BlockLogContents, PrecomputedBlock};
