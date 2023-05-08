@@ -1,6 +1,7 @@
 use std::{ffi::OsStr, path::Path};
 
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
 use self::precomputed::{BlockLogContents, PrecomputedBlock};
@@ -10,7 +11,7 @@ pub mod precomputed;
 pub mod receiver;
 pub mod store;
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
@@ -18,7 +19,7 @@ pub struct Block {
     pub blockchain_length: Option<u32>,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BlockHash(pub String);
 
 impl BlockHash {
