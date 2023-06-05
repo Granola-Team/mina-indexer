@@ -39,13 +39,14 @@ impl PrecomputedBlock {
     pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
         let blockchain_length = log_contents.blockchain_length;
+        let str = String::from_utf8_lossy(&log_contents.contents);
         let BlockLog {
             scheduled_time,
             protocol_state,
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
-        } = serde_json::from_slice(&log_contents.contents)?;
+        } = serde_json::from_str::<BlockLog>(&str).unwrap();
         Ok(Self {
             state_hash,
             scheduled_time,
