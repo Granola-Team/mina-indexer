@@ -35,7 +35,14 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = ServerArgs::parse();
     let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Ok(genesis_ledger) => Some(genesis_ledger),
-        Err(_e) => process::exit(100),
+        Err(e) => {
+            eprintln!(
+                "Unable to parse genesis ledger at {}: {}! Exiting.",
+                args.genesis_ledger.display(),
+                e
+            );
+            process::exit(100)
+        }
     };
 
     let root_hash = BlockHash(args.root_hash);
