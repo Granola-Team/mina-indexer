@@ -47,8 +47,8 @@ impl From<GenesisLedger> for Ledger {
     fn from(genesis_ledger: GenesisLedger) -> Ledger {
         let mut accounts = HashMap::new();
         for genesis_account in genesis_ledger.accounts {
-            let balance = match str::parse::<f32>(&genesis_account.balance) {
-                Ok(float) => Amount((float * 1e9) as u64),
+            let balance = match str::parse::<u64>(&genesis_account.balance) {
+                Ok(amt) => Amount(amt * 1_000_000_000),
                 Err(_) => Amount::default(),
             };
 
