@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process;
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -34,14 +35,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = ServerArgs::parse();
     let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Ok(genesis_ledger) => Some(genesis_ledger),
-        Err(e) => {
-            eprintln!(
-                "Unable to read genesis ledger at {}: {}! Using None",
-                args.genesis_ledger.display(),
-                e
-            );
-            None
-        }
+        Err(_e) => process::exit(100),
     };
 
     let root_hash = BlockHash(args.root_hash);
