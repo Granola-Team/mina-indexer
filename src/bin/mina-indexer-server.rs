@@ -184,7 +184,7 @@ async fn handle_conn(
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
         }
-        "account_balance" => {
+        "account_balance\0" => {
             event!(Level::INFO, "received account_balance command");
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
