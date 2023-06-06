@@ -30,6 +30,8 @@ struct ServerArgs {
     watch_dir: PathBuf,
     #[arg(short, long)]
     store_dir: PathBuf,
+    #[arg(short, long)]
+    log_dir: PathBuf,
 }
 
 pub struct IndexerConfiguration {
@@ -37,6 +39,7 @@ pub struct IndexerConfiguration {
     startup_dir: PathBuf,
     watch_dir: PathBuf,
     store_dir: PathBuf,
+    log_file: PathBuf,
     genesis_ledger: GenesisLedger,
 }
 
@@ -49,6 +52,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
     let store_dir = args.store_dir;
+    let log_dir = args.log_dir;
     event!(Level::INFO, "parsing GenesisLedger file");
     match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Err(err) => {
@@ -60,7 +64,16 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
         },
         Ok(genesis_ledger) => {
             event!(Level::INFO, "GenesisLedger parsed {}", args.genesis_ledger.display().to_string());
-            Ok(IndexerConfiguration { root_hash, startup_dir, watch_dir, store_dir, genesis_ledger })
+            
+            let mut log_number = 0;
+            let mut log_file = format!("{}mina-indexer-log-{}", log_dir.display(), log_number);
+            while tokio::fs::metadata(&log_file).await.is_ok() {
+                log_number += 1;
+                log_file = format!("{}mina-indexer-log-{}", log_dir.display(), log_number);
+            }
+            let log_file = PathBuf::from(&log_file);
+            
+            Ok(IndexerConfiguration { root_hash, startup_dir, watch_dir, store_dir, log_file, genesis_ledger })
         }
     }
 }
@@ -70,8 +83,17 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
 async fn main() -> Result<(), anyhow::Error> {
     event!(Level::INFO, "started mina-indexer-server");
     let IndexerConfiguration {
-        root_hash, startup_dir, watch_dir, store_dir, genesis_ledger
+        root_hash, 
+        startup_dir, watch_dir, store_dir, 
+        log_file,
+        genesis_ledger
     } = parse_command_line_arguments().await?;
+
+    let log_writer = std::fs::File::open(log_file)?;
+    let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .init();
 
     event!(Level::INFO, "initializing IndexerState");
     let mut indexer_state = mina_indexer::state::IndexerState::new(
