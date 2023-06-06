@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process;
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -36,11 +37,11 @@ async fn main() -> Result<(), anyhow::Error> {
         Ok(genesis_ledger) => Some(genesis_ledger),
         Err(e) => {
             eprintln!(
-                "Unable to read genesis ledger at {}: {}! Using None",
+                "Unable to parse genesis ledger at {}: {}! Exiting.",
                 args.genesis_ledger.display(),
                 e
             );
-            None
+            process::exit(100)
         }
     };
 
