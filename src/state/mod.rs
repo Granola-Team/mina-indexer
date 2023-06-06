@@ -54,32 +54,31 @@ impl IndexerState {
     }
 
     /// Adds the block to the witness tree and the precomputed block to the db
-    /// 
+    ///
     /// Errors if the block is already present in the witness tree
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
+        // check that the block doesn't already exist in the db
+        if let Some(block_store) = &self.block_store {
+            let state_hash = &precomputed_block.state_hash;
+            match block_store.get_block(state_hash) {
+                Err(err) => return Err(err),
+                Ok(None) => (),
+                Ok(_) => {
+                    return Err(anyhow::Error::msg(format!(
+                    "Block with state hash '{state_hash:?}' is already present in the block store"
+                )))
+                }
+            }
+        }
+
         // add precomputed block to the db
         self.block_store
             .as_mut()
             .map(|block_store| block_store.add_block(precomputed_block));
 
-        // check that the block doesn't already exist in the witness tree
-        {
-            let state_hash = &BlockHash(precomputed_block.state_hash.clone());
-            let err = Err(anyhow::Error::msg(format!("Block {:?} is already present in the witness tree", state_hash.0)));
-            if let Some(root_branch) = &self.root_branch {
-                if root_branch.mem(state_hash) {
-                    return err;
-                }
-            }
-            for dangling_branch in &self.dangling_branches {
-                if dangling_branch.mem(state_hash) {
-                    return err;
-                }
-            }
-        }
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
         if let Some(root_branch) = self.root_branch.as_mut() {

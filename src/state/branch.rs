@@ -328,7 +328,11 @@ where
     }
 
     pub fn mem(&self, state_hash: &BlockHash) -> bool {
-        for node in self.branches.traverse_level_order(&self.branches.root_node_id().unwrap()).unwrap() {
+        for node in self
+            .branches
+            .traverse_level_order(self.branches.root_node_id().unwrap())
+            .unwrap()
+        {
             if &node.data().block.state_hash == state_hash {
                 return true;
             }
