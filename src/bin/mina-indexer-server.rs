@@ -173,7 +173,7 @@ async fn handle_conn(
     dbg!(&command_string);
     match command_string.as_str() {
         "best_chain\0" => {
-            println!("received best_chain command");
+            event!(Level::INFO, "received best_chain command");
             dbg!(best_chain.clone());
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
@@ -185,14 +185,16 @@ async fn handle_conn(
             writer.write_all(&bytes).await?;
         }
         "account_balance" => {
+            event!(Level::INFO, "received account_balance command");
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
             if let Some(block) = best_chain.first() {
+                event!(Level::INFO, "using ledger {:?}", block.get_ledger());
                 let account = block.get_ledger().accounts.get(&public_key);
-                dbg!(block.get_ledger());
                 if let Some(account) = account {
+                    event!(Level::INFO, "writing account {:?} to client", account);
                     let bytes = bcs::to_bytes(account)?;
                     writer.write_all(&bytes).await?;
                 }
