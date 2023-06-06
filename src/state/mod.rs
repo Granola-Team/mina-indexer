@@ -41,13 +41,13 @@ pub enum ExtensionDirection {
 impl IndexerState {
     pub fn new(
         root_hash: BlockHash,
-        genesis_ledger: Option<GenesisLedger>,
+        genesis_ledger: GenesisLedger,
         blocks_path: &std::path::Path,
     ) -> anyhow::Result<Self> {
         let block_store = BlockStoreConn::new(blocks_path).unwrap();
         Ok(Self {
             best_chain: Vec::new(),
-            root_branch: Branch::new_genesis(root_hash, genesis_ledger),
+            root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
             dangling_branches: Vec::new(),
             block_store,
         })
