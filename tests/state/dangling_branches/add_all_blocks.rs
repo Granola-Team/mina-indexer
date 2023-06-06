@@ -16,8 +16,7 @@ async fn extension() {
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
-        let mut state =
-            IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
+        let mut state = IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
             state.add_block(&precomputed_block).unwrap();
@@ -28,54 +27,50 @@ async fn extension() {
         println!("Blocks added: {n}");
         assert_eq!(n, 24);
 
-        // 3 dangling branch
-        // - 0: height = 10
+        // Root branch
+        // - height = 10
+        // - ??? leaves
+        assert_eq!(state.dangling_branches.clone().len(), 2);
+
+        // 2 dangling branch
         // - 1: height = 1
         // - 2: height = 1
         // - 1 leaf
-        assert_eq!(state.dangling_branches.clone().len(), 3);
+        assert_eq!(state.dangling_branches.clone().len(), 2);
         state
             .dangling_branches
             .iter()
             .enumerate()
-            .for_each(|(idx, tree)| {
-                if idx == 0 {
-                    assert_eq!(tree.branches.height(), 10);
-                } else {
-                    assert_eq!(tree.branches.height(), 1);
-                }
+            .for_each(|(_, tree)| {
+                assert_eq!(tree.height(), 1);
             });
         state
             .dangling_branches
             .iter()
             .enumerate()
-            .for_each(|(idx, tree)| {
-                if idx == 0 {
-                    assert_eq!(tree.leaves.len(), 12);
-                } else {
-                    assert_eq!(tree.leaves.len(), 1);
-                }
+            .for_each(|(_, tree)| {
+                assert_eq!(tree.leaves.len(), 1);
             });
+
+        // root branch
+        println!("=== Root Branch ===");
+        let mut tree = String::new();
+        state
+            .root_branch
+            .as_ref()
+            .unwrap()
+            .branches
+            .write_formatted(&mut tree)
+            .unwrap();
+        println!("{tree}");
 
         // dangling branches
-        let branches0 = &state.dangling_branches.get(0).unwrap().branches;
-        let branches1 = &state.dangling_branches.get(1).unwrap().branches;
-        let branches2 = &state.dangling_branches.get(2).unwrap().branches;
-
-        println!("=== Dangling Branch 0 ===");
-        let mut tree = String::new();
-        branches0.write_formatted(&mut tree).unwrap();
-        println!("{tree}");
-
-        println!("=== Dangling Branch 1 ===");
-        let mut tree = String::new();
-        branches1.write_formatted(&mut tree).unwrap();
-        println!("{tree}");
-
-        println!("=== Dangling Branch 2 ===");
-        let mut tree = String::new();
-        branches2.write_formatted(&mut tree).unwrap();
-        println!("{tree}");
+        for (n, branch) in state.dangling_branches.iter().enumerate() {
+            println!("=== Dangling Branch {n} ===");
+            let mut tree = String::new();
+            branch.branches.write_formatted(&mut tree).unwrap();
+            println!("{tree}");
+        }
 
         // check all children.height = 1 + parent.height
         // check all children.parent_hash = parent.state_hash
@@ -88,8 +83,7 @@ async fn extension() {
             {
                 let node = dangling_branch.branches.get(&node_id).unwrap();
                 for child_id in node.children() {
-                    let parent_block =
-                        &dangling_branch.branches.get(&node_id).unwrap().data().block;
+                    let parent_block = &dangling_branch.branches.get(&node_id).unwrap().data().block;
                     let child_block = &dangling_branch.branches.get(child_id).unwrap().data().block;
                     assert_eq!(child_block.height, 1 + parent_block.height);
                     assert_eq!(
@@ -141,7 +135,7 @@ async fn extension() {
         }
 
         // longest chain
-        let longest_chain = state.dangling_branches.get(0).unwrap().longest_chain();
+        let longest_chain = state.root_branch.unwrap().longest_chain();
         let display_chain = longest_chain
             .iter()
             .map(|x| {
@@ -152,7 +146,9 @@ async fn extension() {
                 )
             })
             .collect::<Vec<(u32, u32, &str)>>();
-        println!("=== Longest dangling chain ===\n{display_chain:?}");
+
+        println!("=== Longest dangling chain ===");
+        println!("{display_chain:?}");
 
         // ten blocks in the longest chain
         assert_eq!(longest_chain.len(), 10);
