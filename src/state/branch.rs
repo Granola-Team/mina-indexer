@@ -62,6 +62,7 @@ impl Branch<Ledger> {
             leaves,
         }
     }
+
     // only the genesis block should work here
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
         let new_ledger = Ledger::from_diff(LedgerDiff::from_precomputed_block(root_precomputed));
@@ -310,6 +311,20 @@ where
         }
 
         longest_chain
+    }
+
+    pub fn len(&self) -> usize {
+        let mut size = 0;
+        if let Some(root) = self.branches.root_node_id() {
+            for _ in &self.branches.children_ids(root) {
+                size += 1;
+            }
+        }
+        size
+    }
+
+    pub fn height(&self) -> usize {
+        self.branches.height()
     }
 }
 
