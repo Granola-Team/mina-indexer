@@ -316,7 +316,7 @@ where
     pub fn len(&self) -> usize {
         let mut size = 0;
         if let Some(root) = self.branches.root_node_id() {
-            for _ in &self.branches.children_ids(root) {
+            for _ in self.branches.traverse_level_order_ids(root).unwrap() {
                 size += 1;
             }
         }
