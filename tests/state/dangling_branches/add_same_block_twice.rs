@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
-    state::IndexerState,
-};
+use mina_indexer::{block::{parser::BlockParser, BlockHash}, state::IndexerState};
 
 /// Adds the same block
 #[tokio::test]
@@ -23,30 +20,34 @@ async fn test() {
 
     // block1 = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let block1 = block0.clone();
+    let mut state = IndexerState::new(BlockHash(block0.state_hash), None, None).unwrap();
 
-    let mut state = IndexerState::new(BlockHash(block0.state_hash.clone()), None, None).unwrap();
-
-    // precomputed blocks are obviously the same (they're clones!)
-    assert_eq!(block0, block1);
-
-    println!("=== Dangling Branch 0 ===");
+    // println!("=== Root Branch ===");
     let mut tree = String::new();
     state
-        .dangling_branches
-        .get(0)
+        .root_branch
+        .clone()
         .unwrap()
         .branches
         .write_formatted(&mut tree)
         .unwrap();
-    println!("{tree}");
 
-    // add_block throws an error
+    println!("Root:     {}", state.root_branch.clone().unwrap().len());
+    println!("Dangling: {}", state.dangling_branches.len());
+
+    assert_eq!(state.root_branch.clone().unwrap().len(), 1);
+    assert_eq!(state.dangling_branches.len(), 0);
+
+    // throws err
     match state.add_block(&block1) {
-        Ok(_) => panic!(),
-        Err(err) => println!("{:?}", err),
+        Ok(ext) => println!("Extension type: {ext:?}"),
+        Err(err) => println!("{err:?}"),
     }
 
-    // the block is not addes
-    assert_eq!(state.dangling_branches.len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().branches.height(), 1);
+    // the block is not added to root or dangling
+    println!("Root:     {}", state.root_branch.clone().unwrap().len());
+    println!("Dangling: {}", state.dangling_branches.len());
+
+    assert_eq!(state.root_branch.unwrap().len(), 1);
+    assert_eq!(state.dangling_branches.len(), 0);
 }
