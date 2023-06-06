@@ -22,49 +22,49 @@ async fn account_diffs() {
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
             1000000000000,
             None,
-            None,
+            None
         ),
         (
             "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB",
             1000000000000,
             None,
-            None,
+            None
         ),
     ])
     .unwrap();
@@ -78,50 +78,50 @@ async fn account_diffs() {
         (
             "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
             1000000000000,
-            Some(0),
             None,
+            None
         ),
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             843190000000,
             Some(2),
-            None,
+            None
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
             Some(7),
-            None,
+            None
         ),
         (
             "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB",
             1000000000000,
-            Some(0),
             None,
+            None
         ),
         (
             "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
             1000377787000,
             Some(1),
-            None,
+            None
         ),
         (
             "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
             999997998000,
             Some(4),
-            None,
+            None
         ),
         (
             "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
             1000000002000,
             Some(2),
-            None,
+            None
         ),
         (
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
             1156800000000,
             Some(1),
-            None,
+            None
         ),
     ])
     .unwrap();
