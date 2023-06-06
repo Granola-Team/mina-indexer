@@ -8,16 +8,18 @@ use mina_indexer::{
 /// Merges two dangling branches, ignore others
 #[tokio::test]
 async fn extension() {
-    // ---------- Dangling branches ----------
-    //        Before      |          After
-    // --------------- indices ---------------
-    //   0      1     2   |     0      1     2
-    // ---------------------------------------
-    //                    =>          root
-    //                    =>           |
-    //  root  other  leaf =>  other  middle  .
-    //                    =>           |
-    //                    =>          leaf
+    // ---------------- Branches ------------------
+    //        Before       |         After
+    // ------+-------------+-----------+-----------
+    //  Root |   Dangling  |    Root   |  Dangling
+    // ------+-------------+-----------+-----------
+    //       |   0     1   |           |   0    1
+    // ------+-------------+-----------+-----------
+    //       |             =>   root   |
+    //       |             =>    |     |
+    //  root | other  leaf =>  middle  | other  .
+    //       |             =>    |     |
+    //       |             =>   leaf   |
 
     let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
@@ -66,62 +68,32 @@ async fn extension() {
     // add blocks
     // ----------
 
-    // root in branch 0
+    // root in branch branch
     let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
 
-    // other in branch 1
+    // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
-    // leaf in brach 2
+    // leaf in dangling branch 1
     let extension_type = state.add_block(&leaf_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
-    // 3 dangling branches
+    // 2 dangling branches
     // - each height = 1
     // - each 1 leaf
-    assert_eq!(state.dangling_branches.len(), 3);
-    state
-        .dangling_branches
-        .iter()
-        .for_each(|tree| assert_eq!(tree.branches.height(), 1));
-    state
-        .dangling_branches
-        .iter()
-        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+    assert_eq!(state.dangling_branches.len(), 2);
+    state.dangling_branches.iter().for_each(|tree| {
+        assert_eq!(tree.len(), 1);
+        assert_eq!(tree.leaves.len(), 1);
+    });
 
-    println!("=== Before Branch 0 ===");
-    let mut tree = String::new();
-    state
-        .dangling_branches
-        .get(0)
-        .unwrap()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
-
-    println!("=== Before Branch 1 ===");
-    let mut tree = String::new();
-    state
-        .dangling_branches
-        .get(1)
-        .unwrap()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
-
-    println!("=== Before Branch 2 ===");
-    let mut tree = String::new();
-    state
-        .dangling_branches
-        .get(2)
-        .unwrap()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
+    for (idx, branch) in state.dangling_branches.iter().enumerate() {
+        println!("=== Before Branch {idx} ===");
+        let mut tree = String::new();
+        branch.branches.write_formatted(&mut tree).unwrap();
+        println!("{tree}");
+    }
 
     // ----------------
     // add middle block
@@ -129,89 +101,51 @@ async fn extension() {
 
     // merges branch 2 into 0
     let extension_type = state.add_block(&middle_block).unwrap();
-    assert_eq!(extension_type, ExtensionType::DanglingComplex);
+    assert_eq!(extension_type, ExtensionType::RootComplex);
 
-    println!("=== After Branch 0 ===");
-    let mut tree = String::new();
-    state
-        .dangling_branches
-        .get(0)
-        .unwrap()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
+    for (idx, branch) in state.dangling_branches.iter().enumerate() {
+        println!("=== After Branch {idx} ===");
+        let mut tree = String::new();
+        branch.branches.write_formatted(&mut tree).unwrap();
+        println!("{tree}");
+    }
 
-    println!("=== After Branch 1 ===");
-    let mut tree = String::new();
-    state
-        .dangling_branches
-        .get(1)
-        .unwrap()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
+    // root branch
+    assert_eq!(state.root_branch.clone().unwrap().len(), 3);
+    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 1);
 
-    // 2 dangling branches
-    // - 0: height = 3
-    // - 1: height = 1
-    // - each 1 leaf
-    assert_eq!(state.dangling_branches.len(), 2);
+    // 1 dangling branch
+    // - height = 1
+    // - 1 leaf
+    assert_eq!(state.dangling_branches.len(), 1);
     state
         .dangling_branches
         .iter()
         .enumerate()
-        .for_each(|(index, tree)| match index {
-            0 => assert_eq!(tree.branches.height(), 1),
-            1 => assert_eq!(tree.branches.height(), 3),
-            _ => unreachable!(),
-        });
+        .for_each(|(_, tree)| assert_eq!(tree.height(), 1));
     state.dangling_branches.iter().for_each(|tree| {
         assert_eq!(tree.leaves.len(), 1);
     });
 
     // after extension quantities
-    let root0 = &state.dangling_branches.get(0).unwrap().root;
-    let root1 = &state.dangling_branches.get(1).unwrap().root;
-    let branches0 = &state.dangling_branches.get(0).unwrap().branches;
-    let branches1 = &state.dangling_branches.get(1).unwrap().branches;
-    let branch_root0 = &branches0
-        .get(&branches0.root_node_id().unwrap())
+    let root = &state.root_branch.clone().unwrap().root;
+    let branches = &state.root_branch.clone().unwrap().branches;
+    let branch_root = &branches
+        .get(&branches.root_node_id().unwrap())
         .unwrap()
-        .data()
-        .block;
-    let branch_root1 = &branches1
-        .get(&branches1.root_node_id().unwrap())
-        .unwrap()
-        .data()
-        .block;
-    let leaves0: Vec<Block> = state
-        .dangling_branches
-        .get(0)
-        .unwrap()
-        .leaves
-        .iter()
-        .map(|(_, x)| x.block.clone())
-        .collect();
-    let leaves1: Vec<Block> = state
-        .dangling_branches
-        .get(1)
+        .data();
+    let leaves: Vec<Block> = state
+        .root_branch
         .unwrap()
         .leaves
         .iter()
         .map(|(_, x)| x.block.clone())
         .collect();
     let leaf = Block::from_precomputed(&leaf_block, 2);
-    let other = Block::from_precomputed(&other_block, 0);
 
-    println!("Leaves 0: {:?}", leaves0);
-    println!("Leaves 1: {:?}", leaves1);
-
-    assert_eq!(leaves0.get(0).unwrap(), &other);
-    assert_eq!(leaves1.get(0).unwrap(), &leaf);
+    println!("Root Leaves: {:?}", leaves);
+    assert_eq!(leaves.get(0).unwrap(), &leaf);
 
     // branch root should match the tree's root
-    assert_eq!(root0, branch_root0);
-    assert_eq!(root1, branch_root1);
+    assert_eq!(root, &branch_root.block);
 }
