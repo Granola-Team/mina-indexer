@@ -56,10 +56,7 @@ async fn extension() {
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await
         .unwrap();
-    assert_eq!(
-        state.add_block(&child1).unwrap(),
-        ExtensionType::RootSimple
-    );
+    assert_eq!(state.add_block(&child1).unwrap(), ExtensionType::RootSimple);
     assert_eq!(
         child1.state_hash,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
@@ -90,10 +87,7 @@ async fn extension() {
         .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
         .await
         .unwrap();
-    assert_eq!(
-        state.add_block(&child2).unwrap(),
-        ExtensionType::RootSimple
-    );
+    assert_eq!(state.add_block(&child2).unwrap(), ExtensionType::RootSimple);
     assert_eq!(
         child2.state_hash,
         "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()
@@ -153,7 +147,13 @@ async fn extension() {
     assert_eq!(after_child2_block, leaves1.get(after_child2).unwrap().block);
 
     println!("=== After Root Branch Leaves ===");
-    println!("{:?}", leaves1.iter().map(|(_, leaf)| &leaf.block).collect::<Vec<&Block>>());
+    println!(
+        "{:?}",
+        leaves1
+            .iter()
+            .map(|(_, leaf)| &leaf.block)
+            .collect::<Vec<&Block>>()
+    );
 
     // root doesn't change
     assert_eq!(&before_root, after_root);

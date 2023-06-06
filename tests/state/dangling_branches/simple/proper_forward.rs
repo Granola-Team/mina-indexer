@@ -40,7 +40,8 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash.clone()), None, None).unwrap();
+    let mut state =
+        IndexerState::new(BlockHash(root_block.state_hash.clone()), None, None).unwrap();
 
     // add dangling_root_block
     let extension = state.add_block(&dangling_root_block).unwrap();
@@ -69,7 +70,10 @@ async fn extension() {
     // before_root is the only leaf
     assert_eq!(before_leaves.len(), 1);
     assert_eq!(before_root, before_leaf.block);
-    assert_eq!(before_root, Block::from_precomputed(&dangling_root_block, 0));
+    assert_eq!(
+        before_root,
+        Block::from_precomputed(&dangling_root_block, 0)
+    );
 
     // dangling_child_block = mainnet-105492-3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ.json
     let dangling_child_block = block_parser
@@ -113,9 +117,17 @@ async fn extension() {
     let leaves1 = &branches1.leaves;
     let after_root_id = branches1.branches.root_node_id().unwrap();
     let after_root_leaf = {
-        let child_ids: Vec<&NodeId> = branches1.branches.children_ids(&after_root_id).unwrap().collect();
+        let child_ids: Vec<&NodeId> = branches1
+            .branches
+            .children_ids(&after_root_id)
+            .unwrap()
+            .collect();
         assert_eq!(child_ids.len(), 1);
-        branches1.branches.get(child_ids.get(0).unwrap()).unwrap().data()
+        branches1
+            .branches
+            .get(child_ids.get(0).unwrap())
+            .unwrap()
+            .data()
     };
 
     // branch root should still match the root of the dangling branch
@@ -144,7 +156,10 @@ async fn extension() {
 
     assert_eq!(extension, ExtensionType::DanglingSimpleForward);
 
-    assert_eq!(Block::from_precomputed(&dangling_child_block, 1), after_root_leaf.block);
+    assert_eq!(
+        Block::from_precomputed(&dangling_child_block, 1),
+        after_root_leaf.block
+    );
 
     // root shouldn't change
     assert_eq!(&before_root, after_root);

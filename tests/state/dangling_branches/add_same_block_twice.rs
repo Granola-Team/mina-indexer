@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use mina_indexer::{block::{parser::BlockParser, BlockHash}, state::IndexerState};
+use mina_indexer::{
+    block::{parser::BlockParser, BlockHash},
+    state::IndexerState,
+};
 
 /// Adds the same block
 #[tokio::test]

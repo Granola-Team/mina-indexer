@@ -111,7 +111,10 @@ async fn extension() {
 
     // before root is also a leaf
     assert!(before_leaves.contains_key(before_root_id));
-    assert_eq!(before_root, before_leaves.get(&before_root_id).unwrap().block);
+    assert_eq!(
+        before_root,
+        before_leaves.get(&before_root_id).unwrap().block
+    );
 
     // after root isn't a leaf
     assert!(!after_leaves.contains_key(after_root_id));

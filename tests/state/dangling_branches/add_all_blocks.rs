@@ -16,7 +16,8 @@ async fn extension() {
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
-        let mut state = IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
+        let mut state =
+            IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
             state.add_block(&precomputed_block).unwrap();
@@ -83,7 +84,8 @@ async fn extension() {
             {
                 let node = dangling_branch.branches.get(&node_id).unwrap();
                 for child_id in node.children() {
-                    let parent_block = &dangling_branch.branches.get(&node_id).unwrap().data().block;
+                    let parent_block =
+                        &dangling_branch.branches.get(&node_id).unwrap().data().block;
                     let child_block = &dangling_branch.branches.get(child_id).unwrap().data().block;
                     assert_eq!(child_block.height, 1 + parent_block.height);
                     assert_eq!(

@@ -72,7 +72,15 @@ async fn extensions() {
         .as_ref()
         .unwrap()
         .leaves
-        .get(state.root_branch.as_ref().unwrap().branches.root_node_id().unwrap())
+        .get(
+            state
+                .root_branch
+                .as_ref()
+                .unwrap()
+                .branches
+                .root_node_id()
+                .unwrap(),
+        )
         .unwrap()
         .clone();
 
