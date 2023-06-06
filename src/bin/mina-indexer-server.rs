@@ -200,7 +200,10 @@ async fn handle_conn(
                 }
             }
         }
-        _ => return Err(anyhow::Error::msg("Malformed Request")),
+        bad_request => {
+            event!(Level::ERROR, "malformed request: {}", bad_request);
+            return Err(anyhow::Error::msg("Malformed Request"));
+        }
     }
 
     Ok(())
