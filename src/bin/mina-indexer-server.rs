@@ -25,9 +25,11 @@ struct ServerArgs {
     #[arg(short, long)]
     root_hash: String,
     #[arg(short, long)]
-    logs_dir: PathBuf,
-    #[arg(short, long, default_value = None)]
-    store_dir: Option<PathBuf>,
+    startup_dir: PathBuf,
+    #[arg(short, long)]
+    update_dir: PathBuf,
+    #[arg(short, long)]
+    store_dir: PathBuf,
 }
 
 #[tokio::main]
@@ -46,21 +48,20 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let root_hash = BlockHash(args.root_hash);
-    let logs_dir = args.logs_dir;
     let store_dir = args.store_dir;
     let mut indexer_state = mina_indexer::state::IndexerState::new(
         root_hash,
         genesis_ledger,
-        store_dir.clone().as_deref(),
+        &store_dir,
     )?;
 
-    let mut block_parser = BlockParser::new(&logs_dir.clone())?;
+    let mut block_parser = BlockParser::new(&args.startup_dir)?;
     while let Some(block) = block_parser.next().await? {
         indexer_state.add_block(&block)?;
     }
 
     let mut block_receiver = BlockReceiver::new().await?;
-    block_receiver.load_directory(&logs_dir.clone()).await?;
+    block_receiver.load_directory(&args.update_dir).await?;
 
     let listener = LocalSocketListener::bind(mina_indexer::SOCKET_NAME)?;
 
@@ -82,7 +83,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 let conn = conn_fut?;
                 let best_chain = indexer_state.best_chain.clone();
 
-                let primary_path = store_dir.clone().unwrap();
+                let primary_path = store_dir.clone();
                 let mut secondary_path = primary_path.clone();
                 secondary_path.push(Uuid::new_v4().to_string());
 

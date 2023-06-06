@@ -4,15 +4,15 @@ version = "0.1.1"
 edition = "2021"
 
 [[bin]]
-name = "mina-indexer"
-test = false
-bench = false
+name = "mina-indexer-server"
 
 [[bin]]
 name = "mina-indexer-client"
 
 [[bin]]
-name = "mina-indexer-server"
+name = "mina-indexer"
+test = false
+bench = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
