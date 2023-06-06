@@ -69,7 +69,7 @@ impl AccountDiff {
         })
     }
 
-    pub fn public_key(&self) -> PublicKeyV1 {
+    pub fn public_key(&self) -> PublicKey {
         match self {
             AccountDiff::Payment(payment_diff) => payment_diff.public_key.clone().into(),
             AccountDiff::Delegation(delegation_diff) => delegation_diff.delegator.clone().into(),
