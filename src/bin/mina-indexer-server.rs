@@ -32,6 +32,8 @@ struct ServerArgs {
     store_dir: PathBuf,
     #[arg(short, long)]
     log_dir: PathBuf,
+    #[arg(short, long)]
+    log_stdout: bool,
 }
 
 pub struct IndexerConfiguration {
@@ -41,6 +43,7 @@ pub struct IndexerConfiguration {
     store_dir: PathBuf,
     log_file: PathBuf,
     genesis_ledger: GenesisLedger,
+    log_stdout: bool
 }
 
 #[instrument]
@@ -53,6 +56,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
     let watch_dir = args.watch_dir;
     let store_dir = args.store_dir;
     let log_dir = args.log_dir;
+    let log_stdout = args.log_stdout;
     event!(Level::INFO, "parsing GenesisLedger file");
     match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Err(err) => {
@@ -73,7 +77,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
             }
             let log_file = PathBuf::from(&log_file);
             
-            Ok(IndexerConfiguration { root_hash, startup_dir, watch_dir, store_dir, log_file, genesis_ledger })
+            Ok(IndexerConfiguration { root_hash, startup_dir, watch_dir, store_dir, log_file, log_stdout, genesis_ledger })
         }
     }
 }
@@ -85,9 +89,16 @@ async fn main() -> Result<(), anyhow::Error> {
     let IndexerConfiguration {
         root_hash, 
         startup_dir, watch_dir, store_dir, 
-        log_file,
+        log_file, log_stdout,
         genesis_ledger
     } = parse_command_line_arguments().await?;
+
+    if log_stdout {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+            tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .init();
+    }
 
     let log_writer = std::fs::File::open(log_file)?;
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
