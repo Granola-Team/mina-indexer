@@ -32,7 +32,7 @@ struct ServerArgs {
     store_dir: PathBuf,
     #[arg(short, long)]
     log_dir: PathBuf,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = false)]
     log_stdout: bool,
 }
 
