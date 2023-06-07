@@ -116,7 +116,7 @@ async fn main() -> Result<(), anyhow::Error> {
     event!(Level::INFO, "fast forwarding IndexerState using precomputed blocks in {}", startup_dir.display().to_string());
     let mut block_parser = BlockParser::new(&startup_dir)?;
     while let Some(block) = block_parser.next().await? {
-        event!(Level::INFO, "adding {:?} to IndexerState", block);
+        event!(Level::INFO, "adding {:?} to IndexerState", &block.state_hash);
         indexer_state.add_block(&block)?;
     }
     event!(Level::INFO, "IndexerState up to date {:?}", indexer_state);
@@ -135,7 +135,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     let precomputed_block = block_result?;
                     event!(Level::INFO, "receiving block {:?}", precomputed_block);
                     indexer_state.add_block(&precomputed_block)?;
-                    event!(Level::INFO, "added block {:?} making state {:?}", precomputed_block, indexer_state);
+                    event!(Level::INFO, "added block {:?}", &precomputed_block.state_hash);
                 } else {
                     event!(Level::INFO, "BlockReceiver shutdown, system exit");
                     return Ok(())
