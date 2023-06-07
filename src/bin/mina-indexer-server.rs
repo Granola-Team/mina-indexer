@@ -70,10 +70,10 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
             event!(Level::INFO, "GenesisLedger parsed {}", args.genesis_ledger.display().to_string());
             
             let mut log_number = 0;
-            let mut log_file = format!("{}mina-indexer-log-{}", log_dir.display(), log_number);
+            let mut log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
             while tokio::fs::metadata(&log_file).await.is_ok() {
                 log_number += 1;
-                log_file = format!("{}mina-indexer-log-{}", log_dir.display(), log_number);
+                log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
             }
             let log_file = PathBuf::from(&log_file);
             
@@ -100,7 +100,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
     }
 
-    let log_writer = std::fs::File::open(log_file)?;
+    let log_writer = std::fs::File::create(log_file)?;
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
     tracing_subscriber::fmt()
         .with_writer(non_blocking)
