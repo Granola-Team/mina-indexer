@@ -61,7 +61,13 @@ impl LedgerDiff {
 impl std::fmt::Debug for LedgerDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "=== LedgerDiff ===")?;
-        for account_diff in self.account_diffs.iter() {
+        let mut account_diffs = self.account_diffs.clone();
+        account_diffs.sort_by(|x, y| {
+            x.public_key()
+                .to_address()
+                .cmp(&y.public_key().to_address())
+        });
+        for account_diff in account_diffs.iter() {
             writeln!(f, "{account_diff:?}")?;
         }
         Ok(())

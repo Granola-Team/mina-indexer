@@ -50,7 +50,18 @@ pub struct IndexerConfiguration {
 pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfiguration> {
     event!(Level::INFO, "parsing ServerArgs");
     let args = ServerArgs::parse();
-    event!(Level::INFO, "collecting IndexerConfiguration data");
+    let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
+        Ok(genesis_root) => Some(genesis_root.ledger),
+        Err(e) => {
+            eprintln!(
+                "Unable to parse genesis ledger at {}: {}! Exiting.",
+                args.genesis_ledger.display(),
+                e
+            );
+            process::exit(100)
+        }
+    };
+
     let root_hash = BlockHash(args.root_hash);
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;

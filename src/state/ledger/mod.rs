@@ -87,7 +87,7 @@ impl Ledger {
 
         let mut success = Ok(());
         diff.account_diffs.into_iter().for_each(|diff| {
-            if let Some(account_before) = self.accounts.remove(&diff.public_key().into()) {
+            if let Some(account_before) = self.accounts.remove(&diff.public_key()) {
                 let account_after = match &diff {
                     diff::account::AccountDiff::Payment(payment_diff) => {
                         match &payment_diff.update_type {
@@ -108,8 +108,7 @@ impl Ledger {
                     // TODO got this in another branch
                     diff::account::AccountDiff::Delegation(_) => todo!(),
                 };
-                self.accounts
-                    .insert(diff.public_key().into(), account_after);
+                self.accounts.insert(diff.public_key(), account_after);
             } else {
                 success = Err(anyhow::Error::new(Error::default()));
             }
