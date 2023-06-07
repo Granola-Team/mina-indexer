@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
 };
 
 /// Extends a branch with a new leaf
@@ -34,15 +34,17 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
+        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
+        Path::new("none")).unwrap();
 
     // root branch
     // - len = 1
     // - height = 1
     // - leaves = 1
-    assert_eq!(state.root_branch.as_ref().unwrap().len(), 1);
-    assert_eq!(state.root_branch.as_ref().unwrap().height(), 1);
-    assert_eq!(state.root_branch.as_ref().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.len(), 1);
+    assert_eq!(state.root_branch.height(), 1);
+    assert_eq!(state.root_branch.leaves.len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -63,17 +65,17 @@ async fn extension() {
     );
 
     println!("=== Before Root Branch ===");
-    println!("{:?}", state.root_branch.as_ref().unwrap().branches);
+    println!("{:?}", state.root_branch.branches);
 
-    let before_root = state.root_branch.as_ref().unwrap().root.clone();
+    let before_root = state.root_branch.root.clone();
 
     // root branch
     // - len = 2
     // - height = 2
     // - leaves = 1
-    assert_eq!(state.root_branch.as_ref().unwrap().len(), 2);
-    assert_eq!(state.root_branch.as_ref().unwrap().height(), 2);
-    assert_eq!(state.root_branch.as_ref().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.len(), 2);
+    assert_eq!(state.root_branch.height(), 2);
+    assert_eq!(state.root_branch.leaves.len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -97,17 +99,17 @@ async fn extension() {
     // - len = 3
     // - height = 2
     // - leaves = 2
-    assert_eq!(state.root_branch.as_ref().unwrap().len(), 3);
-    assert_eq!(state.root_branch.as_ref().unwrap().height(), 2);
-    assert_eq!(state.root_branch.as_ref().unwrap().leaves.len(), 2);
+    assert_eq!(state.root_branch.len(), 3);
+    assert_eq!(state.root_branch.height(), 2);
+    assert_eq!(state.root_branch.leaves.len(), 2);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
 
     // after extension quantities
-    let after_root = &state.root_branch.as_ref().unwrap().root;
-    let branches1 = &state.root_branch.as_ref().unwrap().branches;
-    let leaves1 = &state.root_branch.as_ref().unwrap().leaves;
+    let after_root = &state.root_branch.root;
+    let branches1 = &state.root_branch.branches;
+    let leaves1 = &state.root_branch.leaves;
     let after_root_id = branches1.root_node_id().unwrap();
 
     // branch root should match the tree's root
@@ -115,8 +117,6 @@ async fn extension() {
         after_root,
         &state
             .root_branch
-            .as_ref()
-            .unwrap()
             .branches
             .get(after_root_id)
             .unwrap()
@@ -125,7 +125,7 @@ async fn extension() {
     );
 
     println!("=== After Root Branch ===");
-    println!("{:?}", state.root_branch.as_ref().unwrap().branches);
+    println!("{:?}", state.root_branch.branches);
 
     // after root has one child
     let after_children = branches1

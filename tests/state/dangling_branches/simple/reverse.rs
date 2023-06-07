@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
 };
 
 /// Extends a branch backwards with the root's parent
@@ -57,7 +57,9 @@ async fn extension() {
 
     // root_block is the root of the root branch
     let mut state =
-        IndexerState::new(BlockHash(root_block.state_hash.clone()), None, None).unwrap();
+        IndexerState::new(BlockHash(root_block.state_hash.clone()), 
+            GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
+            Path::new("none")).unwrap();
 
     // old_dangling_root_block is originally the root of the 0th dangling branch
     let extension_type = state.add_block(&old_dangling_root_block).unwrap();

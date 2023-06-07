@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::IndexerState,
+    state::{IndexerState, ledger::genesis::GenesisLedger},
 };
 
 /// Parses all blocks in ./tests/data/beautified_sequential_blocks
@@ -17,7 +17,10 @@ async fn extension() {
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
         let mut state =
-            IndexerState::new(BlockHash(precomputed_block.state_hash), None, None).unwrap();
+            IndexerState::new(BlockHash(precomputed_block.state_hash), 
+            GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
+            Path::new("none"))
+        .unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
             state.add_block(&precomputed_block).unwrap();
@@ -58,8 +61,6 @@ async fn extension() {
         let mut tree = String::new();
         state
             .root_branch
-            .as_ref()
-            .unwrap()
             .branches
             .write_formatted(&mut tree)
             .unwrap();
@@ -137,7 +138,7 @@ async fn extension() {
         }
 
         // longest chain
-        let longest_chain = state.root_branch.unwrap().longest_chain();
+        let longest_chain = state.root_branch.longest_chain();
         let display_chain = longest_chain
             .iter()
             .map(|x| {

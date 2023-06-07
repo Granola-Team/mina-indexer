@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
 };
 
 /// Merges two dangling branches, ignore others
@@ -69,7 +69,9 @@ async fn extension() {
     // ----------
 
     // root in branch branch
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
+    let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
+        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
+        Path::new("none")).unwrap();
 
     // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();
@@ -111,8 +113,8 @@ async fn extension() {
     }
 
     // root branch
-    assert_eq!(state.root_branch.clone().unwrap().len(), 3);
-    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().len(), 3);
+    assert_eq!(state.root_branch.clone().leaves.len(), 1);
 
     // 1 dangling branch
     // - height = 1
@@ -128,15 +130,14 @@ async fn extension() {
     });
 
     // after extension quantities
-    let root = &state.root_branch.clone().unwrap().root;
-    let branches = &state.root_branch.clone().unwrap().branches;
+    let root = &state.root_branch.clone().root;
+    let branches = &state.root_branch.clone().branches;
     let branch_root = &branches
         .get(&branches.root_node_id().unwrap())
         .unwrap()
         .data();
     let leaves: Vec<Block> = state
         .root_branch
-        .unwrap()
         .leaves
         .iter()
         .map(|(_, x)| x.block.clone())
