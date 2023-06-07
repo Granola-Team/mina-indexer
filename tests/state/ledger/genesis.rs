@@ -1,6 +1,5 @@
 use std::path::Path;
 
-
 use mina_indexer::state::ledger::{genesis::GenesisRoot, Ledger};
 use tokio::{fs::File, io::AsyncReadExt};
 
@@ -20,7 +19,8 @@ pub async fn mainnet_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("mainnet.json")
         .await
         .expect("mainnet genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json).expect("mainnet genesis ledger parses into GenesisRoot");
+    serde_json::from_str::<GenesisRoot>(&ledger_json)
+        .expect("mainnet genesis ledger parses into GenesisRoot");
 }
 
 #[tokio::test]
@@ -28,7 +28,8 @@ pub async fn berkeley_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("berkeley.json")
         .await
         .expect("berkeley genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json).expect("berkeley genesis ledger parses into GenesisRoot");
+    serde_json::from_str::<GenesisRoot>(&ledger_json)
+        .expect("berkeley genesis ledger parses into GenesisRoot");
 }
 
 #[tokio::test]
@@ -36,7 +37,8 @@ pub async fn devnet_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("devnet.json")
         .await
         .expect("devnet genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json).expect("devnet genesis ledger parses into GenesisRoot");
+    serde_json::from_str::<GenesisRoot>(&ledger_json)
+        .expect("devnet genesis ledger parses into GenesisRoot");
 }
 
 #[tokio::test]
@@ -44,7 +46,8 @@ pub async fn devnet2_genesis_ledger_parses() {
     let ledger_json = read_genesis_ledger_to_string("devnet2.json")
         .await
         .expect("devnet2 genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json).expect("devnet2 genesis ledger parses into GenesisRoot");
+    serde_json::from_str::<GenesisRoot>(&ledger_json)
+        .expect("devnet2 genesis ledger parses into GenesisRoot");
 }
 
 #[tokio::test]
@@ -62,7 +65,8 @@ pub async fn test_ignore_known_invalid_pks_on_mainnet() {
             ]
         }
     }"#;
-    let root: GenesisRoot = serde_json::from_str(ledger_json).expect("Genesis ledger parses into GenesisRoot");
+    let root: GenesisRoot =
+        serde_json::from_str(ledger_json).expect("Genesis ledger parses into GenesisRoot");
     assert_eq!(3, root.ledger.accounts.len(), "Should contain 3 accounts");
     let ledger: Ledger = root.ledger.into();
     assert_eq!(1, ledger.accounts.len(), "Should only be 1 account")

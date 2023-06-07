@@ -1,7 +1,10 @@
-use std::{collections::{HashMap}, error::Error, path::Path};
+use std::{collections::HashMap, error::Error, path::Path};
 
-use mina_serialization_types::{signatures::{PublicKeyJson, CompressedCurvePoint}, v1::PublicKeyV1};
-use mina_signer::{CompressedPubKey};
+use mina_serialization_types::{
+    signatures::{CompressedCurvePoint, PublicKeyJson},
+    v1::PublicKeyV1,
+};
+use mina_signer::CompressedPubKey;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
@@ -59,25 +62,28 @@ impl From<GenesisLedger> for Ledger {
                 Err(_) => Amount::default(),
             };
             // Temporary hack to ignore bad PKs in mainnet genesis ledger
-            if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW" || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1" {
-                println!("Known broken public keys... Ignoring {}", genesis_account.pk);
-                continue
+            if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW"
+                || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1"
+            {
+                println!(
+                    "Known broken public keys... Ignoring {}",
+                    genesis_account.pk
+                );
+                continue;
             }
             if let Ok(pk) = string_to_public_key_json(genesis_account.pk) {
                 accounts.insert(
                     PublicKeyV1::from(pk.clone()).into(),
                     Account {
                         public_key: PublicKeyV1::from(pk.clone()).into(),
-                        delegate: genesis_account
-                            .delegate
-                            .clone()
-                            .map(|delegate| PublicKeyV1::from(string_to_public_key_json(delegate).unwrap()).into()),
+                        delegate: genesis_account.delegate.clone().map(|delegate| {
+                            PublicKeyV1::from(string_to_public_key_json(delegate).unwrap()).into()
+                        }),
                         balance,
                         nonce: Nonce::default(),
                     },
                 );
-            }
-            else {
+            } else {
                 panic!("Unparsable public key");
             }
         }
