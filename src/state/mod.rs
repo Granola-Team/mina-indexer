@@ -61,23 +61,19 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
         // check that the block doesn't already exist in the db
-        if let Some(block_store) = &self.block_store {
-            let state_hash = &precomputed_block.state_hash;
-            match block_store.get_block(state_hash) {
-                Err(err) => return Err(err),
-                Ok(None) => (),
-                Ok(_) => {
-                    return Err(anyhow::Error::msg(format!(
-                    "Block with state hash '{state_hash:?}' is already present in the block store"
-                )))
-                }
+        let state_hash = &precomputed_block.state_hash;
+        match self.block_store.get_block(state_hash) {
+            Err(err) => return Err(err),
+            Ok(None) => (),
+            Ok(_) => {
+                return Err(anyhow::Error::msg(format!(
+                "Block with state hash '{state_hash:?}' is already present in the block store"
+            )))
             }
         }
 
         // add precomputed block to the db
-        self.block_store
-            .as_mut()
-            .map(|block_store| block_store.add_block(precomputed_block));
+        self.block_store.add_block(precomputed_block)?;
 
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch

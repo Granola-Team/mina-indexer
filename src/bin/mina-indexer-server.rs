@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf};
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -11,7 +11,7 @@ use mina_indexer::{
     },
     state::{
         branch::Leaf,
-        ledger::{self, public_key::PublicKey, Ledger, genesis::GenesisLedger},
+        ledger::{self, public_key::PublicKey, Ledger, genesis::{GenesisRoot}},
     },
 };
 use tracing::{Level, instrument, event};
@@ -42,7 +42,7 @@ pub struct IndexerConfiguration {
     watch_dir: PathBuf,
     store_dir: PathBuf,
     log_file: PathBuf,
-    genesis_ledger: GenesisLedger,
+    genesis_ledger: GenesisRoot,
     log_stdout: bool
 }
 
@@ -50,18 +50,6 @@ pub struct IndexerConfiguration {
 pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfiguration> {
     event!(Level::INFO, "parsing ServerArgs");
     let args = ServerArgs::parse();
-    let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
-        Ok(genesis_root) => Some(genesis_root.ledger),
-        Err(e) => {
-            eprintln!(
-                "Unable to parse genesis ledger at {}: {}! Exiting.",
-                args.genesis_ledger.display(),
-                e
-            );
-            process::exit(100)
-        }
-    };
-
     let root_hash = BlockHash(args.root_hash);
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
@@ -120,7 +108,7 @@ async fn main() -> Result<(), anyhow::Error> {
     event!(Level::INFO, "initializing IndexerState");
     let mut indexer_state = mina_indexer::state::IndexerState::new(
         root_hash,
-        genesis_ledger,
+        genesis_ledger.ledger,
         &store_dir,
     )?;
 
