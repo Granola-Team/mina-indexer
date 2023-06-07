@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{branch::Branch, ledger::LedgerMock},
+    state::{branch::Branch, ledger::Ledger},
 };
 
 // extend a branch with a new leaf
@@ -25,7 +25,7 @@ async fn extension() {
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
     // we declare this to be the root tree
-    let root_tree = Branch::new(&root_block, LedgerMock {}).unwrap();
+    let root_tree = Branch::new(&root_block, Ledger::new()).unwrap();
 
     // before extension quantities
     let before_root = root_tree.root;
@@ -35,14 +35,13 @@ async fn extension() {
     let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
     let before_leaf_block = &before_leaves
         .get(&before_root_id)
-        .expect("before: root = leaf")
-        .block;
+        .expect("before: root = leaf");
 
     // before root is also a leaf
-    assert_eq!(&before_root_leaf.block, before_leaf_block);
+    assert_eq!(&before_root_leaf, before_leaf_block);
 
     // extend the branch with a child of the root
-    let mut tree2 = Branch::new(&root_block, LedgerMock {}).unwrap();
+    let mut tree2 = Branch::new(&root_block, Ledger::new()).unwrap();
     let child_block = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await
@@ -64,7 +63,7 @@ async fn extension() {
 
     // branch root should match the tree's root
     assert_eq!(before_root, before_root_leaf.block);
-    assert_eq!(&after_root, &after_root_leaf.block);
+    assert_eq!(after_root, after_root_leaf.block);
 
     let mut w = String::new();
     before_branches.write_formatted(&mut w).unwrap();
@@ -97,10 +96,9 @@ async fn extension() {
             .expect("There should be a leaf block")
             .block
     );
-    println!(
-        "After leaf: {:?}",
-        after_leaves.get(after_child).unwrap().block.clone()
-    );
+
+    let a_leaves = after_leaves.get(after_child).unwrap().clone();
+    println!("After leaf: {a_leaves:?}");
 
     // root shouldn't change
     assert_eq!(before_root, after_root);
@@ -114,8 +112,8 @@ async fn extension() {
     // before root is also a leaf
     assert!(before_leaves.contains_key(before_root_id));
     assert_eq!(
-        before_leaves.get(&before_root_id).unwrap().block,
-        before_root
+        before_root,
+        before_leaves.get(&before_root_id).unwrap().block
     );
 
     // after root isn't a leaf
