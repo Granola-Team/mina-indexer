@@ -15,9 +15,9 @@ pub struct GenesisTimestamp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenesisData {
-    genesis: GenesisTimestamp,
-    ledger: GenesisLedger,
+pub struct GenesisRoot {
+    pub genesis: GenesisTimestamp,
+    pub ledger: GenesisLedger,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,7 +70,7 @@ impl From<GenesisLedger> for Ledger {
     }
 }
 
-pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisLedger> {
+pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisRoot> {
     let mut genesis_ledger_file = tokio::fs::File::open(&filename).await?;
     let mut genesis_ledger_file_contents = Vec::new();
 
@@ -78,7 +78,5 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisLedger> {
         .read_to_end(&mut genesis_ledger_file_contents)
         .await?;
 
-    let genesis_ledger: GenesisLedger = serde_json::from_slice(&genesis_ledger_file_contents)?;
-
-    Ok(genesis_ledger)
+    Ok(serde_json::from_slice(&genesis_ledger_file_contents)?)
 }
