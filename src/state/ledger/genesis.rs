@@ -1,6 +1,7 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::{HashMap}, error::Error, path::Path};
 
-use mina_serialization_types::{signatures::PublicKeyJson, v1::PublicKeyV1};
+use mina_serialization_types::{signatures::{PublicKeyJson, CompressedCurvePoint}, v1::PublicKeyV1};
+use mina_signer::{CompressedPubKey};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 
@@ -11,7 +12,7 @@ use super::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
-    genesis_state_timestamp: String,
+    pub genesis_state_timestamp: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,25 +23,31 @@ pub struct GenesisRoot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccount {
-    pk: PublicKeyJson,
-    balance: String,
-    delegate: Option<PublicKeyJson>,
-    timing: Option<GenesisAccountTiming>,
+    pub pk: String,
+    pub balance: String,
+    pub delegate: Option<String>,
+    pub timing: Option<GenesisAccountTiming>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccountTiming {
-    initial_minimum_balance: String,
-    cliff_time: String,
-    cliff_amount: String,
-    vesting_period: String,
-    vesting_increment: String,
+    pub initial_minimum_balance: String,
+    pub cliff_time: String,
+    pub cliff_amount: String,
+    pub vesting_period: String,
+    pub vesting_increment: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
-    name: String,
-    accounts: Vec<GenesisAccount>,
+    pub name: String,
+    pub accounts: Vec<GenesisAccount>,
+}
+
+pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Error>> {
+    let pk = CompressedPubKey::from_address(&s)?;
+    let pk = CompressedCurvePoint::from(&pk);
+    Ok(pk.into())
 }
 
 impl From<GenesisLedger> for Ledger {
@@ -51,21 +58,29 @@ impl From<GenesisLedger> for Ledger {
                 Ok(amt) => Amount(amt * 1_000_000_000),
                 Err(_) => Amount::default(),
             };
-
-            accounts.insert(
-                PublicKeyV1::from(genesis_account.pk.clone()).into(),
-                Account {
-                    public_key: PublicKeyV1::from(genesis_account.pk).into(),
-                    delegate: genesis_account
-                        .delegate
-                        .clone()
-                        .map(|delegate| PublicKeyV1::from(delegate).into()),
-                    balance,
-                    nonce: Nonce::default(),
-                },
-            );
+            // Temporary hack to ignore bad PKs in mainnet genesis ledger
+            if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW" || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1" {
+                println!("Known broken public keys... Ignoring {}", genesis_account.pk);
+                continue
+            }
+            if let Ok(pk) = string_to_public_key_json(genesis_account.pk) {
+                accounts.insert(
+                    PublicKeyV1::from(pk.clone()).into(),
+                    Account {
+                        public_key: PublicKeyV1::from(pk.clone()).into(),
+                        delegate: genesis_account
+                            .delegate
+                            .clone()
+                            .map(|delegate| PublicKeyV1::from(string_to_public_key_json(delegate).unwrap()).into()),
+                        balance,
+                        nonce: Nonce::default(),
+                    },
+                );
+            }
+            else {
+                panic!("Unparsable public key");
+            }
         }
-        // assert_eq!(genesis_ledger.num_accounts as usize, accounts.len());
         Ledger { accounts }
     }
 }
