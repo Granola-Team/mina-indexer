@@ -109,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut indexer_state = mina_indexer::state::IndexerState::new(
         root_hash,
         genesis_ledger.ledger,
-        &store_dir,
+        Some(&store_dir),
     )?;
 
     event!(Level::INFO, "fast forwarding IndexerState using precomputed blocks in {}", startup_dir.display().to_string());
