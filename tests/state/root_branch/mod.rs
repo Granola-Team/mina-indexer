@@ -7,6 +7,12 @@ mod simple_proper;
 
 #[tokio::test]
 async fn prune_transition_frontier() {
+    // 0
+    // |    1
+    // 1 => |
+    // |    2
+    // 2
+
     let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
