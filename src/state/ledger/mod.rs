@@ -198,11 +198,21 @@ mod tests {
 
     use crate::state::ledger::{account::Amount, diff::account::DelegationDiff};
 
-    use super::{Ledger, public_key::PublicKey, account::Account, diff::{LedgerDiff, account::{AccountDiff, PaymentDiff, UpdateType}}};
+    use super::{
+        account::Account,
+        diff::{
+            account::{AccountDiff, PaymentDiff, UpdateType},
+            LedgerDiff,
+        },
+        public_key::PublicKey,
+        Ledger,
+    };
 
     #[test]
     fn apply_diff_payment() {
-        let public_key = PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy").expect("public key creation");
+        let public_key =
+            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
+                .expect("public key creation");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account);
@@ -210,14 +220,16 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
-            account_diffs: vec![
-                AccountDiff::Payment(PaymentDiff {
-                    public_key: public_key.clone(), amount: 1, update_type: UpdateType::Deposit
-                })
-            ],
+            account_diffs: vec![AccountDiff::Payment(PaymentDiff {
+                public_key: public_key.clone(),
+                amount: 1,
+                update_type: UpdateType::Deposit,
+            })],
         };
 
-        ledger.apply_diff(ledger_diff).expect("ledger diff application");
+        ledger
+            .apply_diff(ledger_diff)
+            .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
@@ -226,8 +238,12 @@ mod tests {
 
     #[test]
     fn apply_diff_delegation() {
-        let public_key = PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy").expect("public key creation");
-        let delegate_key = PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6").expect("delegate public key creation");
+        let public_key =
+            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
+                .expect("public key creation");
+        let delegate_key =
+            PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")
+                .expect("delegate public key creation");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account);
@@ -235,12 +251,15 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
-            account_diffs: vec![
-                AccountDiff::Delegation(DelegationDiff { delegator: public_key.clone(), delegate: delegate_key.clone() })
-            ],
+            account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
+                delegator: public_key.clone(),
+                delegate: delegate_key.clone(),
+            })],
         };
 
-        ledger.apply_diff(ledger_diff).expect("ledger diff application");
+        ledger
+            .apply_diff(ledger_diff)
+            .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 

@@ -14,7 +14,7 @@ use mina_indexer::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     },
 };
-use tracing::{event, instrument, Level, info, debug, error};
+use tracing::{debug, error, event, info, instrument, Level};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -126,10 +126,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     let mut block_parser = BlockParser::new(&startup_dir)?;
     while let Some(block) = block_parser.next().await? {
-        info!(
-            "adding {:?} to IndexerState",
-            &block.state_hash
-        );
+        info!("adding {:?} to IndexerState", &block.state_hash);
         indexer_state.add_block(&block)?;
     }
     info!("IndexerState up to date {:?}", indexer_state);

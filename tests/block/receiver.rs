@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::block::receiver::BlockReceiver;
 use tokio::{
-    fs::{create_dir, remove_dir, remove_file, File, metadata},
+    fs::{create_dir, metadata, remove_dir, remove_file, File},
     io::AsyncWriteExt,
     process::Command,
 };
