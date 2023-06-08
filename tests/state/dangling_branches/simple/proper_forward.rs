@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Adds a new dangling branch and extends it with a new leaf
@@ -40,15 +40,22 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state =
-        IndexerState::new(BlockHash(root_block.state_hash.clone()), None, None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash.clone()),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // add dangling_root_block
     let extension = state.add_block(&dangling_root_block).unwrap();
     assert_eq!(extension, ExtensionType::DanglingNew);
 
     // danlging_root_block is added as the root of the 0th dangling branch
-    assert_eq!(state.root_branch.clone().unwrap().height(), 1);
+    assert_eq!(state.root_branch.clone().height(), 1);
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
 

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Merges two dangling branches
@@ -66,7 +66,15 @@ async fn extension() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // --------
     // add leaf
@@ -80,7 +88,6 @@ async fn extension() {
     state
         .root_branch
         .clone()
-        .unwrap()
         .branches
         .write_formatted(&mut tree)
         .unwrap();
@@ -123,7 +130,6 @@ async fn extension() {
     state
         .root_branch
         .clone()
-        .unwrap()
         .branches
         .write_formatted(&mut tree)
         .unwrap();
@@ -136,18 +142,18 @@ async fn extension() {
     // - len = 3
     // - leaf = 1
     // - height = 3
-    assert_eq!(state.root_branch.clone().unwrap().len(), 3);
-    assert_eq!(state.root_branch.clone().unwrap().height(), 3);
-    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().len(), 3);
+    assert_eq!(state.root_branch.clone().height(), 3);
+    assert_eq!(state.root_branch.clone().leaves.len(), 1);
 
     // after extension quantities
-    let root = &state.root_branch.clone().unwrap().root;
-    let branches = &state.root_branch.clone().unwrap().branches;
+    let root = &state.root_branch.clone().root;
+    let branches = &state.root_branch.clone().branches;
     let branch_root = &branches
         .get(&branches.root_node_id().unwrap())
         .unwrap()
         .data();
-    let root_branch = state.root_branch.unwrap();
+    let root_branch = state.root_branch;
     let leaves: Vec<&Block> = root_branch.leaves.iter().map(|(_, x)| &x.block).collect();
 
     assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);

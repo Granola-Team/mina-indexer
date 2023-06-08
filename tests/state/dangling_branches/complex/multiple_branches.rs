@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Merges three dangling branches
@@ -77,7 +77,15 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), None, None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // ---------
     // add leaf0
@@ -97,9 +105,9 @@ async fn extension() {
     // - len = 1
     // - height = 1
     // - leaves = 1
-    assert_eq!(state.root_branch.clone().unwrap().len(), 1);
-    assert_eq!(state.root_branch.clone().unwrap().height(), 1);
-    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().len(), 1);
+    assert_eq!(state.root_branch.clone().height(), 1);
+    assert_eq!(state.root_branch.clone().leaves.len(), 1);
 
     // 2 dangling branches
     // - len = 1
@@ -124,7 +132,6 @@ async fn extension() {
     state
         .root_branch
         .clone()
-        .unwrap()
         .branches
         .write_formatted(&mut tree)
         .unwrap();
@@ -148,23 +155,23 @@ async fn extension() {
     // - len = 4
     // - height = 3
     // - leaves = 2
-    assert_eq!(state.root_branch.clone().unwrap().len(), 4);
-    assert_eq!(state.root_branch.clone().unwrap().height(), 3);
-    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 2);
+    assert_eq!(state.root_branch.clone().len(), 4);
+    assert_eq!(state.root_branch.clone().height(), 3);
+    assert_eq!(state.root_branch.clone().leaves.len(), 2);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
 
     // after extension quantities
-    let root0 = &state.root_branch.clone().unwrap().root;
-    let branches0 = &state.root_branch.clone().unwrap().branches;
+    let root0 = &state.root_branch.clone().root;
+    let branches0 = &state.root_branch.clone().branches;
     let branch_root0 = &branches0
         .get(&branches0.root_node_id().unwrap())
         .unwrap()
         .data();
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
-    let root_branch = state.root_branch.clone().unwrap();
+    let root_branch = state.root_branch.clone();
     let leaves0: HashSet<&Block> = root_branch.leaves.iter().map(|(_, x)| &x.block).collect();
 
     assert_eq!(
@@ -176,7 +183,6 @@ async fn extension() {
     let mut tree = String::new();
     state
         .root_branch
-        .unwrap()
         .branches
         .write_formatted(&mut tree)
         .unwrap();

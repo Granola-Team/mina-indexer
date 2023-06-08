@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 use tokio::fs::remove_dir_all;
 
@@ -43,7 +43,10 @@ async fn test() {
     // initialize state
     let mut state = IndexerState::new(
         BlockHash(root_block.state_hash),
-        None,
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
         Some(&block_store_dir),
     )
     .unwrap();
@@ -55,12 +58,12 @@ async fn test() {
     println!("=== Before state ===");
     println!("{state:?}");
 
-    println!("Root:     {}", state.root_branch.as_ref().unwrap().len());
+    println!("Root:     {}", state.root_branch.len());
     println!("Dangling: {}", state.dangling_branches.len());
 
     // 1 block in the root branch
     // 1 blovk in the 0th dangling branch
-    assert_eq!(state.root_branch.clone().unwrap().len(), 1);
+    assert_eq!(state.root_branch.clone().len(), 1);
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
 
@@ -77,10 +80,10 @@ async fn test() {
     });
 
     // the block is not added to the state
-    println!("Root:     {}", state.root_branch.clone().unwrap().len());
+    println!("Root:     {}", state.root_branch.clone().len());
     println!("Dangling: {}", state.dangling_branches.len());
 
-    assert_eq!(state.root_branch.unwrap().len(), 1);
+    assert_eq!(state.root_branch.len(), 1);
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
 

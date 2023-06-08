@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ExtensionType, IndexerState},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Creates multiple dangling branches
@@ -52,40 +52,38 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(BlockHash(root0_block.state_hash), None, None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root0_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // Root branch
     // - len = 1
     // - leaf = 1
     // - height = 1
-    assert_eq!(state.root_branch.clone().unwrap().len(), 1);
-    assert_eq!(state.root_branch.clone().unwrap().height(), 1);
-    assert_eq!(state.root_branch.clone().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().len(), 1);
+    assert_eq!(state.root_branch.clone().height(), 1);
+    assert_eq!(state.root_branch.clone().leaves.len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
 
     // before extension quantities
-    let root0 = state.root_branch.clone().unwrap().root;
+    let root0 = state.root_branch.clone().root;
     let root_leaf0 = state
         .root_branch
-        .as_ref()
-        .unwrap()
         .leaves
-        .get(
-            state
-                .root_branch
-                .as_ref()
-                .unwrap()
-                .branches
-                .root_node_id()
-                .unwrap(),
-        )
+        .get(state.root_branch.branches.root_node_id().unwrap())
         .unwrap()
         .clone();
 
     println!("=== Before Branch 0 ===");
-    println!("{:?}", state.root_branch.as_ref().unwrap().branches);
+    println!("{:?}", state.root_branch.branches);
 
     // root == leaf
     assert_eq!(root0, root_leaf0.block);
@@ -102,9 +100,9 @@ async fn extensions() {
     // - len = 1
     // - height = 1
     // - leaves = 1
-    assert_eq!(state.root_branch.as_ref().unwrap().len(), 1);
-    assert_eq!(state.root_branch.as_ref().unwrap().height(), 1);
-    assert_eq!(state.root_branch.as_ref().unwrap().leaves.len(), 1);
+    assert_eq!(state.root_branch.len(), 1);
+    assert_eq!(state.root_branch.height(), 1);
+    assert_eq!(state.root_branch.leaves.len(), 1);
 
     // 1 dangling branch
     // - len = 1
@@ -116,16 +114,14 @@ async fn extensions() {
     assert_eq!(state.dangling_branches.get(0).unwrap().leaves.len(), 1);
 
     // after extension quantities
-    let root1 = &state.root_branch.as_ref().unwrap().root;
-    let branches1 = &state.root_branch.as_ref().unwrap().branches;
+    let root1 = &state.root_branch.root;
+    let branches1 = &state.root_branch.branches;
     let branch_root1 = &branches1
         .get(&branches1.root_node_id().unwrap())
         .unwrap()
         .data();
     let root_leaf1 = state
         .root_branch
-        .as_ref()
-        .unwrap()
         .leaves
         .get(branches1.root_node_id().unwrap())
         .unwrap();

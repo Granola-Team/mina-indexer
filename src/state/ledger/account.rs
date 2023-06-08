@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
 
-#[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct Amount(pub u64);
 
 #[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]

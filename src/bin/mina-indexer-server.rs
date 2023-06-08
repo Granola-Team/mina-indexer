@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-use std::process;
+use std::{path::PathBuf, process};
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -12,9 +11,10 @@ use mina_indexer::{
     },
     state::{
         branch::Leaf,
-        ledger::{self, public_key::PublicKey, Ledger},
+        ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     },
 };
+use tracing::{debug, error, event, info, instrument, Level};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -25,72 +25,150 @@ struct ServerArgs {
     #[arg(short, long)]
     root_hash: String,
     #[arg(short, long)]
-    logs_dir: PathBuf,
-    #[arg(short, long, default_value = None)]
-    store_dir: Option<PathBuf>,
+    startup_dir: PathBuf,
+    #[arg(short, long)]
+    watch_dir: PathBuf,
+    #[arg(short, long)]
+    store_dir: PathBuf,
+    #[arg(short, long)]
+    log_dir: PathBuf,
+    #[arg(short, long, default_value_t = false)]
+    log_stdout: bool,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+pub struct IndexerConfiguration {
+    root_hash: BlockHash,
+    startup_dir: PathBuf,
+    watch_dir: PathBuf,
+    store_dir: PathBuf,
+    log_file: PathBuf,
+    genesis_ledger: GenesisRoot,
+    log_stdout: bool,
+}
+
+#[instrument]
+pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfiguration> {
+    info!("parsing ServerArgs");
     let args = ServerArgs::parse();
-    let genesis_ledger = match ledger::genesis::parse_file(&args.genesis_ledger).await {
-        Ok(genesis_root) => Some(genesis_root.ledger),
-        Err(e) => {
-            eprintln!(
-                "Unable to parse genesis ledger at {}: {}! Exiting.",
-                args.genesis_ledger.display(),
-                e
+    let root_hash = BlockHash(args.root_hash);
+    let startup_dir = args.startup_dir;
+    let watch_dir = args.watch_dir;
+    let store_dir = args.store_dir;
+    let log_dir = args.log_dir;
+    let log_stdout = args.log_stdout;
+    info!("parsing GenesisLedger file");
+    match ledger::genesis::parse_file(&args.genesis_ledger).await {
+        Err(err) => {
+            error!(
+                reason = "unable to parse GenesisLedger",
+                error = err.to_string(),
+                path = &args.genesis_ledger.display().to_string()
             );
             process::exit(100)
         }
-    };
+        Ok(genesis_ledger) => {
+            info!(
+                "GenesisLedger parsed {}",
+                args.genesis_ledger.display().to_string()
+            );
 
-    let root_hash = BlockHash(args.root_hash);
-    let logs_dir = args.logs_dir;
-    let store_dir = args.store_dir;
-    let mut indexer_state = mina_indexer::state::IndexerState::new(
+            let mut log_number = 0;
+            let mut log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
+            while tokio::fs::metadata(&log_file).await.is_ok() {
+                log_number += 1;
+                log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
+            }
+            let log_file = PathBuf::from(&log_file);
+
+            Ok(IndexerConfiguration {
+                root_hash,
+                startup_dir,
+                watch_dir,
+                store_dir,
+                log_file,
+                log_stdout,
+                genesis_ledger,
+            })
+        }
+    }
+}
+
+#[instrument]
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    info!("started mina-indexer-server");
+    let IndexerConfiguration {
         root_hash,
+        startup_dir,
+        watch_dir,
+        store_dir,
+        log_file,
+        log_stdout,
         genesis_ledger,
-        store_dir.clone().as_deref(),
-    )?;
+    } = parse_command_line_arguments().await?;
 
-    let mut block_parser = BlockParser::new(&logs_dir.clone())?;
-    while let Some(block) = block_parser.next().await? {
-        indexer_state.add_block(&block)?;
+    if log_stdout {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+        tracing_subscriber::fmt().with_writer(non_blocking).init();
+    } else {
+        let log_writer = std::fs::File::create(log_file)?;
+        let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
+        tracing_subscriber::fmt().with_writer(non_blocking).init();
     }
 
+    info!("initializing IndexerState");
+    let mut indexer_state =
+        mina_indexer::state::IndexerState::new(root_hash, genesis_ledger.ledger, Some(&store_dir))?;
+
+    info!(
+        "fast forwarding IndexerState using precomputed blocks in {}",
+        startup_dir.display().to_string()
+    );
+    let mut block_parser = BlockParser::new(&startup_dir)?;
+    while let Some(block) = block_parser.next().await? {
+        info!("adding {:?} to IndexerState", &block.state_hash);
+        indexer_state.add_block(&block)?;
+    }
+    info!("IndexerState up to date {:?}", indexer_state);
+
+    info!("initializing BlockReceiver in {:?}", watch_dir);
     let mut block_receiver = BlockReceiver::new().await?;
-    block_receiver.load_directory(&logs_dir.clone()).await?;
+    block_receiver.load_directory(&watch_dir).await?;
 
+    info!("starting LocalSocketListener");
     let listener = LocalSocketListener::bind(mina_indexer::SOCKET_NAME)?;
-
-    dbg!(&indexer_state);
 
     loop {
         tokio::select! {
             block_fut = block_receiver.recv() => {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
+                    debug!("receiving block {:?}", precomputed_block);
                     indexer_state.add_block(&precomputed_block)?;
-                    dbg!(&indexer_state);
+                    info!("added block {:?}", &precomputed_block.state_hash);
                 } else {
+                    info!("BlockReceiver shutdown, system exit");
                     return Ok(())
                 }
             }
 
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
+                info!("receiving connection");
                 let best_chain = indexer_state.best_chain.clone();
 
-                let primary_path = store_dir.clone().unwrap();
+                let primary_path = store_dir.clone();
                 let mut secondary_path = primary_path.clone();
                 secondary_path.push(Uuid::new_v4().to_string());
 
+                debug!("spawning secondary readonly RocksDB instance");
                 let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
                 tokio::spawn(async move {
+                    debug!("handling connection");
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain).await {
-                        eprintln!("{}", format_args!("Error while handling connection: {e}"));
+                        event!(Level::ERROR, "Error handling connection {}", e);
                     }
+                    debug!("removing readonly instance");
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
             }
@@ -98,6 +176,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 }
 
+#[instrument]
 async fn handle_conn(
     conn: LocalSocketStream,
     db: BlockStoreConn,
@@ -112,11 +191,10 @@ async fn handle_conn(
     let command = buffers.next().unwrap();
 
     let command_string = String::from_utf8(command.to_vec())?;
-    dbg!(&command_string);
+
     match command_string.as_str() {
         "best_chain\0" => {
-            println!("received best_chain command");
-            dbg!(best_chain.clone());
+            info!("received best_chain command");
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
                 .cloned()
@@ -126,21 +204,26 @@ async fn handle_conn(
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
         }
-        "account_balance" => {
+        "account_balance\0" => {
+            info!("received account_balance command");
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
             if let Some(block) = best_chain.first() {
+                debug!("using ledger {:?}", block.get_ledger());
                 let account = block.get_ledger().accounts.get(&public_key);
-                dbg!(block.get_ledger());
                 if let Some(account) = account {
+                    info!("writing account {:?} to client", account);
                     let bytes = bcs::to_bytes(account)?;
                     writer.write_all(&bytes).await?;
                 }
             }
         }
-        _ => return Err(anyhow::Error::msg("Malformed Request")),
+        bad_request => {
+            error!("malformed request: {}", bad_request);
+            return Err(anyhow::Error::msg("Malformed Request"));
+        }
     }
 
     Ok(())
