@@ -72,14 +72,15 @@ impl IndexerState {
                 )))
                 }
             }
-    
+
             // add precomputed block to the db
             block_store.add_block(precomputed_block)?;
         }
 
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
-        if let Some(_max_length) = self.root_branch
+        if let Some(_max_length) = self
+            .root_branch
             .leaves
             .iter()
             .flat_map(|(_, x)| x.block.blockchain_length)
@@ -107,8 +108,7 @@ impl IndexerState {
                 self.best_chain = self.root_branch.longest_chain();
                 if !branches_to_remove.is_empty() {
                     // if the root branch is newly connected to dangling branches
-                    for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate()
-                    {
+                    for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                         self.dangling_branches.remove(index_to_remove - num_removed);
                     }
                     return Ok(ExtensionType::RootComplex);
@@ -271,7 +271,8 @@ impl IndexerState {
 
     pub fn chain_commands(&self) -> Vec<Command> {
         if let Some(block_store) = self.block_store.as_ref() {
-            return self.best_chain
+            return self
+                .best_chain
                 .iter()
                 .map(|leaf| leaf.block.state_hash.clone())
                 .flat_map(|state_hash| block_store.get_block(&state_hash.0))

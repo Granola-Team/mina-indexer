@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Merges two dangling branches, ignore others
@@ -69,9 +69,15 @@ async fn extension() {
     // ----------
 
     // root in branch branch
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
-        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Extends a branch with a new leaf
@@ -34,9 +34,15 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
-        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // root branch
     // - len = 1

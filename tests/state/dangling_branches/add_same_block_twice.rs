@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 use tokio::fs::remove_dir_all;
 
@@ -43,7 +43,10 @@ async fn test() {
     // initialize state
     let mut state = IndexerState::new(
         BlockHash(root_block.state_hash),
-        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() },
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
         Some(&block_store_dir),
     )
     .unwrap();

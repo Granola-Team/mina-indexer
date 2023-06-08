@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Creates multiple dangling branches
@@ -52,9 +52,15 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(BlockHash(root0_block.state_hash), 
-        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root0_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // Root branch
     // - len = 1
@@ -72,13 +78,7 @@ async fn extensions() {
     let root_leaf0 = state
         .root_branch
         .leaves
-        .get(
-            state
-                .root_branch
-                .branches
-                .root_node_id()
-                .unwrap(),
-        )
+        .get(state.root_branch.branches.root_node_id().unwrap())
         .unwrap()
         .clone();
 

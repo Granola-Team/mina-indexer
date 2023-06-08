@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{ExtensionType, IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
 };
 
 /// Merges three dangling branches
@@ -77,9 +77,15 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
-        GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        None).unwrap();
+    let mut state = IndexerState::new(
+        BlockHash(root_block.state_hash),
+        GenesisLedger {
+            name: "testing".to_string(),
+            accounts: Vec::new(),
+        },
+        None,
+    )
+    .unwrap();
 
     // ---------
     // add leaf0

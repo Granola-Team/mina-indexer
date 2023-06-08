@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
-    state::{IndexerState, ledger::genesis::GenesisLedger},
+    state::{ledger::genesis::GenesisLedger, IndexerState},
 };
 
 /// Parses all blocks in ./tests/data/beautified_sequential_blocks
@@ -16,10 +16,14 @@ async fn extension() {
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
-        let mut state =
-            IndexerState::new(BlockHash(precomputed_block.state_hash), 
-            GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-            None)
+        let mut state = IndexerState::new(
+            BlockHash(precomputed_block.state_hash),
+            GenesisLedger {
+                name: "testing".to_string(),
+                accounts: Vec::new(),
+            },
+            None,
+        )
         .unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {

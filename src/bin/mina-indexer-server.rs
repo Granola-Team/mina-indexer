@@ -1,4 +1,4 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -11,10 +11,10 @@ use mina_indexer::{
     },
     state::{
         branch::Leaf,
-        ledger::{self, public_key::PublicKey, Ledger, genesis::{GenesisRoot}},
+        ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     },
 };
-use tracing::{Level, instrument, event};
+use tracing::{event, instrument, Level};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -43,7 +43,7 @@ pub struct IndexerConfiguration {
     store_dir: PathBuf,
     log_file: PathBuf,
     genesis_ledger: GenesisRoot,
-    log_stdout: bool
+    log_stdout: bool,
 }
 
 #[instrument]
@@ -59,15 +59,21 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
     event!(Level::INFO, "parsing GenesisLedger file");
     match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Err(err) => {
-            event!(Level::ERROR, reason = "unable to parse GenesisLedger", 
-                error = err.to_string(), 
+            event!(
+                Level::ERROR,
+                reason = "unable to parse GenesisLedger",
+                error = err.to_string(),
                 path = &args.genesis_ledger.display().to_string()
             );
             Err(err)
-        },
+        }
         Ok(genesis_ledger) => {
-            event!(Level::INFO, "GenesisLedger parsed {}", args.genesis_ledger.display().to_string());
-            
+            event!(
+                Level::INFO,
+                "GenesisLedger parsed {}",
+                args.genesis_ledger.display().to_string()
+            );
+
             let mut log_number = 0;
             let mut log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
             while tokio::fs::metadata(&log_file).await.is_ok() {
@@ -75,8 +81,16 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
                 log_file = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
             }
             let log_file = PathBuf::from(&log_file);
-            
-            Ok(IndexerConfiguration { root_hash, startup_dir, watch_dir, store_dir, log_file, log_stdout, genesis_ledger })
+
+            Ok(IndexerConfiguration {
+                root_hash,
+                startup_dir,
+                watch_dir,
+                store_dir,
+                log_file,
+                log_stdout,
+                genesis_ledger,
+            })
         }
     }
 }
@@ -86,36 +100,40 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
 async fn main() -> Result<(), anyhow::Error> {
     event!(Level::INFO, "started mina-indexer-server");
     let IndexerConfiguration {
-        root_hash, 
-        startup_dir, watch_dir, store_dir, 
-        log_file, log_stdout,
-        genesis_ledger
+        root_hash,
+        startup_dir,
+        watch_dir,
+        store_dir,
+        log_file,
+        log_stdout,
+        genesis_ledger,
     } = parse_command_line_arguments().await?;
 
     if log_stdout {
         let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-            tracing_subscriber::fmt()
-        .with_writer(non_blocking)
-        .init();
+        tracing_subscriber::fmt().with_writer(non_blocking).init();
     }
 
     let log_writer = std::fs::File::create(log_file)?;
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
-    tracing_subscriber::fmt()
-        .with_writer(non_blocking)
-        .init();
+    tracing_subscriber::fmt().with_writer(non_blocking).init();
 
     event!(Level::INFO, "initializing IndexerState");
-    let mut indexer_state = mina_indexer::state::IndexerState::new(
-        root_hash,
-        genesis_ledger.ledger,
-        Some(&store_dir),
-    )?;
+    let mut indexer_state =
+        mina_indexer::state::IndexerState::new(root_hash, genesis_ledger.ledger, Some(&store_dir))?;
 
-    event!(Level::INFO, "fast forwarding IndexerState using precomputed blocks in {}", startup_dir.display().to_string());
+    event!(
+        Level::INFO,
+        "fast forwarding IndexerState using precomputed blocks in {}",
+        startup_dir.display().to_string()
+    );
     let mut block_parser = BlockParser::new(&startup_dir)?;
     while let Some(block) = block_parser.next().await? {
-        event!(Level::INFO, "adding {:?} to IndexerState", &block.state_hash);
+        event!(
+            Level::INFO,
+            "adding {:?} to IndexerState",
+            &block.state_hash
+        );
         indexer_state.add_block(&block)?;
     }
     event!(Level::INFO, "IndexerState up to date {:?}", indexer_state);
