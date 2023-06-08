@@ -43,11 +43,11 @@ nix build '.?submodules=1'
 Start the Mina Indexer with `mina-indexer-server`
 * `--startup-dir` the directory to initialize the indexer's state from
 * `--watch-dir` the directory to watch to keep the indexer up to date
-* `--store-dir` the directory to store the indexer's internal RocksDB database in
+* `--database-dir` the directory to store the indexer's internal RocksDB database in
 * `--log-dir` the directory to output the indexer's logs to
 
 ```sh
-mina-indexer-server --startup-dir PATH --watch-dir PATH --store_dir PATH --log-dir PATH
+mina-indexer-server --startup-dir PATH --watch-dir PATH --database_dir PATH --log-dir PATH
 ```
 
 Query data from the Mina Indexer with `mina-indexer-client`
