@@ -109,14 +109,15 @@ async fn main() -> Result<(), anyhow::Error> {
         genesis_ledger,
     } = parse_command_line_arguments().await?;
 
+    // TODO: Improve Logging Subscribers
     if log_stdout {
         let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
         tracing_subscriber::fmt().with_writer(non_blocking).init();
+    } else {
+        let log_writer = std::fs::File::create(log_file)?;
+        let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
+        tracing_subscriber::fmt().with_writer(non_blocking).init();
     }
-
-    let log_writer = std::fs::File::create(log_file)?;
-    let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
-    tracing_subscriber::fmt().with_writer(non_blocking).init();
 
     event!(Level::INFO, "initializing IndexerState");
     let mut indexer_state =
