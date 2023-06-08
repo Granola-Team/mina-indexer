@@ -20,6 +20,7 @@ pub struct IndexerState {
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
     pub block_store: Option<BlockStoreConn>,
+    pub transition_frontier_length: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,6 +44,7 @@ impl IndexerState {
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&std::path::Path>,
+        transition_frontier_length: Option<u32>
     ) -> anyhow::Result<Self> {
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
@@ -50,6 +52,7 @@ impl IndexerState {
             root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
             dangling_branches: Vec::new(),
             block_store,
+            transition_frontier_length
         })
     }
 
@@ -60,6 +63,11 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
+        // prune the root branch
+        if let Some(k) = self.transition_frontier_length {
+            self.root_branch.prune_transition_frontier(k);
+        }
+
         // check that the block doesn't already exist in the db
         let state_hash = &precomputed_block.state_hash;
         if let Some(block_store) = self.block_store.as_ref() {

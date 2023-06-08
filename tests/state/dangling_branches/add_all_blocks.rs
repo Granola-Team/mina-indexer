@@ -23,6 +23,7 @@ async fn extension() {
                 accounts: Vec::new(),
             },
             None,
+            None
         )
         .unwrap();
         n += 1;
