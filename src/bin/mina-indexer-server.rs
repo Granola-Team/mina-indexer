@@ -117,8 +117,11 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt().with_writer(non_blocking).init();
 
     info!("initializing IndexerState");
-    let mut indexer_state =
-        mina_indexer::state::IndexerState::new(root_hash, genesis_ledger.ledger, Some(&database_dir))?;
+    let mut indexer_state = mina_indexer::state::IndexerState::new(
+        root_hash,
+        genesis_ledger.ledger,
+        Some(&database_dir),
+    )?;
 
     info!(
         "fast forwarding IndexerState using precomputed blocks in {}",
