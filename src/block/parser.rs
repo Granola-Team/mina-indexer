@@ -1,6 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    vec::IntoIter,
+};
 
-use glob::{glob, Paths};
+use glob::glob;
 use tokio::io::AsyncReadExt;
 
 use super::{
@@ -16,7 +19,7 @@ pub enum SearchRecursion {
 pub struct BlockParser {
     pub log_path: PathBuf,
     pub recursion: SearchRecursion,
-    paths: Paths,
+    paths: IntoIter<PathBuf>,
 }
 
 impl BlockParser {
@@ -35,11 +38,18 @@ impl BlockParser {
                 SearchRecursion::Recursive => format!("{}/**/*.json", log_path.display()),
             };
             let log_path = log_path.to_owned();
-            let paths = glob(&pattern).expect("Failed to read glob pattern");
+            let mut paths: Vec<PathBuf> = glob(&pattern)
+                .expect("Failed to read glob pattern")
+                .filter_map(|x| x.ok())
+                .collect();
+            paths.sort_by(|x, y| {
+                get_blockchain_length(x.file_name().unwrap())
+                    .cmp(&get_blockchain_length(y.file_name().unwrap()))
+            });
             Ok(Self {
                 log_path,
                 recursion,
-                paths,
+                paths: paths.into_iter(),
             })
         } else {
             Err(anyhow::Error::msg(format!(
@@ -49,8 +59,7 @@ impl BlockParser {
     }
 
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
-        if let Some(next) = self.paths.next() {
-            let next_path = next?;
+        if let Some(next_path) = self.paths.next() {
             if is_valid_block_file(&next_path) {
                 let blockchain_length =
                     get_blockchain_length(next_path.file_name().expect("filename already checked"));
@@ -78,27 +87,34 @@ impl BlockParser {
 
     /// get the precomputed block with supplied hash
     /// it must exist ahead of the current block parser file
-    #[async_recursion::async_recursion]
     pub async fn get_precomputed_block(
         &mut self,
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
-        match self.next().await.unwrap() {
-            None => Err(anyhow::Error::msg(format!(
-                "
+        let error = anyhow::Error::msg(format!(
+            "
 [BlockPasrser::get_precomputed_block]
+Looking in log path: {:?}
+Did not find state hash: {state_hash}
+It may have been skipped unintentionally!
+BlockParser::next() does not exactly follow filename order!",
+            self.log_path
+        ));
+        let mut next_block = self.next().await?.ok_or(error)?;
+
+        while next_block.state_hash != state_hash {
+            next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
+                "
+    [BlockPasrser::get_precomputed_block]
     Looking in log path: {:?}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!
     BlockParser::next() does not exactly follow filename order!",
                 self.log_path
-            ))),
-            Some(precomputed) => Ok(if precomputed.state_hash == state_hash {
-                precomputed
-            } else {
-                self.get_precomputed_block(state_hash).await.unwrap()
-            }),
+            )))?;
         }
+
+        Ok(next_block)
     }
 
     pub async fn parse_file(&mut self, filename: &Path) -> anyhow::Result<PrecomputedBlock> {
