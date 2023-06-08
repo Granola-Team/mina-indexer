@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::{PathBuf, Path}};
+use std::{collections::HashSet, path::PathBuf};
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
@@ -79,7 +79,7 @@ async fn extension() {
 
     let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
         GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        Path::new("none")).unwrap();
+        None).unwrap();
 
     // ---------
     // add leaf0

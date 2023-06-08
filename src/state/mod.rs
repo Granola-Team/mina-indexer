@@ -19,7 +19,7 @@ pub struct IndexerState {
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
-    pub block_store: BlockStoreConn,
+    pub block_store: Option<BlockStoreConn>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -42,9 +42,9 @@ impl IndexerState {
     pub fn new(
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
-        blocks_path: &std::path::Path,
+        rocksdb_path: Option<&std::path::Path>,
     ) -> anyhow::Result<Self> {
-        let block_store = BlockStoreConn::new(blocks_path).unwrap();
+        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
             best_chain: Vec::new(),
             root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
@@ -62,18 +62,20 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         // check that the block doesn't already exist in the db
         let state_hash = &precomputed_block.state_hash;
-        match self.block_store.get_block(state_hash) {
-            Err(err) => return Err(err),
-            Ok(None) => (),
-            Ok(_) => {
-                return Err(anyhow::Error::msg(format!(
-                "Block with state hash '{state_hash:?}' is already present in the block store"
-            )))
+        if let Some(block_store) = self.block_store.as_ref() {
+            match block_store.get_block(state_hash) {
+                Err(err) => return Err(err),
+                Ok(None) => (),
+                Ok(_) => {
+                    return Err(anyhow::Error::msg(format!(
+                    "Block with state hash '{state_hash:?}' is already present in the block store"
+                )))
+                }
             }
+    
+            // add precomputed block to the db
+            block_store.add_block(precomputed_block)?;
         }
-
-        // add precomputed block to the db
-        self.block_store.add_block(precomputed_block)?;
 
         // forward extension on root branch
         // TODO put heights of root and the highest leaf in Branch
@@ -268,13 +270,16 @@ impl IndexerState {
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
-        self.best_chain
-            .iter()
-            .map(|leaf| leaf.block.state_hash.clone())
-            .flat_map(|state_hash| self.block_store.get_block(&state_hash.0))
-            .flatten()
-            .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
-            .collect()
+        if let Some(block_store) = self.block_store.as_ref() {
+            return self.best_chain
+                .iter()
+                .map(|leaf| leaf.block.state_hash.clone())
+                .flat_map(|state_hash| block_store.get_block(&state_hash.0))
+                .flatten()
+                .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
+                .collect();
+        }
+        vec![]
     }
 
     pub fn best_ledger(&self) -> Option<&Ledger> {

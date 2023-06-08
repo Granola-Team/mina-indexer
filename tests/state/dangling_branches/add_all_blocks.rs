@@ -1,4 +1,4 @@
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
@@ -19,7 +19,7 @@ async fn extension() {
         let mut state =
             IndexerState::new(BlockHash(precomputed_block.state_hash), 
             GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-            Path::new("none"))
+            None)
         .unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {

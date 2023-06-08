@@ -1,4 +1,4 @@
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block, BlockHash},
@@ -71,7 +71,7 @@ async fn extension() {
     // root in branch branch
     let mut state = IndexerState::new(BlockHash(root_block.state_hash), 
         GenesisLedger { name: "testing".to_string(), accounts: Vec::new() }, 
-        Path::new("none")).unwrap();
+        None).unwrap();
 
     // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();

@@ -44,7 +44,7 @@ async fn test() {
     let mut state = IndexerState::new(
         BlockHash(root_block.state_hash),
         GenesisLedger { name: "testing".to_string(), accounts: Vec::new() },
-        &block_store_dir,
+        Some(&block_store_dir),
     )
     .unwrap();
 
