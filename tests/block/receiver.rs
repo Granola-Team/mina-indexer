@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::block::receiver::BlockReceiver;
 use tokio::{
-    fs::{create_dir, remove_dir, remove_file, File},
+    fs::{create_dir, remove_dir, remove_file, File, metadata},
     io::AsyncWriteExt,
     process::Command,
 };
@@ -14,16 +14,19 @@ async fn detects_new_block_written() {
         "../data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
 
-    create_dir(TEST_DIR).await.unwrap_or(());
-
     let test_dir_path = PathBuf::from(TEST_DIR);
+    let mut test_block_path = test_dir_path.clone();
+    test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+
+    if metadata(test_block_path.clone()).await.is_ok() {
+        remove_file(test_block_path.clone()).await.unwrap();
+        remove_dir(TEST_DIR).await.unwrap();
+    }
+    create_dir(TEST_DIR).await.unwrap_or(());
 
     let mut block_receiver = BlockReceiver::new().await.unwrap();
 
     block_receiver.load_directory(&test_dir_path).await.unwrap();
-
-    let mut test_block_path = test_dir_path;
-    test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
     let mut file = File::create(test_block_path.clone()).await.unwrap();
     file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
