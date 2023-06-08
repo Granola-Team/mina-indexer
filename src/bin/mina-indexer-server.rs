@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process};
 
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -14,7 +14,7 @@ use mina_indexer::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     },
 };
-use tracing::{event, instrument, Level};
+use tracing::{event, instrument, Level, info, debug, error};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -48,7 +48,7 @@ pub struct IndexerConfiguration {
 
 #[instrument]
 pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfiguration> {
-    event!(Level::INFO, "parsing ServerArgs");
+    info!("parsing ServerArgs");
     let args = ServerArgs::parse();
     let root_hash = BlockHash(args.root_hash);
     let startup_dir = args.startup_dir;
@@ -56,20 +56,18 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
     let store_dir = args.store_dir;
     let log_dir = args.log_dir;
     let log_stdout = args.log_stdout;
-    event!(Level::INFO, "parsing GenesisLedger file");
+    info!("parsing GenesisLedger file");
     match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Err(err) => {
-            event!(
-                Level::ERROR,
+            error!(
                 reason = "unable to parse GenesisLedger",
                 error = err.to_string(),
                 path = &args.genesis_ledger.display().to_string()
             );
-            Err(err)
+            process::exit(100)
         }
         Ok(genesis_ledger) => {
-            event!(
-                Level::INFO,
+            info!(
                 "GenesisLedger parsed {}",
                 args.genesis_ledger.display().to_string()
             );
@@ -98,7 +96,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
 #[instrument]
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    event!(Level::INFO, "started mina-indexer-server");
+    info!("started mina-indexer-server");
     let IndexerConfiguration {
         root_hash,
         startup_dir,
@@ -109,7 +107,6 @@ async fn main() -> Result<(), anyhow::Error> {
         genesis_ledger,
     } = parse_command_line_arguments().await?;
 
-    // TODO: Improve Logging Subscribers
     if log_stdout {
         let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
         tracing_subscriber::fmt().with_writer(non_blocking).init();
@@ -119,31 +116,29 @@ async fn main() -> Result<(), anyhow::Error> {
         tracing_subscriber::fmt().with_writer(non_blocking).init();
     }
 
-    event!(Level::INFO, "initializing IndexerState");
+    info!("initializing IndexerState");
     let mut indexer_state =
         mina_indexer::state::IndexerState::new(root_hash, genesis_ledger.ledger, Some(&store_dir))?;
 
-    event!(
-        Level::INFO,
+    info!(
         "fast forwarding IndexerState using precomputed blocks in {}",
         startup_dir.display().to_string()
     );
     let mut block_parser = BlockParser::new(&startup_dir)?;
     while let Some(block) = block_parser.next().await? {
-        event!(
-            Level::INFO,
+        info!(
             "adding {:?} to IndexerState",
             &block.state_hash
         );
         indexer_state.add_block(&block)?;
     }
-    event!(Level::INFO, "IndexerState up to date {:?}", indexer_state);
+    info!("IndexerState up to date {:?}", indexer_state);
 
-    event!(Level::INFO, "initializing BlockReceiver in {:?}", watch_dir);
+    info!("initializing BlockReceiver in {:?}", watch_dir);
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
 
-    event!(Level::INFO, "starting LocalSocketListener");
+    info!("starting LocalSocketListener");
     let listener = LocalSocketListener::bind(mina_indexer::SOCKET_NAME)?;
 
     loop {
@@ -151,32 +146,32 @@ async fn main() -> Result<(), anyhow::Error> {
             block_fut = block_receiver.recv() => {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
-                    event!(Level::INFO, "receiving block {:?}", precomputed_block);
+                    debug!("receiving block {:?}", precomputed_block);
                     indexer_state.add_block(&precomputed_block)?;
-                    event!(Level::INFO, "added block {:?}", &precomputed_block.state_hash);
+                    info!("added block {:?}", &precomputed_block.state_hash);
                 } else {
-                    event!(Level::INFO, "BlockReceiver shutdown, system exit");
+                    info!("BlockReceiver shutdown, system exit");
                     return Ok(())
                 }
             }
 
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
-                event!(Level::INFO, "receiving connection");
+                info!("receiving connection");
                 let best_chain = indexer_state.best_chain.clone();
 
                 let primary_path = store_dir.clone();
                 let mut secondary_path = primary_path.clone();
                 secondary_path.push(Uuid::new_v4().to_string());
 
-                event!(Level::INFO, "spawning secondary readonly RocksDB instance");
+                debug!("spawning secondary readonly RocksDB instance");
                 let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
                 tokio::spawn(async move {
-                    event!(Level::INFO, "handling connection");
+                    debug!("handling connection");
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain).await {
                         event!(Level::ERROR, "Error handling connection {}", e);
                     }
-                    event!(Level::INFO, "removing readonly instance");
+                    debug!("removing readonly instance");
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
             }
@@ -199,11 +194,10 @@ async fn handle_conn(
     let command = buffers.next().unwrap();
 
     let command_string = String::from_utf8(command.to_vec())?;
-    dbg!(&command_string);
+
     match command_string.as_str() {
         "best_chain\0" => {
-            event!(Level::INFO, "received best_chain command");
-            dbg!(best_chain.clone());
+            info!("received best_chain command");
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
                 .cloned()
@@ -214,23 +208,23 @@ async fn handle_conn(
             writer.write_all(&bytes).await?;
         }
         "account_balance\0" => {
-            event!(Level::INFO, "received account_balance command");
+            info!("received account_balance command");
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
             if let Some(block) = best_chain.first() {
-                event!(Level::INFO, "using ledger {:?}", block.get_ledger());
+                debug!("using ledger {:?}", block.get_ledger());
                 let account = block.get_ledger().accounts.get(&public_key);
                 if let Some(account) = account {
-                    event!(Level::INFO, "writing account {:?} to client", account);
+                    info!("writing account {:?} to client", account);
                     let bytes = bcs::to_bytes(account)?;
                     writer.write_all(&bytes).await?;
                 }
             }
         }
         bad_request => {
-            event!(Level::ERROR, "malformed request: {}", bad_request);
+            error!("malformed request: {}", bad_request);
             return Err(anyhow::Error::msg("Malformed Request"));
         }
     }
