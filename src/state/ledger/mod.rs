@@ -105,8 +105,10 @@ impl Ledger {
                             }
                         }
                     }
-                    // TODO got this in another branch
-                    diff::account::AccountDiff::Delegation(_) => todo!(),
+                    diff::account::AccountDiff::Delegation(delegation_diff) => {
+                        assert_eq!(account_before.public_key, delegation_diff.delegator);
+                        Account::from_delegation(account_before, delegation_diff.delegate.clone())
+                    },
                 };
                 self.accounts.insert(diff.public_key(), account_after);
             } else {
