@@ -8,6 +8,10 @@ name = "mina-indexer"
 test = false
 bench = false
 
+[[bin]]
+name = "mainnet-test"
+test = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
