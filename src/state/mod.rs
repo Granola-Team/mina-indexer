@@ -1,7 +1,7 @@
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 
 use self::{
-    branch::{Branch, Leaf},
+    branch::Branch,
     ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
 };
 
@@ -12,8 +12,6 @@ pub mod ledger;
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
 pub struct IndexerState {
-    /// Longest chain of blocks from the `root_branch`
-    pub best_chain: Vec<Leaf<Ledger>>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch<Ledger>,
     /// Dynamic, dangling branches eventually merged into the `root_branch`
@@ -46,7 +44,6 @@ impl IndexerState {
     ) -> anyhow::Result<Self> {
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
-            best_chain: Vec::new(),
             root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
             dangling_branches: Vec::new(),
             block_store,
@@ -78,7 +75,6 @@ impl IndexerState {
         }
 
         // forward extension on root branch
-        // TODO put heights of root and the highest leaf in Branch
         if let Some(_max_length) = self
             .root_branch
             .leaves
@@ -104,8 +100,6 @@ impl IndexerState {
                     }
                 }
 
-                // should be the only place we need this call
-                self.best_chain = self.root_branch.longest_chain();
                 if !branches_to_remove.is_empty() {
                     // if the root branch is newly connected to dangling branches
                     for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
@@ -272,9 +266,9 @@ impl IndexerState {
     pub fn chain_commands(&self) -> Vec<Command> {
         if let Some(block_store) = self.block_store.as_ref() {
             return self
-                .best_chain
+                .root_branch
+                .longest_chain()
                 .iter()
-                .map(|leaf| leaf.block.state_hash.clone())
                 .flat_map(|state_hash| block_store.get_block(&state_hash.0))
                 .flatten()
                 .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
@@ -284,11 +278,17 @@ impl IndexerState {
     }
 
     pub fn best_ledger(&self) -> Option<&Ledger> {
-        if let Some(head) = self.best_chain.last() {
-            Some(head.get_ledger())
-        } else {
-            None
+        let mut res = None;
+        if let Some(head_state_hash) = self.root_branch.longest_chain().first() {
+            // find the corresponding leaf ledger
+            for leaf in self.root_branch.leaves.values() {
+                if &leaf.block.state_hash == head_state_hash {
+                    res = Some(leaf.get_ledger());
+                    break;
+                }
+            }
         }
+        res
     }
 }
 
