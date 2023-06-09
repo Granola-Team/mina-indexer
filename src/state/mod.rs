@@ -278,17 +278,15 @@ impl IndexerState {
     }
 
     pub fn best_ledger(&self) -> Option<&Ledger> {
-        let mut res = None;
         if let Some(head_state_hash) = self.root_branch.longest_chain().first() {
             // find the corresponding leaf ledger
             for leaf in self.root_branch.leaves.values() {
                 if &leaf.block.state_hash == head_state_hash {
-                    res = Some(leaf.get_ledger());
-                    break;
+                    return Some(leaf.get_ledger());
                 }
             }
         }
-        res
+        None
     }
 }
 

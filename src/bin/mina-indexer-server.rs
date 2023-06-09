@@ -11,7 +11,7 @@ use mina_indexer::{
     },
     state::ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
 };
-use tracing::{debug, error, event, info, instrument, Level};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -171,7 +171,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 tokio::spawn(async move {
                     debug!("handling connection");
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger).await {
-                        event!(Level::ERROR, "Error handling connection {}", e);
+                        error!("Error handling connection {e}");
                     }
                     debug!("removing readonly instance");
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
