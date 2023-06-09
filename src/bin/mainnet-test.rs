@@ -15,7 +15,7 @@ async fn main() {
     let log_dir = args[1]
         .parse::<PathBuf>()
         .expect("First arg should be block log dir path");
-    let num_blocks = args[2]
+    let max_block_count = args[2]
         .parse::<u32>()
         .expect("Second arg should be number of blocks");
 
@@ -35,11 +35,14 @@ async fn main() {
     )
     .unwrap();
 
+    let mut max_branches = 1;
+    let mut max_dangling_len = 0;
+    let mut max_dangling_height = 0;
+    let mut block_count = 1;
     let total = Instant::now();
     let mut adding = Duration::new(0, 0);
-    let mut block_count = 1;
 
-    for _ in 1..num_blocks {
+    for _ in 1..max_block_count {
         match bp.next().await {
             Err(err) => {
                 println!("{err:?}");
@@ -50,9 +53,20 @@ async fn main() {
             }
             Ok(Some(block)) => {
                 let add = Instant::now();
-                state.add_block(&block).unwrap();
+                let _ext = state.add_block(&block).unwrap();
                 adding += add.elapsed();
                 block_count += 1;
+                if state.dangling_branches.len() + 1 > max_branches {
+                    max_branches = state.dangling_branches.len() + 1;
+                }
+                for dangling in &state.dangling_branches {
+                    if dangling.len() > max_dangling_len {
+                        max_dangling_len = dangling.len();
+                    }
+                    if dangling.height() > max_dangling_height {
+                        max_dangling_height = dangling.height();
+                    }
+                }
             }
         }
     }
@@ -65,17 +79,31 @@ async fn main() {
     println!("~~~~~~~~~~~~~~~~~~");
     println!("Blocks:  {block_count}");
     println!("Total:   {total_time:?}");
-    println!(
-        "Per sec: {:?} blocks",
-        block_count as f64 / total_time.as_secs_f64()
-    );
 
+    let blocks_per_sec = block_count as f64 / total_add.as_secs_f64();
     println!("\n~~~ Add to state ~~~");
-    println!("Avg:     {:?}", total_add / block_count as u32);
+    println!("Avg:     {:?}", total_add / block_count);
     println!("Total:   {total_add:?}");
+    println!("Per sec: {blocks_per_sec:?} blocks");
+    println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
+
+    println!("\n~~~ Branches ~~~");
+    println!("Max num:             {max_branches}");
     println!(
-        "Per sec: {:?} blocks",
-        block_count as f64 / total_add.as_secs_f64()
+        "Root height:         {}",
+        state.root_branch.as_ref().unwrap().height()
+    );
+    println!(
+        "Root length:         {}",
+        state.root_branch.as_ref().unwrap().len()
+    );
+    println!("Max dangling len:    {max_dangling_len}");
+    println!("Max dangling height: {max_dangling_height}\n");
+
+    println!("Estimated time to ingest all (~260_000) mainnet blocks at this rate:");
+    println!(
+        "{} hrs\n",
+        (260_000. * total_add.as_secs_f64()) / (3600. * block_count as f64)
     );
 
     println!("\n~~~ DB stats ~~~");
