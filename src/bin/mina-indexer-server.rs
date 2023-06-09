@@ -10,7 +10,6 @@ use mina_indexer::{
         store::BlockStoreConn, BlockHash,
     },
     state::{
-        branch::Leaf,
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     }, MAINNET_TRANSITION_FRONTIER_K,
 };
@@ -119,8 +118,8 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("initializing IndexerState");
     let mut indexer_state =
         mina_indexer::state::IndexerState::new(
-            root_hash, genesis_ledger.ledger, 
-            Some(&store_dir), Some(MAINNET_TRANSITION_FRONTIER_K)
+            root_hash.clone(), genesis_ledger.ledger, 
+            Some(&database_dir), Some(MAINNET_TRANSITION_FRONTIER_K)
         )?;
 
     info!(
