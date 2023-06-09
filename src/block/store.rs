@@ -11,7 +11,7 @@ use super::precomputed::PrecomputedBlock;
 #[derive(Debug)]
 pub struct BlockStoreConn {
     db_path: PathBuf,
-    database: DBWithThreadMode<MultiThreaded>,
+    pub database: DBWithThreadMode<MultiThreaded>,
 }
 
 impl BlockStoreConn {
