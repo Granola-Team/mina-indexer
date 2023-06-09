@@ -1,12 +1,11 @@
-use std::path::PathBuf;
-
-use mina_indexer::block::{parser::BlockParser, BlockHash};
-use mina_indexer::state::IndexerState;
-
-use mina_indexer::state::ledger::genesis;
-use tokio::time::{Duration, Instant};
-
 use bytesize::ByteSize;
+use mina_indexer::{
+    block::{parser::BlockParser, BlockHash},
+    state::{ledger::genesis, IndexerState},
+    MAINNET_TRANSITION_FRONTIER_K,
+};
+use std::path::PathBuf;
+use tokio::time::{Duration, Instant};
 
 #[tokio::main]
 async fn main() {
@@ -30,8 +29,9 @@ async fn main() {
 
     let mut state = IndexerState::new(
         BlockHash(GENESIS_HASH.to_string()),
-        Some(genesis_root.ledger),
+        genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
+        Some(MAINNET_TRANSITION_FRONTIER_K),
     )
     .unwrap();
 
@@ -89,20 +89,14 @@ async fn main() {
 
     println!("\n~~~ Branches ~~~");
     println!("Max num:             {max_branches}");
-    println!(
-        "Root height:         {}",
-        state.root_branch.as_ref().unwrap().height()
-    );
-    println!(
-        "Root length:         {}",
-        state.root_branch.as_ref().unwrap().len()
-    );
+    println!("Root height:         {}", &state.root_branch.height());
+    println!("Root length:         {}", &state.root_branch.len());
     println!("Max dangling len:    {max_dangling_len}");
     println!("Max dangling height: {max_dangling_height}\n");
 
     println!("Estimated time to ingest all (~260_000) mainnet blocks at this rate:");
     println!(
-        "{} hrs\n",
+        "{} hrs",
         (260_000. * total_add.as_secs_f64()) / (3600. * block_count as f64)
     );
 
@@ -140,8 +134,11 @@ async fn main() {
         .unwrap()
         .unwrap();
 
-    println!("Estimate live data size:    {est_data_size:?}");
     println!("Estimate number of keys:    {est_num_keys:?}");
+    println!(
+        "Estimate live data size:    {:?}",
+        ByteSize::b(est_data_size)
+    );
     println!(
         "Current size all memtables: {:?}",
         ByteSize::b(curr_size_mem)
