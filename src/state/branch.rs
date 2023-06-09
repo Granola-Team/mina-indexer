@@ -363,7 +363,7 @@ where
         new_root_id
     }
 
-    pub fn longest_chain(&self) -> Vec<Leaf<T>> {
+    pub fn longest_chain(&self) -> Vec<BlockHash> {
         let mut longest_chain = Vec::new();
         let mut highest_leaf = None;
         for (node_id, leaf) in self.leaves.iter() {
@@ -379,11 +379,19 @@ where
 
         if let Some((node_id, _height)) = highest_leaf {
             // push the leaf itself
-            longest_chain.push(self.branches.get(node_id).unwrap().data().clone());
+            longest_chain.push(
+                self.branches
+                    .get(node_id)
+                    .unwrap()
+                    .data()
+                    .block
+                    .state_hash
+                    .clone(),
+            );
 
             // push the leaf's ancestors
             for node in self.branches.ancestors(node_id).expect("node_id is valid") {
-                longest_chain.push(node.data().clone());
+                longest_chain.push(node.data().block.state_hash.clone());
             }
         }
 

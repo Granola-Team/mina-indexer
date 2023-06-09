@@ -14,7 +14,7 @@ use mina_indexer::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
     }, MAINNET_TRANSITION_FRONTIER_K,
 };
-use tracing::{debug, error, event, info, instrument, Level};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -29,10 +29,10 @@ struct ServerArgs {
     #[arg(short, long)]
     watch_dir: PathBuf,
     #[arg(short, long)]
-    store_dir: PathBuf,
+    database_dir: PathBuf,
     #[arg(short, long)]
     log_dir: PathBuf,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     log_stdout: bool,
 }
 
@@ -40,7 +40,7 @@ pub struct IndexerConfiguration {
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
-    store_dir: PathBuf,
+    database_dir: PathBuf,
     log_file: PathBuf,
     genesis_ledger: GenesisRoot,
     log_stdout: bool,
@@ -53,7 +53,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
     let root_hash = BlockHash(args.root_hash);
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
-    let store_dir = args.store_dir;
+    let database_dir = args.database_dir;
     let log_dir = args.log_dir;
     let log_stdout = args.log_stdout;
     info!("parsing GenesisLedger file");
@@ -84,7 +84,7 @@ pub async fn parse_command_line_arguments() -> anyhow::Result<IndexerConfigurati
                 root_hash,
                 startup_dir,
                 watch_dir,
-                store_dir,
+                database_dir,
                 log_file,
                 log_stdout,
                 genesis_ledger,
@@ -101,20 +101,20 @@ async fn main() -> Result<(), anyhow::Error> {
         root_hash,
         startup_dir,
         watch_dir,
-        store_dir,
+        database_dir,
         log_file,
         log_stdout,
         genesis_ledger,
     } = parse_command_line_arguments().await?;
 
-    if log_stdout {
-        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-        tracing_subscriber::fmt().with_writer(non_blocking).init();
-    } else {
-        let log_writer = std::fs::File::create(log_file)?;
-        let (non_blocking, _guard) = tracing_appender::non_blocking(log_writer);
-        tracing_subscriber::fmt().with_writer(non_blocking).init();
-    }
+    let (non_blocking, _guard) = match log_stdout {
+        true => tracing_appender::non_blocking(std::io::stdout()),
+        false => {
+            let log_writer = std::fs::File::create(log_file)?;
+            tracing_appender::non_blocking(log_writer)
+        }
+    };
+    tracing_subscriber::fmt().with_writer(non_blocking).init();
 
     info!("initializing IndexerState");
     let mut indexer_state =
@@ -158,18 +158,23 @@ async fn main() -> Result<(), anyhow::Error> {
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
                 info!("receiving connection");
-                let best_chain = indexer_state.best_chain.clone();
+                let best_chain = indexer_state.root_branch.longest_chain();
 
-                let primary_path = store_dir.clone();
+                let primary_path = database_dir.clone();
                 let mut secondary_path = primary_path.clone();
                 secondary_path.push(Uuid::new_v4().to_string());
 
                 debug!("spawning secondary readonly RocksDB instance");
                 let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
+
+                let mut leaves = indexer_state.root_branch.leaves.values().cloned();
+                let leaf = leaves.find(|leaf| &leaf.block.state_hash == best_chain.first().unwrap_or(&root_hash)).unwrap();
+                let ledger = leaf.get_ledger().clone();
+
                 tokio::spawn(async move {
                     debug!("handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_chain).await {
-                        event!(Level::ERROR, "Error handling connection {}", e);
+                    if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger).await {
+                        error!("Error handling connection {e}");
                     }
                     debug!("removing readonly instance");
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
@@ -183,7 +188,8 @@ async fn main() -> Result<(), anyhow::Error> {
 async fn handle_conn(
     conn: LocalSocketStream,
     db: BlockStoreConn,
-    best_chain: Vec<Leaf<Ledger>>,
+    best_chain: Vec<BlockHash>,
+    ledger: Ledger,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -201,7 +207,6 @@ async fn handle_conn(
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
                 .cloned()
-                .map(|leaf| leaf.block.state_hash)
                 .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
@@ -213,14 +218,12 @@ async fn handle_conn(
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
-            if let Some(block) = best_chain.first() {
-                debug!("using ledger {:?}", block.get_ledger());
-                let account = block.get_ledger().accounts.get(&public_key);
-                if let Some(account) = account {
-                    info!("writing account {:?} to client", account);
-                    let bytes = bcs::to_bytes(account)?;
-                    writer.write_all(&bytes).await?;
-                }
+            debug!("using ledger {ledger:?}");
+            let account = ledger.accounts.get(&public_key);
+            if let Some(account) = account {
+                info!("writing account {:?} to client", account);
+                let bytes = bcs::to_bytes(account)?;
+                writer.write_all(&bytes).await?;
             }
         }
         bad_request => {
