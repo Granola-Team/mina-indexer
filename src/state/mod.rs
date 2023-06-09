@@ -83,17 +83,12 @@ impl IndexerState {
         if let Some(block_store) = self.block_store.as_ref() {
             match block_store.get_block(state_hash) {
                 Err(err) => return Err(err),
-                Ok(None) => (),
-                Ok(_) => {
-                    error!( "Block with state hash '{state_hash:?}' is already present in the block store");
-                    // return Err(anyhow::Error::msg(format!(
-                    // "Block with state hash '{state_hash:?}' is already present in the block store"
-                    // )))
-                }
+                // add precomputed block to the db
+                Ok(None) => block_store.add_block(precomputed_block)?,
+                // log duplicate block to error
+                Ok(_) => error!( "Block with state hash '{state_hash:?}' is already present in the block store"),
+                    
             }
-
-            // add precomputed block to the db
-            block_store.add_block(precomputed_block)?;
         }
 
         self.blocks_processed += 1;
