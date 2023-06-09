@@ -19,6 +19,8 @@ pub struct IndexerState {
     /// Block database
     pub block_store: Option<BlockStoreConn>,
     pub transition_frontier_length: Option<u32>,
+    pub prune_interval: Option<u32>,
+    pub blocks_processed: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -42,14 +44,17 @@ impl IndexerState {
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&std::path::Path>,
-        transition_frontier_length: Option<u32>
+        transition_frontier_length: Option<u32>,
+        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
             root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
             dangling_branches: Vec::new(),
             block_store,
-            transition_frontier_length
+            transition_frontier_length,
+            prune_interval,
+            blocks_processed: 0
         })
     }
 
@@ -62,7 +67,13 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         // prune the root branch
         if let Some(k) = self.transition_frontier_length {
-            self.root_branch.prune_transition_frontier(k);
+            if let Some(interval) = self.prune_interval {
+                if self.blocks_processed % interval == 0 {
+                    self.root_branch.prune_transition_frontier(k);
+                }
+            } else {
+                self.root_branch.prune_transition_frontier(k);
+            }
         }
 
         // check that the block doesn't already exist in the db
@@ -81,6 +92,8 @@ impl IndexerState {
             // add precomputed block to the db
             block_store.add_block(precomputed_block)?;
         }
+
+        self.blocks_processed += 1;
 
         // forward extension on root branch
         if let Some(_max_length) = self

@@ -119,7 +119,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut indexer_state =
         mina_indexer::state::IndexerState::new(
             root_hash.clone(), genesis_ledger.ledger, 
-            Some(&database_dir), Some(MAINNET_TRANSITION_FRONTIER_K)
+            Some(&database_dir), Some(MAINNET_TRANSITION_FRONTIER_K), Some(100)
         )?;
 
     info!(
