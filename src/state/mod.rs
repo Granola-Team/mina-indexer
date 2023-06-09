@@ -145,10 +145,10 @@ impl IndexerState {
                     .fold(None, |acc, x| acc.max(Some(x))),
                 dangling_branch.root.blockchain_length,
             ) {
-                (Some(max_length), Some(min_length)) => {
+                (Some(max_length), min_length) => {
                     // check incoming block is within the height bounds
                     if let Some(length) = precomputed_block.blockchain_length {
-                        if max_length + 1 >= length && length + 1 >= min_length {
+                        if max_length + 1 >= length && length + 1 >= min_length.unwrap_or(0) {
                             // simple reverse
                             if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
                                 dangling_branch.new_root(precomputed_block);
