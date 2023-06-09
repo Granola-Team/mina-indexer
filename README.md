@@ -41,13 +41,21 @@ nix build '.?submodules=1'
 ```
 
 Start the Mina Indexer with `mina-indexer-server`
+* `--genesis-ledger` the genesis ledger `.json` file to use to initialize the indexer
+* `--root-hash` the state hash of the genesis block, can be found in the genesis ledger
 * `--startup-dir` the directory to initialize the indexer's state from
 * `--watch-dir` the directory to watch to keep the indexer up to date
 * `--database-dir` the directory to store the indexer's internal RocksDB database in
 * `--log-dir` the directory to output the indexer's logs to
+* `--log-stdout` write logs to standard out instead of to a file (overrides `--log-dir`)
 
 ```sh
-mina-indexer-server --startup-dir PATH --watch-dir PATH --database_dir PATH --log-dir PATH
+mina-indexer-server --root-hash STATE_HASH \
+    --genesis-ledger PATH \
+    --startup-dir PATH \
+    --watch-dir PATH \
+    --database-dir PATH \
+    --log-dir PATH 
 ```
 
 Query data from the Mina Indexer with `mina-indexer-client`
