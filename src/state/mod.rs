@@ -1,3 +1,4 @@
+use log::info;
 use tracing::error;
 
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
@@ -71,9 +72,11 @@ impl IndexerState {
         if let Some(k) = self.transition_frontier_length {
             if let Some(interval) = self.prune_interval {
                 if self.blocks_processed % interval == 0 {
+                    info!("pruning transition frontier at k={}", k);
                     self.root_branch.prune_transition_frontier(k);
                 }
             } else {
+                info!("pruning transition frontier at k={}", k);
                 self.root_branch.prune_transition_frontier(k);
             }
         }
