@@ -9,12 +9,9 @@ use mina_indexer::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
         store::BlockStoreConn, BlockHash,
     },
-    state::{
-        branch::Leaf,
-        ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
-    },
+    state::ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
 };
-use tracing::{debug, error, event, info, instrument, Level};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -118,7 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("initializing IndexerState");
     let mut indexer_state = mina_indexer::state::IndexerState::new(
-        root_hash,
+        root_hash.clone(),
         genesis_ledger.ledger,
         Some(&database_dir),
     )?;
@@ -158,7 +155,7 @@ async fn main() -> Result<(), anyhow::Error> {
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
                 info!("receiving connection");
-                let best_chain = indexer_state.best_chain.clone();
+                let best_chain = indexer_state.root_branch.longest_chain();
 
                 let primary_path = database_dir.clone();
                 let mut secondary_path = primary_path.clone();
@@ -166,10 +163,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
                 debug!("spawning secondary readonly RocksDB instance");
                 let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
+
+                let mut leaves = indexer_state.root_branch.leaves.values().cloned();
+                let leaf = leaves.find(|leaf| &leaf.block.state_hash == best_chain.first().unwrap_or(&root_hash)).unwrap();
+                let ledger = leaf.get_ledger().clone();
+
                 tokio::spawn(async move {
                     debug!("handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_chain).await {
-                        event!(Level::ERROR, "Error handling connection {}", e);
+                    if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger).await {
+                        error!("Error handling connection {e}");
                     }
                     debug!("removing readonly instance");
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
@@ -183,7 +185,8 @@ async fn main() -> Result<(), anyhow::Error> {
 async fn handle_conn(
     conn: LocalSocketStream,
     db: BlockStoreConn,
-    best_chain: Vec<Leaf<Ledger>>,
+    best_chain: Vec<BlockHash>,
+    ledger: Ledger,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -201,7 +204,6 @@ async fn handle_conn(
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
                 .cloned()
-                .map(|leaf| leaf.block.state_hash)
                 .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
@@ -213,14 +215,12 @@ async fn handle_conn(
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
-            if let Some(block) = best_chain.first() {
-                debug!("using ledger {:?}", block.get_ledger());
-                let account = block.get_ledger().accounts.get(&public_key);
-                if let Some(account) = account {
-                    info!("writing account {:?} to client", account);
-                    let bytes = bcs::to_bytes(account)?;
-                    writer.write_all(&bytes).await?;
-                }
+            debug!("using ledger {ledger:?}");
+            let account = ledger.accounts.get(&public_key);
+            if let Some(account) = account {
+                info!("writing account {:?} to client", account);
+                let bytes = bcs::to_bytes(account)?;
+                writer.write_all(&bytes).await?;
             }
         }
         bad_request => {
