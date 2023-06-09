@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use mina_indexer::{state::{branch::Branch, ledger::Ledger}, block::{parser::BlockParser, Block}};
+use mina_indexer::{
+    block::{parser::BlockParser, Block},
+    state::{branch::Branch, ledger::Ledger},
+};
 
 mod simple_improper;
 mod simple_proper;

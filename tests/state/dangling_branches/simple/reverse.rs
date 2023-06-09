@@ -62,7 +62,9 @@ async fn extension() {
             name: "testing".to_string(),
             accounts: Vec::new(),
         },
-        None, None, None
+        None,
+        None,
+        None,
     )
     .unwrap();
 

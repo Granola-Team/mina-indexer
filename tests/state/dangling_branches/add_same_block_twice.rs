@@ -47,7 +47,9 @@ async fn test() {
             name: "testing".to_string(),
             accounts: Vec::new(),
         },
-        Some(&block_store_dir), None, None
+        Some(&block_store_dir),
+        None,
+        None,
     )
     .unwrap();
 

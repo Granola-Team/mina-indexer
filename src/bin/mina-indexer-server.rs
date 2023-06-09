@@ -9,9 +9,8 @@ use mina_indexer::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
         store::BlockStoreConn, BlockHash,
     },
-    state::{
-        ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
-    }, MAINNET_TRANSITION_FRONTIER_K,
+    state::ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
+    MAINNET_TRANSITION_FRONTIER_K,
 };
 use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
@@ -116,11 +115,13 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt().with_writer(non_blocking).init();
 
     info!("initializing IndexerState");
-    let mut indexer_state =
-        mina_indexer::state::IndexerState::new(
-            root_hash.clone(), genesis_ledger.ledger, 
-            Some(&database_dir), Some(MAINNET_TRANSITION_FRONTIER_K), Some(100)
-        )?;
+    let mut indexer_state = mina_indexer::state::IndexerState::new(
+        root_hash.clone(),
+        genesis_ledger.ledger,
+        Some(&database_dir),
+        Some(MAINNET_TRANSITION_FRONTIER_K),
+        Some(100),
+    )?;
 
     info!(
         "fast forwarding IndexerState using precomputed blocks in {}",

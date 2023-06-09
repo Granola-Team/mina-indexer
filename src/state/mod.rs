@@ -57,7 +57,7 @@ impl IndexerState {
             block_store,
             transition_frontier_length,
             prune_interval,
-            blocks_processed: 0
+            blocks_processed: 0,
         })
     }
 
@@ -89,11 +89,10 @@ impl IndexerState {
                 // add precomputed block to the db
                 Ok(None) => block_store.add_block(precomputed_block)?,
                 // log duplicate block to error
-                Ok(_) =>{
+                Ok(_) => {
                     error!( "Block with state hash '{state_hash:?}' is already present in the block store");
                     return Ok(ExtensionType::BlockNotAdded);
-                },
-                    
+                }
             }
         }
 
