@@ -145,14 +145,8 @@ async fn extension() {
         let longest_chain = state.root_branch.longest_chain();
         let display_chain = longest_chain
             .iter()
-            .map(|x| {
-                (
-                    x.block.height,
-                    x.block.blockchain_length.unwrap_or(0),
-                    &x.block.state_hash.0[0..12],
-                )
-            })
-            .collect::<Vec<(u32, u32, &str)>>();
+            .map(|x| &x.0[0..12])
+            .collect::<Vec<&str>>();
 
         println!("=== Longest dangling chain ===");
         println!("{display_chain:?}");
