@@ -1,3 +1,5 @@
+use tracing::error;
+
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 
 use self::{
@@ -83,9 +85,10 @@ impl IndexerState {
                 Err(err) => return Err(err),
                 Ok(None) => (),
                 Ok(_) => {
-                    return Err(anyhow::Error::msg(format!(
-                    "Block with state hash '{state_hash:?}' is already present in the block store"
-                )))
+                    error!( "Block with state hash '{state_hash:?}' is already present in the block store");
+                    // return Err(anyhow::Error::msg(format!(
+                    // "Block with state hash '{state_hash:?}' is already present in the block store"
+                    // )))
                 }
             }
 
