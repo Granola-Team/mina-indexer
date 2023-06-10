@@ -1,3 +1,6 @@
+use log::info;
+use tracing::error;
+
 use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 
 use self::{
@@ -18,6 +21,9 @@ pub struct IndexerState {
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
     pub block_store: Option<BlockStoreConn>,
+    pub transition_frontier_length: Option<u32>,
+    pub prune_interval: Option<u32>,
+    pub blocks_processed: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -41,12 +47,17 @@ impl IndexerState {
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&std::path::Path>,
+        transition_frontier_length: Option<u32>,
+        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
             root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
             dangling_branches: Vec::new(),
             block_store,
+            transition_frontier_length,
+            prune_interval,
+            blocks_processed: 0,
         })
     }
 
@@ -57,22 +68,35 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
+        // prune the root branch
+        if let Some(k) = self.transition_frontier_length {
+            if let Some(interval) = self.prune_interval {
+                if self.blocks_processed % interval == 0 {
+                    info!("pruning transition frontier at k={}", k);
+                    self.root_branch.prune_transition_frontier(k);
+                }
+            } else {
+                info!("pruning transition frontier at k={}", k);
+                self.root_branch.prune_transition_frontier(k);
+            }
+        }
+
         // check that the block doesn't already exist in the db
         let state_hash = &precomputed_block.state_hash;
         if let Some(block_store) = self.block_store.as_ref() {
             match block_store.get_block(state_hash) {
                 Err(err) => return Err(err),
-                Ok(None) => (),
+                // add precomputed block to the db
+                Ok(None) => block_store.add_block(precomputed_block)?,
+                // log duplicate block to error
                 Ok(_) => {
-                    return Err(anyhow::Error::msg(format!(
-                    "Block with state hash '{state_hash:?}' is already present in the block store"
-                )))
+                    error!( "Block with state hash '{state_hash:?}' is already present in the block store");
+                    return Ok(ExtensionType::BlockNotAdded);
                 }
             }
-
-            // add precomputed block to the db
-            block_store.add_block(precomputed_block)?;
         }
+
+        self.blocks_processed += 1;
 
         // forward extension on root branch
         if let Some(_max_length) = self

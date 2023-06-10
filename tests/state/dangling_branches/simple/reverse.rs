@@ -63,6 +63,8 @@ async fn extension() {
             accounts: Vec::new(),
         },
         None,
+        None,
+        None,
     )
     .unwrap();
 

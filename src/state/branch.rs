@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use id_tree::{InsertBehavior::*, Node, NodeId, Tree};
+use id_tree::{
+    InsertBehavior::{self, *},
+    Node, NodeId, Tree,
+};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 
@@ -154,6 +157,88 @@ where
             return Some(new_node_id);
         }
         None
+    }
+
+    pub fn prune_transition_frontier(&mut self, k: u32) {
+        let mut prune_point_id = None;
+        for (node_id, _leaf) in self.leaves.iter() {
+            let mut witness_length = 0;
+            let mut transition_frontier_id = None;
+            for ancestor_id in self
+                .branches
+                .ancestor_ids(&node_id)
+                .expect("node_id from leaves, is valid")
+            {
+                witness_length += 1;
+                if witness_length >= k {
+                    transition_frontier_id = Some(ancestor_id.clone());
+                    break;
+                }
+            }
+            if let Some(node_id) = transition_frontier_id {
+                prune_point_id = Some(node_id);
+                break;
+            }
+        }
+
+        if let Some(node_id) = prune_point_id {
+            let mut new_tree = Tree::new();
+            let mut new_leaves = HashMap::new();
+            let mut merge_id_map = HashMap::new();
+
+            let new_root_data = self
+                .branches
+                .get(&node_id)
+                .expect("node_id valid, comes from iterator")
+                .data()
+                .clone();
+            let new_root_id = new_tree
+                .insert(Node::new(new_root_data.clone()), InsertBehavior::AsRoot)
+                .expect("insert as root always succeeds");
+            merge_id_map.insert(node_id.clone(), new_root_id);
+            for old_node_id in self
+                .branches
+                .traverse_level_order_ids(&node_id)
+                .expect("node_id guaranteed by iterator")
+            {
+                let under_node_id = merge_id_map
+                    .get(&old_node_id)
+                    .expect("guaranteed by call structure");
+                let children_ids = self
+                    .branches
+                    .children_ids(&old_node_id)
+                    .expect("old_node_id valid");
+                let mut merge_id_map_inserts = Vec::new();
+                for child_id in children_ids {
+                    let child_node_data = self
+                        .branches
+                        .get(child_id)
+                        .expect("child_id valid")
+                        .data()
+                        .clone();
+                    let new_child_id = new_tree
+                        .insert(Node::new(child_node_data.clone()), UnderNode(under_node_id))
+                        .expect("under_node_id guaranteed by call structure");
+                    if self
+                        .branches
+                        .children_ids(child_id)
+                        .expect("child_id is valid")
+                        .collect::<Vec<&NodeId>>()
+                        .is_empty()
+                    {
+                        new_leaves.insert(new_child_id.clone(), child_node_data.clone());
+                    }
+                    merge_id_map_inserts.push((child_id, new_child_id));
+                }
+                for (child_id, new_child_id) in merge_id_map_inserts {
+                    merge_id_map.insert(child_id.clone(), new_child_id);
+                }
+            }
+
+            self.branches = new_tree;
+            self.leaves = new_leaves;
+            self.root = new_root_data.block;
+        }
     }
 
     pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch<LedgerDiff>) {

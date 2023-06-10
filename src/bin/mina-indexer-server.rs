@@ -10,6 +10,7 @@ use mina_indexer::{
         store::BlockStoreConn, BlockHash,
     },
     state::ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
+    MAINNET_TRANSITION_FRONTIER_K,
 };
 use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
@@ -118,6 +119,8 @@ async fn main() -> Result<(), anyhow::Error> {
         root_hash.clone(),
         genesis_ledger.ledger,
         Some(&database_dir),
+        Some(MAINNET_TRANSITION_FRONTIER_K),
+        Some(100),
     )?;
 
     info!(

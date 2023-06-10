@@ -8,30 +8,6 @@ use thiserror::Error;
 
 use super::precomputed::PrecomputedBlock;
 
-#[derive(Debug, Clone)]
-pub struct BlockStore(pub PathBuf);
-
-impl r2d2::ManageConnection for BlockStore {
-    type Connection = BlockStoreConn;
-
-    type Error = BlockStoreError;
-
-    fn connect(&self) -> Result<Self::Connection, Self::Error> {
-        let mut secondary = self.0.clone();
-        secondary.push("secondary");
-        BlockStoreConn::new_read_only(&self.0, &secondary)
-    }
-
-    fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
-        conn.test_conn()?;
-        Ok(())
-    }
-
-    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
-        false
-    }
-}
-
 #[derive(Debug)]
 pub struct BlockStoreConn {
     db_path: PathBuf,

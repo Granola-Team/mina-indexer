@@ -48,6 +48,8 @@ async fn test() {
             accounts: Vec::new(),
         },
         Some(&block_store_dir),
+        None,
+        None,
     )
     .unwrap();
 
