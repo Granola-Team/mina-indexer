@@ -546,9 +546,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
-        self.branches.write_formatted(&mut tree).unwrap();
-        writeln!(f, "Branch {{").unwrap();
-        write!(f, "{tree}}}")
+        self.branches.write_formatted(&mut tree)?;
+        writeln!(f, "{tree}")
     }
 }
 

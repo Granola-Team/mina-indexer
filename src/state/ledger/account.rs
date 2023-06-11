@@ -74,8 +74,13 @@ impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Account {{ {:?}, {}, {}, {:?} }}",
-            &self.public_key.to_address()[..15],
+            r#"\
+{{ pk: {},
+  balance: {},
+  nonce: {},
+  delegate: {:?}
+}}"#,
+            self.public_key.to_address(),
             self.balance.0,
             self.nonce.0,
             self.delegate

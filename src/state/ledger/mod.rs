@@ -149,10 +149,10 @@ impl Eq for Ledger {}
 
 impl std::fmt::Debug for Ledger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "=== Ledger ===")?;
         for account in self.accounts.values() {
-            writeln!(f, "{account:?}")?;
+            write!(f, "{account:?}")?;
         }
+        writeln!(f)?;
         Ok(())
     }
 }
