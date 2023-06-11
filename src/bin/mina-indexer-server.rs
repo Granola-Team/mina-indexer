@@ -22,16 +22,22 @@ struct ServerArgs {
     genesis_ledger: PathBuf,
     #[arg(short, long)]
     root_hash: String,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_fn = default_dir)]
     startup_dir: PathBuf,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_fn = default_dir)]
     watch_dir: PathBuf,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_fn = default_dir)]
     database_dir: PathBuf,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_fn = default_dir)]
     log_dir: PathBuf,
     #[arg(long, default_value_t = false)]
     log_stdout: bool,
+}
+
+fn default_dir(default_name: &str) -> PathBuf {
+    UserDirs::new()
+        .map(|dirs| dirs.home_dir().join(default_name))
+        .unwrap_or_else(|| Path::new(default_name).to_owned())
 }
 
 pub struct IndexerConfiguration {
