@@ -1,15 +1,16 @@
 use log::info;
 use tracing::error;
-
-use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
-
 use self::{
     branch::Branch,
     ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
 };
+use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
+use chrono::{DateTime, Utc};
+use std::time::Instant;
 
 pub mod branch;
 pub mod ledger;
+pub mod summary;
 
 /// Rooted forest of precomputed block summaries
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
@@ -24,6 +25,12 @@ pub struct IndexerState {
     pub transition_frontier_length: Option<u32>,
     pub prune_interval: Option<u32>,
     pub blocks_processed: u32,
+    /// Number of blocks added to the state
+    pub block_count: usize,
+    /// Time the indexer started running
+    pub time: Instant,
+    /// Datetime the indexer started running
+    pub date_time: DateTime<Utc>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -58,6 +65,9 @@ impl IndexerState {
             transition_frontier_length,
             prune_interval,
             blocks_processed: 0,
+            block_count: 0,
+            time: Instant::now(),
+            date_time: Utc::now(),
         })
     }
 
@@ -129,9 +139,11 @@ impl IndexerState {
                     for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                         self.dangling_branches.remove(index_to_remove - num_removed);
                     }
+                    self.block_count += 1;
                     return Ok(ExtensionType::RootComplex);
                 } else {
                     // if there aren't any branches that are connected
+                    self.block_count += 1;
                     return Ok(ExtensionType::RootSimple);
                 }
             }
@@ -252,6 +264,7 @@ impl IndexerState {
                 }
             }
 
+            self.block_count += 1;
             if !branches_to_update.is_empty() {
                 // remove one
                 let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
@@ -284,6 +297,7 @@ impl IndexerState {
             )
             .expect("cannot fail"),
         );
+        self.block_count += 1;
         Ok(ExtensionType::DanglingNew)
     }
 
@@ -316,19 +330,13 @@ impl IndexerState {
 
 impl std::fmt::Debug for IndexerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "=== State ===")?;
+        writeln!(f, "=== Root branch ===")?;
+        writeln!(f, "{:?}", self.root_branch)?;
 
-        writeln!(f, "Root branch:")?;
-        let mut tree = String::new();
-        self.root_branch.branches.write_formatted(&mut tree)?;
-        writeln!(f, "{tree}")?;
-
-        writeln!(f, "Dangling branches:")?;
+        writeln!(f, "=== Dangling branches ===")?;
         for (n, branch) in self.dangling_branches.iter().enumerate() {
             writeln!(f, "Dangling branch {n}:")?;
-            let mut tree = String::new();
-            branch.branches.write_formatted(&mut tree)?;
-            write!(f, "{tree}")?;
+            writeln!(f, "{branch:?}")?;
         }
         Ok(())
     }
