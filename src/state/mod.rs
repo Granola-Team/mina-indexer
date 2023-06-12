@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
+use id_tree::NodeId;
 use log::info;
 use std::time::Instant;
 use tracing::error;
@@ -28,9 +29,8 @@ pub struct IndexerState {
     pub block_store: Option<BlockStoreConn>,
     pub transition_frontier_length: Option<u32>,
     pub prune_interval: Option<u32>,
-    pub blocks_processed: u32,
     /// Number of blocks added to the state
-    pub block_count: usize,
+    pub blocks_processed: u32,
     /// Time the indexer started running
     pub time: Instant,
     /// Datetime the indexer started running
@@ -71,7 +71,28 @@ impl IndexerState {
             transition_frontier_length,
             prune_interval,
             blocks_processed: 0,
-            block_count: 0,
+            time: Instant::now(),
+            date_time: Utc::now(),
+        })
+    }
+
+    pub fn new_testing(
+        root_block: &PrecomputedBlock,
+        root_ledger: Option<Ledger>,
+        rocksdb_path: Option<&std::path::Path>,
+        transition_frontier_length: Option<u32>,
+        prune_interval: Option<u32>,
+    ) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_testing(root_block, root_ledger);
+        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
+        Ok(Self {
+            best_tip: root_branch.root.clone(),
+            root_branch,
+            dangling_branches: Vec::new(),
+            block_store,
+            transition_frontier_length,
+            prune_interval,
+            blocks_processed: 0,
             time: Instant::now(),
             date_time: Utc::now(),
         })
@@ -120,15 +141,7 @@ impl IndexerState {
             >= precomputed_block.blockchain_length.unwrap_or(0)
         {
             if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
-                // update the best tip if necessary
-                if let Some(leaf) = self.root_branch.leaves.get(&new_node_id) {
-                    if leaf.block.height > self.best_tip.height
-                        || leaf.block.height == self.best_tip.height
-                            && leaf.block.state_hash.0 > self.best_tip.state_hash.0
-                    {
-                        self.best_tip = leaf.block.clone();
-                    }
-                }
+                self.update_best_tip(&new_node_id);
                 let mut branches_to_remove = Vec::new();
                 // check if new block connects to a dangling branch
                 for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
@@ -140,7 +153,9 @@ impl IndexerState {
 
                     // if the block is already in the dangling branch, do nothing
                     if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Ok(ExtensionType::BlockNotAdded);
+                        return Err(anyhow::Error::msg(
+                            "Same block added twice to the indexer state",
+                        ));
                     }
                 }
 
@@ -149,11 +164,11 @@ impl IndexerState {
                     for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                         self.dangling_branches.remove(index_to_remove - num_removed);
                     }
-                    self.block_count += 1;
+
+                    self.update_best_tip(&new_node_id);
                     return Ok(ExtensionType::RootComplex);
                 } else {
                     // if there aren't any branches that are connected
-                    self.block_count += 1;
                     return Ok(ExtensionType::RootSimple);
                 }
             }
@@ -198,7 +213,9 @@ impl IndexerState {
 
                             // if the block is already in a dangling branch, do nothing
                             if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Ok(ExtensionType::BlockNotAdded);
+                                return Err(anyhow::Error::msg(
+                                    "Same block added twice to the indexer state",
+                                ));
                             }
                         }
                     } else {
@@ -221,7 +238,9 @@ impl IndexerState {
 
                         // if the block is already in a dangling branch, do nothing
                         if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                            return Ok(ExtensionType::BlockNotAdded);
+                            return Err(anyhow::Error::msg(
+                                "Same block added twice to the indexer state",
+                            ));
                         }
 
                         // simple forward
@@ -251,7 +270,9 @@ impl IndexerState {
 
                     // if the block is already in a dangling branch, do nothing
                     if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Ok(ExtensionType::BlockNotAdded);
+                        return Err(anyhow::Error::msg(
+                            "Same block added twice to the indexer state",
+                        ));
                     }
 
                     // simple forward
@@ -273,7 +294,6 @@ impl IndexerState {
                 }
             }
 
-            self.block_count += 1;
             if !branches_to_update.is_empty() {
                 // remove one
                 let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
@@ -285,9 +305,11 @@ impl IndexerState {
                     };
                     let branch_to_update = self.dangling_branches.get_mut(index).unwrap();
                     extended_branch.merge_on(&new_node_id, branch_to_update);
-                    // remove one for each index we see, i.e. n
+
+                    // remove one for each index we see
                     self.dangling_branches.remove(index);
                 }
+
                 self.dangling_branches.push(extended_branch);
                 return Ok(ExtensionType::DanglingComplex);
             } else {
@@ -306,7 +328,6 @@ impl IndexerState {
             )
             .expect("cannot fail"),
         );
-        self.block_count += 1;
         Ok(ExtensionType::DanglingNew)
     }
 
@@ -334,6 +355,17 @@ impl IndexerState {
             }
         }
         None
+    }
+
+    fn update_best_tip(&mut self, new_node_id: &NodeId) {
+        if let Some(leaf) = self.root_branch.leaves.get(new_node_id) {
+            if leaf.block.height > self.best_tip.height
+                || leaf.block.height == self.best_tip.height
+                    && leaf.block.state_hash.0 > self.best_tip.state_hash.0
+            {
+                self.best_tip = leaf.block.clone();
+            }
+        }
     }
 }
 

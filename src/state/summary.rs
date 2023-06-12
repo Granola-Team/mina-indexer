@@ -7,7 +7,7 @@ use std::{str::Lines, time::Duration};
 pub struct Summary {
     pub uptime: Duration,
     pub date_time: DateTime<Utc>,
-    pub block_count: usize,
+    pub blocks_processed: u32,
     pub best_tip_hash: String,
     pub root_hash: String,
     pub root_height: usize,
@@ -24,7 +24,7 @@ impl std::fmt::Display for Summary {
         writeln!(f, "===== Mina-indexer summary =====")?;
         writeln!(f, "  Uptime:       {:?}", self.uptime)?;
         writeln!(f, "  Started:      {}", self.date_time)?;
-        writeln!(f, "  Blocks added: {}", self.block_count)?;
+        writeln!(f, "  Blocks added: {}", self.blocks_processed)?;
 
         writeln!(f, "\n=== Root branch ===")?;
         writeln!(f, "  Height:        {}", self.root_height)?;

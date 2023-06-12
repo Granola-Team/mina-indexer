@@ -66,6 +66,28 @@ impl Branch<Ledger> {
         }
     }
 
+    pub fn new_testing(precomputed_block: &PrecomputedBlock, root_ledger: Option<Ledger>) -> Self {
+        let root_block = Block::from_precomputed(precomputed_block, 0);
+        let root_ledger = match root_ledger {
+            Some(genesis_ledger) => genesis_ledger.into(),
+            None => Ledger::default(),
+        };
+
+        let mut branches = Tree::new();
+        let root_leaf = Leaf::new(root_block.clone(), root_ledger);
+        let root_id = branches
+            .insert(Node::new(root_leaf.clone()), AsRoot)
+            .unwrap();
+
+        let mut leaves = HashMap::new();
+        leaves.insert(root_id, root_leaf);
+        Self {
+            root: root_block,
+            branches,
+            leaves,
+        }
+    }
+
     // only the genesis block should work here
     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
         let new_ledger = Ledger::from_diff(LedgerDiff::from_precomputed_block(root_precomputed));
@@ -547,7 +569,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
         self.branches.write_formatted(&mut tree)?;
-        writeln!(f, "{tree}")
+        write!(f, "{tree}")
     }
 }
 

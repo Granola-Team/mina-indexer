@@ -220,7 +220,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 let summary = Summary {
                     uptime: indexer_state.time.clone().elapsed(),
                     date_time: indexer_state.date_time,
-                    block_count: indexer_state.block_count,
+                    blocks_processed: indexer_state.blocks_processed,
                     best_tip_hash: indexer_state.best_tip.state_hash.0.clone(),
                     root_hash: indexer_state.root_branch.root.state_hash.0.clone(),
                     root_height: indexer_state.root_branch.height(),
