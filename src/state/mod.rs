@@ -1,5 +1,3 @@
-use log::info;
-use tracing::error;
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStoreConn, Block, BlockHash},
     state::{
@@ -8,7 +6,9 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
+use log::info;
 use std::time::Instant;
+use tracing::error;
 
 pub mod branch;
 pub mod ledger;

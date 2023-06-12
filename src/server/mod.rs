@@ -8,7 +8,7 @@ use crate::{
         summary::{DbStats, Summary},
         IndexerState,
     },
-    SOCKET_NAME, MAINNET_TRANSITION_FRONTIER_K,
+    MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 use clap::{Args, Parser};
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};

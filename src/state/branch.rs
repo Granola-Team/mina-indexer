@@ -1,9 +1,3 @@
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use id_tree::{
-    InsertBehavior::{self, *},
-    Node, NodeId, Tree,
-};
 use crate::{
     block::{precomputed::PrecomputedBlock, Block, BlockHash},
     state::ledger::{
@@ -11,6 +5,10 @@ use crate::{
         ExtendWithLedgerDiff,
         {diff::LedgerDiff, Ledger},
     },
+};
+use id_tree::{
+    InsertBehavior::{self, *},
+    Node, NodeId, Tree,
 };
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
@@ -168,7 +166,7 @@ where
             let mut transition_frontier_id = None;
             for ancestor_id in self
                 .branches
-                .ancestor_ids(&node_id)
+                .ancestor_ids(node_id)
                 .expect("node_id from leaves, is valid")
             {
                 witness_length += 1;
