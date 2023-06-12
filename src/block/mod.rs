@@ -51,6 +51,15 @@ impl Block {
             blockchain_length: precomputed_block.blockchain_length,
         }
     }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{{ len: {}, state: {} }}",
+            self.blockchain_length
+                .map_or("unknown".to_string(), |len| len.to_string()),
+            self.state_hash.0
+        )
+    }
 }
 
 impl std::fmt::Debug for Block {
