@@ -23,7 +23,7 @@ impl std::fmt::Display for Summary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "===== Mina-indexer summary =====")?;
         writeln!(f, "  Uptime:       {:?}", self.uptime)?;
-        writeln!(f, "  Start date:   {}", self.date_time)?;
+        writeln!(f, "  Started:      {}", self.date_time)?;
         writeln!(f, "  Blocks added: {}", self.block_count)?;
 
         writeln!(f, "\n=== Root branch ===")?;
@@ -42,7 +42,7 @@ impl std::fmt::Display for Summary {
 
         let db_stats = self.db_stats.as_ref().unwrap();
         writeln!(f, "\n=== DB stats ===")?;
-        writeln!(f, "  All memtables:     {}", ByteSize::b(db_stats.memory))?;
+        writeln!(f, "  All memtable size: {}", ByteSize::b(db_stats.memory))?;
         writeln!(f, "  Uptime:            {}", db_stats.uptime)?;
         writeln!(f, "  Cumulative writes: {}", db_stats.cum_writes)?;
         writeln!(f, "  Cumulative WAL:    {}", db_stats.cum_wal)?;
@@ -89,10 +89,8 @@ impl std::str::FromStr for DbStats {
 
 fn value(lines: &mut Lines) -> String {
     let mut res = String::new();
-    let mut split_line = lines.next().unwrap().split(':').collect::<Vec<&str>>();
-    split_line.remove(0);
-    for s in split_line {
-        res.push_str(s.trim_start());
-    }
+    let line = lines.next().unwrap();
+    let idx = line.find(':').unwrap();
+    res.push_str(line[(idx + 1)..].trim_start());
     res
 }
