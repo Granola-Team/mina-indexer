@@ -1,10 +1,12 @@
 use log::info;
 use tracing::error;
-use self::{
-    branch::Branch,
-    ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
+use crate::{
+    block::{precomputed::PrecomputedBlock, store::BlockStoreConn, Block, BlockHash},
+    state::{
+        branch::Branch,
+        ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
+    },
 };
-use crate::block::{precomputed::PrecomputedBlock, store::BlockStoreConn, BlockHash};
 use chrono::{DateTime, Utc};
 use std::time::Instant;
 
@@ -16,6 +18,8 @@ pub mod summary;
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
 pub struct IndexerState {
+    /// State hahs of the best tip of the root branch
+    pub best_tip: Block,
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch<Ledger>,
     /// Dynamic, dangling branches eventually merged into the `root_branch`
@@ -57,9 +61,11 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
         Ok(Self {
-            root_branch: Branch::new_genesis(root_hash, Some(genesis_ledger)),
+            best_tip: root_branch.root.clone(),
+            root_branch,
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
@@ -109,16 +115,20 @@ impl IndexerState {
         self.blocks_processed += 1;
 
         // forward extension on root branch
-        if let Some(_max_length) = self
-            .root_branch
-            .leaves
-            .iter()
-            .flat_map(|(_, x)| x.block.blockchain_length)
-            .fold(None, |acc, x| acc.max(Some(x)))
+        // check leaf heights first
+        if self.best_tip.blockchain_length.unwrap_or(0) + 1
+            >= precomputed_block.blockchain_length.unwrap_or(0)
         {
-            // check leaf heights first
-            // if max_length + 1 >= precomputed_block.blockchain_length.unwrap_or(0) {
             if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
+                // update the best tip if necessary
+                if let Some(leaf) = self.root_branch.leaves.get(&new_node_id) {
+                    if leaf.block.height > self.best_tip.height
+                        || leaf.block.height == self.best_tip.height
+                            && leaf.block.state_hash.0 > self.best_tip.state_hash.0
+                    {
+                        self.best_tip = leaf.block.clone();
+                    }
+                }
                 let mut branches_to_remove = Vec::new();
                 // check if new block connects to a dangling branch
                 for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
@@ -147,7 +157,6 @@ impl IndexerState {
                     return Ok(ExtensionType::RootSimple);
                 }
             }
-            // }
         }
 
         let mut extension = None;
