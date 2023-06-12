@@ -1,12 +1,12 @@
 use bytesize::ByteSize;
-use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
 use std::{str::Lines, time::Duration};
+use time::PrimitiveDateTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Summary {
     pub uptime: Duration,
-    pub date_time: DateTime<Utc>,
+    pub date_time: PrimitiveDateTime,
     pub blocks_processed: u32,
     pub best_tip_hash: String,
     pub root_hash: String,

@@ -14,6 +14,7 @@ use clap::{Args, Parser};
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, str::FromStr};
+use time::PrimitiveDateTime;
 use tokio::{fs, time::Instant};
 use tracing::{debug, error, info};
 use uuid::Uuid;
@@ -219,7 +220,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     .unwrap_or_default();
                 let summary = Summary {
                     uptime: indexer_state.time.clone().elapsed(),
-                    date_time: indexer_state.date_time,
+                    date_time: PrimitiveDateTime::new(indexer_state.date_time.date(), indexer_state.date_time.time()),
                     blocks_processed: indexer_state.blocks_processed,
                     best_tip_hash: indexer_state.best_tip.state_hash.0.clone(),
                     root_hash: indexer_state.root_branch.root.state_hash.0.clone(),

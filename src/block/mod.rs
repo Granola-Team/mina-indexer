@@ -44,7 +44,6 @@ impl Block {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
         let state_hash = BlockHash(precomputed_block.state_hash.clone());
-        println!("Block length: {:?}", precomputed_block.blockchain_length);
         Self {
             parent_hash,
             state_hash,

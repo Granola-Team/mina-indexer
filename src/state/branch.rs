@@ -69,7 +69,7 @@ impl Branch<Ledger> {
     pub fn new_testing(precomputed_block: &PrecomputedBlock, root_ledger: Option<Ledger>) -> Self {
         let root_block = Block::from_precomputed(precomputed_block, 0);
         let root_ledger = match root_ledger {
-            Some(genesis_ledger) => genesis_ledger.into(),
+            Some(root_ledger) => root_ledger,
             None => Ledger::default(),
         };
 

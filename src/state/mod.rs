@@ -5,11 +5,10 @@ use crate::{
         ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
     },
 };
-use chrono::{DateTime, Utc};
 use id_tree::NodeId;
-use log::info;
 use std::time::Instant;
-use tracing::error;
+use time::OffsetDateTime;
+use tracing::{info, warn};
 
 pub mod branch;
 pub mod ledger;
@@ -34,7 +33,7 @@ pub struct IndexerState {
     /// Time the indexer started running
     pub time: Instant,
     /// Datetime the indexer started running
-    pub date_time: DateTime<Utc>,
+    pub date_time: OffsetDateTime,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -72,7 +71,7 @@ impl IndexerState {
             prune_interval,
             blocks_processed: 0,
             time: Instant::now(),
-            date_time: Utc::now(),
+            date_time: OffsetDateTime::now_utc(),
         })
     }
 
@@ -94,7 +93,7 @@ impl IndexerState {
             prune_interval,
             blocks_processed: 0,
             time: Instant::now(),
-            date_time: Utc::now(),
+            date_time: OffsetDateTime::now_utc(),
         })
     }
 
@@ -127,7 +126,7 @@ impl IndexerState {
                 Ok(None) => block_store.add_block(precomputed_block)?,
                 // log duplicate block to error
                 Ok(_) => {
-                    error!( "Block with state hash '{state_hash:?}' is already present in the block store");
+                    warn!( "Block with state hash '{state_hash:?}' is already present in the block store");
                     return Ok(ExtensionType::BlockNotAdded);
                 }
             }
