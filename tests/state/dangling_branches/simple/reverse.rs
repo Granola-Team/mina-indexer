@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::{parser::BlockParser, Block},
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Extends a branch backwards with the root's parent
 #[tokio::test]
@@ -56,17 +55,7 @@ async fn extension() {
     // ----------------
 
     // root_block is the root of the root branch
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash.clone()),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
 
     // old_dangling_root_block is originally the root of the 0th dangling branch
     let extension_type = state.add_block(&old_dangling_root_block).unwrap();

@@ -1,19 +1,19 @@
-use std::collections::HashMap;
-use std::marker::PhantomData;
-
+use crate::{
+    block::{precomputed::PrecomputedBlock, Block, BlockHash},
+    state::ledger::{
+        genesis::GenesisLedger,
+        ExtendWithLedgerDiff,
+        {diff::LedgerDiff, Ledger},
+    },
+};
 use id_tree::{
     InsertBehavior::{self, *},
     Node, NodeId, Tree,
 };
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
-
-use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
-
-use crate::state::ledger::ExtendWithLedgerDiff;
-
-use super::ledger::genesis::GenesisLedger;
-use super::ledger::{diff::LedgerDiff, Ledger};
+use std::collections::HashMap;
+use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct Branch<T> {
@@ -61,6 +61,28 @@ impl Branch<Ledger> {
         leaves.insert(root_id, root_leaf);
         Self {
             root: genesis_block,
+            branches,
+            leaves,
+        }
+    }
+
+    pub fn new_testing(precomputed_block: &PrecomputedBlock, root_ledger: Option<Ledger>) -> Self {
+        let root_block = Block::from_precomputed(precomputed_block, 0);
+        let root_ledger = match root_ledger {
+            Some(root_ledger) => root_ledger,
+            None => Ledger::default(),
+        };
+
+        let mut branches = Tree::new();
+        let root_leaf = Leaf::new(root_block.clone(), root_ledger);
+        let root_id = branches
+            .insert(Node::new(root_leaf.clone()), AsRoot)
+            .unwrap();
+
+        let mut leaves = HashMap::new();
+        leaves.insert(root_id, root_leaf);
+        Self {
+            root: root_block,
             branches,
             leaves,
         }
@@ -166,7 +188,7 @@ where
             let mut transition_frontier_id = None;
             for ancestor_id in self
                 .branches
-                .ancestor_ids(&node_id)
+                .ancestor_ids(node_id)
                 .expect("node_id from leaves, is valid")
             {
                 witness_length += 1;
@@ -546,9 +568,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
-        self.branches.write_formatted(&mut tree).unwrap();
-        writeln!(f, "Branch {{").unwrap();
-        write!(f, "{tree}}}")
+        self.branches.write_formatted(&mut tree)?;
+        write!(f, "{tree}")
     }
 }
 

@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::{parser::BlockParser, Block},
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Adds a new dangling branch and extends it with a new leaf
 #[tokio::test]
@@ -40,17 +39,7 @@ async fn extension() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash.clone()),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
 
     // add dangling_root_block
     let extension = state.add_block(&dangling_root_block).unwrap();

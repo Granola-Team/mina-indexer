@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::parser::BlockParser,
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Creates multiple dangling branches
 #[tokio::test]
@@ -52,17 +51,7 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(
-        BlockHash(root0_block.state_hash),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root0_block, None, None, None, None).unwrap();
 
     // Root branch
     // - len = 1

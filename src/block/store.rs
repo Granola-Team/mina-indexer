@@ -60,6 +60,20 @@ impl BlockStoreConn {
         self.database.delete("test")?;
         Ok(())
     }
+
+    pub fn stats(&self) -> String {
+        self.database
+            .property_value(rocksdb::properties::DBSTATS)
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn memtables_size(&self) -> String {
+        self.database
+            .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
+            .unwrap()
+            .unwrap()
+    }
 }
 
 #[derive(Debug, Clone, Error)]

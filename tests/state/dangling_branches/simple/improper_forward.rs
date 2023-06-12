@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::{parser::BlockParser, Block},
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Extends a branch with a new leaf
 #[tokio::test]
@@ -34,17 +33,7 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
 
     // root branch
     // - len = 1

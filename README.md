@@ -29,7 +29,7 @@ subject to change without notice. With that being said, happy hacking!
 Clone the repo
 
 ```sh
-git clone https://github.com/Granola-Team/mina-indexer.git
+git clone git@github.com:Granola-Team/mina-indexer.git
 cd mina-indexer
 ```
 
@@ -40,41 +40,59 @@ nix develop
 nix build '.?submodules=1'
 ```
 
-Start the Mina Indexer with `mina-indexer-server`
-* `--genesis-ledger` the genesis ledger `.json` file to use to initialize the indexer
-* `--root-hash` the state hash of the genesis block, can be found in the genesis ledger
-* `--startup-dir` the directory to initialize the indexer's state from
-* `--watch-dir` the directory to watch to keep the indexer up to date
-* `--database-dir` the directory to store the indexer's internal RocksDB database in
-* `--log-dir` the directory to output the indexer's logs to
-* `--log-stdout` write logs to standard out instead of to a file (overrides `--log-dir`)
+Start the `mina-indexer` server with
+
+* `--genesis-ledger`, `-g`
+  * genesis ledger `.json` file to use to initialize the indexer
+* `--root-hash`, `-r`
+  * state hash of the genesis block
+  * defaults to mainnet genesis state hash `3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ`
+* `--startup-dir`, `-s`
+  * directory of precomputed blocks to initialize the indexer's state
+* `--watch-dir`, `-w`
+  * directory the block receiver watches to keep the indexer up to date
+* `--database-dir`, `-d`
+  * directory to store the indexer's internal RocksDB database
+* `--log-dir`, `-l`
+  * directory to output the indexer's logs
+  * defaults to `stdout`
 
 ```sh
-mina-indexer-server --root-hash STATE_HASH \
-    --genesis-ledger PATH \
+mina-indexer server --genesis-ledger PATH \
+    --root-hash STATE_HASH \
     --startup-dir PATH \
     --watch-dir PATH \
     --database-dir PATH \
-    --log-dir PATH 
+    --log-dir PATH
 ```
 
-Query data from the Mina Indexer with `mina-indexer-client`
+Query data with the `mina-indexer` client
 
-* Get the account balance for a specific Public Key
+* Get the account info for a specific Public Key
 ```sh
-mina-indexer-client balance --public-key PUBLIC_KEY
+mina-indexer client account --public-key PUBLIC_KEY
 ```
 
-* Get the best (most likely canonical) Blockchain
+* Get the best (most likely canonical) blockchain
 ```sh
-mina-indexer-client best-chain
+mina-indexer client best-chain
 ```
 
-For more information, check out the help menu
+* Dump the best ledger to a file
+```sh
+mina-indexer client best-ledger --path PATH
+```
+
+* Get a summary of the indexer state
+```sh
+mina-indexer client summary
+```
+
+For more information, check out the help menus
 
 ```sh
-mina-indexer-server --help
-mina-indexer-client --help
+mina-indexer server --help
+mina-indexer client --help
 ```
 
 ## About the development environment

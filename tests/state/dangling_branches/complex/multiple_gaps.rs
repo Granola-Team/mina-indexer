@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use mina_indexer::{
-    block::{parser::BlockParser, Block, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::{parser::BlockParser, Block},
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Merges two dangling branches, ignore others
 #[tokio::test]
@@ -69,17 +68,7 @@ async fn extension() {
     // ----------
 
     // root in branch branch
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
 
     // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();
