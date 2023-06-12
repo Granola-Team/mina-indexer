@@ -14,8 +14,8 @@ use clap::{Args, Parser};
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, str::FromStr};
-use tokio::time::Instant;
-use tracing::{debug, error, info, instrument};
+use tokio::{fs, time::Instant};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 #[derive(Parser, Debug, Clone)]
@@ -39,7 +39,7 @@ pub struct ServerArgs {
     /// Path to directory for logs (default: stdout)
     #[arg(short, long)]
     log_dir: Option<PathBuf>,
-    /// Override an existing db
+    /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
     db_override: bool,
 }
@@ -59,7 +59,6 @@ pub struct IndexerConfiguration {
     log_file: Option<PathBuf>,
 }
 
-#[instrument(level = "info")]
 pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
@@ -114,7 +113,6 @@ pub async fn handle_command_line_arguments(
     }
 }
 
-#[instrument(level = "info")]
 pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
@@ -140,6 +138,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     };
     tracing_subscriber::fmt().with_writer(non_blocking).init();
 
+    // TODO
+    // if !db_override
+    // check if db has blocks and reconstitute state before reading blocks from startup_dir
     info!("Initializing indexer state");
     let mut indexer_state = IndexerState::new(
         root_hash.clone(),
@@ -149,7 +150,6 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         Some(100),
     )?;
 
-    // TODO check if db has values and reconstitute state from db block first
     let init_dir = startup_dir.display().to_string();
     info!("Ingesting precomputed blocks from {init_dir}");
     let mut block_parser = BlockParser::new(&startup_dir)?;
@@ -211,18 +211,11 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 let db_stats_str = indexer_state
                     .block_store
                     .as_ref()
-                    .map(|db| db.database
-                        .property_value(rocksdb::properties::DBSTATS)
-                        .unwrap()
-                        .unwrap()
-                    );
+                    .map(|db| db.stats());
                 let mem = indexer_state
                     .block_store
                     .as_ref()
-                    .map(|db| db.database
-                        .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
-                        .unwrap()
-                        .unwrap())
+                    .map(|db| db.memtables_size())
                     .unwrap_or_default();
                 let summary = Summary {
                     uptime: indexer_state.time.clone().elapsed(),
@@ -246,7 +239,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 tokio::spawn(async move {
                     debug!("Handling connection");
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger, summary).await {
-                        error!("Error handling connection\n{e}");
+                        error!("Error handling connection: {e}");
                     }
                     debug!("Removing readonly instance at {}", secondary_path.display());
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
@@ -256,7 +249,6 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     }
 }
 
-#[instrument(level = "info")]
 async fn handle_conn(
     conn: LocalSocketStream,
     db: BlockStoreConn,
@@ -289,10 +281,14 @@ async fn handle_conn(
                 writer.write_all(&bytes).await?;
             }
         }
-        "best_chain\0" => {
+        "best_chain" => {
             info!("Received best_chain command");
+            let data_buffer = buffers.next().unwrap();
+            let num = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
+                .parse::<usize>()?;
             let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
                 .iter()
+                .take(num)
                 .cloned()
                 .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
                 .collect();
@@ -305,7 +301,8 @@ async fn handle_conn(
             let path = &String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<PathBuf>()?;
             debug!("Writing ledger to {}", path.display());
-            let bytes = bcs::to_bytes(&ledger)?;
+            fs::write(path, format!("{ledger:?}")).await?;
+            let bytes = bcs::to_bytes(&format!("Ledger written to {}", path.display()))?;
             writer.write_all(&bytes).await?;
         }
         "summary\0" => {
@@ -314,10 +311,9 @@ async fn handle_conn(
             writer.write_all(&bytes).await?;
         }
         bad_request => {
-            error!("Malformed request: {bad_request}");
-            return Err(anyhow::Error::msg(format!(
-                "Malformed request: {bad_request}"
-            )));
+            let err_msg = format!("Malformed request: {bad_request}");
+            error!("{err_msg}");
+            return Err(anyhow::Error::msg(err_msg));
         }
     }
 
