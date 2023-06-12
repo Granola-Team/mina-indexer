@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
-
 use id_tree::{
     InsertBehavior::{self, *},
     Node, NodeId, Tree,
 };
+use crate::{
+    block::{precomputed::PrecomputedBlock, Block, BlockHash},
+    state::ledger::{
+        genesis::GenesisLedger,
+        ExtendWithLedgerDiff,
+        {diff::LedgerDiff, Ledger},
+    },
+};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
-
-use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
-
-use crate::state::ledger::ExtendWithLedgerDiff;
-
-use super::ledger::genesis::GenesisLedger;
-use super::ledger::{diff::LedgerDiff, Ledger};
+use std::collections::HashMap;
+use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct Branch<T> {

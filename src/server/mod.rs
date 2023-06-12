@@ -40,7 +40,7 @@ pub struct ServerArgs {
     #[arg(short, long)]
     log_dir: Option<PathBuf>,
     /// Override an existing db
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     db_override: bool,
 }
 
@@ -161,7 +161,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         block_count += 1;
     }
     info!(
-        "Ingested {block_count} blocks from {init_dir} in {:?}",
+        "Ingested {block_count} blocks in {:?}",
         ingestion_time.elapsed()
     );
 
@@ -211,22 +211,32 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 let db_stats_str = indexer_state
                     .block_store
                     .as_ref()
-                    .map(|db|
-                        db.database
+                    .map(|db| db.database
                         .property_value(rocksdb::properties::DBSTATS)
                         .unwrap()
                         .unwrap()
                     );
+                let mem = indexer_state
+                    .block_store
+                    .as_ref()
+                    .map(|db| db.database
+                        .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
+                        .unwrap()
+                        .unwrap())
+                    .unwrap_or_default();
                 let summary = Summary {
-                    block_count: indexer_state.block_count,
-                    date_time: indexer_state.date_time,
                     uptime: indexer_state.time.clone().elapsed(),
+                    date_time: indexer_state.date_time,
+                    block_count: indexer_state.block_count,
+                    best_tip_hash: indexer_state.best_tip.state_hash.0.clone(),
+                    root_hash: indexer_state.root_branch.root.state_hash.0.clone(),
                     root_height: indexer_state.root_branch.height(),
                     root_length: indexer_state.root_branch.len(),
+                    num_leaves: indexer_state.root_branch.leaves.len(),
                     num_dangling: indexer_state.dangling_branches.len(),
                     max_dangling_height,
                     max_dangling_length,
-                    db_stats: db_stats_str.map(|s| DbStats::from_str(&s).unwrap()),
+                    db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
 
                 let mut leaves = indexer_state.root_branch.leaves.values().cloned();
