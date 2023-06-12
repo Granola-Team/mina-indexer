@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use mina_indexer::{
-    block::{parser::BlockParser, Block, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::{parser::BlockParser, Block},
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 
 /// Merges two dangling branches
 #[tokio::test]
@@ -66,17 +65,7 @@ async fn extension() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
 
     // --------
     // add leaf
@@ -123,10 +112,10 @@ async fn extension() {
     // add middle block
     // ----------------
 
-    // dangling branch rebases on top of root_branch
-    let extension_type = state.add_block(&middle_block).unwrap();
-    assert_eq!(extension_type, ExtensionType::RootComplex);
-
+    println!(
+        "Block added: {:?}\n",
+        Block::from_precomputed(&middle_block, 1)
+    );
     println!("=== After Root Branch ===");
     let mut tree = String::new();
     state
@@ -136,6 +125,10 @@ async fn extension() {
         .write_formatted(&mut tree)
         .unwrap();
     println!("{tree}");
+
+    // dangling branch rebases on top of root_branch
+    let extension_type = state.add_block(&middle_block).unwrap();
+    assert_eq!(extension_type, ExtensionType::RootComplex);
 
     // no more dangling branches
     assert_eq!(state.dangling_branches.len(), 0);

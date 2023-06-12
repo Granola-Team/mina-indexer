@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
-    state::{ledger::genesis::GenesisLedger, ExtensionType, IndexerState},
+    block::parser::BlockParser,
+    state::{ExtensionType, IndexerState},
 };
+use std::path::PathBuf;
 use tokio::fs::remove_dir_all;
 
 /// Adds the same block twice, second time fails
@@ -41,24 +40,15 @@ async fn test() {
     );
 
     // initialize state
-    let mut state = IndexerState::new(
-        BlockHash(root_block.state_hash),
-        GenesisLedger {
-            name: "testing".to_string(),
-            accounts: Vec::new(),
-        },
-        Some(&block_store_dir),
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state =
+        IndexerState::new_testing(&root_block, None, Some(&block_store_dir), None, None).unwrap();
 
     // add block for the first time
     let extension_type = state.add_block(&block0).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!("=== Before state ===");
-    println!("{state:?}");
+    print!("{state:?}");
 
     println!("Root:     {}", state.root_branch.len());
     println!("Dangling: {}", state.dangling_branches.len());
@@ -69,17 +59,11 @@ async fn test() {
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
 
-    // throws err
-    assert!(match state.add_block(&block1) {
-        Ok(ext) => {
-            println!("Extension type: {ext:?}");
-            false
-        }
-        Err(err) => {
-            println!("{err:?}");
-            true
-        }
-    });
+    // block not added again
+    assert_eq!(
+        state.add_block(&block1).unwrap(),
+        ExtensionType::BlockNotAdded
+    );
 
     // the block is not added to the state
     println!("Root:     {}", state.root_branch.clone().len());
