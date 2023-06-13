@@ -71,14 +71,15 @@ jobs:
           args: --package mina-indexer -- --check
 
   Clippy:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    name: ${{ matrix.toolchain }} / clippy
+    permissions:
+      contents: read
+      checks: write
     strategy:
+      fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-        rust:
-          - stable
-          - unstable
+        toolchain: [stable, beta]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -89,20 +90,15 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ matrix.toolchain }}
           override: true
           components: clippy
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-
       - name: Run Clippy
         if: github.event_name == 'pull_request'
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
-
   Build:
     runs-on: ${{ matrix.os }}
     strategy:
