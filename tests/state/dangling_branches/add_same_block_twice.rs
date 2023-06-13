@@ -41,7 +41,7 @@ async fn test() {
 
     // initialize state
     let mut state =
-        IndexerState::new_testing(&root_block, None, Some(&block_store_dir), None, None).unwrap();
+        IndexerState::new_testing(&root_block, None, Some(&block_store_dir), None).unwrap();
 
     // add block for the first time
     let extension_type = state.add_block(&block0).unwrap();

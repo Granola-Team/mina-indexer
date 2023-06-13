@@ -68,7 +68,7 @@ async fn extension() {
     // ----------
 
     // root in branch branch
-    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None).unwrap();
 
     // other in dangling branch 0
     let extension_type = state.add_block(&other_block).unwrap();
