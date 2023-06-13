@@ -148,7 +148,6 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         genesis_ledger.ledger,
         Some(&database_dir),
         Some(MAINNET_TRANSITION_FRONTIER_K),
-        Some(100),
     )?;
 
     let init_dir = startup_dir.display().to_string();

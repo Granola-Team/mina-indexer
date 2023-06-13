@@ -27,7 +27,6 @@ pub struct IndexerState {
     /// Block database
     pub block_store: Option<BlockStoreConn>,
     pub transition_frontier_length: Option<u32>,
-    pub prune_interval: Option<u32>,
     /// Number of blocks added to the state
     pub blocks_processed: u32,
     /// Time the indexer started running
@@ -58,7 +57,6 @@ impl IndexerState {
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
-        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
@@ -68,7 +66,6 @@ impl IndexerState {
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
-            prune_interval,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -80,7 +77,6 @@ impl IndexerState {
         root_ledger: Option<Ledger>,
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
-        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block, root_ledger);
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
@@ -90,7 +86,6 @@ impl IndexerState {
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
-            prune_interval,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -106,14 +101,10 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         // prune the root branch
         if let Some(k) = self.transition_frontier_length {
-            if let Some(interval) = self.prune_interval {
-                if self.blocks_processed % interval == 0 {
-                    info!("pruning transition frontier at k={}", k);
-                    self.root_branch.prune_transition_frontier(k);
-                }
-            } else {
-                info!("pruning transition frontier at k={}", k);
-                self.root_branch.prune_transition_frontier(k);
+            if self.root_branch.height() > 5 * k as usize {
+                info!("Pruning transition frontier at k={}", k);
+                self.root_branch
+                    .prune_transition_frontier(k, &self.best_tip);
             }
         }
 
