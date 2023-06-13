@@ -6,6 +6,7 @@ edition = "2021"
 [[bin]]
 name = "block-ingestion"
 
+[[bin]]
 name = "mina-indexer"
 test = false
 bench = false
