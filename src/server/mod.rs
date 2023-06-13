@@ -29,17 +29,17 @@ pub struct ServerArgs {
     #[arg(short, long)]
     root_hash: Option<String>,
     /// Path to startup blocks directory
-    #[arg(short, long)]
-    startup_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/default-startup-dir"))]
+    startup_dir: PathBuf,
     /// Path to directory to watch for new blocks
-    #[arg(short, long)]
-    watch_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/default-watch-dir"))]
+    watch_dir: PathBuf,
     /// Path to directory for rocksdb
-    #[arg(short, long)]
-    database_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/default-database-dir"))]
+    database_dir: PathBuf,
     /// Path to directory for logs (default: stdout)
-    #[arg(short, long)]
-    log_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/default-log-dir"))]
+    log_dir: PathBuf,
     /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
     db_override: bool,
