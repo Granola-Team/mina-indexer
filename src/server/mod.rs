@@ -45,7 +45,7 @@ pub struct ServerArgs {
     log_dir: Option<PathBuf>,
     /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
-    db_override: bool,
+    restore_from_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long)]
     prune_interval: Option<u32>,
@@ -65,6 +65,7 @@ pub struct IndexerConfiguration {
     database_dir: PathBuf,
     log_file: Option<PathBuf>,
     prune_interval: Option<u32>,
+    restore_from_db: bool,
 }
 
 #[instrument]
@@ -81,6 +82,7 @@ pub async fn handle_command_line_arguments(
     let database_dir = args.database_dir.unwrap();
     let log_dir = args.log_dir;
     let prune_interval = args.prune_interval;
+    let restore_from_db = args.restore_from_db;
 
     info!(
         "Parsing genesis ledger file at {}",
@@ -119,6 +121,7 @@ pub async fn handle_command_line_arguments(
                 database_dir,
                 log_file,
                 prune_interval,
+                restore_from_db,
             })
         }
     }
@@ -140,6 +143,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         database_dir,
         log_file,
         prune_interval,
+        restore_from_db,
     } = handle_command_line_arguments(args).await?;
 
     let (non_blocking, _guard) = match log_file {
@@ -151,17 +155,25 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     };
     tracing_subscriber::fmt().with_writer(non_blocking).init();
 
-    // TODO
-    // if !db_override
+    let mut indexer_state;
+    if restore_from_db {
+        info!("Initializing indexer state");
+        indexer_state = IndexerState::new(
+            root_hash.clone(),
+            genesis_ledger.ledger,
+            Some(&database_dir),
+            Some(MAINNET_TRANSITION_FRONTIER_K),
+            prune_interval,
+        )?;
+    } else {
+        // TODO check that the db has data
+        info!("Syncing indexer state from rocksdb");
+
+        // TODO
+        indexer_state =
+            IndexerState::restore_from_db(&BlockStoreConn::new(&database_dir).unwrap()).unwrap();
+    }
     // check if db has blocks and reconstitute state before reading blocks from startup_dir
-    info!("Initializing indexer state");
-    let mut indexer_state = IndexerState::new(
-        root_hash.clone(),
-        genesis_ledger.ledger,
-        Some(&database_dir),
-        Some(MAINNET_TRANSITION_FRONTIER_K),
-        prune_interval,
-    )?;
 
     let init_dir = startup_dir.display().to_string();
     info!("Ingesting precomputed blocks from {init_dir}");
@@ -173,7 +185,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             "Adding {:?} with length {:?} to the state",
             &block.state_hash, &block.blockchain_length
         );
-        indexer_state.add_block(&block)?;
+        indexer_state.add_block(&block, true)?;
         block_count += 1;
     }
     info!(
@@ -194,7 +206,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
                     debug!("Receiving block {:?}", precomputed_block);
-                    indexer_state.add_block(&precomputed_block)?;
+                    indexer_state.add_block(&precomputed_block, true)?;
                     info!("Added block hash: {:?}, height: {}", &precomputed_block.state_hash, precomputed_block.blockchain_length.unwrap_or(0));
                 } else {
                     info!("Block receiver shutdown, system exit");

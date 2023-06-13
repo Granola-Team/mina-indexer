@@ -4,9 +4,10 @@ use crate::{
         branch::Branch,
         ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
     },
+    MAINNET_TRANSITION_FRONTIER_K,
 };
 use id_tree::NodeId;
-use std::time::Instant;
+use std::{borrow::Borrow, path::Path, time::Instant};
 use time::OffsetDateTime;
 use tracing::{info, warn};
 
@@ -57,7 +58,7 @@ impl IndexerState {
     pub fn new(
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
-        rocksdb_path: Option<&std::path::Path>,
+        rocksdb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
@@ -79,7 +80,7 @@ impl IndexerState {
     pub fn new_testing(
         root_block: &PrecomputedBlock,
         root_ledger: Option<Ledger>,
-        rocksdb_path: Option<&std::path::Path>,
+        rocksdb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block, root_ledger);
@@ -95,6 +96,39 @@ impl IndexerState {
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
         })
+    }
+
+    pub fn restore_from_db(db: &BlockStoreConn) -> anyhow::Result<Self> {
+        // TODO
+        // find best tip block in db (according to Block::cmp)
+        // go back at least 290 blocks (make this block the root of the root tree)
+        // Q: How to compute ledger? Should we require it to do quick sync?
+        // iterate over the db blocks, starting at the root, adding them to the state with add_block(..., false)
+        let mut state_opt: Option<IndexerState> = None;
+        for res in db.iterator() {
+            match res {
+                Ok((_k, v)) => {
+                    if let Ok(block) = bcs::from_bytes::<PrecomputedBlock>(v.borrow()) {
+                        if let Some(mut state) = state_opt {
+                            state.add_block(&block, false).unwrap();
+                            state_opt = Some(state);
+                        } else {
+                            state_opt = Some(
+                                Self::new_testing(
+                                    &block,
+                                    None,
+                                    Some(db.db_path()),
+                                    Some(MAINNET_TRANSITION_FRONTIER_K),
+                                )
+                                .unwrap(),
+                            )
+                        }
+                    }
+                }
+                Err(_e) => (),
+            }
+        }
+        todo!()
     }
 
     fn prune_root_branch(&mut self) {
@@ -114,12 +148,13 @@ impl IndexerState {
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
+        check_if_block_in_db: bool,
     ) -> anyhow::Result<ExtensionType> {
         // prune the root branch
         self.prune_root_branch();
 
         // check that the block doesn't already exist in the db
-        if self.block_exists(&precomputed_block.state_hash)? {
+        if check_if_block_in_db && self.block_exists(&precomputed_block.state_hash)? {
             warn!(
                 "Block with state hash '{:?}' is already present in the block store",
                 &precomputed_block.state_hash
@@ -164,8 +199,14 @@ impl IndexerState {
         if let Some(block_store) = self.block_store.as_ref() {
             match block_store.get_block(state_hash)? {
                 None => Ok(false),
-                // log duplicate block to error
-                Some(_block) => Ok(true),
+                Some(block) => {
+                    warn!(
+                        "Attempted to add duplicate block! length: {}, state_hash: {:?}",
+                        block.blockchain_length.unwrap_or(0),
+                        block.state_hash
+                    );
+                    Ok(true)
+                }
             }
         } else {
             Ok(false)

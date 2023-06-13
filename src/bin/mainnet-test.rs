@@ -111,7 +111,7 @@ async fn main() {
                 parsing_time += parse_time.elapsed();
 
                 let add = Instant::now();
-                state.add_block(&block).unwrap();
+                state.add_block(&block, true).unwrap();
                 adding_time += add.elapsed();
 
                 match block.blockchain_length {

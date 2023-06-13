@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rocksdb::{DBWithThreadMode, MultiThreaded};
+use rocksdb::{DBIteratorWithThreadMode, DBWithThreadMode, MultiThreaded};
 use thiserror::Error;
 
 use super::precomputed::PrecomputedBlock;
@@ -15,6 +15,7 @@ pub struct BlockStoreConn {
 }
 
 impl BlockStoreConn {
+    /// Creates a read-only copy of the db at path, located at secodary
     pub fn new_read_only(path: &Path, secondary: &Path) -> BlockStoreResult<Self> {
         let database_opts = rocksdb::Options::default();
         let database =
@@ -49,6 +50,10 @@ impl BlockStoreConn {
             return Ok(Some(precomputed_block));
         }
         Ok(None)
+    }
+
+    pub fn iterator(&self) -> DBIteratorWithThreadMode<DBWithThreadMode<MultiThreaded>> {
+        self.database.iterator(rocksdb::IteratorMode::Start)
     }
 
     pub fn db_path(&self) -> &Path {
