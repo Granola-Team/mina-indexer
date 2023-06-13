@@ -20,7 +20,7 @@ async fn extension() {
     //       |             =>    |     |
     //       |             =>   leaf   |
 
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
     // root_block = mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json

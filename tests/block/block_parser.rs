@@ -23,7 +23,7 @@ async fn representative_bench() {
 
     let start = Instant::now();
     logs_processed = 0;
-    let sample_dir1 = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let sample_dir1 = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser1 = BlockParser::new(&sample_dir1).unwrap();
     while let Some(precomputed_block) = block_parser1
         .next()
@@ -34,6 +34,6 @@ async fn representative_bench() {
         dbg!(precomputed_block.state_hash);
     }
     assert_eq!(logs_processed, 24);
-    println!("./tests/data/beautified_sequential_blocks");
+    println!("./tests/data/sequential_blocks");
     println!("Parse {logs_processed} logs: {:?}\n", start.elapsed());
 }

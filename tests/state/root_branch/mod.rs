@@ -10,54 +10,117 @@ mod simple_proper;
 
 #[tokio::test]
 async fn prune_transition_frontier() {
-    // 0
-    // |    1
-    // 1 => |
-    // |    2
-    // 2
+    //   0
+    //  / \
+    // 1   6
+    // |
+    // 2         4
+    // |     =>  |
+    // 3         5
+    // |
+    // 4
+    // |
+    // 5
 
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
-    // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
+    // root_block = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
     let root_block = block_parser
-        .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
-        .await
-        .unwrap();
-    assert_eq!(
-        root_block.state_hash,
-        "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
-    );
-
-    let mut root_tree = Branch::new(&root_block, Ledger::new()).unwrap();
-
-    let middle_block = block_parser
-        .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
-        .await
-        .unwrap();
-    assert_eq!(
-        middle_block.state_hash,
-        "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
-    );
-    root_tree
-        .simple_extension(&middle_block)
-        .expect("new leaf should be inserted");
-
-    let child_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await
         .unwrap();
     assert_eq!(
-        child_block.state_hash,
+        root_block.state_hash,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
-    root_tree
-        .simple_extension(&child_block)
-        .expect("new leaf should be inserted");
 
-    root_tree.prune_transition_frontier(1);
+    // main_1_block = mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
+    let main_1_block = block_parser
+        .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
+        .await
+        .unwrap();
+    assert_eq!(
+        main_1_block.state_hash,
+        "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
+    );
 
-    let pruned_root_block = root_tree.root;
+    // fork_block = mainnet-105492-3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN.json
+    let fork_block = block_parser
+        .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
+        .await
+        .unwrap();
+    assert_eq!(
+        fork_block.state_hash,
+        "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()
+    );
 
-    assert_eq!(Block::from_precomputed(&middle_block, 1), pruned_root_block);
+    // main_2_block = mainnet-105493-3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db.json
+    let main_2_block = block_parser
+        .get_precomputed_block("3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db")
+        .await
+        .unwrap();
+    assert_eq!(
+        main_2_block.state_hash,
+        "3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db".to_owned()
+    );
+
+    // main_3_block = mainnet-105494-3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww.json
+    let main_3_block = block_parser
+        .get_precomputed_block("3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww")
+        .await
+        .unwrap();
+    assert_eq!(
+        main_3_block.state_hash,
+        "3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww".to_owned()
+    );
+
+    // main_4_block = mainnet-105495-3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9.json
+    let main_4_block = block_parser
+        .get_precomputed_block("3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9")
+        .await
+        .unwrap();
+    assert_eq!(
+        main_4_block.state_hash,
+        "3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9".to_owned()
+    );
+
+    // main_5_block = mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
+    let main_5_block = block_parser
+        .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
+        .await
+        .unwrap();
+    assert_eq!(
+        main_5_block.state_hash,
+        "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
+    );
+
+    // create the tree and add blocks
+    let mut branch = Branch::new(&root_block, Ledger::new()).unwrap();
+
+    branch.simple_extension(&fork_block).unwrap();
+    branch.simple_extension(&main_1_block).unwrap();
+    branch.simple_extension(&main_2_block).unwrap();
+    branch.simple_extension(&main_3_block).unwrap();
+    branch.simple_extension(&main_4_block).unwrap();
+    let best_tip_id = branch.simple_extension(&main_5_block).unwrap();
+
+    println!("=== Before prune ===");
+    println!("{branch:?}");
+
+    branch.prune_transition_frontier(
+        1,
+        &branch
+            .branches
+            .get(&best_tip_id)
+            .unwrap()
+            .data()
+            .block
+            .clone(),
+    );
+
+    println!("=== After prune ===");
+    println!("{branch:?}");
+
+    assert_eq!(Block::from_precomputed(&main_4_block, 0), branch.root);
 }
