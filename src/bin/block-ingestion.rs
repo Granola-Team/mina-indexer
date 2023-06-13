@@ -23,7 +23,6 @@ fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
 }
 
 fn main() {
-    let start_time = Instant::now();
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
     let pattern = format!("{}/*.json", blocks_dir.display());
@@ -38,6 +37,7 @@ fn main() {
     });
 
     let mut count = 0;
+    let start_time = Instant::now();
 
     for path in paths {
         let mut buff = Vec::new();
