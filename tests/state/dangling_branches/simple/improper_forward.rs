@@ -16,7 +16,7 @@ async fn extension() {
     //      => child0 => child0 child1
     // --------------------------------
 
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
     // ----------------
