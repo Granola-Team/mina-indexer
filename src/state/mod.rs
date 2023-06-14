@@ -122,15 +122,14 @@ impl IndexerState {
         self.prune_root();
 
         // check that the block doesn't already exist in the db
-        if !self.block_exists(&precomputed_block.state_hash)? {
-            if let Some(block_store) = self.block_store.as_ref() {
-                block_store.add_block(precomputed_block)?;
-            }
-        } else {
+        if self.block_exists(&precomputed_block.state_hash)? {
             warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
             return Ok(ExtensionType::BlockNotAdded);
         }
 
+        if let Some(block_store) = self.block_store.as_ref() {
+            block_store.add_block(precomputed_block)?;
+        }
         self.blocks_processed += 1;
 
         // forward extension on root branch
