@@ -5,8 +5,8 @@ use crate::{
         ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
     },
 };
-use std::time::Instant;
 use id_tree::NodeId;
+use std::time::Instant;
 use time::OffsetDateTime;
 use tracing::{info, warn};
 
@@ -120,7 +120,10 @@ impl IndexerState {
 
         // check that the block doesn't already exist in the db
         if self.block_exists(&precomputed_block.state_hash)? {
-            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
+            warn!(
+                "Block with state hash '{:?}' is already present in the block store",
+                &precomputed_block.state_hash
+            );
             return Ok(ExtensionType::BlockNotAdded);
         }
 
@@ -142,14 +145,15 @@ impl IndexerState {
         }
 
         // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
-        if let Some((extended_branch_index, new_node_id, direction)) = 
-            self.dangling_extension(precomputed_block)? 
+        if let Some((extended_branch_index, new_node_id, direction)) =
+            self.dangling_extension(precomputed_block)?
         {
             return self.update_dangling(
-                precomputed_block, 
-                extended_branch_index, 
-                new_node_id, 
-                direction);
+                precomputed_block,
+                extended_branch_index,
+                new_node_id,
+                direction,
+            );
         }
 
         // block is added as a new dangling branch
@@ -161,12 +165,17 @@ impl IndexerState {
             match block_store.get_block(state_hash)? {
                 None => Ok(false),
                 // log duplicate block to error
-                Some(_block) => Ok(true)
+                Some(_block) => Ok(true),
             }
-        } else { Ok(false) } 
+        } else {
+            Ok(false)
+        }
     }
 
-    pub fn root_extension(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<Option<ExtensionType>> {
+    pub fn root_extension(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<Option<ExtensionType>> {
         if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
             self.update_best_tip();
             let mut branches_to_remove = Vec::new();
@@ -198,10 +207,15 @@ impl IndexerState {
                 // if there aren't any branches that are connected
                 Ok(Some(ExtensionType::RootSimple))
             }
-        } else { Ok(None) }
+        } else {
+            Ok(None)
+        }
     }
 
-    pub fn dangling_extension(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
+    pub fn dangling_extension(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
             match (
@@ -300,47 +314,49 @@ impl IndexerState {
     }
 
     pub fn update_dangling(
-        &mut self, 
+        &mut self,
         precomputed_block: &PrecomputedBlock,
-        extended_branch_index: usize, 
-        new_node_id: NodeId, 
-        direction: ExtensionDirection) 
-        -> anyhow::Result<ExtensionType>
-    {
+        extended_branch_index: usize,
+        new_node_id: NodeId,
+        direction: ExtensionDirection,
+    ) -> anyhow::Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
-            for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
-                if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                    branches_to_update.push(index);
-                }
+        for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
+            if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+                branches_to_update.push(index);
+            }
+        }
+
+        if !branches_to_update.is_empty() {
+            // remove one
+            let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
+            for (n, dangling_branch_index) in branches_to_update.iter().enumerate() {
+                let index = if extended_branch_index < *dangling_branch_index {
+                    dangling_branch_index - n - 1
+                } else {
+                    *dangling_branch_index
+                };
+                let branch_to_update = self.dangling_branches.get_mut(index).unwrap();
+                extended_branch.merge_on(&new_node_id, branch_to_update);
+
+                // remove one for each index we see
+                self.dangling_branches.remove(index);
             }
 
-            if !branches_to_update.is_empty() {
-                // remove one
-                let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
-                for (n, dangling_branch_index) in branches_to_update.iter().enumerate() {
-                    let index = if extended_branch_index < *dangling_branch_index {
-                        dangling_branch_index - n - 1
-                    } else {
-                        *dangling_branch_index
-                    };
-                    let branch_to_update = self.dangling_branches.get_mut(index).unwrap();
-                    extended_branch.merge_on(&new_node_id, branch_to_update);
-
-                    // remove one for each index we see
-                    self.dangling_branches.remove(index);
-                }
-
-                self.dangling_branches.push(extended_branch);
-                Ok(ExtensionType::DanglingComplex)
-            } else {
-                match direction {
-                    ExtensionDirection::Forward => Ok(ExtensionType::DanglingSimpleForward),
-                    ExtensionDirection::Reverse => Ok(ExtensionType::DanglingSimpleReverse),
-                }
+            self.dangling_branches.push(extended_branch);
+            Ok(ExtensionType::DanglingComplex)
+        } else {
+            match direction {
+                ExtensionDirection::Forward => Ok(ExtensionType::DanglingSimpleForward),
+                ExtensionDirection::Reverse => Ok(ExtensionType::DanglingSimpleReverse),
             }
+        }
     }
 
-    pub fn new_dangling(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<ExtensionType> {
+    pub fn new_dangling(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<ExtensionType> {
         self.dangling_branches.push(
             Branch::new(
                 precomputed_block,
