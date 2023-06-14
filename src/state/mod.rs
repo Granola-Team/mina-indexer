@@ -124,8 +124,10 @@ impl IndexerState {
 
         // forward extension on root branch
         // check leaf heights first
-        if self.best_tip.blockchain_length.unwrap_or(0) + 1
-            >= precomputed_block.blockchain_length.unwrap_or(0)
+        if precomputed_block.blockchain_length.is_some()
+            && self.best_tip.blockchain_length.unwrap_or(0) + 1
+                >= precomputed_block.blockchain_length.unwrap()
+            || precomputed_block.blockchain_length.is_none()
         {
             if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
                 self.update_best_tip();
@@ -140,7 +142,6 @@ impl IndexerState {
                         branches_to_remove.push(index);
 
                         Self::same_block_added_twice(dangling_branch, precomputed_block)?;
-                        break;
                     }
                 }
 

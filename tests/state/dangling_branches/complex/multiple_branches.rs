@@ -4,9 +4,9 @@ use mina_indexer::{
 };
 use std::{collections::HashSet, path::PathBuf};
 
-/// Merges three dangling branches
+/// Merges two dangling branches onto the root branch
 #[tokio::test]
-async fn extension() {
+async fn merge() {
     // --------------------------
     //       Root branch
     // ----------+---------------
@@ -118,22 +118,8 @@ async fn extension() {
         .iter()
         .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
 
-    println!("=== Before Root Branch ===");
-    let mut tree = String::new();
-    state
-        .root_branch
-        .clone()
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
-
-    for (n, branch) in state.dangling_branches.iter().enumerate() {
-        println!("=== Before Dangling Branch {n} ===");
-        let mut tree = String::new();
-        branch.branches.write_formatted(&mut tree).unwrap();
-        println!("{tree}");
-    }
+    println!("=== Before state ===");
+    println!("{state:?}");
 
     // ----------------
     // add middle block
@@ -141,6 +127,9 @@ async fn extension() {
 
     let extension_type = state.add_block(&middle_block).unwrap();
     assert_eq!(extension_type, ExtensionType::RootComplex);
+
+    println!("=== After state ===");
+    println!("{state:?}");
 
     // Root branch
     // - len = 4
@@ -169,15 +158,6 @@ async fn extension() {
         leaves0.iter().collect::<HashSet<&&Block>>(),
         HashSet::from([&&leaf0, &&leaf1])
     );
-
-    println!("=== After Root Branch ===");
-    let mut tree = String::new();
-    state
-        .root_branch
-        .branches
-        .write_formatted(&mut tree)
-        .unwrap();
-    println!("{tree}");
 
     // branch root should match the tree's root
     assert_eq!(root0, &branch_root0.block);
