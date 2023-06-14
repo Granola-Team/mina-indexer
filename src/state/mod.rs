@@ -97,14 +97,7 @@ impl IndexerState {
         })
     }
 
-    /// Adds the block to the witness tree and the precomputed block to the db
-    ///
-    /// Errors if the block is already present in the witness tree
-    pub fn add_block(
-        &mut self,
-        precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<ExtensionType> {
-        // prune the root branch
+    pub fn prune_root(&mut self) {
         if let Some(k) = self.transition_frontier_length {
             if let Some(interval) = self.prune_interval {
                 if self.blocks_processed % interval == 0 {
@@ -116,20 +109,36 @@ impl IndexerState {
                 self.root_branch.prune_transition_frontier(k);
             }
         }
+    }
+
+    pub fn block_exists(&self, state_hash: &str) -> anyhow::Result<bool> {
+        if let Some(block_store) = self.block_store.as_ref() {
+            match block_store.get_block(state_hash)? {
+                None => Ok(false),
+                // log duplicate block to error
+                Some(_block) => Ok(true)
+            }
+        } else { Ok(false) } 
+    }
+
+    /// Adds the block to the witness tree and the precomputed block to the db
+    ///
+    /// Errors if the block is already present in the witness tree
+    pub fn add_block(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<ExtensionType> {
+        // prune the root branch
+        self.prune_root();
 
         // check that the block doesn't already exist in the db
-        let state_hash = &precomputed_block.state_hash;
-        if let Some(block_store) = self.block_store.as_ref() {
-            match block_store.get_block(state_hash) {
-                Err(err) => return Err(err),
-                // add precomputed block to the db
-                Ok(None) => block_store.add_block(precomputed_block)?,
-                // log duplicate block to error
-                Ok(_) => {
-                    warn!( "Block with state hash '{state_hash:?}' is already present in the block store");
-                    return Ok(ExtensionType::BlockNotAdded);
-                }
+        if !self.block_exists(&precomputed_block.state_hash)? {
+            if let Some(block_store) = self.block_store.as_ref() {
+                block_store.add_block(precomputed_block)?;
             }
+        } else {
+            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
+            return Ok(ExtensionType::BlockNotAdded);
         }
 
         self.blocks_processed += 1;
