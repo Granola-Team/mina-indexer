@@ -111,6 +111,54 @@ impl IndexerState {
         }
     }
 
+    /// Adds the block to the witness tree and the precomputed block to the db
+    ///
+    /// Errors if the block is already present in the witness tree
+    pub fn add_block(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<ExtensionType> {
+        // prune the root branch
+        self.prune_root();
+
+        // check that the block doesn't already exist in the db
+        if !self.block_exists(&precomputed_block.state_hash)? {
+            if let Some(block_store) = self.block_store.as_ref() {
+                block_store.add_block(precomputed_block)?;
+            }
+        } else {
+            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
+            return Ok(ExtensionType::BlockNotAdded);
+        }
+
+        self.blocks_processed += 1;
+
+        // forward extension on root branch
+        // check leaf heights first
+        if self.best_tip.blockchain_length.unwrap_or(0) + 1
+            >= precomputed_block.blockchain_length.unwrap_or(0)
+        {
+            if let Some(root_extension) = self.root_extension(precomputed_block)? {
+                return Ok(root_extension);
+            }
+        }
+
+        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
+        if let Some((extended_branch_index, new_node_id, direction)) = 
+            self.dangling_extension(precomputed_block)? 
+        {
+            return Ok(self.update_dangling(
+                precomputed_block, 
+                extended_branch_index, 
+                new_node_id, 
+                direction)?
+            );
+        }
+
+        // block is added as a new dangling branch
+        self.new_dangling(precomputed_block)
+    }
+
     pub fn block_exists(&self, state_hash: &str) -> anyhow::Result<bool> {
         if let Some(block_store) = self.block_store.as_ref() {
             match block_store.get_block(state_hash)? {
@@ -321,54 +369,6 @@ impl IndexerState {
             .expect("cannot fail"),
         );
         Ok(ExtensionType::DanglingNew)
-    }
-
-    /// Adds the block to the witness tree and the precomputed block to the db
-    ///
-    /// Errors if the block is already present in the witness tree
-    pub fn add_block(
-        &mut self,
-        precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<ExtensionType> {
-        // prune the root branch
-        self.prune_root();
-
-        // check that the block doesn't already exist in the db
-        if !self.block_exists(&precomputed_block.state_hash)? {
-            if let Some(block_store) = self.block_store.as_ref() {
-                block_store.add_block(precomputed_block)?;
-            }
-        } else {
-            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
-            return Ok(ExtensionType::BlockNotAdded);
-        }
-
-        self.blocks_processed += 1;
-
-        // forward extension on root branch
-        // check leaf heights first
-        if self.best_tip.blockchain_length.unwrap_or(0) + 1
-            >= precomputed_block.blockchain_length.unwrap_or(0)
-        {
-            if let Some(root_extension) = self.root_extension(precomputed_block)? {
-                return Ok(root_extension);
-            }
-        }
-
-        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
-        if let Some((extended_branch_index, new_node_id, direction)) = 
-            self.dangling_extension(precomputed_block)? 
-        {
-            return Ok(self.update_dangling(
-                precomputed_block, 
-                extended_branch_index, 
-                new_node_id, 
-                direction)?
-            );
-        }
-
-        // block is added as a new dangling branch
-        self.new_dangling(precomputed_block)
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
