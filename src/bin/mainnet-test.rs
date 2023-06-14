@@ -11,16 +11,20 @@ use tokio::time::{Duration, Instant};
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    let log_dir = args[1]
+    let blocks_dir = args[1]
         .parse::<PathBuf>()
-        .expect("First arg should be block log dir path");
+        .expect("First arg should be blocks dir path");
+    assert!(blocks_dir.is_dir(), "Should be a dir path");
+
     let max_block_count = args[2]
         .parse::<u32>()
         .expect("Second arg should be number of blocks");
 
-    let mut bp = BlockParser::new(&log_dir).unwrap();
+    let freq = 5000;
 
-    const DB_PATH: &str = "./block-store-test";
+    let mut bp = BlockParser::new(&blocks_dir).unwrap();
+
+    const DB_PATH: &str = "./mainnet-test-block-store";
     let store_dir = &PathBuf::from(DB_PATH);
 
     const GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
@@ -36,6 +40,8 @@ async fn main() {
     .unwrap();
 
     let mut max_branches = 1;
+    let mut max_root_len = 0;
+    let mut max_root_height = 0;
     let mut max_dangling_len = 0;
     let mut max_dangling_height = 0;
     let mut block_count = 1;
@@ -43,6 +49,26 @@ async fn main() {
     let mut adding = Duration::new(0, 0);
 
     for _ in 1..max_block_count {
+        if block_count % freq == 0 {
+            println!("=== Progress #{} ===", block_count / freq);
+            println!("Blocks:  {block_count}");
+            println!("Total:   {:?}", total.elapsed());
+
+            let blocks_per_sec = block_count as f64 / adding.as_secs_f64();
+            println!("\n~~~ Add to state ~~~");
+            println!("Avg:     {:?}", adding / block_count);
+            println!("Total:   {adding:?}");
+            println!("Per sec: {blocks_per_sec:?} blocks");
+            println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
+
+            println!("\n~~~ Branches ~~~");
+            println!("Max num:             {max_branches}");
+            println!("Max root length:     {max_root_len}");
+            println!("Max root height:     {max_root_height}");
+            println!("Max dangling len:    {max_dangling_len}");
+            println!("Max dangling height: {max_dangling_height}\n");
+        }
+
         match bp.next().await {
             Err(err) => {
                 println!("{err:?}");
@@ -53,19 +79,17 @@ async fn main() {
             }
             Ok(Some(block)) => {
                 let add = Instant::now();
-                let _ext = state.add_block(&block).unwrap();
+                state.add_block(&block).unwrap();
                 adding += add.elapsed();
+
+                // update metrics
                 block_count += 1;
-                if state.dangling_branches.len() + 1 > max_branches {
-                    max_branches = state.dangling_branches.len() + 1;
-                }
+                max_branches = state.dangling_branches.len().max(max_branches);
+                max_root_height = state.root_branch.height().max(max_root_height);
+                max_root_len = state.root_branch.len().max(max_root_len);
                 for dangling in &state.dangling_branches {
-                    if dangling.len() > max_dangling_len {
-                        max_dangling_len = dangling.len();
-                    }
-                    if dangling.height() > max_dangling_height {
-                        max_dangling_height = dangling.height();
-                    }
+                    max_dangling_height = dangling.height().max(max_dangling_height);
+                    max_dangling_len = dangling.len().max(max_dangling_len);
                 }
             }
         }
@@ -94,10 +118,10 @@ async fn main() {
     println!("Max dangling len:    {max_dangling_len}");
     println!("Max dangling height: {max_dangling_height}\n");
 
-    println!("Estimated time to ingest all (~260_000) mainnet blocks at this rate:");
+    println!("Estimated time to ingest all (~640_000) mainnet blocks at this rate:");
     println!(
         "{} hrs",
-        (260_000. * total_add.as_secs_f64()) / (3600. * block_count as f64)
+        (640_000. * total_add.as_secs_f64()) / (3600. * block_count as f64)
     );
 
     println!("\n~~~ DB stats ~~~");
