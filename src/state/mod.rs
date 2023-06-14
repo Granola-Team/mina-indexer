@@ -145,12 +145,11 @@ impl IndexerState {
         if let Some((extended_branch_index, new_node_id, direction)) = 
             self.dangling_extension(precomputed_block)? 
         {
-            return Ok(self.update_dangling(
+            return self.update_dangling(
                 precomputed_block, 
                 extended_branch_index, 
                 new_node_id, 
-                direction)?
-            );
+                direction);
         }
 
         // block is added as a new dangling branch
@@ -332,12 +331,12 @@ impl IndexerState {
                 }
 
                 self.dangling_branches.push(extended_branch);
-                return Ok(ExtensionType::DanglingComplex);
+                Ok(ExtensionType::DanglingComplex)
             } else {
-                return match direction {
+                match direction {
                     ExtensionDirection::Forward => Ok(ExtensionType::DanglingSimpleForward),
                     ExtensionDirection::Reverse => Ok(ExtensionType::DanglingSimpleReverse),
-                };
+                }
             }
     }
 
