@@ -224,7 +224,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 let db_stats_str = indexer_state
                     .block_store
                     .as_ref()
-                    .map(|db| db.stats());
+                    .map(|db| db.db_stats());
                 let mem = indexer_state
                     .block_store
                     .as_ref()
