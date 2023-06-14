@@ -26,6 +26,8 @@ pub struct IndexerState {
     /// Block database
     pub block_store: Option<BlockStoreConn>,
     pub transition_frontier_length: Option<u32>,
+    /// Interval to the prune the root branch
+    pub prune_interval: Option<u32>,
     /// Number of blocks added to the state
     pub blocks_processed: u32,
     /// Time the indexer started running
@@ -56,6 +58,7 @@ impl IndexerState {
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
+        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
@@ -65,6 +68,7 @@ impl IndexerState {
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
+            prune_interval,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -85,6 +89,7 @@ impl IndexerState {
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
+            prune_interval: None,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -97,9 +102,8 @@ impl IndexerState {
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-        prune_interval: u32,
     ) -> anyhow::Result<ExtensionType> {
-        self.prune_root_branch(prune_interval);
+        self.prune_root_branch();
 
         // check that the block doesn't already exist in the db
         let state_hash = &precomputed_block.state_hash;
@@ -319,8 +323,9 @@ impl IndexerState {
         None
     }
 
-    fn prune_root_branch(&mut self, interval: u32) {
+    fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
+            let interval = self.prune_interval.unwrap_or(5);
             if self.root_branch.height() as u32 > interval * k {
                 info!("Pruning transition frontier at k={}", k);
                 self.root_branch
