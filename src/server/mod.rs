@@ -46,6 +46,9 @@ pub struct ServerArgs {
     /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
     db_override: bool,
+    /// Interval for pruning the root branch
+    #[arg(short, long, default_value_t = 5)]
+    prune_interval: u32,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -61,6 +64,7 @@ pub struct IndexerConfiguration {
     watch_dir: PathBuf,
     database_dir: PathBuf,
     log_file: Option<PathBuf>,
+    prune_interval: u32,
 }
 
 pub async fn handle_command_line_arguments(
@@ -75,6 +79,7 @@ pub async fn handle_command_line_arguments(
     let watch_dir = args.watch_dir.unwrap();
     let database_dir = args.database_dir.unwrap();
     let log_dir = args.log_dir;
+    let prune_interval = args.prune_interval;
 
     info!(
         "Parsing genesis ledger file at {}",
@@ -112,6 +117,7 @@ pub async fn handle_command_line_arguments(
                 watch_dir,
                 database_dir,
                 log_file,
+                prune_interval,
             })
         }
     }
@@ -131,6 +137,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         watch_dir,
         database_dir,
         log_file,
+        prune_interval,
     } = handle_command_line_arguments(args).await?;
 
     let (non_blocking, _guard) = match log_file {
@@ -160,7 +167,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     let ingestion_time = Instant::now();
     while let Some(block) = block_parser.next().await? {
         debug!("Adding {:?} to the state", &block.state_hash);
-        indexer_state.add_block(&block)?;
+        indexer_state.add_block(&block, prune_interval)?;
         block_count += 1;
     }
     info!(
@@ -181,7 +188,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
                     debug!("Receiving block {:?}", precomputed_block);
-                    indexer_state.add_block(&precomputed_block)?;
+                    indexer_state.add_block(&precomputed_block, prune_interval)?;
                     info!("Added block {:?}", &precomputed_block.state_hash);
                 } else {
                     info!("Block receiver shutdown, system exit");
