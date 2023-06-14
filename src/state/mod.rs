@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use std::time::Instant;
+use id_tree::NodeId;
 use time::OffsetDateTime;
 use tracing::{info, warn};
 
@@ -96,16 +97,13 @@ impl IndexerState {
         })
     }
 
-    pub fn prune_root(&mut self) {
+    fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
-            if let Some(interval) = self.prune_interval {
-                if self.blocks_processed % interval == 0 {
-                    info!("pruning transition frontier at k={}", k);
-                    self.root_branch.prune_transition_frontier(k);
-                }
-            } else {
-                info!("pruning transition frontier at k={}", k);
-                self.root_branch.prune_transition_frontier(k);
+            let interval = self.prune_interval.unwrap_or(5);
+            if self.root_branch.height() as u32 > interval * k {
+                info!("Pruning transition frontier at k={}", k);
+                self.root_branch
+                    .prune_transition_frontier(k, &self.best_tip);
             }
         }
     }
@@ -118,7 +116,7 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
         // prune the root branch
-        self.prune_root();
+        self.prune_root_branch();
 
         // check that the block doesn't already exist in the db
         if self.block_exists(&precomputed_block.state_hash)? {
@@ -171,7 +169,7 @@ impl IndexerState {
 
     pub fn root_extension(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<Option<ExtensionType>> {
         if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
-            self.update_best_tip(&new_node_id);
+            self.update_best_tip();
             let mut branches_to_remove = Vec::new();
             // check if new block connects to a dangling branch
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
@@ -195,7 +193,7 @@ impl IndexerState {
                     self.dangling_branches.remove(index_to_remove - num_removed);
                 }
 
-                self.update_best_tip(&new_node_id);
+                self.update_best_tip();
                 Ok(Some(ExtensionType::RootComplex))
             } else {
                 // if there aren't any branches that are connected
@@ -378,17 +376,6 @@ impl IndexerState {
             }
         }
         None
-    }
-
-    fn prune_root_branch(&mut self) {
-        if let Some(k) = self.transition_frontier_length {
-            let interval = self.prune_interval.unwrap_or(5);
-            if self.root_branch.height() as u32 > interval * k {
-                info!("Pruning transition frontier at k={}", k);
-                self.root_branch
-                    .prune_transition_frontier(k, &self.best_tip);
-            }
-        }
     }
 
     fn update_best_tip(&mut self) {
