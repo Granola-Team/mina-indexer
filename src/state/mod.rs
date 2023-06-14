@@ -134,9 +134,9 @@ impl IndexerState {
 
         // forward extension on root branch
         // check leaf heights first
-        if precomputed_block.blockchain_length.is_some()
+        if (precomputed_block.blockchain_length.is_some()
             && self.best_tip.blockchain_length.unwrap_or(0) + 1
-                >= precomputed_block.blockchain_length.unwrap()
+                >= precomputed_block.blockchain_length.unwrap())
             || precomputed_block.blockchain_length.is_none()
         {
             if let Some(root_extension) = self.root_extension(precomputed_block)? {
