@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{client, server};
+use tracing::instrument;
 use std::error::Error;
 
 #[derive(Parser, Debug)]
@@ -21,6 +22,7 @@ enum IndexerCommand {
     },
 }
 
+#[instrument]
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
     let indexer_folder = std::path::Path::new(concat!(env!("HOME"), "/mina-indexer"));

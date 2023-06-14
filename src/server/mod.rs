@@ -16,7 +16,7 @@ use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, str::FromStr};
 use time::PrimitiveDateTime;
 use tokio::{fs, time::Instant};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Parser, Debug, Clone)]
@@ -67,6 +67,7 @@ pub struct IndexerConfiguration {
     prune_interval: Option<u32>,
 }
 
+#[instrument]
 pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
@@ -123,6 +124,7 @@ pub async fn handle_command_line_arguments(
     }
 }
 
+#[instrument]
 pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
@@ -167,7 +169,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     let mut block_count = 0;
     let ingestion_time = Instant::now();
     while let Some(block) = block_parser.next().await? {
-        debug!("Adding {:?} to the state", &block.state_hash);
+        debug!("Adding {:?} with length {:?} to the state", &block.state_hash, &block.blockchain_length);
         indexer_state.add_block(&block)?;
         block_count += 1;
     }
@@ -260,6 +262,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     }
 }
 
+#[instrument]
 async fn handle_conn(
     conn: LocalSocketStream,
     db: BlockStoreConn,
