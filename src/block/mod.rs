@@ -62,6 +62,26 @@ impl Block {
     }
 }
 
+impl std::cmp::PartialOrd for Block {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.state_hash == other.state_hash {
+            Some(std::cmp::Ordering::Equal)
+        } else if self.height > other.height
+            || self.height == other.height && self.state_hash.0 > other.state_hash.0
+        {
+            Some(std::cmp::Ordering::Greater)
+        } else {
+            Some(std::cmp::Ordering::Less)
+        }
+    }
+}
+
+impl std::cmp::Ord for Block {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
