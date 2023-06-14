@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::block::receiver::BlockReceiver;
 use tokio::{
-    fs::{create_dir, remove_dir, remove_file, File},
+    fs::{create_dir, metadata, remove_dir_all, File},
     io::AsyncWriteExt,
     process::Command,
 };
@@ -18,11 +18,10 @@ async fn detects_new_block_written() {
     let mut test_block_path = test_dir_path.clone();
     test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
-    if tokio::fs::metadata(&test_block_path).await.is_ok() {
-        remove_file(test_block_path.clone()).await.unwrap();
-        remove_dir(TEST_DIR).await.unwrap();
+    if metadata(&TEST_DIR).await.is_ok() {
+        remove_dir_all(TEST_DIR).await.unwrap();
     }
-    create_dir(TEST_DIR).await.unwrap_or(());
+    create_dir(TEST_DIR).await.unwrap();
 
     let mut block_receiver = BlockReceiver::new().await.unwrap();
 
@@ -33,8 +32,9 @@ async fn detects_new_block_written() {
 
     let _recvd = block_receiver.recv().await.unwrap().unwrap();
 
-    remove_file(test_block_path).await.unwrap();
-    remove_dir(TEST_DIR).await.unwrap();
+    if metadata(TEST_DIR).await.is_ok() {
+        remove_dir_all(TEST_DIR).await.unwrap();
+    }
 }
 
 #[tokio::test]
@@ -46,9 +46,8 @@ async fn detects_new_block_copied() {
     let mut test_block_path = test_dir_path.clone();
     test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
-    if tokio::fs::metadata(&test_block_path).await.is_ok() {
-        remove_file(test_block_path.clone()).await.unwrap();
-        remove_dir(TEST_DIR).await.unwrap();
+    if metadata(&TEST_DIR).await.is_ok() {
+        remove_dir_all(TEST_DIR).await.unwrap();
     }
     create_dir(TEST_DIR).await.unwrap_or(());
 
@@ -65,6 +64,7 @@ async fn detects_new_block_copied() {
 
     let _recvd = block_receiver.recv().await.unwrap().unwrap();
 
-    remove_file(test_block_path).await.unwrap();
-    remove_dir(TEST_DIR).await.unwrap();
+    if metadata(TEST_DIR).await.is_ok() {
+        remove_dir_all(TEST_DIR).await.unwrap();
+    }
 }

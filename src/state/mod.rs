@@ -5,7 +5,6 @@ use crate::{
         ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
     },
 };
-use id_tree::NodeId;
 use std::time::Instant;
 use time::OffsetDateTime;
 use tracing::{info, warn};
@@ -27,6 +26,7 @@ pub struct IndexerState {
     /// Block database
     pub block_store: Option<BlockStoreConn>,
     pub transition_frontier_length: Option<u32>,
+    /// Interval to the prune the root branch
     pub prune_interval: Option<u32>,
     /// Number of blocks added to the state
     pub blocks_processed: u32,
@@ -80,7 +80,6 @@ impl IndexerState {
         root_ledger: Option<Ledger>,
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
-        prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block, root_ledger);
         let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
@@ -90,7 +89,7 @@ impl IndexerState {
             dangling_branches: Vec::new(),
             block_store,
             transition_frontier_length,
-            prune_interval,
+            prune_interval: None,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -134,8 +133,10 @@ impl IndexerState {
 
         // forward extension on root branch
         // check leaf heights first
-        if self.best_tip.blockchain_length.unwrap_or(0) + 1
-            >= precomputed_block.blockchain_length.unwrap_or(0)
+        if precomputed_block.blockchain_length.is_some()
+            && self.best_tip.blockchain_length.unwrap_or(0) + 1
+                >= precomputed_block.blockchain_length.unwrap()
+            || precomputed_block.blockchain_length.is_none()
         {
             if let Some(root_extension) = self.root_extension(precomputed_block)? {
                 return Ok(root_extension);
@@ -215,7 +216,7 @@ impl IndexerState {
                 dangling_branch.root.blockchain_length,
             ) {
                 (Some(max_length), min_length) => {
-                    // check incoming block is within the height bounds
+                    // check incoming block is within the length bounds
                     if let Some(length) = precomputed_block.blockchain_length {
                         if max_length + 1 >= length && length + 1 >= min_length.unwrap_or(0) {
                             // simple reverse
@@ -241,12 +242,7 @@ impl IndexerState {
                                 break;
                             }
 
-                            // if the block is already in a dangling branch, do nothing
-                            if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                                return Err(anyhow::Error::msg(
-                                    "Same block added twice to the indexer state",
-                                ));
-                            }
+                            Self::same_block_added_twice(dangling_branch, precomputed_block)?;
                         }
                     } else {
                         // we don't know the blockchain_length for the incoming block, so we can't discriminate
@@ -266,12 +262,7 @@ impl IndexerState {
                             break;
                         }
 
-                        // if the block is already in a dangling branch, do nothing
-                        if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                            return Err(anyhow::Error::msg(
-                                "Same block added twice to the indexer state",
-                            ));
-                        }
+                        Self::same_block_added_twice(dangling_branch, precomputed_block)?;
 
                         // simple forward
                         if let Some(new_node_id) =
@@ -296,13 +287,6 @@ impl IndexerState {
                             ExtensionDirection::Reverse,
                         ));
                         break;
-                    }
-
-                    // if the block is already in a dangling branch, do nothing
-                    if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Err(anyhow::Error::msg(
-                            "Same block added twice to the indexer state",
-                        ));
                     }
 
                     // simple forward
@@ -396,15 +380,38 @@ impl IndexerState {
         None
     }
 
-    fn update_best_tip(&mut self, new_node_id: &NodeId) {
-        if let Some(leaf) = self.root_branch.leaves.get(new_node_id) {
-            if leaf.block.height > self.best_tip.height
-                || leaf.block.height == self.best_tip.height
-                    && leaf.block.state_hash.0 > self.best_tip.state_hash.0
-            {
-                self.best_tip = leaf.block.clone();
+    fn prune_root_branch(&mut self) {
+        if let Some(k) = self.transition_frontier_length {
+            let interval = self.prune_interval.unwrap_or(5);
+            if self.root_branch.height() as u32 > interval * k {
+                info!("Pruning transition frontier at k={}", k);
+                self.root_branch
+                    .prune_transition_frontier(k, &self.best_tip);
             }
         }
+    }
+
+    fn update_best_tip(&mut self) {
+        if let Some(best_tip_leaf) = self
+            .root_branch
+            .leaves
+            .values()
+            .max_by(|leafx, leafy| leafx.block.cmp(&leafy.block))
+        {
+            self.best_tip = best_tip_leaf.block.clone();
+        };
+    }
+
+    fn same_block_added_twice<T>(
+        branch: &Branch<T>,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<()> {
+        if precomputed_block.state_hash == branch.root.state_hash.0 {
+            return Err(anyhow::Error::msg(
+                "Same block added twice to the indexer state",
+            ));
+        }
+        Ok(())
     }
 }
 

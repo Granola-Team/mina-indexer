@@ -16,7 +16,7 @@ async fn extension() {
     //      => child0 => child0 child1
     // --------------------------------
 
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
     // ----------------
@@ -33,7 +33,7 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None).unwrap();
 
     // root branch
     // - len = 1
