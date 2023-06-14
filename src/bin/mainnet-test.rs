@@ -1,4 +1,7 @@
 use bytesize::ByteSize;
+
+use clap::Parser;
+
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     state::{ledger::genesis, IndexerState},
@@ -7,18 +10,23 @@ use mina_indexer::{
 use std::path::PathBuf;
 use tokio::time::{Duration, Instant};
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    blocks_dir: PathBuf,
+    #[arg(short, long, default_value_t = 10_000)]
+    max_block_count: u32,
+}
+
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let args = Args::parse();
+    let blocks_dir = args.blocks_dir;
 
-    let blocks_dir = args[1]
-        .parse::<PathBuf>()
-        .expect("First arg should be blocks dir path");
     assert!(blocks_dir.is_dir(), "Should be a dir path");
 
-    let max_block_count = args[2]
-        .parse::<u32>()
-        .expect("Second arg should be number of blocks");
+    let max_block_count = args.max_block_count;
 
     let freq = 5000;
 
