@@ -47,8 +47,8 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = false)]
     db_override: bool,
     /// Interval for pruning the root branch
-    #[arg(short, long, default_value_t = 5)]
-    prune_interval: u32,
+    #[arg(short, long)]
+    prune_interval: Option<u32>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -64,7 +64,7 @@ pub struct IndexerConfiguration {
     watch_dir: PathBuf,
     database_dir: PathBuf,
     log_file: Option<PathBuf>,
-    prune_interval: u32,
+    prune_interval: Option<u32>,
 }
 
 pub async fn handle_command_line_arguments(
@@ -158,6 +158,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         genesis_ledger.ledger,
         Some(&database_dir),
         Some(MAINNET_TRANSITION_FRONTIER_K),
+        prune_interval,
     )?;
 
     let init_dir = startup_dir.display().to_string();
@@ -167,7 +168,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     let ingestion_time = Instant::now();
     while let Some(block) = block_parser.next().await? {
         debug!("Adding {:?} to the state", &block.state_hash);
-        indexer_state.add_block(&block, prune_interval)?;
+        indexer_state.add_block(&block)?;
         block_count += 1;
     }
     info!(
@@ -188,7 +189,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
                     debug!("Receiving block {:?}", precomputed_block);
-                    indexer_state.add_block(&precomputed_block, prune_interval)?;
+                    indexer_state.add_block(&precomputed_block)?;
                     info!("Added block {:?}", &precomputed_block.state_hash);
                 } else {
                     info!("Block receiver shutdown, system exit");
