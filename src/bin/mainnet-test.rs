@@ -36,6 +36,7 @@ async fn main() {
         genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
         Some(MAINNET_TRANSITION_FRONTIER_K),
+        None,
     )
     .unwrap();
 
@@ -125,49 +126,35 @@ async fn main() {
     );
 
     println!("\n~~~ DB stats ~~~");
-    let db_stats = state
-        .block_store
-        .as_ref()
-        .unwrap()
-        .database
-        .property_value(rocksdb::properties::DBSTATS)
-        .unwrap()
-        .unwrap();
-    let est_data_size = state
-        .block_store
-        .as_ref()
-        .unwrap()
-        .database
-        .property_int_value(rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE)
-        .unwrap()
-        .unwrap();
-    let est_num_keys = state
-        .block_store
-        .as_ref()
-        .unwrap()
-        .database
-        .property_int_value(rocksdb::properties::ESTIMATE_NUM_KEYS)
-        .unwrap()
-        .unwrap();
-    let curr_size_mem = state
-        .block_store
-        .as_ref()
-        .unwrap()
-        .database
-        .property_int_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
-        .unwrap()
-        .unwrap();
-
-    println!("Estimate number of keys:    {est_num_keys:?}");
+    println!(
+        "Estimate number of keys:    {:?}",
+        state
+            .block_store
+            .as_ref()
+            .unwrap()
+            .estimate_live_data_size()
+    );
     println!(
         "Estimate live data size:    {:?}",
-        ByteSize::b(est_data_size)
+        ByteSize::b(
+            state
+                .block_store
+                .as_ref()
+                .unwrap()
+                .estimate_live_data_size()
+        )
     );
     println!(
         "Current size all memtables: {:?}",
-        ByteSize::b(curr_size_mem)
+        ByteSize::b(
+            state
+                .block_store
+                .as_ref()
+                .unwrap()
+                .cur_size_all_mem_tables()
+        )
     );
-    println!("{db_stats}");
+    println!("{}", state.block_store.as_ref().unwrap().db_stats());
 
     tokio::fs::remove_dir_all(store_dir).await.unwrap();
 }

@@ -61,7 +61,7 @@ impl BlockStoreConn {
         Ok(())
     }
 
-    pub fn stats(&self) -> String {
+    pub fn db_stats(&self) -> String {
         self.database
             .property_value(rocksdb::properties::DBSTATS)
             .unwrap()
@@ -71,6 +71,34 @@ impl BlockStoreConn {
     pub fn memtables_size(&self) -> String {
         self.database
             .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn x(&self) -> String {
+        self.database
+            .property_value(rocksdb::properties::DBSTATS)
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn estimate_live_data_size(&self) -> u64 {
+        self.database
+            .property_int_value(rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE)
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn estimate_num_keys(&self) -> u64 {
+        self.database
+            .property_int_value(rocksdb::properties::ESTIMATE_NUM_KEYS)
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn cur_size_all_mem_tables(&self) -> u64 {
+        self.database
+            .property_int_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
     }
