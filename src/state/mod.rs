@@ -121,67 +121,42 @@ impl IndexerState {
         } else { Ok(false) } 
     }
 
-    /// Adds the block to the witness tree and the precomputed block to the db
-    ///
-    /// Errors if the block is already present in the witness tree
-    pub fn add_block(
-        &mut self,
-        precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<ExtensionType> {
-        // prune the root branch
-        self.prune_root();
+    pub fn root_extension(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<Option<ExtensionType>> {
+        if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
+            self.update_best_tip(&new_node_id);
+            let mut branches_to_remove = Vec::new();
+            // check if new block connects to a dangling branch
+            for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
+                // incoming block is the parent of the dangling branch root
+                if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+                    self.root_branch.merge_on(&new_node_id, dangling_branch);
+                    branches_to_remove.push(index);
+                }
 
-        // check that the block doesn't already exist in the db
-        if !self.block_exists(&precomputed_block.state_hash)? {
-            if let Some(block_store) = self.block_store.as_ref() {
-                block_store.add_block(precomputed_block)?;
+                // if the block is already in the dangling branch, do nothing
+                if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
+                    return Err(anyhow::Error::msg(
+                        "Same block added twice to the indexer state",
+                    ));
+                }
             }
-        } else {
-            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
-            return Ok(ExtensionType::BlockNotAdded);
-        }
 
-        self.blocks_processed += 1;
+            if !branches_to_remove.is_empty() {
+                // if the root branch is newly connected to dangling branches
+                for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
+                    self.dangling_branches.remove(index_to_remove - num_removed);
+                }
 
-        // forward extension on root branch
-        // check leaf heights first
-        if self.best_tip.blockchain_length.unwrap_or(0) + 1
-            >= precomputed_block.blockchain_length.unwrap_or(0)
-        {
-            if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
                 self.update_best_tip(&new_node_id);
-                let mut branches_to_remove = Vec::new();
-                // check if new block connects to a dangling branch
-                for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
-                    // incoming block is the parent of the dangling branch root
-                    if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                        self.root_branch.merge_on(&new_node_id, dangling_branch);
-                        branches_to_remove.push(index);
-                    }
-
-                    // if the block is already in the dangling branch, do nothing
-                    if precomputed_block.state_hash == dangling_branch.root.state_hash.0 {
-                        return Err(anyhow::Error::msg(
-                            "Same block added twice to the indexer state",
-                        ));
-                    }
-                }
-
-                if !branches_to_remove.is_empty() {
-                    // if the root branch is newly connected to dangling branches
-                    for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
-                        self.dangling_branches.remove(index_to_remove - num_removed);
-                    }
-
-                    self.update_best_tip(&new_node_id);
-                    return Ok(ExtensionType::RootComplex);
-                } else {
-                    // if there aren't any branches that are connected
-                    return Ok(ExtensionType::RootSimple);
-                }
+                Ok(Some(ExtensionType::RootComplex))
+            } else {
+                // if there aren't any branches that are connected
+                Ok(Some(ExtensionType::RootSimple))
             }
-        }
+        } else { Ok(None) }
+    }
 
+    pub fn dangling_extension(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
             match (
@@ -293,9 +268,18 @@ impl IndexerState {
             }
         }
 
-        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
-        if let Some((extended_branch_index, new_node_id, direction)) = extension {
-            let mut branches_to_update = Vec::new();
+        Ok(extension)
+    }
+
+    pub fn update_dangling(
+        &mut self, 
+        precomputed_block: &PrecomputedBlock,
+        extended_branch_index: usize, 
+        new_node_id: NodeId, 
+        direction: ExtensionDirection) 
+        -> anyhow::Result<ExtensionType>
+    {
+        let mut branches_to_update = Vec::new();
             for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
                 if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
                     branches_to_update.push(index);
@@ -326,9 +310,9 @@ impl IndexerState {
                     ExtensionDirection::Reverse => Ok(ExtensionType::DanglingSimpleReverse),
                 };
             }
-        }
+    }
 
-        // block is added as a new dangling branch
+    pub fn new_dangling(&mut self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<ExtensionType> {
         self.dangling_branches.push(
             Branch::new(
                 precomputed_block,
@@ -337,6 +321,54 @@ impl IndexerState {
             .expect("cannot fail"),
         );
         Ok(ExtensionType::DanglingNew)
+    }
+
+    /// Adds the block to the witness tree and the precomputed block to the db
+    ///
+    /// Errors if the block is already present in the witness tree
+    pub fn add_block(
+        &mut self,
+        precomputed_block: &PrecomputedBlock,
+    ) -> anyhow::Result<ExtensionType> {
+        // prune the root branch
+        self.prune_root();
+
+        // check that the block doesn't already exist in the db
+        if !self.block_exists(&precomputed_block.state_hash)? {
+            if let Some(block_store) = self.block_store.as_ref() {
+                block_store.add_block(precomputed_block)?;
+            }
+        } else {
+            warn!( "Block with state hash '{:?}' is already present in the block store", &precomputed_block.state_hash);
+            return Ok(ExtensionType::BlockNotAdded);
+        }
+
+        self.blocks_processed += 1;
+
+        // forward extension on root branch
+        // check leaf heights first
+        if self.best_tip.blockchain_length.unwrap_or(0) + 1
+            >= precomputed_block.blockchain_length.unwrap_or(0)
+        {
+            if let Some(root_extension) = self.root_extension(precomputed_block)? {
+                return Ok(root_extension);
+            }
+        }
+
+        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
+        if let Some((extended_branch_index, new_node_id, direction)) = 
+            self.dangling_extension(precomputed_block)? 
+        {
+            return Ok(self.update_dangling(
+                precomputed_block, 
+                extended_branch_index, 
+                new_node_id, 
+                direction)?
+            );
+        }
+
+        // block is added as a new dangling branch
+        self.new_dangling(precomputed_block)
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
