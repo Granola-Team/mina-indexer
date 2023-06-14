@@ -136,7 +136,7 @@ where
             .expect("root_node_id guaranteed by constructor");
         for node_id in self
             .branches
-            .traverse_level_order_ids(root_node_id)
+            .traverse_post_order_ids(root_node_id)
             .expect("root_node_id is valid")
         {
             let node = self
@@ -458,7 +458,7 @@ where
     pub fn mem(&self, state_hash: &BlockHash) -> bool {
         for node in self
             .branches
-            .traverse_level_order(self.branches.root_node_id().unwrap())
+            .traverse_post_order(self.branches.root_node_id().unwrap())
             .unwrap()
         {
             if &node.data().block.state_hash == state_hash {
