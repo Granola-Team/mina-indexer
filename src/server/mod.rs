@@ -26,7 +26,7 @@ pub struct ServerArgs {
     #[arg(short, long)]
     genesis_ledger: PathBuf,
     /// Hash of startup ledger
-    #[arg(short, long)]
+    #[arg(long, default_value = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ")]
     root_hash: Option<String>,
     /// Path to startup blocks directory
     #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/default-startup-dir"))]
