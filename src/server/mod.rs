@@ -26,19 +26,22 @@ pub struct ServerArgs {
     #[arg(short, long)]
     genesis_ledger: PathBuf,
     /// Hash of startup ledger
-    #[arg(short, long)]
+    #[arg(
+        long,
+        default_value = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+    )]
     root_hash: Option<String>,
     /// Path to startup blocks directory
-    #[arg(short, long)]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/startup-dir"))]
     startup_dir: Option<PathBuf>,
     /// Path to directory to watch for new blocks
-    #[arg(short, long)]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/watch-dir"))]
     watch_dir: Option<PathBuf>,
     /// Path to directory for rocksdb
-    #[arg(short, long)]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/database-dir"))]
     database_dir: Option<PathBuf>,
     /// Path to directory for logs (default: stdout)
-    #[arg(short, long)]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/log-dir"))]
     log_dir: Option<PathBuf>,
     /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
