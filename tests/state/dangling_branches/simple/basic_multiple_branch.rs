@@ -23,7 +23,7 @@ async fn extensions() {
     //      .     =>    1
     // -----------------------
 
-    let log_dir = PathBuf::from("./tests/data/beautified_sequential_blocks");
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new(&log_dir).unwrap();
 
     // root0_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
@@ -51,7 +51,7 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new_testing(&root0_block, None, None, None, None).unwrap();
+    let mut state = IndexerState::new_testing(&root0_block, None, None, None).unwrap();
 
     // Root branch
     // - len = 1

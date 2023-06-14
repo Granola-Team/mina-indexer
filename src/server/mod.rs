@@ -46,6 +46,9 @@ pub struct ServerArgs {
     /// Override an existing db on the path provided by database_dir (default: false)
     #[arg(long, default_value_t = false)]
     db_override: bool,
+    /// Interval for pruning the root branch
+    #[arg(short, long)]
+    prune_interval: Option<u32>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -61,6 +64,7 @@ pub struct IndexerConfiguration {
     watch_dir: PathBuf,
     database_dir: PathBuf,
     log_file: Option<PathBuf>,
+    prune_interval: Option<u32>,
 }
 
 pub async fn handle_command_line_arguments(
@@ -75,6 +79,7 @@ pub async fn handle_command_line_arguments(
     let watch_dir = args.watch_dir.unwrap();
     let database_dir = args.database_dir.unwrap();
     let log_dir = args.log_dir;
+    let prune_interval = args.prune_interval;
 
     info!(
         "Parsing genesis ledger file at {}",
@@ -112,6 +117,7 @@ pub async fn handle_command_line_arguments(
                 watch_dir,
                 database_dir,
                 log_file,
+                prune_interval,
             })
         }
     }
@@ -131,6 +137,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         watch_dir,
         database_dir,
         log_file,
+        prune_interval,
     } = handle_command_line_arguments(args).await?;
 
     let (non_blocking, _guard) = match log_file {
@@ -151,7 +158,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         genesis_ledger.ledger,
         Some(&database_dir),
         Some(MAINNET_TRANSITION_FRONTIER_K),
-        Some(100),
+        prune_interval,
     )?;
 
     let init_dir = startup_dir.display().to_string();

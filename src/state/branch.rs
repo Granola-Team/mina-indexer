@@ -7,8 +7,11 @@ use crate::{
     },
 };
 use id_tree::{
-    InsertBehavior::{self, *},
-    Node, NodeId, Tree,
+    InsertBehavior::{AsRoot, UnderNode},
+    MoveBehavior::ToRoot,
+    Node, NodeId,
+    RemoveBehavior::{DropChildren, OrphanChildren},
+    Tree,
 };
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
@@ -133,7 +136,7 @@ where
             .expect("root_node_id guaranteed by constructor");
         for node_id in self
             .branches
-            .traverse_level_order_ids(root_node_id)
+            .traverse_post_order_ids(root_node_id)
             .expect("root_node_id is valid")
         {
             let node = self
@@ -181,86 +184,96 @@ where
         None
     }
 
-    pub fn prune_transition_frontier(&mut self, k: u32) {
+    /// Prunes the tree and updates the root and leaves
+    pub fn prune_transition_frontier(&mut self, k: u32, best_tip: &Block) {
+        let mut witness_length = 0;
+        let mut new_root_id = None;
         let mut prune_point_id = None;
-        for (node_id, _leaf) in self.leaves.iter() {
-            let mut witness_length = 0;
-            let mut transition_frontier_id = None;
-            for ancestor_id in self
-                .branches
-                .ancestor_ids(node_id)
-                .expect("node_id from leaves, is valid")
-            {
-                witness_length += 1;
-                if witness_length >= k {
-                    transition_frontier_id = Some(ancestor_id.clone());
-                    break;
-                }
+        let best_tip_id = self.leaf_node_id(best_tip).unwrap();
+
+        for ancestor_id in self.branches.ancestor_ids(best_tip_id).unwrap().cloned() {
+            witness_length += 1;
+            if witness_length == k {
+                new_root_id = Some(ancestor_id.clone());
             }
-            if let Some(node_id) = transition_frontier_id {
-                prune_point_id = Some(node_id);
-                break;
+            if witness_length == k + 1 {
+                prune_point_id = Some(ancestor_id);
             }
         }
 
-        if let Some(node_id) = prune_point_id {
-            let mut new_tree = Tree::new();
-            let mut new_leaves = HashMap::new();
-            let mut merge_id_map = HashMap::new();
+        // guaranteed to exist because of the height precondition
+        let new_root_id = new_root_id.unwrap();
+        let prune_point_id = prune_point_id.unwrap();
 
-            let new_root_data = self
-                .branches
-                .get(&node_id)
-                .expect("node_id valid, comes from iterator")
-                .data()
-                .clone();
-            let new_root_id = new_tree
-                .insert(Node::new(new_root_data.clone()), InsertBehavior::AsRoot)
-                .expect("insert as root always succeeds");
-            merge_id_map.insert(node_id.clone(), new_root_id);
-            for old_node_id in self
-                .branches
-                .traverse_level_order_ids(&node_id)
-                .expect("node_id guaranteed by iterator")
-            {
-                let under_node_id = merge_id_map
-                    .get(&old_node_id)
-                    .expect("guaranteed by call structure");
-                let children_ids = self
-                    .branches
-                    .children_ids(&old_node_id)
-                    .expect("old_node_id valid");
-                let mut merge_id_map_inserts = Vec::new();
-                for child_id in children_ids {
-                    let child_node_data = self
-                        .branches
-                        .get(child_id)
-                        .expect("child_id valid")
-                        .data()
-                        .clone();
-                    let new_child_id = new_tree
-                        .insert(Node::new(child_node_data.clone()), UnderNode(under_node_id))
-                        .expect("under_node_id guaranteed by call structure");
-                    if self
-                        .branches
-                        .children_ids(child_id)
-                        .expect("child_id is valid")
-                        .collect::<Vec<&NodeId>>()
-                        .is_empty()
-                    {
-                        new_leaves.insert(new_child_id.clone(), child_node_data.clone());
-                    }
-                    merge_id_map_inserts.push((child_id, new_child_id));
-                }
-                for (child_id, new_child_id) in merge_id_map_inserts {
-                    merge_id_map.insert(child_id.clone(), new_child_id);
-                }
+        // remove all prune point siblings
+        for node_id in self
+            .branches
+            .get(&prune_point_id)
+            .unwrap()
+            .children()
+            .clone()
+        {
+            if node_id != new_root_id {
+                self.branches
+                    .remove_node(node_id.clone(), id_tree::RemoveBehavior::DropChildren)
+                    .unwrap();
             }
-
-            self.branches = new_tree;
-            self.leaves = new_leaves;
-            self.root = new_root_data.block;
         }
+
+        // remove parent node + orphan children
+        self.branches
+            .remove_node(prune_point_id, OrphanChildren)
+            .unwrap();
+
+        // remove original root + drop children
+        self.branches
+            .remove_node(self.branches.root_node_id().unwrap().clone(), DropChildren)
+            .unwrap();
+
+        // move prune node to root
+        self.branches.move_node(&new_root_id, ToRoot).unwrap();
+
+        // update node heights
+        let n = self.branches.get(&new_root_id).unwrap().data().block.height;
+        let node_ids: Vec<NodeId> = self
+            .branches
+            .traverse_level_order_ids(&new_root_id)
+            .unwrap()
+            .collect();
+        for node_id in node_ids {
+            let node = self.branches.get_mut(&node_id).unwrap();
+            node.data_mut().block.height -= n;
+        }
+
+        // update root
+        self.root = self
+            .branches
+            .get(&new_root_id)
+            .unwrap()
+            .data()
+            .block
+            .clone();
+
+        // update leaves
+        let mut to_remove = vec![];
+        for leaf_id in self.leaves.keys().cloned() {
+            if self.branches.get(&leaf_id).is_err() {
+                to_remove.push(leaf_id);
+            }
+        }
+        for leaf_id in to_remove {
+            self.leaves.remove(&leaf_id);
+        }
+    }
+
+    /// block is guaranteed to exist in leaves
+    fn leaf_node_id(&self, block: &Block) -> Option<&NodeId> {
+        for (node_id, leaf) in self.leaves.iter() {
+            if leaf.block.state_hash == block.state_hash {
+                return Some(node_id);
+            }
+        }
+        None
     }
 
     pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch<LedgerDiff>) {
@@ -445,7 +458,7 @@ where
     pub fn mem(&self, state_hash: &BlockHash) -> bool {
         for node in self
             .branches
-            .traverse_level_order(self.branches.root_node_id().unwrap())
+            .traverse_post_order(self.branches.root_node_id().unwrap())
             .unwrap()
         {
             if &node.data().block.state_hash == state_hash {
