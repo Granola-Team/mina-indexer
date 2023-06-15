@@ -41,7 +41,7 @@ async fn extension() {
     // - leaves = 1
     assert_eq!(state.root_branch.len(), 1);
     assert_eq!(state.root_branch.height(), 1);
-    assert_eq!(state.root_branch.leaves.len(), 1);
+    assert_eq!(state.root_branch.leaves().len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -72,7 +72,7 @@ async fn extension() {
     // - leaves = 1
     assert_eq!(state.root_branch.len(), 2);
     assert_eq!(state.root_branch.height(), 2);
-    assert_eq!(state.root_branch.leaves.len(), 1);
+    assert_eq!(state.root_branch.leaves().len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -98,7 +98,7 @@ async fn extension() {
     // - leaves = 2
     assert_eq!(state.root_branch.len(), 3);
     assert_eq!(state.root_branch.height(), 2);
-    assert_eq!(state.root_branch.leaves.len(), 2);
+    assert_eq!(state.root_branch.leaves().len(), 2);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -106,7 +106,7 @@ async fn extension() {
     // after extension quantities
     let after_root = &state.root_branch.root;
     let branches1 = &state.root_branch.branches;
-    let leaves1 = &state.root_branch.leaves;
+    let leaves1 = state.root_branch.leaves();
     let after_root_id = branches1.root_node_id().unwrap();
 
     // branch root should match the tree's root
@@ -132,23 +132,29 @@ async fn extension() {
     assert_eq!(after_children.len(), 2);
     println!("After children:\n  {:?}", after_children);
 
-    let after_child1 = after_children.get(0).unwrap();
-    let after_child2 = after_children.get(1).unwrap();
     let after_child1_block = Block::from_precomputed(&child1, 1);
     let after_child2_block = Block::from_precomputed(&child2, 1);
 
     // child1 is a leaf
-    assert_eq!(after_child1_block, leaves1.get(after_child1).unwrap().block);
+    assert!(leaves1
+        .iter()
+        .map(|x| x.block.clone())
+        .collect::<Vec<Block>>()
+        .contains(&after_child1_block));
 
     // child2 is a leaf
-    assert_eq!(after_child2_block, leaves1.get(after_child2).unwrap().block);
+    assert!(leaves1
+        .iter()
+        .map(|x| x.block.clone())
+        .collect::<Vec<Block>>()
+        .contains(&after_child2_block));
 
     println!("=== After Root Branch Leaves ===");
     println!(
         "{:?}",
         leaves1
             .iter()
-            .map(|(_, leaf)| &leaf.block)
+            .map(|leaf| &leaf.block)
             .collect::<Vec<&Block>>()
     );
 
@@ -156,5 +162,9 @@ async fn extension() {
     assert_eq!(&before_root, after_root);
 
     // after root isn't a leaf
-    assert!(!leaves1.contains_key(after_root_id));
+    assert!(!leaves1
+        .iter()
+        .map(|x| x.block.clone())
+        .collect::<Vec<Block>>()
+        .contains(after_root));
 }

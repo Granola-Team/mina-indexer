@@ -28,17 +28,14 @@ async fn extension() {
     let root_tree = Branch::new(&root_block, Ledger::new()).unwrap();
 
     // before extension quantities
-    let before_root = root_tree.root;
-    let before_branches = root_tree.branches;
+    let before_root = root_tree.root.clone();
+    let before_branches = root_tree.branches.clone();
     let before_root_id = before_branches.root_node_id().unwrap();
-    let before_leaves = root_tree.leaves;
     let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
-    let before_leaf_block = &before_leaves
-        .get(&before_root_id)
-        .expect("before: root = leaf");
+    let before_leaf_block = before_branches.get(&before_root_id).unwrap().data();
 
     // before root is also a leaf
-    assert_eq!(&before_root_leaf, before_leaf_block);
+    assert_eq!(before_root_leaf, before_leaf_block);
 
     // extend the branch with a child of the root
     let mut tree2 = Branch::new(&root_block, Ledger::new()).unwrap();
@@ -55,9 +52,8 @@ async fn extension() {
         .expect("new leaf should be inserted");
 
     // after extension quantities
-    let after_root = tree2.root;
-    let after_branches = tree2.branches;
-    let after_leaves = tree2.leaves;
+    let after_root = tree2.root.clone();
+    let after_branches = tree2.branches.clone();
     let after_root_id = after_branches.root_node_id().unwrap();
     let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
 
@@ -65,13 +61,11 @@ async fn extension() {
     assert_eq!(before_root, before_root_leaf.block);
     assert_eq!(after_root, after_root_leaf.block);
 
-    let mut w = String::new();
-    before_branches.write_formatted(&mut w).unwrap();
-    println!("Before tree:{}", w);
+    println!("=== Before tree ===");
+    println!("{root_tree:?}");
 
-    let mut w = String::new();
-    after_branches.write_formatted(&mut w).unwrap();
-    println!("After tree:{}", w);
+    println!("=== After tree ===");
+    println!("{tree2:?}");
 
     // extension-specific checks
     // before root has no children
@@ -87,18 +81,20 @@ async fn extension() {
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
     assert_eq!(after_children.len(), 1);
+
     let after_child = after_children.pop().unwrap();
     let after_child_block = Block::from_precomputed(&child_block, 1);
     assert_eq!(
         after_child_block,
-        after_leaves
+        after_branches
             .get(after_child)
             .expect("There should be a leaf block")
+            .data()
             .block
     );
 
-    let a_leaves = after_leaves.get(after_child).unwrap().clone();
-    println!("After leaf: {a_leaves:?}");
+    let a_leaf = after_branches.get(after_child).unwrap().data().clone();
+    println!("After leaf: {a_leaf:?}");
 
     // root shouldn't change
     assert_eq!(before_root, after_root);
@@ -110,12 +106,15 @@ async fn extension() {
     assert_eq!(after_branches.height(), 1 + before_branches.height());
 
     // before root is also a leaf
-    assert!(before_leaves.contains_key(before_root_id));
     assert_eq!(
         before_root,
-        before_leaves.get(&before_root_id).unwrap().block
+        before_branches.get(&before_root_id).unwrap().data().block
     );
 
     // after root isn't a leaf
-    assert!(!after_leaves.contains_key(after_root_id));
+    assert!(tree2
+        .leaves()
+        .iter()
+        .map(|leaf| leaf.block.clone())
+        .all(|x| x != after_root));
 }

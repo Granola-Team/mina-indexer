@@ -241,16 +241,13 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     root_hash: indexer_state.root_branch.root.state_hash.0.clone(),
                     root_height: indexer_state.root_branch.height(),
                     root_length: indexer_state.root_branch.len(),
-                    num_leaves: indexer_state.root_branch.leaves.len(),
+                    num_leaves: indexer_state.root_branch.leaves().len(),
                     num_dangling: indexer_state.dangling_branches.len(),
                     max_dangling_height,
                     max_dangling_length,
                     db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
-
-                let mut leaves = indexer_state.root_branch.leaves.values().cloned();
-                let leaf = leaves.find(|leaf| &leaf.block.state_hash == best_chain.first().unwrap_or(&root_hash)).unwrap();
-                let ledger = leaf.get_ledger().clone();
+                let ledger = indexer_state.root_branch.best_tip().unwrap().get_ledger().clone();
 
                 tokio::spawn(async move {
                     debug!("Handling connection");

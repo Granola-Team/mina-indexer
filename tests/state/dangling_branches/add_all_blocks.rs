@@ -1,7 +1,4 @@
-use mina_indexer::{
-    block::{parser::BlockParser, Block},
-    state::IndexerState,
-};
+use mina_indexer::{block::parser::BlockParser, state::IndexerState};
 use std::path::PathBuf;
 
 /// Parses all blocks in ./tests/data/sequential_blocks
@@ -48,7 +45,7 @@ async fn extension() {
             .iter()
             .enumerate()
             .for_each(|(_, tree)| {
-                assert_eq!(tree.leaves.len(), 1);
+                assert_eq!(tree.leaves().len(), 1);
             });
 
         // root branch
@@ -72,7 +69,7 @@ async fn extension() {
         // check all children.height = 1 + parent.height
         // check all children.parent_hash = parent.state_hash
         // check all children.parent_hash = parent.state_hash
-        for (idx, dangling_branch) in state.dangling_branches.iter().enumerate() {
+        for dangling_branch in state.dangling_branches.iter() {
             for node_id in dangling_branch
                 .branches
                 .traverse_level_order_ids(dangling_branch.branches.root_node_id().unwrap())
@@ -99,36 +96,6 @@ async fn extension() {
                             .parent_hash
                     );
                 }
-
-                // Branch leaves faithfully correspond to the underlying tree's leaf blocks
-                let leaves: Vec<&Block> = state
-                    .dangling_branches
-                    .get(idx)
-                    .unwrap()
-                    .leaves
-                    .iter()
-                    .map(|(_, node_block)| &node_block.block)
-                    .collect();
-                let tree_leaves: Vec<&Block> = state
-                    .dangling_branches
-                    .get(idx)
-                    .unwrap()
-                    .leaves
-                    .iter()
-                    .map(|(leaf_id, _)| {
-                        // tree node corresponding to leaf_id
-                        &state
-                            .dangling_branches
-                            .get(idx)
-                            .unwrap()
-                            .branches
-                            .get(leaf_id)
-                            .unwrap()
-                            .data()
-                            .block
-                    })
-                    .collect();
-                assert_eq!(leaves, tree_leaves);
             }
         }
 

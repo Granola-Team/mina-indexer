@@ -106,7 +106,7 @@ async fn extension() {
     state
         .dangling_branches
         .iter()
-        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+        .for_each(|tree| assert_eq!(tree.leaves().len(), 1));
 
     // ----------------
     // add middle block
@@ -139,7 +139,7 @@ async fn extension() {
     // - height = 3
     assert_eq!(state.root_branch.clone().len(), 3);
     assert_eq!(state.root_branch.clone().height(), 3);
-    assert_eq!(state.root_branch.clone().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().leaves().len(), 1);
 
     // after extension quantities
     let root = &state.root_branch.clone().root;
@@ -149,7 +149,7 @@ async fn extension() {
         .unwrap()
         .data();
     let root_branch = state.root_branch;
-    let leaves: Vec<&Block> = root_branch.leaves.iter().map(|(_, x)| &x.block).collect();
+    let leaves: Vec<&Block> = root_branch.leaves().iter().map(|x| &x.block).collect();
 
     assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);
 
