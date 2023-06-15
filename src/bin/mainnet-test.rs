@@ -28,10 +28,10 @@ async fn main() {
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
     let freq = args.report_freq;
+    let verbose = args.verbose;
+    let max_block_count = args.max_block_count;
 
     assert!(blocks_dir.is_dir(), "Should be a dir path");
-
-    let max_block_count = args.max_block_count;
 
     let mut bp = BlockParser::new(&blocks_dir).unwrap();
 
@@ -55,24 +55,29 @@ async fn main() {
         None,
     )
     .unwrap();
+
     let sorting_time = total_time.elapsed();
     println!("Sorting time: {sorting_time:?}\n");
 
+    // blocks
+    let mut block_count = 1;
+    let mut highest_seq_height = 2;
+
+    // branches
     let mut max_branches = 1;
     let mut max_root_len = 0;
     let mut max_root_height = 0;
     let mut max_dangling_len = 0;
     let mut max_dangling_height = 0;
-    let mut block_count = 1;
-    let mut highest_seq_height = 2;
 
+    // time
     let mut floor_minutes = 0;
     let mut adding_time = Duration::new(0, 0);
     let mut parsing_time = Duration::new(0, 0);
 
     for _ in 1..max_block_count {
         // Report every passing minute
-        if args.verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
+        if verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
             println!("Time elapsed: {:?}", total_time.elapsed());
             floor_minutes += 1;
         }
@@ -114,28 +119,29 @@ async fn main() {
                 state.add_block(&block).unwrap();
                 adding_time += add.elapsed();
 
-                match block.blockchain_length {
-                    None => println!("Block with no height! state_hash: {:?}", block.state_hash),
-                    Some(n) => match n.cmp(&highest_seq_height) {
-                        std::cmp::Ordering::Less => {
-                            println!(
-                                "Another block of height: {n}! state_hash: {:?}",
-                                block.state_hash
-                            );
-                        }
-                        std::cmp::Ordering::Equal => highest_seq_height += 1,
-                        std::cmp::Ordering::Greater => {
-                            println!("Expected {highest_seq_height}, instead got height {n}, state_hash: {:?}", block.state_hash);
-                        }
-                    },
-                }
-
-                if args.verbose {
+                if verbose {
                     println!(
                         "Added block (length: {}, state_hash: {:?})",
                         block.blockchain_length.unwrap_or(0),
                         block.state_hash
                     );
+                    match block.blockchain_length {
+                        None => {
+                            println!("Block with no height! state_hash: {:?}", block.state_hash)
+                        }
+                        Some(n) => match n.cmp(&highest_seq_height) {
+                            std::cmp::Ordering::Less => {
+                                println!(
+                                    "Another block of height: {n}! state_hash: {:?}",
+                                    block.state_hash
+                                )
+                            }
+                            std::cmp::Ordering::Equal => highest_seq_height += 1,
+                            std::cmp::Ordering::Greater => {
+                                println!("Expected {highest_seq_height}, instead got height {n}, state_hash: {:?}", block.state_hash)
+                            }
+                        },
+                    }
                 }
 
                 // update metrics
