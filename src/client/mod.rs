@@ -10,6 +10,7 @@ use futures::{
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
 use std::{path::PathBuf, process};
+use tracing::instrument;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -54,6 +55,7 @@ pub struct LedgerArgs {
     path: PathBuf,
 }
 
+#[instrument]
 pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
     let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
