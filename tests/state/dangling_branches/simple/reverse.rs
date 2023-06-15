@@ -63,22 +63,24 @@ async fn extension() {
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // before extension quantities
-    let before_branch = state.dangling_branches.get(0).unwrap();
-    let before_root = before_branch.root.clone();
-    let before_leaves = before_branch.leaves.clone();
-    let before_root_leaf = before_branch
-        .leaves
-        .get(before_branch.branches.root_node_id().unwrap())
+    let before_root = state.dangling_branches.get(0).unwrap().root.clone();
+    let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
+    let before_root_leaf = state
+        .dangling_branches
+        .get(0)
+        .unwrap()
+        .leaves()
+        .get(0)
         .unwrap()
         .clone();
 
     assert_eq!(before_leaves.len(), 1);
-    assert_eq!(before_branch.len(), 1);
-    assert_eq!(before_branch.height(), 1);
+    assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
+    assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
     assert_eq!(before_root, before_root_leaf.block);
 
     println!("=== Before state ===");
-    println!("{:?}", &state);
+    println!("{state:?}");
 
     // extend the branch with new_dangling_root_block (the parent)
     let extension_type = state.add_block(&new_dangling_root_block).unwrap();
@@ -92,7 +94,7 @@ async fn extension() {
     let after_branch = state.dangling_branches.get(0).unwrap();
     let after_root = &after_branch.root;
     let branches1 = &after_branch.branches;
-    let leaves1 = &after_branch.leaves;
+    let leaves1 = &after_branch.leaves();
     let after_root_id = branches1.root_node_id().unwrap();
     let after_root_block = branches1.get(&after_root_id).unwrap().data().clone();
 
@@ -108,12 +110,12 @@ async fn extension() {
         .collect::<Vec<&NodeId>>();
     assert_eq!(after_children.len(), 1);
 
-    let after_child = after_children.get(0).unwrap();
     let after_child_block = Block::from_precomputed(&old_dangling_root_block, 1);
     assert_eq!(
         after_child_block,
-        leaves1
-            .get(after_child)
+        after_branch
+            .leaves()
+            .get(0)
             .expect("There should be a leaf block")
             .block
     );
@@ -123,7 +125,7 @@ async fn extension() {
     assert_eq!(after_root, &after_root_block.block);
 
     // leaf checks
-    let leaves: Vec<&Block> = leaves1.iter().map(|(_, x)| &x.block).collect();
+    let leaves: Vec<&Block> = leaves1.iter().map(|x| &x.block).collect();
     let leaf = leaves.get(0).unwrap();
 
     // height differs, hashes agree

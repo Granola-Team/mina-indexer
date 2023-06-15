@@ -120,7 +120,7 @@ async fn extensions() {
     state
         .dangling_branches
         .iter()
-        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+        .for_each(|tree| assert_eq!(tree.leaves().len(), 1));
 
     // -----------
     // add child 0
@@ -158,9 +158,9 @@ async fn extensions() {
         .enumerate()
         .for_each(|(idx, tree)| {
             if idx == 0 {
-                assert_eq!(tree.leaves.len(), 1)
+                assert_eq!(tree.leaves().len(), 1)
             } else if idx == 1 {
-                assert_eq!(tree.leaves.len(), 2)
+                assert_eq!(tree.leaves().len(), 2)
             }
         });
 
@@ -175,9 +175,9 @@ async fn extensions() {
         .dangling_branches
         .get(1)
         .unwrap()
-        .leaves
+        .leaves()
         .iter()
-        .map(|(_, x)| &x.block)
+        .map(|x| &x.block)
         .collect();
 
     // root1 is not a leaf
