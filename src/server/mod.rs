@@ -192,7 +192,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     let precomputed_block = block_result?;
                     debug!("Receiving block {:?}", precomputed_block);
                     indexer_state.add_block(&precomputed_block)?;
-                    info!("Added block {:?}", &precomputed_block.state_hash);
+                    info!("Added block hash: {:?}, height: {}", &precomputed_block.state_hash, precomputed_block.blockchain_length.unwrap_or(0));
                 } else {
                     info!("Block receiver shutdown, system exit");
                     return Ok(())

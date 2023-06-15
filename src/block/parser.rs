@@ -1,5 +1,6 @@
 use std::{
     path::{Path, PathBuf},
+    u32::MAX,
     vec::IntoIter,
 };
 
@@ -44,7 +45,8 @@ impl BlockParser {
                 .collect();
             paths.sort_by(|x, y| {
                 get_blockchain_length(x.file_name().unwrap())
-                    .cmp(&get_blockchain_length(y.file_name().unwrap()))
+                    .unwrap_or(MAX)
+                    .cmp(&get_blockchain_length(y.file_name().unwrap()).unwrap_or(MAX))
             });
             Ok(Self {
                 log_path,
