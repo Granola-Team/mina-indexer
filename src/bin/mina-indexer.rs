@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{client, server};
-use tracing::instrument;
 use std::error::Error;
+use tracing::instrument;
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\

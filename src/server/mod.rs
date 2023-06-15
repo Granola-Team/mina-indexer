@@ -169,7 +169,10 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     let mut block_count = 0;
     let ingestion_time = Instant::now();
     while let Some(block) = block_parser.next().await? {
-        debug!("Adding {:?} with length {:?} to the state", &block.state_hash, &block.blockchain_length);
+        debug!(
+            "Adding {:?} with length {:?} to the state",
+            &block.state_hash, &block.blockchain_length
+        );
         indexer_state.add_block(&block)?;
         block_count += 1;
     }

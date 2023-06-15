@@ -8,7 +8,7 @@ use crate::{
 use id_tree::NodeId;
 use std::time::Instant;
 use time::OffsetDateTime;
-use tracing::{info, warn };
+use tracing::{info, warn};
 
 pub mod branch;
 pub mod ledger;

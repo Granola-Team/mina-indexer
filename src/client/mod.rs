@@ -9,8 +9,8 @@ use futures::{
     AsyncReadExt,
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
-use tracing::instrument;
 use std::{path::PathBuf, process};
+use tracing::instrument;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
