@@ -160,73 +160,16 @@ impl IndexerState {
 
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
-            match (
-                dangling_branch
-                    .leaves
-                    .iter()
-                    .flat_map(|(_, x)| x.block.blockchain_length)
-                    .fold(None, |acc, x| acc.max(Some(x))),
-                dangling_branch.root.blockchain_length,
-            ) {
-                (Some(max_length), min_length) => {
-                    // check incoming block is within the length bounds
-                    if let Some(length) = precomputed_block.blockchain_length {
-                        if max_length + 1 >= length && length + 1 >= min_length.unwrap_or(0) {
-                            // simple reverse
-                            if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                                dangling_branch.new_root(precomputed_block);
-                                extension = Some((
-                                    index,
-                                    dangling_branch
-                                        .branches
-                                        .root_node_id()
-                                        .expect("has root")
-                                        .clone(),
-                                    ExtensionDirection::Reverse,
-                                ));
-                                break;
-                            }
-
-                            // simple forward
-                            if let Some(new_node_id) =
-                                dangling_branch.simple_extension(precomputed_block)
-                            {
-                                extension = Some((index, new_node_id, ExtensionDirection::Forward));
-                                break;
-                            }
-
-                            Self::same_block_added_twice(dangling_branch, precomputed_block)?;
-                        }
-                    } else {
-                        // we don't know the blockchain_length for the incoming block, so we can't discriminate
-
-                        // simple reverse
-                        if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
-                            dangling_branch.new_root(precomputed_block);
-                            extension = Some((
-                                index,
-                                dangling_branch
-                                    .branches
-                                    .root_node_id()
-                                    .expect("has root")
-                                    .clone(),
-                                ExtensionDirection::Reverse,
-                            ));
-                            break;
-                        }
-
-                        Self::same_block_added_twice(dangling_branch, precomputed_block)?;
-
-                        // simple forward
-                        if let Some(new_node_id) =
-                            dangling_branch.simple_extension(precomputed_block)
-                        {
-                            extension = Some((index, new_node_id, ExtensionDirection::Forward));
-                            break;
-                        }
-                    }
-                }
-                (None, None) => {
+            let min_length = dangling_branch.root.blockchain_length.unwrap_or(0);
+            let max_length = dangling_branch
+                .best_tip()
+                .unwrap()
+                .block
+                .blockchain_length
+                .unwrap_or(0);
+            // check incoming block is within the length bounds
+            if let Some(length) = precomputed_block.blockchain_length {
+                if max_length + 1 >= length && length + 1 >= min_length {
                     // simple reverse
                     if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
                         dangling_branch.new_root(precomputed_block);
@@ -247,8 +190,34 @@ impl IndexerState {
                         extension = Some((index, new_node_id, ExtensionDirection::Forward));
                         break;
                     }
+
+                    Self::same_block_added_twice(dangling_branch, precomputed_block)?;
                 }
-                _ => unreachable!(),
+            } else {
+                // we don't know the blockchain_length for the incoming block, so we can't discriminate
+
+                // simple reverse
+                if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+                    dangling_branch.new_root(precomputed_block);
+                    extension = Some((
+                        index,
+                        dangling_branch
+                            .branches
+                            .root_node_id()
+                            .expect("has root")
+                            .clone(),
+                        ExtensionDirection::Reverse,
+                    ));
+                    break;
+                }
+
+                Self::same_block_added_twice(dangling_branch, precomputed_block)?;
+
+                // simple forward
+                if let Some(new_node_id) = dangling_branch.simple_extension(precomputed_block) {
+                    extension = Some((index, new_node_id, ExtensionDirection::Forward));
+                    break;
+                }
             }
         }
 
@@ -313,15 +282,7 @@ impl IndexerState {
     }
 
     pub fn best_ledger(&self) -> Option<&Ledger> {
-        if let Some(head_state_hash) = self.root_branch.longest_chain().first() {
-            // find the corresponding leaf ledger
-            for leaf in self.root_branch.leaves.values() {
-                if &leaf.block.state_hash == head_state_hash {
-                    return Some(leaf.get_ledger());
-                }
-            }
-        }
-        None
+        self.root_branch.best_tip().map(|leaf| leaf.get_ledger())
     }
 
     fn prune_root_branch(&mut self) {
@@ -336,14 +297,11 @@ impl IndexerState {
     }
 
     fn update_best_tip(&mut self) {
-        if let Some(best_tip_leaf) = self
-            .root_branch
-            .leaves
-            .values()
-            .max_by(|leafx, leafy| leafx.block.cmp(&leafy.block))
-        {
-            self.best_tip = best_tip_leaf.block.clone();
-        };
+        if self.root_branch.best_tip().is_none() {
+            println!("~~~ Root tree ~~~");
+            println!("{:?}", self.root_branch);
+        }
+        self.best_tip = self.root_branch.best_tip().unwrap().block.clone();
     }
 
     fn same_block_added_twice<T>(

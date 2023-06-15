@@ -52,18 +52,8 @@ async fn extension() {
 
     // before extension quantities
     let before_root = state.dangling_branches.get(0).unwrap().root.clone();
-    let before_leaves = state.dangling_branches.get(0).unwrap().leaves.clone();
-    let before_leaf = &before_leaves
-        .get(
-            state
-                .dangling_branches
-                .get(0)
-                .unwrap()
-                .branches
-                .root_node_id()
-                .unwrap(),
-        )
-        .unwrap();
+    let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
+    let before_leaf = before_leaves.get(0).unwrap();
 
     // before_root is the only leaf
     assert_eq!(before_leaves.len(), 1);
@@ -112,7 +102,7 @@ async fn extension() {
     // after extension quantities
     let after_root = &state.dangling_branches.get(0).unwrap().root;
     let branches1 = &state.dangling_branches.get(0).unwrap();
-    let leaves1 = &branches1.leaves;
+    let leaves1 = branches1.leaves();
     let after_root_id = branches1.branches.root_node_id().unwrap();
     let after_root_leaf = {
         let child_ids: Vec<&NodeId> = branches1
@@ -166,5 +156,6 @@ async fn extension() {
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 2);
 
     // after root isn't a leaf
-    assert!(!leaves1.contains_key(after_root_id));
+    assert_eq!(leaves1.len(), 1);
+    assert_ne!(after_root, &leaves1.get(0).unwrap().block);
 }

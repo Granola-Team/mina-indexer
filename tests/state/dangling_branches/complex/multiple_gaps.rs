@@ -84,7 +84,7 @@ async fn extension() {
     assert_eq!(state.dangling_branches.len(), 2);
     state.dangling_branches.iter().for_each(|tree| {
         assert_eq!(tree.len(), 1);
-        assert_eq!(tree.leaves.len(), 1);
+        assert_eq!(tree.leaves().len(), 1);
     });
 
     for (idx, branch) in state.dangling_branches.iter().enumerate() {
@@ -111,7 +111,7 @@ async fn extension() {
 
     // root branch
     assert_eq!(state.root_branch.clone().len(), 3);
-    assert_eq!(state.root_branch.clone().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().leaves().len(), 1);
 
     // 1 dangling branch
     // - height = 1
@@ -123,7 +123,7 @@ async fn extension() {
         .enumerate()
         .for_each(|(_, tree)| assert_eq!(tree.height(), 1));
     state.dangling_branches.iter().for_each(|tree| {
-        assert_eq!(tree.leaves.len(), 1);
+        assert_eq!(tree.leaves().len(), 1);
     });
 
     // after extension quantities
@@ -135,9 +135,9 @@ async fn extension() {
         .data();
     let leaves: Vec<Block> = state
         .root_branch
-        .leaves
+        .leaves()
         .iter()
-        .map(|(_, x)| x.block.clone())
+        .map(|x| x.block.clone())
         .collect();
     let leaf = Block::from_precomputed(&leaf_block, 2);
 

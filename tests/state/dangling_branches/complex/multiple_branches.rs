@@ -98,7 +98,7 @@ async fn merge() {
     // - leaves = 1
     assert_eq!(state.root_branch.clone().len(), 1);
     assert_eq!(state.root_branch.clone().height(), 1);
-    assert_eq!(state.root_branch.clone().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().leaves().len(), 1);
 
     // 2 dangling branches
     // - len = 1
@@ -116,7 +116,7 @@ async fn merge() {
     state
         .dangling_branches
         .iter()
-        .for_each(|tree| assert_eq!(tree.leaves.len(), 1));
+        .for_each(|tree| assert_eq!(tree.leaves().len(), 1));
 
     println!("=== Before state ===");
     println!("{state:?}");
@@ -137,7 +137,7 @@ async fn merge() {
     // - leaves = 2
     assert_eq!(state.root_branch.clone().len(), 4);
     assert_eq!(state.root_branch.clone().height(), 3);
-    assert_eq!(state.root_branch.clone().leaves.len(), 2);
+    assert_eq!(state.root_branch.clone().leaves().len(), 2);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -152,7 +152,7 @@ async fn merge() {
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
     let root_branch = state.root_branch.clone();
-    let leaves0: HashSet<&Block> = root_branch.leaves.iter().map(|(_, x)| &x.block).collect();
+    let leaves0: HashSet<&Block> = root_branch.leaves().iter().map(|x| &x.block).collect();
 
     assert_eq!(
         leaves0.iter().collect::<HashSet<&&Block>>(),

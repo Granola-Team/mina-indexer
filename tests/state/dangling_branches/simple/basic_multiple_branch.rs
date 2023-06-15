@@ -59,19 +59,14 @@ async fn extensions() {
     // - height = 1
     assert_eq!(state.root_branch.clone().len(), 1);
     assert_eq!(state.root_branch.clone().height(), 1);
-    assert_eq!(state.root_branch.clone().leaves.len(), 1);
+    assert_eq!(state.root_branch.clone().leaves().len(), 1);
 
     // no dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
 
     // before extension quantities
     let root0 = state.root_branch.clone().root;
-    let root_leaf0 = state
-        .root_branch
-        .leaves
-        .get(state.root_branch.branches.root_node_id().unwrap())
-        .unwrap()
-        .clone();
+    let root_leaf0 = state.root_branch.leaves().get(0).unwrap().clone();
 
     println!("=== Before Branch 0 ===");
     println!("{:?}", state.root_branch.branches);
@@ -93,7 +88,7 @@ async fn extensions() {
     // - leaves = 1
     assert_eq!(state.root_branch.len(), 1);
     assert_eq!(state.root_branch.height(), 1);
-    assert_eq!(state.root_branch.leaves.len(), 1);
+    assert_eq!(state.root_branch.leaves().len(), 1);
 
     // 1 dangling branch
     // - len = 1
@@ -102,7 +97,7 @@ async fn extensions() {
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().leaves.len(), 1);
+    assert_eq!(state.dangling_branches.get(0).unwrap().leaves().len(), 1);
 
     // after extension quantities
     let root1 = &state.root_branch.root;
@@ -111,11 +106,8 @@ async fn extensions() {
         .get(&branches1.root_node_id().unwrap())
         .unwrap()
         .data();
-    let root_leaf1 = state
-        .root_branch
-        .leaves
-        .get(branches1.root_node_id().unwrap())
-        .unwrap();
+    let leaves1 = state.root_branch.leaves();
+    let root_leaf1 = leaves1.get(0).unwrap();
 
     // root == leaf
     assert_eq!(root1, &root_leaf1.block);
