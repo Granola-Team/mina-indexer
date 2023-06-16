@@ -25,11 +25,6 @@ enum IndexerCommand {
 #[instrument]
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
-    let indexer_folder = std::path::Path::new(concat!(env!("HOME"), "/mina-indexer"));
-    if !indexer_folder.exists() {
-        std::fs::create_dir(indexer_folder)?;
-    }
-
     let args = Cli::parse();
 
     if let Some(arguments) = &args.command {

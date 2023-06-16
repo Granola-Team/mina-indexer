@@ -8,7 +8,7 @@ use crate::{
 use id_tree::NodeId;
 use std::time::Instant;
 use time::OffsetDateTime;
-use tracing::{info, warn};
+use tracing::debug;
 
 pub mod branch;
 pub mod ledger;
@@ -99,9 +99,9 @@ impl IndexerState {
 
     fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
-            let interval = self.prune_interval.unwrap_or(5);
+            let interval = self.prune_interval.unwrap_or(2);
             if self.root_branch.height() as u32 > interval * k {
-                info!("Pruning transition frontier at k={}", k);
+                debug!("Pruning transition frontier at k={}", k);
                 self.root_branch
                     .prune_transition_frontier(k, &self.best_tip);
             }
@@ -120,7 +120,7 @@ impl IndexerState {
 
         // check that the block doesn't already exist in the db
         if self.block_exists(&precomputed_block.state_hash)? {
-            warn!(
+            debug!(
                 "Block with state hash '{:?}' is already present in the block store",
                 &precomputed_block.state_hash
             );
@@ -164,7 +164,6 @@ impl IndexerState {
         if let Some(block_store) = self.block_store.as_ref() {
             match block_store.get_block(state_hash)? {
                 None => Ok(false),
-                // log duplicate block to error
                 Some(_block) => Ok(true),
             }
         } else {
