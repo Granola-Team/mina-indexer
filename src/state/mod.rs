@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use id_tree::NodeId;
-use std::time::Instant;
+use std::{path::Path, time::Instant};
 use time::OffsetDateTime;
 use tracing::debug;
 
@@ -95,6 +95,11 @@ impl IndexerState {
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
         })
+    }
+
+    pub fn new_from_db(path: &Path) -> anyhow::Result<Self> {
+        let msg = format!("Restore from {}", path.display());
+        todo!("{msg}")
     }
 
     fn prune_root_branch(&mut self) {

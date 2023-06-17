@@ -36,23 +36,26 @@ pub struct ServerArgs {
     )]
     root_hash: String,
     /// Path to startup blocks directory
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/startup-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
     startup_dir: PathBuf,
     /// Path to directory to watch for new blocks
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/watch-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
     /// Path to directory for rocksdb
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/database"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     database_dir: PathBuf,
     /// Path to directory for logs
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/logs"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     log_dir: PathBuf,
+    /// Max file log level
+    #[arg(long, default_value_t = LevelFilter::DEBUG)]
+    log_level: LevelFilter,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
-    log_level: LevelFilter,
-    /// Override an existing db on the path provided by database_dir
-    #[arg(long, default_value_t = false)]
-    db_override: bool,
+    log_level_stdout: LevelFilter,
+    /// Restore indexer state from an existing db on the path provided by database_dir
+    #[arg(long, default_value_t = true)]
+    restore_from_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long)]
     prune_interval: Option<u32>,
@@ -66,6 +69,8 @@ pub struct IndexerConfiguration {
     database_dir: PathBuf,
     log_file: PathBuf,
     log_level: LevelFilter,
+    log_level_stdout: LevelFilter,
+    restore_from_db: bool,
     prune_interval: Option<u32>,
 }
 
@@ -80,6 +85,8 @@ pub async fn handle_command_line_arguments(
     let database_dir = args.database_dir;
     let log_dir = args.log_dir;
     let log_level = args.log_level;
+    let log_level_stdout = args.log_level_stdout;
+    let restore_from_db = args.restore_from_db;
     let prune_interval = args.prune_interval;
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
@@ -107,7 +114,7 @@ pub async fn handle_command_line_arguments(
 
             while tokio::fs::metadata(&log_fname).await.is_ok() {
                 log_number += 1;
-                log_fname = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
+                log_fname = format!("{}/mina-indexer{}.log", log_dir.display(), log_number);
             }
 
             Ok(IndexerConfiguration {
@@ -118,6 +125,8 @@ pub async fn handle_command_line_arguments(
                 database_dir,
                 log_file: PathBuf::from(&log_fname),
                 log_level,
+                log_level_stdout,
+                restore_from_db,
                 prune_interval,
             })
         }
@@ -140,6 +149,8 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         database_dir,
         log_file,
         log_level,
+        log_level_stdout,
+        restore_from_db,
         prune_interval,
     } = handle_command_line_arguments(args).await?;
 
@@ -153,21 +164,29 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 
     let stdout_layer = tracing_subscriber::fmt::layer();
     tracing_subscriber::registry()
-        .with(stdout_layer.with_filter(log_level))
-        .with(file_layer.with_filter(LevelFilter::DEBUG))
+        .with(stdout_layer.with_filter(log_level_stdout))
+        .with(file_layer.with_filter(log_level))
         .init();
 
-    // TODO
-    // if !db_override
-    // check if db has blocks and reconstitute state before reading blocks from startup_dir
-    info!("Initializing indexer state");
-    let mut indexer_state = IndexerState::new(
-        root_hash.clone(),
-        genesis_ledger.ledger,
-        Some(&database_dir),
-        Some(MAINNET_TRANSITION_FRONTIER_K),
-        prune_interval,
-    )?;
+    let mut indexer_state;
+    if restore_from_db {
+        info!("Restoring from db in {}", database_dir.display());
+        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
+        // if no db or it doesn't have blocks, use the startup_dir like usual
+        indexer_state = IndexerState::new_from_db(&database_dir)?;
+    } else {
+        info!(
+            "Initializing indexer state from blocks in {}",
+            startup_dir.display()
+        );
+        indexer_state = IndexerState::new(
+            root_hash.clone(),
+            genesis_ledger.ledger,
+            Some(&database_dir),
+            Some(MAINNET_TRANSITION_FRONTIER_K),
+            prune_interval,
+        )?;
+    }
 
     let init_dir = startup_dir.display().to_string();
     info!("Ingesting precomputed blocks from {init_dir}");
