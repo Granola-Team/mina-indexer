@@ -57,7 +57,7 @@ async fn extension() {
 
     // before_root is the only leaf
     assert_eq!(before_leaves.len(), 1);
-    assert_eq!(before_root, before_leaf.block);
+    assert_eq!(&before_root, before_leaf);
     assert_eq!(
         before_root,
         Block::from_precomputed(&dangling_root_block, 0)
@@ -121,7 +121,7 @@ async fn extension() {
     // branch root should still match the root of the dangling branch
     assert_eq!(
         after_root,
-        &state
+        state
             .dangling_branches
             .get(0)
             .unwrap()
@@ -137,7 +137,6 @@ async fn extension() {
             )
             .unwrap()
             .data()
-            .block
     );
 
     println!("After state:\n{state:?}");
@@ -145,8 +144,8 @@ async fn extension() {
     assert_eq!(extension, ExtensionType::DanglingSimpleForward);
 
     assert_eq!(
-        Block::from_precomputed(&dangling_child_block, 1),
-        after_root_leaf.block
+        &Block::from_precomputed(&dangling_child_block, 1),
+        after_root_leaf
     );
 
     // root shouldn't change
@@ -157,5 +156,5 @@ async fn extension() {
 
     // after root isn't a leaf
     assert_eq!(leaves1.len(), 1);
-    assert_ne!(after_root, &leaves1.get(0).unwrap().block);
+    assert_ne!(after_root, leaves1.get(0).unwrap());
 }

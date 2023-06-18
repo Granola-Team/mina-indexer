@@ -78,21 +78,20 @@ async fn extension() {
                 let node = dangling_branch.branches.get(&node_id).unwrap();
                 for child_id in node.children() {
                     let parent_block =
-                        &dangling_branch.branches.get(&node_id).unwrap().data().block;
-                    let child_block = &dangling_branch.branches.get(child_id).unwrap().data().block;
+                        &dangling_branch.branches.get(&node_id).unwrap().data();
+                    let child_block = &dangling_branch.branches.get(child_id).unwrap().data();
                     assert_eq!(child_block.height, 1 + parent_block.height);
                     assert_eq!(
                         child_block.blockchain_length.unwrap(),
                         1 + parent_block.blockchain_length.unwrap()
                     );
                     assert_eq!(
-                        node.data().block.state_hash,
+                        node.data().state_hash,
                         dangling_branch
                             .branches
                             .get(child_id)
                             .unwrap()
                             .data()
-                            .block
                             .parent_hash
                     );
                 }

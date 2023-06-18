@@ -112,13 +112,12 @@ async fn extension() {
     // branch root should match the tree's root
     assert_eq!(
         after_root,
-        &state
+        state
             .root_branch
             .branches
             .get(after_root_id)
             .unwrap()
             .data()
-            .block
     );
 
     println!("=== After Root Branch ===");
@@ -138,14 +137,14 @@ async fn extension() {
     // child1 is a leaf
     assert!(leaves1
         .iter()
-        .map(|x| x.block.clone())
+        .map(|x| x.clone())
         .collect::<Vec<Block>>()
         .contains(&after_child1_block));
 
     // child2 is a leaf
     assert!(leaves1
         .iter()
-        .map(|x| x.block.clone())
+        .map(|x| x.clone())
         .collect::<Vec<Block>>()
         .contains(&after_child2_block));
 
@@ -154,8 +153,8 @@ async fn extension() {
         "{:?}",
         leaves1
             .iter()
-            .map(|leaf| &leaf.block)
-            .collect::<Vec<&Block>>()
+            .map(|leaf| leaf.clone())
+            .collect::<Vec<Block>>()
     );
 
     // root doesn't change
@@ -164,7 +163,7 @@ async fn extension() {
     // after root isn't a leaf
     assert!(!leaves1
         .iter()
-        .map(|x| x.block.clone())
+        .map(|x| x.clone())
         .collect::<Vec<Block>>()
         .contains(after_root));
 }

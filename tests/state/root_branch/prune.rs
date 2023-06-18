@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{branch::Branch, ledger::Ledger},
+    state::branch::Branch,
 };
 
 #[tokio::test]
@@ -93,7 +93,7 @@ async fn transition_frontier() {
     );
 
     // create the tree and add blocks
-    let mut branch = Branch::new(&root_block, Ledger::new()).unwrap();
+    let mut branch = Branch::new(&root_block).unwrap();
 
     branch.simple_extension(&fork_block).unwrap();
     branch.simple_extension(&main_1_block).unwrap();
@@ -112,7 +112,6 @@ async fn transition_frontier() {
             .get(&best_tip_id)
             .unwrap()
             .data()
-            .block
             .clone(),
     );
 
