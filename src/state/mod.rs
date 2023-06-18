@@ -2,13 +2,15 @@ use crate::{
     block::{precomputed::PrecomputedBlock, Block, BlockHash, store::BlockStore},
     state::{
         branch::Branch,
-        ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
+        ledger::{command::Command, genesis::GenesisLedger, Ledger},
     }, store::IndexerStore,
 };
 use id_tree::NodeId;
 use std::{path::Path, time::Instant};
 use time::OffsetDateTime;
 use tracing::debug;
+
+use self::ledger::{store::LedgerStore, diff::LedgerDiff};
 
 pub mod branch;
 pub mod ledger;
@@ -21,9 +23,9 @@ pub struct IndexerState {
     /// State hahs of the best tip of the root branch
     pub best_tip: Block,
     /// Append-only tree of blocks built from genesis, each containing a ledger
-    pub root_branch: Branch<Ledger>,
+    pub root_branch: Branch,
     /// Dynamic, dangling branches eventually merged into the `root_branch`
-    pub dangling_branches: Vec<Branch<LedgerDiff>>,
+    pub dangling_branches: Vec<Branch>,
     /// Block database
     pub indexer_store: Option<IndexerStore>,
     pub transition_frontier_length: Option<u32>,
@@ -61,8 +63,13 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
-        let indexer_store = rocksdb_path.map(|path| IndexerStore::new(path).unwrap());
+        let root_branch = Branch::new_genesis(root_hash.clone());
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            store.add_ledger(&root_hash, genesis_ledger.into())
+                .expect("ledger add succeeds");
+            store
+        });
         Ok(Self {
             best_tip: root_branch.root.clone(),
             root_branch,
@@ -82,8 +89,15 @@ impl IndexerState {
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_testing(root_block, root_ledger);
-        let indexer_store = rocksdb_path.map(|path| IndexerStore::new(path).unwrap());
+        let root_branch = Branch::new_testing(root_block);
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            if let Some(ledger) = root_ledger {
+                store.add_ledger(&BlockHash(root_block.state_hash.clone()), ledger)
+                    .expect("ledger add succeeds");
+            }
+            store
+        });
         Ok(Self {
             best_tip: root_branch.root.clone(),
             root_branch,
@@ -226,7 +240,6 @@ impl IndexerState {
             let max_length = dangling_branch
                 .best_tip()
                 .unwrap()
-                .block
                 .blockchain_length
                 .unwrap_or(0);
             // check incoming block is within the length bounds
@@ -333,7 +346,6 @@ impl IndexerState {
         self.dangling_branches.push(
             Branch::new(
                 precomputed_block,
-                LedgerDiff::from_precomputed_block(precomputed_block),
             )
             .expect("cannot fail"),
         );
@@ -354,8 +366,33 @@ impl IndexerState {
         vec![]
     }
 
-    pub fn best_ledger(&self) -> Option<&Ledger> {
-        self.root_branch.best_tip().map(|leaf| leaf.get_ledger())
+    pub fn best_ledger(&self) -> anyhow::Result<Ledger> {
+        let mut ledger = None;
+        if let (Some(block), Some(store)) = (self.root_branch.best_tip(), self.indexer_store.as_ref()) {
+            ledger = store.get_ledger(&block.state_hash)?;
+            if ledger.is_none() {
+                let mut ledger_diffs = Vec::new();
+                let mut state_hash = block.state_hash;
+                loop {
+                    if let Some(block_ledger) = store.get_ledger(&state_hash)? {
+                        ledger = Some(block_ledger);
+                        break;
+                    }
+                    let precomputed_block = store.get_block(&state_hash)?
+                        .expect("block comes from root branch, is in block store");
+                    let ledger_diff = LedgerDiff::from_precomputed_block(&precomputed_block);
+                    ledger_diffs.push(ledger_diff);
+                    state_hash = BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash);
+                }
+                for ledger_diff in ledger_diffs {
+                    ledger.iter_mut().for_each(|ledger| 
+                        ledger.apply_diff(ledger_diff.clone())
+                            .expect("ledger diff application succeeds")
+                    );
+                }
+            }
+        }
+        Ok(ledger.expect("genesis ledger guaranteed"))
     }
 
     fn update_best_tip(&mut self) {
@@ -363,11 +400,11 @@ impl IndexerState {
             println!("~~~ Root tree ~~~");
             println!("{:?}", self.root_branch);
         }
-        self.best_tip = self.root_branch.best_tip().unwrap().block.clone();
+        self.best_tip = self.root_branch.best_tip().unwrap().clone();
     }
 
-    fn same_block_added_twice<T>(
-        branch: &Branch<T>,
+    fn same_block_added_twice(
+        branch: &Branch,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<()> {
         if precomputed_block.state_hash == branch.root.state_hash.0 {

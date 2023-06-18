@@ -280,7 +280,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     max_dangling_length,
                     db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
-                let ledger = indexer_state.root_branch.best_tip().unwrap().get_ledger().clone();
+                let ledger = indexer_state.best_ledger()?;
 
                 // handle the connection
                 tokio::spawn(async move {
