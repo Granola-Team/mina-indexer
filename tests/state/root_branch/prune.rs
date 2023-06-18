@@ -107,12 +107,7 @@ async fn transition_frontier() {
 
     branch.prune_transition_frontier(
         1,
-        &branch
-            .branches
-            .get(&best_tip_id)
-            .unwrap()
-            .data()
-            .clone(),
+        &branch.branches.get(&best_tip_id).unwrap().data().clone(),
     );
 
     println!("=== After prune ===");

@@ -8,7 +8,8 @@ use crate::{
         summary::{DbStats, Summary},
         IndexerState,
     },
-    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME, store::IndexerStore,
+    store::IndexerStore,
+    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};

@@ -155,7 +155,10 @@ async fn merge() {
     let leaves0: HashSet<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
 
     assert_eq!(
-        leaves0.iter().map(|x| x.clone()).collect::<HashSet<Block>>(),
+        leaves0
+            .iter()
+            .map(|x| x.clone())
+            .collect::<HashSet<Block>>(),
         HashSet::from([leaf0, leaf1])
     );
 

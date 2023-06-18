@@ -1,16 +1,17 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, Block, BlockHash, store::BlockStore},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash},
     state::{
         branch::Branch,
         ledger::{command::Command, genesis::GenesisLedger, Ledger},
-    }, store::IndexerStore,
+    },
+    store::IndexerStore,
 };
 use id_tree::NodeId;
 use std::{path::Path, time::Instant};
 use time::OffsetDateTime;
 use tracing::debug;
 
-use self::ledger::{store::LedgerStore, diff::LedgerDiff};
+use self::ledger::{diff::LedgerDiff, store::LedgerStore};
 
 pub mod branch;
 pub mod ledger;
@@ -66,7 +67,8 @@ impl IndexerState {
         let root_branch = Branch::new_genesis(root_hash.clone());
         let indexer_store = rocksdb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
-            store.add_ledger(&root_hash, genesis_ledger.into())
+            store
+                .add_ledger(&root_hash, genesis_ledger.into())
                 .expect("ledger add succeeds");
             store
         });
@@ -93,7 +95,8 @@ impl IndexerState {
         let indexer_store = rocksdb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger {
-                store.add_ledger(&BlockHash(root_block.state_hash.clone()), ledger)
+                store
+                    .add_ledger(&BlockHash(root_block.state_hash.clone()), ledger)
                     .expect("ledger add succeeds");
             }
             store
@@ -343,12 +346,8 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.dangling_branches.push(
-            Branch::new(
-                precomputed_block,
-            )
-            .expect("cannot fail"),
-        );
+        self.dangling_branches
+            .push(Branch::new(precomputed_block).expect("cannot fail"));
         Ok(ExtensionType::DanglingNew)
     }
 
@@ -358,7 +357,7 @@ impl IndexerState {
                 .root_branch
                 .longest_chain()
                 .iter()
-                .flat_map(|state_hash| indexer_store.get_block(&state_hash))
+                .flat_map(|state_hash| indexer_store.get_block(state_hash))
                 .flatten()
                 .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
                 .collect();
@@ -368,7 +367,9 @@ impl IndexerState {
 
     pub fn best_ledger(&self) -> anyhow::Result<Ledger> {
         let mut ledger = None;
-        if let (Some(block), Some(store)) = (self.root_branch.best_tip(), self.indexer_store.as_ref()) {
+        if let (Some(block), Some(store)) =
+            (self.root_branch.best_tip(), self.indexer_store.as_ref())
+        {
             ledger = store.get_ledger(&block.state_hash)?;
             if ledger.is_none() {
                 let mut ledger_diffs = Vec::new();
@@ -378,17 +379,21 @@ impl IndexerState {
                         ledger = Some(block_ledger);
                         break;
                     }
-                    let precomputed_block = store.get_block(&state_hash)?
+                    let precomputed_block = store
+                        .get_block(&state_hash)?
                         .expect("block comes from root branch, is in block store");
                     let ledger_diff = LedgerDiff::from_precomputed_block(&precomputed_block);
                     ledger_diffs.push(ledger_diff);
-                    state_hash = BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash);
+                    state_hash = BlockHash::from_hashv1(
+                        precomputed_block.protocol_state.previous_state_hash,
+                    );
                 }
                 for ledger_diff in ledger_diffs {
-                    ledger.iter_mut().for_each(|ledger| 
-                        ledger.apply_diff(ledger_diff.clone())
+                    ledger.iter_mut().for_each(|ledger| {
+                        ledger
+                            .apply_diff(ledger_diff.clone())
                             .expect("ledger diff application succeeds")
-                    );
+                    });
                 }
             }
         }
@@ -400,7 +405,7 @@ impl IndexerState {
             println!("~~~ Root tree ~~~");
             println!("{:?}", self.root_branch);
         }
-        self.best_tip = self.root_branch.best_tip().unwrap().clone();
+        self.best_tip = self.root_branch.best_tip().unwrap();
     }
 
     fn same_block_added_twice(

@@ -1,6 +1,6 @@
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
-use rocksdb::{MultiThreaded, DBWithThreadMode};
+use rocksdb::{DBWithThreadMode, MultiThreaded};
 
 use crate::{block::store::BlockStore, state::ledger::store::LedgerStore};
 
@@ -43,13 +43,14 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block(&self, state_hash: &crate::block::BlockHash) -> anyhow::Result<Option<crate::block::precomputed::PrecomputedBlock>> {
+    fn get_block(
+        &self,
+        state_hash: &crate::block::BlockHash,
+    ) -> anyhow::Result<Option<crate::block::precomputed::PrecomputedBlock>> {
         let mut precomputed_block = None;
         self.database.try_catch_up_with_primary().ok();
         let key = state_hash.0.as_bytes();
-        if let Some(bytes) = self.database.get_pinned(key)?
-            .map(|bytes| bytes.to_vec()) 
-        {
+        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
             precomputed_block = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(precomputed_block)
@@ -57,20 +58,25 @@ impl BlockStore for IndexerStore {
 }
 
 impl LedgerStore for IndexerStore {
-    fn add_ledger(&self, state_hash: &crate::block::BlockHash, ledger: crate::state::ledger::Ledger) -> anyhow::Result<()> {
+    fn add_ledger(
+        &self,
+        state_hash: &crate::block::BlockHash,
+        ledger: crate::state::ledger::Ledger,
+    ) -> anyhow::Result<()> {
         let key = state_hash.0.as_bytes();
         let value = bcs::to_bytes(&ledger)?;
         self.database.put(key, value)?;
         Ok(())
     }
 
-    fn get_ledger(&self, state_hash: &crate::block::BlockHash) -> anyhow::Result<Option<crate::state::ledger::Ledger>> {
+    fn get_ledger(
+        &self,
+        state_hash: &crate::block::BlockHash,
+    ) -> anyhow::Result<Option<crate::state::ledger::Ledger>> {
         let mut ledger = None;
         self.database.try_catch_up_with_primary().ok();
         let key = state_hash.0.as_bytes();
-        if let Some(bytes) = self.database.get_pinned(key)?
-            .map(|bytes| bytes.to_vec()) 
-        {
+        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
             ledger = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(ledger)
@@ -126,4 +132,3 @@ impl IndexerStore {
             .unwrap()
     }
 }
-

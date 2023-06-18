@@ -117,7 +117,6 @@ async fn extension() {
             .leaves()
             .get(0)
             .expect("There should be a leaf block")
-
     );
 
     // root checks

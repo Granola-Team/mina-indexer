@@ -1,6 +1,4 @@
-use crate::{
-    block::{precomputed::PrecomputedBlock, Block, BlockHash},
-};
+use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
     MoveBehavior::ToRoot,
@@ -37,7 +35,9 @@ impl Branch {
         };
         let mut branches = Tree::new();
 
-        branches.insert(Node::new(genesis_block.clone()), AsRoot).unwrap();
+        branches
+            .insert(Node::new(genesis_block.clone()), AsRoot)
+            .unwrap();
 
         Self {
             root: genesis_block,
@@ -48,7 +48,9 @@ impl Branch {
     pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
         let root_block = Block::from_precomputed(precomputed_block, 0);
         let mut branches = Tree::new();
-        branches.insert(Node::new(root_block.clone()), AsRoot).unwrap();
+        branches
+            .insert(Node::new(root_block.clone()), AsRoot)
+            .unwrap();
 
         Self {
             root: root_block,
@@ -75,7 +77,10 @@ impl Branch {
         let mut branches = Tree::new();
 
         branches.insert(Node::new(root_block.clone()), AsRoot)?;
-        Ok(Self { root: root_block, branches })
+        Ok(Self {
+            root: root_block,
+            branches,
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -175,12 +180,7 @@ impl Branch {
         }
 
         // update root
-        self.root = self
-            .branches
-            .get(&new_root_id)
-            .unwrap()
-            .data()
-            .clone();
+        self.root = self.branches.get(&new_root_id).unwrap().data().clone();
     }
 
     /// block is guaranteed to exist in leaves
@@ -352,10 +352,8 @@ impl Branch {
     pub fn best_tip_with_id(&self) -> Option<(NodeId, Block)> {
         let height = self.height() as u32;
         let mut leaves = self.top_leaves_with_id(self.height() as u32);
-        leaves.sort_by(|(_, x), (_, y)| x.cmp(&y).reverse());
-        let res = leaves
-            .iter()
-            .find(|(_, leaf)| leaf.height + 1 == height);
+        leaves.sort_by(|(_, x), (_, y)| x.cmp(y).reverse());
+        let res = leaves.iter().find(|(_, leaf)| leaf.height + 1 == height);
         res.cloned()
     }
 
