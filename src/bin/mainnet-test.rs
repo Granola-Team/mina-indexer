@@ -195,7 +195,7 @@ async fn main() {
     println!(
         "Estimate number of keys:    {:?}",
         state
-            .block_store
+            .indexer_store
             .as_ref()
             .unwrap()
             .estimate_live_data_size()
@@ -204,7 +204,7 @@ async fn main() {
         "Estimate live data size:    {:?}",
         ByteSize::b(
             state
-                .block_store
+                .indexer_store
                 .as_ref()
                 .unwrap()
                 .estimate_live_data_size()
@@ -214,13 +214,13 @@ async fn main() {
         "Current size all memtables: {:?}",
         ByteSize::b(
             state
-                .block_store
+                .indexer_store
                 .as_ref()
                 .unwrap()
                 .cur_size_all_mem_tables()
         )
     );
-    println!("{}", state.block_store.as_ref().unwrap().db_stats());
+    println!("{}", state.indexer_store.as_ref().unwrap().db_stats());
 
     if !args.persist_db {
         tokio::fs::remove_dir_all(store_dir).await.unwrap();

@@ -1,9 +1,9 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStoreConn, Block, BlockHash},
+    block::{precomputed::PrecomputedBlock, Block, BlockHash, store::BlockStore},
     state::{
         branch::Branch,
         ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
-    },
+    }, store::IndexerStore,
 };
 use id_tree::NodeId;
 use std::{path::Path, time::Instant};
@@ -25,7 +25,7 @@ pub struct IndexerState {
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     pub dangling_branches: Vec<Branch<LedgerDiff>>,
     /// Block database
-    pub block_store: Option<BlockStoreConn>,
+    pub indexer_store: Option<IndexerStore>,
     pub transition_frontier_length: Option<u32>,
     /// Interval to the prune the root branch
     pub prune_interval: Option<u32>,
@@ -62,12 +62,12 @@ impl IndexerState {
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
-        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
+        let indexer_store = rocksdb_path.map(|path| IndexerStore::new(path).unwrap());
         Ok(Self {
             best_tip: root_branch.root.clone(),
             root_branch,
             dangling_branches: Vec::new(),
-            block_store,
+            indexer_store,
             transition_frontier_length,
             prune_interval,
             blocks_processed: 0,
@@ -83,12 +83,12 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block, root_ledger);
-        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
+        let indexer_store = rocksdb_path.map(|path| IndexerStore::new(path).unwrap());
         Ok(Self {
             best_tip: root_branch.root.clone(),
             root_branch,
             dangling_branches: Vec::new(),
-            block_store,
+            indexer_store,
             transition_frontier_length,
             prune_interval: None,
             blocks_processed: 0,
@@ -132,8 +132,8 @@ impl IndexerState {
             return Ok(ExtensionType::BlockNotAdded);
         }
 
-        if let Some(block_store) = self.block_store.as_ref() {
-            block_store.add_block(precomputed_block)?;
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            indexer_store.add_block(precomputed_block)?;
         }
         self.blocks_processed += 1;
 
@@ -166,8 +166,8 @@ impl IndexerState {
     }
 
     pub fn block_exists(&self, state_hash: &str) -> anyhow::Result<bool> {
-        if let Some(block_store) = self.block_store.as_ref() {
-            match block_store.get_block(state_hash)? {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            match indexer_store.get_block(&BlockHash(state_hash.to_string()))? {
                 None => Ok(false),
                 Some(_block) => Ok(true),
             }
@@ -341,12 +341,12 @@ impl IndexerState {
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
-        if let Some(block_store) = self.block_store.as_ref() {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
             return self
                 .root_branch
                 .longest_chain()
                 .iter()
-                .flat_map(|state_hash| block_store.get_block(&state_hash.0))
+                .flat_map(|state_hash| indexer_store.get_block(&state_hash))
                 .flatten()
                 .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
                 .collect();

@@ -1,14 +1,14 @@
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
-        store::BlockStoreConn, BlockHash,
+        store::BlockStore, BlockHash,
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{DbStats, Summary},
         IndexerState,
     },
-    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
+    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME, store::IndexerStore,
 };
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -242,7 +242,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 secondary_path.push(Uuid::new_v4().to_string());
 
                 debug!("Spawning secondary readonly RocksDB instance");
-                let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
+                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
 
                 // state summary
                 let mut max_dangling_height = 0;
@@ -258,11 +258,11 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 }
 
                 let db_stats_str = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.db_stats());
                 let mem = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.memtables_size())
                     .unwrap_or_default();
@@ -300,7 +300,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 #[instrument]
 async fn handle_conn(
     conn: LocalSocketStream,
-    db: BlockStoreConn,
+    db: IndexerStore,
     best_chain: Vec<BlockHash>,
     ledger: Ledger,
     summary: Summary,
@@ -339,7 +339,7 @@ async fn handle_conn(
                 .iter()
                 .take(num)
                 .cloned()
-                .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
+                .map(|state_hash| db.get_block(&state_hash).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
