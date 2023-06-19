@@ -22,10 +22,14 @@ pub enum SearchRecursion {
     Recursive,
 }
 
+/// Splits block paths into two collections: canonical and successive
+///
+/// Traverses canoncial paths first, then successive
 pub struct BlockParser {
     pub blocks_dir: PathBuf,
     pub recursion: SearchRecursion,
-    paths: IntoIter<PathBuf>,
+    canonical_paths: IntoIter<PathBuf>,
+    successive_paths: IntoIter<PathBuf>,
 }
 
 impl BlockParser {
@@ -48,7 +52,8 @@ impl BlockParser {
             Ok(Self {
                 blocks_dir,
                 recursion: SearchRecursion::None,
-                paths: paths.into_iter(),
+                canonical_paths: vec![].into_iter(),
+                successive_paths: paths.into_iter(),
             })
         } else {
             Err(anyhow::Error::msg(format!(
@@ -70,8 +75,8 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .collect();
 
-            let mut blocks_to_add = vec![];
-            let mut canonical_blocks = vec![];
+            let mut successive_paths = vec![];
+            let mut canonical_paths = vec![];
 
             if !paths.is_empty() {
                 info!("Sorting startup blocks by length");
@@ -124,7 +129,8 @@ impl BlockParser {
                     return Ok(Self {
                         blocks_dir,
                         recursion,
-                        paths: paths.into_iter(),
+                        canonical_paths: vec![].into_iter(),
+                        successive_paths: paths.into_iter(),
                     });
                 }
 
@@ -170,7 +176,7 @@ impl BlockParser {
                     curr_path.display(),
                     time.elapsed()
                 );
-                canonical_blocks.push(curr_path.clone());
+                canonical_paths.push(curr_path.clone());
                 info!("Walking the canonical chain back to the beginning");
 
                 let time = Instant::now();
@@ -190,7 +196,7 @@ impl BlockParser {
                         if extract_parent_hash_from_path(curr_path).unwrap()
                             == hash_from_path(path).unwrap()
                         {
-                            canonical_blocks.push(path.clone());
+                            canonical_paths.push(path.clone());
                             curr_path = path;
                             curr_length_idx = prev_length_idx;
                             count += 1;
@@ -205,32 +211,32 @@ impl BlockParser {
                     if extract_parent_hash_from_path(curr_path).unwrap()
                         == hash_from_path(path).unwrap()
                     {
-                        canonical_blocks.push(path.clone());
+                        canonical_paths.push(path.clone());
                         break;
                     }
                 }
 
                 info!(
                     "Found {} canonical blocks in {:?}",
-                    canonical_blocks.len(),
+                    canonical_paths.len(),
                     time.elapsed()
                 );
-                canonical_blocks.reverse();
-                blocks_to_add = canonical_blocks;
+                canonical_paths.reverse();
 
                 // add the blocks that are not know to be canonical but extend the chain
                 for path in paths[max_start_idx..]
                     .iter()
                     .filter(|p| length_from_path(p).is_some())
                 {
-                    blocks_to_add.push(path.clone());
+                    successive_paths.push(path.clone());
                 }
             }
 
             Ok(Self {
                 blocks_dir,
                 recursion,
-                paths: blocks_to_add.into_iter(),
+                canonical_paths: canonical_paths.into_iter(),
+                successive_paths: successive_paths.into_iter(),
             })
         } else {
             Err(anyhow::Error::msg(format!(
@@ -239,31 +245,44 @@ impl BlockParser {
         }
     }
 
+    /// Traverse the internal paths. First canonical, then successive.
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
-        if let Some(next_path) = self.paths.next() {
-            if is_valid_block_file(&next_path) {
-                let blockchain_length =
-                    get_blockchain_length(next_path.file_name().expect("filename already checked"));
-                let state_hash =
-                    get_state_hash(next_path.file_name().expect("filename already checked"))
-                        .expect("state hash already checked");
+        if let Some(next_path) = self.canonical_paths.next() {
+            return Self::handle_path(&next_path).await;
+        }
 
-                let mut log_file = tokio::fs::File::open(&next_path).await?;
-                let mut log_file_contents = Vec::new();
-
-                log_file.read_to_end(&mut log_file_contents).await?;
-
-                let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
-                    state_hash,
-                    blockchain_length,
-                    contents: log_file_contents,
-                })?;
-
-                return Ok(Some(precomputed_block));
-            }
+        if let Some(next_path) = self.successive_paths.next() {
+            return Self::handle_path(&next_path).await;
         }
 
         Ok(None)
+    }
+
+    async fn handle_path(path: &Path) -> anyhow::Result<Option<PrecomputedBlock>> {
+        if is_valid_block_file(path) {
+            let blockchain_length =
+                get_blockchain_length(path.file_name().expect("filename already checked"));
+            let state_hash = get_state_hash(path.file_name().expect("filename already checked"))
+                .expect("state hash already checked");
+
+            let mut log_file = tokio::fs::File::open(&path).await?;
+            let mut log_file_contents = Vec::new();
+
+            log_file.read_to_end(&mut log_file_contents).await?;
+
+            let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
+                state_hash,
+                blockchain_length,
+                contents: log_file_contents,
+            })?;
+
+            Ok(Some(precomputed_block))
+        } else {
+            Err(anyhow::Error::msg(format!(
+                "Invalid block path: {:?}",
+                path.display()
+            )))
+        }
     }
 
     /// get the precomputed block with supplied hash

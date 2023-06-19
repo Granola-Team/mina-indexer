@@ -54,7 +54,7 @@ impl Branch {
         };
         let mut branches = Tree::new();
 
-        branches.insert(Node::new(root), AsRoot).unwrap();
+        branches.insert(Node::new(root.clone()), AsRoot).unwrap();
 
         Self { root, branches }
     }
