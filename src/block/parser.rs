@@ -1,16 +1,21 @@
+use crate::{
+    block::{
+        get_blockchain_length, get_state_hash, is_valid_block_file,
+        precomputed::{BlockLogContents, PrecomputedBlock},
+    },
+    MAINNET_CANONICAL_THRESHOLD,
+};
+use glob::glob;
 use std::{
+    fs::File,
+    io::{prelude::*, SeekFrom},
     path::{Path, PathBuf},
+    time::Instant,
     u32::MAX,
     vec::IntoIter,
 };
-
-use glob::glob;
 use tokio::io::AsyncReadExt;
-
-use super::{
-    get_blockchain_length, get_state_hash, is_valid_block_file,
-    precomputed::{BlockLogContents, PrecomputedBlock},
-};
+use tracing::{debug, info};
 
 pub enum SearchRecursion {
     None,
@@ -18,44 +23,218 @@ pub enum SearchRecursion {
 }
 
 pub struct BlockParser {
-    pub log_path: PathBuf,
+    pub blocks_dir: PathBuf,
     pub recursion: SearchRecursion,
     paths: IntoIter<PathBuf>,
 }
 
 impl BlockParser {
-    pub fn new(log_path: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(log_path, SearchRecursion::None)
+    pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
+        Self::new_internal(blocks_dir, SearchRecursion::None)
     }
 
-    pub fn new_recursive(log_path: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(log_path, SearchRecursion::Recursive)
+    pub fn new_recursive(blocks_dir: &Path) -> anyhow::Result<Self> {
+        Self::new_internal(blocks_dir, SearchRecursion::Recursive)
     }
 
-    fn new_internal(log_path: &Path, recursion: SearchRecursion) -> anyhow::Result<Self> {
-        if log_path.exists() {
-            let pattern = match &recursion {
-                SearchRecursion::None => format!("{}/*.json", log_path.display()),
-                SearchRecursion::Recursive => format!("{}/**/*.json", log_path.display()),
-            };
-            let log_path = log_path.to_owned();
-            let mut paths: Vec<PathBuf> = glob(&pattern)
+    pub fn new_testing(blocks_dir: &Path) -> anyhow::Result<Self> {
+        if blocks_dir.exists() {
+            let blocks_dir = blocks_dir.to_owned();
+            let paths: Vec<PathBuf> = glob(&format!("{}/*.json", blocks_dir.display()))
                 .expect("Failed to read glob pattern")
                 .filter_map(|x| x.ok())
                 .collect();
-            paths.sort_by(|x, y| {
-                get_blockchain_length(x.file_name().unwrap())
-                    .unwrap_or(MAX)
-                    .cmp(&get_blockchain_length(y.file_name().unwrap()).unwrap_or(MAX))
-            });
+
             Ok(Self {
-                log_path,
-                recursion,
+                blocks_dir,
+                recursion: SearchRecursion::None,
                 paths: paths.into_iter(),
             })
         } else {
             Err(anyhow::Error::msg(format!(
-                "[BlockParser::new_internal] log path {log_path:?} does not exist!"
+                "[BlockParser::new_testing] log path {blocks_dir:?} does not exist!"
+            )))
+        }
+    }
+
+    fn new_internal(blocks_dir: &Path, recursion: SearchRecursion) -> anyhow::Result<Self> {
+        debug!("Building parser");
+        if blocks_dir.exists() {
+            let pattern = match &recursion {
+                SearchRecursion::None => format!("{}/*.json", blocks_dir.display()),
+                SearchRecursion::Recursive => format!("{}/**/*.json", blocks_dir.display()),
+            };
+            let blocks_dir = blocks_dir.to_owned();
+            let mut paths: Vec<PathBuf> = glob(&pattern)
+                .expect("Failed to read glob pattern")
+                .filter_map(|x| x.ok())
+                .collect();
+
+            let mut blocks_to_add = vec![];
+            let mut canonical_blocks = vec![];
+
+            if !paths.is_empty() {
+                info!("Sorting startup blocks by length");
+
+                let time = Instant::now();
+                paths.sort_by(|x, y| {
+                    length_from_path(x)
+                        .unwrap_or(MAX)
+                        .cmp(&length_from_path(y).unwrap_or(MAX))
+                });
+
+                info!(
+                    "{} blocks sorted by length in {:?}",
+                    paths.len(),
+                    time.elapsed()
+                );
+                info!("Searching for canonical chain in startup blocks");
+
+                let mut length_start_indices = vec![];
+                let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
+
+                // build the length_start_indices vec corresponding to the
+                // longest contiguous chain starting from the lowest block
+                for (idx, path) in paths.iter().enumerate() {
+                    let height = length_from_path(path).unwrap_or(MAX);
+                    if idx == 0 || height > curr_length {
+                        length_start_indices.push(idx);
+                        curr_length = height;
+                    } else {
+                        continue;
+                    }
+                }
+
+                // check that there are enough contiguous blocks
+                let check_lengths = length_start_indices
+                    .iter()
+                    .take(MAINNET_CANONICAL_THRESHOLD as usize + 1)
+                    .map(|idx| length_from_path(paths.get(*idx).unwrap()).unwrap_or(MAX));
+
+                let check = check_lengths.enumerate().fold(None, |acc, (n, x)| {
+                    if acc.is_none() && n == 0 || x == acc.unwrap_or(0) + 1 {
+                        Some(x)
+                    } else {
+                        None
+                    }
+                });
+
+                if check.is_none() {
+                    info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
+                    return Ok(Self {
+                        blocks_dir,
+                        recursion,
+                        paths: paths.into_iter(),
+                    });
+                }
+
+                let (max_start_idx, max_length_idx) =
+                    if length_from_path(paths.last().unwrap()).is_some() {
+                        (
+                            length_start_indices.len() - 1,
+                            *length_start_indices.last().unwrap(),
+                        )
+                    } else {
+                        (
+                            length_start_indices.len() - 2,
+                            length_start_indices[length_start_indices.len() - 2],
+                        )
+                    };
+
+                // backtrack canonical_threshold blocks to find a canonical one
+                let mut curr_start_idx = max_start_idx;
+                let mut curr_length_idx = max_length_idx;
+                let mut curr_path = paths.get(curr_length_idx).unwrap();
+                let time = Instant::now();
+
+                for _ in 1..=MAINNET_CANONICAL_THRESHOLD {
+                    if curr_start_idx > 0 {
+                        let prev_length_idx = length_start_indices[curr_start_idx - 1];
+
+                        for path in paths[prev_length_idx..curr_length_idx].iter() {
+                            if extract_parent_hash_from_path(curr_path).unwrap()
+                                == hash_from_path(path).unwrap()
+                            {
+                                curr_path = path;
+                                curr_length_idx = prev_length_idx;
+                                curr_start_idx -= 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                // curr_path represents a canonical block
+                info!(
+                    "Found the canonical tip {} in {:?}",
+                    curr_path.display(),
+                    time.elapsed()
+                );
+                canonical_blocks.push(curr_path.clone());
+                info!("Walking the canonical chain back to the beginning");
+
+                let time = Instant::now();
+                let mut count = 1;
+                while curr_start_idx > 0 {
+                    if count % 50_000 == 0 {
+                        info!("Found {count} canonical blocks in {:?}", time.elapsed());
+                    }
+
+                    let prev_length_idx = if curr_start_idx > 0 {
+                        length_start_indices[curr_start_idx - 1]
+                    } else {
+                        0
+                    };
+
+                    for path in paths[prev_length_idx..curr_length_idx].iter() {
+                        if extract_parent_hash_from_path(curr_path).unwrap()
+                            == hash_from_path(path).unwrap()
+                        {
+                            canonical_blocks.push(path.clone());
+                            curr_path = path;
+                            curr_length_idx = prev_length_idx;
+                            count += 1;
+                            curr_start_idx -= 1;
+                            continue;
+                        }
+                    }
+                }
+
+                // final canonical block
+                for path in paths[0..curr_length_idx].iter() {
+                    if extract_parent_hash_from_path(curr_path).unwrap()
+                        == hash_from_path(path).unwrap()
+                    {
+                        canonical_blocks.push(path.clone());
+                        break;
+                    }
+                }
+
+                info!(
+                    "Found {} canonical blocks in {:?}",
+                    canonical_blocks.len(),
+                    time.elapsed()
+                );
+                canonical_blocks.reverse();
+                blocks_to_add = canonical_blocks;
+
+                // add the blocks that are not know to be canonical but extend the chain
+                for path in paths[max_start_idx..]
+                    .iter()
+                    .filter(|p| length_from_path(p).is_some())
+                {
+                    blocks_to_add.push(path.clone());
+                }
+            }
+
+            Ok(Self {
+                blocks_dir,
+                recursion,
+                paths: blocks_to_add.into_iter(),
+            })
+        } else {
+            Err(anyhow::Error::msg(format!(
+                "[BlockParser::new_internal] log path {blocks_dir:?} does not exist!"
             )))
         }
     }
@@ -96,23 +275,21 @@ impl BlockParser {
         let error = anyhow::Error::msg(format!(
             "
 [BlockPasrser::get_precomputed_block]
-Looking in log path: {:?}
-Did not find state hash: {state_hash}
-It may have been skipped unintentionally!
-BlockParser::next() does not exactly follow filename order!",
-            self.log_path
+    Looking in blocks dir: {:?}
+    Did not find state hash: {state_hash}
+    It may have been skipped unintentionally!",
+            self.blocks_dir
         ));
         let mut next_block = self.next().await?.ok_or(error)?;
 
         while next_block.state_hash != state_hash {
             next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
                 "
-    [BlockPasrser::get_precomputed_block]
-    Looking in log path: {:?}
+[BlockPasrser::get_precomputed_block]
+    Looking in blocks dir: {:?}
     Did not find state hash: {state_hash}
-    It may have been skipped unintentionally!
-    BlockParser::next() does not exactly follow filename order!",
-                self.log_path
+    It may have been skipped unintentionally!",
+                self.blocks_dir
             )))?;
         }
 
@@ -144,11 +321,31 @@ BlockParser::next() does not exactly follow filename order!",
                 "
 [BlockParser::parse_file]
     Could not find valid block!
-    {:} is not a valid Precomputed Block",
+    {:} is not a valid precomputed block",
                 filename.display()
             )))
         }
     }
+}
+
+fn length_from_path(path: &Path) -> Option<u32> {
+    get_blockchain_length(path.file_name().unwrap())
+}
+
+fn hash_from_path(path: &Path) -> Option<String> {
+    get_state_hash(path.file_name().unwrap())
+}
+
+fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
+    let parent_hash_offset = 75;
+    let parent_hash_length = 52;
+
+    let mut f = File::open(path)?;
+    f.seek(SeekFrom::Start(parent_hash_offset))?;
+    let mut buf = vec![0; parent_hash_length];
+    f.read_exact(&mut buf)?;
+    let parent_hash = String::from_utf8(buf)?;
+    Ok(parent_hash)
 }
 
 #[cfg(test)]
