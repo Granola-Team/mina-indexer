@@ -17,7 +17,7 @@ async fn extension() {
     // --------------------------------
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // ----------------
     // initialize state

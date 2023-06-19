@@ -17,7 +17,7 @@ async fn extensions() {
     //               => child0  child10  child11
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let root_block = block_parser
