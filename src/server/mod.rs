@@ -55,7 +55,7 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = LevelFilter::INFO)]
     log_level_stdout: LevelFilter,
     /// Restore indexer state from an existing db on the path provided by database_dir
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = false)]
     restore_from_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long)]
