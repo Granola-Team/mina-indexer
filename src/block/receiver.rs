@@ -1,12 +1,11 @@
-use std::path::{Path, PathBuf};
-
-use super::{parse_file, parser::BlockParser, precomputed::PrecomputedBlock};
-
+use crate::block::{parse_file, parser::BlockParser, precomputed::PrecomputedBlock};
 use async_priority_channel as priority;
+use std::path::{Path, PathBuf};
 use tokio::sync::{
     mpsc,
     watch::{self, Sender},
 };
+use tracing::debug;
 use watchexec::{
     error::RuntimeError,
     event::{
@@ -33,11 +32,14 @@ pub struct ReceivedBlock {
 
 impl BlockReceiver {
     pub async fn new() -> anyhow::Result<BlockReceiver> {
+        debug!("Building new block receiver");
+
         let (ev_s, worker_event_receiver) = priority::bounded(1024);
         let (er_s, worker_error_receiver) = mpsc::channel(64);
         let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());
 
         tokio::spawn(async {
+            debug!("Spawn worker");
             worker(wd_r, er_s, ev_s).await.unwrap();
         });
 
@@ -51,6 +53,8 @@ impl BlockReceiver {
     }
 
     pub async fn load_directory(&mut self, directory: &Path) -> anyhow::Result<()> {
+        debug!("Loading directory");
+
         if !directory.is_dir() {
             return Err(anyhow::Error::msg(format!(
                 "

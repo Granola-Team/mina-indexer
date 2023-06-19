@@ -20,7 +20,7 @@ async fn transition_frontier() {
     // 5
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
     let root_block = block_parser

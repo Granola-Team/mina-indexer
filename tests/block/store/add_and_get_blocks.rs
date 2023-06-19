@@ -13,6 +13,7 @@ async fn rocksdb() {
 
     let db = IndexerStore::new(store_dir).unwrap();
     let mut bp = BlockParser::new(log_dir).unwrap();
+
     let mut blocks = HashMap::new();
 
     let mut n = 0;

@@ -2,7 +2,7 @@ use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ledger::genesis, IndexerState},
+    state::{ledger::genesis, IndexerMode, IndexerState},
     MAINNET_TRANSITION_FRONTIER_K,
 };
 use std::path::PathBuf;
@@ -11,14 +11,22 @@ use tokio::time::{Duration, Instant};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Blocks directory path
     #[arg(short, long)]
     blocks_dir: PathBuf,
+    /// Max number of blocks to parse
     #[arg(short, long, default_value_t = 10_000)]
     max_block_count: u32,
+    /// Report frequency (number of blocks)
     #[arg(short, long, default_value_t = 5000)]
     report_freq: u32,
+    /// To keep the db or not, that is the question
     #[arg(short, long, default_value_t = false)]
     persist_db: bool,
+    /// Indexer mode
+    #[arg(long, default_value_t = IndexerMode::Light)]
+    mode: IndexerMode,
+    /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
@@ -28,6 +36,7 @@ async fn main() {
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
     let freq = args.report_freq;
+    let mode = args.mode;
     let verbose = args.verbose;
     let max_block_count = args.max_block_count;
 
@@ -48,6 +57,7 @@ async fn main() {
 
     let total_time = Instant::now();
     let mut state = IndexerState::new(
+        mode,
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
