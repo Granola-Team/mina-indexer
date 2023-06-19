@@ -45,17 +45,26 @@ impl Branch {
         }
     }
 
-    pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
-        let root_block = Block::from_precomputed(precomputed_block, 0);
+    pub fn new_non_genesis(root_hash: BlockHash, blockchain_length: Option<u32>) -> Self {
+        let root = Block {
+            state_hash: root_hash.clone(),
+            parent_hash: root_hash,
+            height: 0,
+            blockchain_length,
+        };
         let mut branches = Tree::new();
-        branches
-            .insert(Node::new(root_block.clone()), AsRoot)
-            .unwrap();
 
-        Self {
-            root: root_block,
-            branches,
-        }
+        branches.insert(Node::new(root), AsRoot).unwrap();
+
+        Self { root, branches }
+    }
+
+    pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
+        let root = Block::from_precomputed(precomputed_block, 0);
+        let mut branches = Tree::new();
+        branches.insert(Node::new(root.clone()), AsRoot).unwrap();
+
+        Self { root, branches }
     }
 
     // only the genesis block should work here
