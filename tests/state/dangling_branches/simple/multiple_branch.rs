@@ -171,17 +171,17 @@ async fn extensions() {
         .get(&branches1.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves1: Vec<&Block> = state
+    let leaves1: Vec<Block> = state
         .dangling_branches
         .get(1)
         .unwrap()
         .leaves()
         .iter()
-        .map(|x| &x.block)
+        .map(|x| x.clone())
         .collect();
 
     // root1 is not a leaf
-    assert_ne!(&root1, leaves1.get(0).unwrap());
+    assert_ne!(root1, leaves1.get(0).unwrap());
     println!(
         "\n=== After Branch 0 ===\n{:?}",
         &state.dangling_branches.get(0).unwrap()
@@ -192,5 +192,5 @@ async fn extensions() {
     );
 
     // branch root should match the tree's root
-    assert_eq!(root1, &branch_root1.block);
+    assert_eq!(&root1, branch_root1);
 }

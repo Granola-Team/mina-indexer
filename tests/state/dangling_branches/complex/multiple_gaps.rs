@@ -137,7 +137,7 @@ async fn extension() {
         .root_branch
         .leaves()
         .iter()
-        .map(|x| x.block.clone())
+        .map(|x| x.clone())
         .collect();
     let leaf = Block::from_precomputed(&leaf_block, 2);
 
@@ -145,5 +145,5 @@ async fn extension() {
     assert_eq!(leaves.get(0).unwrap(), &leaf);
 
     // branch root should match the tree's root
-    assert_eq!(root, &branch_root.block);
+    assert_eq!(&root, branch_root);
 }

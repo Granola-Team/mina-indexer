@@ -77,7 +77,7 @@ async fn extension() {
     assert_eq!(before_leaves.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
-    assert_eq!(before_root, before_root_leaf.block);
+    assert_eq!(before_root, before_root_leaf);
 
     println!("=== Before state ===");
     println!("{state:?}");
@@ -112,20 +112,19 @@ async fn extension() {
 
     let after_child_block = Block::from_precomputed(&old_dangling_root_block, 1);
     assert_eq!(
-        after_child_block,
+        &after_child_block,
         after_branch
             .leaves()
             .get(0)
             .expect("There should be a leaf block")
-            .block
     );
 
     // root checks
     assert_ne!(&before_root, after_root);
-    assert_eq!(after_root, &after_root_block.block);
+    assert_eq!(after_root, &after_root_block);
 
     // leaf checks
-    let leaves: Vec<&Block> = leaves1.iter().map(|x| &x.block).collect();
+    let leaves: Vec<Block> = leaves1.iter().map(|x| x.clone()).collect();
     let leaf = leaves.get(0).unwrap();
 
     // height differs, hashes agree

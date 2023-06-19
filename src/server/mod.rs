@@ -1,13 +1,14 @@
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
-        store::BlockStoreConn, BlockHash,
+        store::BlockStore, BlockHash,
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{DbStats, Summary},
         IndexerState,
     },
+    store::IndexerStore,
     MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 use clap::Parser;
@@ -54,7 +55,7 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = LevelFilter::INFO)]
     log_level_stdout: LevelFilter,
     /// Restore indexer state from an existing db on the path provided by database_dir
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = false)]
     restore_from_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long)]
@@ -242,7 +243,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 secondary_path.push(Uuid::new_v4().to_string());
 
                 debug!("Spawning secondary readonly RocksDB instance");
-                let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
+                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
 
                 // state summary
                 let mut max_dangling_height = 0;
@@ -258,11 +259,11 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 }
 
                 let db_stats_str = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.db_stats());
                 let mem = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.memtables_size())
                     .unwrap_or_default();
@@ -280,7 +281,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     max_dangling_length,
                     db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
-                let ledger = indexer_state.root_branch.best_tip().unwrap().get_ledger().clone();
+                let ledger = indexer_state.best_ledger()?;
 
                 // handle the connection
                 tokio::spawn(async move {
@@ -300,7 +301,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 #[instrument]
 async fn handle_conn(
     conn: LocalSocketStream,
-    db: BlockStoreConn,
+    db: IndexerStore,
     best_chain: Vec<BlockHash>,
     ledger: Ledger,
     summary: Summary,
@@ -339,7 +340,7 @@ async fn handle_conn(
                 .iter()
                 .take(num)
                 .cloned()
-                .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
+                .map(|state_hash| db.get_block(&state_hash).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;

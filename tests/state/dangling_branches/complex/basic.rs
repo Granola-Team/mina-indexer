@@ -149,10 +149,10 @@ async fn extension() {
         .unwrap()
         .data();
     let root_branch = state.root_branch;
-    let leaves: Vec<&Block> = root_branch.leaves().iter().map(|x| &x.block).collect();
+    let leaves: Vec<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
 
     assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);
 
     // branch root should match the tree's root
-    assert_eq!(root, &branch_root.block);
+    assert_eq!(&root, branch_root);
 }

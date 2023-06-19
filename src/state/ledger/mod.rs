@@ -6,6 +6,7 @@ pub mod command;
 pub mod diff;
 pub mod genesis;
 pub mod public_key;
+pub mod store;
 
 use account::Account;
 use diff::LedgerDiff;
