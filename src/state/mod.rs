@@ -388,12 +388,13 @@ impl IndexerState {
                         precomputed_block.protocol_state.previous_state_hash,
                     );
                 }
-                ledger_diffs.into_iter().for_each(|diff| 
-                    ledger.iter_mut().for_each(|ledger| 
-                        ledger.apply_diff(diff.clone())
-                        .expect("ledger diff application succeeds")
-                    )
-                );
+                ledger_diffs.into_iter().for_each(|diff| {
+                    ledger.iter_mut().for_each(|ledger| {
+                        ledger
+                            .apply_diff(diff.clone())
+                            .expect("ledger diff application succeeds")
+                    })
+                });
             }
         }
         Ok(ledger.expect("genesis ledger guaranteed"))
