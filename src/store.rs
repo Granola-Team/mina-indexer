@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
 
-use crate::{block::store::BlockStore, state::ledger::store::LedgerStore};
+use crate::{block::{store::BlockStore, BlockHash}, state::ledger::{store::LedgerStore, Ledger}};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -86,8 +86,8 @@ impl BlockStore for IndexerStore {
 impl LedgerStore for IndexerStore {
     fn add_ledger(
         &self,
-        state_hash: &crate::block::BlockHash,
-        ledger: crate::state::ledger::Ledger,
+        state_hash: &BlockHash,
+        ledger: Ledger,
     ) -> anyhow::Result<()> {
         let cf_handle = self
             .database
@@ -101,8 +101,8 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger(
         &self,
-        state_hash: &crate::block::BlockHash,
-    ) -> anyhow::Result<Option<crate::state::ledger::Ledger>> {
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Ledger>> {
         let cf_handle = self
             .database
             .cf_handle("ledgers")
