@@ -6,7 +6,7 @@ use crate::{
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{DbStats, Summary},
-        IndexerState,
+        IndexerMode, IndexerState,
     },
     store::IndexerStore,
     MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
@@ -48,18 +48,21 @@ pub struct ServerArgs {
     /// Path to directory for logs
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     log_dir: PathBuf,
+    /// Only store canonical blocks in the db
+    #[arg(short, long, default_value_t = false)]
+    keep_non_canonical_blocks: bool,
     /// Max file log level
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
     log_level: LevelFilter,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     log_level_stdout: LevelFilter,
-    /// Restore indexer state from an existing db on the path provided by database_dir
-    #[arg(long, default_value_t = false)]
-    restore_from_db: bool,
+    /// Ignore restoring indexer state from an existing db on the path provided by database_dir
+    #[arg(short, long, default_value_t = false)]
+    ignore_db: bool,
     /// Interval for pruning the root branch
-    #[arg(short, long)]
-    prune_interval: Option<u32>,
+    #[arg(short, long, default_value_t = 2)]
+    prune_interval: u32,
 }
 
 pub struct IndexerConfiguration {
@@ -68,11 +71,12 @@ pub struct IndexerConfiguration {
     startup_dir: PathBuf,
     watch_dir: PathBuf,
     database_dir: PathBuf,
+    keep_noncanonical_blocks: bool,
     log_file: PathBuf,
     log_level: LevelFilter,
     log_level_stdout: LevelFilter,
-    restore_from_db: bool,
-    prune_interval: Option<u32>,
+    ignore_db: bool,
+    prune_interval: u32,
 }
 
 #[instrument]
@@ -84,10 +88,11 @@ pub async fn handle_command_line_arguments(
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
     let database_dir = args.database_dir;
+    let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let log_dir = args.log_dir;
     let log_level = args.log_level;
     let log_level_stdout = args.log_level_stdout;
-    let restore_from_db = args.restore_from_db;
+    let ignore_db = args.ignore_db;
     let prune_interval = args.prune_interval;
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
@@ -115,7 +120,7 @@ pub async fn handle_command_line_arguments(
 
             while tokio::fs::metadata(&log_fname).await.is_ok() {
                 log_number += 1;
-                log_fname = format!("{}/mina-indexer{}.log", log_dir.display(), log_number);
+                log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
             }
 
             Ok(IndexerConfiguration {
@@ -124,10 +129,11 @@ pub async fn handle_command_line_arguments(
                 startup_dir,
                 watch_dir,
                 database_dir,
+                keep_noncanonical_blocks,
                 log_file: PathBuf::from(&log_fname),
                 log_level,
                 log_level_stdout,
-                restore_from_db,
+                ignore_db,
                 prune_interval,
             })
         }
@@ -148,10 +154,11 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         startup_dir,
         watch_dir,
         database_dir,
+        keep_noncanonical_blocks,
         log_file,
         log_level,
         log_level_stdout,
-        restore_from_db,
+        ignore_db,
         prune_interval,
     } = handle_command_line_arguments(args).await?;
 
@@ -169,41 +176,39 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         .with(file_layer.with_filter(log_level))
         .init();
 
-    let mut indexer_state;
-    if restore_from_db {
-        info!("Restoring from db in {}", database_dir.display());
-        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
-        // if no db or it doesn't have blocks, use the startup_dir like usual
-        indexer_state = IndexerState::new_from_db(&database_dir)?;
+    let mode = if keep_noncanonical_blocks {
+        IndexerMode::Full
     } else {
+        IndexerMode::Light
+    };
+    let mut indexer_state = if ignore_db {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
-        indexer_state = IndexerState::new(
+        IndexerState::new(
+            mode,
             root_hash.clone(),
             genesis_ledger.ledger,
             Some(&database_dir),
             Some(MAINNET_TRANSITION_FRONTIER_K),
-            prune_interval,
-        )?;
-    }
+            Some(prune_interval),
+        )?
+    } else {
+        info!("Restoring from db in {}", database_dir.display());
+        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
+        // if no db or it doesn't have blocks, use the startup_dir like usual
+        IndexerState::new_from_db(&database_dir)?;
+        todo!()
+    };
 
     let init_dir = startup_dir.display().to_string();
     info!("Ingesting precomputed blocks from {init_dir}");
 
     let mut block_parser = BlockParser::new(&startup_dir)?;
-    let mut block_count = 0;
-    let ingestion_time = Instant::now();
 
-    while let Some(block) = block_parser.next().await? {
-        debug!(
-            "Adding {:?} with length {:?} to the state",
-            &block.state_hash, &block.blockchain_length
-        );
-        indexer_state.add_block(&block)?;
-        block_count += 1;
-    }
+    let ingestion_time = Instant::now();
+    let block_count = indexer_state.add_blocks(&mut block_parser).await?;
 
     info!(
         "Ingested {block_count} blocks in {:?}",
@@ -211,8 +216,8 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     );
 
     let mut block_receiver = BlockReceiver::new().await?;
-    info!("Block receiver set to watch {watch_dir:?}");
     block_receiver.load_directory(&watch_dir).await?;
+    info!("Block receiver set to watch {watch_dir:?}");
 
     let listener = LocalSocketListener::bind(SOCKET_NAME)?;
     info!("Local socket listener started");
@@ -372,6 +377,7 @@ async fn handle_conn(
 
 async fn create_dir_if_non_existent(path: &str) {
     if metadata(path).await.is_err() {
+        debug!("Creating directory {path}");
         create_dir_all(path).await.unwrap();
     }
 }

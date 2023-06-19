@@ -120,8 +120,14 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(root_hash, blockchain_length);
-        let indexer_store = rocksdb_path.map(|path| IndexerStore::new(path).unwrap());
+        let root_branch = Branch::new_non_genesis(root_hash.clone(), blockchain_length);
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            store
+                .add_ledger(&root_hash, ledger)
+                .expect("ledger add succeeds");
+            store
+        });
         Ok(Self {
             mode,
             phase: IndexerPhase::InitializingFromDB,
