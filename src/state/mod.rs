@@ -395,8 +395,14 @@ impl IndexerState {
                             .expect("ledger diff application succeeds")
                     })
                 });
+
+                ledger.clone().map(|ledger| 
+                    store.add_ledger(&state_hash, ledger)
+                    .expect("ledger add succeeds")
+                );
             }
         }
+
         Ok(ledger.expect("genesis ledger guaranteed"))
     }
 
