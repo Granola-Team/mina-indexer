@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rocksdb::{DBWithThreadMode, MultiThreaded};
+use rocksdb::{DBWithThreadMode, MultiThreaded, ColumnFamilyDescriptor};
 
 use crate::{block::store::BlockStore, state::ledger::store::LedgerStore};
 
@@ -14,16 +14,23 @@ impl IndexerStore {
     pub fn new_read_only(path: &Path, secondary: &Path) -> anyhow::Result<Self> {
         let database_opts = rocksdb::Options::default();
         let database =
-            rocksdb::DBWithThreadMode::open_as_secondary(&database_opts, path, secondary)?;
+            rocksdb::DBWithThreadMode::open_cf_as_secondary(&database_opts, path, secondary, vec!["blocks", "ledgers"])?;
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
         })
     }
     pub fn new(path: &Path) -> anyhow::Result<Self> {
+        let mut cf_opts = rocksdb::Options::default();
+        cf_opts.set_max_write_buffer_number(16);
+        let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
+        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
+
         let mut database_opts = rocksdb::Options::default();
+        database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
-        let database = rocksdb::DBWithThreadMode::open(&database_opts, path)?;
+        let database = rocksdb::DBWithThreadMode::open_cf_descriptors
+            (&database_opts, path, vec![blocks, ledgers])?;
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
@@ -37,9 +44,11 @@ impl IndexerStore {
 
 impl BlockStore for IndexerStore {
     fn add_block(&self, block: &crate::block::precomputed::PrecomputedBlock) -> anyhow::Result<()> {
+        let cf_handle = self.database.cf_handle("blocks")
+            .expect("column family exists");
         let key = block.state_hash.as_bytes();
         let value = bcs::to_bytes(&block)?;
-        self.database.put(key, value)?;
+        self.database.put_cf(&cf_handle, key, value)?;
         Ok(())
     }
 
@@ -47,10 +56,12 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &crate::block::BlockHash,
     ) -> anyhow::Result<Option<crate::block::precomputed::PrecomputedBlock>> {
+        let cf_handle = self.database.cf_handle("blocks")
+            .expect("column family exists");
         let mut precomputed_block = None;
         self.database.try_catch_up_with_primary().ok();
         let key = state_hash.0.as_bytes();
-        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
+        if let Some(bytes) = self.database.get_pinned_cf(&cf_handle, key)?.map(|bytes| bytes.to_vec()) {
             precomputed_block = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(precomputed_block)
@@ -63,9 +74,11 @@ impl LedgerStore for IndexerStore {
         state_hash: &crate::block::BlockHash,
         ledger: crate::state::ledger::Ledger,
     ) -> anyhow::Result<()> {
+        let cf_handle = self.database.cf_handle("ledgers")
+            .expect("column family exists");
         let key = state_hash.0.as_bytes();
         let value = bcs::to_bytes(&ledger)?;
-        self.database.put(key, value)?;
+        self.database.put_cf(&cf_handle, key, value)?;
         Ok(())
     }
 
@@ -73,10 +86,12 @@ impl LedgerStore for IndexerStore {
         &self,
         state_hash: &crate::block::BlockHash,
     ) -> anyhow::Result<Option<crate::state::ledger::Ledger>> {
+        let cf_handle = self.database.cf_handle("ledgers")
+            .expect("column family exists");
         let mut ledger = None;
         self.database.try_catch_up_with_primary().ok();
         let key = state_hash.0.as_bytes();
-        if let Some(bytes) = self.database.get_pinned(key)?.map(|bytes| bytes.to_vec()) {
+        if let Some(bytes) = self.database.get_pinned_cf(&cf_handle, key)?.map(|bytes| bytes.to_vec()) {
             ledger = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(ledger)
