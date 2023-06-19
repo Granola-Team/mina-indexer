@@ -396,10 +396,11 @@ impl IndexerState {
                     })
                 });
 
-                ledger.clone().map(|ledger| 
-                    store.add_ledger(&state_hash, ledger)
-                    .expect("ledger add succeeds")
-                );
+                if let Some(ledger) = ledger.clone() {
+                    store
+                        .add_ledger(&state_hash, ledger)
+                        .expect("ledger add succeeds")
+                }
             }
         }
 

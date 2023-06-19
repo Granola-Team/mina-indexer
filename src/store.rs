@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
 
 use crate::{
-    block::{store::BlockStore, BlockHash},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     state::ledger::{store::LedgerStore, Ledger},
 };
 
@@ -53,7 +53,7 @@ impl IndexerStore {
 }
 
 impl BlockStore for IndexerStore {
-    fn add_block(&self, block: &crate::block::precomputed::PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         let cf_handle = self
             .database
             .cf_handle("blocks")
@@ -64,10 +64,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block(
-        &self,
-        state_hash: &crate::block::BlockHash,
-    ) -> anyhow::Result<Option<crate::block::precomputed::PrecomputedBlock>> {
+    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
         let cf_handle = self
             .database
             .cf_handle("blocks")
