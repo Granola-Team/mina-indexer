@@ -9,7 +9,7 @@ use crate::{
         IndexerMode, IndexerState,
     },
     store::IndexerStore,
-    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
+    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
 };
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -61,7 +61,7 @@ pub struct ServerArgs {
     #[arg(short, long, default_value_t = false)]
     ignore_db: bool,
     /// Interval for pruning the root branch
-    #[arg(short, long, default_value_t = 2)]
+    #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
 }
 

@@ -7,11 +7,12 @@ use crate::{
         ledger::{command::Command, genesis::GenesisLedger, Ledger},
     },
     store::IndexerStore,
+    BLOCK_REPORTING_FREQ, PRUNE_INTERVAL_DEFAULT,
 };
 use id_tree::NodeId;
 use std::{path::Path, time::Instant};
 use time::OffsetDateTime;
-use tracing::{debug, trace};
+use tracing::{debug, info};
 
 use self::ledger::{diff::LedgerDiff, store::LedgerStore};
 
@@ -181,7 +182,7 @@ impl IndexerState {
 
     fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
-            let interval = self.prune_interval.unwrap_or(2);
+            let interval = self.prune_interval.unwrap_or(PRUNE_INTERVAL_DEFAULT);
             if self.root_branch.height() as u32 > interval * k {
                 debug!(
                     "Pruning transition frontier at k = {}, best tip length: {}",
@@ -199,13 +200,18 @@ impl IndexerState {
     /// Returns the number of blocks parsed
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<u32> {
         let mut block_count = 0;
+        let time = Instant::now();
 
         while let Some(block) = block_parser.next().await? {
-            trace!(
-                "Adding {:?} with length {:?} to the state",
-                &block.state_hash,
-                &block.blockchain_length
-            );
+            if block_count > 0 && block_count % BLOCK_REPORTING_FREQ == 0 {
+                info!(
+                    "{}",
+                    format!(
+                        "Parsed and added {block_count} blocks to the witness tree in {:?}",
+                        time.elapsed()
+                    )
+                );
+            }
             self.add_block(&block)?;
             block_count += 1;
         }

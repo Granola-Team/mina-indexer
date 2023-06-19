@@ -3,7 +3,7 @@ use crate::{
         get_blockchain_length, get_state_hash, is_valid_block_file,
         precomputed::{BlockLogContents, PrecomputedBlock},
     },
-    MAINNET_CANONICAL_THRESHOLD,
+    BLOCK_REPORTING_FREQ, MAINNET_CANONICAL_THRESHOLD,
 };
 use glob::glob;
 use std::{
@@ -170,19 +170,22 @@ impl BlockParser {
                     }
                 }
 
+                let successive_idx = length_start_indices[curr_start_idx + 1];
+
                 // curr_path represents a canonical block
                 info!(
                     "Found the canonical tip {} in {:?}",
                     curr_path.display(),
                     time.elapsed()
                 );
+
                 canonical_paths.push(curr_path.clone());
-                info!("Walking the canonical chain back to the beginning");
+                info!("Walking the canonical chain back to the beginning, Will report every {BLOCK_REPORTING_FREQ} blocks found.", );
 
                 let time = Instant::now();
                 let mut count = 1;
                 while curr_start_idx > 0 {
-                    if count % 50_000 == 0 {
+                    if count % BLOCK_REPORTING_FREQ == 0 {
                         info!("Found {count} canonical blocks in {:?}", time.elapsed());
                     }
 
@@ -216,15 +219,16 @@ impl BlockParser {
                     }
                 }
 
+                info!("Canonical chain discovery finished");
                 info!(
-                    "Found {} canonical blocks in {:?}",
-                    canonical_paths.len(),
+                    "Found {} blocks in the canonical chain in {:?}",
+                    canonical_paths.len() + 1, // +1 for starting block
                     time.elapsed()
                 );
                 canonical_paths.reverse();
 
-                // add the blocks that are not know to be canonical but extend the chain
-                for path in paths[max_start_idx..]
+                // add all blocks successive to the canonical chain
+                for path in paths[successive_idx..]
                     .iter()
                     .filter(|p| length_from_path(p).is_some())
                 {
@@ -232,6 +236,10 @@ impl BlockParser {
                 }
             }
 
+            info!(
+                "Indexer state initializing from {} blocks",
+                canonical_paths.len() + successive_paths.len()
+            );
             Ok(Self {
                 blocks_dir,
                 recursion,
