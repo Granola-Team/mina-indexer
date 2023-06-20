@@ -1,7 +1,7 @@
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
-        store::BlockStore, BlockHash,
+        store::BlockStore, BlockHash, BlockWithoutHeight,
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
@@ -227,11 +227,11 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             block_fut = block_receiver.recv() => {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
-                    debug!("Receiving block {:?}", precomputed_block);
+                    let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
+                    debug!("Receiving block {block:?}");
 
                     indexer_state.add_block(&precomputed_block)?;
-
-                    info!("Added block with height: {}, state_hash: {:?}", &precomputed_block.state_hash, precomputed_block.blockchain_length.unwrap_or(0));
+                    info!("Added {block:?}");
                 } else {
                     info!("Block receiver shutdown, system exit");
                     return Ok(())

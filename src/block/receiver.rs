@@ -58,7 +58,7 @@ impl BlockReceiver {
         if !directory.is_dir() {
             return Err(anyhow::Error::msg(format!(
                 "
-[BlockPasrserReceiver::load_directory]
+[BlockReceiver::load_directory]
     Adding directory {:} to the watched directories
     {:} is not a directory!",
                 directory.display(),
