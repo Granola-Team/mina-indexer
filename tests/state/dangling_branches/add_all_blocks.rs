@@ -15,7 +15,7 @@ async fn extension() {
         let mut state = IndexerState::new_testing(&precomputed_block, None, None, None).unwrap();
         n += 1;
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
-            state.add_block(&precomputed_block).unwrap();
+            state.add_block(&precomputed_block, false).unwrap();
             n += 1;
         }
 

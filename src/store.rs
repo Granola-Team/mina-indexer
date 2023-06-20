@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
+use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{precomputed::PrecomputedBlock, BlockHash, store::BlockStore},
     state::ledger::{store::LedgerStore, Ledger},
 };
 
@@ -49,6 +49,10 @@ impl IndexerStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    pub fn iterator(&self) -> DBIteratorWithThreadMode<DBWithThreadMode<MultiThreaded>> {
+        self.database.iterator(rocksdb::IteratorMode::Start)
     }
 }
 
