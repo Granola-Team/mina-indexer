@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{client, server};
-use std::error::Error;
 use tracing::instrument;
 
 #[derive(Parser, Debug)]
@@ -8,7 +7,7 @@ use tracing::instrument;
 Efficiently index and query the Mina blockchain"))]
 struct Cli {
     #[command(subcommand)]
-    command: Option<IndexerCommand>,
+    command: IndexerCommand,
 }
 
 #[derive(Subcommand, Debug)]
@@ -18,24 +17,15 @@ enum IndexerCommand {
     /// Client commands
     Client {
         #[command(subcommand)]
-        command: client::ClientCli,
+        args: client::ClientCli,
     },
 }
 
 #[instrument]
 #[tokio::main]
-pub async fn main() -> Result<(), Box<dyn Error>> {
-    let args = Cli::parse();
-
-    if let Some(arguments) = &args.command {
-        match arguments {
-            IndexerCommand::Client { command } => {
-                client::run(command).await?;
-            }
-            IndexerCommand::Server(args) => {
-                server::run(args.clone()).await?;
-            }
-        }
+pub async fn main() -> anyhow::Result<()> {
+    match Cli::parse().command {
+        IndexerCommand::Client { args } => client::run(&args).await,
+        IndexerCommand::Server(args) => server::run(args.clone()).await,
     }
-    Ok(())
 }
