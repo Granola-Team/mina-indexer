@@ -79,7 +79,7 @@ pub struct IndexerConfiguration {
     prune_interval: u32,
 }
 
-#[instrument]
+#[instrument(skip_all)]
 pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
@@ -140,7 +140,7 @@ pub async fn handle_command_line_arguments(
     }
 }
 
-#[instrument]
+#[instrument(skip_all)]
 pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
@@ -286,7 +286,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     max_dangling_length,
                     db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
-                let ledger = indexer_state.best_ledger()?;
+                let ledger = indexer_state.best_ledger()?.unwrap();
 
                 // handle the connection
                 tokio::spawn(async move {
@@ -303,7 +303,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     }
 }
 
-#[instrument]
+#[instrument(skip_all)]
 async fn handle_conn(
     conn: LocalSocketStream,
     db: IndexerStore,
@@ -318,7 +318,6 @@ async fn handle_conn(
 
     let mut buffers = buffer.split(|byte| *byte == 32);
     let command = buffers.next().unwrap();
-
     let command_string = String::from_utf8(command.to_vec())?;
 
     match command_string.as_str() {

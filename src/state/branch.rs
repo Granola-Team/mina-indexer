@@ -73,13 +73,6 @@ impl Branch {
     }
 }
 
-// impl Branch<LedgerDiff> {
-//     pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
-//         let diff = LedgerDiff::from_precomputed_block(root_precomputed);
-//         Branch::new(root_precomputed, diff).unwrap()
-//     }
-// }
-
 impl Branch {
     pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
         let root_block = Block::from_precomputed(root_precomputed, 0);
@@ -126,7 +119,7 @@ impl Branch {
         None
     }
 
-    /// Prunes the tree and updates the root and leaves
+    /// Prunes the tree and updates the root
     pub fn prune_transition_frontier(&mut self, k: u32, best_tip: &Block) {
         let mut witness_length = 0;
         let mut new_root_id = None;

@@ -78,7 +78,9 @@ impl Ledger {
     }
 
     // should this be a mutable update or immutable?
-    pub fn apply_diff(&mut self, diff: LedgerDiff) -> anyhow::Result<()> {
+    pub fn apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
+        let diff = diff.clone();
+
         diff.public_keys_seen.into_iter().for_each(|public_key| {
             if self.accounts.get(&public_key).is_none() {
                 self.accounts
@@ -167,7 +169,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
         let mut ledger = self;
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -175,7 +177,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn from_diff(ledger_diff: LedgerDiff) -> Self {
         let mut ledger = Ledger::new();
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -229,7 +231,7 @@ mod tests {
         };
 
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
@@ -259,7 +261,7 @@ mod tests {
         };
 
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
