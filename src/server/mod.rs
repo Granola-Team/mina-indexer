@@ -1,22 +1,27 @@
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
-        store::BlockStoreConn, BlockHash,
+        BlockHash, store::BlockStore,
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{DbStats, Summary},
-        IndexerState,
+        IndexerMode, IndexerState,
     },
-    MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
+    store::IndexerStore,
+    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
 };
-use clap::{Args, Parser};
+use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, str::FromStr};
 use time::PrimitiveDateTime;
-use tokio::{fs, time::Instant};
-use tracing::{debug, error, info, instrument};
+use tokio::{
+    fs::{self, create_dir_all, metadata},
+    time::Instant,
+};
+use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
+use tracing_subscriber::prelude::*;
 use uuid::Uuid;
 
 #[derive(Parser, Debug, Clone)]
@@ -28,33 +33,36 @@ pub struct ServerArgs {
     /// Hash of startup ledger
     #[arg(
         long,
-        default_value = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+        default_value = MAINNET_GENESIS_HASH
     )]
-    root_hash: Option<String>,
+    root_hash: String,
     /// Path to startup blocks directory
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/startup-dir"))]
-    startup_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
+    startup_dir: PathBuf,
     /// Path to directory to watch for new blocks
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/watch-dir"))]
-    watch_dir: Option<PathBuf>,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
+    watch_dir: PathBuf,
     /// Path to directory for rocksdb
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/database-dir"))]
-    database_dir: Option<PathBuf>,
-    /// Path to directory for logs (default: stdout)
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/mina-indexer/log-dir"))]
-    log_dir: Option<PathBuf>,
-    /// Override an existing db on the path provided by database_dir (default: false)
-    #[arg(long, default_value_t = false)]
-    restore_from_db: bool,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
+    database_dir: PathBuf,
+    /// Path to directory for logs
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
+    log_dir: PathBuf,
+    /// Only store canonical blocks in the db
+    #[arg(short, long, default_value_t = false)]
+    keep_non_canonical_blocks: bool,
+    /// Max file log level
+    #[arg(long, default_value_t = LevelFilter::DEBUG)]
+    log_level: LevelFilter,
+    /// Max stdout log level
+    #[arg(long, default_value_t = LevelFilter::INFO)]
+    log_level_stdout: LevelFilter,
+    /// Ignore restoring indexer state from an existing db on the path provided by database_dir
+    #[arg(short, long, default_value_t = false)]
+    ignore_db: bool,
     /// Interval for pruning the root branch
-    #[arg(short, long)]
-    prune_interval: Option<u32>,
-}
-
-#[derive(Args, Debug, Clone)]
-#[command(author, version, about, long_about = None)]
-pub struct GenesisPath {
-    genesis_ledger: String,
+    #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
+    prune_interval: u32,
 }
 
 pub struct IndexerConfiguration {
@@ -63,9 +71,12 @@ pub struct IndexerConfiguration {
     startup_dir: PathBuf,
     watch_dir: PathBuf,
     database_dir: PathBuf,
-    log_file: Option<PathBuf>,
-    prune_interval: Option<u32>,
-    restore_from_db: bool,
+    keep_noncanonical_blocks: bool,
+    log_file: PathBuf,
+    log_level: LevelFilter,
+    log_level_stdout: LevelFilter,
+    ignore_db: bool,
+    prune_interval: u32,
 }
 
 #[instrument]
@@ -73,21 +84,25 @@ pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
     debug!("Parsing server args");
-    let root_hash = BlockHash(args.root_hash.unwrap_or({
-        info!("Using default root hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ");
-        "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string()
-    }));
-    let startup_dir = args.startup_dir.unwrap();
-    let watch_dir = args.watch_dir.unwrap();
-    let database_dir = args.database_dir.unwrap();
+    let root_hash = BlockHash(args.root_hash.to_string());
+    let startup_dir = args.startup_dir;
+    let watch_dir = args.watch_dir;
+    let database_dir = args.database_dir;
+    let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let log_dir = args.log_dir;
+    let log_level = args.log_level;
+    let log_level_stdout = args.log_level_stdout;
+    let ignore_db = args.ignore_db;
     let prune_interval = args.prune_interval;
-    let restore_from_db = args.restore_from_db;
+
+    create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
+    create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
 
     info!(
         "Parsing genesis ledger file at {}",
         args.genesis_ledger.display()
     );
+
     match ledger::genesis::parse_file(&args.genesis_ledger).await {
         Err(err) => {
             error!(
@@ -100,28 +115,26 @@ pub async fn handle_command_line_arguments(
         Ok(genesis_ledger) => {
             info!("Genesis ledger parsed successfully!");
 
-            let log_file;
-            if let Some(log_dir) = log_dir {
-                let mut log_number = 0;
-                let mut log_fname =
-                    format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
-                while tokio::fs::metadata(&log_fname).await.is_ok() {
-                    log_number += 1;
-                    log_fname = format!("{}/mina-indexer-log-{}", log_dir.display(), log_number);
-                }
-                log_file = Some(PathBuf::from(&log_fname));
-            } else {
-                log_file = None;
+            let mut log_number = 0;
+            let mut log_fname = format!("{}/mina-indexer-0.log", log_dir.display());
+
+            while tokio::fs::metadata(&log_fname).await.is_ok() {
+                log_number += 1;
+                log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
             }
+
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
                 database_dir,
-                log_file,
+                keep_noncanonical_blocks,
+                log_file: PathBuf::from(&log_fname),
+                log_level,
+                log_level_stdout,
+                ignore_db,
                 prune_interval,
-                restore_from_db,
             })
         }
     }
@@ -141,61 +154,71 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         startup_dir,
         watch_dir,
         database_dir,
+        keep_noncanonical_blocks,
         log_file,
+        log_level,
+        log_level_stdout,
+        ignore_db,
         prune_interval,
-        restore_from_db,
     } = handle_command_line_arguments(args).await?;
 
-    let (non_blocking, _guard) = match log_file {
-        None => tracing_appender::non_blocking(std::io::stdout()),
-        Some(log_file) => {
-            let log_writer = std::fs::File::create(log_file)?;
-            tracing_appender::non_blocking(log_writer)
-        }
-    };
-    tracing_subscriber::fmt().with_writer(non_blocking).init();
+    // setup tracing
+    if let Some(parent) = log_file.parent() {
+        create_dir_if_non_existent(parent.to_str().unwrap()).await;
+    }
 
-    let mut indexer_state;
-    if restore_from_db {
-        info!("Initializing indexer state");
-        indexer_state = IndexerState::new(
+    let log_file = std::fs::File::create(log_file)?;
+    let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
+
+    let stdout_layer = tracing_subscriber::fmt::layer();
+    tracing_subscriber::registry()
+        .with(stdout_layer.with_filter(log_level_stdout))
+        .with(file_layer.with_filter(log_level))
+        .init();
+
+    let mode = if keep_noncanonical_blocks {
+        IndexerMode::Full
+    } else {
+        IndexerMode::Light
+    };
+    let mut indexer_state = if ignore_db {
+        info!(
+            "Initializing indexer state from blocks in {}",
+            startup_dir.display()
+        );
+        IndexerState::new(
+            mode,
             root_hash.clone(),
             genesis_ledger.ledger,
             Some(&database_dir),
             Some(MAINNET_TRANSITION_FRONTIER_K),
-            prune_interval,
-        )?;
+            Some(prune_interval),
+        )?
     } else {
-        // TODO check that the db has data
-        info!("Syncing indexer state from rocksdb");
-
-        // TODO
-        indexer_state =
-            IndexerState::restore_from_db(&BlockStoreConn::new(&database_dir).unwrap()).unwrap();
-    }
-    // check if db has blocks and reconstitute state before reading blocks from startup_dir
+        info!("Restoring from db in {}", database_dir.display());
+        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
+        // if no db or it doesn't have blocks, use the startup_dir like usual
+        let indexer_store = IndexerStore::new(&database_dir)?;
+        IndexerState::restore_from_db(&indexer_store)?;
+        todo!()
+    };
 
     let init_dir = startup_dir.display().to_string();
     info!("Ingesting precomputed blocks from {init_dir}");
+
     let mut block_parser = BlockParser::new(&startup_dir)?;
-    let mut block_count = 0;
+
     let ingestion_time = Instant::now();
-    while let Some(block) = block_parser.next().await? {
-        debug!(
-            "Adding {:?} with length {:?} to the state",
-            &block.state_hash, &block.blockchain_length
-        );
-        indexer_state.add_block(&block, true)?;
-        block_count += 1;
-    }
+    let block_count = indexer_state.add_blocks(&mut block_parser).await?;
+
     info!(
         "Ingested {block_count} blocks in {:?}",
         ingestion_time.elapsed()
     );
 
     let mut block_receiver = BlockReceiver::new().await?;
-    info!("Block receiver set to watch {watch_dir:?}");
     block_receiver.load_directory(&watch_dir).await?;
+    info!("Block receiver set to watch {watch_dir:?}");
 
     let listener = LocalSocketListener::bind(SOCKET_NAME)?;
     info!("Local socket listener started");
@@ -206,8 +229,10 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
                     debug!("Receiving block {:?}", precomputed_block);
+
                     indexer_state.add_block(&precomputed_block, true)?;
-                    info!("Added block hash: {:?}, height: {}", &precomputed_block.state_hash, precomputed_block.blockchain_length.unwrap_or(0));
+
+                    info!("Added block with height: {}, state_hash: {:?}", &precomputed_block.state_hash, precomputed_block.blockchain_length.unwrap_or(0));
                 } else {
                     info!("Block receiver shutdown, system exit");
                     return Ok(())
@@ -224,10 +249,12 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                 secondary_path.push(Uuid::new_v4().to_string());
 
                 debug!("Spawning secondary readonly RocksDB instance");
-                let block_store_readonly = BlockStoreConn::new_read_only(&primary_path, &secondary_path)?;
+                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
 
+                // state summary
                 let mut max_dangling_height = 0;
                 let mut max_dangling_length = 0;
+
                 for dangling in &indexer_state.dangling_branches {
                     if dangling.height() > max_dangling_height {
                         max_dangling_height = dangling.height();
@@ -236,12 +263,13 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                         max_dangling_length = dangling.len();
                     }
                 }
+
                 let db_stats_str = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.db_stats());
                 let mem = indexer_state
-                    .block_store
+                    .indexer_store
                     .as_ref()
                     .map(|db| db.memtables_size())
                     .unwrap_or_default();
@@ -259,13 +287,15 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     max_dangling_length,
                     db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
                 };
-                let ledger = indexer_state.root_branch.best_tip().unwrap().get_ledger().clone();
+                let ledger = indexer_state.best_ledger()?;
 
+                // handle the connection
                 tokio::spawn(async move {
                     debug!("Handling connection");
                     if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger, summary).await {
                         error!("Error handling connection: {e}");
                     }
+
                     debug!("Removing readonly instance at {}", secondary_path.display());
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
@@ -277,7 +307,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 #[instrument]
 async fn handle_conn(
     conn: LocalSocketStream,
-    db: BlockStoreConn,
+    db: IndexerStore,
     best_chain: Vec<BlockHash>,
     ledger: Ledger,
     summary: Summary,
@@ -316,7 +346,7 @@ async fn handle_conn(
                 .iter()
                 .take(num)
                 .cloned()
-                .map(|state_hash| db.get_block(&state_hash.0).unwrap().unwrap())
+                .map(|state_hash| db.get_block(&state_hash).unwrap().unwrap())
                 .collect();
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
@@ -344,4 +374,11 @@ async fn handle_conn(
     }
 
     Ok(())
+}
+
+async fn create_dir_if_non_existent(path: &str) {
+    if metadata(path).await.is_err() {
+        debug!("Creating directory {path}");
+        create_dir_all(path).await.unwrap();
+    }
 }

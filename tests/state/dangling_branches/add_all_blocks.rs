@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[tokio::test]
 async fn extension() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
@@ -77,22 +77,20 @@ async fn extension() {
             {
                 let node = dangling_branch.branches.get(&node_id).unwrap();
                 for child_id in node.children() {
-                    let parent_block =
-                        &dangling_branch.branches.get(&node_id).unwrap().data().block;
-                    let child_block = &dangling_branch.branches.get(child_id).unwrap().data().block;
+                    let parent_block = &dangling_branch.branches.get(&node_id).unwrap().data();
+                    let child_block = &dangling_branch.branches.get(child_id).unwrap().data();
                     assert_eq!(child_block.height, 1 + parent_block.height);
                     assert_eq!(
                         child_block.blockchain_length.unwrap(),
                         1 + parent_block.blockchain_length.unwrap()
                     );
                     assert_eq!(
-                        node.data().block.state_hash,
+                        node.data().state_hash,
                         dangling_branch
                             .branches
                             .get(child_id)
                             .unwrap()
                             .data()
-                            .block
                             .parent_hash
                     );
                 }

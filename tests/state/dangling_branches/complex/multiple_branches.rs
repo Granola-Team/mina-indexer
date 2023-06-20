@@ -30,7 +30,7 @@ async fn merge() {
     // --------------------------
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
     let root_block = block_parser
@@ -152,13 +152,16 @@ async fn merge() {
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
     let root_branch = state.root_branch.clone();
-    let leaves0: HashSet<&Block> = root_branch.leaves().iter().map(|x| &x.block).collect();
+    let leaves0: HashSet<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
 
     assert_eq!(
-        leaves0.iter().collect::<HashSet<&&Block>>(),
-        HashSet::from([&&leaf0, &&leaf1])
+        leaves0
+            .iter()
+            .map(|x| x.clone())
+            .collect::<HashSet<Block>>(),
+        HashSet::from([leaf0, leaf1])
     );
 
     // branch root should match the tree's root
-    assert_eq!(root0, &branch_root0.block);
+    assert_eq!(&root0, branch_root0);
 }

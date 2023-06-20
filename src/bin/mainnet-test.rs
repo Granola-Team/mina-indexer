@@ -2,7 +2,7 @@ use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    state::{ledger::genesis, IndexerState},
+    state::{ledger::genesis, IndexerMode, IndexerState},
     MAINNET_TRANSITION_FRONTIER_K,
 };
 use std::path::PathBuf;
@@ -11,14 +11,22 @@ use tokio::time::{Duration, Instant};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Blocks directory path
     #[arg(short, long)]
     blocks_dir: PathBuf,
+    /// Max number of blocks to parse
     #[arg(short, long, default_value_t = 10_000)]
     max_block_count: u32,
+    /// Report frequency (number of blocks)
     #[arg(short, long, default_value_t = 5000)]
     report_freq: u32,
+    /// To keep the db or not, that is the question
     #[arg(short, long, default_value_t = false)]
     persist_db: bool,
+    /// Indexer mode
+    #[arg(long, default_value_t = IndexerMode::Light)]
+    mode: IndexerMode,
+    /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
@@ -28,10 +36,11 @@ async fn main() {
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
     let freq = args.report_freq;
+    let mode = args.mode;
+    let verbose = args.verbose;
+    let max_block_count = args.max_block_count;
 
     assert!(blocks_dir.is_dir(), "Should be a dir path");
-
-    let max_block_count = args.max_block_count;
 
     let mut bp = BlockParser::new(&blocks_dir).unwrap();
 
@@ -48,6 +57,7 @@ async fn main() {
 
     let total_time = Instant::now();
     let mut state = IndexerState::new(
+        mode,
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
@@ -55,24 +65,29 @@ async fn main() {
         None,
     )
     .unwrap();
+
     let sorting_time = total_time.elapsed();
     println!("Sorting time: {sorting_time:?}\n");
 
+    // blocks
+    let mut block_count = 1;
+    let mut highest_seq_height = 2;
+
+    // branches
     let mut max_branches = 1;
     let mut max_root_len = 0;
     let mut max_root_height = 0;
     let mut max_dangling_len = 0;
     let mut max_dangling_height = 0;
-    let mut block_count = 1;
-    let mut highest_seq_height = 2;
 
+    // time
     let mut floor_minutes = 0;
     let mut adding_time = Duration::new(0, 0);
     let mut parsing_time = Duration::new(0, 0);
 
     for _ in 1..max_block_count {
         // Report every passing minute
-        if args.verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
+        if verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
             println!("Time elapsed: {:?}", total_time.elapsed());
             floor_minutes += 1;
         }
@@ -114,28 +129,29 @@ async fn main() {
                 state.add_block(&block, true).unwrap();
                 adding_time += add.elapsed();
 
-                match block.blockchain_length {
-                    None => println!("Block with no height! state_hash: {:?}", block.state_hash),
-                    Some(n) => match n.cmp(&highest_seq_height) {
-                        std::cmp::Ordering::Less => {
-                            println!(
-                                "Another block of height: {n}! state_hash: {:?}",
-                                block.state_hash
-                            );
-                        }
-                        std::cmp::Ordering::Equal => highest_seq_height += 1,
-                        std::cmp::Ordering::Greater => {
-                            println!("Expected {highest_seq_height}, instead got height {n}, state_hash: {:?}", block.state_hash);
-                        }
-                    },
-                }
-
-                if args.verbose {
+                if verbose {
                     println!(
                         "Added block (length: {}, state_hash: {:?})",
                         block.blockchain_length.unwrap_or(0),
                         block.state_hash
                     );
+                    match block.blockchain_length {
+                        None => {
+                            println!("Block with no height! state_hash: {:?}", block.state_hash)
+                        }
+                        Some(n) => match n.cmp(&highest_seq_height) {
+                            std::cmp::Ordering::Less => {
+                                println!(
+                                    "Another block of height: {n}! state_hash: {:?}",
+                                    block.state_hash
+                                )
+                            }
+                            std::cmp::Ordering::Equal => highest_seq_height += 1,
+                            std::cmp::Ordering::Greater => {
+                                println!("Expected {highest_seq_height}, instead got height {n}, state_hash: {:?}", block.state_hash)
+                            }
+                        },
+                    }
                 }
 
                 // update metrics
@@ -189,7 +205,7 @@ async fn main() {
     println!(
         "Estimate number of keys:    {:?}",
         state
-            .block_store
+            .indexer_store
             .as_ref()
             .unwrap()
             .estimate_live_data_size()
@@ -198,7 +214,7 @@ async fn main() {
         "Estimate live data size:    {:?}",
         ByteSize::b(
             state
-                .block_store
+                .indexer_store
                 .as_ref()
                 .unwrap()
                 .estimate_live_data_size()
@@ -208,13 +224,13 @@ async fn main() {
         "Current size all memtables: {:?}",
         ByteSize::b(
             state
-                .block_store
+                .indexer_store
                 .as_ref()
                 .unwrap()
                 .cur_size_all_mem_tables()
         )
     );
-    println!("{}", state.block_store.as_ref().unwrap().db_stats());
+    println!("{}", state.indexer_store.as_ref().unwrap().db_stats());
 
     if !args.persist_db {
         tokio::fs::remove_dir_all(store_dir).await.unwrap();

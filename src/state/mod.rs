@@ -1,32 +1,43 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStoreConn, Block, BlockHash},
+    block::{
+        parser::BlockParser, precomputed::PrecomputedBlock, Block, BlockHash, store::BlockStore,
+    },
     state::{
         branch::Branch,
-        ledger::{command::Command, diff::LedgerDiff, genesis::GenesisLedger, Ledger},
+        ledger::{command::Command, genesis::GenesisLedger, Ledger},
     },
-    MAINNET_TRANSITION_FRONTIER_K,
+    store::IndexerStore,
+    BLOCK_REPORTING_FREQ, PRUNE_INTERVAL_DEFAULT, MAINNET_TRANSITION_FRONTIER_K,
 };
 use id_tree::NodeId;
-use std::{borrow::Borrow, path::Path, time::Instant};
+use std::{path::Path, time::Instant, borrow::Borrow};
 use time::OffsetDateTime;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+
+use self::ledger::{diff::LedgerDiff, store::LedgerStore};
 
 pub mod branch;
 pub mod ledger;
 pub mod summary;
 
-/// Rooted forest of precomputed block summaries
+/// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
 pub struct IndexerState {
-    /// State hahs of the best tip of the root branch
+    /// Indexer mode
+    pub mode: IndexerMode,
+    /// Indexer phase
+    pub phase: IndexerPhase,
+    /// Block representing the best tip of the root branch
     pub best_tip: Block,
     /// Append-only tree of blocks built from genesis, each containing a ledger
-    pub root_branch: Branch<Ledger>,
+    pub root_branch: Branch,
     /// Dynamic, dangling branches eventually merged into the `root_branch`
-    pub dangling_branches: Vec<Branch<LedgerDiff>>,
+    /// needed for the possibility of missing blocks
+    pub dangling_branches: Vec<Branch>,
     /// Block database
-    pub block_store: Option<BlockStoreConn>,
+    pub indexer_store: Option<IndexerStore>,
+    /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: Option<u32>,
     /// Interval to the prune the root branch
     pub prune_interval: Option<u32>,
@@ -36,6 +47,21 @@ pub struct IndexerState {
     pub time: Instant,
     /// Datetime the indexer started running
     pub date_time: OffsetDateTime,
+}
+
+#[derive(Debug, Clone)]
+pub enum IndexerPhase {
+    InitializingFromBlockDir,
+    InitializingFromDB,
+    Watching,
+    Testing,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum IndexerMode {
+    Light,
+    Full,
+    Test,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -56,19 +82,60 @@ pub enum ExtensionDirection {
 
 impl IndexerState {
     pub fn new(
+        mode: IndexerMode,
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
         prune_interval: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(root_hash, Some(genesis_ledger));
-        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
+        let root_branch = Branch::new_genesis(root_hash.clone());
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            store
+                .add_ledger(&root_hash, genesis_ledger.into())
+                .expect("ledger add succeeds");
+            store
+        });
         Ok(Self {
+            mode,
+            phase: IndexerPhase::InitializingFromBlockDir,
             best_tip: root_branch.root.clone(),
             root_branch,
             dangling_branches: Vec::new(),
-            block_store,
+            indexer_store,
+            transition_frontier_length,
+            prune_interval,
+            blocks_processed: 0,
+            time: Instant::now(),
+            date_time: OffsetDateTime::now_utc(),
+        })
+    }
+
+    pub fn new_non_genesis(
+        mode: IndexerMode,
+        root_hash: BlockHash,
+        ledger: Ledger,
+        blockchain_length: Option<u32>,
+        rocksdb_path: Option<&Path>,
+        transition_frontier_length: Option<u32>,
+        prune_interval: Option<u32>,
+    ) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_non_genesis(root_hash.clone(), blockchain_length);
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            store
+                .add_ledger(&root_hash, ledger)
+                .expect("ledger add succeeds");
+            store
+        });
+        Ok(Self {
+            mode,
+            phase: IndexerPhase::InitializingFromDB,
+            best_tip: root_branch.root.clone(),
+            root_branch,
+            dangling_branches: Vec::new(),
+            indexer_store,
             transition_frontier_length,
             prune_interval,
             blocks_processed: 0,
@@ -83,13 +150,23 @@ impl IndexerState {
         rocksdb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_testing(root_block, root_ledger);
-        let block_store = rocksdb_path.map(|path| BlockStoreConn::new(path).unwrap());
+        let root_branch = Branch::new_testing(root_block);
+        let indexer_store = rocksdb_path.map(|path| {
+            let store = IndexerStore::new(path).unwrap();
+            if let Some(ledger) = root_ledger {
+                store
+                    .add_ledger(&BlockHash(root_block.state_hash.clone()), ledger)
+                    .expect("ledger add succeeds");
+            }
+            store
+        });
         Ok(Self {
+            mode: IndexerMode::Test,
+            phase: IndexerPhase::Testing,
             best_tip: root_branch.root.clone(),
             root_branch,
             dangling_branches: Vec::new(),
-            block_store,
+            indexer_store,
             transition_frontier_length,
             prune_interval: None,
             blocks_processed: 0,
@@ -98,7 +175,7 @@ impl IndexerState {
         })
     }
 
-    pub fn restore_from_db(db: &BlockStoreConn) -> anyhow::Result<Self> {
+    pub fn restore_from_db(db: &IndexerStore) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
@@ -133,13 +210,43 @@ impl IndexerState {
 
     fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
-            let interval = self.prune_interval.unwrap_or(5);
+            let interval = self.prune_interval.unwrap_or(PRUNE_INTERVAL_DEFAULT);
             if self.root_branch.height() as u32 > interval * k {
-                info!("Pruning transition frontier at k={}", k);
+                debug!(
+                    "Pruning transition frontier at k = {}, best tip length: {}",
+                    k,
+                    self.best_tip.blockchain_length.unwrap_or(0)
+                );
                 self.root_branch
                     .prune_transition_frontier(k, &self.best_tip);
             }
         }
+    }
+
+    /// Adds blocks to the state according to block_parser then changes phase to Watching
+    ///
+    /// Returns the number of blocks parsed
+    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<u32> {
+        let mut block_count = 0;
+        let time = Instant::now();
+
+        while let Some(block) = block_parser.next().await? {
+            if block_count > 0 && block_count % BLOCK_REPORTING_FREQ == 0 {
+                info!(
+                    "{}",
+                    format!(
+                        "Parsed and added {block_count} blocks to the witness tree in {:?}",
+                        time.elapsed()
+                    )
+                );
+            }
+            self.add_block(&block, true)?;
+            block_count += 1;
+        }
+
+        debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
+        self.phase = IndexerPhase::Watching;
+        Ok(block_count)
     }
 
     /// Adds the block to the witness tree and the precomputed block to the db
@@ -150,7 +257,6 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
         check_if_block_in_db: bool,
     ) -> anyhow::Result<ExtensionType> {
-        // prune the root branch
         self.prune_root_branch();
 
         // check that the block doesn't already exist in the db
@@ -162,8 +268,8 @@ impl IndexerState {
             return Ok(ExtensionType::BlockNotAdded);
         }
 
-        if let Some(block_store) = self.block_store.as_ref() {
-            block_store.add_block(precomputed_block)?;
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            indexer_store.add_block(precomputed_block)?;
         }
         self.blocks_processed += 1;
 
@@ -196,8 +302,8 @@ impl IndexerState {
     }
 
     pub fn block_exists(&self, state_hash: &str) -> anyhow::Result<bool> {
-        if let Some(block_store) = self.block_store.as_ref() {
-            match block_store.get_block(state_hash)? {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            match indexer_store.get_block(&BlockHash(state_hash.to_string()))? {
                 None => Ok(false),
                 Some(block) => {
                     warn!(
@@ -207,6 +313,7 @@ impl IndexerState {
                     );
                     Ok(true)
                 }
+                Some(_block) => Ok(true),
             }
         } else {
             Ok(false)
@@ -263,7 +370,6 @@ impl IndexerState {
             let max_length = dangling_branch
                 .best_tip()
                 .unwrap()
-                .block
                 .blockchain_length
                 .unwrap_or(0);
             // check incoming block is within the length bounds
@@ -367,23 +473,18 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.dangling_branches.push(
-            Branch::new(
-                precomputed_block,
-                LedgerDiff::from_precomputed_block(precomputed_block),
-            )
-            .expect("cannot fail"),
-        );
+        self.dangling_branches
+            .push(Branch::new(precomputed_block).expect("cannot fail"));
         Ok(ExtensionType::DanglingNew)
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
-        if let Some(block_store) = self.block_store.as_ref() {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
             return self
                 .root_branch
                 .longest_chain()
                 .iter()
-                .flat_map(|state_hash| block_store.get_block(&state_hash.0))
+                .flat_map(|state_hash| indexer_store.get_block(state_hash))
                 .flatten()
                 .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
                 .collect();
@@ -391,8 +492,46 @@ impl IndexerState {
         vec![]
     }
 
-    pub fn best_ledger(&self) -> Option<&Ledger> {
-        self.root_branch.best_tip().map(|leaf| leaf.get_ledger())
+    pub fn best_ledger(&self) -> anyhow::Result<Ledger> {
+        let mut ledger = None;
+        if let (Some(block), Some(store)) =
+            (self.root_branch.best_tip(), self.indexer_store.as_ref())
+        {
+            ledger = store.get_ledger(&block.state_hash)?;
+            if ledger.is_none() {
+                let mut ledger_diffs = Vec::new();
+                let mut state_hash = block.state_hash;
+                loop {
+                    if let Some(block_ledger) = store.get_ledger(&state_hash)? {
+                        ledger = Some(block_ledger);
+                        break;
+                    }
+                    let precomputed_block = store
+                        .get_block(&state_hash)?
+                        .expect("block comes from root branch, is in block store");
+                    let ledger_diff = LedgerDiff::from_precomputed_block(&precomputed_block);
+                    ledger_diffs.push(ledger_diff);
+                    state_hash = BlockHash::from_hashv1(
+                        precomputed_block.protocol_state.previous_state_hash,
+                    );
+                }
+                ledger_diffs.into_iter().for_each(|diff| {
+                    ledger.iter_mut().for_each(|ledger| {
+                        ledger
+                            .apply_diff(diff.clone())
+                            .expect("ledger diff application succeeds")
+                    })
+                });
+
+                if let Some(ledger) = ledger.clone() {
+                    store
+                        .add_ledger(&state_hash, ledger)
+                        .expect("ledger add succeeds")
+                }
+            }
+        }
+
+        Ok(ledger.expect("genesis ledger guaranteed"))
     }
 
     fn update_best_tip(&mut self) {
@@ -400,11 +539,11 @@ impl IndexerState {
             println!("~~~ Root tree ~~~");
             println!("{:?}", self.root_branch);
         }
-        self.best_tip = self.root_branch.best_tip().unwrap().block.clone();
+        self.best_tip = self.root_branch.best_tip().unwrap();
     }
 
-    fn same_block_added_twice<T>(
-        branch: &Branch<T>,
+    fn same_block_added_twice(
+        branch: &Branch,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<()> {
         if precomputed_block.state_hash == branch.root.state_hash.0 {
@@ -427,5 +566,27 @@ impl std::fmt::Debug for IndexerState {
             writeln!(f, "{branch:?}")?;
         }
         Ok(())
+    }
+}
+
+impl std::fmt::Display for IndexerMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexerMode::Full => write!(f, "full"),
+            IndexerMode::Light => write!(f, "light"),
+            IndexerMode::Test => write!(f, "test"),
+        }
+    }
+}
+
+impl std::fmt::Display for IndexerPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexerPhase::InitializingFromBlockDir | IndexerPhase::InitializingFromDB => {
+                write!(f, "initializing")
+            }
+            IndexerPhase::Watching => write!(f, "watching"),
+            IndexerPhase::Testing => write!(f, "testing"),
+        }
     }
 }

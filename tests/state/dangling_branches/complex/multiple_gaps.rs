@@ -21,7 +21,7 @@ async fn extension() {
     //       |             =>   leaf   |
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
     let root_block = block_parser
@@ -137,7 +137,7 @@ async fn extension() {
         .root_branch
         .leaves()
         .iter()
-        .map(|x| x.block.clone())
+        .map(|x| x.clone())
         .collect();
     let leaf = Block::from_precomputed(&leaf_block, 2);
 
@@ -145,5 +145,5 @@ async fn extension() {
     assert_eq!(leaves.get(0).unwrap(), &leaf);
 
     // branch root should match the tree's root
-    assert_eq!(root, &branch_root.block);
+    assert_eq!(&root, branch_root);
 }

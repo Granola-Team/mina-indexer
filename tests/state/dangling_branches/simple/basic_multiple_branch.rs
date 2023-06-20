@@ -24,7 +24,7 @@ async fn extensions() {
     // -----------------------
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root0_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let root0_block = block_parser
@@ -72,7 +72,7 @@ async fn extensions() {
     println!("{:?}", state.root_branch.branches);
 
     // root == leaf
-    assert_eq!(root0, root_leaf0.block);
+    assert_eq!(root0, root_leaf0);
 
     // ---------
     // add block
@@ -110,7 +110,7 @@ async fn extensions() {
     let root_leaf1 = leaves1.get(0).unwrap();
 
     // root == leaf
-    assert_eq!(root1, &root_leaf1.block);
+    assert_eq!(root1, root_leaf1);
 
     println!("\n=== After Root Branch ===");
     println!("{:?}", state.root_branch);
@@ -118,5 +118,5 @@ async fn extensions() {
     println!("{:?}", state.dangling_branches.get(0).unwrap());
 
     // branch root should match the tree's root
-    assert_eq!(root1, &branch_root1.block);
+    assert_eq!(&root1, branch_root1);
 }

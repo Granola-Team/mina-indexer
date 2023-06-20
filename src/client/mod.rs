@@ -60,7 +60,12 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
     let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
-            println!("Make sure the server has started!");
+            println!(
+                "Make sure the server has been started and initial block ingestion has completed."
+            );
+            println!(
+                "Initial block ingestion takes several minutes if ingesting all mainnet blocks."
+            );
             println!("Error: {e}");
             process::exit(111);
         }

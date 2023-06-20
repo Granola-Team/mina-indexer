@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::{parser::BlockParser, Block},
-    state::{branch::Branch, ledger::Ledger},
+    state::branch::Branch,
 };
 
 #[tokio::test]
@@ -20,7 +20,7 @@ async fn transition_frontier() {
     // 5
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
     let root_block = block_parser
@@ -93,7 +93,7 @@ async fn transition_frontier() {
     );
 
     // create the tree and add blocks
-    let mut branch = Branch::new(&root_block, Ledger::new()).unwrap();
+    let mut branch = Branch::new(&root_block).unwrap();
 
     branch.simple_extension(&fork_block).unwrap();
     branch.simple_extension(&main_1_block).unwrap();
@@ -107,13 +107,7 @@ async fn transition_frontier() {
 
     branch.prune_transition_frontier(
         1,
-        &branch
-            .branches
-            .get(&best_tip_id)
-            .unwrap()
-            .data()
-            .block
-            .clone(),
+        &branch.branches.get(&best_tip_id).unwrap().data().clone(),
     );
 
     println!("=== After prune ===");
