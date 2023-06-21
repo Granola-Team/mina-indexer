@@ -113,7 +113,7 @@ impl Ledger {
                 };
                 self.accounts.insert(diff.public_key(), account_after);
             } else {
-                success = Err(anyhow::Error::new(Error::default()));
+                success = Err(anyhow::Error::new(Error));
             }
         });
         success
