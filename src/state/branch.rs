@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct Branch {
-    pub root: Block,
+    pub root: NodeId,
     pub branches: Tree<Block>,
 }
 
@@ -35,34 +35,28 @@ impl Branch {
         };
         let mut branches = Tree::new();
 
-        branches
-            .insert(Node::new(genesis_block.clone()), AsRoot)
-            .unwrap();
+        let root = branches.insert(Node::new(genesis_block), AsRoot).unwrap();
 
-        Self {
-            root: genesis_block,
-            branches,
-        }
+        Self { root, branches }
     }
 
     pub fn new_non_genesis(root_hash: BlockHash, blockchain_length: Option<u32>) -> Self {
-        let root = Block {
+        let root_block = Block {
             state_hash: root_hash.clone(),
             parent_hash: root_hash,
             height: 0,
             blockchain_length,
         };
         let mut branches = Tree::new();
-
-        branches.insert(Node::new(root.clone()), AsRoot).unwrap();
+        let root = branches.insert(Node::new(root_block), AsRoot).unwrap();
 
         Self { root, branches }
     }
 
     pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
-        let root = Block::from_precomputed(precomputed_block, 0);
+        let root_block = Block::from_precomputed(precomputed_block, 0);
         let mut branches = Tree::new();
-        branches.insert(Node::new(root.clone()), AsRoot).unwrap();
+        let root = branches.insert(Node::new(root_block), AsRoot).unwrap();
 
         Self { root, branches }
     }
@@ -77,12 +71,9 @@ impl Branch {
     pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
         let root_block = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
+        let root = branches.insert(Node::new(root_block), AsRoot)?;
 
-        branches.insert(Node::new(root_block.clone()), AsRoot)?;
-        Ok(Self {
-            root: root_block,
-            branches,
-        })
+        Ok(Self { root, branches })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -182,7 +173,7 @@ impl Branch {
         }
 
         // update root
-        self.root = self.branches.get(&new_root_id).unwrap().data().clone();
+        self.root = new_root_id.clone();
     }
 
     /// block is guaranteed to exist in leaves
@@ -279,14 +270,14 @@ impl Branch {
         }
     }
 
-    pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) -> NodeId {
+    pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) {
         let new_block = Block::from_precomputed(precomputed_block, 0);
         let new_root_id = self
             .branches
-            .insert(Node::new(new_block.clone()), AsRoot)
+            .insert(Node::new(new_block), AsRoot)
             .expect("insert as root always succeeds");
 
-        self.root = new_block;
+        self.root = new_root_id.clone();
 
         let child_ids: Vec<NodeId> = self
             .branches
@@ -306,8 +297,10 @@ impl Branch {
                 node.replace_data(block);
             }
         }
+    }
 
-        new_root_id
+    pub fn root_block(&self) -> &Block {
+        self.branches.get(&self.root).unwrap().data()
     }
 
     pub fn leaves(&self) -> Vec<Block> {

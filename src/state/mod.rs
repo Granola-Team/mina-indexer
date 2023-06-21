@@ -33,9 +33,9 @@ pub struct IndexerState {
     /// Indexer phase
     pub phase: IndexerPhase,
     /// Block representing the best tip of the root branch
-    pub best_tip: Block,
+    pub best_tip: NodeId,
     /// Highest known canonical block
-    pub canonical_tip: Block,
+    pub canonical_tip: NodeId,
     /// Map of ledger diffs following the canonical tip
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -210,34 +210,50 @@ impl IndexerState {
     fn prune_root_branch(&mut self) {
         if let Some(k) = self.transition_frontier_length {
             let interval = self.prune_interval.unwrap_or(PRUNE_INTERVAL_DEFAULT);
+            let best_tip_block = self.best_tip_block().clone();
             if self.root_branch.height() as u32 > interval * k {
                 debug!(
                     "Pruning transition frontier at k = {}, best tip length: {}",
                     k,
-                    self.best_tip.blockchain_length.unwrap_or(0)
+                    self.best_tip_block().blockchain_length.unwrap_or(0)
                 );
                 self.root_branch
-                    .prune_transition_frontier(k, &self.best_tip);
+                    .prune_transition_frontier(k, &best_tip_block);
             }
         }
     }
 
-    fn update_canonical(&mut self, best_tip_node_id: NodeId) {
+    pub fn canonical_tip_block(&self) -> &Block {
+        self.get_block_from_id(&self.canonical_tip)
+    }
+
+    pub fn best_tip_block(&self) -> &Block {
+        self.get_block_from_id(&self.best_tip)
+    }
+
+    /// Only works with blocks in the root branch
+    fn get_block_from_id(&self, node_id: &NodeId) -> &Block {
+        self.root_branch.branches.get(node_id).unwrap().data()
+    }
+
+    fn update_canonical(&mut self) {
         let mut canonical_hashes = vec![];
-        let old_canonical_tip = self.canonical_tip.state_hash.clone();
+        let old_canonical_tip_id = self.canonical_tip.clone();
+        let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
 
         // update canonical_tip
-        for (n, ancestor) in self
+        for (n, ancestor_id) in self
             .root_branch
             .branches
-            .ancestors(&best_tip_node_id)
+            .ancestor_ids(&self.best_tip)
             .unwrap()
             .enumerate()
         {
             if n <= MAINNET_CANONICAL_THRESHOLD as usize {
-                canonical_hashes.push(ancestor.data().state_hash.clone());
+                let ancestor_block = self.get_block_from_id(ancestor_id);
+                canonical_hashes.push(ancestor_block.state_hash.clone());
             } else {
-                self.canonical_tip = ancestor.data().clone();
+                self.canonical_tip = ancestor_id.clone();
                 break;
             }
         }
@@ -245,10 +261,10 @@ impl IndexerState {
         canonical_hashes.reverse();
 
         // update canonical ledger
-        if self.best_tip.height % self.ledger_update_freq == 0 {
+        if self.best_tip_block().height % self.ledger_update_freq == 0 {
             if let Some(indexer_store) = &self.indexer_store {
                 let mut ledger = indexer_store
-                    .get_ledger(&old_canonical_tip)
+                    .get_ledger(&old_canonical_tip_hash)
                     .unwrap()
                     .unwrap();
 
@@ -258,7 +274,7 @@ impl IndexerState {
                 }
 
                 indexer_store
-                    .add_ledger(&self.canonical_tip.state_hash, ledger)
+                    .add_ledger(&self.canonical_tip_block().state_hash, ledger)
                     .unwrap();
             }
         }
@@ -274,8 +290,18 @@ impl IndexerState {
             }
         }
 
-        // clear the diffs map
-        self.diffs_map.clear();
+        // remove diffs corresponding to blocks at or beneath the height of the new canonical tip
+        for node_id in self
+            .root_branch
+            .branches
+            .traverse_level_order_ids(&old_canonical_tip_id)
+            .unwrap()
+        {
+            if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
+                self.diffs_map
+                    .remove(&self.get_block_from_id(&node_id).state_hash.clone());
+            }
+        }
     }
 
     /// Adds blocks to the state according to block_parser then changes phase to Watching
@@ -358,8 +384,8 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<Option<ExtensionType>> {
         if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
-            let tip_id = self.update_best_tip();
-            self.update_canonical(tip_id);
+            self.update_best_tip();
+            self.update_canonical();
 
             // check if new block connects to a dangling branch
             let mut branches_to_remove = Vec::new();
@@ -379,8 +405,8 @@ impl IndexerState {
                     self.dangling_branches.remove(index_to_remove - num_removed);
                 }
 
-                let tip_id = self.update_best_tip();
-                self.update_canonical(tip_id);
+                self.update_best_tip();
+                self.update_canonical();
 
                 Ok(Some(ExtensionType::RootComplex))
             } else {
@@ -398,7 +424,7 @@ impl IndexerState {
     ) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
-            let min_length = dangling_branch.root.blockchain_length.unwrap_or(0);
+            let min_length = dangling_branch.root_block().blockchain_length.unwrap_or(0);
             let max_length = dangling_branch
                 .best_tip()
                 .unwrap()
@@ -471,7 +497,7 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
         for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
-            if precomputed_block.state_hash == dangling_branch.root.parent_hash.0 {
+            if precomputed_block.state_hash == dangling_branch.root_block().parent_hash.0 {
                 branches_to_update.push(index);
             }
         }
@@ -513,7 +539,7 @@ impl IndexerState {
 
     fn is_length_within_root_bounds(&self, precomputed_block: &PrecomputedBlock) -> bool {
         (precomputed_block.blockchain_length.is_some()
-            && self.best_tip.blockchain_length.unwrap_or(0) + 1
+            && self.best_tip_block().blockchain_length.unwrap_or(0) + 1
                 >= precomputed_block.blockchain_length.unwrap())
             || precomputed_block.blockchain_length.is_none()
     }
@@ -529,10 +555,9 @@ impl IndexerState {
         }
     }
 
-    fn update_best_tip(&mut self) -> NodeId {
-        let (id, block) = self.root_branch.best_tip_with_id().unwrap();
-        self.best_tip = block;
-        id
+    fn update_best_tip(&mut self) {
+        let (id, _) = self.root_branch.best_tip_with_id().unwrap();
+        self.best_tip = id;
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {
@@ -563,11 +588,10 @@ impl IndexerState {
     }
 
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
-        let (tip_id, _) = self.root_branch.best_tip_with_id().unwrap();
-        self.update_canonical(tip_id);
+        self.update_canonical();
 
         if let Some(indexer_store) = &self.indexer_store {
-            return indexer_store.get_ledger(&self.canonical_tip.state_hash);
+            return indexer_store.get_ledger(&self.canonical_tip_block().state_hash);
         }
 
         Ok(None)
@@ -575,14 +599,14 @@ impl IndexerState {
 }
 
 fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
-    precomputed_block.state_hash == branch.root.parent_hash.0
+    precomputed_block.state_hash == branch.root_block().parent_hash.0
 }
 
 fn same_block_added_twice(
     branch: &Branch,
     precomputed_block: &PrecomputedBlock,
 ) -> anyhow::Result<()> {
-    if precomputed_block.state_hash == branch.root.state_hash.0 {
+    if precomputed_block.state_hash == branch.root_block().state_hash.0 {
         return Err(anyhow::Error::msg(
             "Same block added twice to the indexer state",
         ));

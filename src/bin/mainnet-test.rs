@@ -246,7 +246,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Initial ingestion complete!");
     println!("Watching {} now", watch_dir.display());
 
-    let mut next_length = state.best_tip.blockchain_length.unwrap() + 1;
+    let mut next_length = state.best_tip_block().blockchain_length.unwrap() + 1;
     let watch_duration = Duration::new(duration, 0);
     let watch_time = Instant::now();
 
