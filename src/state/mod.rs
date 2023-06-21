@@ -112,6 +112,7 @@ impl IndexerState {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_non_genesis(
         mode: IndexerMode,
         root_hash: BlockHash,
@@ -122,7 +123,8 @@ impl IndexerState {
         prune_interval: Option<u32>,
         global_slot_number: Option<u32>,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(root_hash.clone(), blockchain_length, global_slot_number);
+        let root_branch =
+            Branch::new_non_genesis(root_hash.clone(), blockchain_length, global_slot_number);
         let indexer_store = rocksdb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
             store
