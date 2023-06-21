@@ -1602,6 +1602,7 @@ dependencies = [
  "mina-serialization-types",
  "mina-signer",
  "r2d2",
+ "regex",
  "rocksdb",
  "serde",
  "serde_derive",

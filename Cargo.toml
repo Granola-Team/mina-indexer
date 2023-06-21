@@ -15,6 +15,7 @@ test = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+regex = "1.4"
 anyhow = {version = "1.0.69"}
 async_executors = { version = "0.6.0", features = ["tokio_tp"] }
 async-trait = "0.1.64"

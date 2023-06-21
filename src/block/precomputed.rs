@@ -13,6 +13,7 @@ pub struct BlockLogContents {
     pub(crate) state_hash: String,
     pub(crate) blockchain_length: Option<u32>,
     pub(crate) contents: Vec<u8>,
+    pub(crate) global_slot_number: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -33,12 +34,14 @@ pub struct PrecomputedBlock {
     pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: StagedLedgerDiff,
     pub delta_transition_chain_proof: DeltaTransitionChainProof,
+    pub global_slot_number: Option<u32>,
 }
 
 impl PrecomputedBlock {
     pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
         let blockchain_length = log_contents.blockchain_length;
+        let global_slot_number = log_contents.global_slot_number;
         let str = String::from_utf8_lossy(&log_contents.contents);
         let BlockLog {
             scheduled_time,
@@ -55,6 +58,7 @@ impl PrecomputedBlock {
             protocol_state_proof: protocol_state_proof.into(),
             staged_ledger_diff: staged_ledger_diff.into(),
             delta_transition_chain_proof: delta_transition_chain_proof.into(),
+            global_slot_number,
         })
     }
 }

@@ -32,7 +32,6 @@ pub enum Command {
 }
 
 impl Command {
-    // i say i say now this is a thiccy
     pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         precomputed_block
             .staged_ledger_diff
