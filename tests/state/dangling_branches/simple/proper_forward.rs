@@ -51,15 +51,15 @@ async fn extension() {
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
 
     // before extension quantities
-    let before_root = state.dangling_branches.get(0).unwrap().root.clone();
+    let before_root = state.dangling_branches.get(0).unwrap().root_block().clone();
     let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
-    let before_leaf = before_leaves.get(0).unwrap();
+    let before_leaf = before_leaves.get(0).unwrap().clone();
 
     // before_root is the only leaf
     assert_eq!(before_leaves.len(), 1);
-    assert_eq!(&before_root, before_leaf);
+    assert_eq!(before_root, before_leaf);
     assert_eq!(
-        before_root,
+        before_root.clone(),
         Block::from_precomputed(&dangling_root_block, 0)
     );
 
@@ -100,8 +100,8 @@ async fn extension() {
     let extension = state.add_block(&dangling_child_block).unwrap();
 
     // after extension quantities
-    let after_root = &state.dangling_branches.get(0).unwrap().root;
-    let branches1 = &state.dangling_branches.get(0).unwrap();
+    let after_root = state.dangling_branches.get(0).unwrap().root_block().clone();
+    let branches1 = state.dangling_branches.get(0).unwrap();
     let leaves1 = branches1.leaves();
     let after_root_id = branches1.branches.root_node_id().unwrap();
     let after_root_leaf = {
@@ -120,7 +120,7 @@ async fn extension() {
 
     // branch root should still match the root of the dangling branch
     assert_eq!(
-        after_root,
+        &after_root,
         state
             .dangling_branches
             .get(0)
@@ -149,12 +149,12 @@ async fn extension() {
     );
 
     // root shouldn't change
-    assert_eq!(&before_root, after_root);
+    assert_eq!(before_root, after_root);
 
     // after tree has 2 blocks
     assert_eq!(state.dangling_branches.get(0).unwrap().height(), 2);
 
     // after root isn't a leaf
     assert_eq!(leaves1.len(), 1);
-    assert_ne!(after_root, leaves1.get(0).unwrap());
+    assert_ne!(&after_root, leaves1.get(0).unwrap());
 }

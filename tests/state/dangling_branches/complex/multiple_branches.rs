@@ -143,15 +143,15 @@ async fn merge() {
     assert_eq!(state.dangling_branches.len(), 0);
 
     // after extension quantities
-    let root0 = &state.root_branch.clone().root;
-    let branches0 = &state.root_branch.clone().branches;
-    let branch_root0 = &branches0
+    let root_branch = state.root_branch.clone();
+    let root0 = state.root_branch.root_block();
+    let branches0 = state.root_branch.clone().branches;
+    let branch_root0 = branches0
         .get(&branches0.root_node_id().unwrap())
         .unwrap()
         .data();
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
-    let root_branch = state.root_branch.clone();
     let leaves0: HashSet<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
 
     assert_eq!(
@@ -163,5 +163,5 @@ async fn merge() {
     );
 
     // branch root should match the tree's root
-    assert_eq!(&root0, branch_root0);
+    assert_eq!(root0, branch_root0);
 }

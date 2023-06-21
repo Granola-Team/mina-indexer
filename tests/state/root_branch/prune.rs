@@ -113,5 +113,8 @@ async fn transition_frontier() {
     println!("=== After prune ===");
     println!("{branch:?}");
 
-    assert_eq!(Block::from_precomputed(&main_4_block, 0), branch.root);
+    assert_eq!(
+        Block::from_precomputed(&main_4_block, 0),
+        branch.root_block().clone()
+    );
 }
