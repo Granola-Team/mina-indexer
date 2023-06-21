@@ -269,8 +269,9 @@ impl IndexerState {
                     .unwrap();
 
                 for canonical_hash in &canonical_hashes {
-                    let diff = self.diffs_map.get(canonical_hash).unwrap();
-                    ledger.apply_diff(diff).unwrap();
+                    if let Some(diff) = self.diffs_map.get(canonical_hash) {
+                        ledger.apply_diff(diff).unwrap();
+                    }
                 }
 
                 indexer_store
