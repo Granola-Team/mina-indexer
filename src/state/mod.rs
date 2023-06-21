@@ -112,6 +112,7 @@ impl IndexerState {
         })
     }
 
+    // 8 arguments here
     #[allow(clippy::too_many_arguments)]
     pub fn new_non_genesis(
         mode: IndexerMode,
