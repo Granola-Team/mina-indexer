@@ -1,5 +1,3 @@
-use std::{collections::HashMap, fmt::Error, result::Result};
-
 pub mod account;
 pub mod coinbase;
 pub mod command;
@@ -8,13 +6,14 @@ pub mod genesis;
 pub mod public_key;
 pub mod store;
 
+use self::account::{Amount, Nonce};
 use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
 use serde::{Deserialize, Serialize};
-
-use self::account::{Amount, Nonce};
+use std::{collections::HashMap, fmt::Error, result::Result};
+use tracing::debug;
 
 impl ExtendWithLedgerDiff for LedgerMock {
     fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
@@ -126,7 +125,7 @@ impl PartialEq for Ledger {
     fn eq(&self, other: &Self) -> bool {
         for pk in self.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
-                println!(
+                debug!(
                     "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
                     self.accounts.get(pk),
                     other.accounts.get(pk)
@@ -136,7 +135,7 @@ impl PartialEq for Ledger {
         }
         for pk in other.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
-                println!(
+                debug!(
                     "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
                     self.accounts.get(pk),
                     other.accounts.get(pk)
