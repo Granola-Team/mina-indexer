@@ -33,9 +33,9 @@ pub struct IndexerState {
     /// Indexer phase
     pub phase: IndexerPhase,
     /// Block representing the best tip of the root branch
-    pub best_tip: NodeId,
+    pub best_tip: Tip,
     /// Highest known canonical block
-    pub canonical_tip: NodeId,
+    pub canonical_tip: Tip,
     /// Map of ledger diffs following the canonical tip
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -57,6 +57,12 @@ pub struct IndexerState {
     pub time: Instant,
     /// Datetime the indexer started running
     pub date_time: OffsetDateTime,
+}
+
+#[derive(Debug, Clone)]
+pub struct Tip {
+    pub state_hash: BlockHash,
+    pub node_id: NodeId,
 }
 
 #[derive(Debug, Clone)]
@@ -114,12 +120,17 @@ impl IndexerState {
                 .expect("ledger add succeeds");
             store
         });
+        let tip = Tip {
+            state_hash: root_branch.root_block().state_hash.clone(),
+            node_id: root_branch.root.clone(),
+        };
+
         Ok(Self {
             mode,
             phase: IndexerPhase::InitializingFromBlockDir,
-            canonical_tip: root_branch.root.clone(),
+            canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
-            best_tip: root_branch.root.clone(),
+            best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
             indexer_store,
@@ -150,12 +161,17 @@ impl IndexerState {
                 .expect("ledger add succeeds");
             store
         });
+        let tip = Tip {
+            state_hash: root_branch.root_block().state_hash.clone(),
+            node_id: root_branch.root.clone(),
+        };
+
         Ok(Self {
             mode,
             phase: IndexerPhase::InitializingFromDB,
-            canonical_tip: root_branch.root.clone(),
+            canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
-            best_tip: root_branch.root.clone(),
+            best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
             indexer_store,
@@ -184,12 +200,17 @@ impl IndexerState {
             }
             store
         });
+        let tip = Tip {
+            state_hash: root_branch.root_block().state_hash.clone(),
+            node_id: root_branch.root.clone(),
+        };
+
         Ok(Self {
             mode: IndexerMode::Test,
             phase: IndexerPhase::Testing,
-            canonical_tip: root_branch.root.clone(),
+            canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
-            best_tip: root_branch.root.clone(),
+            best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
             indexer_store,
@@ -211,11 +232,13 @@ impl IndexerState {
         if let Some(k) = self.transition_frontier_length {
             let interval = self.prune_interval.unwrap_or(PRUNE_INTERVAL_DEFAULT);
             let best_tip_block = self.best_tip_block().clone();
+
             if self.root_branch.height() as u32 > interval * k {
                 debug!(
-                    "Pruning transition frontier at k = {}, best tip length: {}",
+                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
                     k,
-                    self.best_tip_block().blockchain_length.unwrap_or(0)
+                    self.best_tip_block().blockchain_length.unwrap_or(0),
+                    self.canonical_tip_block().blockchain_length.unwrap_or(0),
                 );
                 self.root_branch
                     .prune_transition_frontier(k, &best_tip_block);
@@ -224,11 +247,11 @@ impl IndexerState {
     }
 
     pub fn canonical_tip_block(&self) -> &Block {
-        self.get_block_from_id(&self.canonical_tip)
+        self.get_block_from_id(&self.canonical_tip.node_id)
     }
 
     pub fn best_tip_block(&self) -> &Block {
-        self.get_block_from_id(&self.best_tip)
+        self.get_block_from_id(&self.best_tip.node_id)
     }
 
     /// Only works with blocks in the root branch
@@ -237,70 +260,79 @@ impl IndexerState {
     }
 
     fn update_canonical(&mut self) {
-        let mut canonical_hashes = vec![];
-        let old_canonical_tip_id = self.canonical_tip.clone();
-        let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
-
-        // update canonical_tip
-        for (n, ancestor_id) in self
-            .root_branch
-            .branches
-            .ancestor_ids(&self.best_tip)
-            .unwrap()
-            .enumerate()
+        if self.best_tip_block().height - self.canonical_tip_block().height
+            > MAINNET_CANONICAL_THRESHOLD
         {
-            if n <= MAINNET_CANONICAL_THRESHOLD as usize {
-                let ancestor_block = self.get_block_from_id(ancestor_id);
-                canonical_hashes.push(ancestor_block.state_hash.clone());
-            } else {
-                self.canonical_tip = ancestor_id.clone();
-                break;
+            let mut canonical_hashes = vec![];
+            let old_canonical_tip_id = self.canonical_tip.node_id.clone();
+            let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
+
+            // update canonical_tip
+            for (n, ancestor_id) in self
+                .root_branch
+                .branches
+                .ancestor_ids(&self.best_tip.node_id)
+                .unwrap()
+                .enumerate()
+            {
+                // only add blocks between the old_canonical_tip and the new one
+                if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
+                    self.canonical_tip.node_id = ancestor_id.clone();
+                    self.canonical_tip.state_hash =
+                        self.get_block_from_id(ancestor_id).state_hash.clone();
+                } else if n > MAINNET_CANONICAL_THRESHOLD as usize
+                    && ancestor_id != &old_canonical_tip_id
+                {
+                    let ancestor_block = self.get_block_from_id(ancestor_id);
+                    canonical_hashes.push(ancestor_block.state_hash.clone());
+                } else if ancestor_id == &old_canonical_tip_id {
+                    break;
+                }
             }
-        }
 
-        canonical_hashes.reverse();
+            canonical_hashes.reverse();
 
-        // update canonical ledger
-        if self.best_tip_block().height % self.ledger_update_freq == 0 {
-            if let Some(indexer_store) = &self.indexer_store {
-                let mut ledger = indexer_store
-                    .get_ledger(&old_canonical_tip_hash)
-                    .unwrap()
-                    .unwrap();
+            // update canonical ledger
+            if self.best_tip_block().height % self.ledger_update_freq == 0 {
+                if let Some(indexer_store) = &self.indexer_store {
+                    let mut ledger = indexer_store.get_ledger(&old_canonical_tip_hash).unwrap();
 
-                for canonical_hash in &canonical_hashes {
-                    if let Some(diff) = self.diffs_map.get(canonical_hash) {
-                        ledger.apply_diff(diff).unwrap();
+                    // apply the new canonical diffs to the old canonical ledger
+                    for canonical_hash in &canonical_hashes {
+                        if let Some(diff) = self.diffs_map.get(canonical_hash) {
+                            ledger.as_mut().unwrap().apply_diff(diff).unwrap();
+                        }
+                    }
+
+                    // update the ledger
+                    indexer_store
+                        .add_ledger(&self.canonical_tip_block().state_hash, ledger.unwrap())
+                        .unwrap();
+                }
+            }
+
+            // update canonicity store
+            for block_hash in self.diffs_map.keys() {
+                if let Some(indexer_store) = &self.indexer_store {
+                    if canonical_hashes.contains(block_hash) {
+                        indexer_store.add_canonical(block_hash).unwrap();
+                    } else {
+                        indexer_store.add_orphaned(block_hash).unwrap();
                     }
                 }
-
-                indexer_store
-                    .add_ledger(&self.canonical_tip_block().state_hash, ledger)
-                    .unwrap();
             }
-        }
 
-        // update canonicity store
-        for block_hash in self.diffs_map.keys() {
-            if let Some(indexer_store) = &self.indexer_store {
-                if canonical_hashes.contains(block_hash) {
-                    indexer_store.add_canonical(block_hash).unwrap();
-                } else {
-                    indexer_store.add_orphaned(block_hash).unwrap();
+            // remove diffs corresponding to blocks at or beneath the height of the new canonical tip
+            for node_id in self
+                .root_branch
+                .branches
+                .traverse_level_order_ids(&old_canonical_tip_id)
+                .unwrap()
+            {
+                if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
+                    self.diffs_map
+                        .remove(&self.get_block_from_id(&node_id).state_hash.clone());
                 }
-            }
-        }
-
-        // remove diffs corresponding to blocks at or beneath the height of the new canonical tip
-        for node_id in self
-            .root_branch
-            .branches
-            .traverse_level_order_ids(&old_canonical_tip_id)
-            .unwrap()
-        {
-            if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
-                self.diffs_map
-                    .remove(&self.get_block_from_id(&node_id).state_hash.clone());
             }
         }
     }
@@ -384,20 +416,36 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<Option<ExtensionType>> {
-        if let Some(new_node_id) = self.root_branch.simple_extension(precomputed_block) {
-            self.update_best_tip();
-            self.update_canonical();
+        if let Some((new_node_id, new_block)) = self.root_branch.simple_extension(precomputed_block)
+        {
+            self.update_best_tip(&new_block, &new_node_id);
 
             // check if new block connects to a dangling branch
+            let mut merged_tip_id = None;
             let mut branches_to_remove = Vec::new();
+
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 // new block is the parent of the dangling branch root
                 if is_reverse_extension(dangling_branch, precomputed_block) {
-                    self.root_branch.merge_on(&new_node_id, dangling_branch);
+                    merged_tip_id = self.root_branch.merge_on(&new_node_id, dangling_branch);
                     branches_to_remove.push(index);
                 }
 
                 same_block_added_twice(dangling_branch, precomputed_block)?;
+            }
+
+            if let Some(merged_tip_id) = merged_tip_id {
+                let merged_tip_block = self
+                    .root_branch
+                    .branches
+                    .get(&merged_tip_id)
+                    .unwrap()
+                    .data()
+                    .clone();
+
+                if merged_tip_block > self.best_tip_block().clone() {
+                    self.update_best_tip(&merged_tip_block, &merged_tip_id);
+                }
             }
 
             if !branches_to_remove.is_empty() {
@@ -405,9 +453,6 @@ impl IndexerState {
                 for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                     self.dangling_branches.remove(index_to_remove - num_removed);
                 }
-
-                self.update_best_tip();
-                self.update_canonical();
 
                 Ok(Some(ExtensionType::RootComplex))
             } else {
@@ -451,7 +496,9 @@ impl IndexerState {
                     }
 
                     // simple forward
-                    if let Some(new_node_id) = dangling_branch.simple_extension(precomputed_block) {
+                    if let Some((new_node_id, _)) =
+                        dangling_branch.simple_extension(precomputed_block)
+                    {
                         extension = Some((index, new_node_id, ExtensionDirection::Forward));
                         break;
                     }
@@ -477,7 +524,8 @@ impl IndexerState {
                 }
 
                 // simple forward
-                if let Some(new_node_id) = dangling_branch.simple_extension(precomputed_block) {
+                if let Some((new_node_id, _)) = dangling_branch.simple_extension(precomputed_block)
+                {
                     extension = Some((index, new_node_id, ExtensionDirection::Forward));
                     break;
                 }
@@ -498,13 +546,12 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
         for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
-            if precomputed_block.state_hash == dangling_branch.root_block().parent_hash.0 {
+            if is_reverse_extension(dangling_branch, precomputed_block) {
                 branches_to_update.push(index);
             }
         }
 
         if !branches_to_update.is_empty() {
-            // remove one
             let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
             for (n, dangling_branch_index) in branches_to_update.iter().enumerate() {
                 let index = if extended_branch_index < *dangling_branch_index {
@@ -535,6 +582,7 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         self.dangling_branches
             .push(Branch::new(precomputed_block).expect("cannot fail"));
+
         Ok(ExtensionType::DanglingNew)
     }
 
@@ -556,9 +604,21 @@ impl IndexerState {
         }
     }
 
-    fn update_best_tip(&mut self) {
-        let (id, _) = self.root_branch.best_tip_with_id().unwrap();
-        self.best_tip = id;
+    fn update_best_tip(&mut self, incoming_block: &Block, node_id: &NodeId) {
+        if let Some(incoming_length) = incoming_block.blockchain_length {
+            let best_tip_length = self.best_tip_block().blockchain_length.unwrap_or(0);
+
+            if incoming_length == best_tip_length + 1
+                || incoming_length == best_tip_length && incoming_block > self.best_tip_block()
+            {
+                self.best_tip.node_id = node_id.clone();
+                self.best_tip.state_hash = incoming_block.state_hash.clone();
+            }
+        }
+
+        let (id, block) = self.root_branch.best_tip_with_id().unwrap();
+        self.best_tip.node_id = id;
+        self.best_tip.state_hash = block.state_hash;
     }
 
     pub fn chain_commands(&self) -> Vec<Command> {

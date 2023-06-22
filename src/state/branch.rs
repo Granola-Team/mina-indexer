@@ -80,7 +80,8 @@ impl Branch {
         self.branches.height() == 0
     }
 
-    pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<NodeId> {
+    /// Returns the new node's id in the branch
+    pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<(NodeId, Block)> {
         let root_node_id = self
             .branches
             .root_node_id()
@@ -101,10 +102,10 @@ impl Branch {
                 let new_block = Block::from_precomputed(block, node.data().height + 1);
                 let new_node_id = self
                     .branches
-                    .insert(Node::new(new_block), UnderNode(&node_id))
+                    .insert(Node::new(new_block.clone()), UnderNode(&node_id))
                     .expect("node_id comes from branches iterator, cannot be invalid");
 
-                return Some(new_node_id);
+                return Some((new_node_id, new_block));
             }
         }
         None
@@ -186,7 +187,12 @@ impl Branch {
             })
     }
 
-    pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch) {
+    /// Merges two trees:
+    /// incoming is placed under junction_id in self
+    ///
+    /// Returns the id of the best tip in the merged subtree
+    pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch) -> Option<NodeId> {
+        let (merged_tip_id, _) = incoming.best_tip_with_id().unwrap();
         let mut merge_id_map = HashMap::new();
 
         // associate the incoming tree's root node id with it's new id in the base tree
@@ -268,6 +274,8 @@ impl Branch {
                 merge_id_map.insert(child_id, new_child_id);
             }
         }
+
+        merge_id_map.get(&merged_tip_id).cloned()
     }
 
     pub fn new_root(&mut self, precomputed_block: &PrecomputedBlock) {
@@ -303,38 +311,44 @@ impl Branch {
         self.branches.get(&self.root).unwrap().data()
     }
 
-    pub fn leaves(&self) -> Vec<Block> {
-        self.top_leaves(self.height() as u32)
-    }
+    pub fn top_leaves_with_id(&self) -> Vec<(NodeId, Block)> {
+        let mut top_leaves = vec![];
 
-    pub fn top_leaves_with_id(&self, depth: u32) -> Vec<(NodeId, Block)> {
-        let height = self.height() as u32;
-        let mut leaves = vec![];
         for node_id in self
             .branches
             .traverse_post_order_ids(self.branches.root_node_id().unwrap())
             .unwrap()
         {
             let node = self.branches.get(&node_id).unwrap();
-            if node.data().height + depth >= height && node.children().is_empty() {
-                leaves.push((node_id.clone(), node.data().clone()));
+            if node.data().height + 1 == self.height() as u32 {
+                top_leaves.push((node_id.clone(), node.data().clone()));
             }
         }
-        leaves
+
+        top_leaves
     }
 
-    pub fn top_leaves(&self, depth: u32) -> Vec<Block> {
-        let height = self.height() as u32;
+    pub fn top_leaves(&self) -> Vec<Block> {
+        self.top_leaves_with_id()
+            .iter()
+            .map(|(_, block)| block)
+            .cloned()
+            .collect()
+    }
+
+    pub fn leaves(&self) -> Vec<Block> {
         let mut leaves = vec![];
+
         for node in self
             .branches
-            .traverse_post_order(self.branches.root_node_id().unwrap())
+            .traverse_level_order(self.branches.root_node_id().unwrap())
             .unwrap()
         {
-            if node.data().height + depth >= height && node.children().is_empty() {
+            if node.data().height + 1 == self.height() as u32 {
                 leaves.push(node.data().clone());
             }
         }
+
         leaves
     }
 
@@ -345,11 +359,9 @@ impl Branch {
 
     // Always returns some for a non-empty tree
     pub fn best_tip_with_id(&self) -> Option<(NodeId, Block)> {
-        let height = self.height() as u32;
-        let mut leaves = self.top_leaves_with_id(self.height() as u32);
+        let mut leaves = self.top_leaves_with_id();
         leaves.sort_by(|(_, x), (_, y)| x.cmp(y).reverse());
-        let res = leaves.iter().find(|(_, leaf)| leaf.height + 1 == height);
-        res.cloned()
+        leaves.first().cloned()
     }
 
     pub fn longest_chain(&self) -> Vec<BlockHash> {
@@ -432,6 +444,7 @@ where
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::fmt;
+
 impl<'de, T> Deserialize<'de> for Leaf<T>
 where
     T: Deserialize<'de>,
