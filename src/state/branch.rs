@@ -32,7 +32,6 @@ impl Branch {
             parent_hash: root_hash,
             height: 0,
             blockchain_length: Some(1),
-            global_slot_number: Some(1),
         };
         let mut branches = Tree::new();
 
@@ -46,13 +45,15 @@ impl Branch {
         }
     }
 
-    pub fn new_non_genesis(root_hash: BlockHash, blockchain_length: Option<u32>, global_slot_number: Option<u32>) -> Self {
+    pub fn new_non_genesis(
+        root_hash: BlockHash,
+        blockchain_length: Option<u32>,
+    ) -> Self {
         let root = Block {
             state_hash: root_hash.clone(),
             parent_hash: root_hash,
             height: 0,
             blockchain_length,
-            global_slot_number,
         };
         let mut branches = Tree::new();
 

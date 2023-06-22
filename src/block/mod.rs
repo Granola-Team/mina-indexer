@@ -1,13 +1,10 @@
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, path::{Path, PathBuf}};
 
-use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
-use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
-use std::{
-    fs::File,
-    io::Read,
-};
+use mina_serialization_types::{common::{Base58EncodableVersionedType}, v1::{HashV1, GlobalSlotNumberV1}, version_bytes};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::Read};
+use tokio::io::AsyncReadExt;
 
 use self::precomputed::{BlockLogContents, PrecomputedBlock};
 
@@ -22,7 +19,6 @@ pub struct Block {
     pub state_hash: BlockHash,
     pub height: u32,
     pub blockchain_length: Option<u32>,
-    pub global_slot_number: Option<u32>,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -62,7 +58,6 @@ impl Block {
             state_hash,
             height,
             blockchain_length: precomputed_block.blockchain_length,
-            global_slot_number: precomputed_block.global_slot_number,
         }
     }
 
@@ -113,12 +108,11 @@ impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Block {{ height: {}, len: {}, state: {}, parent: {}, slot: {} }}",
+            "Block {{ height: {}, len: {}, state: {}, parent: {}}}",
             self.height,
             self.blockchain_length.unwrap_or(0),
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12],
-            self.global_slot_number.unwrap_or(0),
         )
     }
 }
@@ -153,13 +147,13 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
 
         log_file.read_to_end(&mut log_file_contents).await?;
 
-        let global_slot_number = extract_global_slot_number(&String::from_utf8_lossy(&log_file_contents));
+        let global_slot_since_genesis = extract_global_slot_since_genesis(&PathBuf::from(filename));
 
         let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
             state_hash,
             blockchain_length,
             contents: log_file_contents,
-            global_slot_number,
+            global_slot_since_genesis,
         })?;
 
         Ok(precomputed_block)
@@ -214,21 +208,25 @@ fn is_valid_block_file(path: &Path) -> bool {
     }
 }
 
-fn extract_global_slot_number(file_path: &str) -> Option<u32> {
-    let mut file = File::open(file_path).ok()?;
+fn extract_global_slot_since_genesis(file_path: &PathBuf) -> GlobalSlotNumberV1 {
+    let mut file = File::open(file_path)
+        .unwrap_or_else(|err| panic!("failed to open file: {}", err));
     let mut contents = Vec::new();
-    file.read_to_end(&mut contents).ok()?;
+    file.read_to_end(&mut contents)
+        .unwrap_or_else(|err| panic!("failed to read file: {}", err));
 
-    let regex = Regex::new(r"global_slot_since_genesis=(\d+)").unwrap();
+    let regex = Regex::new(r"global_slot_since_genesis=(\d+)")
+        .unwrap_or_else(|err| panic!("failed to create regex: {}", err));
+
     let contents_str = String::from_utf8_lossy(&contents);
 
     if let Some(captures) = regex.captures(&contents_str) {
         if let Some(slot_str) = captures.get(1) {
             if let Ok(slot) = slot_str.as_str().parse::<u32>() {
-                return Some(slot);
+                return GlobalSlotNumberV1::from(slot);
             }
         }
     }
 
-    None
+    panic!("failed to extract global_slot_since_genesis from file");
 }

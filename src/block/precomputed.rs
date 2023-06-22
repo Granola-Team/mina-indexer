@@ -1,11 +1,13 @@
 use mina_serialization_types::{
-    json::DeltaTransitionChainProofJson,
+    json::{DeltaTransitionChainProofJson},
     protocol_state::{ProtocolState, ProtocolStateJson},
+    consensus_state::{ConsensusState, ConsensusStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
     staged_ledger_diff::{
         self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
     },
-    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1},
+    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1, GlobalSlotNumberV1},
+    common::U32Json,
 };
 use serde::{Deserialize, Serialize};
 
@@ -13,13 +15,14 @@ pub struct BlockLogContents {
     pub(crate) state_hash: String,
     pub(crate) blockchain_length: Option<u32>,
     pub(crate) contents: Vec<u8>,
-    pub(crate) global_slot_number: Option<u32>,
+    pub(crate) global_slot_since_genesis: GlobalSlotNumberV1,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockLog {
     scheduled_time: String,
     protocol_state: ProtocolStateJson,
+    consensus_state: ConsensusStateJson,
     protocol_state_proof: ProtocolStateProofBase64Json,
     staged_ledger_diff: StagedLedgerDiffJson,
     delta_transition_chain_proof: DeltaTransitionChainProofJson,
@@ -30,22 +33,24 @@ pub struct PrecomputedBlock {
     pub state_hash: String,
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
+    pub consensus_state: ConsensusState,
     pub blockchain_length: Option<u32>,
     pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: StagedLedgerDiff,
     pub delta_transition_chain_proof: DeltaTransitionChainProof,
-    pub global_slot_number: Option<u32>,
+    pub global_slot_since_genesis: U32Json,
 }
 
 impl PrecomputedBlock {
     pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
         let blockchain_length = log_contents.blockchain_length;
-        let global_slot_number = log_contents.global_slot_number;
         let str = String::from_utf8_lossy(&log_contents.contents);
+        let global_slot_since_genesis = log_contents.global_slot_since_genesis;
         let BlockLog {
             scheduled_time,
             protocol_state,
+            consensus_state,
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
@@ -55,10 +60,11 @@ impl PrecomputedBlock {
             scheduled_time,
             blockchain_length,
             protocol_state: protocol_state.into(),
+            consensus_state: consensus_state.into(),
             protocol_state_proof: protocol_state_proof.into(),
             staged_ledger_diff: staged_ledger_diff.into(),
             delta_transition_chain_proof: delta_transition_chain_proof.into(),
-            global_slot_number,
+            global_slot_since_genesis: global_slot_since_genesis.into(),
         })
     }
 }

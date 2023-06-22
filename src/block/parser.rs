@@ -17,7 +17,7 @@ use std::{
 use tokio::io::AsyncReadExt;
 use tracing::{debug, info};
 
-use super::extract_global_slot_number;
+use super::extract_global_slot_since_genesis;
 
 pub enum SearchRecursion {
     None,
@@ -280,13 +280,13 @@ impl BlockParser {
 
             log_file.read_to_end(&mut log_file_contents).await?;
 
-            let global_slot_number = extract_global_slot_number(&String::from_utf8_lossy(&log_file_contents));
+            let global_slot_since_genesis = extract_global_slot_since_genesis(&PathBuf::from(path));
 
             let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
                 state_hash,
                 blockchain_length,
                 contents: log_file_contents,
-                global_slot_number,
+                global_slot_since_genesis,
             })?;
 
             Ok(Some(precomputed_block))
@@ -341,13 +341,13 @@ impl BlockParser {
 
             log_file.read_to_end(&mut log_file_contents).await?;
 
-            let global_slot_number = extract_global_slot_number(&String::from_utf8_lossy(&log_file_contents));
+            let global_slot_since_genesis = extract_global_slot_since_genesis(&PathBuf::from(filename));
 
             let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
                 state_hash,
                 blockchain_length,
                 contents: log_file_contents,
-                global_slot_number,
+                global_slot_since_genesis,
             })?;
 
             Ok(precomputed_block)
