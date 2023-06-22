@@ -72,7 +72,7 @@ async fn account_diffs() {
     println!("=== Initial ===");
     println!("{:?}", ledger);
 
-    ledger.apply_diff(diff.clone()).unwrap();
+    ledger.apply_diff(&diff).unwrap();
 
     let expected = Ledger::from(vec![
         (

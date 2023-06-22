@@ -165,7 +165,7 @@ async fn extensions() {
         });
 
     // after extension quantities
-    let root1 = &state.dangling_branches.get(1).unwrap().root;
+    let root1 = state.dangling_branches.get(1).unwrap().root_block();
     let branches1 = &state.dangling_branches.get(1).unwrap().branches;
     let branch_root1 = &branches1
         .get(&branches1.root_node_id().unwrap())

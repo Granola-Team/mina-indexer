@@ -1,11 +1,12 @@
-use std::path::{Path, PathBuf};
-
-use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
-
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    state::ledger::{store::LedgerStore, Ledger},
+    state::{
+        ledger::{store::LedgerStore, Ledger},
+        Canonicity,
+    },
 };
+use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -31,7 +32,8 @@ impl IndexerStore {
         let mut cf_opts = rocksdb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
-        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
+        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
+        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -39,7 +41,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers],
+            vec![blocks, ledgers, canonicity],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -81,6 +83,29 @@ impl BlockStore for IndexerStore {
         }
         Ok(precomputed_block)
     }
+
+    fn set_canonicity(&self, state_hash: &BlockHash, canonicity: Canonicity) -> anyhow::Result<()> {
+        if let Some(precomputed_block) = self.get_block(state_hash)? {
+            let with_canonicity = PrecomputedBlock {
+                canonicity: Some(canonicity),
+                ..precomputed_block
+            };
+            self.add_block(&with_canonicity)?;
+        }
+        Ok(())
+    }
+
+    fn get_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+        let mut canonicity = None;
+        if let Some(PrecomputedBlock {
+            canonicity: Some(block_canonicity),
+            ..
+        }) = self.get_block(state_hash)?
+        {
+            canonicity = Some(block_canonicity);
+        }
+        Ok(canonicity)
+    }
 }
 
 impl LedgerStore for IndexerStore {
@@ -96,13 +121,15 @@ impl LedgerStore for IndexerStore {
     }
 
     fn get_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
+        let mut ledger = None;
+        let key = state_hash.0.as_bytes();
         let cf_handle = self
             .database
             .cf_handle("ledgers")
             .expect("column family exists");
-        let mut ledger = None;
+
         self.database.try_catch_up_with_primary().ok();
-        let key = state_hash.0.as_bytes();
+
         if let Some(bytes) = self
             .database
             .get_pinned_cf(&cf_handle, key)?
@@ -131,13 +158,6 @@ impl IndexerStore {
     pub fn memtables_size(&self) -> String {
         self.database
             .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
-            .unwrap()
-            .unwrap()
-    }
-
-    pub fn x(&self) -> String {
-        self.database
-            .property_value(rocksdb::properties::DBSTATS)
             .unwrap()
             .unwrap()
     }

@@ -28,7 +28,7 @@ async fn extension() {
     let root_tree = Branch::new(&root_block).unwrap();
 
     // before extension quantities
-    let before_root = root_tree.root.clone();
+    let before_root = root_tree.root_block();
     let before_branches = root_tree.branches.clone();
     let before_root_id = before_branches.root_node_id().unwrap();
     let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
@@ -52,14 +52,14 @@ async fn extension() {
         .expect("new leaf should be inserted");
 
     // after extension quantities
-    let after_root = tree2.root.clone();
+    let after_root = tree2.root_block();
     let after_branches = tree2.branches.clone();
     let after_root_id = after_branches.root_node_id().unwrap();
     let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
 
     // branch root should match the tree's root
-    assert_eq!(&before_root, before_root_leaf);
-    assert_eq!(&after_root, after_root_leaf);
+    assert_eq!(before_root, before_root_leaf);
+    assert_eq!(after_root, after_root_leaf);
 
     println!("=== Before tree ===");
     println!("{root_tree:?}");
@@ -106,7 +106,7 @@ async fn extension() {
 
     // before root is also a leaf
     assert_eq!(
-        &before_root,
+        before_root,
         before_branches.get(&before_root_id).unwrap().data()
     );
 
@@ -115,5 +115,5 @@ async fn extension() {
         .leaves()
         .iter()
         .map(|leaf| leaf.clone())
-        .all(|x| x != after_root));
+        .all(|x| x != after_root.clone()));
 }

@@ -127,9 +127,9 @@ async fn extension() {
     });
 
     // after extension quantities
-    let root = &state.root_branch.clone().root;
-    let branches = &state.root_branch.clone().branches;
-    let branch_root = &branches
+    let root = state.root_branch.root_block();
+    let branches = state.root_branch.clone().branches;
+    let branch_root = branches
         .get(&branches.root_node_id().unwrap())
         .unwrap()
         .data();
@@ -145,5 +145,5 @@ async fn extension() {
     assert_eq!(leaves.get(0).unwrap(), &leaf);
 
     // branch root should match the tree's root
-    assert_eq!(&root, branch_root);
+    assert_eq!(root, branch_root);
 }

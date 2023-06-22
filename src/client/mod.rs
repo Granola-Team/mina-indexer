@@ -1,6 +1,9 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, Block},
-    state::{ledger::account::Account, summary::Summary},
+    state::{
+        ledger::account::Account,
+        summary::{SummaryShort, SummaryVerbose},
+    },
     SOCKET_NAME,
 };
 use clap::Parser;
@@ -22,7 +25,7 @@ pub enum ClientCli {
     /// Dump the best ledger to a file
     BestLedger(LedgerArgs),
     /// Show summary of indexer state
-    Summary,
+    Summary(SummaryArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -53,6 +56,14 @@ pub struct LedgerArgs {
     /// Path to write the ledger
     #[arg(short, long)]
     path: PathBuf,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct SummaryArgs {
+    /// Verbose output should be redirected to a file
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
 }
 
 #[instrument]
@@ -104,11 +115,17 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let msg: String = bcs::from_bytes(&buffer)?;
             println!("{msg}");
         }
-        ClientCli::Summary => {
-            writer.write_all(b"summary\0").await?;
+        ClientCli::Summary(summary_args) => {
+            let command = format!("summary {}\0", summary_args.verbose);
+            writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let summary: Summary = bcs::from_bytes(&buffer)?;
-            println!("{summary}");
+            if summary_args.verbose {
+                let summary: SummaryVerbose = bcs::from_bytes(&buffer)?;
+                println!("{summary}");
+            } else {
+                let summary: SummaryShort = bcs::from_bytes(&buffer)?;
+                println!("{summary}");
+            }
         }
     }
 

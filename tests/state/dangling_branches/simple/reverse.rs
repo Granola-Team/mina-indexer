@@ -63,7 +63,7 @@ async fn extension() {
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // before extension quantities
-    let before_root = state.dangling_branches.get(0).unwrap().root.clone();
+    let before_root = state.dangling_branches.get(0).unwrap().root_block().clone();
     let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
     let before_root_leaf = state
         .dangling_branches
@@ -92,7 +92,7 @@ async fn extension() {
 
     // after extension quantities
     let after_branch = state.dangling_branches.get(0).unwrap();
-    let after_root = &after_branch.root;
+    let after_root = after_branch.root_block().clone();
     let branches1 = &after_branch.branches;
     let leaves1 = &after_branch.leaves();
     let after_root_id = branches1.root_node_id().unwrap();
@@ -120,8 +120,8 @@ async fn extension() {
     );
 
     // root checks
-    assert_ne!(&before_root, after_root);
-    assert_eq!(after_root, &after_root_block);
+    assert_ne!(before_root, after_root);
+    assert_eq!(after_root, after_root_block);
 
     // leaf checks
     let leaves: Vec<Block> = leaves1.iter().map(|x| x.clone()).collect();
