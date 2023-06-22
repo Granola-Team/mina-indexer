@@ -1,9 +1,5 @@
 use crate::{
-    block::{
-        precomputed::PrecomputedBlock,
-        store::BlockStore,
-        BlockHash,
-    },
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -90,9 +86,9 @@ impl BlockStore for IndexerStore {
 
     fn set_canonicity(&self, state_hash: &BlockHash, canonicity: Canonicity) -> anyhow::Result<()> {
         if let Some(precomputed_block) = self.get_block(state_hash)? {
-            let with_canonicity = PrecomputedBlock { 
-                canonicity: Some(canonicity), 
-                ..precomputed_block 
+            let with_canonicity = PrecomputedBlock {
+                canonicity: Some(canonicity),
+                ..precomputed_block
             };
             self.add_block(&with_canonicity)?;
         }
@@ -101,7 +97,11 @@ impl BlockStore for IndexerStore {
 
     fn get_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         let mut canonicity = None;
-        if let Some(PrecomputedBlock { canonicity: Some(block_canonicity), ..}) = self.get_block(state_hash)? {
+        if let Some(PrecomputedBlock {
+            canonicity: Some(block_canonicity),
+            ..
+        }) = self.get_block(state_hash)?
+        {
             canonicity = Some(block_canonicity);
         }
         Ok(canonicity)

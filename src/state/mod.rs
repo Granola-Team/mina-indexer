@@ -1,9 +1,7 @@
 use crate::{
     block::{
-        parser::BlockParser,
-        precomputed::PrecomputedBlock,
-        store::BlockStore,
-        Block, BlockHash, BlockWithoutHeight,
+        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
+        BlockWithoutHeight,
     },
     state::{
         branch::Branch,
@@ -332,9 +330,13 @@ impl IndexerState {
             for block_hash in self.diffs_map.keys() {
                 if let Some(indexer_store) = &self.indexer_store {
                     if canonical_hashes.contains(block_hash) {
-                        indexer_store.set_canonicity(block_hash, Canonicity::Canonical).unwrap();
+                        indexer_store
+                            .set_canonicity(block_hash, Canonicity::Canonical)
+                            .unwrap();
                     } else {
-                        indexer_store.set_canonicity(block_hash, Canonicity::Orphaned).unwrap();
+                        indexer_store
+                            .set_canonicity(block_hash, Canonicity::Orphaned)
+                            .unwrap();
                     }
                 }
             }
