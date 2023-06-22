@@ -71,6 +71,16 @@ impl Block {
     }
 }
 
+impl From<Block> for BlockWithoutHeight {
+    fn from(value: Block) -> Self {
+        Self {
+            parent_hash: value.parent_hash.clone(),
+            state_hash: value.state_hash.clone(),
+            blockchain_length: value.blockchain_length,
+        }
+    }
+}
+
 impl BlockWithoutHeight {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
         let parent_hash =

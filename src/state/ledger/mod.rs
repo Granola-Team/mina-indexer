@@ -1,5 +1,3 @@
-use std::{collections::HashMap, fmt::Error, result::Result};
-
 pub mod account;
 pub mod coinbase;
 pub mod command;
@@ -8,13 +6,14 @@ pub mod genesis;
 pub mod public_key;
 pub mod store;
 
+use self::account::{Amount, Nonce};
 use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
 use serde::{Deserialize, Serialize};
-
-use self::account::{Amount, Nonce};
+use std::{collections::HashMap, fmt::Error, result::Result};
+use tracing::debug;
 
 impl ExtendWithLedgerDiff for LedgerMock {
     fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
@@ -78,7 +77,9 @@ impl Ledger {
     }
 
     // should this be a mutable update or immutable?
-    pub fn apply_diff(&mut self, diff: LedgerDiff) -> anyhow::Result<()> {
+    pub fn apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
+        let diff = diff.clone();
+
         diff.public_keys_seen.into_iter().for_each(|public_key| {
             if self.accounts.get(&public_key).is_none() {
                 self.accounts
@@ -124,7 +125,7 @@ impl PartialEq for Ledger {
     fn eq(&self, other: &Self) -> bool {
         for pk in self.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
-                println!(
+                debug!(
                     "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
                     self.accounts.get(pk),
                     other.accounts.get(pk)
@@ -134,7 +135,7 @@ impl PartialEq for Ledger {
         }
         for pk in other.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
-                println!(
+                debug!(
                     "[Ledger.eq mismatch] {pk:?} | {:?} | {:?}",
                     self.accounts.get(pk),
                     other.accounts.get(pk)
@@ -167,7 +168,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
         let mut ledger = self;
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -175,7 +176,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn from_diff(ledger_diff: LedgerDiff) -> Self {
         let mut ledger = Ledger::new();
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -229,7 +230,7 @@ mod tests {
         };
 
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
@@ -259,7 +260,7 @@ mod tests {
         };
 
         ledger
-            .apply_diff(ledger_diff)
+            .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");

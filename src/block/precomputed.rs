@@ -11,6 +11,8 @@ use mina_serialization_types::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::state::Canonicity;
+
 pub struct BlockLogContents {
     pub(crate) state_hash: String,
     pub(crate) blockchain_length: Option<u32>,
@@ -30,6 +32,7 @@ pub struct BlockLog {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlock {
+    pub canonicity: Option<Canonicity>,
     pub state_hash: String,
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
@@ -56,6 +59,7 @@ impl PrecomputedBlock {
             delta_transition_chain_proof,
         } = serde_json::from_str::<BlockLog>(&str).unwrap();
         Ok(Self {
+            canonicity: None,
             state_hash,
             scheduled_time,
             blockchain_length,

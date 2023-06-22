@@ -100,7 +100,7 @@ async fn transition_frontier() {
     branch.simple_extension(&main_2_block).unwrap();
     branch.simple_extension(&main_3_block).unwrap();
     branch.simple_extension(&main_4_block).unwrap();
-    let best_tip_id = branch.simple_extension(&main_5_block).unwrap();
+    let (best_tip_id, _) = branch.simple_extension(&main_5_block).unwrap();
 
     println!("=== Before prune ===");
     println!("{branch:?}");
@@ -113,5 +113,8 @@ async fn transition_frontier() {
     println!("=== After prune ===");
     println!("{branch:?}");
 
-    assert_eq!(Block::from_precomputed(&main_4_block, 0), branch.root);
+    assert_eq!(
+        Block::from_precomputed(&main_4_block, 0),
+        branch.root_block().clone()
+    );
 }
