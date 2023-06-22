@@ -320,7 +320,7 @@ impl Branch {
             .unwrap()
         {
             let node = self.branches.get(&node_id).unwrap();
-            if node.data().height + 1 == self.height() as u32 {
+            if node.data().height + 1 == self.height() {
                 top_leaves.push((node_id.clone(), node.data().clone()));
             }
         }
@@ -344,7 +344,7 @@ impl Branch {
             .traverse_level_order(self.branches.root_node_id().unwrap())
             .unwrap()
         {
-            if node.data().height + 1 == self.height() as u32 {
+            if node.data().height + 1 == self.height() {
                 leaves.push(node.data().clone());
             }
         }
@@ -386,7 +386,7 @@ impl Branch {
         longest_chain
     }
 
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u32 {
         let mut size = 0;
         if let Some(root) = self.branches.root_node_id() {
             for _ in self.branches.traverse_level_order_ids(root).unwrap() {
@@ -396,8 +396,8 @@ impl Branch {
         size
     }
 
-    pub fn height(&self) -> usize {
-        self.branches.height()
+    pub fn height(&self) -> u32 {
+        self.branches.height() as u32
     }
 
     pub fn mem(&self, state_hash: &BlockHash) -> bool {

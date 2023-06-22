@@ -5,7 +5,7 @@ use tokio::sync::{
     mpsc,
     watch::{self, Sender},
 };
-use tracing::debug;
+use tracing::{debug, info};
 use watchexec::{
     error::RuntimeError,
     event::{
@@ -74,6 +74,8 @@ impl BlockReceiver {
             Ok(block_parser) => self.parsers.push(block_parser),
             Err(err) => return Err(err),
         }
+
+        info!("Set to watch directory {}", directory.display());
         Ok(())
     }
 

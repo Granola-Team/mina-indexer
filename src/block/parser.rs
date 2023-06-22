@@ -3,7 +3,7 @@ use crate::{
         get_blockchain_length, get_state_hash, is_valid_block_file,
         precomputed::{BlockLogContents, PrecomputedBlock},
     },
-    BLOCK_REPORTING_FREQ, MAINNET_CANONICAL_THRESHOLD,
+    BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
 };
 use glob::glob;
 use std::{
@@ -174,18 +174,18 @@ impl BlockParser {
 
                 // curr_path represents a canonical block
                 info!(
-                    "Found the canonical tip {} in {:?}",
-                    curr_path.display(),
+                    "Found canonical tip {} in {:?}",
+                    curr_path.file_name().unwrap().to_str().unwrap(),
                     time.elapsed()
                 );
 
                 canonical_paths.push(curr_path.clone());
-                info!("Walking the canonical chain back to the beginning, Will report every {BLOCK_REPORTING_FREQ} blocks found.", );
+                info!("Walking the canonical chain back to the beginning, Will report every {BLOCK_REPORTING_FREQ_NUM} blocks found.", );
 
                 let time = Instant::now();
                 let mut count = 1;
                 while curr_start_idx > 0 {
-                    if count % BLOCK_REPORTING_FREQ == 0 {
+                    if count % BLOCK_REPORTING_FREQ_NUM == 0 {
                         info!("Found {count} canonical blocks in {:?}", time.elapsed());
                     }
 
@@ -236,10 +236,6 @@ impl BlockParser {
                 }
             }
 
-            info!(
-                "Indexer state initializing from {} blocks",
-                canonical_paths.len() + successive_paths.len()
-            );
             Ok(Self {
                 blocks_dir,
                 recursion,
