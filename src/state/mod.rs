@@ -3,7 +3,7 @@ use crate::{
         parser::BlockParser,
         precomputed::PrecomputedBlock,
         store::{BlockStore, CanonicityStore},
-        Block, BlockHash,
+        Block, BlockHash, BlockWithoutHeight,
     },
     state::{
         branch::Branch,
@@ -12,14 +12,18 @@ use crate::{
         },
     },
     store::IndexerStore,
-    BLOCK_REPORTING_FREQ, CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD,
-    MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
+    MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path, time::Instant};
-use time::OffsetDateTime;
+use std::{collections::HashMap, path::Path, str::FromStr, time::Instant};
+use time::{OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, info};
+
+use self::summary::{
+    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
+};
 
 pub mod branch;
 pub mod ledger;
@@ -66,7 +70,7 @@ pub struct Tip {
     pub node_id: NodeId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IndexerPhase {
     InitializingFromBlockDir,
     InitializingFromDB,
@@ -238,10 +242,12 @@ impl IndexerState {
 
     /// Removes the lower portion of the root tree which is no longer needed
     fn prune_root_branch(&mut self) {
+        self.update_canonical();
+
         let k = self.transition_frontier_length;
         let best_tip_block = self.best_tip_block().clone();
 
-        if self.root_branch.height() as u32 > self.prune_interval * k {
+        if self.root_branch.height() > self.prune_interval * k {
             debug!(
                 "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
                 k,
@@ -269,7 +275,7 @@ impl IndexerState {
     }
 
     /// Updates the canonical tip if the precondition is met
-    fn update_canonical(&mut self) {
+    pub fn update_canonical(&mut self) {
         if self.best_tip_block().height - self.canonical_tip_block().height
             > self.canonical_update_threshold
         {
@@ -353,21 +359,43 @@ impl IndexerState {
     /// Returns the number of blocks parsed
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<u32> {
         let mut block_count = 0;
-        let time = Instant::now();
+        let total_time = Instant::now();
+        let mut step_time = total_time;
+
+        info!(
+            "Will report every {}s or {BLOCK_REPORTING_FREQ_NUM} blocks",
+            BLOCK_REPORTING_FREQ_SEC
+        );
 
         while let Some(block) = block_parser.next().await? {
-            if block_count > 0 && block_count % BLOCK_REPORTING_FREQ == 0 {
+            if block_count > 0 && block_count % BLOCK_REPORTING_FREQ_NUM == 0
+                || ((self.phase == IndexerPhase::InitializingFromBlockDir
+                    || self.phase == IndexerPhase::InitializingFromDB)
+                    && step_time.elapsed().as_secs() > 180)
+            {
+                step_time = Instant::now();
+
+                let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
+                let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
+
                 info!(
-                    "{}",
-                    format!(
-                        "Parsed and added {block_count} blocks to the witness tree in {:?}",
-                        time.elapsed()
-                    )
+                    "Parsed and added {block_count} blocks to the witness tree in {:?}",
+                    total_time.elapsed()
                 );
+                debug!("Root branch height: {}", self.root_branch.height());
+                debug!("Root branch length: {}", self.root_branch.len());
+                info!("Current best tip: {best_tip:?}");
+                info!("Current canonical tip: {canonical_tip:?}");
             }
+
             self.add_block(&block)?;
             block_count += 1;
         }
+
+        info!(
+            "Ingested {block_count} blocks in {:?}",
+            total_time.elapsed()
+        );
 
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
         self.phase = IndexerPhase::Watching;
@@ -400,10 +428,16 @@ impl IndexerState {
             return Ok(ExtensionType::BlockNotAdded);
         }
 
+        // add block to the db
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
         }
+
         self.blocks_processed += 1;
+        self.diffs_map.insert(
+            BlockHash(precomputed_block.state_hash.clone()),
+            LedgerDiff::from_precomputed_block(precomputed_block),
+        );
 
         // forward extension on root branch
         if self.is_length_within_root_bounds(precomputed_block) {
@@ -423,11 +457,6 @@ impl IndexerState {
                 direction,
             );
         }
-
-        self.diffs_map.insert(
-            BlockHash(precomputed_block.state_hash.clone()),
-            LedgerDiff::from_precomputed_block(precomputed_block),
-        );
 
         self.new_dangling(precomputed_block)
     }
@@ -672,14 +701,144 @@ impl IndexerState {
         None
     }
 
+    // TODO maybe we should add another function for getting a ledger at a specific slot/"height"?
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
         self.update_canonical();
 
-        if let Some(indexer_store) = &self.indexer_store {
-            return indexer_store.get_ledger(&self.canonical_tip_block().state_hash);
+        // get the most recent canonical ledger
+        let ledger = if let Some(indexer_store) = &self.indexer_store {
+            indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
+        } else {
+            None
+        };
+
+        if let Some(mut ledger) = ledger {
+            // collect diffs from canonical tip to best tip
+            let mut diffs_since_canonical_tip =
+                if self.best_tip.state_hash != self.canonical_tip.state_hash {
+                    vec![self.diffs_map.get(&self.best_tip.state_hash).unwrap()]
+                } else {
+                    vec![]
+                };
+
+            for ancestor in self
+                .root_branch
+                .branches
+                .ancestors(&self.best_tip.node_id)
+                .unwrap()
+            {
+                if ancestor.data().state_hash != self.canonical_tip.state_hash {
+                    diffs_since_canonical_tip
+                        .push(self.diffs_map.get(&ancestor.data().state_hash).unwrap());
+                } else {
+                    break;
+                }
+            }
+
+            // apply diffs from canonical tip to best tip
+            diffs_since_canonical_tip.reverse();
+            for diff in diffs_since_canonical_tip {
+                ledger.apply_diff(diff)?;
+            }
+
+            return Ok(Some(ledger));
         }
 
         Ok(None)
+    }
+
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> u32 {
+        let mut len = self.root_branch.len();
+        for dangling in &self.dangling_branches {
+            len += dangling.len();
+        }
+        len
+    }
+
+    pub fn summary_short(&self) -> SummaryShort {
+        let mut max_dangling_height = 0;
+        let mut max_dangling_length = 0;
+
+        for dangling in &self.dangling_branches {
+            if dangling.height() > max_dangling_height {
+                max_dangling_height = dangling.height();
+            }
+            if dangling.len() > max_dangling_length {
+                max_dangling_length = dangling.len();
+            }
+        }
+
+        let db_stats_str = self.indexer_store.as_ref().map(|db| db.db_stats());
+        let mem = self
+            .indexer_store
+            .as_ref()
+            .map(|db| db.memtables_size())
+            .unwrap_or_default();
+        let witness_tree = WitnessTreeSummaryShort {
+            best_tip_hash: self.best_tip_block().state_hash.0.clone(),
+            best_tip_length: self.best_tip_block().blockchain_length.unwrap_or(0),
+            canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
+            canonical_tip_length: self.canonical_tip_block().blockchain_length.unwrap_or(0),
+            root_hash: self.root_branch.root_block().state_hash.0.clone(),
+            root_height: self.root_branch.height(),
+            root_length: self.root_branch.len(),
+            num_leaves: self.root_branch.leaves().len() as u32,
+            num_dangling: self.dangling_branches.len() as u32,
+            max_dangling_height,
+            max_dangling_length,
+        };
+
+        SummaryShort {
+            uptime: self.time.clone().elapsed(),
+            date_time: PrimitiveDateTime::new(self.date_time.date(), self.date_time.time()),
+            blocks_processed: self.blocks_processed,
+            witness_tree,
+            db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
+        }
+    }
+
+    pub fn summary_verbose(&self) -> SummaryVerbose {
+        let mut max_dangling_height = 0;
+        let mut max_dangling_length = 0;
+
+        for dangling in &self.dangling_branches {
+            if dangling.height() > max_dangling_height {
+                max_dangling_height = dangling.height();
+            }
+            if dangling.len() > max_dangling_length {
+                max_dangling_length = dangling.len();
+            }
+        }
+
+        let db_stats_str = self.indexer_store.as_ref().map(|db| db.db_stats());
+        let mem = self
+            .indexer_store
+            .as_ref()
+            .map(|db| db.memtables_size())
+            .unwrap_or_default();
+        let witness_tree = WitnessTreeSummaryVerbose {
+            best_tip_hash: self.best_tip_block().state_hash.0.clone(),
+            best_tip_length: self.best_tip_block().blockchain_length.unwrap_or(0),
+            canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
+            canonical_tip_length: self.canonical_tip_block().blockchain_length.unwrap_or(0),
+            root_hash: self.root_branch.root_block().state_hash.0.clone(),
+            root_height: self.root_branch.height(),
+            root_length: self.root_branch.len(),
+            num_leaves: self.root_branch.leaves().len() as u32,
+            num_dangling: self.dangling_branches.len() as u32,
+            max_dangling_height,
+            max_dangling_length,
+            witness_tree: format!("{self:?}"),
+        };
+
+        SummaryVerbose {
+            uptime: self.time.clone().elapsed(),
+            date_time: PrimitiveDateTime::new(self.date_time.date(), self.date_time.time()),
+            blocks_processed: self.blocks_processed,
+            witness_tree,
+            db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
+        }
     }
 }
 
@@ -707,11 +866,14 @@ impl std::fmt::Debug for IndexerState {
         writeln!(f, "=== Root branch ===")?;
         writeln!(f, "{:?}", self.root_branch)?;
 
-        writeln!(f, "=== Dangling branches ===")?;
-        for (n, branch) in self.dangling_branches.iter().enumerate() {
-            writeln!(f, "Dangling branch {n}:")?;
-            writeln!(f, "{branch:?}")?;
+        if !self.dangling_branches.is_empty() {
+            writeln!(f, "=== Dangling branches ===")?;
+            for (n, branch) in self.dangling_branches.iter().enumerate() {
+                writeln!(f, "Dangling branch {n}:")?;
+                writeln!(f, "{branch:?}")?;
+            }
         }
+
         Ok(())
     }
 }

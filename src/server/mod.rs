@@ -5,7 +5,7 @@ use crate::{
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
-        summary::{DbStats, Summary},
+        summary::{SummaryShort, SummaryVerbose},
         IndexerMode, IndexerState,
     },
     store::IndexerStore,
@@ -15,12 +15,8 @@ use crate::{
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-use std::{path::PathBuf, process, str::FromStr};
-use time::PrimitiveDateTime;
-use tokio::{
-    fs::{self, create_dir_all, metadata},
-    time::Instant,
-};
+use std::{path::PathBuf, process};
+use tokio::fs::{self, create_dir_all, metadata};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::prelude::*;
 use uuid::Uuid;
@@ -221,14 +217,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     info!("Ingesting precomputed blocks from {init_dir}");
 
     let mut block_parser = BlockParser::new(&startup_dir)?;
-
-    let ingestion_time = Instant::now();
-    let block_count = indexer_state.add_blocks(&mut block_parser).await?;
-
-    info!(
-        "Ingested {block_count} blocks in {:?}",
-        ingestion_time.elapsed()
-    );
+    indexer_state.add_blocks(&mut block_parser).await?;
 
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
@@ -264,43 +253,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 
                 debug!("Spawning secondary readonly RocksDB instance");
                 let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
-
-                // state summary
-                let mut max_dangling_height = 0;
-                let mut max_dangling_length = 0;
-
-                for dangling in &indexer_state.dangling_branches {
-                    if dangling.height() > max_dangling_height {
-                        max_dangling_height = dangling.height();
-                    }
-                    if dangling.len() > max_dangling_length {
-                        max_dangling_length = dangling.len();
-                    }
-                }
-
-                let db_stats_str = indexer_state
-                    .indexer_store
-                    .as_ref()
-                    .map(|db| db.db_stats());
-                let mem = indexer_state
-                    .indexer_store
-                    .as_ref()
-                    .map(|db| db.memtables_size())
-                    .unwrap_or_default();
-                let summary = Summary {
-                    uptime: indexer_state.time.clone().elapsed(),
-                    date_time: PrimitiveDateTime::new(indexer_state.date_time.date(), indexer_state.date_time.time()),
-                    blocks_processed: indexer_state.blocks_processed,
-                    best_tip_hash: indexer_state.best_tip_block().state_hash.0.clone(),
-                    root_hash: indexer_state.root_branch.root_block().state_hash.0.clone(),
-                    root_height: indexer_state.root_branch.height(),
-                    root_length: indexer_state.root_branch.len(),
-                    num_leaves: indexer_state.root_branch.leaves().len(),
-                    num_dangling: indexer_state.dangling_branches.len(),
-                    max_dangling_height,
-                    max_dangling_length,
-                    db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
-                };
+                let summary = indexer_state.summary_verbose();
                 let ledger = indexer_state.best_ledger()?.unwrap();
 
                 // handle the connection
@@ -324,7 +277,7 @@ async fn handle_conn(
     db: IndexerStore,
     best_chain: Vec<BlockHash>,
     ledger: Ledger,
-    summary: Summary,
+    summary: SummaryVerbose,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -374,10 +327,19 @@ async fn handle_conn(
             let bytes = bcs::to_bytes(&format!("Ledger written to {}", path.display()))?;
             writer.write_all(&bytes).await?;
         }
-        "summary\0" => {
+        "summary" => {
             info!("Received summary command");
-            let bytes = bcs::to_bytes(&summary)?;
-            writer.write_all(&bytes).await?;
+            let data_buffer = buffers.next().unwrap();
+            let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
+                .parse::<bool>()?;
+            if verbose {
+                let bytes = bcs::to_bytes(&summary)?;
+                writer.write_all(&bytes).await?;
+            } else {
+                let summary: SummaryShort = summary.into();
+                let bytes = bcs::to_bytes(&summary)?;
+                writer.write_all(&bytes).await?;
+            }
         }
         bad_request => {
             let err_msg = format!("Malformed request: {bad_request}");
