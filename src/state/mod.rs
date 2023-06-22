@@ -2,7 +2,7 @@ use crate::{
     block::{
         parser::BlockParser,
         precomputed::PrecomputedBlock,
-        store::{BlockStore, CanonicityStore},
+        store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
     },
     state::{
@@ -101,7 +101,7 @@ pub enum ExtensionDirection {
     Reverse,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum Canonicity {
     Canonical,
     Orphaned,
@@ -332,9 +332,9 @@ impl IndexerState {
             for block_hash in self.diffs_map.keys() {
                 if let Some(indexer_store) = &self.indexer_store {
                     if canonical_hashes.contains(block_hash) {
-                        indexer_store.add_canonical(block_hash).unwrap();
+                        indexer_store.set_canonicity(block_hash, Canonicity::Canonical).unwrap();
                     } else {
-                        indexer_store.add_orphaned(block_hash).unwrap();
+                        indexer_store.set_canonicity(block_hash, Canonicity::Orphaned).unwrap();
                     }
                 }
             }

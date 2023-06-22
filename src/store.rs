@@ -1,7 +1,7 @@
 use crate::{
     block::{
         precomputed::PrecomputedBlock,
-        store::{BlockStore, CanonicityStore},
+        store::BlockStore,
         BlockHash,
     },
     state::{
@@ -87,6 +87,25 @@ impl BlockStore for IndexerStore {
         }
         Ok(precomputed_block)
     }
+
+    fn set_canonicity(&self, state_hash: &BlockHash, canonicity: Canonicity) -> anyhow::Result<()> {
+        if let Some(precomputed_block) = self.get_block(state_hash)? {
+            let with_canonicity = PrecomputedBlock { 
+                canonicity: Some(canonicity), 
+                ..precomputed_block 
+            };
+            self.add_block(&with_canonicity)?;
+        }
+        Ok(())
+    }
+
+    fn get_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+        let mut canonicity = None;
+        if let Some(PrecomputedBlock { canonicity: Some(block_canonicity), ..}) = self.get_block(state_hash)? {
+            canonicity = Some(block_canonicity);
+        }
+        Ok(canonicity)
+    }
 }
 
 impl LedgerStore for IndexerStore {
@@ -119,47 +138,6 @@ impl LedgerStore for IndexerStore {
             ledger = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(ledger)
-    }
-}
-
-impl CanonicityStore for IndexerStore {
-    fn get_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
-        let cf_handle = self
-            .database
-            .cf_handle("canonicity")
-            .expect("column family exists");
-        let key = state_hash.0.as_bytes();
-
-        self.database.try_catch_up_with_primary().ok();
-
-        match self.database.get_pinned_cf(&cf_handle, key) {
-            Ok(bytes) => Ok(bytes.map(|bs| bcs::from_bytes(&bs).unwrap())),
-            Err(e) => Err(anyhow::Error::from(e)),
-        }
-    }
-
-    fn add_canonical(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
-        let cf_handle = self
-            .database
-            .cf_handle("canonicity")
-            .expect("column family exists");
-        let key = state_hash.0.as_bytes();
-        let value = bcs::to_bytes(&Canonicity::Canonical)?;
-
-        self.database.put_cf(&cf_handle, key, value)?;
-        Ok(())
-    }
-
-    fn add_orphaned(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
-        let cf_handle = self
-            .database
-            .cf_handle("canonicity")
-            .expect("column family exists");
-        let key = state_hash.0.as_bytes();
-        let value = bcs::to_bytes(&Canonicity::Orphaned)?;
-
-        self.database.put_cf(&cf_handle, key, value)?;
-        Ok(())
     }
 }
 
