@@ -3,7 +3,7 @@ use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     state::{ledger::genesis, IndexerMode, IndexerState},
-    MAINNET_TRANSITION_FRONTIER_K,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use std::{path::PathBuf, thread};
 use tokio::{
@@ -72,8 +72,9 @@ async fn main() -> anyhow::Result<()> {
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
-        Some(MAINNET_TRANSITION_FRONTIER_K),
-        None,
+        MAINNET_TRANSITION_FRONTIER_K,
+        PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD,
     )
     .unwrap();
 

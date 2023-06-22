@@ -9,7 +9,8 @@ use crate::{
         IndexerMode, IndexerState,
     },
     store::IndexerStore,
-    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
+    PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
 };
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -63,6 +64,9 @@ pub struct ServerArgs {
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
+    /// Threshold for updating the canonical tip/ledger
+    #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
+    canonical_update_threshold: u32,
 }
 
 pub struct IndexerConfiguration {
@@ -77,6 +81,7 @@ pub struct IndexerConfiguration {
     log_level_stdout: LevelFilter,
     ignore_db: bool,
     prune_interval: u32,
+    canonical_update_threshold: u32,
 }
 
 #[instrument(skip_all)]
@@ -94,6 +99,13 @@ pub async fn handle_command_line_arguments(
     let log_level_stdout = args.log_level_stdout;
     let ignore_db = args.ignore_db;
     let prune_interval = args.prune_interval;
+    let canonical_update_threshold = args.canonical_update_threshold;
+
+    assert!(
+        // bad things happen if this condition fails
+        canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
+        "canonical update threshold must be strictly less than the transition frontier length!"
+    );
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
     create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
@@ -135,6 +147,7 @@ pub async fn handle_command_line_arguments(
                 log_level_stdout,
                 ignore_db,
                 prune_interval,
+                canonical_update_threshold,
             })
         }
     }
@@ -160,6 +173,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         log_level_stdout,
         ignore_db,
         prune_interval,
+        canonical_update_threshold,
     } = handle_command_line_arguments(args).await?;
 
     // setup tracing
@@ -191,8 +205,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             root_hash.clone(),
             genesis_ledger.ledger,
             Some(&database_dir),
-            Some(MAINNET_TRANSITION_FRONTIER_K),
-            Some(prune_interval),
+            MAINNET_TRANSITION_FRONTIER_K,
+            prune_interval,
+            canonical_update_threshold,
         )?
     } else {
         info!("Restoring from db in {}", database_dir.display());

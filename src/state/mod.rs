@@ -12,7 +12,8 @@ use crate::{
         },
     },
     store::IndexerStore,
-    BLOCK_REPORTING_FREQ, LEDGER_UPDATE_FREQ, MAINNET_CANONICAL_THRESHOLD, PRUNE_INTERVAL_DEFAULT,
+    BLOCK_REPORTING_FREQ, CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD,
+    MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
@@ -46,11 +47,11 @@ pub struct IndexerState {
     /// Block database
     pub indexer_store: Option<IndexerStore>,
     /// Threshold amount of confirmations to trigger a pruning event
-    pub transition_frontier_length: Option<u32>,
+    pub transition_frontier_length: u32,
     /// Interval to the prune the root branch
-    pub prune_interval: Option<u32>,
-    /// How often to update the canonical ledger
-    pub ledger_update_freq: u32,
+    pub prune_interval: u32,
+    /// Threshold for updating the canonical tip and db ledger
+    pub canonical_update_threshold: u32,
     /// Number of blocks added to the state
     pub blocks_processed: u32,
     /// Time the indexer started running
@@ -104,13 +105,15 @@ pub enum Canonicity {
 }
 
 impl IndexerState {
+    /// Creates a new indexer state from the genesis ledger
     pub fn new(
         mode: IndexerMode,
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         rocksdb_path: Option<&Path>,
-        transition_frontier_length: Option<u32>,
-        prune_interval: Option<u32>,
+        transition_frontier_length: u32,
+        prune_interval: u32,
+        canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash.clone());
         let indexer_store = rocksdb_path.map(|path| {
@@ -136,22 +139,24 @@ impl IndexerState {
             indexer_store,
             transition_frontier_length,
             prune_interval,
-            ledger_update_freq: LEDGER_UPDATE_FREQ,
+            canonical_update_threshold,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
         })
     }
 
-    /// Start a new indexer state from a canonical ledger
+    #[allow(clippy::too_many_arguments)]
+    /// Creates a new indexer state from a "canonical" ledger
     pub fn new_non_genesis(
         mode: IndexerMode,
         root_hash: BlockHash,
         ledger: Ledger,
         blockchain_length: Option<u32>,
         rocksdb_path: Option<&Path>,
-        transition_frontier_length: Option<u32>,
-        prune_interval: Option<u32>,
+        transition_frontier_length: u32,
+        prune_interval: u32,
+        canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_non_genesis(root_hash.clone(), blockchain_length);
         let indexer_store = rocksdb_path.map(|path| {
@@ -177,13 +182,14 @@ impl IndexerState {
             indexer_store,
             transition_frontier_length,
             prune_interval,
-            ledger_update_freq: LEDGER_UPDATE_FREQ,
+            canonical_update_threshold,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
         })
     }
 
+    /// Creates a new indexer state for testing
     pub fn new_testing(
         root_block: &PrecomputedBlock,
         root_ledger: Option<Ledger>,
@@ -214,42 +220,45 @@ impl IndexerState {
             root_branch,
             dangling_branches: Vec::new(),
             indexer_store,
-            transition_frontier_length,
-            prune_interval: None,
-            ledger_update_freq: LEDGER_UPDATE_FREQ,
+            transition_frontier_length: transition_frontier_length
+                .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
+            prune_interval: PRUNE_INTERVAL_DEFAULT,
+            canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
         })
     }
 
+    /// Creates a new indexer state from a db instance
     pub fn new_from_db(path: &Path) -> anyhow::Result<Self> {
         let msg = format!("Restore from {}", path.display());
         todo!("{msg}")
     }
 
+    /// Removes the lower portion of the root tree which is no longer needed
     fn prune_root_branch(&mut self) {
-        if let Some(k) = self.transition_frontier_length {
-            let interval = self.prune_interval.unwrap_or(PRUNE_INTERVAL_DEFAULT);
-            let best_tip_block = self.best_tip_block().clone();
+        let k = self.transition_frontier_length;
+        let best_tip_block = self.best_tip_block().clone();
 
-            if self.root_branch.height() as u32 > interval * k {
-                debug!(
-                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
-                    k,
-                    self.best_tip_block().blockchain_length.unwrap_or(0),
-                    self.canonical_tip_block().blockchain_length.unwrap_or(0),
-                );
-                self.root_branch
-                    .prune_transition_frontier(k, &best_tip_block);
-            }
+        if self.root_branch.height() as u32 > self.prune_interval * k {
+            debug!(
+                "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
+                k,
+                self.best_tip_block().blockchain_length.unwrap_or(0),
+                self.canonical_tip_block().blockchain_length.unwrap_or(0),
+            );
+            self.root_branch
+                .prune_transition_frontier(k, &best_tip_block);
         }
     }
 
+    /// The highest known canonical block
     pub fn canonical_tip_block(&self) -> &Block {
         self.get_block_from_id(&self.canonical_tip.node_id)
     }
 
+    /// The highest block known to be a descendant of the original root block
     pub fn best_tip_block(&self) -> &Block {
         self.get_block_from_id(&self.best_tip.node_id)
     }
@@ -259,9 +268,10 @@ impl IndexerState {
         self.root_branch.branches.get(node_id).unwrap().data()
     }
 
+    /// Updates the canonical tip if the precondition is met
     fn update_canonical(&mut self) {
         if self.best_tip_block().height - self.canonical_tip_block().height
-            > MAINNET_CANONICAL_THRESHOLD
+            > self.canonical_update_threshold
         {
             let mut canonical_hashes = vec![];
             let old_canonical_tip_id = self.canonical_tip.node_id.clone();
@@ -293,22 +303,23 @@ impl IndexerState {
             canonical_hashes.reverse();
 
             // update canonical ledger
-            if self.best_tip_block().height % self.ledger_update_freq == 0 {
-                if let Some(indexer_store) = &self.indexer_store {
-                    let mut ledger = indexer_store.get_ledger(&old_canonical_tip_hash).unwrap();
+            if let Some(indexer_store) = &self.indexer_store {
+                let mut ledger = indexer_store
+                    .get_ledger(&old_canonical_tip_hash)
+                    .unwrap()
+                    .unwrap();
 
-                    // apply the new canonical diffs to the old canonical ledger
-                    for canonical_hash in &canonical_hashes {
-                        if let Some(diff) = self.diffs_map.get(canonical_hash) {
-                            ledger.as_mut().unwrap().apply_diff(diff).unwrap();
-                        }
+                // apply the new canonical diffs to the old canonical ledger
+                for canonical_hash in &canonical_hashes {
+                    if let Some(diff) = self.diffs_map.get(canonical_hash) {
+                        ledger.apply_diff(diff).unwrap();
                     }
-
-                    // update the ledger
-                    indexer_store
-                        .add_ledger(&self.canonical_tip_block().state_hash, ledger.unwrap())
-                        .unwrap();
                 }
+
+                // update the ledger
+                indexer_store
+                    .add_ledger(&self.canonical_tip_block().state_hash, ledger)
+                    .unwrap();
             }
 
             // update canonicity store
@@ -380,6 +391,15 @@ impl IndexerState {
             return Ok(ExtensionType::BlockNotAdded);
         }
 
+        let incoming_length = precomputed_block.blockchain_length.unwrap_or(u32::MAX);
+        if self.root_branch.root_block().blockchain_length.unwrap_or(0) > incoming_length {
+            debug!(
+                "Block with state hash {:?} has length {incoming_length} which is too low to add to the witness tree",
+                precomputed_block.state_hash,
+            );
+            return Ok(ExtensionType::BlockNotAdded);
+        }
+
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
         }
@@ -412,6 +432,7 @@ impl IndexerState {
         self.new_dangling(precomputed_block)
     }
 
+    /// Extends the root branch forward, potentially causing dangling branches to be merged into it
     fn root_extension(
         &mut self,
         precomputed_block: &PrecomputedBlock,
@@ -464,6 +485,7 @@ impl IndexerState {
         }
     }
 
+    /// Extends an existing dangling branch either forwards or backwards
     fn dangling_extension(
         &mut self,
         precomputed_block: &PrecomputedBlock,
@@ -537,6 +559,7 @@ impl IndexerState {
         Ok(extension)
     }
 
+    /// Updates an existing dangling branch in the witness tree
     fn update_dangling(
         &mut self,
         precomputed_block: &PrecomputedBlock,
@@ -576,6 +599,7 @@ impl IndexerState {
         }
     }
 
+    /// Spawns a new dangling branch in the witness tree
     fn new_dangling(
         &mut self,
         precomputed_block: &PrecomputedBlock,
@@ -586,6 +610,7 @@ impl IndexerState {
         Ok(ExtensionType::DanglingNew)
     }
 
+    /// Checks if it's even possible to add block to the root branch
     fn is_length_within_root_bounds(&self, precomputed_block: &PrecomputedBlock) -> bool {
         (precomputed_block.blockchain_length.is_some()
             && self.best_tip_block().blockchain_length.unwrap_or(0) + 1
@@ -604,6 +629,7 @@ impl IndexerState {
         }
     }
 
+    /// Update the best tip of the root branch
     fn update_best_tip(&mut self, incoming_block: &Block, node_id: &NodeId) {
         if let Some(incoming_length) = incoming_block.blockchain_length {
             let best_tip_length = self.best_tip_block().blockchain_length.unwrap_or(0);
@@ -636,13 +662,11 @@ impl IndexerState {
     }
 
     pub fn get_block_status(&self, state_hash: &BlockHash) -> Option<Canonicity> {
-        // check diffs map
-        if self.diffs_map.get(state_hash).is_some() {
-            return Some(Canonicity::Pending);
-        }
-
+        // first check the db, then diffs map
         if let Some(indexer_store) = &self.indexer_store {
             return indexer_store.get_canonicity(state_hash).unwrap();
+        } else if self.diffs_map.get(state_hash).is_some() {
+            return Some(Canonicity::Pending);
         }
 
         None
@@ -659,18 +683,21 @@ impl IndexerState {
     }
 }
 
+/// Checks if the block is the parent of the branch's root
 fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
     precomputed_block.state_hash == branch.root_block().parent_hash.0
 }
 
+/// Errors if the blocks is added a second time
 fn same_block_added_twice(
     branch: &Branch,
     precomputed_block: &PrecomputedBlock,
 ) -> anyhow::Result<()> {
     if precomputed_block.state_hash == branch.root_block().state_hash.0 {
-        return Err(anyhow::Error::msg(
-            "Same block added twice to the indexer state",
-        ));
+        return Err(anyhow::Error::msg(format!(
+            "Block with hash {:?} added twice to the indexer state",
+            precomputed_block.state_hash,
+        )));
     }
     Ok(())
 }
