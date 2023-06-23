@@ -142,17 +142,17 @@ async fn extension() {
     assert_eq!(state.root_branch.clone().leaves().len(), 1);
 
     // after extension quantities
-    let root = &state.root_branch.clone().root;
-    let branches = &state.root_branch.clone().branches;
-    let branch_root = &branches
+    let root_branch = state.root_branch;
+    let root = root_branch.root_block();
+    let branches = root_branch.clone().branches;
+    let branch_root = branches
         .get(&branches.root_node_id().unwrap())
         .unwrap()
         .data();
-    let root_branch = state.root_branch;
     let leaves: Vec<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
 
     assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);
 
     // branch root should match the tree's root
-    assert_eq!(&root, branch_root);
+    assert_eq!(root, branch_root);
 }

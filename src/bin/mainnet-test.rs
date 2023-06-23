@@ -3,23 +3,32 @@ use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     state::{ledger::genesis, IndexerMode, IndexerState},
-    MAINNET_TRANSITION_FRONTIER_K,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use std::path::PathBuf;
-use tokio::time::{Duration, Instant};
+use std::{path::PathBuf, thread};
+use tokio::{
+    process,
+    time::{Duration, Instant},
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Blocks directory path
-    #[arg(short, long)]
+    /// Startup blocks directory path
+    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/startup-blocks"))]
     blocks_dir: PathBuf,
+    /// Watch blocks directory path
+    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/watch-blocks"))]
+    watch_dir: PathBuf,
     /// Max number of blocks to parse
     #[arg(short, long, default_value_t = 10_000)]
     max_block_count: u32,
     /// Report frequency (number of blocks)
     #[arg(short, long, default_value_t = 5000)]
     report_freq: u32,
+    /// Watch duration (sec)
+    #[arg(short, long, default_value_t = 600)]
+    duration: u64,
     /// To keep the db or not, that is the question
     #[arg(short, long, default_value_t = false)]
     persist_db: bool,
@@ -32,10 +41,12 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
+    let watch_dir = args.watch_dir;
     let freq = args.report_freq;
+    let duration = args.duration;
     let mode = args.mode;
     let verbose = args.verbose;
     let max_block_count = args.max_block_count;
@@ -61,8 +72,9 @@ async fn main() {
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
         Some(&PathBuf::from(store_dir)),
-        Some(MAINNET_TRANSITION_FRONTIER_K),
-        None,
+        MAINNET_TRANSITION_FRONTIER_K,
+        PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD,
     )
     .unwrap();
 
@@ -232,7 +244,40 @@ async fn main() {
     );
     println!("{}", state.indexer_store.as_ref().unwrap().db_stats());
 
+    println!("Initial ingestion complete!");
+    println!("Watching {} now", watch_dir.display());
+
+    let mut next_length = state.best_tip_block().blockchain_length.unwrap() + 1;
+    let watch_duration = Duration::new(duration, 0);
+    let watch_time = Instant::now();
+
+    // get next blocks in a loop via gsutil
+    loop {
+        if watch_time.elapsed() >= watch_duration {
+            break;
+        }
+
+        let mut command = process::Command::new("gsutil");
+        command.arg("-m");
+        command.arg("cp");
+        command.arg("-n");
+        command.arg(&format!(
+            "gs://mina_network_block_data/mainnet-{next_length}-*.json"
+        ));
+        command.arg(&watch_dir.display().to_string());
+
+        let mut cmd = command.spawn()?;
+        if let Ok(exit_status) = cmd.wait().await {
+            if exit_status.success() {
+                next_length += 1;
+            }
+        }
+        thread::sleep(Duration::new(180, 0));
+    }
+
     if !args.persist_db {
         tokio::fs::remove_dir_all(store_dir).await.unwrap();
     }
+
+    Ok(())
 }

@@ -64,7 +64,7 @@ async fn extension() {
     println!("=== Before Root Branch ===");
     println!("{:?}", state.root_branch.branches);
 
-    let before_root = state.root_branch.root.clone();
+    let before_root = state.root_branch.root_block().clone();
 
     // root branch
     // - len = 2
@@ -104,14 +104,14 @@ async fn extension() {
     assert_eq!(state.dangling_branches.len(), 0);
 
     // after extension quantities
-    let after_root = &state.root_branch.root;
+    let after_root = state.root_branch.root_block().clone();
     let branches1 = &state.root_branch.branches;
     let leaves1 = state.root_branch.leaves();
     let after_root_id = branches1.root_node_id().unwrap();
 
     // branch root should match the tree's root
     assert_eq!(
-        after_root,
+        &after_root,
         state
             .root_branch
             .branches
@@ -158,12 +158,12 @@ async fn extension() {
     );
 
     // root doesn't change
-    assert_eq!(&before_root, after_root);
+    assert_eq!(before_root, after_root);
 
     // after root isn't a leaf
     assert!(!leaves1
         .iter()
         .map(|x| x.clone())
         .collect::<Vec<Block>>()
-        .contains(after_root));
+        .contains(&after_root));
 }

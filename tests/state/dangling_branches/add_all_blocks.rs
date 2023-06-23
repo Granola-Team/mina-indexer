@@ -14,10 +14,13 @@ async fn extension() {
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {
         let mut state = IndexerState::new_testing(&precomputed_block, None, None, None).unwrap();
         n += 1;
+
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
             state.add_block(&precomputed_block, false).unwrap();
             n += 1;
         }
+
+        println!("{state:?}");
 
         // All 24 blocks are parsed successfully
         println!("Blocks added: {n}");
@@ -28,11 +31,12 @@ async fn extension() {
         // - ??? leaves
         assert_eq!(state.dangling_branches.clone().len(), 2);
 
-        // 2 dangling branch
+        // 2 dangling branches
         // - 1: height = 1
         // - 2: height = 1
         // - 1 leaf
         assert_eq!(state.dangling_branches.clone().len(), 2);
+
         state
             .dangling_branches
             .iter()
@@ -40,6 +44,7 @@ async fn extension() {
             .for_each(|(_, tree)| {
                 assert_eq!(tree.height(), 1);
             });
+
         state
             .dangling_branches
             .iter()
@@ -50,20 +55,12 @@ async fn extension() {
 
         // root branch
         println!("=== Root Branch ===");
-        let mut tree = String::new();
-        state
-            .root_branch
-            .branches
-            .write_formatted(&mut tree)
-            .unwrap();
-        println!("{tree}");
+        println!("{:?}", state.root_branch);
 
         // dangling branches
         for (n, branch) in state.dangling_branches.iter().enumerate() {
             println!("=== Dangling Branch {n} ===");
-            let mut tree = String::new();
-            branch.branches.write_formatted(&mut tree).unwrap();
-            println!("{tree}");
+            println!("{branch:?}");
         }
 
         // check all children.height = 1 + parent.height

@@ -20,6 +20,13 @@ pub struct Block {
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct BlockWithoutHeight {
+    pub parent_hash: BlockHash,
+    pub state_hash: BlockHash,
+    pub blockchain_length: Option<u32>,
+}
+
+#[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BlockHash(pub String);
 
 impl BlockHash {
@@ -62,6 +69,29 @@ impl Block {
     }
 }
 
+impl From<Block> for BlockWithoutHeight {
+    fn from(value: Block) -> Self {
+        Self {
+            parent_hash: value.parent_hash.clone(),
+            state_hash: value.state_hash.clone(),
+            blockchain_length: value.blockchain_length,
+        }
+    }
+}
+
+impl BlockWithoutHeight {
+    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
+        let parent_hash =
+            BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
+        let state_hash = BlockHash(precomputed_block.state_hash.clone());
+        Self {
+            parent_hash,
+            state_hash,
+            blockchain_length: precomputed_block.blockchain_length,
+        }
+    }
+}
+
 impl std::cmp::PartialOrd for Block {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.state_hash == other.state_hash {
@@ -88,6 +118,18 @@ impl std::fmt::Debug for Block {
             f,
             "Block {{ height: {}, len: {}, state: {}, parent: {} }}",
             self.height,
+            self.blockchain_length.unwrap_or(0),
+            &self.state_hash.0[0..12],
+            &self.parent_hash.0[0..12]
+        )
+    }
+}
+
+impl std::fmt::Debug for BlockWithoutHeight {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Block {{ len: {}, state: {}, parent: {} }}",
             self.blockchain_length.unwrap_or(0),
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12]

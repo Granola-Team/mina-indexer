@@ -3,7 +3,7 @@ use crate::{
         get_blockchain_length, get_state_hash, is_valid_block_file,
         precomputed::{BlockLogContents, PrecomputedBlock},
     },
-    BLOCK_REPORTING_FREQ, MAINNET_CANONICAL_THRESHOLD,
+    BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
 };
 use glob::glob;
 use std::{
@@ -26,6 +26,8 @@ pub enum SearchRecursion {
 ///
 /// Traverses canoncial paths first, then successive
 pub struct BlockParser {
+    pub num_canonical: u32,
+    pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
     pub recursion: SearchRecursion,
     canonical_paths: IntoIter<PathBuf>,
@@ -50,6 +52,8 @@ impl BlockParser {
                 .collect();
 
             Ok(Self {
+                num_canonical: 0,
+                total_num_blocks: paths.len() as u32,
                 blocks_dir,
                 recursion: SearchRecursion::None,
                 canonical_paths: vec![].into_iter(),
@@ -127,6 +131,8 @@ impl BlockParser {
                 if check.is_none() {
                     info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
                     return Ok(Self {
+                        num_canonical: 0,
+                        total_num_blocks: paths.len() as u32,
                         blocks_dir,
                         recursion,
                         canonical_paths: vec![].into_iter(),
@@ -174,18 +180,18 @@ impl BlockParser {
 
                 // curr_path represents a canonical block
                 info!(
-                    "Found the canonical tip {} in {:?}",
-                    curr_path.display(),
+                    "Found canonical tip {} in {:?}",
+                    curr_path.file_name().unwrap().to_str().unwrap(),
                     time.elapsed()
                 );
 
                 canonical_paths.push(curr_path.clone());
-                info!("Walking the canonical chain back to the beginning, Will report every {BLOCK_REPORTING_FREQ} blocks found.", );
+                info!("Walking the canonical chain back to the beginning, reporting every {BLOCK_REPORTING_FREQ_NUM} blocks.", );
 
                 let time = Instant::now();
                 let mut count = 1;
                 while curr_start_idx > 0 {
-                    if count % BLOCK_REPORTING_FREQ == 0 {
+                    if count % BLOCK_REPORTING_FREQ_NUM == 0 {
                         info!("Found {count} canonical blocks in {:?}", time.elapsed());
                     }
 
@@ -236,11 +242,9 @@ impl BlockParser {
                 }
             }
 
-            info!(
-                "Indexer state initializing from {} blocks",
-                canonical_paths.len() + successive_paths.len()
-            );
             Ok(Self {
+                num_canonical: canonical_paths.len() as u32,
+                total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,
                 blocks_dir,
                 recursion,
                 canonical_paths: canonical_paths.into_iter(),

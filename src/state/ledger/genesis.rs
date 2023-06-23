@@ -1,17 +1,16 @@
-use std::{collections::HashMap, error::Error, path::Path};
-
+use super::{
+    account::{Account, Amount, Nonce},
+    Ledger,
+};
 use mina_serialization_types::{
     signatures::{CompressedCurvePoint, PublicKeyJson},
     v1::PublicKeyV1,
 };
 use mina_signer::CompressedPubKey;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, error::Error, path::Path};
 use tokio::io::AsyncReadExt;
-
-use super::{
-    account::{Account, Amount, Nonce},
-    Ledger,
-};
+use tracing::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
@@ -53,6 +52,12 @@ pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Err
     Ok(pk.into())
 }
 
+impl From<GenesisRoot> for Ledger {
+    fn from(value: GenesisRoot) -> Self {
+        value.ledger.into()
+    }
+}
+
 impl From<GenesisLedger> for Ledger {
     fn from(genesis_ledger: GenesisLedger) -> Ledger {
         let mut accounts = HashMap::new();
@@ -65,7 +70,7 @@ impl From<GenesisLedger> for Ledger {
             if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW"
                 || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1"
             {
-                println!(
+                debug!(
                     "Known broken public keys... Ignoring {}",
                     genesis_account.pk
                 );
