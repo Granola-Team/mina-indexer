@@ -224,7 +224,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             .initialize_with_contiguous_canonical(&mut block_parser)
             .await?;
     } else {
-        indexer_state.add_blocks(&mut block_parser).await?;
+        indexer_state
+            .initialize_without_contiguous_canonical(&mut block_parser)
+            .await?;
     }
 
     let mut block_receiver = BlockReceiver::new().await?;

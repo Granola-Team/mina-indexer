@@ -359,7 +359,7 @@ impl IndexerState {
         }
     }
 
-    /// Initializing from contiguous canonical blocks
+    /// Initialize indexer state from a collection of contiguous canonical blocks
     pub async fn initialize_with_contiguous_canonical(
         &mut self,
         block_parser: &mut BlockParser,
@@ -421,18 +421,34 @@ impl IndexerState {
         }
 
         // now add the successive non-canoical blocks
-        self.add_blocks(block_parser).await
+        self.add_blocks(block_parser, block_count).await
+    }
+
+    /// Initialize indexer state without contiguous canonical blocks
+    pub async fn initialize_without_contiguous_canonical(
+        &mut self,
+        block_parser: &mut BlockParser,
+    ) -> anyhow::Result<()> {
+        self.add_blocks(block_parser, 0).await
     }
 
     /// Adds blocks to the state according to block_parser then changes phase to Watching
     ///
     /// Returns the number of blocks parsed
-    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        let mut block_count = 0;
+    pub async fn add_blocks(
+        &mut self,
+        block_parser: &mut BlockParser,
+        blocks_processed: u32,
+    ) -> anyhow::Result<()> {
+        let mut block_count = blocks_processed;
         let total_time = Instant::now();
         let mut step_time = total_time;
 
-        info!("Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks");
+        if blocks_processed == 0 {
+            info!(
+                "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
+            );
+        }
         while let Some(block) = block_parser.next().await? {
             if should_report_from_block_count(block_count)
                 || self.should_report_from_time(step_time.elapsed())
