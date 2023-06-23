@@ -277,6 +277,7 @@ impl IndexerState {
         // iterate over the db blocks, starting at the root, adding them to the state with add_block(..., false)
 
         // find the best tip
+        debug!("finding best tip in the provided database");
         let mut best_tip_length = u32::MIN;
         let mut best_tip_state_hash = BlockHash::from_bytes([0; 32]);
         for entry in db.iterator() {
@@ -292,6 +293,7 @@ impl IndexerState {
         }
 
         // track the best tip's parent hash back 290 blocks
+        debug!("finding the transition frontier of the best tip");
         let mut root_state_hash = best_tip_state_hash.clone();
         for _i in 0..290 {
             match db.get_block(&root_state_hash) {
@@ -314,6 +316,7 @@ impl IndexerState {
 
         // add all blocks with chain length longer than the root to the indexer state
         // QUESTION what do we do about blocks with blockchain_length == None
+        debug!("adding all blocks with chain length higher than computed root"); 
         let root_precomputed = db
             .get_block(&root_state_hash)?
             .expect("state hash from database, exists");
