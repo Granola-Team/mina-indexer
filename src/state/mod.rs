@@ -3,7 +3,7 @@ use self::summary::{
 };
 use crate::{
     block::{
-        parser::BlockParser, precomputed::{PrecomputedBlock}, store::BlockStore, Block, BlockHash,
+        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
         BlockWithoutHeight,
     },
     state::{
@@ -19,10 +19,11 @@ use crate::{
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     path::Path,
     str::FromStr,
-    time::{Duration, Instant}, borrow::Borrow,
+    time::{Duration, Instant},
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, info, instrument, warn};
@@ -236,8 +237,13 @@ impl IndexerState {
         })
     }
 
-    pub fn new_with_db(root_block: Block, transition_frontier_length: Option<u32>, store: IndexerStore) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length);
+    pub fn new_with_db(
+        root_block: Block,
+        transition_frontier_length: Option<u32>,
+        store: IndexerStore,
+    ) -> anyhow::Result<Self> {
+        let root_branch =
+            Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length);
         let tip = Tip {
             state_hash: root_block.state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -258,26 +264,25 @@ impl IndexerState {
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 0,
             time: Instant::now(),
-            date_time: OffsetDateTime::now_utc()
+            date_time: OffsetDateTime::now_utc(),
         })
     }
 
     #[instrument]
-    pub fn restore_from_db(
-        db: IndexerStore, 
-    ) -> anyhow::Result<Self> {
+    pub fn restore_from_db(db: IndexerStore) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
         // Q: How to compute ledger? Should we require it to do quick sync?
         // iterate over the db blocks, starting at the root, adding them to the state with add_block(..., false)
-        
+
         // find the best tip
         let mut best_tip_length = u32::MIN;
         let mut best_tip_state_hash = BlockHash::from_bytes([0; 32]);
         for entry in db.iterator() {
             let (state_hash_bytes, precomputed_block_bytes) = entry?;
-            let precomputed_block = bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
+            let precomputed_block =
+                bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
             if let Some(length) = precomputed_block.blockchain_length {
                 if length > best_tip_length {
                     best_tip_length = length;
@@ -285,38 +290,48 @@ impl IndexerState {
                 }
             }
         }
-        
+
         // track the best tip's parent hash back 290 blocks
         let mut root_state_hash = best_tip_state_hash.clone();
         for _i in 0..290 {
             match db.get_block(&root_state_hash) {
                 Ok(parent_block) => {
                     if let Some(precomputed_block) = parent_block {
-                        root_state_hash = BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash);
+                        root_state_hash = BlockHash::from_hashv1(
+                            precomputed_block.protocol_state.previous_state_hash,
+                        );
                     } else {
                         warn!("parent block is not in the block store");
                         break;
                     }
-                },
+                }
                 Err(_) => {
                     warn!("database does not have a full transition frontier");
-                    break
-                },
+                    break;
+                }
             }
         }
 
         // add all blocks with chain length longer than the root to the indexer state
         // QUESTION what do we do about blocks with blockchain_length == None
-        let root_precomputed = db.get_block(&root_state_hash)?.expect("state hash from database, exists");
+        let root_precomputed = db
+            .get_block(&root_state_hash)?
+            .expect("state hash from database, exists");
         let mut state = IndexerState::new_with_db(
-            Block::from_precomputed(&root_precomputed, 0), 
+            Block::from_precomputed(&root_precomputed, 0),
             Some(MAINNET_TRANSITION_FRONTIER_K),
-            db
+            db,
         )?;
         let mut blocks_to_add = Vec::new();
-        for entry in state.indexer_store.as_ref().expect("guaranteed by above call").iterator() {
-            let (_state_hash_bytes, precomputed_block_bytes) = entry?; 
-            let precomputed_block = bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
+        for entry in state
+            .indexer_store
+            .as_ref()
+            .expect("guaranteed by above call")
+            .iterator()
+        {
+            let (_state_hash_bytes, precomputed_block_bytes) = entry?;
+            let precomputed_block =
+                bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
             if let Some(length) = precomputed_block.blockchain_length {
                 if length > root_precomputed.blockchain_length.expect("already checked") {
                     blocks_to_add.push(precomputed_block);
