@@ -52,6 +52,12 @@ pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Err
     Ok(pk.into())
 }
 
+impl From<GenesisRoot> for Ledger {
+    fn from(value: GenesisRoot) -> Self {
+        value.ledger.into()
+    }
+}
+
 impl From<GenesisLedger> for Ledger {
     fn from(genesis_ledger: GenesisLedger) -> Ledger {
         let mut accounts = HashMap::new();
