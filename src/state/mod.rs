@@ -152,19 +152,24 @@ impl IndexerState {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     /// Creates a new indexer state from a "canonical" ledger
+    #[allow(clippy::too_many_arguments)]
     pub fn new_non_genesis(
         mode: IndexerMode,
         root_hash: BlockHash,
         ledger: Ledger,
         blockchain_length: Option<u32>,
+        global_slot_since_genesis: u32,
         rocksdb_path: Option<&Path>,
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(root_hash.clone(), blockchain_length);
+        let root_branch = Branch::new_non_genesis(
+            root_hash.clone(),
+            blockchain_length,
+            global_slot_since_genesis,
+        );
         let indexer_store = rocksdb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
             store

@@ -17,6 +17,7 @@ pub struct Block {
     pub state_hash: BlockHash,
     pub height: u32,
     pub blockchain_length: Option<u32>,
+    pub global_slot_since_genesis: u32,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -24,6 +25,7 @@ pub struct BlockWithoutHeight {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
     pub blockchain_length: Option<u32>,
+    pub global_slot_since_genesis: u32,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -55,6 +57,17 @@ impl Block {
             parent_hash,
             state_hash,
             height,
+            global_slot_since_genesis: precomputed_block
+                .protocol_state
+                .body
+                .t
+                .t
+                .consensus_state
+                .t
+                .t
+                .global_slot_since_genesis
+                .t
+                .t,
             blockchain_length: precomputed_block.blockchain_length,
         }
     }
@@ -74,6 +87,7 @@ impl From<Block> for BlockWithoutHeight {
         Self {
             parent_hash: value.parent_hash.clone(),
             state_hash: value.state_hash.clone(),
+            global_slot_since_genesis: value.global_slot_since_genesis,
             blockchain_length: value.blockchain_length,
         }
     }
@@ -87,6 +101,17 @@ impl BlockWithoutHeight {
         Self {
             parent_hash,
             state_hash,
+            global_slot_since_genesis: precomputed_block
+                .protocol_state
+                .body
+                .t
+                .t
+                .consensus_state
+                .t
+                .t
+                .global_slot_since_genesis
+                .t
+                .t,
             blockchain_length: precomputed_block.blockchain_length,
         }
     }
@@ -116,9 +141,10 @@ impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Block {{ height: {}, len: {}, state: {}, parent: {} }}",
+            "Block {{ height: {}, len: {}, slot: {}, state: {}, parent: {} }}",
             self.height,
             self.blockchain_length.unwrap_or(0),
+            self.global_slot_since_genesis,
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12]
         )
@@ -129,8 +155,9 @@ impl std::fmt::Debug for BlockWithoutHeight {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Block {{ len: {}, state: {}, parent: {} }}",
+            "Block {{ len: {}, slot: {}, state: {}, parent: {} }}",
             self.blockchain_length.unwrap_or(0),
+            self.global_slot_since_genesis,
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12]
         )

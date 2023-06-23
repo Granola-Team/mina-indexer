@@ -135,4 +135,17 @@ impl PrecomputedBlock {
 
         public_keys
     }
+
+    pub fn global_slot_since_genesis(&self) -> u32 {
+        self.protocol_state
+            .body
+            .t
+            .t
+            .consensus_state
+            .t
+            .t
+            .global_slot_since_genesis
+            .t
+            .t
+    }
 }
