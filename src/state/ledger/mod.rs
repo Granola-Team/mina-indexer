@@ -33,6 +33,11 @@ pub struct Ledger {
     pub accounts: HashMap<PublicKey, Account>,
 }
 
+#[derive(Default, Clone, Serialize, Deserialize)]
+pub struct NonGenesisLedger {
+    pub ledger: Ledger,
+}
+
 impl Ledger {
     pub fn new() -> Self {
         Ledger {

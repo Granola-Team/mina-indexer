@@ -15,6 +15,7 @@ use crate::{
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
+use log::trace;
 use std::{path::PathBuf, process};
 use tokio::fs::{self, create_dir_all, metadata};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
@@ -24,10 +25,13 @@ use uuid::Uuid;
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to genesis ledger
+    /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
     #[arg(short, long)]
-    genesis_ledger: PathBuf,
-    /// Hash of startup ledger
+    ledger: PathBuf,
+    /// Use a non-genesis ledger
+    #[arg(short, long, default_value_t = false)]
+    non_genesis_ledger: bool,
+    /// Hash of the base ledger
     #[arg(
         long,
         default_value = MAINNET_GENESIS_HASH
@@ -43,7 +47,7 @@ pub struct ServerArgs {
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     database_dir: PathBuf,
     /// Path to directory for logs
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
+    #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     log_dir: PathBuf,
     /// Only store canonical blocks in the db
     #[arg(short, long, default_value_t = false)]
@@ -66,7 +70,8 @@ pub struct ServerArgs {
 }
 
 pub struct IndexerConfiguration {
-    genesis_ledger: GenesisRoot,
+    ledger: GenesisRoot,
+    non_genesis_ledger: bool,
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
@@ -84,7 +89,9 @@ pub struct IndexerConfiguration {
 pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
-    debug!("Parsing server args");
+    trace!("Parsing server args");
+
+    let non_genesis_ledger = args.non_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
@@ -106,25 +113,22 @@ pub async fn handle_command_line_arguments(
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
     create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
 
-    info!(
-        "Parsing genesis ledger file at {}",
-        args.genesis_ledger.display()
-    );
+    info!("Parsing genesis ledger file at {}", args.ledger.display());
 
-    match ledger::genesis::parse_file(&args.genesis_ledger).await {
+    match ledger::genesis::parse_file(&args.ledger).await {
         Err(err) => {
             error!(
                 reason = "Unable to parse genesis ledger",
                 error = err.to_string(),
-                path = &args.genesis_ledger.display().to_string()
+                path = &args.ledger.display().to_string()
             );
             process::exit(100)
         }
-        Ok(genesis_ledger) => {
+        Ok(ledger) => {
             info!("Genesis ledger parsed successfully!");
 
             let mut log_number = 0;
-            let mut log_fname = format!("{}/mina-indexer-0.log", log_dir.display());
+            let mut log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
 
             while tokio::fs::metadata(&log_fname).await.is_ok() {
                 log_number += 1;
@@ -132,7 +136,8 @@ pub async fn handle_command_line_arguments(
             }
 
             Ok(IndexerConfiguration {
-                genesis_ledger,
+                ledger,
+                non_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
@@ -158,7 +163,8 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
 
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
-        genesis_ledger,
+        ledger,
+        non_genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir,
@@ -199,25 +205,29 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         IndexerState::new(
             mode,
             root_hash.clone(),
-            genesis_ledger.ledger,
+            ledger.ledger,
             Some(&database_dir),
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
         )?
     } else {
-        info!("Restoring from db in {}", database_dir.display());
         // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
         // if no db or it doesn't have blocks, use the startup_dir like usual
         IndexerState::new_from_db(&database_dir)?;
-        todo!()
+        todo!("Restoring from db in {}", database_dir.display());
     };
 
-    let init_dir = startup_dir.display().to_string();
-    info!("Ingesting precomputed blocks from {init_dir}");
-
     let mut block_parser = BlockParser::new(&startup_dir)?;
-    indexer_state.add_blocks(&mut block_parser).await?;
+    if ignore_db && !non_genesis_ledger {
+        indexer_state
+            .initialize_with_contiguous_canonical(&mut block_parser)
+            .await?;
+    } else {
+        indexer_state
+            .initialize_without_contiguous_canonical(&mut block_parser)
+            .await?;
+    }
 
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
