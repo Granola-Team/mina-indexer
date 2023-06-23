@@ -1,3 +1,6 @@
+use self::summary::{
+    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
+};
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
@@ -15,13 +18,14 @@ use crate::{
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path, str::FromStr, time::Instant};
+use std::{
+    collections::HashMap,
+    path::Path,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 use time::{OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, info};
-
-use self::summary::{
-    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
-};
 
 pub mod branch;
 pub mod ledger;
@@ -233,25 +237,24 @@ impl IndexerState {
     }
 
     /// Creates a new indexer state from a db instance
-    pub fn new_from_db(path: &Path) -> anyhow::Result<Self> {
-        let msg = format!("Restore from {}", path.display());
-        todo!("{msg}")
+    pub fn new_from_db(database_dir: &Path) -> anyhow::Result<Self> {
+        todo!("Restoring from db in {}", database_dir.display());
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
     fn prune_root_branch(&mut self) {
+        let k = self.transition_frontier_length;
         self.update_canonical();
 
-        let k = self.transition_frontier_length;
-        let best_tip_block = self.best_tip_block().clone();
-
         if self.root_branch.height() > self.prune_interval * k {
+            let best_tip_block = self.best_tip_block().clone();
             debug!(
                 "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
                 k,
                 self.best_tip_block().blockchain_length.unwrap_or(0),
                 self.canonical_tip_block().blockchain_length.unwrap_or(0),
             );
+
             self.root_branch
                 .prune_transition_frontier(k, &best_tip_block);
         }
@@ -356,38 +359,105 @@ impl IndexerState {
         }
     }
 
+    /// Initializing from contiguous canonical blocks
+    pub async fn initialize_with_contiguous_canonical(
+        &mut self,
+        block_parser: &mut BlockParser,
+    ) -> anyhow::Result<()> {
+        let mut block_count = 0;
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            let mut ledger = indexer_store
+                .get_ledger(&self.canonical_tip.state_hash)?
+                .unwrap();
+            let total_time = Instant::now();
+
+            info!("Reporting every {BLOCK_REPORTING_FREQ_NUM} blocks");
+            while block_count < block_parser.num_canonical {
+                block_count += 1;
+
+                if should_report_from_block_count(block_count) {
+                    let rate = block_count as f64 / total_time.elapsed().as_secs() as f64;
+
+                    info!(
+                        "{block_count} blocks parsed and applied in {:?}",
+                        total_time.elapsed()
+                    );
+                    info!(
+                        "Estimated time: {} min",
+                        (block_parser.total_num_blocks - block_count) as f64 / (rate * 60_f64)
+                    );
+                    debug!("Rate: {rate} blocks/s");
+                }
+
+                let precomputed_block = block_parser.next().await?.unwrap();
+                let diff = LedgerDiff::from_precomputed_block(&precomputed_block);
+
+                // apply and add to db
+                ledger.apply_diff(&diff)?;
+                indexer_store.add_block(&precomputed_block)?;
+
+                // TODO store ledger at specified cadence, e.g. at epoch boundaries
+                // for now, just store every 1000 blocks
+                if block_count % 1000 == 0 {
+                    indexer_store.add_ledger(
+                        &BlockHash(precomputed_block.state_hash.clone()),
+                        ledger.clone(),
+                    )?;
+                }
+
+                if block_count == block_parser.num_canonical {
+                    // update root branch
+                    self.root_branch = Branch::new(&precomputed_block)?;
+                    self.best_tip = Tip {
+                        state_hash: self.root_branch.root_block().state_hash.clone(),
+                        node_id: self.root_branch.root.clone(),
+                    };
+                    self.canonical_tip = self.best_tip.clone();
+                }
+            }
+
+            // store the most recent canonical ledger
+            indexer_store.add_ledger(&self.root_branch.root_block().state_hash, ledger.clone())?;
+        }
+
+        // now add the successive non-canoical blocks
+        self.add_blocks(block_parser).await
+    }
+
     /// Adds blocks to the state according to block_parser then changes phase to Watching
     ///
     /// Returns the number of blocks parsed
-    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<u32> {
+    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
         let mut block_count = 0;
         let total_time = Instant::now();
         let mut step_time = total_time;
 
-        info!(
-            "Will report every {}s or {BLOCK_REPORTING_FREQ_NUM} blocks",
-            BLOCK_REPORTING_FREQ_SEC
-        );
-
+        info!("Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks");
         while let Some(block) = block_parser.next().await? {
-            if block_count > 0 && block_count % BLOCK_REPORTING_FREQ_NUM == 0
-                || ((self.phase == IndexerPhase::InitializingFromBlockDir
-                    || self.phase == IndexerPhase::InitializingFromDB)
-                    && step_time.elapsed().as_secs() > 180)
+            if should_report_from_block_count(block_count)
+                || self.should_report_from_time(step_time.elapsed())
             {
                 step_time = Instant::now();
 
                 let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
                 let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
+                let rate = block_count as f64 / total_time.elapsed().as_secs() as f64;
 
                 info!(
                     "Parsed and added {block_count} blocks to the witness tree in {:?}",
                     total_time.elapsed()
                 );
-                debug!("Root branch height: {}", self.root_branch.height());
-                debug!("Root branch length: {}", self.root_branch.len());
-                info!("Current best tip: {best_tip:?}");
-                info!("Current canonical tip: {canonical_tip:?}");
+
+                debug!("Root height:       {}", self.root_branch.height());
+                debug!("Root length:       {}", self.root_branch.len());
+                debug!("Rate:              {rate} blocks/s");
+
+                info!(
+                    "Estimate rem time: {} hr",
+                    (block_parser.total_num_blocks - block_count) as f64 / (rate * 3600_f64)
+                );
+                info!("Best tip:          {best_tip:?}");
+                info!("Canonical tip:     {canonical_tip:?}");
             }
 
             self.add_block(&block)?;
@@ -401,7 +471,7 @@ impl IndexerState {
 
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
         self.phase = IndexerPhase::Watching;
-        Ok(block_count)
+        Ok(())
     }
 
     /// Adds the block to the witness tree and the precomputed block to the db
@@ -842,6 +912,15 @@ impl IndexerState {
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
+
+    fn is_initializing(&self) -> bool {
+        self.phase == IndexerPhase::InitializingFromBlockDir
+            || self.phase == IndexerPhase::InitializingFromDB
+    }
+
+    fn should_report_from_time(&self, duration: Duration) -> bool {
+        self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
+    }
 }
 
 /// Checks if the block is the parent of the branch's root
@@ -861,6 +940,10 @@ fn same_block_added_twice(
         )));
     }
     Ok(())
+}
+
+fn should_report_from_block_count(block_count: u32) -> bool {
+    block_count > 0 && block_count % BLOCK_REPORTING_FREQ_NUM == 0
 }
 
 impl std::fmt::Debug for IndexerState {
