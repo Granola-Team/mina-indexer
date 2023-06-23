@@ -316,7 +316,7 @@ impl IndexerState {
 
         // add all blocks with chain length longer than the root to the indexer state
         // QUESTION what do we do about blocks with blockchain_length == None
-        debug!("adding all blocks with chain length higher than computed root"); 
+        debug!("adding all blocks with chain length higher than computed root");
         let root_precomputed = db
             .get_block(&root_state_hash)?
             .expect("state hash from database, exists");
