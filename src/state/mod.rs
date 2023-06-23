@@ -3,7 +3,7 @@ use self::summary::{
 };
 use crate::{
     block::{
-        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
+        parser::BlockParser, precomputed::{PrecomputedBlock}, store::BlockStore, Block, BlockHash,
         BlockWithoutHeight,
     },
     state::{
@@ -22,10 +22,10 @@ use std::{
     collections::HashMap,
     path::Path,
     str::FromStr,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, borrow::Borrow,
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{debug, info};
+use tracing::{debug, info, instrument, warn};
 
 pub mod branch;
 pub mod ledger;
@@ -236,37 +236,100 @@ impl IndexerState {
         })
     }
 
-    pub fn restore_from_db(db: &IndexerStore) -> anyhow::Result<Self> {
+    pub fn new_with_db(root_block: Block, transition_frontier_length: Option<u32>, store: IndexerStore) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length);
+        let tip = Tip {
+            state_hash: root_block.state_hash.clone(),
+            node_id: root_branch.root.clone(),
+        };
+
+        Ok(Self {
+            mode: IndexerMode::Light,
+            phase: IndexerPhase::Watching,
+            canonical_tip: tip.clone(),
+            diffs_map: HashMap::new(),
+            best_tip: tip,
+            root_branch,
+            dangling_branches: Vec::new(),
+            indexer_store: Some(store),
+            transition_frontier_length: transition_frontier_length
+                .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
+            prune_interval: PRUNE_INTERVAL_DEFAULT,
+            canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
+            blocks_processed: 0,
+            time: Instant::now(),
+            date_time: OffsetDateTime::now_utc()
+        })
+    }
+
+    #[instrument]
+    pub fn restore_from_db(
+        db: IndexerStore, 
+    ) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
         // Q: How to compute ledger? Should we require it to do quick sync?
         // iterate over the db blocks, starting at the root, adding them to the state with add_block(..., false)
-        let mut state_opt: Option<IndexerState> = None;
-        for res in db.iterator() {
-            match res {
-                Ok((_k, v)) => {
-                    if let Ok(block) = bcs::from_bytes::<PrecomputedBlock>(v.borrow()) {
-                        if let Some(mut state) = state_opt {
-                            state.add_block(&block, false).unwrap();
-                            state_opt = Some(state);
-                        } else {
-                            state_opt = Some(
-                                Self::new_testing(
-                                    &block,
-                                    None,
-                                    Some(db.db_path()),
-                                    Some(MAINNET_TRANSITION_FRONTIER_K),
-                                )
-                                .unwrap(),
-                            )
-                        }
-                    }
+        
+        // find the best tip
+        let mut best_tip_length = u32::MIN;
+        let mut best_tip_state_hash = BlockHash::from_bytes([0; 32]);
+        for entry in db.iterator() {
+            let (state_hash_bytes, precomputed_block_bytes) = entry?;
+            let precomputed_block = bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
+            if let Some(length) = precomputed_block.blockchain_length {
+                if length > best_tip_length {
+                    best_tip_length = length;
+                    best_tip_state_hash = BlockHash(bcs::from_bytes(&state_hash_bytes)?);
                 }
-                Err(_e) => (),
             }
         }
-        todo!()
+        
+        // track the best tip's parent hash back 290 blocks
+        let mut root_state_hash = best_tip_state_hash.clone();
+        for _i in 0..290 {
+            match db.get_block(&root_state_hash) {
+                Ok(parent_block) => {
+                    if let Some(precomputed_block) = parent_block {
+                        root_state_hash = BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash);
+                    } else {
+                        warn!("parent block is not in the block store");
+                        break;
+                    }
+                },
+                Err(_) => {
+                    warn!("database does not have a full transition frontier");
+                    break
+                },
+            }
+        }
+
+        // add all blocks with chain length longer than the root to the indexer state
+        // QUESTION what do we do about blocks with blockchain_length == None
+        let root_precomputed = db.get_block(&root_state_hash)?.expect("state hash from database, exists");
+        let mut state = IndexerState::new_with_db(
+            Block::from_precomputed(&root_precomputed, 0), 
+            Some(MAINNET_TRANSITION_FRONTIER_K),
+            db
+        )?;
+        let mut blocks_to_add = Vec::new();
+        for entry in state.indexer_store.as_ref().expect("guaranteed by above call").iterator() {
+            let (_state_hash_bytes, precomputed_block_bytes) = entry?; 
+            let precomputed_block = bcs::from_bytes::<PrecomputedBlock>(precomputed_block_bytes.borrow())?;
+            if let Some(length) = precomputed_block.blockchain_length {
+                if length > root_precomputed.blockchain_length.expect("already checked") {
+                    blocks_to_add.push(precomputed_block);
+                }
+            } else {
+                blocks_to_add.push(precomputed_block);
+            }
+        }
+        for block in blocks_to_add {
+            state.add_block(&block, false)?;
+        }
+
+        Ok(state)
     }
 
     /// Removes the lower portion of the root tree which is no longer needed

@@ -5,7 +5,7 @@ use crate::{
         Canonicity,
     },
 };
-use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
+use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, DBIteratorWithThreadMode};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]

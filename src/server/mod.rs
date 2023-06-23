@@ -214,8 +214,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     } else {
         // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
         // if no db or it doesn't have blocks, use the startup_dir like usual
-        IndexerState::new_from_db(&database_dir)?;
-        todo!("Restoring from db in {}", database_dir.display());
+        let store = IndexerStore::new(&database_dir)?;
+        info!("restoring from database in {}", database_dir.display());
+        IndexerState::restore_from_db(store)?
     };
 
     let mut block_parser = BlockParser::new(&startup_dir)?;
@@ -244,7 +245,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
 
-                    indexer_state.add_block(&precomputed_block)?;
+                    indexer_state.add_block(&precomputed_block, true)?;
                     info!("Added {block:?}");
                 } else {
                     info!("Block receiver shutdown, system exit");
