@@ -252,7 +252,7 @@ impl IndexerState {
 
         Ok(Self {
             mode: IndexerMode::Light,
-            phase: IndexerPhase::Watching,
+            phase: IndexerPhase::InitializingFromDB,
             canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
             best_tip: tip,
