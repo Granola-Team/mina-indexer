@@ -613,7 +613,7 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         self.prune_root_branch();
 
-        if self.is_block_already_in_db(precomputed_block)? {
+        if check_if_block_in_db && self.is_block_already_in_db(precomputed_block)? {
             debug!(
                 "Block with state hash {:?} is already present in the block store",
                 precomputed_block.state_hash
