@@ -3,7 +3,7 @@ use mina_serialization_types::{
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
     staged_ledger_diff::{
-        self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
+        self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation, UserCommand, UserCommandWithStatus,
     },
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1},
 };
@@ -64,6 +64,13 @@ impl PrecomputedBlock {
 }
 
 impl PrecomputedBlock {
+    pub fn user_commands(&self) -> Vec<UserCommandWithStatus> {
+        self.staged_ledger_diff.diff.t.0.t.t.commands
+            .iter()
+            .map(|command| command.t.clone())
+            .collect()
+    }
+
     pub fn block_public_keys(&self) -> Vec<PublicKeyV1> {
         let mut public_keys = Vec::new();
         let consenesus_state = self
