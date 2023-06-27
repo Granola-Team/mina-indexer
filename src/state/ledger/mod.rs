@@ -74,23 +74,20 @@ impl Ledger {
         }
     }
 
-    pub fn apply_precomputed(&self, precomputed_block: &PrecomputedBlock) -> Self {
-        let mut ledger = self.clone();
+    pub fn apply_precomputed(&mut self, precomputed_block: &PrecomputedBlock) {
         UserCommand::from_precomputed(precomputed_block)
             .into_iter()
             .for_each(|user_command| {
                 if UserCommandType::Delegation == user_command.command_type {
-                    ledger.apply_delegation(
+                    self.apply_delegation(
                         user_command.source.public_key.clone(), 
                         user_command.receiver.public_key.clone()
                     );
                 }
-                ledger.apply_balance_update(user_command.fee_payer);
-                ledger.apply_balance_update(user_command.source);
-                ledger.apply_balance_update(user_command.receiver);
+                self.apply_balance_update(user_command.fee_payer);
+                self.apply_balance_update(user_command.source);
+                self.apply_balance_update(user_command.receiver);
             });
-
-        ledger
     }
 
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> Result<Self, PubKeyError> {

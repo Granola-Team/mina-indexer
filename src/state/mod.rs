@@ -355,9 +355,9 @@ impl IndexerState {
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) {
+    fn prune_root_branch(&mut self) -> anyhow::Result<()> {
         let k = self.transition_frontier_length;
-        self.update_canonical();
+        self.update_canonical()?;
 
         if self.root_branch.height() > self.prune_interval * k {
             let best_tip_block = self.best_tip_block().clone();
@@ -371,6 +371,8 @@ impl IndexerState {
             self.root_branch
                 .prune_transition_frontier(k, &best_tip_block);
         }
+
+        Ok(())
     }
 
     /// The highest known canonical block
@@ -389,7 +391,7 @@ impl IndexerState {
     }
 
     /// Updates the canonical tip if the precondition is met
-    pub fn update_canonical(&mut self) {
+    pub fn update_canonical(&mut self) -> anyhow::Result<()> {
         if self.best_tip_block().height - self.canonical_tip_block().height
             > self.canonical_update_threshold
         {
@@ -431,8 +433,8 @@ impl IndexerState {
 
                 // apply the new canonical diffs to the old canonical ledger
                 for canonical_hash in &canonical_hashes {
-                    if let Some(diff) = self.diffs_map.get(canonical_hash) {
-                        ledger.apply_diff(diff).unwrap();
+                    if let Some(precomputed_block) = indexer_store.get_block(canonical_hash)? {
+                        ledger.apply_precomputed(&precomputed_block);
                     }
                 }
 
@@ -470,6 +472,8 @@ impl IndexerState {
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Initialize indexer state from a collection of contiguous canonical blocks
@@ -611,7 +615,7 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
         check_if_block_in_db: bool,
     ) -> anyhow::Result<ExtensionType> {
-        self.prune_root_branch();
+        self.prune_root_branch()?;
 
         if check_if_block_in_db && self.is_block_already_in_db(precomputed_block)? {
             debug!(
@@ -905,7 +909,7 @@ impl IndexerState {
 
     // TODO maybe we should add another function for getting a ledger at a specific slot/"height"?
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
-        self.update_canonical();
+        self.update_canonical()?;
 
         // get the most recent canonical ledger
         let ledger = if let Some(indexer_store) = &self.indexer_store {
