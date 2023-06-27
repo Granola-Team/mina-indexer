@@ -216,7 +216,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         // if no db or it doesn't have blocks, use the startup_dir like usual
         let store = IndexerStore::new(&database_dir)?;
         info!("restoring from database in {}", database_dir.display());
-        IndexerState::restore_from_db(store)?
+        IndexerState::restore_from_db(store, canonical_update_threshold)?
     };
 
     let mut block_parser = BlockParser::new(&startup_dir)?;

@@ -239,6 +239,7 @@ impl IndexerState {
 
     pub fn new_with_db(
         root_block: Block,
+        canonical_update_threshold: u32,
         transition_frontier_length: Option<u32>,
         store: IndexerStore,
     ) -> anyhow::Result<Self> {
@@ -261,7 +262,7 @@ impl IndexerState {
             transition_frontier_length: transition_frontier_length
                 .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
-            canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
+            canonical_update_threshold,
             blocks_processed: 0,
             time: Instant::now(),
             date_time: OffsetDateTime::now_utc(),
@@ -269,7 +270,7 @@ impl IndexerState {
     }
 
     #[instrument]
-    pub fn restore_from_db(db: IndexerStore) -> anyhow::Result<Self> {
+    pub fn restore_from_db(db: IndexerStore, canonical_update_threshold: u32) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
@@ -295,7 +296,7 @@ impl IndexerState {
         // track the best tip's parent hash back 290 blocks
         debug!("finding the transition frontier of the best tip");
         let mut root_state_hash = best_tip_state_hash.clone();
-        for _i in 0..290 {
+        for _i in 0..canonical_update_threshold {
             match db.get_block(&root_state_hash) {
                 Ok(parent_block) => {
                     if let Some(precomputed_block) = parent_block {
@@ -316,12 +317,14 @@ impl IndexerState {
 
         // add all blocks with chain length longer than the root to the indexer state
         // QUESTION what do we do about blocks with blockchain_length == None
+        // ^^^^^^^^ currently adding them all to the state anyway, could result in dangling branches
         debug!("adding all blocks with chain length higher than computed root");
         let root_precomputed = db
             .get_block(&root_state_hash)?
             .expect("state hash from database, exists");
         let mut state = IndexerState::new_with_db(
             Block::from_precomputed(&root_precomputed, 0),
+            canonical_update_threshold,
             Some(MAINNET_TRANSITION_FRONTIER_K),
             db,
         )?;
@@ -344,6 +347,7 @@ impl IndexerState {
             }
         }
         for block in blocks_to_add {
+            // QUESTION: Prune blocks that create a dangling branch?
             state.add_block(&block, false)?;
         }
 
