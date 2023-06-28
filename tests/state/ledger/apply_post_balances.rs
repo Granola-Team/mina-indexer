@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use mina_indexer::{block::parser::BlockParser, state::ledger::{Ledger, account::Nonce}};
+use mina_indexer::{block::parser::BlockParser, state::ledger::Ledger};
 
 #[tokio::test]
 async fn post_balances() {
@@ -13,57 +13,57 @@ async fn post_balances() {
         .await
         .unwrap();
 
-        let mut ledger = Ledger::from(vec![
-            (
-                "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
-                1000000000000,
-                None,
-                None,
-            ),
-            (
-                "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB",
-                1000000000000,
-                None,
-                None,
-            ),
-        ])
-        .unwrap();
+    let mut ledger = Ledger::from(vec![
+        (
+            "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
+            1000000000000,
+            None,
+            None,
+        ),
+        (
+            "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB",
+            1000000000000,
+            None,
+            None,
+        ),
+    ])
+    .unwrap();
 
     println!("=== Initial ===");
     println!("{:?}", ledger);

@@ -5,8 +5,8 @@ use crate::{
         Canonicity,
     },
 };
-use rocksdb::{ColumnFamilyDescriptor, DBIteratorWithThreadMode, DBWithThreadMode, MultiThreaded};
 use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
+use rocksdb::{ColumnFamilyDescriptor, DBIteratorWithThreadMode, DBWithThreadMode, MultiThreaded};
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -87,7 +87,7 @@ impl IndexerStore {
     pub fn iterator(&self) -> DBIteratorWithThreadMode<DBWithThreadMode<MultiThreaded>> {
         self.database.iterator(rocksdb::IteratorMode::Start)
     }
-    
+
     pub fn put_tx(&self, height: u32, tx: UserCommandWithStatusV1) -> anyhow::Result<()> {
         let cf_handle = self.database.cf_handle("tx").expect("column family exists");
 

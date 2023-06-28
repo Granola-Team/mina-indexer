@@ -9,7 +9,10 @@ pub mod user_commands;
 
 use crate::{block::precomputed::PrecomputedBlock, state::ledger::user_commands::UserCommandType};
 
-use self::{account::{Amount, Nonce}, user_commands::{UserCommand, BalanceUpdate}};
+use self::{
+    account::{Amount, Nonce},
+    user_commands::{BalanceUpdate, UserCommand},
+};
 use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
@@ -55,21 +58,29 @@ impl Ledger {
                     return;
                 }
             }
-            
+
             account.delegate = Some(new_delegate);
         }
     }
 
     pub fn apply_balance_update(&mut self, balance_update: BalanceUpdate, nonce: Option<i32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
-            let nonce = if let Some(nonce) = nonce { Nonce(nonce as u32 + 1) } else { account.nonce };
+            let nonce = if let Some(nonce) = nonce {
+                Nonce(nonce as u32 + 1)
+            } else {
+                account.nonce
+            };
             account.balance = Amount(balance_update.balance);
             account.nonce = nonce;
         } else {
             let new_account = Account {
                 public_key: balance_update.public_key.clone(),
                 balance: Amount(balance_update.balance),
-                nonce: if let Some(nonce) = nonce { Nonce(nonce as u32) } else { Nonce(0) },
+                nonce: if let Some(nonce) = nonce {
+                    Nonce(nonce as u32)
+                } else {
+                    Nonce(0)
+                },
                 delegate: None,
             };
             self.accounts.insert(balance_update.public_key, new_account);
@@ -82,8 +93,8 @@ impl Ledger {
             .for_each(|user_command| {
                 if UserCommandType::Delegation == user_command.command_type {
                     self.apply_delegation(
-                        user_command.source.public_key.clone(), 
-                        user_command.receiver.public_key.clone()
+                        user_command.source.public_key.clone(),
+                        user_command.receiver.public_key.clone(),
                     );
                 }
                 self.apply_balance_update(user_command.fee_payer, None);

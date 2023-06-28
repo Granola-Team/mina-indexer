@@ -249,10 +249,13 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
         store: IndexerStore,
     ) -> anyhow::Result<Self> {
-        let root_branch =
-            Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length, global_slot_since_genesis);
+        let root_branch = Branch::new_non_genesis(
+            root_block.state_hash.clone(),
+            root_block.blockchain_length,
+            global_slot_since_genesis,
+        );
         let tip = Tip {
-            state_hash: root_block.state_hash.clone(),
+            state_hash: root_block.state_hash,
             node_id: root_branch.root.clone(),
         };
 
@@ -276,7 +279,11 @@ impl IndexerState {
     }
 
     #[instrument]
-    pub fn restore_from_db(db: IndexerStore, canonical_update_threshold: u32, global_slot_since_genesis: u32) -> anyhow::Result<Self> {
+    pub fn restore_from_db(
+        db: IndexerStore,
+        canonical_update_threshold: u32,
+        global_slot_since_genesis: u32,
+    ) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
@@ -301,7 +308,7 @@ impl IndexerState {
 
         // track the best tip's parent hash back 290 blocks
         debug!("finding the transition frontier of the best tip");
-        let mut root_state_hash = best_tip_state_hash.clone();
+        let mut root_state_hash = best_tip_state_hash;
         for _i in 0..canonical_update_threshold {
             match db.get_block(&root_state_hash) {
                 Ok(parent_block) => {
@@ -931,38 +938,39 @@ impl IndexerState {
 
         // get the most recent canonical ledger
         if let Some(indexer_store) = &self.indexer_store {
-            if let Some(mut ledger) = indexer_store.get_ledger(&self.canonical_tip_block().state_hash)? {
+            if let Some(mut ledger) =
+                indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
+            {
                 // collect diffs from canonical tip to best tip
                 let mut hashes_since_canonical_tip =
-                if self.best_tip.state_hash != self.canonical_tip.state_hash {
-                    vec![self.best_tip.state_hash.clone()]
-                } else {
-                    vec![]
-                };
+                    if self.best_tip.state_hash != self.canonical_tip.state_hash {
+                        vec![self.best_tip.state_hash.clone()]
+                    } else {
+                        vec![]
+                    };
 
-            for ancestor in self
-                .root_branch
-                .branches
-                .ancestors(&self.best_tip.node_id)
-                .unwrap()
-            {
-                if ancestor.data().state_hash != self.canonical_tip.state_hash {
-                    hashes_since_canonical_tip
-                        .push(ancestor.data().state_hash.clone());
-                } else {
-                    break;
+                for ancestor in self
+                    .root_branch
+                    .branches
+                    .ancestors(&self.best_tip.node_id)
+                    .unwrap()
+                {
+                    if ancestor.data().state_hash != self.canonical_tip.state_hash {
+                        hashes_since_canonical_tip.push(ancestor.data().state_hash.clone());
+                    } else {
+                        break;
+                    }
                 }
-            }
 
-            // apply diffs from canonical tip to best tip
-            hashes_since_canonical_tip.reverse();
-            for hash in hashes_since_canonical_tip {
-                if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
-                    ledger.apply_post_balances(&precomputed_block);
+                // apply diffs from canonical tip to best tip
+                hashes_since_canonical_tip.reverse();
+                for hash in hashes_since_canonical_tip {
+                    if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
+                        ledger.apply_post_balances(&precomputed_block);
+                    }
                 }
-            }
 
-            return Ok(Some(ledger));
+                return Ok(Some(ledger));
             }
         }
 
