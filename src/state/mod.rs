@@ -441,7 +441,7 @@ impl IndexerState {
                 // apply the new canonical diffs to the old canonical ledger
                 for canonical_hash in &canonical_hashes {
                     if let Some(precomputed_block) = indexer_store.get_block(canonical_hash)? {
-                        ledger.apply_precomputed(&precomputed_block);
+                        ledger.apply_post_balances(&precomputed_block);
                     }
                 }
 
@@ -516,7 +516,7 @@ impl IndexerState {
                 let precomputed_block = block_parser.next().await?.unwrap();
 
                 // apply and add to db
-                ledger.apply_precomputed(&precomputed_block);
+                ledger.apply_post_balances(&precomputed_block);
                 indexer_store.add_block(&precomputed_block)?;
 
                 if let Some(height) = precomputed_block.blockchain_length {
@@ -958,7 +958,7 @@ impl IndexerState {
             hashes_since_canonical_tip.reverse();
             for hash in hashes_since_canonical_tip {
                 if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
-                    ledger.apply_precomputed(&precomputed_block);
+                    ledger.apply_post_balances(&precomputed_block);
                 }
             }
 

@@ -76,7 +76,7 @@ impl Ledger {
         }
     }
 
-    pub fn apply_precomputed(&mut self, precomputed_block: &PrecomputedBlock) {
+    pub fn apply_post_balances(&mut self, precomputed_block: &PrecomputedBlock) {
         UserCommand::from_precomputed(precomputed_block)
             .into_iter()
             .for_each(|user_command| {
@@ -87,8 +87,8 @@ impl Ledger {
                     );
                 }
                 self.apply_balance_update(user_command.fee_payer, None);
-                self.apply_balance_update(user_command.source, Some(user_command.source_nonce));
                 self.apply_balance_update(user_command.receiver, None);
+                self.apply_balance_update(user_command.source, Some(user_command.source_nonce));
             });
     }
 
