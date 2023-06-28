@@ -13,7 +13,7 @@ use std::{
 };
 
 /// Storage Key
-pub struct Key<T>(PhantomData<T>, String);
+pub struct Key<T>(PhantomData<T>);
 
 /// T-{Height}-{Signature} -> Transaction
 /// We use the signature as key until we have a better way to identify transactions (e.g. hash)
