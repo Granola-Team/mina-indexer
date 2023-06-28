@@ -62,7 +62,7 @@ impl Ledger {
 
     pub fn apply_balance_update(&mut self, balance_update: BalanceUpdate, nonce: Option<i32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
-            let nonce = if let Some(nonce) = nonce { Nonce(nonce as u32) } else { account.nonce };
+            let nonce = if let Some(nonce) = nonce { Nonce(nonce as u32 + 1) } else { account.nonce };
             account.balance = Amount(balance_update.balance);
             account.nonce = nonce;
         } else {
