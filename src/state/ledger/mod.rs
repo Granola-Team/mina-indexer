@@ -60,14 +60,16 @@ impl Ledger {
         }
     }
 
-    pub fn apply_balance_update(&mut self, balance_update: BalanceUpdate) {
+    pub fn apply_balance_update(&mut self, balance_update: BalanceUpdate, nonce: Option<i32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
+            let nonce = if let Some(nonce) = nonce { Nonce(nonce as u32) } else { account.nonce };
             account.balance = Amount(balance_update.balance);
+            account.nonce = nonce;
         } else {
             let new_account = Account {
                 public_key: balance_update.public_key.clone(),
                 balance: Amount(balance_update.balance),
-                nonce: Nonce(0),
+                nonce: if let Some(nonce) = nonce { Nonce(nonce as u32) } else { Nonce(0) },
                 delegate: None,
             };
             self.accounts.insert(balance_update.public_key, new_account);
@@ -84,9 +86,9 @@ impl Ledger {
                         user_command.receiver.public_key.clone()
                     );
                 }
-                self.apply_balance_update(user_command.fee_payer);
-                self.apply_balance_update(user_command.source);
-                self.apply_balance_update(user_command.receiver);
+                self.apply_balance_update(user_command.fee_payer, None);
+                self.apply_balance_update(user_command.source, Some(user_command.source_nonce));
+                self.apply_balance_update(user_command.receiver, None);
             });
     }
 

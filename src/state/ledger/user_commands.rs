@@ -16,6 +16,7 @@ pub struct BalanceUpdate {
 }
 
 pub struct UserCommand {
+    pub source_nonce: i32,
     pub command_type: UserCommandType,
     pub fee_payer: BalanceUpdate,
     pub source: BalanceUpdate,
@@ -28,6 +29,11 @@ impl UserCommand {
             .iter()
             .map(|command| command.t.clone())
             .flat_map(|command| {
+                let source_nonce = match &command.data.t.t {
+                    staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
+                        signed_command.t.t.payload.t.t.common.t.t.t.nonce.t.t
+                    },
+                };
                 if let TransactionStatus::Applied(_, balance_data_versioned) = command.status.t {
                     let mut delegation = false;
                     let (fee_payer, source, receiver) = match command.data.t.t {
@@ -64,6 +70,7 @@ impl UserCommand {
                     {
                         let user_command_type = if delegation { UserCommandType::Delegation } else { UserCommandType::Payment };
                         Some(UserCommand {
+                            source_nonce,
                             command_type: user_command_type,
                             fee_payer: BalanceUpdate { public_key: fee_payer.into(), balance: fee_payer_balance },
                             source: BalanceUpdate { public_key: source.into(), balance: source_balance },
