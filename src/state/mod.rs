@@ -507,10 +507,9 @@ impl IndexerState {
                 }
 
                 let precomputed_block = block_parser.next().await?.unwrap();
-                let diff = LedgerDiff::from_precomputed_block(&precomputed_block);
 
                 // apply and add to db
-                ledger.apply_diff(&diff)?;
+                ledger.apply_precomputed(&precomputed_block);
                 indexer_store.add_block(&precomputed_block)?;
 
                 // TODO store ledger at specified cadence, e.g. at epoch boundaries
@@ -912,17 +911,12 @@ impl IndexerState {
         self.update_canonical()?;
 
         // get the most recent canonical ledger
-        let ledger = if let Some(indexer_store) = &self.indexer_store {
-            indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
-        } else {
-            None
-        };
-
-        if let Some(mut ledger) = ledger {
-            // collect diffs from canonical tip to best tip
-            let mut diffs_since_canonical_tip =
+        if let Some(indexer_store) = &self.indexer_store {
+            if let Some(mut ledger) = indexer_store.get_ledger(&self.canonical_tip_block().state_hash)? {
+                // collect diffs from canonical tip to best tip
+                let mut hashes_since_canonical_tip =
                 if self.best_tip.state_hash != self.canonical_tip.state_hash {
-                    vec![self.diffs_map.get(&self.best_tip.state_hash).unwrap()]
+                    vec![self.best_tip.state_hash.clone()]
                 } else {
                     vec![]
                 };
@@ -934,20 +928,23 @@ impl IndexerState {
                 .unwrap()
             {
                 if ancestor.data().state_hash != self.canonical_tip.state_hash {
-                    diffs_since_canonical_tip
-                        .push(self.diffs_map.get(&ancestor.data().state_hash).unwrap());
+                    hashes_since_canonical_tip
+                        .push(ancestor.data().state_hash.clone());
                 } else {
                     break;
                 }
             }
 
             // apply diffs from canonical tip to best tip
-            diffs_since_canonical_tip.reverse();
-            for diff in diffs_since_canonical_tip {
-                ledger.apply_diff(diff)?;
+            hashes_since_canonical_tip.reverse();
+            for hash in hashes_since_canonical_tip {
+                if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
+                    ledger.apply_precomputed(&precomputed_block);
+                }
             }
 
             return Ok(Some(ledger));
+            }
         }
 
         Ok(None)
