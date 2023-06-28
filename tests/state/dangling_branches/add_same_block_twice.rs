@@ -61,7 +61,7 @@ async fn test() {
 
     // block not added again
     assert_eq!(
-        state.add_block(&block1, false).unwrap(),
+        state.add_block(&block1, true).unwrap(),
         ExtensionType::BlockNotAdded
     );
 

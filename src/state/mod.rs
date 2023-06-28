@@ -245,11 +245,12 @@ impl IndexerState {
     pub fn new_with_db(
         root_block: Block,
         canonical_update_threshold: u32,
+        global_slot_since_genesis: u32,
         transition_frontier_length: Option<u32>,
         store: IndexerStore,
     ) -> anyhow::Result<Self> {
         let root_branch =
-            Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length);
+            Branch::new_non_genesis(root_block.state_hash.clone(), root_block.blockchain_length, global_slot_since_genesis);
         let tip = Tip {
             state_hash: root_block.state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -275,7 +276,7 @@ impl IndexerState {
     }
 
     #[instrument]
-    pub fn restore_from_db(db: IndexerStore, canonical_update_threshold: u32) -> anyhow::Result<Self> {
+    pub fn restore_from_db(db: IndexerStore, canonical_update_threshold: u32, global_slot_since_genesis: u32) -> anyhow::Result<Self> {
         // TODO
         // find best tip block in db (according to Block::cmp)
         // go back at least 290 blocks (make this block the root of the root tree)
@@ -330,6 +331,7 @@ impl IndexerState {
         let mut state = IndexerState::new_with_db(
             Block::from_precomputed(&root_precomputed, 0),
             canonical_update_threshold,
+            global_slot_since_genesis,
             Some(MAINNET_TRANSITION_FRONTIER_K),
             db,
         )?;
