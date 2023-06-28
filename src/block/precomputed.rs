@@ -5,7 +5,7 @@ use mina_serialization_types::{
     staged_ledger_diff::{
         self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
     },
-    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1},
+    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +60,17 @@ impl PrecomputedBlock {
             staged_ledger_diff: staged_ledger_diff.into(),
             delta_transition_chain_proof: delta_transition_chain_proof.into(),
         })
+    }
+
+    pub fn cmds(&self) -> Vec<UserCommandWithStatusV1> {
+        self.staged_ledger_diff
+            .diff
+            .clone()
+            .inner()
+            .0
+            .inner()
+            .inner()
+            .commands
     }
 }
 
