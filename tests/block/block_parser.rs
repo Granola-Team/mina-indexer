@@ -37,3 +37,20 @@ async fn representative_bench() {
     println!("./tests/data/sequential_blocks");
     println!("Parse {logs_processed} logs: {:?}\n", start.elapsed());
 }
+
+#[tokio::test]
+async fn get_global_slot_since_genesis() {
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+
+    // block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
+    let block = block_parser
+        .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
+        .await
+        .unwrap();
+    assert_eq!(
+        block.state_hash,
+        "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
+    );
+    assert_eq!(block.global_slot_since_genesis(), 155140);
+}
