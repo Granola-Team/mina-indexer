@@ -13,7 +13,7 @@ use std::{
 };
 
 /// Storage Key
-pub struct Key<T>(PhantomData<T>);
+pub struct Key<T>(PhantomData<T>, String);
 
 /// T-{Height}-{Signature} -> Transaction
 /// We use the signature as key until we have a better way to identify transactions (e.g. hash)
@@ -21,8 +21,8 @@ pub struct Key<T>(PhantomData<T>);
 pub struct Transaction;
 
 impl Key<Transaction> {
-    /// Creates a new key for a transaction
-    pub fn new<S>(h: u32, s: S) -> String
+    /// Creates a new key for a transaction as string
+    pub fn str<S>(h: u32, s: S) -> String
     where
         S: Into<String>,
     {
@@ -34,7 +34,7 @@ impl Key<Transaction> {
     where
         S: Into<String>,
     {
-        Self::new(h, s).into_bytes()
+        Self::str(h, s).into_bytes()
     }
 }
 
