@@ -401,6 +401,12 @@ impl IndexerState {
                 ledger.apply_diff(&diff)?;
                 indexer_store.add_block(&precomputed_block)?;
 
+                if let Some(height) = precomputed_block.blockchain_length {
+                    for cmd in precomputed_block.cmds() {
+                        indexer_store.put_tx(height, cmd)?;
+                    }
+                }
+
                 // TODO store ledger at specified cadence, e.g. at epoch boundaries
                 // for now, just store every 1000 blocks
                 if block_count % 1000 == 0 {
@@ -524,6 +530,12 @@ impl IndexerState {
         // add block to the db
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
+
+            if let Some(height) = precomputed_block.blockchain_length {
+                for cmd in precomputed_block.cmds() {
+                    indexer_store.put_tx(height, cmd)?;
+                }
+            }
         }
 
         self.blocks_processed += 1;

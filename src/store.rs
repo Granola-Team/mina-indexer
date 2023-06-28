@@ -5,8 +5,38 @@ use crate::{
         Canonicity,
     },
 };
+use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
 use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
-use std::path::{Path, PathBuf};
+use std::{
+    marker::PhantomData,
+    path::{Path, PathBuf},
+};
+
+/// Storage Key
+pub struct Key<T>(PhantomData<T>);
+
+/// T-{Height}-{Signature} -> Transaction
+/// We use the signature as key until we have a better way to identify transactions (e.g. hash)
+/// The height is padded to 12 digits for sequential iteration
+pub struct Transaction;
+
+impl Key<Transaction> {
+    /// Creates a new key for a transaction as string
+    pub fn str<S>(h: u32, s: S) -> String
+    where
+        S: Into<String>,
+    {
+        format!("T-{:012}-{}", h, s.into())
+    }
+
+    /// Creates a new key for a transaction as bytes
+    pub fn bytes<S>(h: u32, s: S) -> Vec<u8>
+    where
+        S: Into<String>,
+    {
+        Self::str(h, s).into_bytes()
+    }
+}
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -33,7 +63,8 @@ impl IndexerStore {
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
-        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts);
+        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
+        let tx = ColumnFamilyDescriptor::new("tx", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -41,7 +72,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity],
+            vec![blocks, ledgers, canonicity, tx],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -51,6 +82,23 @@ impl IndexerStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    pub fn put_tx(&self, height: u32, tx: UserCommandWithStatusV1) -> anyhow::Result<()> {
+        let cf_handle = self.database.cf_handle("tx").expect("column family exists");
+
+        match tx.clone().inner().data.inner().inner() {
+            UserCommand::SignedCommand(cmd) => {
+                let sig = serde_json::to_string(&cmd.inner().inner().signature)?;
+
+                let key = Key::<Transaction>::bytes(height, sig);
+                let value = bcs::to_bytes(&tx)?;
+
+                self.database.put_cf(&cf_handle, key, value)?;
+
+                Ok(())
+            }
+        }
     }
 }
 
