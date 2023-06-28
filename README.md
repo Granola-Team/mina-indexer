@@ -40,40 +40,46 @@ nix develop
 nix build '.?submodules=1'
 ```
 
-Start the `mina-indexer` server with
+alternatively, you can build with `cargo` inside the nix shell.
 
-* `--genesis-ledger`, `-g`
+### Starting the indexer
+
+For example, from the root of this project, you can start the `mina-indexer` for mainnet via
+
+```sh
+mina-indexer server -i -l tests/data/genesis_ledgers/mainnet.json -s path/to/your/precomputed/blocks/dir
+```
+
+### Some other useful CLI flags
+
+* `--ledger`, `-l`
   * genesis ledger `.json` file to use to initialize the indexer
+* `--ignore-db`, `-i`
+  * determines if the indexer will restore from an existing database
+  * for now, it's required to start without a db
 * `--root-hash`, `-r`
   * state hash of the genesis block
   * defaults to mainnet genesis state hash `3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ`
 * `--startup-dir`, `-s`
   * directory of precomputed blocks to initialize the indexer's state
+  * defaults to `$HOME/.mina-indexer/startup-blocks`
 * `--watch-dir`, `-w`
   * directory the block receiver watches to keep the indexer up to date
+  * defaults to `$HOME/.mina-indexer/watch-blocks`
 * `--database-dir`, `-d`
   * directory to store the indexer's internal RocksDB database
-* `--log-dir`, `-l`
-  * directory to output the indexer's logs
-  * defaults to `stdout`
+  * defaults to `$HOME/.mina-indexer/database`
 
-```sh
-mina-indexer server --genesis-ledger PATH \
-    --root-hash STATE_HASH \
-    --startup-dir PATH \
-    --watch-dir PATH \
-    --database-dir PATH \
-    --log-dir PATH
-```
+### Some useful client commands
 
-Query data with the `mina-indexer` client
+Query data with the `mina-indexer` client (from another terminal window)
 
 * Get the account info for a specific Public Key
 ```sh
 mina-indexer client account --public-key PUBLIC_KEY
 ```
 
-* Get the best (most likely canonical) blockchain
+* Get the current best chain of block hashes within the root branch
 ```sh
 mina-indexer client best-chain
 ```
@@ -87,6 +93,13 @@ mina-indexer client best-ledger --path PATH
 ```sh
 mina-indexer client summary
 ```
+
+* Get a verbose summary of the indexer state (pretty pictures included!)
+```sh
+mina-indexer client summary -v
+```
+
+### Help
 
 For more information, check out the help menus
 
