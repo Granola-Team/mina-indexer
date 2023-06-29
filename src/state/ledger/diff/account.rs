@@ -165,8 +165,8 @@ impl std::fmt::Debug for UpdateType {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccountDiff, PaymentDiff, UpdateType, DelegationDiff};
-    use crate::state::ledger::{command::{Payment, Command, Delegation}};
+    use super::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType};
+    use crate::state::ledger::command::{Command, Delegation, Payment};
     use crate::state::ledger::PublicKey;
 
     #[test]
@@ -201,7 +201,6 @@ mod tests {
         ];
 
         assert_eq!(AccountDiff::from_command(payment_command), expected_result);
-
     }
 
     #[test]
@@ -226,7 +225,29 @@ mod tests {
             delegate: delegate_public_key_result.into(),
         })];
 
-        assert_eq!(AccountDiff::from_command(delegation_command), expected_result);
+        assert_eq!(
+            AccountDiff::from_command(delegation_command),
+            expected_result
+        );
+    }
+
+    #[test]
+    fn test_from_coinbase() {
+        let coinbase_receiver_str = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw";
+        let coinbase_receiver_result = PublicKey::from_address(coinbase_receiver_str).unwrap();
+        let coinbase_receiver = coinbase_receiver_result.clone();
+        let supercharge_coinbase = true;
+
+        let account_diff = AccountDiff::from_coinbase(coinbase_receiver_result.into(), supercharge_coinbase);
+
+        let expected_payment_diff = PaymentDiff {
+            public_key: coinbase_receiver.into(),
+            amount: 1440 * (1e9 as u64),
+            update_type: UpdateType::Deposit,
+        };
+        let expected_account_diff = AccountDiff::Payment(expected_payment_diff);
+
+        assert_eq!(account_diff, expected_account_diff);
     }
 
 }
