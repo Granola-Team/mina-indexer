@@ -238,7 +238,8 @@ mod tests {
         let coinbase_receiver = coinbase_receiver_result.clone();
         let supercharge_coinbase = true;
 
-        let account_diff = AccountDiff::from_coinbase(coinbase_receiver_result.into(), supercharge_coinbase);
+        let account_diff =
+            AccountDiff::from_coinbase(coinbase_receiver_result.into(), supercharge_coinbase);
 
         let expected_payment_diff = PaymentDiff {
             public_key: coinbase_receiver.into(),
@@ -249,5 +250,4 @@ mod tests {
 
         assert_eq!(account_diff, expected_account_diff);
     }
-
 }
