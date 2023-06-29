@@ -169,10 +169,9 @@ mod tests {
     use crate::state::ledger::command::{Command, Delegation, Payment};
     use crate::state::ledger::PublicKey;
 
+    // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw for all tests below
     #[test]
     fn test_from_command() {
-        // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
-
         let source_str = "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG";
         let source_public_key_result = PublicKey::from_address(source_str).unwrap();
         let source_public_key = source_public_key_result.clone();
@@ -205,8 +204,6 @@ mod tests {
 
     #[test]
     fn test_from_command_delegation() {
-        // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
-
         let delegator_str = "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi";
         let delegator_public_key_result = PublicKey::from_address(delegator_str).unwrap();
         let delegator_public_key = delegator_public_key_result.clone();
@@ -236,6 +233,7 @@ mod tests {
         let coinbase_receiver_str = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw";
         let coinbase_receiver_result = PublicKey::from_address(coinbase_receiver_str).unwrap();
         let coinbase_receiver = coinbase_receiver_result.clone();
+
         let supercharge_coinbase = true;
 
         let account_diff =
@@ -249,5 +247,47 @@ mod tests {
         let expected_account_diff = AccountDiff::Payment(expected_payment_diff);
 
         assert_eq!(account_diff, expected_account_diff);
+    }
+
+    #[test]
+    fn test_public_key_payment() {
+        let payment_diff = PaymentDiff {
+            public_key: PublicKey::from_address(
+                "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG",
+            )
+            .unwrap(),
+            amount: 536900000000,
+            update_type: UpdateType::Deduction,
+        };
+        let account_diff = AccountDiff::Payment(payment_diff);
+
+        let result = account_diff.public_key();
+
+        let expected =
+            PublicKey::from_address("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")
+                .unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_public_key_delegation() {
+        let delegation_diff = DelegationDiff {
+            delegator: PublicKey::from_address(
+                "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi",
+            )
+            .unwrap(),
+            delegate: PublicKey::from_address(
+                "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz",
+            )
+            .unwrap(),
+        };
+        let account_diff = AccountDiff::Delegation(delegation_diff);
+
+        let result = account_diff.public_key();
+
+        let expected =
+            PublicKey::from_address("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi")
+                .unwrap();
+        assert_eq!(result, expected);
     }
 }
