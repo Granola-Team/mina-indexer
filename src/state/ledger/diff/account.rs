@@ -162,3 +162,71 @@ impl std::fmt::Debug for UpdateType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AccountDiff, PaymentDiff, UpdateType, DelegationDiff};
+    use crate::state::ledger::{command::{Payment, Command, Delegation}};
+    use crate::state::ledger::PublicKey;
+
+    #[test]
+    fn test_from_command() {
+        // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
+
+        let source_str = "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG";
+        let source_public_key_result = PublicKey::from_address(source_str).unwrap();
+        let source_public_key = source_public_key_result.clone();
+
+        let receiver_str = "B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs";
+        let receiver_public_key_result = PublicKey::from_address(receiver_str).unwrap();
+        let receiver_public_key = receiver_public_key_result.clone();
+
+        let payment_command = Command::Payment(Payment {
+            source: source_public_key.into(),
+            receiver: receiver_public_key.into(),
+            amount: 536900000000,
+        });
+
+        let expected_result = vec![
+            AccountDiff::Payment(PaymentDiff {
+                public_key: source_public_key_result.into(),
+                amount: 536900000000,
+                update_type: UpdateType::Deduction,
+            }),
+            AccountDiff::Payment(PaymentDiff {
+                public_key: receiver_public_key_result.into(),
+                amount: 536900000000,
+                update_type: UpdateType::Deposit,
+            }),
+        ];
+
+        assert_eq!(AccountDiff::from_command(payment_command), expected_result);
+
+    }
+
+    #[test]
+    fn test_from_command_delegation() {
+        // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
+
+        let delegator_str = "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi";
+        let delegator_public_key_result = PublicKey::from_address(delegator_str).unwrap();
+        let delegator_public_key = delegator_public_key_result.clone();
+
+        let delegate_str = "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz";
+        let delegate_public_key_result = PublicKey::from_address(delegate_str).unwrap();
+        let delegate_public_key = delegate_public_key_result.clone();
+
+        let delegation_command = Command::Delegation(Delegation {
+            delegator: delegator_public_key.into(),
+            delegate: delegate_public_key.into(),
+        });
+
+        let expected_result = vec![AccountDiff::Delegation(DelegationDiff {
+            delegator: delegator_public_key_result.into(),
+            delegate: delegate_public_key_result.into(),
+        })];
+
+        assert_eq!(AccountDiff::from_command(delegation_command), expected_result);
+    }
+
+}
