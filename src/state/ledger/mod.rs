@@ -12,7 +12,7 @@ use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
 use public_key::PublicKey;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Error, result::Result};
+use std::{collections::HashMap, result::Result};
 use tracing::debug;
 
 impl ExtendWithLedgerDiff for LedgerMock {
@@ -36,6 +36,12 @@ pub struct Ledger {
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct NonGenesisLedger {
     pub ledger: Ledger,
+}
+
+#[derive(Debug, Clone)]
+pub enum LedgerError {
+    AccountNotFound,
+    InvalidDelegation,
 }
 
 impl Ledger {
@@ -92,37 +98,48 @@ impl Ledger {
             }
         });
 
-        let mut success = Ok(());
-        diff.account_diffs.into_iter().for_each(|diff| {
-            if let Some(account_before) = self.accounts.remove(&diff.public_key()) {
-                let account_after = match &diff {
-                    diff::account::AccountDiff::Payment(payment_diff) => {
-                        match &payment_diff.update_type {
-                            diff::account::UpdateType::Deposit => {
-                                Account::from_deposit(account_before, payment_diff.amount)
-                            }
-                            diff::account::UpdateType::Deduction => {
-                                match Account::from_deduction(
-                                    account_before.clone(),
-                                    payment_diff.amount,
-                                ) {
-                                    Some(account) => account,
-                                    None => account_before,
+        for diff in diff.account_diffs {
+            match self.accounts.remove(&diff.public_key()) {
+                Some(account_before) => {
+                    let account_after = match &diff {
+                        diff::account::AccountDiff::Payment(payment_diff) => {
+                            match &payment_diff.update_type {
+                                diff::account::UpdateType::Deposit => {
+                                    Account::from_deposit(account_before, payment_diff.amount)
+                                }
+                                diff::account::UpdateType::Deduction => {
+                                    match Account::from_deduction(
+                                        account_before.clone(),
+                                        payment_diff.amount,
+                                    ) {
+                                        Some(account) => account,
+                                        None => account_before,
+                                    }
                                 }
                             }
                         }
-                    }
-                    diff::account::AccountDiff::Delegation(delegation_diff) => {
-                        assert_eq!(account_before.public_key, delegation_diff.delegator);
-                        Account::from_delegation(account_before, delegation_diff.delegate.clone())
-                    }
-                };
-                self.accounts.insert(diff.public_key(), account_after);
-            } else {
-                success = Err(anyhow::Error::new(Error::default()));
+                        diff::account::AccountDiff::Delegation(delegation_diff) => {
+                            assert_eq!(account_before.public_key, delegation_diff.delegator);
+                            Account::from_delegation(
+                                account_before,
+                                delegation_diff.delegate.clone(),
+                            )
+                        }
+                    };
+
+                    self.accounts.insert(diff.public_key(), account_after);
+                }
+                None => {
+                    let error = match diff {
+                        diff::account::AccountDiff::Payment(_) => LedgerError::AccountNotFound,
+                        diff::account::AccountDiff::Delegation(_) => LedgerError::InvalidDelegation,
+                    };
+
+                    return Err(error.into());
+                }
             }
-        });
-        success
+        }
+        Ok(())
     }
 }
 
@@ -198,6 +215,19 @@ impl ExtendWithLedgerDiff for LedgerDiff {
         ledger_diff
     }
 }
+
+impl std::fmt::Display for LedgerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LedgerError::AccountNotFound => write!(f, "Account not found in ledger: payment error"),
+            LedgerError::InvalidDelegation => {
+                write!(f, "Invalid data or parameters: delegation error")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LedgerError {}
 
 #[cfg(test)]
 mod tests {
