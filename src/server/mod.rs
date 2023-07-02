@@ -58,9 +58,6 @@ pub struct ServerArgs {
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     log_level_stdout: LevelFilter,
-    /// Ignore restoring indexer state from an existing db on the path provided by database_dir
-    #[arg(short, long, default_value_t = false)]
-    ignore_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
@@ -80,7 +77,6 @@ pub struct IndexerConfiguration {
     log_file: PathBuf,
     log_level: LevelFilter,
     log_level_stdout: LevelFilter,
-    ignore_db: bool,
     prune_interval: u32,
     canonical_update_threshold: u32,
 }
@@ -100,7 +96,6 @@ pub async fn handle_command_line_arguments(
     let log_dir = args.log_dir;
     let log_level = args.log_level;
     let log_level_stdout = args.log_level_stdout;
-    let ignore_db = args.ignore_db;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
 
@@ -146,7 +141,7 @@ pub async fn handle_command_line_arguments(
                 log_file: PathBuf::from(&log_fname),
                 log_level,
                 log_level_stdout,
-                ignore_db,
+
                 prune_interval,
                 canonical_update_threshold,
             })
@@ -173,7 +168,6 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         log_file,
         log_level,
         log_level_stdout,
-        ignore_db,
         prune_interval,
         canonical_update_threshold,
     } = handle_command_line_arguments(args).await?;
@@ -197,7 +191,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     } else {
         IndexerMode::Light
     };
-    let mut indexer_state = if ignore_db {
+    let mut indexer_state = {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
@@ -211,16 +205,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             prune_interval,
             canonical_update_threshold,
         )?
-    } else {
-        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
-        // if no db or it doesn't have blocks, use the startup_dir like usual
-        let store = IndexerStore::new(&database_dir)?;
-        info!("restoring from database in {}", database_dir.display());
-        IndexerState::restore_from_db(store, canonical_update_threshold, 0)?
     };
-
     let mut block_parser = BlockParser::new(&startup_dir)?;
-    if ignore_db && !non_genesis_ledger {
+    if !non_genesis_ledger {
         indexer_state
             .initialize_with_contiguous_canonical(&mut block_parser)
             .await?;
