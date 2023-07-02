@@ -42,7 +42,7 @@ async fn extension() {
     let mut state = IndexerState::new_testing(&root_block, None, None, None).unwrap();
 
     // add dangling_root_block
-    let extension = state.add_block(&dangling_root_block, false).unwrap();
+    let extension = state.add_block(&dangling_root_block).unwrap();
     assert_eq!(extension, ExtensionType::DanglingNew);
 
     // danlging_root_block is added as the root of the 0th dangling branch
@@ -97,7 +97,7 @@ async fn extension() {
     // ---------------
     // add child block
     // ---------------
-    let extension = state.add_block(&dangling_child_block, false).unwrap();
+    let extension = state.add_block(&dangling_child_block).unwrap();
 
     // after extension quantities
     let after_root = state.dangling_branches.get(0).unwrap().root_block().clone();

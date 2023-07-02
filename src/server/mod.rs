@@ -232,7 +232,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
 
-                    indexer_state.add_block(&precomputed_block, true)?;
+                    indexer_state.add_block(&precomputed_block)?;
                     info!("Added {block:?}");
                 } else {
                     info!("Block receiver shutdown, system exit");

@@ -56,7 +56,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        state.add_block(&child1, false).unwrap(),
+        state.add_block(&child1).unwrap(),
         ExtensionType::RootSimple
     );
     assert_eq!(
@@ -90,7 +90,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        state.add_block(&child2, false).unwrap(),
+        state.add_block(&child2).unwrap(),
         ExtensionType::RootSimple
     );
     assert_eq!(

@@ -82,14 +82,14 @@ async fn merge() {
     // add leaf0
     // ---------
 
-    let extension_type = state.add_block(&leaf0_block, false).unwrap();
+    let extension_type = state.add_block(&leaf0_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ---------
     // add leaf1
     // ---------
 
-    let extension_type = state.add_block(&leaf1_block, false).unwrap();
+    let extension_type = state.add_block(&leaf1_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // Root branch
@@ -125,7 +125,7 @@ async fn merge() {
     // add middle block
     // ----------------
 
-    let extension_type = state.add_block(&middle_block, false).unwrap();
+    let extension_type = state.add_block(&middle_block).unwrap();
     assert_eq!(extension_type, ExtensionType::RootComplex);
 
     println!("=== After state ===");

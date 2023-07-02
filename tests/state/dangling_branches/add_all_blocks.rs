@@ -16,7 +16,7 @@ async fn extension() {
         n += 1;
 
         while let Some(precomputed_block) = block_parser.next().await.unwrap() {
-            state.add_block(&precomputed_block, false).unwrap();
+            state.add_block(&precomputed_block).unwrap();
             n += 1;
         }
 

@@ -486,7 +486,7 @@ impl IndexerState {
                 info!("Canonical tip:     {canonical_tip:?}");
             }
 
-            self.add_block(&block, false)?;
+            self.add_block(&block)?;
             block_count += 1;
         }
 
@@ -506,11 +506,10 @@ impl IndexerState {
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-        check_if_block_in_db: bool,
     ) -> anyhow::Result<ExtensionType> {
         self.prune_root_branch()?;
 
-        if check_if_block_in_db && self.is_block_already_in_db(precomputed_block)? {
+        if self.is_block_already_in_db(precomputed_block)? {
             debug!(
                 "Block with state hash {:?} is already present in the block store",
                 precomputed_block.state_hash

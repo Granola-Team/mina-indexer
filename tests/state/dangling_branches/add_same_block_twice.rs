@@ -44,7 +44,7 @@ async fn test() {
         IndexerState::new_testing(&root_block, None, Some(&block_store_dir), None).unwrap();
 
     // add block for the first time
-    let extension_type = state.add_block(&block0, false).unwrap();
+    let extension_type = state.add_block(&block0).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!("=== Before state ===");
@@ -61,7 +61,7 @@ async fn test() {
 
     // block not added again
     assert_eq!(
-        state.add_block(&block1, true).unwrap(),
+        state.add_block(&block1).unwrap(),
         ExtensionType::BlockNotAdded
     );
 
