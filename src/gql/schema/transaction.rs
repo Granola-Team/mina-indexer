@@ -22,6 +22,7 @@ impl Transaction {
         match cmd.data {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;
+
                 let (sender, receiver) = {
                     match payload.body {
                         SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
@@ -38,12 +39,15 @@ impl Transaction {
                     }
                 };
 
+                let naive_dt = NaiveDateTime::from_timestamp_millis(timestamp as i64).unwrap();
+                let timestamp = DateTime::<Utc>::from_utc(naive_dt, Utc);
+
                 Self {
                     from: sanitize_json(sender),
                     to: sanitize_json(receiver),
                     memo: sanitize_json(payload.common.memo),
                     height,
-                    timestamp: timestamp_to_datetime(timestamp),
+                    timestamp,
                 }
             }
         }
@@ -53,13 +57,6 @@ impl Transaction {
 // JSON utility
 fn sanitize_json<T: serde::Serialize>(s: T) -> String {
     serde_json::to_string(&s).unwrap().replace('\"', "")
-}
-
-// Conversion utility
-fn timestamp_to_datetime(ts: u64) -> DateTime<Utc> {
-    let ts_sec = ts / 1_000; // convert milliseconds to seconds
-    let naive_datetime = NaiveDateTime::from_timestamp_opt(ts_sec as i64, 0).unwrap();
-    DateTime::<Utc>::from_utc(naive_datetime, Utc)
 }
 
 #[derive(GraphQLInputObject)]

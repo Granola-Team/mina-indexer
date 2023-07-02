@@ -48,7 +48,7 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
