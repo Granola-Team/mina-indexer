@@ -138,7 +138,7 @@ async fn main() -> anyhow::Result<()> {
                 parsing_time += parse_time.elapsed();
 
                 let add = Instant::now();
-                state.add_block(&block, true).unwrap();
+                state.add_block(&block).unwrap();
                 adding_time += add.elapsed();
 
                 if verbose {
