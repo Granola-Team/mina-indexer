@@ -242,42 +242,6 @@ impl IndexerState {
         })
     }
 
-    pub fn new_with_db(
-        root_block: Block,
-        canonical_update_threshold: u32,
-        global_slot_since_genesis: u32,
-        transition_frontier_length: Option<u32>,
-        store: IndexerStore,
-    ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(
-            root_block.state_hash.clone(),
-            root_block.blockchain_length,
-            global_slot_since_genesis,
-        );
-        let tip = Tip {
-            state_hash: root_block.state_hash,
-            node_id: root_branch.root.clone(),
-        };
-
-        Ok(Self {
-            mode: IndexerMode::Light,
-            phase: IndexerPhase::InitializingFromDB,
-            canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
-            best_tip: tip,
-            root_branch,
-            dangling_branches: Vec::new(),
-            indexer_store: Some(store),
-            transition_frontier_length: transition_frontier_length
-                .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
-            prune_interval: PRUNE_INTERVAL_DEFAULT,
-            canonical_update_threshold,
-            blocks_processed: 0,
-            time: Instant::now(),
-            date_time: OffsetDateTime::now_utc(),
-        })
-    }
-
     /// Removes the lower portion of the root tree which is no longer needed
     fn prune_root_branch(&mut self) -> anyhow::Result<()> {
         let k = self.transition_frontier_length;
