@@ -19,14 +19,13 @@ use crate::{
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    borrow::Borrow,
     collections::HashMap,
     path::Path,
     str::FromStr,
     time::{Duration, Instant},
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info};
 
 pub mod branch;
 pub mod ledger;

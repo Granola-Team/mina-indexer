@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
-use rocksdb::{ColumnFamilyDescriptor, DBIteratorWithThreadMode, DBWithThreadMode, MultiThreaded};
+use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -82,10 +82,6 @@ impl IndexerStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
-    }
-
-    pub fn iterator(&self) -> DBIteratorWithThreadMode<DBWithThreadMode<MultiThreaded>> {
-        self.database.iterator(rocksdb::IteratorMode::Start)
     }
 
     pub fn put_tx(&self, height: u32, tx: UserCommandWithStatusV1) -> anyhow::Result<()> {
