@@ -9,13 +9,12 @@ use mina_serialization_types::staged_ledger_diff::UserCommandJson;
 
 use crate::gql::root::Context;
 
+#[allow(non_snake_case)]
 pub struct Transaction {
     pub from: String,
     pub to: String,
     pub memo: String,
-    #[allow(non_snake_case)]
     pub blockHeight: i32,
-    #[allow(non_snake_case)]
     pub dateTime: DateTime<Utc>,
 }
 
