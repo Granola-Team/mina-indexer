@@ -71,8 +71,8 @@ impl QueryRoot {
                     }
                 }
 
-                if let Some(ref memo) = query_input.memo {
-                    if transaction.memo != *memo {
+                if let Some(ref memos) = query_input.memos {
+                    if !memos.contains(&transaction.memo) {
                         continue;
                     }
                 }

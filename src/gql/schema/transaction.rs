@@ -64,7 +64,7 @@ fn sanitize_json<T: serde::Serialize>(s: T) -> String {
 pub struct TransactionQueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
-    pub memo: Option<String>,
+    pub memos: Option<Vec<String>>,
     pub date_time_gte: Option<DateTime<Utc>>,
     pub date_time_lte: Option<DateTime<Utc>>,
 }
