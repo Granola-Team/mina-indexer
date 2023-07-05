@@ -302,4 +302,65 @@ mod tests {
 
         assert_eq!(account_after.delegate, Some(delegate_key));
     }
+
+    #[test]
+    fn apply_diff_payment_with_post_balance() {
+        let public_key =
+            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
+                .expect("public key creation");
+        let mut account = Account::empty(public_key.clone());
+        account.balance = Amount(10); // Set the balance explicitly
+        let mut accounts = HashMap::new();
+        accounts.insert(public_key.clone(), account);
+        let mut ledger = Ledger { accounts };
+
+        let ledger_diff = LedgerDiff {
+            public_keys_seen: vec![],
+            account_diffs: vec![AccountDiff::Payment(PaymentDiff {
+                public_key: public_key.clone(),
+                amount: 1, // Pass the underlying value
+                update_type: UpdateType::Deposit,
+            })],
+        };
+
+        ledger
+            .apply_diff(&ledger_diff)
+            .expect("ledger diff application");
+
+        let account_after = ledger.accounts.get(&public_key).expect("account get");
+
+        assert_eq!(account_after.balance, Amount(11)); // Assert against the balance
+    }
+
+    #[test]
+    fn apply_diff_delegation_with_post_balance() {
+        let public_key =
+            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
+                .expect("public key creation");
+        let delegate_key =
+            PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")
+                .expect("delegate public key creation");
+        let mut account = Account::empty(public_key.clone());
+        account.balance = Amount(20); // Set the balance explicitly
+        let mut accounts = HashMap::new();
+        accounts.insert(public_key.clone(), account);
+        let mut ledger = Ledger { accounts };
+
+        let ledger_diff = LedgerDiff {
+            public_keys_seen: vec![],
+            account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
+                delegator: public_key.clone(),
+                delegate: delegate_key.clone(),
+            })],
+        };
+
+        ledger
+            .apply_diff(&ledger_diff)
+            .expect("ledger diff application");
+
+        let account_after = ledger.accounts.get(&public_key).expect("account get");
+
+        assert_eq!(account_after.delegate, Some(delegate_key));
+        assert_eq!(account_after.balance, Amount(20)); // Balance should remain unchanged
+    }
 }
