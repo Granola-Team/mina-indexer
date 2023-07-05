@@ -164,8 +164,12 @@ impl BlockParser {
                         let prev_length_idx = length_start_indices[curr_start_idx - 1];
 
                         for path in paths[prev_length_idx..curr_length_idx].iter() {
-                            if extract_parent_hash_from_path(curr_path).unwrap()
-                                == hash_from_path(path).unwrap()
+                            // if there's a gap, skip the current length, or
+                            // if we found a parent, check the next lower length
+                            if length_from_path(path).unwrap() + 1
+                                < length_from_path(curr_path).unwrap()
+                                || extract_parent_hash_from_path(curr_path).unwrap()
+                                    == hash_from_path(path).unwrap()
                             {
                                 curr_path = path;
                                 curr_length_idx = prev_length_idx;
@@ -176,12 +180,16 @@ impl BlockParser {
                     }
                 }
 
-                let successive_idx = length_start_indices[curr_start_idx + 1];
+                let successive_idx = if curr_start_idx + 1 < length_start_indices.len() {
+                    Some(length_start_indices[curr_start_idx + 1])
+                } else {
+                    None
+                };
 
                 // curr_path represents a canonical block
                 info!(
-                    "Found canonical tip {} in {:?}",
-                    curr_path.file_name().unwrap().to_str().unwrap(),
+                    "Found canonical tip with hash {} in {:?}",
+                    get_state_hash(curr_path.file_name().unwrap()).unwrap(),
                     time.elapsed()
                 );
 
@@ -234,11 +242,13 @@ impl BlockParser {
                 canonical_paths.reverse();
 
                 // add all blocks successive to the canonical chain
-                for path in paths[successive_idx..]
-                    .iter()
-                    .filter(|p| length_from_path(p).is_some())
-                {
-                    successive_paths.push(path.clone());
+                if let Some(successive_idx) = successive_idx {
+                    for path in paths[successive_idx..]
+                        .iter()
+                        .filter(|p| length_from_path(p).is_some())
+                    {
+                        successive_paths.push(path.clone());
+                    }
                 }
             }
 
@@ -427,14 +437,14 @@ mod tests {
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
             .for_each(|x| {
-                println!("{:?}", x);
+                println!("{x:?}");
             });
         Vec::from(FILENAMES_INVALID)
             .into_iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
             .for_each(|x| {
-                println!("{:?}", x);
+                println!("{x:?}");
             });
     }
 

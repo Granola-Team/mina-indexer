@@ -201,7 +201,7 @@ Could not find valid block!
 }
 
 /// extract a state hash from an OS file name
-fn get_state_hash(file_name: &OsStr) -> Option<String> {
+pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
     let last_part = file_name.to_str()?.split('-').last()?.to_string();
     if last_part.starts_with('.') {
         return None;
