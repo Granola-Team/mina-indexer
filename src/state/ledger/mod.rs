@@ -311,7 +311,7 @@ mod tests {
         let mut account = Account::empty(public_key.clone());
         account.balance = Amount(10); // Set the balance explicitly
         let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account);
+        accounts.insert(public_key.clone(), account.clone());
         let mut ledger = Ledger { accounts };
 
         let ledger_diff = LedgerDiff {
@@ -327,8 +327,10 @@ mod tests {
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
+        let account_before = account.clone();
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
+        assert_eq!(account_before.balance, Amount(10)); // with cloning
         assert_eq!(account_after.balance, Amount(11)); // Assert against the balance
     }
 
@@ -343,7 +345,7 @@ mod tests {
         let mut account = Account::empty(public_key.clone());
         account.balance = Amount(20); // Set the balance explicitly
         let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account);
+        accounts.insert(public_key.clone(), account.clone());
         let mut ledger = Ledger { accounts };
 
         let ledger_diff = LedgerDiff {
@@ -358,8 +360,10 @@ mod tests {
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
+        let account_before = account.clone();
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
+        assert_eq!(account_before.balance, account_after.balance); // with cloning
         assert_eq!(account_after.delegate, Some(delegate_key));
         assert_eq!(account_after.balance, Amount(20)); // Balance should remain unchanged
     }
