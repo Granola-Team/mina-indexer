@@ -1,7 +1,12 @@
-use crate::{block::precomputed::PrecomputedBlock, state::ledger::Amount};
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    state::ledger::{public_key::PublicKey, Amount},
+};
 use mina_serialization_types::{
-    staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation, UserCommand},
-    v1::PublicKeyV1,
+    staged_ledger_diff::{
+        SignedCommandPayloadBody, SignedCommandPayloadCommon, StakeDelegation, UserCommand,
+    },
+    v1::{PaymentPayloadV1, PublicKeyV1, SignedCommandV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,62 +35,103 @@ pub enum Command {
     Delegation(Delegation),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct SignedCommand(pub SignedCommandV1);
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct PaymentPayload(pub PaymentPayloadV1);
+
 impl Command {
-    // i say i say now this is a thiccy
     pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         precomputed_block
-            .staged_ledger_diff
-            .diff
-            .clone()
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands
+            .commands()
             .iter()
             .map(
-                |command| match command.clone().inner().data.inner().inner() {
-                    UserCommand::SignedCommand(signed_command) => match signed_command
-                        .inner()
-                        .inner()
-                        .payload
-                        .inner()
-                        .inner()
-                        .body
-                        .inner()
-                        .inner()
-                    {
-                        SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                            let source = payment_payload.clone().inner().inner().source_pk;
-                            let receiver = payment_payload.clone().inner().inner().receiver_pk;
-                            let amount = payment_payload
-                                .inner()
-                                .inner()
-                                .amount
-                                .inner()
-                                .inner()
-                                .into();
-                            Self::Payment(Payment {
-                                source,
-                                receiver,
-                                amount,
-                            })
-                        }
-                        SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
-                            match delegation_payload.inner() {
-                                StakeDelegation::SetDelegate {
-                                    delegator,
-                                    new_delegate,
-                                } => Self::Delegation(Delegation {
-                                    delegate: new_delegate,
-                                    delegator,
-                                }),
+                |command| match UserCommandWithStatus(command.clone()).data() {
+                    UserCommand::SignedCommand(signed_command) => {
+                        match SignedCommand(signed_command).payload_body() {
+                            SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+                                let source = payment_payload.clone().inner().inner().source_pk;
+                                let receiver = payment_payload.clone().inner().inner().receiver_pk;
+                                let amount = payment_payload.inner().inner().amount.inner().inner();
+                                Self::Payment(Payment {
+                                    source,
+                                    receiver,
+                                    amount: amount.into(),
+                                })
+                            }
+                            SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
+                                match delegation_payload.inner() {
+                                    StakeDelegation::SetDelegate {
+                                        delegator,
+                                        new_delegate,
+                                    } => Self::Delegation(Delegation {
+                                        delegate: new_delegate,
+                                        delegator,
+                                    }),
+                                }
                             }
                         }
-                    },
+                    }
                 },
             )
             .collect()
+    }
+}
+
+impl SignedCommand {
+    pub fn payload_body(&self) -> SignedCommandPayloadBody {
+        self.0
+            .clone()
+            .inner()
+            .inner()
+            .payload
+            .inner()
+            .inner()
+            .body
+            .inner()
+            .inner()
+    }
+
+    pub fn payload_common(&self) -> SignedCommandPayloadCommon {
+        self.0
+            .clone()
+            .inner()
+            .inner()
+            .payload
+            .inner()
+            .inner()
+            .common
+            .inner()
+            .inner()
+            .inner()
+    }
+
+    pub fn fee_payer_pk(&self) -> PublicKey {
+        self.payload_common().fee_payer_pk.into()
+    }
+
+    pub fn signer(&self) -> PublicKey {
+        self.0.clone().inner().inner().signer.0.inner().into()
+    }
+}
+
+impl UserCommandWithStatus {
+    pub fn data(self) -> UserCommand {
+        self.0.inner().data.inner().inner()
+    }
+}
+
+impl PaymentPayload {
+    pub fn source_pk(&self) -> PublicKey {
+        self.0.clone().inner().inner().source_pk.into()
+    }
+
+    pub fn receiver_pk(&self) -> PublicKey {
+        self.0.clone().inner().inner().receiver_pk.into()
     }
 }
 

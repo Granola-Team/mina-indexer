@@ -399,25 +399,14 @@ impl IndexerState {
                 indexer_store.add_block(&precomputed_block)?;
 
                 if let Some(height) = precomputed_block.blockchain_length {
-                    let tmstmp = precomputed_block
-                        .protocol_state
-                        .body
-                        .clone()
-                        .inner()
-                        .inner()
-                        .blockchain_state
-                        .inner()
-                        .inner()
-                        .timestamp
-                        .inner()
-                        .inner();
+                    let tmstmp = precomputed_block.timestamp();
 
-                    for cmd in precomputed_block.cmds() {
+                    for cmd in precomputed_block.commands() {
                         indexer_store.put_tx(height, tmstmp, cmd)?;
                     }
                 }
 
-                // TODO store ledger at specified cadence, e.g. at epoch boundaries
+                // TODO: store ledger at specified cadence, e.g. at epoch boundaries
                 // for now, just store every 1000 blocks
                 if block_count % 1000 == 0 {
                     indexer_store.add_ledger(
@@ -469,6 +458,7 @@ impl IndexerState {
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
             );
         }
+
         while let Some(block) = block_parser.next().await? {
             if should_report_from_block_count(block_count)
                 || self.should_report_from_time(step_time.elapsed())
@@ -541,20 +531,9 @@ impl IndexerState {
             indexer_store.add_block(precomputed_block)?;
 
             if let Some(height) = precomputed_block.blockchain_length {
-                let tmstmp = precomputed_block
-                    .protocol_state
-                    .body
-                    .clone()
-                    .inner()
-                    .inner()
-                    .blockchain_state
-                    .inner()
-                    .inner()
-                    .timestamp
-                    .inner()
-                    .inner();
+                let tmstmp = precomputed_block.timestamp();
 
-                for cmd in precomputed_block.cmds() {
+                for cmd in precomputed_block.commands() {
                     indexer_store.put_tx(height, tmstmp, cmd)?;
                 }
             }
@@ -827,7 +806,7 @@ impl IndexerState {
         None
     }
 
-    // TODO maybe we should add another function for getting a ledger at a specific slot/"height"?
+    // TODO: maybe we should add another function for getting a ledger at a specific slot/"height"?
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
         self.update_canonical();
 
