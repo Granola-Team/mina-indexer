@@ -13,8 +13,10 @@ pub struct Transaction {
     pub from: String,
     pub to: String,
     pub memo: String,
-    pub height: i32,
-    pub timestamp: DateTime<Utc>,
+    #[allow(non_snake_case)]
+    pub blockHeight: i32,
+    #[allow(non_snake_case)]
+    pub dateTime: DateTime<Utc>,
 }
 
 impl Transaction {
@@ -40,14 +42,14 @@ impl Transaction {
                 };
 
                 let naive_dt = NaiveDateTime::from_timestamp_millis(timestamp as i64).unwrap();
-                let timestamp = DateTime::<Utc>::from_utc(naive_dt, Utc);
+                let datetime = DateTime::<Utc>::from_utc(naive_dt, Utc);
 
                 Self {
                     from: sanitize_json(sender),
                     to: sanitize_json(receiver),
                     memo: sanitize_json(payload.common.memo),
-                    height,
-                    timestamp,
+                    blockHeight: height,
+                    dateTime: datetime,
                 }
             }
         }
@@ -88,12 +90,12 @@ impl Transaction {
     }
 
     #[graphql(description = "Block height")]
-    fn height(&self) -> i32 {
-        self.height
+    fn blockHeight(&self) -> i32 {
+        self.blockHeight
     }
 
-    #[graphql(description = "Timestamp")]
-    fn timestamp(&self) -> DateTime<Utc> {
-        self.timestamp
+    #[graphql(description = "Datetime")]
+    fn dateTime(&self) -> DateTime<Utc> {
+        self.dateTime
     }
 }
