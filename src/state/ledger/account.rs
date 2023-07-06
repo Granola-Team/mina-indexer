@@ -7,7 +7,7 @@ use super::PublicKey;
 )]
 pub struct Amount(pub u64);
 
-#[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Nonce(pub u32);
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]

@@ -3,10 +3,16 @@ pub mod coinbase;
 pub mod command;
 pub mod diff;
 pub mod genesis;
+pub mod post_balances;
 pub mod public_key;
 pub mod store;
 
-use self::account::{Amount, Nonce};
+use crate::{block::precomputed::PrecomputedBlock, state::ledger::post_balances::UserCommandType};
+
+use self::{
+    account::{Amount, Nonce},
+    post_balances::{PostBalance, PostBalanceUpdate},
+};
 use account::Account;
 use diff::LedgerDiff;
 use mina_signer::pubkey::PubKeyError;
@@ -49,6 +55,49 @@ impl Ledger {
         Ledger {
             accounts: HashMap::new(),
         }
+    }
+
+    pub fn apply_delegation(&mut self, delegator: PublicKey, new_delegate: PublicKey) {
+        if let Some(account) = self.accounts.get_mut(&delegator) {
+            account.delegate = Some(new_delegate);
+        }
+    }
+
+    pub fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<i32>) {
+        if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
+            if let Some(nonce) = nonce {
+                account.nonce = Nonce(nonce as u32 + 1);
+            }
+            account.balance = Amount(balance_update.balance);
+        } else {
+            let new_account = Account {
+                public_key: balance_update.public_key.clone(),
+                balance: Amount(balance_update.balance),
+                nonce: if let Some(nonce) = nonce {
+                    Nonce(nonce as u32)
+                } else {
+                    Nonce(0)
+                },
+                delegate: None,
+            };
+            self.accounts.insert(balance_update.public_key, new_account);
+        }
+    }
+
+    pub fn apply_post_balances(&mut self, precomputed_block: &PrecomputedBlock) {
+        PostBalanceUpdate::from_precomputed(precomputed_block)
+            .into_iter()
+            .for_each(|user_command| {
+                if UserCommandType::Delegation == user_command.command_type {
+                    self.apply_delegation(
+                        user_command.source.public_key.clone(),
+                        user_command.receiver.public_key.clone(),
+                    );
+                }
+                self.apply_balance_update(user_command.fee_payer, None);
+                self.apply_balance_update(user_command.receiver, None);
+                self.apply_balance_update(user_command.source, Some(user_command.source_nonce));
+            });
     }
 
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> Result<Self, PubKeyError> {

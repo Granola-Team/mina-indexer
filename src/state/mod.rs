@@ -238,15 +238,10 @@ impl IndexerState {
         })
     }
 
-    /// Creates a new indexer state from a db instance
-    pub fn new_from_db(_indexer_store: Arc<IndexerStore>) -> anyhow::Result<Self> {
-        todo!("Restoring from db");
-    }
-
     /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) {
+    fn prune_root_branch(&mut self) -> anyhow::Result<()> {
         let k = self.transition_frontier_length;
-        self.update_canonical();
+        self.update_canonical()?;
 
         if self.root_branch.height() > self.prune_interval * k {
             let best_tip_block = self.best_tip_block().clone();
@@ -260,6 +255,8 @@ impl IndexerState {
             self.root_branch
                 .prune_transition_frontier(k, &best_tip_block);
         }
+
+        Ok(())
     }
 
     /// The highest known canonical block
@@ -278,7 +275,7 @@ impl IndexerState {
     }
 
     /// Updates the canonical tip if the precondition is met
-    pub fn update_canonical(&mut self) {
+    pub fn update_canonical(&mut self) -> anyhow::Result<()> {
         if self.best_tip_block().height - self.canonical_tip_block().height
             > self.canonical_update_threshold
         {
@@ -320,8 +317,8 @@ impl IndexerState {
 
                 // apply the new canonical diffs to the old canonical ledger
                 for canonical_hash in &canonical_hashes {
-                    if let Some(diff) = self.diffs_map.get(canonical_hash) {
-                        ledger.apply_diff(diff).unwrap();
+                    if let Some(precomputed_block) = indexer_store.get_block(canonical_hash)? {
+                        ledger.apply_post_balances(&precomputed_block);
                     }
                 }
 
@@ -359,6 +356,8 @@ impl IndexerState {
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Initialize indexer state from a collection of contiguous canonical blocks
@@ -392,10 +391,9 @@ impl IndexerState {
                 }
 
                 let precomputed_block = block_parser.next().await?.unwrap();
-                let diff = LedgerDiff::from_precomputed_block(&precomputed_block);
 
                 // apply and add to db
-                ledger.apply_diff(&diff)?;
+                ledger.apply_post_balances(&precomputed_block);
                 indexer_store.add_block(&precomputed_block)?;
 
                 if let Some(height) = precomputed_block.blockchain_length {
@@ -507,7 +505,7 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.prune_root_branch();
+        self.prune_root_branch()?;
 
         if self.is_block_already_in_db(precomputed_block)? {
             debug!(
@@ -808,45 +806,44 @@ impl IndexerState {
 
     // TODO: maybe we should add another function for getting a ledger at a specific slot/"height"?
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
-        self.update_canonical();
+        self.update_canonical()?;
 
         // get the most recent canonical ledger
-        let ledger = if let Some(indexer_store) = &self.indexer_store {
-            indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
-        } else {
-            None
-        };
-
-        if let Some(mut ledger) = ledger {
-            // collect diffs from canonical tip to best tip
-            let mut diffs_since_canonical_tip =
-                if self.best_tip.state_hash != self.canonical_tip.state_hash {
-                    vec![self.diffs_map.get(&self.best_tip.state_hash).unwrap()]
-                } else {
-                    vec![]
-                };
-
-            for ancestor in self
-                .root_branch
-                .branches
-                .ancestors(&self.best_tip.node_id)
-                .unwrap()
+        if let Some(indexer_store) = &self.indexer_store {
+            if let Some(mut ledger) =
+                indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
             {
-                if ancestor.data().state_hash != self.canonical_tip.state_hash {
-                    diffs_since_canonical_tip
-                        .push(self.diffs_map.get(&ancestor.data().state_hash).unwrap());
-                } else {
-                    break;
+                // collect diffs from canonical tip to best tip
+                let mut hashes_since_canonical_tip =
+                    if self.best_tip.state_hash != self.canonical_tip.state_hash {
+                        vec![self.best_tip.state_hash.clone()]
+                    } else {
+                        vec![]
+                    };
+
+                for ancestor in self
+                    .root_branch
+                    .branches
+                    .ancestors(&self.best_tip.node_id)
+                    .unwrap()
+                {
+                    if ancestor.data().state_hash != self.canonical_tip.state_hash {
+                        hashes_since_canonical_tip.push(ancestor.data().state_hash.clone());
+                    } else {
+                        break;
+                    }
                 }
-            }
 
-            // apply diffs from canonical tip to best tip
-            diffs_since_canonical_tip.reverse();
-            for diff in diffs_since_canonical_tip {
-                ledger.apply_diff(diff)?;
-            }
+                // apply diffs from canonical tip to best tip
+                hashes_since_canonical_tip.reverse();
+                for hash in hashes_since_canonical_tip {
+                    if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
+                        ledger.apply_post_balances(&precomputed_block);
+                    }
+                }
 
-            return Ok(Some(ledger));
+                return Ok(Some(ledger));
+            }
         }
 
         Ok(None)
