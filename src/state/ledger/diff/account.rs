@@ -1,11 +1,11 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{account::Amount, command::Command, PublicKey},
+    state::ledger::{
+        command::{Command, SignedCommand},
+        Amount, PublicKey,
+    },
 };
-use mina_serialization_types::{
-    staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand},
-    v1::PublicKeyV1,
-};
+use mina_serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand};
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
@@ -55,13 +55,13 @@ impl AccountDiff {
         }
     }
 
-    pub fn from_coinbase(coinbase_receiver: PublicKeyV1, supercharge_coinbase: bool) -> Self {
+    pub fn from_coinbase(coinbase_receiver: PublicKey, supercharge_coinbase: bool) -> Self {
         let amount = match supercharge_coinbase {
             true => 1440,
             false => 720,
         } * (1e9 as u64);
         AccountDiff::Payment(PaymentDiff {
-            public_key: coinbase_receiver.into(),
+            public_key: coinbase_receiver,
             amount: amount.into(),
             update_type: UpdateType::Deposit,
         })
@@ -75,18 +75,11 @@ impl AccountDiff {
     }
 
     pub fn from_block_fees(
-        coinbase_receiver: PublicKeyV1,
+        coinbase_receiver: PublicKey,
         precomputed_block: &PrecomputedBlock,
     ) -> Vec<AccountDiff> {
         precomputed_block
-            .staged_ledger_diff
-            .clone()
-            .diff
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands
+            .commands()
             .iter()
             .flat_map(
                 |command| match command.clone().inner().data.inner().inner() {
@@ -98,16 +91,7 @@ impl AccountDiff {
                             nonce: _nonce,
                             valid_until: _valid_until,
                             memo: _memo,
-                        } = signed_command
-                            .inner()
-                            .inner()
-                            .payload
-                            .inner()
-                            .inner()
-                            .common
-                            .inner()
-                            .inner()
-                            .inner();
+                        } = SignedCommand(signed_command).payload_common();
                         vec![
                             AccountDiff::Payment(PaymentDiff {
                                 public_key: fee_payer_pk.into(),
@@ -115,7 +99,7 @@ impl AccountDiff {
                                 update_type: UpdateType::Deduction,
                             }),
                             AccountDiff::Payment(PaymentDiff {
-                                public_key: coinbase_receiver.clone().into(),
+                                public_key: coinbase_receiver.clone(),
                                 amount: fee.inner().inner().into(),
                                 update_type: UpdateType::Deposit,
                             }),

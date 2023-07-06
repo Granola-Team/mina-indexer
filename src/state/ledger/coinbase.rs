@@ -29,6 +29,6 @@ impl Coinbase {
     }
 
     pub fn as_account_diff(self) -> AccountDiff {
-        AccountDiff::from_coinbase(self.receiver.into(), self.supercharge)
+        AccountDiff::from_coinbase(self.receiver, self.supercharge)
     }
 }

@@ -11,7 +11,6 @@ use std::{
     io::{prelude::*, SeekFrom},
     path::{Path, PathBuf},
     time::Instant,
-    u32::MAX,
     vec::IntoIter,
 };
 use tokio::io::AsyncReadExt;
@@ -86,11 +85,7 @@ impl BlockParser {
                 info!("Sorting startup blocks by length");
 
                 let time = Instant::now();
-                paths.sort_by(|x, y| {
-                    length_from_path(x)
-                        .unwrap_or(MAX)
-                        .cmp(&length_from_path(y).unwrap_or(MAX))
-                });
+                paths.sort_by_key(|x| length_from_path_or_max(x));
 
                 info!(
                     "{} blocks sorted by length in {:?}",
@@ -105,7 +100,7 @@ impl BlockParser {
                 // build the length_start_indices vec corresponding to the
                 // longest contiguous chain starting from the lowest block
                 for (idx, path) in paths.iter().enumerate() {
-                    let height = length_from_path(path).unwrap_or(MAX);
+                    let height = length_from_path_or_max(path);
                     if idx == 0 || height > curr_length {
                         length_start_indices.push(idx);
                         curr_length = height;
@@ -118,7 +113,7 @@ impl BlockParser {
                 let check_lengths = length_start_indices
                     .iter()
                     .take(MAINNET_CANONICAL_THRESHOLD as usize + 1)
-                    .map(|idx| length_from_path(paths.get(*idx).unwrap()).unwrap_or(MAX));
+                    .map(|idx| length_from_path_or_max(paths.get(*idx).unwrap()));
 
                 let check = check_lengths.enumerate().fold(None, |acc, (n, x)| {
                     if acc.is_none() && n == 0 || x == acc.unwrap_or(0) + 1 {
@@ -164,9 +159,9 @@ impl BlockParser {
                         let prev_length_idx = length_start_indices[curr_start_idx - 1];
 
                         for path in paths[prev_length_idx..curr_length_idx].iter() {
-                            if extract_parent_hash_from_path(curr_path).unwrap()
-                                == hash_from_path(path).unwrap()
-                            {
+                            // if there's a gap, skip the current length, or
+                            // if we found a parent, check the next lower length
+                            if has_gap(path, curr_path) || is_parent(path, curr_path) {
                                 curr_path = path;
                                 curr_length_idx = prev_length_idx;
                                 curr_start_idx -= 1;
@@ -176,12 +171,16 @@ impl BlockParser {
                     }
                 }
 
-                let successive_idx = length_start_indices[curr_start_idx + 1];
+                let successive_idx = if curr_start_idx + 1 < length_start_indices.len() {
+                    Some(length_start_indices[curr_start_idx + 1])
+                } else {
+                    None
+                };
 
                 // curr_path represents a canonical block
                 info!(
-                    "Found canonical tip {} in {:?}",
-                    curr_path.file_name().unwrap().to_str().unwrap(),
+                    "Found canonical tip with hash {} in {:?}",
+                    hash_from_path(curr_path),
                     time.elapsed()
                 );
 
@@ -202,9 +201,7 @@ impl BlockParser {
                     };
 
                     for path in paths[prev_length_idx..curr_length_idx].iter() {
-                        if extract_parent_hash_from_path(curr_path).unwrap()
-                            == hash_from_path(path).unwrap()
-                        {
+                        if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
                             canonical_paths.push(path.clone());
                             curr_path = path;
                             curr_length_idx = prev_length_idx;
@@ -217,9 +214,7 @@ impl BlockParser {
 
                 // final canonical block
                 for path in paths[0..curr_length_idx].iter() {
-                    if extract_parent_hash_from_path(curr_path).unwrap()
-                        == hash_from_path(path).unwrap()
-                    {
+                    if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
                         canonical_paths.push(path.clone());
                         break;
                     }
@@ -234,11 +229,13 @@ impl BlockParser {
                 canonical_paths.reverse();
 
                 // add all blocks successive to the canonical chain
-                for path in paths[successive_idx..]
-                    .iter()
-                    .filter(|p| length_from_path(p).is_some())
-                {
-                    successive_paths.push(path.clone());
+                if let Some(idx) = successive_idx {
+                    for path in paths[idx..]
+                        .iter()
+                        .filter(|p| length_from_path(p).is_some())
+                    {
+                        successive_paths.push(path.clone());
+                    }
                 }
             }
 
@@ -257,7 +254,7 @@ impl BlockParser {
         }
     }
 
-    /// Traverse the internal paths. First canonical, then successive.
+    /// Traverses the internal paths. First canonical, then successive.
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
             return Self::handle_path(&next_path).await;
@@ -297,7 +294,7 @@ impl BlockParser {
         }
     }
 
-    /// get the precomputed block with supplied hash
+    /// Gets the precomputed block with supplied `state_hash`,
     /// it must exist ahead of the current block parser file
     pub async fn get_precomputed_block(
         &mut self,
@@ -306,10 +303,10 @@ impl BlockParser {
         let error = anyhow::Error::msg(format!(
             "
 [BlockPasrser::get_precomputed_block]
-    Looking in blocks dir: {:?}
+    Looking in blocks dir: {}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!",
-            self.blocks_dir
+            self.blocks_dir.display()
         ));
         let mut next_block = self.next().await?.ok_or(error)?;
 
@@ -317,10 +314,10 @@ impl BlockParser {
             next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
                 "
 [BlockPasrser::get_precomputed_block]
-    Looking in blocks dir: {:?}
+    Looking in blocks dir: {}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!",
-                self.blocks_dir
+                self.blocks_dir.display()
             )))?;
         }
 
@@ -352,7 +349,7 @@ impl BlockParser {
                 "
 [BlockParser::parse_file]
     Could not find valid block!
-    {:} is not a valid precomputed block",
+    {} is not a valid precomputed block",
                 filename.display()
             )))
         }
@@ -363,8 +360,12 @@ fn length_from_path(path: &Path) -> Option<u32> {
     get_blockchain_length(path.file_name().unwrap())
 }
 
-fn hash_from_path(path: &Path) -> Option<String> {
-    get_state_hash(path.file_name().unwrap())
+fn length_from_path_or_max(path: &Path) -> u32 {
+    length_from_path(path).unwrap_or(u32::MAX)
+}
+
+fn hash_from_path(path: &Path) -> String {
+    get_state_hash(path.file_name().unwrap()).unwrap()
 }
 
 fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
@@ -373,10 +374,22 @@ fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
 
     let mut f = File::open(path)?;
     f.seek(SeekFrom::Start(parent_hash_offset))?;
+
     let mut buf = vec![0; parent_hash_length];
     f.read_exact(&mut buf)?;
+
     let parent_hash = String::from_utf8(buf)?;
     Ok(parent_hash)
+}
+
+/// Checks if there is a gap between the blocks at `path` and `curr_path`
+fn has_gap(path: &Path, curr_path: &Path) -> bool {
+    length_from_path(path).unwrap() + 1 < length_from_path(curr_path).unwrap()
+}
+
+/// Checks if the block at `curr_path` is the parent of the block at `path`
+fn is_parent(path: &Path, curr_path: &Path) -> bool {
+    extract_parent_hash_from_path(curr_path).unwrap() == hash_from_path(path)
 }
 
 #[cfg(test)]
@@ -427,14 +440,14 @@ mod tests {
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
             .for_each(|x| {
-                println!("{:?}", x);
+                println!("{x:?}");
             });
         Vec::from(FILENAMES_INVALID)
             .into_iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
             .for_each(|x| {
-                println!("{:?}", x);
+                println!("{x:?}");
             });
     }
 

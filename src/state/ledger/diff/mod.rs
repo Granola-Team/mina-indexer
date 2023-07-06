@@ -22,7 +22,7 @@ impl LedgerDiff {
 
         let commands = Command::from_precomputed_block(precomputed_block); // [A]
         let mut account_diffs_fees: Vec<AccountDiff> =
-            AccountDiff::from_block_fees(coinbase.receiver.into(), precomputed_block); // [A]
+            AccountDiff::from_block_fees(coinbase.receiver, precomputed_block); // [A]
         let mut account_diffs_transactions = commands
             .iter()
             .cloned()
@@ -34,11 +34,7 @@ impl LedgerDiff {
         account_diffs.append(&mut account_diffs_transactions);
         account_diffs.push(coinbase_update);
 
-        let public_keys_seen = precomputed_block
-            .block_public_keys()
-            .into_iter()
-            .map(|key| key.into())
-            .collect();
+        let public_keys_seen = precomputed_block.block_public_keys().into_iter().collect();
 
         LedgerDiff {
             public_keys_seen,
