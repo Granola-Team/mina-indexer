@@ -16,7 +16,7 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use std::{path::PathBuf, process};
+use std::{path::PathBuf, process, sync::Arc};
 use tokio::fs::{self, create_dir_all, metadata};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::prelude::*;
@@ -72,7 +72,7 @@ pub struct IndexerConfiguration {
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
-    database_dir: PathBuf,
+    pub database_dir: PathBuf,
     keep_noncanonical_blocks: bool,
     log_file: PathBuf,
     log_level: LevelFilter,
@@ -150,7 +150,10 @@ pub async fn handle_command_line_arguments(
 }
 
 #[instrument(skip_all)]
-pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
+pub async fn run(
+    config: IndexerConfiguration,
+    indexer_store: Arc<IndexerStore>,
+) -> Result<(), anyhow::Error> {
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
         .await
@@ -170,7 +173,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         log_level_stdout,
         prune_interval,
         canonical_update_threshold,
-    } = handle_command_line_arguments(args).await?;
+    } = config;
 
     // setup tracing
     if let Some(parent) = log_file.parent() {
@@ -200,7 +203,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             mode,
             root_hash.clone(),
             ledger.ledger,
-            Some(&database_dir),
+            indexer_store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,

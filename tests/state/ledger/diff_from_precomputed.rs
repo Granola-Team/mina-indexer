@@ -68,24 +68,24 @@ async fn account_diffs() {
             }) => {
                 println!("\n* Payment");
                 println!("public_key:  {public_key:?}");
-                println!("amount:      {amount}");
+                println!("amount:      {}", amount.0);
                 println!("update_type: {update_type:?}");
 
                 match update_type {
                     UpdateType::Deduction => {
                         if let Some(balance) = ledger.get_mut(&public_key) {
-                            if amount as i64 > *balance {
+                            if amount.0 as i64 > *balance {
                                 println!("deduction amount exceeded balance");
                                 panic!();
                             }
-                            *balance -= amount as i64;
+                            *balance -= amount.0 as i64;
                         }
                     }
                     UpdateType::Deposit => {
                         if let Some(balance) = ledger.get_mut(&public_key) {
-                            *balance += amount as i64;
+                            *balance += amount.0 as i64;
                         } else {
-                            ledger.insert(public_key, amount as i64);
+                            ledger.insert(public_key, amount.0 as i64);
                         }
                     }
                 }

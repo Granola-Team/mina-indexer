@@ -3,9 +3,10 @@ use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     state::{ledger::genesis, IndexerMode, IndexerState},
+    store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use std::{path::PathBuf, thread};
+use std::{path::PathBuf, sync::Arc, thread};
 use tokio::{
     process,
     time::{Duration, Instant},
@@ -57,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
 
     const DB_PATH: &str = "./mainnet-test-block-store";
     let store_dir = &PathBuf::from(DB_PATH);
+    let indexer_store = Arc::new(IndexerStore::new(store_dir).unwrap());
 
     const GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
     let genesis_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
@@ -71,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         mode,
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
-        Some(&PathBuf::from(store_dir)),
+        indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,

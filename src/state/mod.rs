@@ -20,8 +20,8 @@ use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    path::Path,
     str::FromStr,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
@@ -51,7 +51,7 @@ pub struct IndexerState {
     /// needed for the possibility of missing blocks
     pub dangling_branches: Vec<Branch>,
     /// Block database
-    pub indexer_store: Option<IndexerStore>,
+    pub indexer_store: Option<Arc<IndexerStore>>,
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
     /// Interval to the prune the root branch
@@ -116,19 +116,17 @@ impl IndexerState {
         mode: IndexerMode,
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
-        rocksdb_path: Option<&Path>,
+        indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash.clone());
-        let indexer_store = rocksdb_path.map(|path| {
-            let store = IndexerStore::new(path).unwrap();
-            store
-                .add_ledger(&root_hash, genesis_ledger.into())
-                .expect("ledger add succeeds");
-            store
-        });
+
+        indexer_store
+            .add_ledger(&root_hash, genesis_ledger.into())
+            .expect("ledger add succeeds");
+
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -142,7 +140,7 @@ impl IndexerState {
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
-            indexer_store,
+            indexer_store: Some(indexer_store),
             transition_frontier_length,
             prune_interval,
             canonical_update_threshold,
@@ -160,7 +158,7 @@ impl IndexerState {
         ledger: Ledger,
         blockchain_length: Option<u32>,
         global_slot_since_genesis: u32,
-        rocksdb_path: Option<&Path>,
+        indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
@@ -170,13 +168,11 @@ impl IndexerState {
             blockchain_length,
             global_slot_since_genesis,
         );
-        let indexer_store = rocksdb_path.map(|path| {
-            let store = IndexerStore::new(path).unwrap();
-            store
-                .add_ledger(&root_hash, ledger)
-                .expect("ledger add succeeds");
-            store
-        });
+
+        indexer_store
+            .add_ledger(&root_hash, ledger)
+            .expect("ledger add succeeds");
+
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -190,7 +186,7 @@ impl IndexerState {
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
-            indexer_store,
+            indexer_store: Some(indexer_store),
             transition_frontier_length,
             prune_interval,
             canonical_update_threshold,
@@ -204,7 +200,7 @@ impl IndexerState {
     pub fn new_testing(
         root_block: &PrecomputedBlock,
         root_ledger: Option<Ledger>,
-        rocksdb_path: Option<&Path>,
+        rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block);
@@ -217,6 +213,7 @@ impl IndexerState {
             }
             store
         });
+
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -230,7 +227,7 @@ impl IndexerState {
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
-            indexer_store,
+            indexer_store: indexer_store.map(Arc::new),
             transition_frontier_length: transition_frontier_length
                 .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
@@ -400,12 +397,14 @@ impl IndexerState {
                 indexer_store.add_block(&precomputed_block)?;
 
                 if let Some(height) = precomputed_block.blockchain_length {
-                    for cmd in precomputed_block.cmds() {
-                        indexer_store.put_tx(height, cmd)?;
+                    let tmstmp = precomputed_block.timestamp();
+
+                    for cmd in precomputed_block.commands() {
+                        indexer_store.put_tx(height, tmstmp, cmd)?;
                     }
                 }
 
-                // TODO store ledger at specified cadence, e.g. at epoch boundaries
+                // TODO: store ledger at specified cadence, e.g. at epoch boundaries
                 // for now, just store every 1000 blocks
                 if block_count % 1000 == 0 {
                     indexer_store.add_ledger(
@@ -432,7 +431,6 @@ impl IndexerState {
         // now add the successive non-canoical blocks
         self.add_blocks(block_parser, block_count).await
     }
-
     /// Initialize indexer state without contiguous canonical blocks
     pub async fn initialize_without_contiguous_canonical(
         &mut self,
@@ -458,6 +456,7 @@ impl IndexerState {
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
             );
         }
+
         while let Some(block) = block_parser.next().await? {
             if should_report_from_block_count(block_count)
                 || self.should_report_from_time(step_time.elapsed())
@@ -530,8 +529,10 @@ impl IndexerState {
             indexer_store.add_block(precomputed_block)?;
 
             if let Some(height) = precomputed_block.blockchain_length {
-                for cmd in precomputed_block.cmds() {
-                    indexer_store.put_tx(height, cmd)?;
+                let tmstmp = precomputed_block.timestamp();
+
+                for cmd in precomputed_block.commands() {
+                    indexer_store.put_tx(height, tmstmp, cmd)?;
                 }
             }
         }
@@ -792,7 +793,6 @@ impl IndexerState {
         }
         vec![]
     }
-
     pub fn get_block_status(&self, state_hash: &BlockHash) -> Option<Canonicity> {
         // first check the db, then diffs map
         if let Some(indexer_store) = &self.indexer_store {
@@ -804,7 +804,7 @@ impl IndexerState {
         None
     }
 
-    // TODO maybe we should add another function for getting a ledger at a specific slot/"height"?
+    // TODO: maybe we should add another function for getting a ledger at a specific slot/"height"?
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
         self.update_canonical()?;
 

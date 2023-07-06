@@ -1,15 +1,13 @@
-use mina_serialization_types::{
-    staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand},
-    v1::PublicKeyV1,
-};
-use serde::{Deserialize, Serialize};
-
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{command::Command, PublicKey},
+    state::ledger::{
+        command::{Command, SignedCommand},
+        Amount, PublicKey,
+    },
 };
+use mina_serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand};
+use serde::{Deserialize, Serialize};
 
-// add delegations later
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum UpdateType {
     Deposit,
@@ -19,7 +17,7 @@ pub enum UpdateType {
 #[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct PaymentDiff {
     pub public_key: PublicKey,
-    pub amount: u64,
+    pub amount: Amount,
     pub update_type: UpdateType,
 }
 
@@ -57,14 +55,14 @@ impl AccountDiff {
         }
     }
 
-    pub fn from_coinbase(coinbase_receiver: PublicKeyV1, supercharge_coinbase: bool) -> Self {
+    pub fn from_coinbase(coinbase_receiver: PublicKey, supercharge_coinbase: bool) -> Self {
         let amount = match supercharge_coinbase {
             true => 1440,
             false => 720,
         } * (1e9 as u64);
         AccountDiff::Payment(PaymentDiff {
-            public_key: coinbase_receiver.into(),
-            amount,
+            public_key: coinbase_receiver,
+            amount: amount.into(),
             update_type: UpdateType::Deposit,
         })
     }
@@ -77,18 +75,11 @@ impl AccountDiff {
     }
 
     pub fn from_block_fees(
-        coinbase_receiver: PublicKeyV1,
+        coinbase_receiver: PublicKey,
         precomputed_block: &PrecomputedBlock,
     ) -> Vec<AccountDiff> {
         precomputed_block
-            .staged_ledger_diff
-            .clone()
-            .diff
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands
+            .commands()
             .iter()
             .flat_map(
                 |command| match command.clone().inner().data.inner().inner() {
@@ -100,25 +91,16 @@ impl AccountDiff {
                             nonce: _nonce,
                             valid_until: _valid_until,
                             memo: _memo,
-                        } = signed_command
-                            .inner()
-                            .inner()
-                            .payload
-                            .inner()
-                            .inner()
-                            .common
-                            .inner()
-                            .inner()
-                            .inner();
+                        } = SignedCommand(signed_command).payload_common();
                         vec![
                             AccountDiff::Payment(PaymentDiff {
                                 public_key: fee_payer_pk.into(),
-                                amount: fee.clone().inner().inner(),
+                                amount: fee.clone().inner().inner().into(),
                                 update_type: UpdateType::Deduction,
                             }),
                             AccountDiff::Payment(PaymentDiff {
-                                public_key: coinbase_receiver.clone().into(),
-                                amount: fee.inner().inner(),
+                                public_key: coinbase_receiver.clone(),
+                                amount: fee.inner().inner().into(),
                                 update_type: UpdateType::Deposit,
                             }),
                         ]
@@ -134,7 +116,7 @@ impl std::fmt::Debug for PaymentDiff {
         write!(
             f,
             "{:?} | {:?} | {}",
-            self.public_key, self.update_type, self.amount
+            self.public_key, self.update_type, self.amount.0
         )
     }
 }
@@ -166,6 +148,7 @@ impl std::fmt::Debug for UpdateType {
 #[cfg(test)]
 mod tests {
     use super::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType};
+    use crate::state::ledger::account::Amount;
     use crate::state::ledger::command::{Command, Delegation, Payment};
     use crate::state::ledger::PublicKey;
 
@@ -183,18 +166,18 @@ mod tests {
         let payment_command = Command::Payment(Payment {
             source: source_public_key.into(),
             receiver: receiver_public_key.into(),
-            amount: 536900000000,
+            amount: 536900000000.into(),
         });
 
         let expected_result = vec![
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key_result.into(),
-                amount: 536900000000,
+                amount: 536900000000.into(),
                 update_type: UpdateType::Deduction,
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: receiver_public_key_result.into(),
-                amount: 536900000000,
+                amount: 536900000000.into(),
                 update_type: UpdateType::Deposit,
             }),
         ];
@@ -241,7 +224,7 @@ mod tests {
 
         let expected_payment_diff = PaymentDiff {
             public_key: coinbase_receiver.into(),
-            amount: 1440 * (1e9 as u64),
+            amount: Amount(1440 * (1e9 as u64)),
             update_type: UpdateType::Deposit,
         };
         let expected_account_diff = AccountDiff::Payment(expected_payment_diff);
@@ -256,7 +239,7 @@ mod tests {
                 "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG",
             )
             .unwrap(),
-            amount: 536900000000,
+            amount: 536900000000.into(),
             update_type: UpdateType::Deduction,
         };
         let account_diff = AccountDiff::Payment(payment_diff);
