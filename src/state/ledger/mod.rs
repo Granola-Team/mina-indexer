@@ -229,6 +229,18 @@ impl std::fmt::Display for LedgerError {
 
 impl std::error::Error for LedgerError {}
 
+impl Amount {
+    pub fn add(&self, other: &Amount) -> Amount {
+        Amount(self.0 + other.0)
+    }
+}
+
+impl From<u64> for Amount {
+    fn from(value: u64) -> Self {
+        Amount(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -310,8 +322,9 @@ mod tests {
                 .expect("public key creation");
         let mut account = Account::empty(public_key.clone());
         account.balance = Amount(10); // Set the balance explicitly
+        let account_before = account.clone();
         let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account.clone());
+        accounts.insert(public_key.clone(), account);
         let mut ledger = Ledger { accounts };
 
         let ledger_diff = LedgerDiff {
@@ -327,11 +340,16 @@ mod tests {
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
-        let account_before = account.clone();
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
-        assert_eq!(account_before.balance, Amount(10)); // with cloning
-        assert_eq!(account_after.balance, Amount(11)); // Assert against the balance
+        if let AccountDiff::Payment(payment_diff) = &ledger_diff.account_diffs[0] {
+            assert_eq!(
+                account_after.balance,
+                account_before.balance.add(&payment_diff.amount.into())
+            );
+        } else {
+            panic!("Expected payment diff");
+        }
     }
 
     #[test]
@@ -365,6 +383,5 @@ mod tests {
 
         assert_eq!(account_before.balance, account_after.balance); // with cloning
         assert_eq!(account_after.delegate, Some(delegate_key));
-        assert_eq!(account_after.balance, Amount(20)); // Balance should remain unchanged
     }
 }
