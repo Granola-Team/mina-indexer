@@ -4,7 +4,8 @@ use crate::{
 };
 use mina_serialization_types::{
     staged_ledger_diff::{
-        SignedCommandPayloadBody, SignedCommandPayloadCommon, StakeDelegation, UserCommand,
+        SignedCommandPayloadBody, SignedCommandPayloadCommon, StakeDelegation,
+        TransactionStatusBalanceData, UserCommand,
     },
     v1::{PaymentPayloadV1, PublicKeyV1, SignedCommandV1, UserCommandWithStatusV1},
 };
@@ -39,7 +40,31 @@ pub enum Command {
 pub struct SignedCommand(pub SignedCommandV1);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum CommandStatusData {
+    Applied {
+        balance_data: TransactionStatusBalanceData,
+    },
+    Failed,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
+
+impl UserCommandWithStatus {
+    pub fn status_data(&self) -> CommandStatusData {
+        match self.0.t.status.t.clone() {
+            mina_serialization_types::staged_ledger_diff::TransactionStatus::Applied(
+                _,
+                balance_data,
+            ) => CommandStatusData::Applied {
+                balance_data: balance_data.t,
+            },
+            mina_serialization_types::staged_ledger_diff::TransactionStatus::Failed(_, _) => {
+                CommandStatusData::Failed
+            }
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct PaymentPayload(pub PaymentPayloadV1);

@@ -2320,6 +2320,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uuid 1.4.0",
+ "versioned",
  "watchexec",
 ]
 

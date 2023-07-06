@@ -9,6 +9,7 @@ use self::precomputed::{BlockLogContents, PrecomputedBlock};
 pub mod parser;
 pub mod precomputed;
 pub mod receiver;
+pub mod signed_command;
 pub mod store;
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]

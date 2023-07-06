@@ -3,15 +3,15 @@ pub mod coinbase;
 pub mod command;
 pub mod diff;
 pub mod genesis;
+pub mod post_balances;
 pub mod public_key;
 pub mod store;
-pub mod user_commands;
 
-use crate::{block::precomputed::PrecomputedBlock, state::ledger::user_commands::UserCommandType};
+use crate::{block::precomputed::PrecomputedBlock, state::ledger::post_balances::UserCommandType};
 
 use self::{
     account::{Amount, Nonce},
-    user_commands::{BalanceUpdate, UserCommand},
+    post_balances::{PostBalance, PostBalanceUpdate},
 };
 use account::Account;
 use diff::LedgerDiff;
@@ -69,7 +69,7 @@ impl Ledger {
         }
     }
 
-    pub fn apply_balance_update(&mut self, balance_update: BalanceUpdate, nonce: Option<i32>) {
+    pub fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<i32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
             let nonce = if let Some(nonce) = nonce {
                 Nonce(nonce as u32 + 1)
@@ -94,7 +94,7 @@ impl Ledger {
     }
 
     pub fn apply_post_balances(&mut self, precomputed_block: &PrecomputedBlock) {
-        UserCommand::from_precomputed(precomputed_block)
+        PostBalanceUpdate::from_precomputed(precomputed_block)
             .into_iter()
             .for_each(|user_command| {
                 if UserCommandType::Delegation == user_command.command_type {

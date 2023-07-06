@@ -11,7 +11,6 @@ use mina_serialization_types::{
     protocol_state_proof::ProtocolStateProofBase64Json,
     staged_ledger_diff::{
         self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
-        UserCommandWithStatus,
     },
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1, UserCommandWithStatusV1},
 };
