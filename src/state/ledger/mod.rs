@@ -59,25 +59,16 @@ impl Ledger {
 
     pub fn apply_delegation(&mut self, delegator: PublicKey, new_delegate: PublicKey) {
         if let Some(account) = self.accounts.get_mut(&delegator) {
-            if let Some(old_delegate) = &account.delegate {
-                if old_delegate == &new_delegate {
-                    return;
-                }
-            }
-
             account.delegate = Some(new_delegate);
         }
     }
 
     pub fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<i32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
-            let nonce = if let Some(nonce) = nonce {
-                Nonce(nonce as u32 + 1)
-            } else {
-                account.nonce
-            };
+            if let Some(nonce) = nonce {
+                account.nonce = Nonce(nonce as u32 + 1);
+            }
             account.balance = Amount(balance_update.balance);
-            account.nonce = nonce;
         } else {
             let new_account = Account {
                 public_key: balance_update.public_key.clone(),
