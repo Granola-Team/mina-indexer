@@ -193,30 +193,29 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
         Err(anyhow::Error::msg(format!(
             "
 [PrecomputedBlock::parse_file]
-Could not find valid block!
-{:} is not a valid Precomputed Block",
+    Could not find valid block!
+    {} is not a valid Precomputed Block",
             filename.display()
         )))
     }
 }
 
-/// extract a state hash from an OS file name
+/// Extracts a state hash from an OS file name
 pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
     let last_part = file_name.to_str()?.split('-').last()?.to_string();
-    if last_part.starts_with('.') {
+    if last_part.starts_with('.') || !last_part.starts_with("3N") {
         return None;
     }
-    if !last_part.starts_with("3N") {
-        return None;
-    }
+
     let state_hash = last_part.split('.').next()?;
     if state_hash.contains('.') {
         return None;
     }
+
     Some(state_hash.to_string())
 }
 
-/// extract a blockchain length from an OS file name
+/// Extracts a blockchain length from an OS file name
 fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
     file_name
         .to_str()?
