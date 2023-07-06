@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
 
-#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
+)]
 pub struct Amount(pub u64);
 
 #[derive(PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
@@ -26,23 +28,23 @@ impl Account {
         }
     }
 
-    pub fn from_deduction(pre: Self, amount: u64) -> Option<Self> {
-        if amount > pre.balance.0 {
+    pub fn from_deduction(pre: Self, amount: Amount) -> Option<Self> {
+        if amount > pre.balance {
             None
         } else {
             Some(Account {
                 public_key: pre.public_key.clone(),
-                balance: Amount(pre.balance.0 - amount),
+                balance: pre.balance.sub(&amount),
                 nonce: Nonce(pre.nonce.0 + 1),
                 delegate: pre.delegate,
             })
         }
     }
 
-    pub fn from_deposit(pre: Self, amount: u64) -> Self {
+    pub fn from_deposit(pre: Self, amount: Amount) -> Self {
         Account {
             public_key: pre.public_key.clone(),
-            balance: Amount(pre.balance.0 + amount),
+            balance: pre.balance.add(&amount),
             nonce: Nonce(pre.nonce.0 + 1),
             delegate: pre.delegate,
         }

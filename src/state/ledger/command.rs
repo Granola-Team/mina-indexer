@@ -1,10 +1,9 @@
+use crate::{block::precomputed::PrecomputedBlock, state::ledger::Amount};
 use mina_serialization_types::{
     staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation, UserCommand},
     v1::PublicKeyV1,
 };
 use serde::{Deserialize, Serialize};
-
-use crate::block::precomputed::PrecomputedBlock;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TransactionType {
@@ -16,7 +15,7 @@ pub enum TransactionType {
 pub struct Payment {
     pub source: PublicKeyV1,
     pub receiver: PublicKeyV1,
-    pub amount: u64,
+    pub amount: Amount,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -59,7 +58,13 @@ impl Command {
                         SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                             let source = payment_payload.clone().inner().inner().source_pk;
                             let receiver = payment_payload.clone().inner().inner().receiver_pk;
-                            let amount = payment_payload.inner().inner().amount.inner().inner();
+                            let amount = payment_payload
+                                .inner()
+                                .inner()
+                                .amount
+                                .inner()
+                                .inner()
+                                .into();
                             Self::Payment(Payment {
                                 source,
                                 receiver,
@@ -114,7 +119,7 @@ mod test {
                     let receiver = PublicKey::from(receiver);
                     println!("s: {source:?}");
                     println!("r: {receiver:?}");
-                    println!("a: {amount}");
+                    println!("a: {}", amount.0);
                     payments.push((source, receiver, amount));
                 }
                 Command::Delegation(Delegation {
@@ -207,7 +212,7 @@ mod test {
                 expected_payments,
                 payments
                     .iter()
-                    .map(|(s, r, a)| (s.to_address(), r.to_address(), *a))
+                    .map(|(s, r, a)| (s.to_address(), r.to_address(), (*a).0))
                     .collect::<Vec<(String, String, u64)>>()
             );
         }

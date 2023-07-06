@@ -63,7 +63,7 @@ impl Ledger {
                                     pk.clone(),
                                     Account {
                                         public_key: pk,
-                                        balance: Amount(balance),
+                                        balance: balance.into(),
                                         nonce: Nonce(nonce.unwrap_or_default()),
                                         delegate: Some(delegate),
                                     },
@@ -74,7 +74,7 @@ impl Ledger {
                     } else {
                         let acct = Account {
                             public_key: pk.clone(),
-                            balance: Amount(balance),
+                            balance: balance.into(),
                             nonce: Nonce(nonce.unwrap_or_default()),
                             delegate: None,
                         };
@@ -231,7 +231,11 @@ impl std::error::Error for LedgerError {}
 
 impl Amount {
     pub fn add(&self, other: &Amount) -> Amount {
-        Amount(self.0 + other.0)
+        Self(self.0 + other.0)
+    }
+
+    pub fn sub(&self, other: &Amount) -> Amount {
+        Self(self.0 - other.0)
     }
 }
 
@@ -259,19 +263,21 @@ mod tests {
 
     #[test]
     fn apply_diff_payment() {
+        let diff_amount = 1.into();
         let public_key =
             PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
                 .expect("public key creation");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account);
-        let mut ledger = Ledger { accounts };
 
+        accounts.insert(public_key.clone(), account);
+
+        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
                 public_key: public_key.clone(),
-                amount: 1,
+                amount: diff_amount,
                 update_type: UpdateType::Deposit,
             })],
         };
@@ -281,8 +287,7 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
-
-        assert_eq!(account_after.balance, Amount(1));
+        assert_eq!(account_after.balance, diff_amount);
     }
 
     #[test]
@@ -311,27 +316,30 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
-
         assert_eq!(account_after.delegate, Some(delegate_key));
     }
 
     #[test]
     fn apply_diff_payment_with_post_balance() {
+        let diff_amount = 1.into();
         let public_key =
             PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
                 .expect("public key creation");
         let mut account = Account::empty(public_key.clone());
+
         account.balance = Amount(10); // Set the balance explicitly
+
         let account_before = account.clone();
         let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account);
-        let mut ledger = Ledger { accounts };
 
+        accounts.insert(public_key.clone(), account);
+
+        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
                 public_key: public_key.clone(),
-                amount: 1, // Pass the underlying value
+                amount: diff_amount,
                 update_type: UpdateType::Deposit,
             })],
         };
@@ -341,15 +349,10 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
-
-        if let AccountDiff::Payment(payment_diff) = &ledger_diff.account_diffs[0] {
-            assert_eq!(
-                account_after.balance,
-                account_before.balance.add(&payment_diff.amount.into())
-            );
-        } else {
-            panic!("Expected payment diff");
-        }
+        assert_eq!(
+            account_after.balance,
+            account_before.balance.add(&diff_amount)
+        );
     }
 
     #[test]
@@ -361,11 +364,13 @@ mod tests {
             PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")
                 .expect("delegate public key creation");
         let mut account = Account::empty(public_key.clone());
-        account.balance = Amount(20); // Set the balance explicitly
+
+        account.balance = Amount(20);
+
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account.clone());
-        let mut ledger = Ledger { accounts };
 
+        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
@@ -381,7 +386,7 @@ mod tests {
         let account_before = account.clone();
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
-        assert_eq!(account_before.balance, account_after.balance); // with cloning
+        assert_eq!(account_before.balance, account_after.balance);
         assert_eq!(account_after.delegate, Some(delegate_key));
     }
 }
