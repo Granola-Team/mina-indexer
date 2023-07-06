@@ -94,36 +94,39 @@ impl BlockParser {
                 );
                 info!("Searching for canonical chain in startup blocks");
 
+                let mut length_diffs = vec![];
                 let mut length_start_indices = vec![];
                 let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
 
-                // build the length_start_indices vec corresponding to the
-                // longest contiguous chain starting from the lowest block
+                // now that paths are length-sorted, we build
+                // a vec of all starting indicies for each length
+                // and a vec of length diffs to find gaps
                 for (idx, path) in paths.iter().enumerate() {
-                    let height = length_from_path_or_max(path);
-                    if idx == 0 || height > curr_length {
+                    let length = length_from_path_or_max(path);
+                    if idx == 0 || length > curr_length {
                         length_start_indices.push(idx);
-                        curr_length = height;
+                        length_diffs.push(length - curr_length);
+                        curr_length = length;
                     } else {
                         continue;
                     }
                 }
+                assert_eq!(length_start_indices.len(), length_diffs.len());
 
-                // check that there are enough contiguous blocks
-                let check_lengths = length_start_indices
-                    .iter()
-                    .take(MAINNET_CANONICAL_THRESHOLD as usize + 1)
-                    .map(|idx| length_from_path_or_max(paths.get(*idx).unwrap()));
-
-                let check = check_lengths.enumerate().fold(None, |acc, (n, x)| {
-                    if acc.is_none() && n == 0 || x == acc.unwrap_or(0) + 1 {
-                        Some(x)
-                    } else {
-                        None
+                // check that there are enough contiguous blocks for a canonical chain
+                let mut last_contiguous_idx = 0;
+                let mut last_contiguous_start_idx = 0;
+                for (idx, diff) in length_diffs.iter().enumerate() {
+                    if *diff > 1 {
+                        if idx != 0 {
+                            last_contiguous_idx = length_start_indices[idx];
+                            last_contiguous_start_idx = idx;
+                        }
+                        break;
                     }
-                });
+                }
 
-                if check.is_none() {
+                if last_contiguous_idx < MAINNET_CANONICAL_THRESHOLD as usize {
                     info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
                     return Ok(Self {
                         num_canonical: 0,
@@ -135,22 +138,9 @@ impl BlockParser {
                     });
                 }
 
-                let (max_start_idx, max_length_idx) =
-                    if length_from_path(paths.last().unwrap()).is_some() {
-                        (
-                            length_start_indices.len() - 1,
-                            *length_start_indices.last().unwrap(),
-                        )
-                    } else {
-                        (
-                            length_start_indices.len() - 2,
-                            length_start_indices[length_start_indices.len() - 2],
-                        )
-                    };
-
                 // backtrack canonical_threshold blocks to find a canonical one
-                let mut curr_start_idx = max_start_idx;
-                let mut curr_length_idx = max_length_idx;
+                let mut curr_length_idx = last_contiguous_idx;
+                let mut curr_start_idx = last_contiguous_start_idx;
                 let mut curr_path = paths.get(curr_length_idx).unwrap();
                 let time = Instant::now();
 
