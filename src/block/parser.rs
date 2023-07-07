@@ -119,8 +119,8 @@ impl BlockParser {
                 for (idx, diff) in length_diffs.iter().enumerate() {
                     if *diff > 1 {
                         if idx != 0 {
-                            last_contiguous_idx = length_start_indices[idx];
-                            last_contiguous_start_idx = idx;
+                            last_contiguous_idx = length_start_indices[idx] - 1;
+                            last_contiguous_start_idx = idx - 1;
                         }
                         break;
                     }
@@ -203,7 +203,7 @@ impl BlockParser {
                 }
 
                 // final canonical block
-                for path in paths[0..curr_length_idx].iter() {
+                for path in paths[..curr_length_idx].iter() {
                     if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
                         canonical_paths.push(path.clone());
                         break;
@@ -374,7 +374,7 @@ fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
 
 /// Checks if there is a gap between the blocks at `path` and `curr_path`
 fn has_gap(path: &Path, curr_path: &Path) -> bool {
-    length_from_path(path).unwrap() + 1 < length_from_path(curr_path).unwrap()
+    length_from_path(path).unwrap_or(0) + 1 < length_from_path(curr_path).unwrap_or(0)
 }
 
 /// Checks if the block at `curr_path` is the parent of the block at `path`
