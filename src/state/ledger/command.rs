@@ -170,7 +170,7 @@ mod test {
     #[tokio::test]
     async fn from_precomputed() {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
-        let log_dir = PathBuf::from("./tests/data/beautified_logs");
+        let log_dir = PathBuf::from("./tests/data/non_sequential_blocks");
         let mut bp = BlockParser::new(&log_dir).unwrap();
         let block = bp
             .get_precomputed_block("3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw")
