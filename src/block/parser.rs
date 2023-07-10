@@ -42,6 +42,7 @@ impl BlockParser {
         Self::new_internal(blocks_dir, SearchRecursion::Recursive)
     }
 
+    /// Simplified `BlockParser` for testing without canonical chain discovery.
     pub fn new_testing(blocks_dir: &Path) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
@@ -65,6 +66,10 @@ impl BlockParser {
         }
     }
 
+    /// Length-sorts `block_dir`'s paths and performs _canonical chain discovery_
+    /// separating the block paths into two categories:
+    /// - blocks known to be _canonical_
+    /// - blocks that are higher than the canonical tip
     fn new_internal(blocks_dir: &Path, recursion: SearchRecursion) -> anyhow::Result<Self> {
         debug!("Building parser");
         if blocks_dir.exists() {
@@ -78,8 +83,10 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .collect();
 
-            let mut successive_paths = vec![];
+            // separate all blocks into the canonical chain
+            // and the blocks that follow the canonical tip
             let mut canonical_paths = vec![];
+            let mut successive_paths = vec![];
 
             if !paths.is_empty() {
                 info!("Sorting startup blocks by length");
@@ -94,37 +101,28 @@ impl BlockParser {
                 );
                 info!("Searching for canonical chain in startup blocks");
 
-                let mut length_diffs = vec![];
-                let mut length_start_indices = vec![];
+                // keep track of:
+                // - diffs between blocks of successive lengths (to find gaps)
+                // - starting index for each collection of blocks of a fixed length
+                // - length of the current path under investigation
+                let mut length_start_indices_and_diffs = vec![];
                 let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
 
-                // now that paths are length-sorted, we build
-                // a vec of all starting indicies for each length
-                // and a vec of length diffs to find gaps
                 for (idx, path) in paths.iter().enumerate() {
                     let length = length_from_path_or_max(path);
                     if idx == 0 || length > curr_length {
-                        length_start_indices.push(idx);
-                        length_diffs.push(length - curr_length);
+                        length_start_indices_and_diffs.push((idx, length - curr_length));
                         curr_length = length;
                     } else {
                         continue;
                     }
                 }
-                assert_eq!(length_start_indices.len(), length_diffs.len());
 
                 // check that there are enough contiguous blocks for a canonical chain
-                let mut last_contiguous_idx = 0;
-                let mut last_contiguous_start_idx = 0;
-                for (idx, diff) in length_diffs.iter().enumerate() {
-                    if *diff > 1 {
-                        if idx != 0 {
-                            last_contiguous_idx = length_start_indices[idx] - 1;
-                            last_contiguous_start_idx = idx - 1;
-                        }
-                        break;
-                    }
-                }
+                let last_contiguous_start_idx =
+                    last_contiguous_start_idx(&length_start_indices_and_diffs);
+                let last_contiguous_idx =
+                    1.max(length_start_indices_and_diffs[last_contiguous_start_idx].0) - 1;
 
                 if last_contiguous_idx < MAINNET_CANONICAL_THRESHOLD as usize {
                     info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
@@ -138,58 +136,50 @@ impl BlockParser {
                     });
                 }
 
-                // backtrack canonical_threshold blocks to find a canonical one
-                let mut curr_length_idx = last_contiguous_idx;
-                let mut curr_start_idx = last_contiguous_start_idx;
-                let mut curr_path = paths.get(curr_length_idx).unwrap();
+                // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
+                // the `last_contiguous_idx` to find the canonical tip
                 let time = Instant::now();
+                let (mut curr_length_idx, mut curr_start_idx) = find_canonical_tip(
+                    &paths,
+                    &length_start_indices_and_diffs,
+                    last_contiguous_start_idx - 1,
+                    last_contiguous_idx,
+                );
+                let mut curr_path = &paths[curr_length_idx];
 
-                for _ in 1..=MAINNET_CANONICAL_THRESHOLD {
-                    if curr_start_idx > 0 {
-                        let prev_length_idx = length_start_indices[curr_start_idx - 1];
-
-                        for path in paths[prev_length_idx..curr_length_idx].iter() {
-                            // if there's a gap, skip the current length, or
-                            // if we found a parent, check the next lower length
-                            if has_gap(path, curr_path) || is_parent(path, curr_path) {
-                                curr_path = path;
-                                curr_length_idx = prev_length_idx;
-                                curr_start_idx -= 1;
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                let successive_idx = if curr_start_idx + 1 < length_start_indices.len() {
-                    Some(length_start_indices[curr_start_idx + 1])
-                } else {
-                    None
-                };
-
-                // curr_path represents a canonical block
                 info!(
                     "Found canonical tip with hash {} in {:?}",
                     hash_from_path(curr_path),
                     time.elapsed()
                 );
 
+                // handle all blocks that are higher than the canonical tip
+                let successive_start_idx = curr_start_idx + 1;
+                if successive_start_idx < length_start_indices_and_diffs.len() {
+                    for path in paths[length_start_indices_and_diffs[successive_start_idx].0..]
+                        .iter()
+                        .filter(|p| length_from_path(p).is_some())
+                    {
+                        successive_paths.push(path.clone());
+                    }
+                }
+
+                // collect the canonical blocks
                 canonical_paths.push(curr_path.clone());
                 info!("Walking the canonical chain back to the beginning, reporting every {BLOCK_REPORTING_FREQ_NUM} blocks.", );
 
                 let time = Instant::now();
                 let mut count = 1;
+
+                // descend from the canonical tip to the lowest block in the dir,
+                // segment by segment, searching for ancestors
                 while curr_start_idx > 0 {
                     if count % BLOCK_REPORTING_FREQ_NUM == 0 {
                         info!("Found {count} canonical blocks in {:?}", time.elapsed());
                     }
 
-                    let prev_length_idx = if curr_start_idx > 0 {
-                        length_start_indices[curr_start_idx - 1]
-                    } else {
-                        0
-                    };
-
+                    // search for parent in previous segment's blocks
+                    let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
                     for path in paths[prev_length_idx..curr_length_idx].iter() {
                         if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
                             canonical_paths.push(path.clone());
@@ -202,7 +192,7 @@ impl BlockParser {
                     }
                 }
 
-                // final canonical block
+                // push the lowest canonical block
                 for path in paths[..curr_length_idx].iter() {
                     if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
                         canonical_paths.push(path.clone());
@@ -210,23 +200,15 @@ impl BlockParser {
                     }
                 }
 
-                info!("Canonical chain discovery finished");
+                info!("Canonical chain discovery finished!");
                 info!(
                     "Found {} blocks in the canonical chain in {:?}",
-                    canonical_paths.len() + 1, // +1 for starting block
+                    canonical_paths.len(),
                     time.elapsed()
                 );
-                canonical_paths.reverse();
 
-                // add all blocks successive to the canonical chain
-                if let Some(idx) = successive_idx {
-                    for path in paths[idx..]
-                        .iter()
-                        .filter(|p| length_from_path(p).is_some())
-                    {
-                        successive_paths.push(path.clone());
-                    }
-                }
+                // sort lowest to highest
+                canonical_paths.reverse();
             }
 
             Ok(Self {
@@ -244,61 +226,33 @@ impl BlockParser {
         }
     }
 
-    /// Traverses the internal paths. First canonical, then successive.
+    /// Traverses `self`'s internal paths. First canonical, then successive.
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return Self::handle_path(&next_path).await;
+            return self.parse_file(&next_path).await.map(Some);
         }
 
         if let Some(next_path) = self.successive_paths.next() {
-            return Self::handle_path(&next_path).await;
+            return self.parse_file(&next_path).await.map(Some);
         }
 
         Ok(None)
     }
 
-    async fn handle_path(path: &Path) -> anyhow::Result<Option<PrecomputedBlock>> {
-        if is_valid_block_file(path) {
-            let blockchain_length =
-                get_blockchain_length(path.file_name().expect("filename already checked"));
-            let state_hash = get_state_hash(path.file_name().expect("filename already checked"))
-                .expect("state hash already checked");
-
-            let mut log_file = tokio::fs::File::open(&path).await?;
-            let mut log_file_contents = Vec::new();
-
-            log_file.read_to_end(&mut log_file_contents).await?;
-
-            let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
-                state_hash,
-                blockchain_length,
-                contents: log_file_contents,
-            })?;
-
-            Ok(Some(precomputed_block))
-        } else {
-            Err(anyhow::Error::msg(format!(
-                "Invalid block path: {:?}",
-                path.display()
-            )))
-        }
-    }
-
-    /// Gets the precomputed block with supplied `state_hash`,
-    /// it must exist ahead of the current block parser file
+    /// Gets the precomputed block with supplied `state_hash`, it must exist ahead
+    /// of `self`'s current file in the order imposed by glob/filesystem.
     pub async fn get_precomputed_block(
         &mut self,
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
-        let error = anyhow::Error::msg(format!(
+        let mut next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
             "
 [BlockPasrser::get_precomputed_block]
     Looking in blocks dir: {}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!",
             self.blocks_dir.display()
-        ));
-        let mut next_block = self.next().await?.ok_or(error)?;
+        )))?;
 
         while next_block.state_hash != state_hash {
             next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
@@ -314,6 +268,7 @@ impl BlockParser {
         Ok(next_block)
     }
 
+    /// Parses the precomputed block's JSON file, throws if a read error occurs.
     pub async fn parse_file(&mut self, filename: &Path) -> anyhow::Result<PrecomputedBlock> {
         if is_valid_block_file(filename) {
             let blockchain_length =
@@ -346,18 +301,9 @@ impl BlockParser {
     }
 }
 
-fn length_from_path(path: &Path) -> Option<u32> {
-    get_blockchain_length(path.file_name().unwrap())
-}
-
-fn length_from_path_or_max(path: &Path) -> u32 {
-    length_from_path(path).unwrap_or(u32::MAX)
-}
-
-fn hash_from_path(path: &Path) -> String {
-    get_state_hash(path.file_name().unwrap()).unwrap()
-}
-
+/// Gets the parent hash from the contents of the block's JSON file.
+/// This function depends on the current JSON layout for precomputed blocks
+/// and should be modified to use a custom `prev_state_hash` field deserializer.
 fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
     let parent_hash_offset = 75;
     let parent_hash_length = 52;
@@ -372,14 +318,62 @@ fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
     Ok(parent_hash)
 }
 
-/// Checks if there is a gap between the blocks at `path` and `curr_path`
-fn has_gap(path: &Path, curr_path: &Path) -> bool {
-    length_from_path(path).unwrap_or(0) + 1 < length_from_path(curr_path).unwrap_or(0)
-}
-
-/// Checks if the block at `curr_path` is the parent of the block at `path`
+/// Checks if the block at `curr_path` is the _parent_ of the block at `path`.
 fn is_parent(path: &Path, curr_path: &Path) -> bool {
     extract_parent_hash_from_path(curr_path).unwrap() == hash_from_path(path)
+}
+
+/// Finds the _canonical tip_, i.e. the _highest_ block in the
+/// _lowest contiguous chain_ with `MAINNET_CANONICAL_THRESHOLD` ancestors.
+fn find_canonical_tip(
+    paths: &[PathBuf],
+    length_start_indices_and_diffs: &[(usize, u32)],
+    mut curr_start_idx: usize,
+    mut curr_length_idx: usize,
+) -> (usize, usize) {
+    let mut curr_path = &paths[curr_length_idx];
+    for _ in 0..=MAINNET_CANONICAL_THRESHOLD {
+        if curr_start_idx > 0 {
+            let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
+
+            for path in paths[prev_length_idx..curr_length_idx].iter() {
+                // if the parent is found, check that it has a parent, etc
+                if is_parent(path, curr_path) {
+                    curr_path = path;
+                    curr_length_idx = prev_length_idx;
+                    curr_start_idx -= 1;
+                    continue;
+                }
+            }
+        }
+    }
+    (curr_length_idx, curr_start_idx)
+}
+
+/// Finds the _start index_ of the _highest_ possible block in the _lowest contiguous chain_.
+fn last_contiguous_start_idx(length_start_indices_and_diffs: &[(usize, u32)]) -> usize {
+    for (idx, (_, diff)) in length_start_indices_and_diffs.iter().enumerate() {
+        if *diff > 1 {
+            if idx != 0 {
+                return idx;
+            }
+            return 0;
+        }
+    }
+    0
+}
+
+// path helpers
+fn length_from_path(path: &Path) -> Option<u32> {
+    get_blockchain_length(path.file_name()?)
+}
+
+fn length_from_path_or_max(path: &Path) -> u32 {
+    length_from_path(path).unwrap_or(u32::MAX)
+}
+
+fn hash_from_path(path: &Path) -> String {
+    get_state_hash(path.file_name().unwrap()).unwrap()
 }
 
 #[cfg(test)]
