@@ -40,7 +40,7 @@ pub struct AccountArgs {
 #[command(author, version, about, long_about = None)]
 pub struct ChainArgs {
     /// Number of blocks to include
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = 10)]
     num: usize,
     /// Path to write the best chain (default: stdout)
     #[arg(short, long)]
