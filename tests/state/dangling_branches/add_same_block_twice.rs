@@ -48,7 +48,7 @@ async fn test() {
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!("=== Before state ===");
-    print!("{state:?}");
+    print!("{state}");
 
     println!("Root:     {}", state.root_branch.len());
     println!("Dangling: {}", state.dangling_branches.len());

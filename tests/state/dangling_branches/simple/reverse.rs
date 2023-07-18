@@ -80,13 +80,13 @@ async fn extension() {
     assert_eq!(before_root, before_root_leaf);
 
     println!("=== Before state ===");
-    println!("{state:?}");
+    println!("{state}");
 
     // extend the branch with new_dangling_root_block (the parent)
     let extension_type = state.add_block(&new_dangling_root_block).unwrap();
 
     println!("=== After state ===");
-    println!("{:?}", &state);
+    println!("{}", &state);
 
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
@@ -101,7 +101,7 @@ async fn extension() {
     assert_eq!(leaves1.len(), 1);
     assert_eq!(branches1.height(), 2);
     println!("=== After state ===");
-    println!("{:?}", &state);
+    println!("{}", &state);
 
     // after root has one child
     let after_children = branches1

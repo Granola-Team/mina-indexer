@@ -119,7 +119,7 @@ async fn merge() {
         .for_each(|tree| assert_eq!(tree.leaves().len(), 1));
 
     println!("=== Before state ===");
-    println!("{state:?}");
+    println!("{state}");
 
     // ----------------
     // add middle block
@@ -129,7 +129,7 @@ async fn merge() {
     assert_eq!(extension_type, ExtensionType::RootComplex);
 
     println!("=== After state ===");
-    println!("{state:?}");
+    println!("{state}");
 
     // Root branch
     // - len = 4

@@ -92,7 +92,7 @@ async fn extension() {
         .next()
         .is_none());
 
-    println!("Before state:\n{state:?}");
+    println!("Before state:\n{state}");
 
     // ---------------
     // add child block
@@ -139,7 +139,7 @@ async fn extension() {
             .data()
     );
 
-    println!("After state:\n{state:?}");
+    println!("After state:\n{state}");
 
     assert_eq!(extension, ExtensionType::DanglingSimpleForward);
 
