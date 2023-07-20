@@ -19,6 +19,9 @@ test = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actix-web = "4.3.1"
+actix-web-lab = "0.19.1"
+actix-cors = "0.6.4"
 anyhow = {version = "1.0.69"}
 async_executors = { version = "0.6.0", features = ["tokio_tp"] }
 async-trait = "0.1.64"
@@ -32,7 +35,10 @@ serde_json = {version = "1.0.92", features = [ "raw_value" ] }
 clap = { version = "4.1.4", features = [ "derive" ] }
 thiserror = "1.0.38"
 glob = "0.3.1"
+juniper = { version= "0.15.11", default-features = false, features = ["chrono", "schema-language", "url", "uuid"] }
+chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", version = "0.1.0" }
+versioned = { path = "./mina-rs/protocol/versioned", version = "0.1.0" }
 mina-signer = { path = "./mina-rs/proof-systems/signer", version = "0.1.0" }
 rocksdb = "0.20.1"
 bcs = "0.1.5"

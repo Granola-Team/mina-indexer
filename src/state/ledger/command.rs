@@ -1,10 +1,15 @@
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    state::ledger::{public_key::PublicKey, Amount},
+};
 use mina_serialization_types::{
-    staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation, UserCommand},
-    v1::PublicKeyV1,
+    staged_ledger_diff::{
+        SignedCommandPayloadBody, SignedCommandPayloadCommon, StakeDelegation,
+        TransactionStatusBalanceData, UserCommand,
+    },
+    v1::{PaymentPayloadV1, PublicKeyV1, SignedCommandV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
-
-use crate::block::precomputed::PrecomputedBlock;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TransactionType {
@@ -16,7 +21,7 @@ pub enum TransactionType {
 pub struct Payment {
     pub source: PublicKeyV1,
     pub receiver: PublicKeyV1,
-    pub amount: u64,
+    pub amount: Amount,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -31,56 +36,127 @@ pub enum Command {
     Delegation(Delegation),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct SignedCommand(pub SignedCommandV1);
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum CommandStatusData {
+    Applied {
+        balance_data: TransactionStatusBalanceData,
+    },
+    Failed,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
+
+impl UserCommandWithStatus {
+    pub fn status_data(&self) -> CommandStatusData {
+        match self.0.t.status.t.clone() {
+            mina_serialization_types::staged_ledger_diff::TransactionStatus::Applied(
+                _,
+                balance_data,
+            ) => CommandStatusData::Applied {
+                balance_data: balance_data.t,
+            },
+            mina_serialization_types::staged_ledger_diff::TransactionStatus::Failed(_, _) => {
+                CommandStatusData::Failed
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct PaymentPayload(pub PaymentPayloadV1);
+
 impl Command {
-    // i say i say now this is a thiccy
     pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         precomputed_block
-            .staged_ledger_diff
-            .diff
-            .clone()
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands
+            .commands()
             .iter()
             .map(
-                |command| match command.clone().inner().data.inner().inner() {
-                    UserCommand::SignedCommand(signed_command) => match signed_command
-                        .inner()
-                        .inner()
-                        .payload
-                        .inner()
-                        .inner()
-                        .body
-                        .inner()
-                        .inner()
-                    {
-                        SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                            let source = payment_payload.clone().inner().inner().source_pk;
-                            let receiver = payment_payload.clone().inner().inner().receiver_pk;
-                            let amount = payment_payload.inner().inner().amount.inner().inner();
-                            Self::Payment(Payment {
-                                source,
-                                receiver,
-                                amount,
-                            })
-                        }
-                        SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
-                            match delegation_payload.inner() {
-                                StakeDelegation::SetDelegate {
-                                    delegator,
-                                    new_delegate,
-                                } => Self::Delegation(Delegation {
-                                    delegate: new_delegate,
-                                    delegator,
-                                }),
+                |command| match UserCommandWithStatus(command.clone()).data() {
+                    UserCommand::SignedCommand(signed_command) => {
+                        match SignedCommand(signed_command).payload_body() {
+                            SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+                                let source = payment_payload.clone().inner().inner().source_pk;
+                                let receiver = payment_payload.clone().inner().inner().receiver_pk;
+                                let amount = payment_payload.inner().inner().amount.inner().inner();
+                                Self::Payment(Payment {
+                                    source,
+                                    receiver,
+                                    amount: amount.into(),
+                                })
+                            }
+                            SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
+                                match delegation_payload.inner() {
+                                    StakeDelegation::SetDelegate {
+                                        delegator,
+                                        new_delegate,
+                                    } => Self::Delegation(Delegation {
+                                        delegate: new_delegate,
+                                        delegator,
+                                    }),
+                                }
                             }
                         }
-                    },
+                    }
                 },
             )
             .collect()
+    }
+}
+
+impl SignedCommand {
+    pub fn payload_body(&self) -> SignedCommandPayloadBody {
+        self.0
+            .clone()
+            .inner()
+            .inner()
+            .payload
+            .inner()
+            .inner()
+            .body
+            .inner()
+            .inner()
+    }
+
+    pub fn payload_common(&self) -> SignedCommandPayloadCommon {
+        self.0
+            .clone()
+            .inner()
+            .inner()
+            .payload
+            .inner()
+            .inner()
+            .common
+            .inner()
+            .inner()
+            .inner()
+    }
+
+    pub fn fee_payer_pk(&self) -> PublicKey {
+        self.payload_common().fee_payer_pk.into()
+    }
+
+    pub fn signer(&self) -> PublicKey {
+        self.0.clone().inner().inner().signer.0.inner().into()
+    }
+}
+
+impl UserCommandWithStatus {
+    pub fn data(self) -> UserCommand {
+        self.0.inner().data.inner().inner()
+    }
+}
+
+impl PaymentPayload {
+    pub fn source_pk(&self) -> PublicKey {
+        self.0.clone().inner().inner().source_pk.into()
+    }
+
+    pub fn receiver_pk(&self) -> PublicKey {
+        self.0.clone().inner().inner().receiver_pk.into()
     }
 }
 
@@ -94,7 +170,7 @@ mod test {
     #[tokio::test]
     async fn from_precomputed() {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
-        let log_dir = PathBuf::from("./tests/data/beautified_logs");
+        let log_dir = PathBuf::from("./tests/data/non_sequential_blocks");
         let mut bp = BlockParser::new(&log_dir).unwrap();
         let block = bp
             .get_precomputed_block("3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw")
@@ -114,7 +190,7 @@ mod test {
                     let receiver = PublicKey::from(receiver);
                     println!("s: {source:?}");
                     println!("r: {receiver:?}");
-                    println!("a: {amount}");
+                    println!("a: {}", amount.0);
                     payments.push((source, receiver, amount));
                 }
                 Command::Delegation(Delegation {
@@ -207,7 +283,7 @@ mod test {
                 expected_payments,
                 payments
                     .iter()
-                    .map(|(s, r, a)| (s.to_address(), r.to_address(), *a))
+                    .map(|(s, r, a)| (s.to_address(), r.to_address(), (*a).0))
                     .collect::<Vec<(String, String, u64)>>()
             );
         }

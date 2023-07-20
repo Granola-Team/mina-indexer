@@ -6,13 +6,77 @@ use crate::{
         Canonicity,
     },
 };
-use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
-use std::path::{Path, PathBuf};
+use mina_serialization_types::{
+    signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
+};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
+/// T-{Height}-{Timestamp}-{Signature} -> Transaction
+/// We use the signature as key until we have a better way to identify transactions (e.g. hash)
+/// The height is padded to 12 digits for sequential iteration
+#[derive(Debug, Clone)]
+pub struct TransactionKey(u32, u64, String);
+
+impl std::fmt::Display for TransactionKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "T-{:012}-{}-{}", self.0, self.1, self.2)
+    }
+}
+
+impl TransactionKey {
+    /// Creates a new key for a transaction
+    pub fn new<S>(h: u32, t: u64, s: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self(h, t, s.into())
+    }
+
+    /// Returns the key as bytes
+    pub fn bytes(&self) -> Vec<u8> {
+        self.to_string().into_bytes()
+    }
+
+    /// Creates a new key from a slice
+    pub fn from_slice(bytes: &[u8]) -> anyhow::Result<Self> {
+        let key = std::str::from_utf8(bytes)?;
+        let parts: Vec<&str> = key.split('-').collect();
+
+        if parts.len() != 4 {
+            anyhow::bail!("Invalid transaction key: {}", key);
+        }
+
+        Ok(Self(
+            u32::from_str(parts[1])?,
+            u64::from_str(parts[2])?,
+            parts[3].to_string(),
+        ))
+    }
+
+    /// Returns the height of the transaction
+    pub fn height(&self) -> u32 {
+        self.0
+    }
+
+    /// Returns the timestamp of the transaction
+    pub fn timestamp(&self) -> u64 {
+        self.1
+    }
+
+    /// Returns the signature of the transaction
+    pub fn signature(&self) -> &str {
+        &self.2
+    }
+}
 
 #[derive(Debug)]
 pub struct IndexerStore {
     db_path: PathBuf,
-    database: DBWithThreadMode<MultiThreaded>,
+    database: DB,
 }
 
 impl IndexerStore {
@@ -34,7 +98,8 @@ impl IndexerStore {
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
-        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts);
+        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
+        let tx = ColumnFamilyDescriptor::new("tx", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -42,7 +107,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity],
+            vec![blocks, ledgers, canonicity, tx],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -52,6 +117,35 @@ impl IndexerStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    pub fn put_tx(
+        &self,
+        height: u32,
+        timestamp: u64,
+        tx: UserCommandWithStatusV1,
+    ) -> anyhow::Result<()> {
+        let cf_handle = self.database.cf_handle("tx").expect("column family exists");
+
+        match tx.clone().inner().data.inner().inner() {
+            UserCommand::SignedCommand(cmd) => {
+                let json_sig = SignatureJson::from(cmd.inner().inner().signature);
+                let sig = serde_json::to_string(&json_sig)?;
+
+                let key = TransactionKey::new(height, timestamp, sig).bytes();
+                let value = bcs::to_bytes(&tx)?;
+
+                self.database.put_cf(&cf_handle, key, value)?;
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Creates a prefix iterator over a CF in the DB
+    pub fn iter_prefix_cf(&self, cf: &str, prefix: &[u8]) -> DBIterator<'_> {
+        let cf_handle = self.database.cf_handle(cf).expect("column family exists");
+        self.database.prefix_iterator_cf(&cf_handle, prefix)
     }
 }
 

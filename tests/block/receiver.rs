@@ -11,7 +11,7 @@ use tokio::{
 async fn detects_new_block_written() {
     const TEST_DIR: &'static str = "./receiver_write_test";
     const TEST_BLOCK: &'static str = include_str!(
-        "../data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
+        "../data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
 
     let timeout = Duration::new(5, 0);
@@ -42,7 +42,7 @@ async fn detects_new_block_written() {
 #[tokio::test]
 async fn detects_new_block_copied() {
     const TEST_DIR: &'static str = "./receiver_copy_test";
-    const TEST_BLOCK_PATH: &'static str = "./tests/data/beautified_logs/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
+    const TEST_BLOCK_PATH: &'static str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
 
     let timeout = Duration::new(5, 0);
     let mut success = false;

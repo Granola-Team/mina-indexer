@@ -16,7 +16,7 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use std::{path::PathBuf, process};
+use std::{path::PathBuf, process, sync::Arc};
 use tokio::fs::{self, create_dir_all, metadata};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::prelude::*;
@@ -58,9 +58,6 @@ pub struct ServerArgs {
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     log_level_stdout: LevelFilter,
-    /// Ignore restoring indexer state from an existing db on the path provided by database_dir
-    #[arg(short, long, default_value_t = false)]
-    ignore_db: bool,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
@@ -75,12 +72,11 @@ pub struct IndexerConfiguration {
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
-    database_dir: PathBuf,
+    pub database_dir: PathBuf,
     keep_noncanonical_blocks: bool,
     log_file: PathBuf,
     log_level: LevelFilter,
     log_level_stdout: LevelFilter,
-    ignore_db: bool,
     prune_interval: u32,
     canonical_update_threshold: u32,
 }
@@ -100,7 +96,6 @@ pub async fn handle_command_line_arguments(
     let log_dir = args.log_dir;
     let log_level = args.log_level;
     let log_level_stdout = args.log_level_stdout;
-    let ignore_db = args.ignore_db;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
 
@@ -146,7 +141,7 @@ pub async fn handle_command_line_arguments(
                 log_file: PathBuf::from(&log_fname),
                 log_level,
                 log_level_stdout,
-                ignore_db,
+
                 prune_interval,
                 canonical_update_threshold,
             })
@@ -155,7 +150,10 @@ pub async fn handle_command_line_arguments(
 }
 
 #[instrument(skip_all)]
-pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
+pub async fn run(
+    config: IndexerConfiguration,
+    indexer_store: Arc<IndexerStore>,
+) -> Result<(), anyhow::Error> {
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
         .await
@@ -173,10 +171,9 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
         log_file,
         log_level,
         log_level_stdout,
-        ignore_db,
         prune_interval,
         canonical_update_threshold,
-    } = handle_command_line_arguments(args).await?;
+    } = config;
 
     // setup tracing
     if let Some(parent) = log_file.parent() {
@@ -197,7 +194,7 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
     } else {
         IndexerMode::Light
     };
-    let mut indexer_state = if ignore_db {
+    let mut indexer_state = {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
@@ -206,20 +203,14 @@ pub async fn run(args: ServerArgs) -> Result<(), anyhow::Error> {
             mode,
             root_hash.clone(),
             ledger.ledger,
-            Some(&database_dir),
+            indexer_store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
         )?
-    } else {
-        // if db exists in database_dir, use it's blocks to restore state before reading blocks from startup_dir (or maybe go right to watching)
-        // if no db or it doesn't have blocks, use the startup_dir like usual
-        IndexerState::new_from_db(&database_dir)?;
-        todo!("Restoring from db in {}", database_dir.display());
     };
-
     let mut block_parser = BlockParser::new(&startup_dir)?;
-    if ignore_db && !non_genesis_ledger {
+    if !non_genesis_ledger {
         indexer_state
             .initialize_with_contiguous_canonical(&mut block_parser)
             .await?;

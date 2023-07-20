@@ -1,3 +1,10 @@
+use crate::state::{
+    ledger::{
+        command::{PaymentPayload, SignedCommand, UserCommandWithStatus},
+        public_key::PublicKey,
+    },
+    Canonicity,
+};
 use mina_serialization_types::{
     json::DeltaTransitionChainProofJson,
     protocol_state::{ProtocolState, ProtocolStateJson},
@@ -5,11 +12,9 @@ use mina_serialization_types::{
     staged_ledger_diff::{
         self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
     },
-    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, PublicKeyV1},
+    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
-
-use crate::state::Canonicity;
 
 pub struct BlockLogContents {
     pub(crate) state_hash: String,
@@ -61,11 +66,20 @@ impl PrecomputedBlock {
             delta_transition_chain_proof: delta_transition_chain_proof.into(),
         })
     }
-}
 
-impl PrecomputedBlock {
-    pub fn block_public_keys(&self) -> Vec<PublicKeyV1> {
-        let mut public_keys = Vec::new();
+    pub fn commands(&self) -> Vec<UserCommandWithStatusV1> {
+        self.staged_ledger_diff
+            .diff
+            .clone()
+            .inner()
+            .0
+            .inner()
+            .inner()
+            .commands
+    }
+
+    pub fn block_public_keys(&self) -> Vec<PublicKey> {
+        let mut public_keys: Vec<PublicKey> = vec![];
         let consenesus_state = self
             .protocol_state
             .body
@@ -76,58 +90,31 @@ impl PrecomputedBlock {
             .inner()
             .inner();
         public_keys.append(&mut vec![
-            consenesus_state.block_creator,
-            consenesus_state.coinbase_receiver,
-            consenesus_state.block_stake_winner,
+            consenesus_state.block_creator.into(),
+            consenesus_state.coinbase_receiver.into(),
+            consenesus_state.block_stake_winner.into(),
         ]);
 
-        let commands = self
-            .staged_ledger_diff
-            .diff
-            .clone()
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands;
+        let commands = self.commands();
         commands.iter().for_each(|command| {
-            let signed_command = match command.clone().inner().data.inner().inner() {
+            let signed_command = match UserCommandWithStatus(command.clone()).data() {
                 staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
-                    signed_command.inner().inner()
+                    SignedCommand(signed_command)
                 }
             };
-            public_keys.push(signed_command.signer.0.inner());
-
-            public_keys.push(
-                signed_command
-                    .payload
-                    .clone()
-                    .inner()
-                    .inner()
-                    .common
-                    .inner()
-                    .inner()
-                    .inner()
-                    .fee_payer_pk,
-            );
-            public_keys.append(&mut match signed_command
-                .payload
-                .inner()
-                .inner()
-                .body
-                .inner()
-                .inner()
-            {
+            public_keys.push(signed_command.signer());
+            public_keys.push(signed_command.fee_payer_pk());
+            public_keys.append(&mut match signed_command.payload_body() {
                 SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
-                    payment_payload.clone().inner().inner().source_pk,
-                    payment_payload.inner().inner().receiver_pk,
+                    PaymentPayload(payment_payload.clone()).source_pk(),
+                    PaymentPayload(payment_payload).receiver_pk(),
                 ],
                 SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
                     match stake_delegation.inner() {
                         StakeDelegation::SetDelegate {
                             delegator,
                             new_delegate,
-                        } => vec![delegator, new_delegate],
+                        } => vec![delegator.into(), new_delegate.into()],
                     }
                 }
             })
@@ -147,5 +134,19 @@ impl PrecomputedBlock {
             .global_slot_since_genesis
             .t
             .t
+    }
+
+    pub fn timestamp(&self) -> u64 {
+        self.protocol_state
+            .body
+            .clone()
+            .inner()
+            .inner()
+            .blockchain_state
+            .inner()
+            .inner()
+            .timestamp
+            .inner()
+            .inner()
     }
 }
