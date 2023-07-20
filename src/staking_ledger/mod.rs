@@ -1,3 +1,5 @@
+pub(crate) mod staking_ledger_store;
+
 use anyhow::Context;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
@@ -9,19 +11,21 @@ use serde::{
     Deserialize,
 };
 
+use serde::Serialize;
+
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StakingLedger(pub Vec<StakingLedgerAccount>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NanoMina(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Nonce(u32);
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StakingLedgerAccount {
     pub pk: String,
     pub balance: NanoMina,
