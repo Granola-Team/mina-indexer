@@ -37,26 +37,24 @@ Build (install [nix](#about-the-development-environment) first)
 
 ```sh
 nix develop
-nix build '.?submodules=1'
+nix build
 ```
 
-alternatively, you can build with `cargo` inside the nix shell.
+Alternatively, you can build with `cargo` inside the nix shell
+(replace `mina-indexer` by `cargo run --release --bin mina-indexer --` in all following commands).
 
 ### Starting the indexer
 
 For example, from the root of this project, you can start the `mina-indexer` for mainnet via
 
 ```sh
-mina-indexer server -i -l tests/data/genesis_ledgers/mainnet.json -s path/to/your/precomputed/blocks/dir
+mina-indexer server -l tests/data/genesis_ledgers/mainnet.json -s path/to/your/precomputed/blocks/dir
 ```
 
-### Some other useful CLI flags
+### Some useful `server` options
 
 * `--ledger`, `-l`
   * genesis ledger `.json` file to use to initialize the indexer
-* `--ignore-db`, `-i`
-  * determines if the indexer will restore from an existing database
-  * for now, it's required to start without a db
 * `--root-hash`, `-r`
   * state hash of the genesis block
   * defaults to mainnet genesis state hash `3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ`
@@ -70,7 +68,7 @@ mina-indexer server -i -l tests/data/genesis_ledgers/mainnet.json -s path/to/you
   * directory to store the indexer's internal RocksDB database
   * defaults to `$HOME/.mina-indexer/database`
 
-### Some useful client commands
+### Some useful `client` commands
 
 Query data with the `mina-indexer` client (from another terminal window)
 
@@ -79,9 +77,9 @@ Query data with the `mina-indexer` client (from another terminal window)
 mina-indexer client account --public-key PUBLIC_KEY
 ```
 
-* Get the current best chain of block hashes within the root branch
+* Get the current best chain of blocks from the tip, length `NUM`
 ```sh
-mina-indexer client best-chain
+mina-indexer client best-chain --num NUM
 ```
 
 * Dump the best ledger to a file
