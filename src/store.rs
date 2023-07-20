@@ -1,10 +1,10 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
     },
-    staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
 };
 use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded};
 use std::path::{Path, PathBuf};
