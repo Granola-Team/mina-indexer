@@ -74,59 +74,6 @@ impl Branch {
         self.branches.height() == 0
     }
 
-    /// Returns the node id of the best tip
-    pub fn best_tip_id(&self) -> NodeId {
-        let mut best_tip_id = self
-            .branches
-            .root_node_id()
-            .expect("branch always has root node")
-            .clone();
-        for node_id in self
-            .branches
-            .traverse_post_order_ids(&best_tip_id)
-            .expect("branch always has root node")
-        {
-            let best_tip = self
-                .branches
-                .get(&best_tip_id)
-                .expect("branch always has root node")
-                .data()
-                .clone();
-            let node = self
-                .branches
-                .get(&node_id)
-                .expect("node_id from iterator")
-                .data()
-                .clone();
-            if best_tip.height > node.height {
-                best_tip_id = node_id.clone();
-            }
-        }
-        best_tip_id
-    }
-
-    /// Returns the node id of the canonical tip, if it exists
-    pub fn canonical_tip_id(&self, canonical_update_threshold: u32) -> Option<NodeId> {
-        let mut generation_removed = 0;
-        let mut canonical_tip_id = self.best_tip_id();
-        for node_id in self
-            .branches
-            .ancestor_ids(&canonical_tip_id)
-            .expect("best tip guaranteed")
-        {
-            canonical_tip_id = node_id.clone();
-            generation_removed += 1;
-            if generation_removed > canonical_update_threshold {
-                break;
-            }
-        }
-        if generation_removed <= canonical_update_threshold {
-            None
-        } else {
-            Some(canonical_tip_id)
-        }
-    }
-
     /// Returns the new node's id in the branch and its data
     pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<(NodeId, Block)> {
         let root_node_id = self

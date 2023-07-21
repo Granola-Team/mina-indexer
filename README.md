@@ -37,7 +37,7 @@ Build (install [nix](#about-the-development-environment) first)
 
 ```sh
 nix develop
-nix build
+nix build '.?submodules=1'
 ```
 
 Alternatively, you can build with `cargo` inside the nix shell

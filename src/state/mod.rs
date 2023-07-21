@@ -34,6 +34,7 @@ pub mod summary;
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
+#[derive(Debug)]
 pub struct IndexerState {
     /// Indexer mode
     pub mode: IndexerMode,
@@ -428,7 +429,7 @@ impl IndexerState {
             indexer_store.add_ledger(&self.root_branch.root_block().state_hash, ledger.clone())?;
         }
 
-        // now add the successive non-canoical blocks
+        // now add the successive non-canonical blocks
         self.add_blocks(block_parser, block_count).await
     }
 
