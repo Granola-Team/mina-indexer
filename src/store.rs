@@ -1,5 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -220,6 +221,41 @@ impl LedgerStore for IndexerStore {
         let cf_handle = self
             .database
             .cf_handle("ledgers")
+            .expect("column family exists");
+
+        self.database.try_catch_up_with_primary().ok();
+
+        if let Some(bytes) = self
+            .database
+            .get_pinned_cf(&cf_handle, key)?
+            .map(|bytes| bytes.to_vec())
+        {
+            ledger = Some(bcs::from_bytes(&bytes)?);
+        }
+        Ok(ledger)
+    }
+}
+
+impl StakingLedgerStore for IndexerStore {
+    fn add_epoch(&self, epoch: u32, ledger: &StakingLedger) -> anyhow::Result<()> {
+        let cf_handle = self
+            .database
+            .cf_handle("epochs")
+            .expect("column family exists");
+
+        let key = epoch.to_be_bytes();
+        let value = bcs::to_bytes(ledger)?;
+
+        self.database.put_cf(&cf_handle, key, value)?;
+        Ok(())
+    }
+
+    fn get_epoch(&self, ledger_hash: &str) -> anyhow::Result<Option<StakingLedger>> {
+        let mut ledger = None;
+        let key = ledger_hash.as_bytes();
+        let cf_handle = self
+            .database
+            .cf_handle("staking_ledgers")
             .expect("column family exists");
 
         self.database.try_catch_up_with_primary().ok();

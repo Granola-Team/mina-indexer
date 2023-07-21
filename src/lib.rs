@@ -2,6 +2,7 @@ pub mod block;
 pub mod client;
 pub mod gql;
 pub mod server;
+pub mod staking_ledger;
 pub mod state;
 pub mod store;
 
