@@ -6,6 +6,8 @@ use juniper::RootNode;
 use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
 
+use crate::gql::schema::Stakes;
+use crate::gql::schema::StakesQueryInput;
 use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
 use crate::store::IndexerStore;
@@ -99,6 +101,23 @@ impl QueryRoot {
         }
 
         transactions
+    }
+
+    #[graphql(description = "List of all stakes")]
+    fn stakes(ctx: &Context, query: Option<StakesQueryInput>, limit: Option<i32>) -> Vec<Stakes> {
+        // placeholder below -- work in progress
+        let stakes_data = vec![
+            Stakes {
+                epochNumber: 1,
+                ledgerHash: "ledger_hash_1".to_string(),
+            },
+            Stakes {
+                epochNumber: 2,
+                ledgerHash: "ledger_hash_2".to_string(),
+            },
+        ];
+
+        stakes_data
     }
 }
 
