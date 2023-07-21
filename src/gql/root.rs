@@ -78,13 +78,13 @@ impl QueryRoot {
                 }
 
                 if let Some(ref timestamp_gte) = query_input.date_time_gte {
-                    if transaction.dateTime < *timestamp_gte {
+                    if transaction.date_time < *timestamp_gte {
                         continue;
                     }
                 }
 
                 if let Some(ref timestamp_lte) = query_input.date_time_lte {
-                    if transaction.dateTime > *timestamp_lte {
+                    if transaction.date_time > *timestamp_lte {
                         continue;
                     }
                 }

@@ -8,14 +8,12 @@ use mina_serialization_types::staged_ledger_diff::StakeDelegationJson;
 use mina_serialization_types::staged_ledger_diff::UserCommandJson;
 
 use crate::gql::root::Context;
-
-#[allow(non_snake_case)]
 pub struct Transaction {
     pub from: String,
     pub to: String,
     pub memo: String,
-    pub blockHeight: i32,
-    pub dateTime: DateTime<Utc>,
+    pub block_height: i32,
+    pub date_time: DateTime<Utc>,
 }
 
 impl Transaction {
@@ -47,8 +45,8 @@ impl Transaction {
                     from: sanitize_json(sender),
                     to: sanitize_json(receiver),
                     memo: sanitize_json(payload.common.memo),
-                    blockHeight: height,
-                    dateTime: datetime,
+                    block_height: height,
+                    date_time: datetime,
                 }
             }
         }
@@ -89,12 +87,12 @@ impl Transaction {
     }
 
     #[graphql(description = "Block height")]
-    fn blockHeight(&self) -> i32 {
-        self.blockHeight
+    fn block_height(&self) -> i32 {
+        self.block_height
     }
 
     #[graphql(description = "Datetime")]
-    fn dateTime(&self) -> DateTime<Utc> {
-        self.dateTime
+    fn date_time(&self) -> DateTime<Utc> {
+        self.date_time
     }
 }
