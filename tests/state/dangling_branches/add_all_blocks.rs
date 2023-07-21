@@ -20,7 +20,7 @@ async fn extension() {
             n += 1;
         }
 
-        println!("{state:?}");
+        println!("{state}");
 
         // All 24 blocks are parsed successfully
         println!("Blocks added: {n}");

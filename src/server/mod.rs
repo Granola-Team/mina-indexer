@@ -1,7 +1,7 @@
 use crate::{
     block::{
-        parser::BlockParser, precomputed::PrecomputedBlock, receiver::BlockReceiver,
-        store::BlockStore, BlockHash, BlockWithoutHeight,
+        parser::BlockParser, receiver::BlockReceiver, store::BlockStore, Block, BlockHash,
+        BlockWithoutHeight,
     },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
@@ -246,7 +246,7 @@ pub async fn run(
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
                 info!("Receiving connection");
-                let best_chain = indexer_state.root_branch.longest_chain();
+                let best_tip = indexer_state.best_tip_block().clone();
 
                 let primary_path = database_dir.clone();
                 let mut secondary_path = primary_path.clone();
@@ -260,7 +260,7 @@ pub async fn run(
                 // handle the connection
                 tokio::spawn(async move {
                     debug!("Handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_chain, ledger, summary).await {
+                    if let Err(e) = handle_conn(conn, block_store_readonly, best_tip, ledger, summary).await {
                         error!("Error handling connection: {e}");
                     }
 
@@ -276,7 +276,7 @@ pub async fn run(
 async fn handle_conn(
     conn: LocalSocketStream,
     db: IndexerStore,
-    best_chain: Vec<BlockHash>,
+    best_tip: Block,
     ledger: Ledger,
     summary: SummaryVerbose,
 ) -> Result<(), anyhow::Error> {
@@ -309,12 +309,14 @@ async fn handle_conn(
             let data_buffer = buffers.next().unwrap();
             let num = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<usize>()?;
-            let best_chain: Vec<PrecomputedBlock> = best_chain[..best_chain.len() - 1]
-                .iter()
-                .take(num)
-                .cloned()
-                .map(|state_hash| db.get_block(&state_hash).unwrap().unwrap())
-                .collect();
+            let mut parent_hash = best_tip.parent_hash;
+            let mut best_chain = vec![db.get_block(&best_tip.state_hash)?.unwrap()];
+            for _ in 1..num {
+                let parent_pcb = db.get_block(&parent_hash)?.unwrap();
+                parent_hash =
+                    BlockHash::from_hashv1(parent_pcb.protocol_state.previous_state_hash.clone());
+                best_chain.push(parent_pcb);
+            }
             let bytes = bcs::to_bytes(&best_chain)?;
             writer.write_all(&bytes).await?;
         }

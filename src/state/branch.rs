@@ -6,25 +6,16 @@ use id_tree::{
     RemoveBehavior::{DropChildren, OrphanChildren},
     Tree,
 };
-use serde::ser::SerializeStruct;
-use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Branch {
     pub root: NodeId,
     pub branches: Tree<Block>,
 }
 
-pub type Path = Vec<Block>;
-
-#[derive(Clone)]
-pub struct Leaf<T> {
-    pub block: Block,
-    ledger: T,
-}
-
 impl Branch {
+    /// Creates a new `Branch` from a genesis hash
     pub fn new_genesis(root_hash: BlockHash) -> Self {
         let genesis_block = Block {
             state_hash: root_hash.clone(),
@@ -40,6 +31,7 @@ impl Branch {
         Self { root, branches }
     }
 
+    /// Creates a new `Branch` from an arbitrary starting hash
     pub fn new_non_genesis(
         root_hash: BlockHash,
         blockchain_length: Option<u32>,
@@ -58,6 +50,7 @@ impl Branch {
         Self { root, branches }
     }
 
+    /// Creates a new `Branch` from a `PrecomputedBlock` for testing
     pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
         let root_block = Block::from_precomputed(precomputed_block, 0);
         let mut branches = Tree::new();
@@ -65,14 +58,10 @@ impl Branch {
 
         Self { root, branches }
     }
-
-    // only the genesis block should work here
-    pub fn new_rooted(root_precomputed: &PrecomputedBlock) -> Self {
-        Branch::new(root_precomputed).unwrap()
-    }
 }
 
 impl Branch {
+    /// Creates a new `Branch` from a given `PrecomputedBlock`
     pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
         let root_block = Block::from_precomputed(root_precomputed, 0);
         let mut branches = Tree::new();
@@ -85,7 +74,7 @@ impl Branch {
         self.branches.height() == 0
     }
 
-    /// Returns the new node's id in the branch
+    /// Returns the new node's id in the branch and its data
     pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<(NodeId, Block)> {
         let root_node_id = self
             .branches
@@ -193,7 +182,7 @@ impl Branch {
     }
 
     /// Merges two trees:
-    /// incoming is placed under junction_id in self
+    /// the `incoming` tree is placed under `junction_id` in `self`
     ///
     /// Returns the id of the best tip in the merged subtree
     pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch) -> Option<NodeId> {
@@ -369,10 +358,12 @@ impl Branch {
         leaves.first().cloned()
     }
 
+    /// Returns the `BlockHash`es of the longest chain in the branch,
+    /// sorted from highest to lowest
     pub fn longest_chain(&self) -> Vec<BlockHash> {
         let mut longest_chain = Vec::new();
         if let Some((node_id, _)) = self.best_tip_with_id() {
-            // push the leaf itself
+            // push the tip itself
             longest_chain.push(
                 self.branches
                     .get(&node_id)
@@ -382,7 +373,7 @@ impl Branch {
                     .clone(),
             );
 
-            // push the leaf's ancestors
+            // push the tip's ancestors
             for node in self.branches.ancestors(&node_id).expect("node_id is valid") {
                 longest_chain.push(node.data().state_hash.clone());
             }
@@ -419,36 +410,8 @@ impl Branch {
     }
 }
 
-impl<T> Leaf<T> {
-    pub fn new(data: Block, ledger: T) -> Self {
-        Self {
-            block: data,
-            ledger,
-        }
-    }
-
-    pub fn get_ledger(&self) -> &T {
-        &self.ledger
-    }
-}
-
-impl<T> Serialize for Leaf<T>
-where
-    T: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("Leaf", 2)?;
-        state.serialize_field("block", &self.block)?;
-        state.serialize_field("ledger", &self.ledger)?;
-        state.end()
-    }
-}
-
 // only display the underlying tree
-impl std::fmt::Debug for Branch {
+impl std::fmt::Display for Branch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tree = String::new();
         self.branches.write_formatted(&mut tree)?;
