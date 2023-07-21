@@ -59,6 +59,6 @@ fn main() {
     );
     println!(
         "{} ledgers/sec",
-        (count as f64 / (delta as f64 / 1000.0 as f64))
+        (count as f64 / (delta as f64 / 1000.0_f64))
     );
 }
