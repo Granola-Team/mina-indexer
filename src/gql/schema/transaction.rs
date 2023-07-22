@@ -18,6 +18,7 @@ pub struct Transaction {
     pub date_time: DateTime<Utc>,
     pub canonical: bool,
     pub kind: String,
+    pub token: i32,
 }
 
 impl Transaction {
@@ -25,18 +26,18 @@ impl Transaction {
         match cmd.data {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;
-
-                let (sender, receiver, kind) = {
+                let token = payload.common.fee_token.0;
+                let (sender, receiver, kind, token_id) = {
                     match payload.body {
                         SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
-                            (payload.source_pk, payload.receiver_pk, "PAYMENT")
+                            (payload.source_pk, payload.receiver_pk, "PAYMENT", token)
                         }
                         SignedCommandPayloadBodyJson::StakeDelegation(payload) => {
                             let StakeDelegationJson::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = payload;
-                            (delegator, new_delegate, "STAKE_DELEGATION")
+                            (delegator, new_delegate, "STAKE_DELEGATION", token)
                         }
                     }
                 };
@@ -52,6 +53,7 @@ impl Transaction {
                     date_time: datetime,
                     canonical: true,
                     kind: kind.to_owned(),
+                    token: token_id as i32,
                 }
             }
         }
@@ -72,6 +74,7 @@ pub struct TransactionQueryInput {
     pub memos: Option<Vec<String>>,
     pub canonical: Option<bool>,
     pub kind: Option<String>,
+    pub token: Option<i32>,
     // Logical  operators
     pub OR: Option<Box<TransactionQueryInput>>,
     pub AND: Option<Box<TransactionQueryInput>>,
@@ -114,6 +117,10 @@ impl Transaction {
     #[graphql(description = "Kind")]
     fn kind(&self) -> &str {
         &self.kind
+    }
+    #[graphql(description = "Token")]
+    fn token(&self) -> i32 {
+        self.token
     }
 }
 
