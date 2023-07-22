@@ -14,6 +14,7 @@ pub struct Transaction {
     pub memo: String,
     pub block_height: i32,
     pub date_time: DateTime<Utc>,
+    pub canonical: bool,
 }
 
 impl Transaction {
@@ -47,6 +48,7 @@ impl Transaction {
                     memo: sanitize_json(payload.common.memo),
                     block_height: height,
                     date_time: datetime,
+                    canonical: true,
                 }
             }
         }
@@ -66,6 +68,7 @@ pub struct TransactionQueryInput {
     pub memos: Option<Vec<String>>,
     pub date_time_gte: Option<DateTime<Utc>>,
     pub date_time_lte: Option<DateTime<Utc>>,
+    pub canonical: Option<bool>,
 }
 
 #[juniper::graphql_object(Context = Context)]
@@ -94,5 +97,9 @@ impl Transaction {
     #[graphql(description = "Datetime")]
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time
+    }
+    #[graphql(description = "Canonical")]
+    fn canonical(&self) -> bool {
+        self.canonical
     }
 }

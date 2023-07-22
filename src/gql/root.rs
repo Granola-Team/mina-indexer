@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use juniper::EmptyMutation;
 use juniper::EmptySubscription;
+use juniper::FieldResult;
 use juniper::RootNode;
 use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
@@ -37,12 +38,11 @@ impl QueryRoot {
         ctx: &Context,
         query: Option<TransactionQueryInput>,
         limit: Option<i32>,
-    ) -> Vec<Transaction> {
+    ) -> FieldResult<Vec<Transaction>> {
         let limit = limit.unwrap_or(100);
         let limit_idx = usize::try_from(limit).unwrap();
 
         let mut transactions: Vec<Transaction> = Vec::new();
-
         for entry in ctx.db.iter_prefix_cf("tx", b"T") {
             let (key, value) = entry.unwrap();
 
@@ -59,6 +59,11 @@ impl QueryRoot {
 
             // Only apply filters if a query is provided
             if let Some(ref query_input) = query {
+                if let Some(canonical) = query_input.canonical {
+                    if transaction.canonical != canonical {
+                        continue;
+                    }
+                }
                 if let Some(ref from) = query_input.from {
                     if transaction.from != *from {
                         continue;
@@ -98,7 +103,7 @@ impl QueryRoot {
             }
         }
 
-        transactions
+        Ok(transactions)
     }
 }
 
