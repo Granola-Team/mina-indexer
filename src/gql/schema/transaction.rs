@@ -17,6 +17,7 @@ pub struct Transaction {
     pub block_height: i32,
     pub date_time: DateTime<Utc>,
     pub canonical: bool,
+    pub kind: String,
 }
 
 impl Transaction {
@@ -25,18 +26,17 @@ impl Transaction {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;
 
-                let (sender, receiver) = {
+                let (sender, receiver, kind) = {
                     match payload.body {
                         SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
-                            (payload.source_pk, payload.receiver_pk)
+                            (payload.source_pk, payload.receiver_pk, "PAYMENT")
                         }
                         SignedCommandPayloadBodyJson::StakeDelegation(payload) => {
                             let StakeDelegationJson::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = payload;
-
-                            (delegator, new_delegate)
+                            (delegator, new_delegate, "STAKE_DELEGATION")
                         }
                     }
                 };
@@ -51,6 +51,7 @@ impl Transaction {
                     block_height: height,
                     date_time: datetime,
                     canonical: true,
+                    kind: kind.to_owned(),
                 }
             }
         }
@@ -62,15 +63,21 @@ fn sanitize_json<T: serde::Serialize>(s: T) -> String {
     serde_json::to_string(&s).unwrap().replace('\"', "")
 }
 
+#[allow(non_snake_case)]
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Transaction query input")]
 pub struct TransactionQueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
     pub memos: Option<Vec<String>>,
+    pub canonical: Option<bool>,
+    pub kind: Option<String>,
+    // Logical  operators
+    pub OR: Option<Box<TransactionQueryInput>>,
+    pub AND: Option<Box<TransactionQueryInput>>,
+    // Comparison operators
     pub date_time_gte: Option<DateTime<Utc>>,
     pub date_time_lte: Option<DateTime<Utc>>,
-    pub canonical: Option<bool>,
 }
 
 #[juniper::graphql_object(Context = Context)]
@@ -104,6 +111,10 @@ impl Transaction {
     fn canonical(&self) -> bool {
         self.canonical
     }
+    #[graphql(description = "Kind")]
+    fn kind(&self) -> &str {
+        &self.kind
+    }
 }
 
 pub fn get_transactions(
@@ -130,7 +141,13 @@ pub fn get_transactions(
         );
 
         // Only apply filters if a query is provided
+        // TODO: Generalize filtering
         if let Some(ref query_input) = query {
+            if let Some(ref kind) = query_input.kind {
+                if transaction.kind != *kind {
+                    continue;
+                }
+            }
             if let Some(canonical) = query_input.canonical {
                 if transaction.canonical != canonical {
                     continue;
@@ -166,15 +183,11 @@ pub fn get_transactions(
                 }
             }
         }
-
         transactions.push(transaction);
-
         // stop collecting when reaching limit
         if transactions.len() >= limit_idx {
             break;
         }
     }
-
     transactions
-
 }
