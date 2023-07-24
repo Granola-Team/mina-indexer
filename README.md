@@ -33,6 +33,8 @@ git clone git@github.com:Granola-Team/mina-indexer.git
 cd mina-indexer
 ```
 
+### Building with nix
+
 Build (install [nix](#about-the-development-environment) first)
 
 ```sh
@@ -42,6 +44,15 @@ nix build '.?submodules=1'
 
 Alternatively, you can build with `cargo` inside the nix shell
 (replace `mina-indexer` by `cargo run --release --bin mina-indexer --` in all following commands).
+
+### Building the indexer in Docker
+
+To build the indexer in docker run the following command:
+
+```sh
+docker build -t mina-indexer:latest .
+docker run --rm mina-indexer --help
+```
 
 ### Starting the indexer
 
