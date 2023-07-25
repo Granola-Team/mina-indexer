@@ -18,8 +18,8 @@ use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StakingLedger {
-    pub epochNumber: i32,
-    pub ledgerHash: String,
+    pub epoch_number: i32,
+    pub ledger_hash: String,
     pub accounts: Vec<StakingLedgerAccount>,
 }
 

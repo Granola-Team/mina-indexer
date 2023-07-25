@@ -6,6 +6,7 @@ use juniper::RootNode;
 use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
 
+use crate::gql::schema::CamelCasedStakes;
 use crate::gql::schema::Stakes;
 use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
@@ -104,23 +105,17 @@ impl QueryRoot {
     }
 
     #[graphql(description = "Get staking ledger by epoch number")]
-    fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
-        let ledger = ctx.db.get_by_epoch(epoch_number as u32).unwrap_or(None);
-        if let Some(ledger) = ledger {
-            Some(Stakes::from_staking_ledger(&ledger))
-        } else {
-            None
-        }
+    fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<CamelCasedStakes> {
+        ctx.db.get_by_epoch(epoch_number as u32)
+            .unwrap_or(None)
+            .map(|ledger| Stakes::from_staking_ledger(&ledger).to_camel_case())
     }
 
     #[graphql(description = "Get staking ledger by ledger hash")]
-    fn stakingLedgerByHash(ctx: &Context, ledger_hash: String) -> Option<Stakes> {
-        let ledger = ctx.db.get_by_ledger_hash(&ledger_hash).unwrap_or(None);
-        if let Some(ledger) = ledger {
-            Some(Stakes::from_staking_ledger(&ledger))
-        } else {
-            None
-        }
+    fn stakingLedgerByHash(ctx: &Context, ledger_hash: String) -> Option<CamelCasedStakes> {
+        ctx.db.get_by_ledger_hash(&ledger_hash)
+            .unwrap_or(None)
+            .map(|ledger| Stakes::from_staking_ledger(&ledger).to_camel_case())
     }
 }
 
