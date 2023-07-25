@@ -17,7 +17,11 @@ use std::fmt;
 use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StakingLedger(pub Vec<StakingLedgerAccount>);
+pub struct StakingLedger {
+    pub epochNumber: i32,
+    pub ledgerHash: String,
+    pub accounts: Vec<StakingLedgerAccount>,
+}
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NanoMina(u64);

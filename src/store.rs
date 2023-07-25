@@ -269,6 +269,46 @@ impl StakingLedgerStore for IndexerStore {
         }
         Ok(ledger)
     }
+
+    fn get_by_ledger_hash(&self, ledger_hash: &str) -> anyhow::Result<Option<StakingLedger>> {
+        let mut ledger = None;
+        let key = ledger_hash.as_bytes();
+        let cf_handle = self
+            .database
+            .cf_handle("staking_ledgers")
+            .expect("column family exists");
+
+        self.database.try_catch_up_with_primary().ok();
+
+        if let Some(bytes) = self
+            .database
+            .get_pinned_cf(&cf_handle, key)?
+            .map(|bytes| bytes.to_vec())
+        {
+            ledger = Some(bcs::from_bytes(&bytes)?);
+        }
+        Ok(ledger)
+    }
+
+    fn get_by_epoch(&self, epoch_number: u32) -> anyhow::Result<Option<StakingLedger>> {
+        let mut ledger = None;
+        let key = epoch_number.to_be_bytes();
+        let cf_handle = self
+            .database
+            .cf_handle("epochs")
+            .expect("column family exists");
+
+        self.database.try_catch_up_with_primary().ok();
+
+        if let Some(bytes) = self
+            .database
+            .get_pinned_cf(&cf_handle, key)?
+            .map(|bytes| bytes.to_vec())
+        {
+            ledger = Some(bcs::from_bytes(&bytes)?);
+        }
+        Ok(ledger)
+    }
 }
 
 impl IndexerStore {

@@ -7,9 +7,9 @@ use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
 
 use crate::gql::schema::Stakes;
-use crate::gql::schema::StakesQueryInput;
 use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
+use crate::staking_ledger::staking_ledger_store::StakingLedgerStore;
 use crate::store::IndexerStore;
 use crate::store::TransactionKey;
 
@@ -103,21 +103,24 @@ impl QueryRoot {
         transactions
     }
 
-    #[graphql(description = "List of all stakes")]
-    fn stakes(ctx: &Context, query: Option<StakesQueryInput>, limit: Option<i32>) -> Vec<Stakes> {
-        // placeholder below -- work in progress
-        let stakes_data = vec![
-            Stakes {
-                epochNumber: 1,
-                ledgerHash: "ledger_hash_1".to_string(),
-            },
-            Stakes {
-                epochNumber: 2,
-                ledgerHash: "ledger_hash_2".to_string(),
-            },
-        ];
+    #[graphql(description = "Get staking ledger by epoch number")]
+    fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
+        let ledger = ctx.db.get_by_epoch(epoch_number as u32).unwrap_or(None);
+        if let Some(ledger) = ledger {
+            Some(Stakes::from_staking_ledger(&ledger))
+        } else {
+            None
+        }
+    }
 
-        stakes_data
+    #[graphql(description = "Get staking ledger by ledger hash")]
+    fn stakingLedgerByHash(ctx: &Context, ledger_hash: String) -> Option<Stakes> {
+        let ledger = ctx.db.get_by_ledger_hash(&ledger_hash).unwrap_or(None);
+        if let Some(ledger) = ledger {
+            Some(Stakes::from_staking_ledger(&ledger))
+        } else {
+            None
+        }
     }
 }
 
