@@ -1,5 +1,6 @@
 pub mod block;
 pub mod client;
+pub mod delegation_totals_store;
 pub mod gql;
 pub mod server;
 pub mod staking_ledger;

@@ -5,7 +5,10 @@ use juniper::EmptySubscription;
 use juniper::RootNode;
 use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
+use rocksdb::DB;
 
+use crate::gql::schema::delegations::get_delegation_totals_from_ctx;
+use crate::gql::schema::delegations::DelegationTotals;
 use crate::gql::schema::Stakes;
 use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
@@ -15,11 +18,15 @@ use crate::store::TransactionKey;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
+    pub delegation_totals_db: Arc<DB>,
 }
 
 impl Context {
-    pub fn new(db: Arc<IndexerStore>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<IndexerStore>, delegation_totals_db: Arc<DB>) -> Self {
+        Self {
+            db,
+            delegation_totals_db,
+        }
     }
 }
 
@@ -117,6 +124,29 @@ impl QueryRoot {
             .get_by_ledger_hash(&ledger_hash)
             .unwrap_or(None)
             .map(|ledger| Stakes::from_staking_ledger(&ledger))
+    }
+
+    #[graphql(
+        description = "Get delegation totals from delegation_totals_db based on public key and epoch"
+    )]
+    async fn delegationTotals(
+        ctx: &Context,
+        public_key: String,
+        epoch: i32,
+    ) -> Option<DelegationTotals> {
+        // placeholder to get delegations totals from ctx.delegation_totals_store
+        /*
+        let delegation_totals = get_delegation_totals_from_ctx(
+            &ctx.delegation_totals_db,
+            &public_key,
+            epoch,
+        )
+        .await
+        .unwrap_or(None);
+
+        delegation_totals
+         */
+        unimplemented!()
     }
 }
 
