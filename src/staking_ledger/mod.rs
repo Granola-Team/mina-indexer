@@ -34,7 +34,8 @@ pub struct StakingLedgerAccount {
     pub pk: String,
     pub balance: NanoMina,
     pub delegate: String,
-    //pub ledger_hash: String,
+    pub epoch_number: i32,
+    pub ledger_hash: String,
     pub nonce: Option<Nonce>, // u32
     pub receipt_chain_hash: String,
     pub token: String, // u32
