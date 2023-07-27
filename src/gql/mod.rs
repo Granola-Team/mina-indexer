@@ -49,6 +49,8 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
             .expect("Failed to create delegation totals DB"),
     );
 
+    let default_epoch = 1;
+
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(Context::new(
