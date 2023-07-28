@@ -398,10 +398,10 @@ impl IndexerState {
                 indexer_store.add_block(&precomputed_block)?;
 
                 if let Some(height) = precomputed_block.blockchain_length {
-                    let tmstmp = precomputed_block.timestamp();
+                    let timestamp = precomputed_block.timestamp();
 
                     for cmd in precomputed_block.commands() {
-                        indexer_store.put_tx(height, tmstmp, cmd)?;
+                        indexer_store.put_tx(height, timestamp, cmd)?;
                     }
                 }
 
