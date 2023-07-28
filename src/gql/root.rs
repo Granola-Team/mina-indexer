@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use juniper::EmptyMutation;
 use juniper::EmptySubscription;
 use juniper::RootNode;
