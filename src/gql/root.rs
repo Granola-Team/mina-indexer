@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use juniper::EmptyMutation;
 use juniper::EmptySubscription;
+use juniper::FieldResult;
 use juniper::RootNode;
-use mina_serialization_types::staged_ledger_diff::UserCommandWithStatusJson;
-use mina_serialization_types::v1::UserCommandWithStatusV1;
 
 use crate::gql::schema::transaction;
 use crate::gql::schema::Stakes;
@@ -12,10 +11,6 @@ use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
 use crate::staking_ledger::staking_ledger_store::StakingLedgerStore;
 use crate::store::IndexerStore;
-use juniper::EmptyMutation;
-use juniper::EmptySubscription;
-use juniper::FieldResult;
-use juniper::RootNode;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
