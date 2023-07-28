@@ -77,22 +77,73 @@ pub enum SortBy {
     NonceAsc,
 }
 
-#[allow(non_snake_case)]
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Transaction query input")]
 pub struct TransactionQueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
-    pub memos: Option<Vec<String>>,
+    pub memo: Option<String>,
     pub canonical: Option<bool>,
     pub kind: Option<String>,
     pub token: Option<i32>,
     // Logical  operators
-    pub OR: Option<Box<TransactionQueryInput>>,
-    pub AND: Option<Box<TransactionQueryInput>>,
+    #[graphql(name = "OR")]
+    pub or: Option<Vec<TransactionQueryInput>>,
+    #[graphql(name = "AND")]
+    pub and: Option<Vec<TransactionQueryInput>>,
     // Comparison operators
-    pub date_time_gte: Option<DateTime<Utc>>,
-    pub date_time_lte: Option<DateTime<Utc>>,
+    #[graphql(name = "dateTime_gte")]
+    pub datetime_gte: Option<DateTime<Utc>>,
+    #[graphql(name = "dateTime_lte")]
+    pub datetime_lte: Option<DateTime<Utc>>,
+}
+
+impl TransactionQueryInput {
+    fn matches(&self, transaction: &Transaction) -> bool {
+        let mut matches = true;
+
+        if let Some(ref kind) = self.kind {
+            matches = matches && transaction.kind == *kind;
+        }
+
+        if let Some(canonical) = self.canonical {
+            matches = matches && transaction.canonical == canonical;
+        }
+
+        if let Some(ref from) = self.from {
+            matches = matches && transaction.from == *from;
+        }
+
+        if let Some(ref to) = self.to {
+            matches = matches && transaction.to == *to;
+        }
+
+        if let Some(ref memo) = self.memo {
+            matches = matches && transaction.memo == *memo;
+        }
+
+        if let Some(ref query) = self.and {
+            for and in query.iter() {
+                matches = matches && and.matches(transaction);
+            }
+        }
+
+        if let Some(ref query) = self.or {
+            if !query.is_empty() {
+                matches = query.iter().any(|or| or.matches(transaction));
+            }
+        }
+
+        if let Some(datetime_gte) = self.datetime_gte {
+            matches = matches && transaction.date_time >= datetime_gte;
+        }
+
+        if let Some(datetime_lte) = self.datetime_lte {
+            matches = matches && transaction.date_time <= datetime_lte;
+        }
+
+        matches
+    }
 }
 
 #[juniper::graphql_object(Context = Context)]
@@ -122,18 +173,22 @@ impl Transaction {
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time
     }
+
     #[graphql(description = "Canonical")]
     fn canonical(&self) -> bool {
         self.canonical
     }
+
     #[graphql(description = "Kind")]
     fn kind(&self) -> &str {
         &self.kind
     }
+
     #[graphql(description = "Token")]
     fn token(&self) -> i32 {
         self.token
     }
+
     #[graphql(description = "Nonce")]
     fn nonce(&self) -> i32 {
         self.nonce
@@ -164,60 +219,32 @@ pub fn get_transactions(
             key.timestamp(),
         );
 
-        // Only apply filters if a query is provided
-        // TODO: Generalize filtering
-        if let Some(ref query_input) = query {
-            if let Some(ref kind) = query_input.kind {
-                if transaction.kind != *kind {
-                    continue;
-                }
-            }
-            if let Some(canonical) = query_input.canonical {
-                if transaction.canonical != canonical {
-                    continue;
-                }
-            }
-            if let Some(ref from) = query_input.from {
-                if transaction.from != *from {
-                    continue;
-                }
-            }
+        // If no query is provided, add all transactions
+        if query.is_none() {
+            transactions.push(transaction);
 
-            if let Some(ref to) = query_input.to {
-                if transaction.to != *to {
-                    continue;
-                }
-            }
-
-            if let Some(ref memos) = query_input.memos {
-                if !memos.contains(&transaction.memo) {
-                    continue;
-                }
-            }
-
-            if let Some(ref timestamp_gte) = query_input.date_time_gte {
-                if transaction.date_time < *timestamp_gte {
-                    continue;
-                }
-            }
-
-            if let Some(ref timestamp_lte) = query_input.date_time_lte {
-                if transaction.date_time > *timestamp_lte {
-                    continue;
-                }
+            if transactions.len() >= limit_idx {
+                break;
             }
         }
-        transactions.push(transaction);
-        // stop collecting when reaching limit
-        if transactions.len() >= limit_idx {
-            if let Some(sort_by) = sort_by {
-                match sort_by {
-                    SortBy::NonceDesc => transactions.sort_by(|a, b| b.nonce.cmp(&a.nonce)),
-                    SortBy::NonceAsc => transactions.sort_by(|a, b| a.nonce.cmp(&b.nonce)),
+        // If query is provided, only add transactions that match the query
+        else if let Some(ref query_input) = query {
+            if query_input.matches(&transaction) {
+                transactions.push(transaction);
+
+                if transactions.len() >= limit_idx {
+                    break;
                 }
             }
-            break;
         }
     }
+
+    if let Some(sort_by) = sort_by {
+        match sort_by {
+            SortBy::NonceDesc => transactions.sort_by(|a, b| b.nonce.cmp(&a.nonce)),
+            SortBy::NonceAsc => transactions.sort_by(|a, b| a.nonce.cmp(&b.nonce)),
+        }
+    }
+
     transactions
 }
