@@ -134,19 +134,7 @@ impl QueryRoot {
         public_key: String,
         epoch: i32,
     ) -> Option<DelegationTotals> {
-        // placeholder to get delegations totals from ctx.delegation_totals_store
-        /*
-        let delegation_totals = get_delegation_totals_from_ctx(
-            &ctx.delegation_totals_db,
-            &public_key,
-            epoch,
-        )
-        .await
-        .unwrap_or(None);
-
-        delegation_totals
-         */
-        unimplemented!()
+        get_delegation_totals_from_ctx(ctx, &public_key, epoch).await
     }
 }
 

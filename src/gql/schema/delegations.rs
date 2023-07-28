@@ -1,7 +1,7 @@
 use juniper::GraphQLInputObject;
 use serde::{Deserialize, Serialize};
 
-use crate::gql::root::Context;
+use crate::{delegation_totals_store::get_delegation_totals_from_db, gql::root::Context};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DelegationTotals {
@@ -34,7 +34,9 @@ pub async fn get_delegation_totals_from_ctx(
     ctx: &Context,
     public_key: &str,
     epoch: i32,
-) -> Result<Option<DelegationTotals>, rocksdb::Error> {
-    // placeholder to get delegations totals from ctx.delegation_totals_store
-    unimplemented!()
+) -> Option<DelegationTotals> {
+    match get_delegation_totals_from_db(&ctx.delegation_totals_db, public_key, epoch) {
+        Ok(Some(delegation_totals)) => Some(delegation_totals),
+        _ => None,
+    }
 }

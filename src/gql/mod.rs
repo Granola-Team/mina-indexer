@@ -16,6 +16,7 @@ use juniper::http::GraphQLRequest;
 use rocksdb::DB;
 
 use crate::delegation_totals_store::create_delegation_totals_db;
+use crate::delegation_totals_store::update_delegation_totals;
 use crate::gql::root::Context;
 use crate::store::IndexerStore;
 
@@ -50,6 +51,18 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
     );
 
     let default_epoch = 1;
+    // delegation totals for the default epoch (1) here
+    let total_delegated = 100; // Placeholder value, replace with actual total_delegated value
+    let count_delegates = 10; // Placeholder value, replace with actual count_delegates value
+
+    update_delegation_totals(
+        &delegation_totals_db,
+        "public_key_here",
+        default_epoch,
+        total_delegated,
+        count_delegates,
+    )
+    .expect("Failed to update delegation totals");
 
     HttpServer::new(move || {
         App::new()
