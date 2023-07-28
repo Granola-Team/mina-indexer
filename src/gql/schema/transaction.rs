@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use juniper::GraphQLEnum;
 use juniper::GraphQLInputObject;
 use mina_serialization_types::json::UserCommandWithStatusJson;
 use mina_serialization_types::staged_ledger_diff::SignedCommandPayloadBodyJson;
@@ -19,6 +20,7 @@ pub struct Transaction {
     pub canonical: bool,
     pub kind: String,
     pub token: i32,
+    pub nonce: i32,
 }
 
 impl Transaction {
@@ -27,6 +29,7 @@ impl Transaction {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;
                 let token = payload.common.fee_token.0;
+                let nonce = payload.common.nonce.0;
                 let (sender, receiver, kind, token_id) = {
                     match payload.body {
                         SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
@@ -54,6 +57,7 @@ impl Transaction {
                     canonical: true,
                     kind: kind.to_owned(),
                     token: token_id as i32,
+                    nonce: nonce as i32,
                 }
             }
         }
@@ -63,6 +67,14 @@ impl Transaction {
 // JSON utility
 fn sanitize_json<T: serde::Serialize>(s: T) -> String {
     serde_json::to_string(&s).unwrap().replace('\"', "")
+}
+
+#[derive(Debug, GraphQLEnum)]
+pub enum SortBy {
+    #[graphql(name = "NONCE_DESC")]
+    NonceDesc,
+    #[graphql(name = "NONCE_ASC")]
+    NonceAsc,
 }
 
 #[allow(non_snake_case)]
@@ -122,12 +134,17 @@ impl Transaction {
     fn token(&self) -> i32 {
         self.token
     }
+    #[graphql(description = "Nonce")]
+    fn nonce(&self) -> i32 {
+        self.nonce
+    }
 }
 
 pub fn get_transactions(
     ctx: &Context,
     query: Option<TransactionQueryInput>,
     limit: Option<i32>,
+    sort_by: Option<SortBy>,
 ) -> Vec<Transaction> {
     let limit = limit.unwrap_or(100);
     let limit_idx = usize::try_from(limit).unwrap();
@@ -193,6 +210,12 @@ pub fn get_transactions(
         transactions.push(transaction);
         // stop collecting when reaching limit
         if transactions.len() >= limit_idx {
+            if let Some(sort_by) = sort_by {
+                match sort_by {
+                    SortBy::NonceDesc => transactions.sort_by(|a, b| b.nonce.cmp(&a.nonce)),
+                    SortBy::NonceAsc => transactions.sort_by(|a, b| a.nonce.cmp(&b.nonce)),
+                }
+            }
             break;
         }
     }

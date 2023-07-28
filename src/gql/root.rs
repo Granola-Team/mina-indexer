@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
+use crate::gql::schema::transaction;
+use crate::gql::schema::Transaction;
+use crate::gql::schema::TransactionQueryInput;
+use crate::store::IndexerStore;
 use juniper::EmptyMutation;
 use juniper::EmptySubscription;
 use juniper::FieldResult;
 use juniper::RootNode;
-
-use crate::gql::schema::transaction::get_transactions;
-use crate::gql::schema::Transaction;
-use crate::gql::schema::TransactionQueryInput;
-use crate::store::IndexerStore;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
@@ -36,8 +35,9 @@ impl QueryRoot {
         ctx: &Context,
         query: Option<TransactionQueryInput>,
         limit: Option<i32>,
+        sort_by: Option<transaction::SortBy>,
     ) -> FieldResult<Vec<Transaction>> {
-        Ok(get_transactions(ctx, query, limit))
+        Ok(transaction::get_transactions(ctx, query, limit, sort_by))
     }
 }
 
