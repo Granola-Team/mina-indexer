@@ -54,7 +54,9 @@ pub fn get_delegation_totals_from_db(
         let count_delegates_bytes_array: [u8; 4] =
             count_delegates_bytes.as_slice().try_into().unwrap();
 
-        let total_delegated = f64::from_bits(u64::from_le_bytes(total_delegated_bytes[..].try_into().unwrap()));
+        let total_delegated = f64::from_bits(u64::from_le_bytes(
+            total_delegated_bytes[..].try_into().unwrap(),
+        ));
         let count_delegates = i32::from_le_bytes(count_delegates_bytes_array);
 
         let delegation_totals = DelegationTotals {
