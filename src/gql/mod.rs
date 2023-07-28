@@ -18,9 +18,10 @@ use rocksdb::DB;
 use crate::delegation_totals_store::create_delegation_totals_db;
 use crate::delegation_totals_store::update_delegation_totals;
 use crate::gql::root::Context;
+use crate::gql::root::QueryRoot;
 use crate::store::IndexerStore;
 
-mod root;
+pub(crate) mod root;
 pub(crate) mod schema;
 
 #[get("/graphql")]
@@ -50,15 +51,26 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
             .expect("Failed to create delegation totals DB"),
     );
 
-    let default_epoch = 1;
+    let epoch_number = 1; // default epoch set to 1
+    let staking_ledger = QueryRoot::stakingLedgerByEpoch(&ctx, epoch_number);
+
     // delegation totals for the default epoch (1) here
-    let total_delegated = 100; // Placeholder value, replace with actual total_delegated value
-    let count_delegates = 10; // Placeholder value, replace with actual count_delegates value
+    let mut total_delegated = 0.0;
+    let mut count_delegates = 0;
+
+    if let Some(staking_ledger) = staking_ledger {
+        for account in staking_ledger.accounts {
+            if let Some(delegation_totals) = &account.delegationTotals {
+                total_delegated += delegation_totals.totalDelegated.unwrap_or(0.0);
+                count_delegates += delegation_totals.countDelegates.unwrap_or(0);
+            }
+        }
+    }
 
     update_delegation_totals(
         &delegation_totals_db,
         "public_key_here",
-        default_epoch,
+        epoch_number,
         total_delegated,
         count_delegates,
     )

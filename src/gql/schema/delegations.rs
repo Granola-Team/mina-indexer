@@ -1,11 +1,56 @@
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
+
 use juniper::GraphQLInputObject;
 use serde::{Deserialize, Serialize};
 
 use crate::{delegation_totals_store::get_delegation_totals_from_db, gql::root::Context};
 
+use juniper::GraphQLScalarValue;
+
+// f64 type does not implement the Eq and Hash traits, which are required by the juniper crate for GraphQL objects
+// and i64 doesn't implement the required traits for being used directly as a GraphQL scalar value in the Juniper schema
+// so we can create a custom scalar type for representing the total_delegated field, and then convert the value between i64 and f64 when needed
+#[derive(Debug, Clone, PartialEq, GraphQLScalarValue, Serialize, Deserialize)]
+pub struct TotalDelegated(pub f64);
+
+// Implement conversion traits for TotalDelegated
+impl Into<f64> for TotalDelegated {
+    fn into(self) -> f64 {
+        self.0
+    }
+}
+
+impl From<f64> for TotalDelegated {
+    fn from(value: f64) -> Self {
+        TotalDelegated(value)
+    }
+}
+
+// Implement more traits for TotalDelegated
+impl Eq for TotalDelegated {}
+
+impl Ord for TotalDelegated {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.partial_cmp(&other.0).unwrap_or(Ordering::Equal)
+    }
+}
+
+impl PartialOrd for TotalDelegated {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl Hash for TotalDelegated {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DelegationTotals {
-    pub total_delegated: i32,
+    pub total_delegated: TotalDelegated,
     pub count_delegates: i32,
 }
 
@@ -13,7 +58,7 @@ pub struct DelegationTotals {
 #[graphql(description = "Delegation Totals")]
 impl DelegationTotals {
     #[graphql(description = "Total Delegated")]
-    fn totalDelegated(&self) -> &i32 {
+    fn totalDelegated(&self) -> &TotalDelegated {
         &self.total_delegated
     }
 
@@ -26,7 +71,7 @@ impl DelegationTotals {
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Delegation Totals query input")]
 pub struct DelegationTotalsQueryInput {
-    pub total_delegated: Option<i32>,
+    pub total_delegated: Option<TotalDelegated>,
     pub count_delegates: Option<i32>,
 }
 

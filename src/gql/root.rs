@@ -52,7 +52,7 @@ impl QueryRoot {
     }
 
     #[graphql(description = "Get staking ledger by epoch number")]
-    fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
+    pub fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
         ctx.db
             .get_by_epoch(epoch_number as u32)
             .unwrap_or(None)

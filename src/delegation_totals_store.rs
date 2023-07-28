@@ -1,5 +1,5 @@
 // RocksDB for DelegationTotals
-use crate::gql::schema::delegations::DelegationTotals;
+use crate::gql::schema::delegations::{DelegationTotals, TotalDelegated};
 use rocksdb::{Options, WriteBatch, DB};
 
 pub fn create_delegation_totals_db(path: &str) -> Result<DB, rocksdb::Error> {
@@ -54,12 +54,12 @@ pub fn get_delegation_totals_from_db(
         let count_delegates_bytes_array: [u8; 4] =
             count_delegates_bytes.as_slice().try_into().unwrap();
 
-        let total_delegated = i32::from_le_bytes(total_delegated_bytes_array);
+        let total_delegated = f64::from_bits(u64::from_le_bytes(total_delegated_bytes[..].try_into().unwrap()));
         let count_delegates = i32::from_le_bytes(count_delegates_bytes_array);
 
         let delegation_totals = DelegationTotals {
-            total_delegated,
             count_delegates,
+            total_delegated: TotalDelegated(total_delegated),
         };
         Ok(Some(delegation_totals))
     } else {
