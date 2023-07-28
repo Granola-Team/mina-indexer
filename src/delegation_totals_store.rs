@@ -26,8 +26,8 @@ pub fn update_delegation_totals(
     let total_delegated_value = total_delegated.to_le_bytes();
     let count_delegates_value = count_delegates.to_le_bytes();
 
-    batch.put(&total_key_bytes, &total_delegated_value);
-    batch.put(&count_key_bytes, &count_delegates_value);
+    batch.put(total_key_bytes, total_delegated_value);
+    batch.put(count_key_bytes, count_delegates_value);
 
     db.write(batch)?;
 
@@ -42,8 +42,8 @@ pub fn get_delegation_totals_from_db(
     let combined_key = format!("{}_{}", public_key, epoch);
     let key = combined_key.as_bytes();
 
-    let total_delegated_value = db.get(&key)?;
-    let count_delegates_value = db.get(&key)?;
+    let total_delegated_value = db.get(key)?;
+    let count_delegates_value = db.get(key)?;
 
     if let (Some(total_delegated_bytes), Some(count_delegates_bytes)) = (
         total_delegated_value.as_ref(),
