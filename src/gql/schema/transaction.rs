@@ -123,9 +123,7 @@ impl TransactionQueryInput {
         }
 
         if let Some(ref query) = self.and {
-            for and in query.iter() {
-                matches = matches && and.matches(transaction);
-            }
+            matches = matches && query.iter().all(|and| and.matches(transaction));
         }
 
         if let Some(ref query) = self.or {
@@ -202,7 +200,7 @@ pub fn get_transactions(
     sort_by: Option<SortBy>,
 ) -> Vec<Transaction> {
     let limit = limit.unwrap_or(100);
-    let limit_idx = usize::try_from(limit).unwrap();
+    let limit_idx = limit as usize;
 
     let mut transactions: Vec<Transaction> = Vec::new();
     for entry in ctx.db.iter_prefix_cf("tx", b"T") {
@@ -219,23 +217,19 @@ pub fn get_transactions(
             key.timestamp(),
         );
 
-        // If no query is provided, add all transactions
-        if query.is_none() {
-            transactions.push(transaction);
-
-            if transactions.len() >= limit_idx {
-                break;
-            }
-        }
-        // If query is provided, only add transactions that match the query
-        else if let Some(ref query_input) = query {
+        // If query is provided, only add transactions that satisfy the query
+        if let Some(ref query_input) = query {
             if query_input.matches(&transaction) {
                 transactions.push(transaction);
-
-                if transactions.len() >= limit_idx {
-                    break;
-                }
             }
+        }
+        // If no query is provided, add all transactions
+        else {
+            transactions.push(transaction);
+        }
+        // Early break if the transactions reach the query limit
+        if transactions.len() >= limit_idx {
+            break;
         }
     }
 
