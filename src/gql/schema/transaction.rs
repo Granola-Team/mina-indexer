@@ -130,7 +130,7 @@ impl TransactionQueryInput {
 
         if let Some(ref query) = self.or {
             if !query.is_empty() {
-                matches = query.iter().any(|or| or.matches(transaction));
+                matches = matches && query.iter().any(|or| or.matches(transaction));
             }
         }
 
