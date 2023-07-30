@@ -22,6 +22,7 @@ pub struct Transaction {
     pub token: i32,
     pub nonce: i32,
     pub fee: f64,
+    pub amount: f64,
 }
 
 impl Transaction {
@@ -32,17 +33,21 @@ impl Transaction {
                 let token = payload.common.fee_token.0;
                 let nonce = payload.common.nonce.0;
                 let fee = payload.common.fee.0;
-                let (sender, receiver, kind, token_id) = {
+                let (sender, receiver, kind, token_id, amount) = {
                     match payload.body {
-                        SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
-                            (payload.source_pk, payload.receiver_pk, "PAYMENT", token)
-                        }
+                        SignedCommandPayloadBodyJson::PaymentPayload(payload) => (
+                            payload.source_pk,
+                            payload.receiver_pk,
+                            "PAYMENT",
+                            token,
+                            payload.amount.0,
+                        ),
                         SignedCommandPayloadBodyJson::StakeDelegation(payload) => {
                             let StakeDelegationJson::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = payload;
-                            (delegator, new_delegate, "STAKE_DELEGATION", token)
+                            (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
                         }
                     }
                 };
@@ -60,7 +65,8 @@ impl Transaction {
                     kind: kind.to_owned(),
                     token: token_id as i32,
                     nonce: nonce as i32,
-                    fee: fee as f64,
+                    fee: fee as f64 / 1_000_000_000_f64,
+                    amount: amount as f64 / 1_000_000_000_f64,
                 }
             }
         }
@@ -90,6 +96,7 @@ pub struct TransactionQueryInput {
     pub kind: Option<String>,
     pub token: Option<i32>,
     pub fee: Option<f64>,
+    pub amount: Option<f64>,
     // Logical  operators
     #[graphql(name = "OR")]
     pub or: Option<Vec<TransactionQueryInput>>,
@@ -202,7 +209,12 @@ impl Transaction {
 
     #[graphql(description = "Fee")]
     fn fee(&self) -> f64 {
-        self.fee / 1_000_000_000_f64
+        self.fee
+    }
+
+    #[graphql(description = "Amnount")]
+    fn amount(&self) -> f64 {
+        self.amount
     }
 }
 
