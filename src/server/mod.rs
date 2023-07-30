@@ -16,7 +16,7 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use std::{path::PathBuf, process, sync::Arc};
+use std::{io, path::PathBuf, process, sync::Arc};
 use tokio::fs::{self, create_dir_all, metadata};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::prelude::*;
@@ -223,8 +223,22 @@ pub async fn run(
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
     info!("Block receiver set to watch {watch_dir:?}");
+    let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+        if e.kind() == io::ErrorKind::AddrInUse {
+            let name = &SOCKET_NAME[1..];
+            debug!(
+                "Domain socket: {} already in use. Removing old vestige",
+                name
+            );
+            std::fs::remove_file(name).expect("Should be able to remove socket file");
+            LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+                panic!("Unable to bind domain socket {:?}", e);
+            })
+        } else {
+            panic!("Unable to bind domain socket {:?}", e);
+        }
+    });
 
-    let listener = LocalSocketListener::bind(SOCKET_NAME)?;
     info!("Local socket listener started");
 
     loop {
