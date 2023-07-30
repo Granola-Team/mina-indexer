@@ -21,6 +21,7 @@ pub struct Transaction {
     pub kind: String,
     pub token: i32,
     pub nonce: i32,
+    pub fee: f64,
 }
 
 impl Transaction {
@@ -30,6 +31,7 @@ impl Transaction {
                 let payload = signed_cmd.payload;
                 let token = payload.common.fee_token.0;
                 let nonce = payload.common.nonce.0;
+                let fee = payload.common.fee.0;
                 let (sender, receiver, kind, token_id) = {
                     match payload.body {
                         SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
@@ -58,6 +60,7 @@ impl Transaction {
                     kind: kind.to_owned(),
                     token: token_id as i32,
                     nonce: nonce as i32,
+                    fee: fee as f64,
                 }
             }
         }
@@ -86,6 +89,7 @@ pub struct TransactionQueryInput {
     pub canonical: Option<bool>,
     pub kind: Option<String>,
     pub token: Option<i32>,
+    pub fee: Option<f64>,
     // Logical  operators
     #[graphql(name = "OR")]
     pub or: Option<Vec<TransactionQueryInput>>,
@@ -101,6 +105,10 @@ pub struct TransactionQueryInput {
 impl TransactionQueryInput {
     fn matches(&self, transaction: &Transaction) -> bool {
         let mut matches = true;
+
+        if let Some(ref fee) = self.fee {
+            matches = matches && transaction.fee == *fee;
+        }
 
         if let Some(ref kind) = self.kind {
             matches = matches && transaction.kind == *kind;
@@ -190,6 +198,11 @@ impl Transaction {
     #[graphql(description = "Nonce")]
     fn nonce(&self) -> i32 {
         self.nonce
+    }
+
+    #[graphql(description = "Fee")]
+    fn fee(&self) -> f64 {
+        self.fee / 1_000_000_000_f64
     }
 }
 
