@@ -14,10 +14,10 @@ use juniper::GraphQLScalarValue;
 #[derive(Debug, Clone, PartialEq, GraphQLScalarValue, Serialize, Deserialize)]
 pub struct TotalDelegated(pub f64);
 
-// Implement conversion traits for TotalDelegated
-impl Into<f64> for TotalDelegated {
-    fn into(self) -> f64 {
-        self.0
+// Implement traits (conversion and others) for TotalDelegated
+impl From<TotalDelegated> for f64 {
+    fn from(val: TotalDelegated) -> Self {
+        val.0
     }
 }
 
@@ -27,7 +27,6 @@ impl From<f64> for TotalDelegated {
     }
 }
 
-// Implement more traits for TotalDelegated
 impl Eq for TotalDelegated {}
 
 impl Ord for TotalDelegated {

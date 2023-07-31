@@ -49,7 +49,7 @@ pub fn get_delegation_totals_from_db(
         total_delegated_value.as_ref(),
         count_delegates_value.as_ref(),
     ) {
-        let total_delegated_bytes_array: [u8; 4] =
+        let _total_delegated_bytes_array: [u8; 4] =
             total_delegated_bytes.as_slice().try_into().unwrap();
         let count_delegates_bytes_array: [u8; 4] =
             count_delegates_bytes.as_slice().try_into().unwrap();
@@ -65,6 +65,10 @@ pub fn get_delegation_totals_from_db(
         };
         Ok(Some(delegation_totals))
     } else {
-        Ok(None)
+        // default values if delegation totals not found
+        Ok(Some(DelegationTotals {
+            count_delegates: 0,
+            total_delegated: TotalDelegated(0.0),
+        }))
     }
 }

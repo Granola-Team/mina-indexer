@@ -53,10 +53,7 @@ impl QueryRoot {
 
     #[graphql(description = "Get staking ledger by epoch number")]
     pub fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
-        ctx.db
-            .get_by_epoch(epoch_number as u32)
-            .unwrap_or(None)
-            .map(|ledger| Stakes::from_staking_ledger(&ledger))
+        staking_ledger_by_epoch(ctx, epoch_number)
     }
 
     #[graphql(description = "Get staking ledger by ledger hash")]
@@ -77,6 +74,13 @@ impl QueryRoot {
     ) -> Option<DelegationTotals> {
         get_delegation_totals_from_ctx(ctx, &public_key, epoch).await
     }
+}
+
+pub fn staking_ledger_by_epoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
+    ctx.db
+        .get_by_epoch(epoch_number as u32)
+        .unwrap_or(None)
+        .map(|ledger| Stakes::from_staking_ledger(&ledger))
 }
 
 pub type Schema = RootNode<'static, QueryRoot, EmptyMutation<Context>, EmptySubscription<Context>>;
