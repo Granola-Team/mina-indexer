@@ -9,10 +9,12 @@ use crate::{
 use mina_serialization_types::{
     signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
 };
-use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB, backup::{BackupEngineOptions, BackupEngine}};
+use tracing::{instrument, info, trace};
+use zstd::DEFAULT_COMPRESSION_LEVEL;
 use std::{
     path::{Path, PathBuf},
-    str::FromStr,
+    str::FromStr, fs::remove_dir_all,
 };
 
 /// T-{Height}-{Timestamp}-{Signature} -> Transaction
@@ -146,6 +148,45 @@ impl IndexerStore {
     pub fn iter_prefix_cf(&self, cf: &str, prefix: &[u8]) -> DBIterator<'_> {
         let cf_handle = self.database.cf_handle(cf).expect("column family exists");
         self.database.prefix_iterator_cf(&cf_handle, prefix)
+    }
+
+    #[instrument]
+    pub fn create_backup<BackupPath, BackupName>(&self, backup_name: BackupName, backup_path: BackupPath) 
+        -> anyhow::Result<()> 
+    where 
+        BackupPath: AsRef<Path> + std::fmt::Debug,
+        BackupName: AsRef<str> + std::fmt::Debug,
+    {
+        info!("creating backup with name {:?} in {:?} of rocksdb database in {:?}", 
+            backup_name.as_ref(), 
+            backup_path.as_ref(), 
+            &self.db_path
+        );
+
+        let mut backup_dir = PathBuf::from(backup_path.as_ref());
+        backup_dir.push("rocksdb_backup");
+        let mut snapshot_file_path = PathBuf::from(backup_path.as_ref());
+        snapshot_file_path.push(&format!("{}.tar.zst", backup_name.as_ref()));
+
+        trace!("initializing RocksDB backup engine in {backup_dir:?}");
+        let backup_engine_options = BackupEngineOptions::new(&backup_dir)?;
+        let backup_env = rocksdb::Env::new()?;
+        let mut backup_engine = BackupEngine::open(&backup_engine_options, &backup_env)?;
+
+        trace!("flushing database operations to disk and creating new RocksDB backup");
+        backup_engine.create_new_backup_flush(&self.database, true)?;
+
+        trace!("creating backup tarball with name {:?}", backup_name.as_ref());
+        let backup_tarball = std::fs::File::create(&snapshot_file_path)?;
+        let encoder = zstd::Encoder::new(backup_tarball, DEFAULT_COMPRESSION_LEVEL)?;
+        let mut tar = tar::Builder::new(encoder);
+        tar.append_dir_all("rocksdb_backup", &backup_dir)?;
+
+        trace!("backup creation successful! cleaning up...");
+        drop(tar.into_inner()?.finish()?);
+        remove_dir_all(&backup_dir)?;
+        
+        Ok(())
     }
 }
 
