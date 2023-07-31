@@ -9,7 +9,7 @@ use crate::{
 use mina_serialization_types::{
     signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
 };
-use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB, backup::{BackupEngineOptions, BackupEngine}};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB, backup::{BackupEngineOptions, BackupEngine, RestoreOptions}};
 use tracing::{instrument, info, trace};
 use zstd::DEFAULT_COMPRESSION_LEVEL;
 use std::{
@@ -187,6 +187,45 @@ impl IndexerStore {
         remove_dir_all(&backup_dir)?;
         
         Ok(())
+    }
+
+    #[instrument]
+    pub fn from_backup<DebugPath>(backup_file: DebugPath, database_directory: DebugPath)
+        -> anyhow::Result<Self>
+    where
+        DebugPath: AsRef<Path> + std::fmt::Debug // I wish you could add a constraint here like Constraint<IsFile> or Constraint<IsDirectory>
+    {
+        info!("restoring RocksDB database to {:?} from backup at {:?}", database_directory.as_ref(), backup_file.as_ref());
+        let mut backup_engine_path = PathBuf::from(backup_file.as_ref());
+        backup_engine_path.pop();
+        backup_engine_path.push("rocksdb_backup");
+        let backup_engine_path = backup_engine_path;
+
+        trace!("unpacking backup data from {:?} to {:?}", backup_file.as_ref(), &backup_engine_path);
+        let backup_tarball = std::fs::File::open(backup_file.as_ref())?;
+        let zstd_decoder = zstd::Decoder::new(backup_tarball)?;
+        let mut tar = tar::Archive::new(zstd_decoder);
+        tar.unpack(&backup_engine_path)?;
+
+        trace!("initializing RocksDB backup engine in {:?}", &backup_engine_path);
+        let backup_engine_options = BackupEngineOptions::new(&backup_engine_path)?;
+        let backup_engine_env = rocksdb::Env::new()?;
+        let mut backup_engine = BackupEngine::open(&backup_engine_options, &backup_engine_env)?;
+
+        trace!("restoring RocksDB backup from {:?} to database directory at {:?}", &backup_engine_path, database_directory.as_ref());
+        backup_engine.restore_from_latest_backup(
+            database_directory.as_ref(), 
+            database_directory.as_ref(), 
+            &RestoreOptions::default()
+        )?; drop(backup_engine);
+
+        trace!("initializing IndexerStore with restored database at {:?}", database_directory.as_ref());
+        let indexer_store = IndexerStore::new(database_directory.as_ref())?;
+
+        trace!("backup restoration completed successfully! cleaning up...");
+        std::fs::remove_dir_all(&backup_engine_path)?;
+
+        Ok(indexer_store)
     }
 }
 
