@@ -62,7 +62,10 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
     if let Some(staking_ledger) = staking_ledger {
         for account in staking_ledger.accounts {
             if let Some(delegation_totals) = &account.delegationTotals {
-                total_delegated.0 += delegation_totals.totalDelegated.unwrap_or(TotalDelegated(0.0)).0;
+                total_delegated.0 += delegation_totals
+                    .totalDelegated
+                    .unwrap_or(TotalDelegated(0.0))
+                    .0;
                 count_delegates += delegation_totals.countDelegates.unwrap_or(0);
             }
         }
