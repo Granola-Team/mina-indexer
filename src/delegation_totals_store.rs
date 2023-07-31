@@ -12,7 +12,7 @@ pub fn update_delegation_totals(
     db: &DB,
     public_key: &str,
     epoch: i32,
-    total_delegated: i32,
+    total_delegated: TotalDelegated,
     count_delegates: i32,
 ) -> Result<(), rocksdb::Error> {
     let mut batch = WriteBatch::default();
@@ -23,7 +23,7 @@ pub fn update_delegation_totals(
     let count_key = format!("{}_{}_count", public_key, epoch);
     let count_key_bytes = count_key.as_bytes();
 
-    let total_delegated_value = total_delegated.to_le_bytes();
+    let total_delegated_value = total_delegated.0.to_bits().to_le_bytes();
     let count_delegates_value = count_delegates.to_le_bytes();
 
     batch.put(total_key_bytes, total_delegated_value);

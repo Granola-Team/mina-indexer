@@ -21,6 +21,8 @@ use crate::gql::root::Context;
 use crate::gql::root::QueryRoot;
 use crate::store::IndexerStore;
 
+use self::schema::delegations::TotalDelegated;
+
 pub(crate) mod root;
 pub(crate) mod schema;
 
@@ -51,17 +53,16 @@ pub async fn start_gql(db: Arc<IndexerStore>) -> std::io::Result<()> {
             .expect("Failed to create delegation totals DB"),
     );
 
-    let epoch_number = 1; // default epoch set to 1
-    let staking_ledger = QueryRoot::stakingLedgerByEpoch(&ctx, epoch_number);
-
     // delegation totals for the default epoch (1) here
-    let mut total_delegated = 0.0;
+    let epoch_number = 1;
+    let staking_ledger = QueryRoot::stakingLedgerByEpoch(&ctx, epoch_number);
+    let mut total_delegated = TotalDelegated(0.0);
     let mut count_delegates = 0;
 
     if let Some(staking_ledger) = staking_ledger {
         for account in staking_ledger.accounts {
             if let Some(delegation_totals) = &account.delegationTotals {
-                total_delegated += delegation_totals.totalDelegated.unwrap_or(0.0);
+                total_delegated.0 += delegation_totals.totalDelegated.unwrap_or(TotalDelegated(0.0)).0;
                 count_delegates += delegation_totals.countDelegates.unwrap_or(0);
             }
         }
