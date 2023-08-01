@@ -1,4 +1,4 @@
-use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
+use crate::{block::{precomputed::PrecomputedBlock, Block, BlockHash}, MAINNET_CANONICAL_THRESHOLD};
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
     MoveBehavior::ToRoot,
@@ -117,11 +117,11 @@ impl Branch {
         {
             canonical_tip_id = node_id.clone();
             generation_removed += 1;
-            if generation_removed > canonical_update_threshold {
+            if generation_removed > MAINNET_CANONICAL_THRESHOLD {
                 break;
             }
         }
-        if generation_removed <= canonical_update_threshold {
+        if generation_removed <= MAINNET_CANONICAL_THRESHOLD {
             None
         } else {
             Some(canonical_tip_id)
