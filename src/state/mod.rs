@@ -272,6 +272,8 @@ impl IndexerState {
         canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
         if let Some(snapshot) = indexer_store.read_snapshot()? {
+            let mut snapshot = snapshot;
+            snapshot.root_branch.root = snapshot.root_branch.branches.root_node_id().expect("root node id exists").clone();
             let best_tip_id = snapshot.root_branch.best_tip_id();
             let best_tip = Tip {
                 state_hash: snapshot
