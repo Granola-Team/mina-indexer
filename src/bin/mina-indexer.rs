@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
     server::{self, handle_command_line_arguments},
-    store::IndexerStore,
+    store::IndexerStore, gql,
 };
 
 #[derive(Parser, Debug)]
@@ -31,8 +31,15 @@ pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client { args } => client::run(&args).await,
         IndexerCommand::Server(args) => {
+            let option_snapshot_path = args.snapshot_path.clone();
             let config = handle_command_line_arguments(args).await?;
-            let db = Arc::new(IndexerStore::new(&config.database_dir)?);
+
+            let db = if let Some(snapshot_path) = option_snapshot_path {
+                let indexer_store = IndexerStore::from_backup(&snapshot_path, &config.database_dir)?;
+                Arc::new(indexer_store)
+            } else {
+                Arc::new(IndexerStore::new(&config.database_dir)?)
+            };
             tokio::spawn(server::run(config, db.clone()));
             mina_indexer::gql::start_gql(db).await.unwrap();
             Ok(())

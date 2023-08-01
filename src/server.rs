@@ -64,6 +64,9 @@ pub struct ServerArgs {
     /// Threshold for updating the canonical tip/ledger
     #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
+    /// Path to an indexer snapshot
+    #[arg(long)]
+    pub snapshot_path: Option<PathBuf>,
 }
 
 pub struct IndexerConfiguration {
