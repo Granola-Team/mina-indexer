@@ -23,7 +23,6 @@ use tokio::{
     sync::mpsc,
 };
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
-use tracing_subscriber::prelude::*;
 use uuid::Uuid;
 
 #[derive(Parser, Debug, Clone)]
@@ -81,9 +80,9 @@ pub struct IndexerConfiguration {
     watch_dir: PathBuf,
     pub database_dir: PathBuf,
     keep_noncanonical_blocks: bool,
-    log_file: PathBuf,
-    log_level: LevelFilter,
-    log_level_stdout: LevelFilter,
+    pub log_file: PathBuf,
+    pub log_level: LevelFilter,
+    pub log_level_stdout: LevelFilter,
     prune_interval: u32,
     canonical_update_threshold: u32,
     from_snapshot: bool,
@@ -189,20 +188,6 @@ pub async fn run(
         canonical_update_threshold,
         from_snapshot,
     } = config;
-
-    // setup tracing
-    if let Some(parent) = log_file.parent() {
-        create_dir_if_non_existent(parent.to_str().unwrap()).await;
-    }
-
-    let log_file = std::fs::File::create(log_file)?;
-    let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
-
-    let stdout_layer = tracing_subscriber::fmt::layer();
-    tracing_subscriber::registry()
-        .with(stdout_layer.with_filter(log_level_stdout))
-        .with(file_layer.with_filter(log_level))
-        .init();
 
     let mode = if keep_noncanonical_blocks {
         IndexerMode::Full
@@ -416,7 +401,7 @@ async fn handle_conn(
     Ok(())
 }
 
-async fn create_dir_if_non_existent(path: &str) {
+pub async fn create_dir_if_non_existent(path: &str) {
     if metadata(path).await.is_err() {
         debug!("Creating directory {path}");
         create_dir_all(path).await.unwrap();
