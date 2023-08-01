@@ -3,7 +3,7 @@ use crate::{
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
-        Canonicity,
+        Canonicity, snapshot::{StateStore, StateSnapshot},
     },
 };
 use mina_serialization_types::{
@@ -348,6 +348,27 @@ impl StakingLedgerStore for IndexerStore {
             ledger = Some(bcs::from_bytes(&bytes)?);
         }
         Ok(ledger)
+    }
+}
+
+impl StateStore for IndexerStore {
+    fn store_state_snapshot(&self, snapshot: &StateSnapshot) -> anyhow::Result<()> {
+        let key = b"STATE";
+        let value = bcs::to_bytes(snapshot)?;
+        self.database.put(key, value)?;
+        Ok(())
+    }
+
+    fn read_snapshot(&self) -> anyhow::Result<Option<StateSnapshot>> {
+        let mut snapshot = None;
+        if let Some(bytes) = self
+            .database
+            .get_pinned(b"STATE")?
+            .map(|bytes| bytes.to_vec())
+        {
+            snapshot = Some(bcs::from_bytes(&bytes)?);
+        }
+        Ok(snapshot)
     }
 }
 

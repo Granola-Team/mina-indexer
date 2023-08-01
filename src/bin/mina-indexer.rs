@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
     server::{self, handle_command_line_arguments},
-    store::IndexerStore, gql,
+    store::IndexerStore, 
 };
 
 #[derive(Parser, Debug)]

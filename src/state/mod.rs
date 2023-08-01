@@ -1,6 +1,6 @@
-use self::summary::{
+use self::{summary::{
     DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
-};
+}, snapshot::{StateSnapshot, StateStore}};
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
@@ -22,13 +22,14 @@ use std::{
     collections::HashMap,
     str::FromStr,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant}, process,
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{debug, info};
+use tracing::{debug, info, instrument, trace, error};
 
 pub mod branch;
 pub mod ledger;
+pub mod snapshot;
 pub mod summary;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
@@ -61,10 +62,8 @@ pub struct IndexerState {
     pub canonical_update_threshold: u32,
     /// Number of blocks added to the state
     pub blocks_processed: u32,
-    /// Time the indexer started running
-    pub time: Instant,
     /// Datetime the indexer started running
-    pub date_time: OffsetDateTime,
+    pub init_time: OffsetDateTime,
 }
 
 #[derive(Debug, Clone)]
@@ -146,8 +145,7 @@ impl IndexerState {
             prune_interval,
             canonical_update_threshold,
             blocks_processed: 0,
-            time: Instant::now(),
-            date_time: OffsetDateTime::now_utc(),
+            init_time: OffsetDateTime::now_utc(),
         })
     }
 
@@ -192,8 +190,7 @@ impl IndexerState {
             prune_interval,
             canonical_update_threshold,
             blocks_processed: 0,
-            time: Instant::now(),
-            date_time: OffsetDateTime::now_utc(),
+            init_time: OffsetDateTime::now_utc(),
         })
     }
 
@@ -234,9 +231,81 @@ impl IndexerState {
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 0,
-            time: Instant::now(),
-            date_time: OffsetDateTime::now_utc(),
+            init_time: OffsetDateTime::now_utc(),
         })
+    }
+
+    pub fn to_state_snapshot(&self) -> StateSnapshot {
+        StateSnapshot {
+            root_branch: self.root_branch.clone(),
+            diffs_map: self.diffs_map.clone(),
+        }
+    }
+
+    #[instrument]
+    pub fn from_state_snapshot(
+        indexer_store: Arc<IndexerStore>,
+        transition_frontier_length: u32,
+        prune_interval: u32,
+        canonical_update_threshold: u32,
+    ) -> anyhow::Result<Self> {
+        if let Some(snapshot) = indexer_store.read_snapshot()? {
+            let best_tip_id = snapshot.root_branch.best_tip_id();
+            let best_tip = Tip {
+                state_hash: snapshot
+                    .root_branch
+                    .branches
+                    .get(&best_tip_id)
+                    .expect("best_tip_id guaranteed")
+                    .data()
+                    .state_hash
+                    .clone(),
+                node_id: best_tip_id,
+            };
+            trace!("read best tip {:?}", best_tip.state_hash);
+
+            let canonical_tip_id = if let Some(canonical_tip_id) = snapshot
+                .root_branch
+                .canonical_tip_id(canonical_update_threshold)
+            {
+                canonical_tip_id
+            } else {
+                error!("branch has no canonical tip!");
+                process::exit(100);
+            };
+            let canonical_tip = Tip {
+                state_hash: snapshot
+                    .root_branch
+                    .branches
+                    .get(&canonical_tip_id)
+                    .expect("canonical_tip_id guaranteed")
+                    .data()
+                    .state_hash
+                    .clone(),
+                node_id: canonical_tip_id,
+            };
+            trace!("read canonical tip {:?}", canonical_tip.state_hash);
+
+            Ok(Self {
+                mode: IndexerMode::Full,
+                phase: IndexerPhase::Watching,
+                best_tip,
+                canonical_tip,
+                diffs_map: snapshot.diffs_map,
+                root_branch: snapshot.root_branch,
+                dangling_branches: Vec::new(),
+                indexer_store: Some(indexer_store),
+                transition_frontier_length,
+                prune_interval,
+                canonical_update_threshold,
+                blocks_processed: 0,
+                init_time: time::OffsetDateTime::now_utc(),
+            })
+        } else {
+            Err(anyhow::Error::msg(
+                "No state snapshot stored in rocksdb backup",
+            ))
+        }
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
@@ -894,8 +963,8 @@ impl IndexerState {
         };
 
         SummaryShort {
-            uptime: self.time.clone().elapsed(),
-            date_time: PrimitiveDateTime::new(self.date_time.date(), self.date_time.time()),
+            uptime: OffsetDateTime::now_utc() - self.init_time,
+            date_time: PrimitiveDateTime::new(self.init_time.date(), self.init_time.time()),
             blocks_processed: self.blocks_processed,
             witness_tree,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
@@ -937,8 +1006,8 @@ impl IndexerState {
         };
 
         SummaryVerbose {
-            uptime: self.time.clone().elapsed(),
-            date_time: PrimitiveDateTime::new(self.date_time.date(), self.date_time.time()),
+            uptime: OffsetDateTime::now_utc() - self.init_time,
+            date_time: PrimitiveDateTime::new(self.init_time.date(), self.init_time.time()),
             blocks_processed: self.blocks_processed,
             witness_tree,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
