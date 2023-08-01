@@ -59,6 +59,7 @@ rust_decimal = "1.30.0"
 rust_decimal_macros = "1.30"
 zstd = "0.12.4"
 tar = "0.4.39"
+spmc = "0.3.0"
 
 [dependencies.tokio]
 version = "1.25.0"

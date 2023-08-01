@@ -16,6 +16,7 @@ use crate::{
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
+use chrono::DateTime;
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -233,6 +234,21 @@ impl IndexerState {
             blocks_processed: 0,
             init_time: OffsetDateTime::now_utc(),
         })
+    }
+
+    #[instrument]
+    pub fn save_snapshot<SnapshotDirectory>(&self, snapshot_directory: SnapshotDirectory) 
+        -> anyhow::Result<()>
+    where
+        SnapshotDirectory: AsRef<std::path::Path> + std::fmt::Debug
+    {
+        let snapshot = self.to_state_snapshot();
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            let snapshot_name = format!("indexer-snapshot-{}", OffsetDateTime::now_utc().to_string());
+            indexer_store.store_state_snapshot(&snapshot)?;
+            indexer_store.create_backup(snapshot_name, snapshot_directory.as_ref())?;
+        }
+        Ok(( ))
     }
 
     pub fn to_state_snapshot(&self) -> StateSnapshot {

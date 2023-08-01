@@ -2397,6 +2397,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_test",
+ "spmc",
  "tar",
  "thiserror",
  "time",
@@ -3492,6 +3493,12 @@ checksum = "2d4f0e86297cad2658d92a707320d87bf4e6ae1050287f51d19b67ef3f153a7b"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spmc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02a8428da277a8e3a15271d79943e80ccc2ef254e78813a166a08d65e4c3ece5"
 
 [[package]]
 name = "static_assertions"
