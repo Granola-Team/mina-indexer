@@ -192,7 +192,7 @@ impl IndexerStore {
         let backup_tarball = std::fs::File::create(&snapshot_file_path)?;
         let encoder = zstd::Encoder::new(backup_tarball, DEFAULT_COMPRESSION_LEVEL)?;
         let mut tar = tar::Builder::new(encoder);
-        tar.append_dir_all("rocksdb_backup", &backup_dir)?;
+        tar.append_dir_all(".", &backup_dir)?;
 
         trace!("backup creation successful! cleaning up...");
         drop(tar.into_inner()?.finish()?);
@@ -216,7 +216,6 @@ impl IndexerStore {
         );
         let mut backup_engine_path = PathBuf::from(backup_file.as_ref());
         backup_engine_path.pop();
-        backup_engine_path.push("rocksdb_backup");
         backup_engine_path.push("rocksdb_backup");
         let backup_engine_path = backup_engine_path;
 

@@ -28,7 +28,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use time::{OffsetDateTime, PrimitiveDateTime};
+use time::{OffsetDateTime, PrimitiveDateTime, format_description};
 use tracing::{debug, error, info, instrument, trace};
 
 pub mod branch;
@@ -249,8 +249,8 @@ impl IndexerState {
     {
         let snapshot = self.to_state_snapshot();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let snapshot_name =
-                format!("indexer-snapshot-{}", OffsetDateTime::now_utc());
+            let snapshot_format_description = format_description::parse("[year][month][day][hour][minute][second]")?;
+            let snapshot_name = format!("indexer-snapshot-{}", OffsetDateTime::now_utc().format(&snapshot_format_description)?);
             indexer_store.store_state_snapshot(&snapshot)?;
             indexer_store.create_backup(snapshot_name, snapshot_directory.as_ref())?;
         }
