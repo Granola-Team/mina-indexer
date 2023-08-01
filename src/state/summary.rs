@@ -1,7 +1,7 @@
 use bytesize::ByteSize;
 use serde_derive::{Deserialize, Serialize};
 use std::str::Lines;
-use time::{PrimitiveDateTime, Duration};
+use time::{Duration, PrimitiveDateTime};
 
 pub trait Summary {
     fn uptime(&self) -> Duration;

@@ -1,6 +1,9 @@
-use self::{summary::{
-    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
-}, snapshot::{StateSnapshot, StateStore}};
+use self::{
+    snapshot::{StateSnapshot, StateStore},
+    summary::{
+        DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
+    },
+};
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
@@ -16,17 +19,17 @@ use crate::{
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use chrono::DateTime;
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    process,
     str::FromStr,
     sync::Arc,
-    time::{Duration, Instant}, process,
+    time::{Duration, Instant},
 };
 use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{debug, info, instrument, trace, error};
+use tracing::{debug, error, info, instrument, trace};
 
 pub mod branch;
 pub mod ledger;
@@ -237,18 +240,21 @@ impl IndexerState {
     }
 
     #[instrument]
-    pub fn save_snapshot<SnapshotDirectory>(&self, snapshot_directory: SnapshotDirectory) 
-        -> anyhow::Result<()>
+    pub fn save_snapshot<SnapshotDirectory>(
+        &self,
+        snapshot_directory: SnapshotDirectory,
+    ) -> anyhow::Result<()>
     where
-        SnapshotDirectory: AsRef<std::path::Path> + std::fmt::Debug
+        SnapshotDirectory: AsRef<std::path::Path> + std::fmt::Debug,
     {
         let snapshot = self.to_state_snapshot();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let snapshot_name = format!("indexer-snapshot-{}", OffsetDateTime::now_utc().to_string());
+            let snapshot_name =
+                format!("indexer-snapshot-{}", OffsetDateTime::now_utc());
             indexer_store.store_state_snapshot(&snapshot)?;
             indexer_store.create_backup(snapshot_name, snapshot_directory.as_ref())?;
         }
-        Ok(( ))
+        Ok(())
     }
 
     pub fn to_state_snapshot(&self) -> StateSnapshot {

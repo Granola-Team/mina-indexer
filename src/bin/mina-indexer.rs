@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
     server::{self, handle_command_line_arguments},
-    store::IndexerStore, 
+    store::IndexerStore,
 };
 
 #[derive(Parser, Debug)]
@@ -35,7 +35,8 @@ pub async fn main() -> anyhow::Result<()> {
             let config = handle_command_line_arguments(args).await?;
 
             let db = if let Some(snapshot_path) = option_snapshot_path {
-                let indexer_store = IndexerStore::from_backup(&snapshot_path, &config.database_dir)?;
+                let indexer_store =
+                    IndexerStore::from_backup(&snapshot_path, &config.database_dir)?;
                 Arc::new(indexer_store)
             } else {
                 Arc::new(IndexerStore::new(&config.database_dir)?)

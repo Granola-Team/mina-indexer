@@ -16,9 +16,12 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, sync::Arc};
-use tokio::{fs::{self, create_dir_all, metadata}, sync::mpsc};
+use tokio::{
+    fs::{self, create_dir_all, metadata},
+    sync::mpsc,
+};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::prelude::*;
 use uuid::Uuid;
@@ -83,7 +86,7 @@ pub struct IndexerConfiguration {
     log_level_stdout: LevelFilter,
     prune_interval: u32,
     canonical_update_threshold: u32,
-    from_snapshot: bool
+    from_snapshot: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -154,7 +157,7 @@ pub async fn handle_command_line_arguments(
                 log_level_stdout,
                 prune_interval,
                 canonical_update_threshold,
-                from_snapshot: args.snapshot_path.is_some()
+                from_snapshot: args.snapshot_path.is_some(),
             })
         }
     }
@@ -184,7 +187,7 @@ pub async fn run(
         log_level_stdout,
         prune_interval,
         canonical_update_threshold,
-        from_snapshot
+        from_snapshot,
     } = config;
 
     // setup tracing
@@ -223,10 +226,10 @@ pub async fn run(
     } else {
         info!("initializing indexer state from snapshot");
         IndexerState::from_state_snapshot(
-            indexer_store, 
-            MAINNET_TRANSITION_FRONTIER_K, 
-            prune_interval, 
-            canonical_update_threshold
+            indexer_store,
+            MAINNET_TRANSITION_FRONTIER_K,
+            prune_interval,
+            canonical_update_threshold,
         )?
     };
     let mut block_parser = BlockParser::new(&startup_dir)?;
@@ -394,7 +397,8 @@ async fn handle_conn(
             save_tx.send(SaveCommand(snapshot_path)).await?;
             trace!("awaiting SaveResponse from primary indexer thread");
             loop {
-                if let Some(resp) = save_resp_rx.try_recv()? { // we want to block here
+                if let Some(resp) = save_resp_rx.try_recv()? {
+                    // we want to block here
                     trace!("received SaveResponse {:?}", resp);
                     let bytes = bcs::to_bytes(&resp)?;
                     writer.write_all(&bytes).await?;

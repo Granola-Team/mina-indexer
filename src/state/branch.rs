@@ -6,7 +6,7 @@ use id_tree::{
     RemoveBehavior::{DropChildren, OrphanChildren},
     Tree,
 };
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -127,7 +127,6 @@ impl Branch {
             Some(canonical_tip_id)
         }
     }
-
 
     /// Returns the new node's id in the branch and its data
     pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<(NodeId, Block)> {

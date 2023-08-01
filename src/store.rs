@@ -3,19 +3,24 @@ use crate::{
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
-        Canonicity, snapshot::{StateStore, StateSnapshot},
+        snapshot::{StateSnapshot, StateStore},
+        Canonicity,
     },
 };
 use mina_serialization_types::{
     signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
 };
-use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB, backup::{BackupEngineOptions, BackupEngine, RestoreOptions}};
-use tracing::{instrument, info, trace};
-use zstd::DEFAULT_COMPRESSION_LEVEL;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr, fs::remove_dir_all,
+use rocksdb::{
+    backup::{BackupEngine, BackupEngineOptions, RestoreOptions},
+    ColumnFamilyDescriptor, DBIterator, DB,
 };
+use std::{
+    fs::remove_dir_all,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+use tracing::{info, instrument, trace};
+use zstd::DEFAULT_COMPRESSION_LEVEL;
 
 /// T-{Height}-{Timestamp}-{Signature} -> Transaction
 /// We use the signature as key until we have a better way to identify transactions (e.g. hash)
@@ -151,15 +156,19 @@ impl IndexerStore {
     }
 
     #[instrument]
-    pub fn create_backup<BackupPath, BackupName>(&self, backup_name: BackupName, backup_path: BackupPath) 
-        -> anyhow::Result<()> 
-    where 
+    pub fn create_backup<BackupPath, BackupName>(
+        &self,
+        backup_name: BackupName,
+        backup_path: BackupPath,
+    ) -> anyhow::Result<()>
+    where
         BackupPath: AsRef<Path> + std::fmt::Debug,
         BackupName: AsRef<str> + std::fmt::Debug,
     {
-        info!("creating backup with name {:?} in {:?} of rocksdb database in {:?}", 
-            backup_name.as_ref(), 
-            backup_path.as_ref(), 
+        info!(
+            "creating backup with name {:?} in {:?} of rocksdb database in {:?}",
+            backup_name.as_ref(),
+            backup_path.as_ref(),
             &self.db_path
         );
 
@@ -176,7 +185,10 @@ impl IndexerStore {
         trace!("flushing database operations to disk and creating new RocksDB backup");
         backup_engine.create_new_backup_flush(&self.database, true)?;
 
-        trace!("creating backup tarball with name {:?}", backup_name.as_ref());
+        trace!(
+            "creating backup tarball with name {:?}",
+            backup_name.as_ref()
+        );
         let backup_tarball = std::fs::File::create(&snapshot_file_path)?;
         let encoder = zstd::Encoder::new(backup_tarball, DEFAULT_COMPRESSION_LEVEL)?;
         let mut tar = tar::Builder::new(encoder);
@@ -185,41 +197,62 @@ impl IndexerStore {
         trace!("backup creation successful! cleaning up...");
         drop(tar.into_inner()?.finish()?);
         remove_dir_all(&backup_dir)?;
-        
+
         Ok(())
     }
 
     #[instrument]
-    pub fn from_backup<DebugPath>(backup_file: DebugPath, database_directory: DebugPath)
-        -> anyhow::Result<Self>
+    pub fn from_backup<DebugPath>(
+        backup_file: DebugPath,
+        database_directory: DebugPath,
+    ) -> anyhow::Result<Self>
     where
-        DebugPath: AsRef<Path> + std::fmt::Debug // I wish you could add a constraint here like Constraint<IsFile> or Constraint<IsDirectory>
+        DebugPath: AsRef<Path> + std::fmt::Debug, // I wish you could add a constraint here like Constraint<IsFile> or Constraint<IsDirectory>
     {
-        info!("restoring RocksDB database to {:?} from backup at {:?}", database_directory.as_ref(), backup_file.as_ref());
+        info!(
+            "restoring RocksDB database to {:?} from backup at {:?}",
+            database_directory.as_ref(),
+            backup_file.as_ref()
+        );
         let mut backup_engine_path = PathBuf::from(backup_file.as_ref());
         backup_engine_path.pop();
         backup_engine_path.push("rocksdb_backup");
         let backup_engine_path = backup_engine_path;
 
-        trace!("unpacking backup data from {:?} to {:?}", backup_file.as_ref(), &backup_engine_path);
+        trace!(
+            "unpacking backup data from {:?} to {:?}",
+            backup_file.as_ref(),
+            &backup_engine_path
+        );
         let backup_tarball = std::fs::File::open(backup_file.as_ref())?;
         let zstd_decoder = zstd::Decoder::new(backup_tarball)?;
         let mut tar = tar::Archive::new(zstd_decoder);
         tar.unpack(&backup_engine_path)?;
 
-        trace!("initializing RocksDB backup engine in {:?}", &backup_engine_path);
+        trace!(
+            "initializing RocksDB backup engine in {:?}",
+            &backup_engine_path
+        );
         let backup_engine_options = BackupEngineOptions::new(&backup_engine_path)?;
         let backup_engine_env = rocksdb::Env::new()?;
         let mut backup_engine = BackupEngine::open(&backup_engine_options, &backup_engine_env)?;
 
-        trace!("restoring RocksDB backup from {:?} to database directory at {:?}", &backup_engine_path, database_directory.as_ref());
+        trace!(
+            "restoring RocksDB backup from {:?} to database directory at {:?}",
+            &backup_engine_path,
+            database_directory.as_ref()
+        );
         backup_engine.restore_from_latest_backup(
-            database_directory.as_ref(), 
-            database_directory.as_ref(), 
-            &RestoreOptions::default()
-        )?; drop(backup_engine);
+            database_directory.as_ref(),
+            database_directory.as_ref(),
+            &RestoreOptions::default(),
+        )?;
+        drop(backup_engine);
 
-        trace!("initializing IndexerStore with restored database at {:?}", database_directory.as_ref());
+        trace!(
+            "initializing IndexerStore with restored database at {:?}",
+            database_directory.as_ref()
+        );
         let indexer_store = IndexerStore::new(database_directory.as_ref())?;
 
         trace!("backup restoration completed successfully! cleaning up...");
