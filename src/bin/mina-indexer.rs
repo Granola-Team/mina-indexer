@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, path::PathBuf};
 use tracing_subscriber::prelude::*;
 use clap::{Parser, Subcommand};
 use mina_indexer::{
@@ -32,28 +32,41 @@ pub async fn main() -> anyhow::Result<()> {
         IndexerCommand::Client { args } => client::run(&args).await,
         IndexerCommand::Server(args) => {
             let option_snapshot_path = args.snapshot_path.clone();
+            let database_dir = args.database_dir.clone();
+            let log_dir = args.log_dir.clone();
+            let log_level = args.log_level.clone();
+            let log_level_stdout = args.log_level_stdout.clone();
             let config = handle_command_line_arguments(args).await?;
 
+            let mut log_number = 0;
+            let mut log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
+            create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
+            while tokio::fs::metadata(&log_file).await.is_ok() {
+                log_number += 1;
+                log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
+            }
+            let log_file = PathBuf::from(log_file);
+
             // setup tracing
-            if let Some(parent) = config.log_file.parent() {
+            if let Some(parent) = log_file.parent() {
                 create_dir_if_non_existent(parent.to_str().unwrap()).await;
             }
 
-            let log_file = std::fs::File::create(config.log_file.clone())?;
+            let log_file = std::fs::File::create(log_file.clone())?;
             let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
 
             let stdout_layer = tracing_subscriber::fmt::layer();
             tracing_subscriber::registry()
-                .with(stdout_layer.with_filter(config.log_level_stdout))
-                .with(file_layer.with_filter(config.log_level))
+                .with(stdout_layer.with_filter(log_level_stdout))
+                .with(file_layer.with_filter(log_level))
                 .init();
 
             let db = if let Some(snapshot_path) = option_snapshot_path {
                 let indexer_store =
-                    IndexerStore::from_backup(&snapshot_path, &config.database_dir)?;
+                    IndexerStore::from_backup(&snapshot_path, &database_dir)?;
                 Arc::new(indexer_store)
             } else {
-                Arc::new(IndexerStore::new(&config.database_dir)?)
+                Arc::new(IndexerStore::new(&database_dir)?)
             };
             tokio::spawn(server::run(config, db.clone()));
             mina_indexer::gql::start_gql(db).await.unwrap();

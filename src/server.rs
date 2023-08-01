@@ -48,19 +48,19 @@ pub struct ServerArgs {
     watch_dir: PathBuf,
     /// Path to directory for rocksdb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
-    database_dir: PathBuf,
+    pub database_dir: PathBuf,
     /// Path to directory for logs
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
-    log_dir: PathBuf,
+    pub log_dir: PathBuf,
     /// Only store canonical blocks in the db
     #[arg(short, long, default_value_t = false)]
     keep_non_canonical_blocks: bool,
     /// Max file log level
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
-    log_level: LevelFilter,
+    pub log_level: LevelFilter,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
-    log_level_stdout: LevelFilter,
+    pub log_level_stdout: LevelFilter,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
@@ -78,11 +78,7 @@ pub struct IndexerConfiguration {
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
-    pub database_dir: PathBuf,
     keep_noncanonical_blocks: bool,
-    pub log_file: PathBuf,
-    pub log_level: LevelFilter,
-    pub log_level_stdout: LevelFilter,
     prune_interval: u32,
     canonical_update_threshold: u32,
     from_snapshot: bool,
@@ -104,11 +100,7 @@ pub async fn handle_command_line_arguments(
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
-    let database_dir = args.database_dir;
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
-    let log_dir = args.log_dir;
-    let log_level = args.log_level;
-    let log_level_stdout = args.log_level_stdout;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
 
@@ -119,7 +111,6 @@ pub async fn handle_command_line_arguments(
     );
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
-    create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
 
     info!("Parsing genesis ledger file at {}", args.ledger.display());
 
@@ -135,25 +126,13 @@ pub async fn handle_command_line_arguments(
         Ok(ledger) => {
             info!("Genesis ledger parsed successfully!");
 
-            let mut log_number = 0;
-            let mut log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-
-            while tokio::fs::metadata(&log_fname).await.is_ok() {
-                log_number += 1;
-                log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-            }
-
             Ok(IndexerConfiguration {
                 ledger,
                 non_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
-                database_dir,
                 keep_noncanonical_blocks,
-                log_file: PathBuf::from(&log_fname),
-                log_level,
-                log_level_stdout,
                 prune_interval,
                 canonical_update_threshold,
                 from_snapshot: args.snapshot_path.is_some(),
@@ -179,15 +158,13 @@ pub async fn run(
         root_hash,
         startup_dir,
         watch_dir,
-        database_dir,
         keep_noncanonical_blocks,
-        log_file,
-        log_level,
-        log_level_stdout,
         prune_interval,
         canonical_update_threshold,
         from_snapshot,
     } = config;
+
+    let database_dir = PathBuf::from(indexer_store.db_path());
 
     let mode = if keep_noncanonical_blocks {
         IndexerMode::Full
@@ -199,7 +176,7 @@ pub async fn run(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
-        IndexerState::new(
+        let mut indexer_state = IndexerState::new(
             mode,
             root_hash.clone(),
             ledger.ledger,
@@ -207,7 +184,20 @@ pub async fn run(
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
-        )?
+        )?;
+
+        let mut block_parser = BlockParser::new(&startup_dir)?;
+        if !non_genesis_ledger {
+            indexer_state
+                .initialize_with_contiguous_canonical(&mut block_parser)
+                .await?;
+        } else {
+            indexer_state
+                .initialize_without_contiguous_canonical(&mut block_parser)
+                .await?;
+        }
+
+        indexer_state
     } else {
         info!("initializing indexer state from snapshot");
         IndexerState::from_state_snapshot(
@@ -217,16 +207,6 @@ pub async fn run(
             canonical_update_threshold,
         )?
     };
-    let mut block_parser = BlockParser::new(&startup_dir)?;
-    if !non_genesis_ledger {
-        indexer_state
-            .initialize_with_contiguous_canonical(&mut block_parser)
-            .await?;
-    } else {
-        indexer_state
-            .initialize_without_contiguous_canonical(&mut block_parser)
-            .await?;
-    }
 
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
