@@ -99,7 +99,7 @@ impl Branch {
                 .expect("node_id from iterator")
                 .data()
                 .clone();
-            if best_tip.height > node.height {
+            if best_tip.height < node.height {
                 best_tip_id = node_id.clone();
             }
         }
