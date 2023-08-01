@@ -366,27 +366,33 @@ impl IndexerState {
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
-        let mut block_count = 0;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger = indexer_store
                 .get_ledger(&self.canonical_tip.state_hash)?
                 .unwrap();
             let total_time = Instant::now();
 
-            info!("Reporting every {BLOCK_REPORTING_FREQ_NUM} blocks");
-            while block_count < block_parser.num_canonical {
-                block_count += 1;
+            if block_parser.num_canonical > BLOCK_REPORTING_FREQ_NUM {
+                info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
+            } else {
+                info!("Adding blocks to the state...");
+            }
 
-                if should_report_from_block_count(block_count) {
-                    let rate = block_count as f64 / total_time.elapsed().as_secs() as f64;
+            while self.blocks_processed < block_parser.num_canonical {
+                self.blocks_processed += 1;
+
+                if should_report_from_block_count(self.blocks_processed) {
+                    let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                     info!(
-                        "{block_count} blocks parsed and applied in {:?}",
+                        "{} blocks parsed and applied in {:?}",
+                        self.blocks_processed,
                         total_time.elapsed()
                     );
                     info!(
                         "Estimated time: {} min",
-                        (block_parser.total_num_blocks - block_count) as f64 / (rate * 60_f64)
+                        (block_parser.total_num_blocks - self.blocks_processed) as f64
+                            / (rate * 60_f64)
                     );
                     debug!("Rate: {rate} blocks/s");
                 }
@@ -407,14 +413,14 @@ impl IndexerState {
 
                 // TODO: store ledger at specified cadence, e.g. at epoch boundaries
                 // for now, just store every 1000 blocks
-                if block_count % 1000 == 0 {
+                if self.blocks_processed % 1000 == 0 {
                     indexer_store.add_ledger(
                         &BlockHash(precomputed_block.state_hash.clone()),
                         ledger.clone(),
                     )?;
                 }
 
-                if block_count == block_parser.num_canonical {
+                if self.blocks_processed == block_parser.num_canonical {
                     // update root branch
                     self.root_branch = Branch::new(&precomputed_block)?;
                     self.best_tip = Tip {
@@ -430,7 +436,7 @@ impl IndexerState {
         }
 
         // now add the successive non-canonical blocks
-        self.add_blocks(block_parser, block_count).await
+        self.add_blocks(block_parser).await
     }
 
     /// Initialize indexer state without contiguous canonical blocks
@@ -438,39 +444,35 @@ impl IndexerState {
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
-        self.add_blocks(block_parser, 0).await
+        self.add_blocks(block_parser).await
     }
 
     /// Adds blocks to the state according to block_parser then changes phase to Watching
     ///
     /// Returns the number of blocks parsed
-    pub async fn add_blocks(
-        &mut self,
-        block_parser: &mut BlockParser,
-        blocks_processed: u32,
-    ) -> anyhow::Result<()> {
-        let mut block_count = blocks_processed;
+    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let mut step_time = total_time;
 
-        if blocks_processed == 0 {
+        if self.blocks_processed == 0 {
             info!(
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
             );
         }
 
         while let Some(block) = block_parser.next().await? {
-            if should_report_from_block_count(block_count)
+            if should_report_from_block_count(self.blocks_processed)
                 || self.should_report_from_time(step_time.elapsed())
             {
                 step_time = Instant::now();
 
                 let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
                 let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
-                let rate = block_count as f64 / total_time.elapsed().as_secs() as f64;
+                let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                 info!(
-                    "Parsed and added {block_count} blocks to the witness tree in {:?}",
+                    "Parsed and added {} blocks to the witness tree in {:?}",
+                    self.blocks_processed,
                     total_time.elapsed()
                 );
 
@@ -480,18 +482,19 @@ impl IndexerState {
 
                 info!(
                     "Estimate rem time: {} hr",
-                    (block_parser.total_num_blocks - block_count) as f64 / (rate * 3600_f64)
+                    (block_parser.total_num_blocks - self.blocks_processed) as f64
+                        / (rate * 3600_f64)
                 );
                 info!("Best tip:          {best_tip:?}");
                 info!("Canonical tip:     {canonical_tip:?}");
             }
 
             self.add_block(&block)?;
-            block_count += 1;
         }
 
         info!(
-            "Ingested {block_count} blocks in {:?}",
+            "Ingested {} blocks in {:?}",
+            self.blocks_processed,
             total_time.elapsed()
         );
 
