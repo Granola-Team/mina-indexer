@@ -87,6 +87,7 @@ pub async fn handle_command_line_arguments(
 ) -> anyhow::Result<IndexerConfiguration> {
     trace!("Parsing server args");
 
+    let ledger = args.ledger;
     let non_genesis_ledger = args.non_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
@@ -100,6 +101,11 @@ pub async fn handle_command_line_arguments(
     let canonical_update_threshold = args.canonical_update_threshold;
 
     assert!(
+        ledger.is_file(),
+        "Ledger file does not exist at ./{}",
+        ledger.display()
+    );
+    assert!(
         // bad things happen if this condition fails
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
@@ -108,19 +114,19 @@ pub async fn handle_command_line_arguments(
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
     create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
 
-    info!("Parsing genesis ledger file at {}", args.ledger.display());
+    info!("Parsing ledger file at {}", ledger.display());
 
-    match ledger::genesis::parse_file(&args.ledger).await {
+    match ledger::genesis::parse_file(&ledger).await {
         Err(err) => {
             error!(
-                reason = "Unable to parse genesis ledger",
+                reason = "Unable to parse ledger",
                 error = err.to_string(),
-                path = &args.ledger.display().to_string()
+                path = &ledger.display().to_string()
             );
             process::exit(100)
         }
         Ok(ledger) => {
-            info!("Genesis ledger parsed successfully!");
+            info!("Ledger parsed successfully!");
 
             let mut log_number = 0;
             let mut log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
