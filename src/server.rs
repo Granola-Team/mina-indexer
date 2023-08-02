@@ -361,14 +361,7 @@ async fn handle_conn(
             trace!("sending SaveCommand to primary indexer thread");
             save_tx.send(SaveCommand(snapshot_path)).await?;
             trace!("awaiting SaveResponse from primary indexer thread");
-            loop {
-                if let Some(resp) = save_resp_rx.try_recv()? {
-                    trace!("received SaveResponse {:?}", resp);
-                    let bytes = bcs::to_bytes(&resp)?;
-                    writer.write_all(&bytes).await?;
-                    break;
-                }
-            }
+            writer.write_all(b"saving snapshot...").await?;
         }
         bad_request => {
             let err_msg = format!("Malformed request: {bad_request}");
