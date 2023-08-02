@@ -20,7 +20,8 @@ use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::{
     fs::{self, create_dir_all, metadata},
-    sync::mpsc, io,
+    io,
+    sync::mpsc,
 };
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use uuid::Uuid;
