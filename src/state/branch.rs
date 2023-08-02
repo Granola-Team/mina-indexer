@@ -111,24 +111,17 @@ impl Branch {
 
     /// Returns the node id of the canonical tip, if it exists
     pub fn canonical_tip_id(&self, _canonical_update_threshold: u32) -> Option<NodeId> {
-        let mut generation_removed = 0;
-        let mut canonical_tip_id = self.best_tip_id();
-        for node_id in self
-            .branches
-            .ancestor_ids(&canonical_tip_id)
-            .expect("best tip guaranteed")
-        {
-            canonical_tip_id = node_id.clone();
-            generation_removed += 1;
-            if generation_removed > MAINNET_CANONICAL_THRESHOLD {
-                break;
+        for (n, ancestor_id) in self
+                .branches
+                .ancestor_ids(&self.best_tip_id().clone())
+                .unwrap()
+                .enumerate()
+            {
+                if n > MAINNET_CANONICAL_THRESHOLD as usize {
+                    return Some(ancestor_id.clone());
+                }
             }
-        }
-        if generation_removed <= MAINNET_CANONICAL_THRESHOLD {
-            None
-        } else {
-            Some(canonical_tip_id)
-        }
+        None
     }
 
     /// Returns the new node's id in the branch and its data
