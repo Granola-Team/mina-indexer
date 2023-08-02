@@ -155,7 +155,7 @@ impl IndexerStore {
         self.database.prefix_iterator_cf(&cf_handle, prefix)
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn create_backup<BackupPath, BackupName>(
         &self,
         backup_name: BackupName,

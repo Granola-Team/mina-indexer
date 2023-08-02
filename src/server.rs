@@ -363,7 +363,6 @@ async fn handle_conn(
             trace!("awaiting SaveResponse from primary indexer thread");
             loop {
                 if let Some(resp) = save_resp_rx.try_recv()? {
-                    // we want to block here
                     trace!("received SaveResponse {:?}", resp);
                     let bytes = bcs::to_bytes(&resp)?;
                     writer.write_all(&bytes).await?;

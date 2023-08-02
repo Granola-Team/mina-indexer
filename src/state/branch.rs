@@ -107,7 +107,7 @@ impl Branch {
     }
 
     /// Returns the node id of the canonical tip, if it exists
-    pub fn canonical_tip_id(&self, canonical_update_threshold: u32) -> Option<NodeId> {
+    pub fn canonical_tip_id(&self, _canonical_update_threshold: u32) -> Option<NodeId> {
         let mut generation_removed = 0;
         let mut canonical_tip_id = self.best_tip_id();
         for node_id in self
