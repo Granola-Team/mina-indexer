@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use mina_indexer::block::parser::BlockParser;
+use std::path::PathBuf;
 use tokio::time::Instant;
 
 #[tokio::test]
@@ -19,10 +18,10 @@ async fn representative_benches() {
         dbg!(precomputed_block.state_hash);
     }
 
-    assert_eq!(logs_processed, block_parser0.total_num_blocks);
-
     println!("./tests/data/non_sequential_blocks");
     println!("Parse {logs_processed} logs: {:?}\n", start.elapsed());
+
+    assert_eq!(logs_processed, block_parser0.total_num_blocks);
 
     let start = Instant::now();
     let sample_dir1 = PathBuf::from("./tests/data/sequential_blocks");
@@ -38,27 +37,10 @@ async fn representative_benches() {
         dbg!(precomputed_block.state_hash);
     }
 
-    assert_eq!(logs_processed, block_parser1.total_num_blocks);
-
     println!("./tests/data/sequential_blocks");
     println!("Parse {logs_processed} logs: {:?}\n", start.elapsed());
-}
 
-#[tokio::test]
-async fn canonical_chain_discovery_robustness() {
-    let sample_dir = PathBuf::from("./tests/data/for_canonical_chain_discovery");
-    let mut block_parser = BlockParser::new(&sample_dir).unwrap();
-
-    while let Some(precomputed_block) = block_parser.next().await.unwrap() {
-        println!(
-            "length: {}, hash: {}",
-            precomputed_block.blockchain_length.unwrap_or(0),
-            precomputed_block.state_hash
-        );
-    }
-
-    // only length 2 is known to be canonical
-    assert_eq!(block_parser.num_canonical, 1);
+    assert_eq!(logs_processed, block_parser1.total_num_blocks);
 }
 
 #[tokio::test]

@@ -20,7 +20,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::{
     fs::{self, create_dir_all, metadata},
-    sync::mpsc,
+    sync::mpsc, io,
 };
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use uuid::Uuid;
@@ -96,6 +96,7 @@ pub async fn handle_command_line_arguments(
 ) -> anyhow::Result<IndexerConfiguration> {
     trace!("Parsing server args");
 
+    let ledger = args.ledger;
     let non_genesis_ledger = args.non_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
@@ -105,6 +106,11 @@ pub async fn handle_command_line_arguments(
     let canonical_update_threshold = args.canonical_update_threshold;
 
     assert!(
+        ledger.is_file(),
+        "Ledger file does not exist at ./{}",
+        ledger.display()
+    );
+    assert!(
         // bad things happen if this condition fails
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
@@ -112,19 +118,19 @@ pub async fn handle_command_line_arguments(
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
 
-    info!("Parsing genesis ledger file at {}", args.ledger.display());
+    info!("Parsing ledger file at {}", ledger.display());
 
-    match ledger::genesis::parse_file(&args.ledger).await {
+    match ledger::genesis::parse_file(&ledger).await {
         Err(err) => {
             error!(
-                reason = "Unable to parse genesis ledger",
+                reason = "Unable to parse ledger",
                 error = err.to_string(),
-                path = &args.ledger.display().to_string()
+                path = &ledger.display().to_string()
             );
             process::exit(100)
         }
         Ok(ledger) => {
-            info!("Genesis ledger parsed successfully!");
+            info!("Ledger parsed successfully!");
 
             Ok(IndexerConfiguration {
                 ledger,
@@ -211,8 +217,22 @@ pub async fn run(
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
     info!("Block receiver set to watch {watch_dir:?}");
+    let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+        if e.kind() == io::ErrorKind::AddrInUse {
+            let name = &SOCKET_NAME[1..];
+            debug!(
+                "Domain socket: {} already in use. Removing old vestige",
+                name
+            );
+            std::fs::remove_file(name).expect("Should be able to remove socket file");
+            LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+                panic!("Unable to bind domain socket {:?}", e);
+            })
+        } else {
+            panic!("Unable to bind domain socket {:?}", e);
+        }
+    });
 
-    let listener = LocalSocketListener::bind(SOCKET_NAME)?;
     info!("Local socket listener started");
 
     let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
