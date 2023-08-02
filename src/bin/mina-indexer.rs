@@ -1,11 +1,11 @@
-use std::{sync::Arc, path::PathBuf};
-use tracing_subscriber::prelude::*;
 use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
-    server::{self, handle_command_line_arguments, create_dir_if_non_existent},
+    server::{self, create_dir_if_non_existent, handle_command_line_arguments},
     store::IndexerStore,
 };
+use std::{path::PathBuf, sync::Arc};
+use tracing_subscriber::prelude::*;
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
@@ -34,8 +34,8 @@ pub async fn main() -> anyhow::Result<()> {
             let option_snapshot_path = args.snapshot_path.clone();
             let database_dir = args.database_dir.clone();
             let log_dir = args.log_dir.clone();
-            let log_level = args.log_level.clone();
-            let log_level_stdout = args.log_level_stdout.clone();
+            let log_level = args.log_level;
+            let log_level_stdout = args.log_level_stdout;
             let config = handle_command_line_arguments(args).await?;
 
             let mut log_number = 0;
@@ -62,8 +62,7 @@ pub async fn main() -> anyhow::Result<()> {
                 .init();
 
             let db = if let Some(snapshot_path) = option_snapshot_path {
-                let indexer_store =
-                    IndexerStore::from_backup(&snapshot_path, &database_dir)?;
+                let indexer_store = IndexerStore::from_backup(&snapshot_path, &database_dir)?;
                 Arc::new(indexer_store)
             } else {
                 Arc::new(IndexerStore::new(&database_dir)?)

@@ -286,7 +286,7 @@ async fn handle_conn(
     ledger: Ledger,
     summary: SummaryVerbose,
     save_tx: Arc<mpsc::Sender<SaveCommand>>,
-    save_resp_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
+    _save_resp_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);

@@ -1,4 +1,7 @@
-use crate::{block::{precomputed::PrecomputedBlock, Block, BlockHash}, MAINNET_CANONICAL_THRESHOLD};
+use crate::{
+    block::{precomputed::PrecomputedBlock, Block, BlockHash},
+    MAINNET_CANONICAL_THRESHOLD,
+};
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
     MoveBehavior::ToRoot,

@@ -12,7 +12,7 @@ use futures::{
     AsyncReadExt,
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
-use std::{path::PathBuf, process, thread::sleep, time::Duration};
+use std::{path::PathBuf, process};
 use tracing::instrument;
 
 #[derive(Parser, Debug)]

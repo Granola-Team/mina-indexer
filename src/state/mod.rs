@@ -28,7 +28,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use time::{OffsetDateTime, PrimitiveDateTime, format_description};
+use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, error, info, instrument, trace};
 
 pub mod branch;
@@ -239,7 +239,7 @@ impl IndexerState {
         })
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn save_snapshot<SnapshotDirectory>(
         &self,
         snapshot_directory: SnapshotDirectory,
@@ -249,8 +249,12 @@ impl IndexerState {
     {
         let snapshot = self.to_state_snapshot();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let snapshot_format_description = format_description::parse("[year][month][day][hour][minute][second]")?;
-            let snapshot_name = format!("indexer-snapshot-{}", OffsetDateTime::now_utc().format(&snapshot_format_description)?);
+            let snapshot_format_description =
+                format_description::parse("[year][month][day][hour][minute][second]")?;
+            let snapshot_name = format!(
+                "indexer-snapshot-{}",
+                OffsetDateTime::now_utc().format(&snapshot_format_description)?
+            );
             indexer_store.store_state_snapshot(&snapshot)?;
             indexer_store.create_backup(snapshot_name, snapshot_directory.as_ref())?;
         }
@@ -273,7 +277,12 @@ impl IndexerState {
     ) -> anyhow::Result<Self> {
         if let Some(snapshot) = indexer_store.read_snapshot()? {
             let mut snapshot = snapshot;
-            snapshot.root_branch.root = snapshot.root_branch.branches.root_node_id().expect("root node id exists").clone();
+            snapshot.root_branch.root = snapshot
+                .root_branch
+                .branches
+                .root_node_id()
+                .expect("root node id exists")
+                .clone();
             let best_tip_id = snapshot.root_branch.best_tip_id();
             let best_tip = Tip {
                 state_hash: snapshot
