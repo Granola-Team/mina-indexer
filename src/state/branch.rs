@@ -120,7 +120,7 @@ impl Branch {
                 .enumerate()
             {
                 let state_hash = &self.branches.get(ancestor_id).unwrap().data().state_hash;
-                trace!("state_hash: {}", state_hash.0);
+                trace!("{}th state_hash: {}", n, state_hash.0);
                 if n > MAINNET_CANONICAL_THRESHOLD as usize {
                     return Some(ancestor_id.clone());
                 }
