@@ -241,7 +241,7 @@ impl IndexerState {
 
     #[instrument(skip(self))]
     pub fn save_snapshot<SnapshotDirectory>(
-        &self,
+        &mut self,
         snapshot_directory: SnapshotDirectory,
     ) -> anyhow::Result<()>
     where
