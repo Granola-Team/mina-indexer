@@ -247,7 +247,6 @@ impl IndexerState {
     where
         SnapshotDirectory: AsRef<std::path::Path> + std::fmt::Debug,
     {
-        self.update_canonical()?;
         let snapshot = self.to_state_snapshot();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let snapshot_format_description =
