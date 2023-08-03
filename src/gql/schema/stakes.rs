@@ -45,8 +45,9 @@ pub fn get_accounts(ctx: &Context, query: Option<StakesQueryInput>) -> Vec<Staki
 #[graphql(description = "Stakes")]
 impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
-    fn epoch(&self) -> &i32 {
-        &self.epoch_number
+    fn epoch(&self) -> i32 {
+        let epoch = &self.epoch_number.unwrap();
+        return epoch.clone();
     }
 }
 
