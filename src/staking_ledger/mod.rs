@@ -24,7 +24,7 @@ pub struct StakingLedger {
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NanoMina(u64);
+pub struct NanoMina(pub u64);
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Nonce(u32);

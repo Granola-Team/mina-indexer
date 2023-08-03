@@ -256,7 +256,7 @@ impl StakingLedgerStore for IndexerStore {
         let key = epoch_number.to_be_bytes();
         let cf_handle = self
             .database
-            .cf_handle("epochs")
+            .cf_handle("staking-ledgers")
             .expect("column family exists");
 
         self.database.try_catch_up_with_primary().ok();

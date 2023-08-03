@@ -49,6 +49,18 @@ impl StakingLedgerAccount {
         let epoch = &self.epoch_number.unwrap();
         return epoch.clone();
     }
+    #[graphql(description = "Public Key")]
+    fn public_key(&self) -> &str {
+        &self.pk
+    }
+    #[graphql(description = "Delegate Key")]
+    fn delegate(&self) -> &str {
+        &self.delegate
+    }
+    #[graphql(description = "Account balance")]
+    fn balance(&self) -> f64 {
+        self.balance.0 as f64 / 1_000_000_000_f64
+    }
 }
 
 #[derive(GraphQLInputObject)]
