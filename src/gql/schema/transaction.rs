@@ -21,6 +21,8 @@ pub struct Transaction {
     pub kind: String,
     pub token: i32,
     pub nonce: i32,
+    pub fee: f64,
+    pub amount: f64,
 }
 
 impl Transaction {
@@ -30,17 +32,22 @@ impl Transaction {
                 let payload = signed_cmd.payload;
                 let token = payload.common.fee_token.0;
                 let nonce = payload.common.nonce.0;
-                let (sender, receiver, kind, token_id) = {
+                let fee = payload.common.fee.0;
+                let (sender, receiver, kind, token_id, amount) = {
                     match payload.body {
-                        SignedCommandPayloadBodyJson::PaymentPayload(payload) => {
-                            (payload.source_pk, payload.receiver_pk, "PAYMENT", token)
-                        }
+                        SignedCommandPayloadBodyJson::PaymentPayload(payload) => (
+                            payload.source_pk,
+                            payload.receiver_pk,
+                            "PAYMENT",
+                            token,
+                            payload.amount.0,
+                        ),
                         SignedCommandPayloadBodyJson::StakeDelegation(payload) => {
                             let StakeDelegationJson::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = payload;
-                            (delegator, new_delegate, "STAKE_DELEGATION", token)
+                            (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
                         }
                     }
                 };
@@ -58,6 +65,8 @@ impl Transaction {
                     kind: kind.to_owned(),
                     token: token_id as i32,
                     nonce: nonce as i32,
+                    fee: fee as f64 / 1_000_000_000_f64,
+                    amount: amount as f64 / 1_000_000_000_f64,
                 }
             }
         }
@@ -77,22 +86,77 @@ pub enum SortBy {
     NonceAsc,
 }
 
-#[allow(non_snake_case)]
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Transaction query input")]
 pub struct TransactionQueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
-    pub memos: Option<Vec<String>>,
+    pub memo: Option<String>,
     pub canonical: Option<bool>,
     pub kind: Option<String>,
     pub token: Option<i32>,
+    pub fee: Option<f64>,
+    pub amount: Option<f64>,
     // Logical  operators
-    pub OR: Option<Box<TransactionQueryInput>>,
-    pub AND: Option<Box<TransactionQueryInput>>,
+    #[graphql(name = "OR")]
+    pub or: Option<Vec<TransactionQueryInput>>,
+    #[graphql(name = "AND")]
+    pub and: Option<Vec<TransactionQueryInput>>,
     // Comparison operators
-    pub date_time_gte: Option<DateTime<Utc>>,
-    pub date_time_lte: Option<DateTime<Utc>>,
+    #[graphql(name = "dateTime_gte")]
+    pub datetime_gte: Option<DateTime<Utc>>,
+    #[graphql(name = "dateTime_lte")]
+    pub datetime_lte: Option<DateTime<Utc>>,
+}
+
+impl TransactionQueryInput {
+    fn matches(&self, transaction: &Transaction) -> bool {
+        let mut matches = true;
+
+        if let Some(ref fee) = self.fee {
+            matches = matches && transaction.fee == *fee;
+        }
+
+        if let Some(ref kind) = self.kind {
+            matches = matches && transaction.kind == *kind;
+        }
+
+        if let Some(canonical) = self.canonical {
+            matches = matches && transaction.canonical == canonical;
+        }
+
+        if let Some(ref from) = self.from {
+            matches = matches && transaction.from == *from;
+        }
+
+        if let Some(ref to) = self.to {
+            matches = matches && transaction.to == *to;
+        }
+
+        if let Some(ref memo) = self.memo {
+            matches = matches && transaction.memo == *memo;
+        }
+
+        if let Some(ref query) = self.and {
+            matches = matches && query.iter().all(|and| and.matches(transaction));
+        }
+
+        if let Some(ref query) = self.or {
+            if !query.is_empty() {
+                matches = matches && query.iter().any(|or| or.matches(transaction));
+            }
+        }
+
+        if let Some(datetime_gte) = self.datetime_gte {
+            matches = matches && transaction.date_time >= datetime_gte;
+        }
+
+        if let Some(datetime_lte) = self.datetime_lte {
+            matches = matches && transaction.date_time <= datetime_lte;
+        }
+
+        matches
+    }
 }
 
 #[juniper::graphql_object(Context = Context)]
@@ -122,21 +186,35 @@ impl Transaction {
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time
     }
+
     #[graphql(description = "Canonical")]
     fn canonical(&self) -> bool {
         self.canonical
     }
+
     #[graphql(description = "Kind")]
     fn kind(&self) -> &str {
         &self.kind
     }
+
     #[graphql(description = "Token")]
     fn token(&self) -> i32 {
         self.token
     }
+
     #[graphql(description = "Nonce")]
     fn nonce(&self) -> i32 {
         self.nonce
+    }
+
+    #[graphql(description = "Fee")]
+    fn fee(&self) -> f64 {
+        self.fee
+    }
+
+    #[graphql(description = "Amnount")]
+    fn amount(&self) -> f64 {
+        self.amount
     }
 }
 
@@ -147,7 +225,7 @@ pub fn get_transactions(
     sort_by: Option<SortBy>,
 ) -> Vec<Transaction> {
     let limit = limit.unwrap_or(100);
-    let limit_idx = usize::try_from(limit).unwrap();
+    let limit_idx = limit as usize;
 
     let mut transactions: Vec<Transaction> = Vec::new();
     for entry in ctx.db.iter_prefix_cf("tx", b"T") {
@@ -164,60 +242,28 @@ pub fn get_transactions(
             key.timestamp(),
         );
 
-        // Only apply filters if a query is provided
-        // TODO: Generalize filtering
+        // If query is provided, only add transactions that satisfy the query
         if let Some(ref query_input) = query {
-            if let Some(ref kind) = query_input.kind {
-                if transaction.kind != *kind {
-                    continue;
-                }
-            }
-            if let Some(canonical) = query_input.canonical {
-                if transaction.canonical != canonical {
-                    continue;
-                }
-            }
-            if let Some(ref from) = query_input.from {
-                if transaction.from != *from {
-                    continue;
-                }
-            }
-
-            if let Some(ref to) = query_input.to {
-                if transaction.to != *to {
-                    continue;
-                }
-            }
-
-            if let Some(ref memos) = query_input.memos {
-                if !memos.contains(&transaction.memo) {
-                    continue;
-                }
-            }
-
-            if let Some(ref timestamp_gte) = query_input.date_time_gte {
-                if transaction.date_time < *timestamp_gte {
-                    continue;
-                }
-            }
-
-            if let Some(ref timestamp_lte) = query_input.date_time_lte {
-                if transaction.date_time > *timestamp_lte {
-                    continue;
-                }
+            if query_input.matches(&transaction) {
+                transactions.push(transaction);
             }
         }
-        transactions.push(transaction);
-        // stop collecting when reaching limit
+        // If no query is provided, add all transactions
+        else {
+            transactions.push(transaction);
+        }
+        // Early break if the transactions reach the query limit
         if transactions.len() >= limit_idx {
-            if let Some(sort_by) = sort_by {
-                match sort_by {
-                    SortBy::NonceDesc => transactions.sort_by(|a, b| b.nonce.cmp(&a.nonce)),
-                    SortBy::NonceAsc => transactions.sort_by(|a, b| a.nonce.cmp(&b.nonce)),
-                }
-            }
             break;
         }
     }
+
+    if let Some(sort_by) = sort_by {
+        match sort_by {
+            SortBy::NonceDesc => transactions.sort_by(|a, b| b.nonce.cmp(&a.nonce)),
+            SortBy::NonceAsc => transactions.sort_by(|a, b| a.nonce.cmp(&b.nonce)),
+        }
+    }
+
     transactions
 }
