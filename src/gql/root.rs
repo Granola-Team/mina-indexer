@@ -5,12 +5,14 @@ use juniper::EmptySubscription;
 use juniper::FieldResult;
 use juniper::RootNode;
 
+use crate::gql::schema::stakes;
 use crate::gql::schema::transaction;
-use crate::gql::schema::Stakes;
 use crate::gql::schema::Transaction;
 use crate::gql::schema::TransactionQueryInput;
-use crate::staking_ledger::staking_ledger_store::StakingLedgerStore;
+use crate::staking_ledger::StakingLedgerAccount;
 use crate::store::IndexerStore;
+
+use super::schema::StakesQueryInput;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
@@ -43,20 +45,12 @@ impl QueryRoot {
         Ok(transaction::get_transactions(ctx, query, limit, sort_by))
     }
 
-    #[graphql(description = "Get staking ledger by epoch number")]
-    fn stakingLedgerByEpoch(ctx: &Context, epoch_number: i32) -> Option<Stakes> {
-        ctx.db
-            .get_by_epoch(epoch_number as u32)
-            .unwrap_or(None)
-            .map(|ledger| Stakes::from_staking_ledger(&ledger))
-    }
-
-    #[graphql(description = "Get staking ledger by ledger hash")]
-    fn stakingLedgerByHash(ctx: &Context, ledger_hash: String) -> Option<Stakes> {
-        ctx.db
-            .get_by_ledger_hash(&ledger_hash)
-            .unwrap_or(None)
-            .map(|ledger| Stakes::from_staking_ledger(&ledger))
+    #[graphql(description = "Get staking ledger entry")]
+    fn stakes(
+        ctx: &Context,
+        query: Option<StakesQueryInput>,
+    ) -> FieldResult<Vec<StakingLedgerAccount>> {
+        Ok(stakes::get_accounts(ctx, query))
     }
 }
 

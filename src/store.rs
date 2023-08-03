@@ -75,8 +75,8 @@ impl TransactionKey {
 
 #[derive(Debug)]
 pub struct IndexerStore {
-    db_path: PathBuf,
-    database: DB,
+    pub db_path: PathBuf,
+    pub database: DB,
 }
 
 impl IndexerStore {
@@ -99,7 +99,8 @@ impl IndexerStore {
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
-        let tx = ColumnFamilyDescriptor::new("tx", cf_opts);
+        let tx = ColumnFamilyDescriptor::new("tx", cf_opts.clone());
+        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -107,7 +108,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity, tx],
+            vec![blocks, ledgers, canonicity, tx, staking_ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -240,57 +241,17 @@ impl StakingLedgerStore for IndexerStore {
     fn add_epoch(&self, epoch: u32, ledger: &StakingLedger) -> anyhow::Result<()> {
         let cf_handle = self
             .database
-            .cf_handle("epochs")
+            .cf_handle("staking-ledgers")
             .expect("column family exists");
 
-        let key = epoch.to_be_bytes();
+        let key = format!("epoch:{}", epoch);
         let value = bcs::to_bytes(ledger)?;
 
-        self.database.put_cf(&cf_handle, key, value)?;
+        self.database.put_cf(&cf_handle, key.as_bytes(), value)?;
         Ok(())
     }
 
-    fn get_epoch(&self, ledger_hash: &str) -> anyhow::Result<Option<StakingLedger>> {
-        let mut ledger = None;
-        let key = ledger_hash.as_bytes();
-        let cf_handle = self
-            .database
-            .cf_handle("staking_ledgers")
-            .expect("column family exists");
-
-        self.database.try_catch_up_with_primary().ok();
-
-        if let Some(bytes) = self
-            .database
-            .get_pinned_cf(&cf_handle, key)?
-            .map(|bytes| bytes.to_vec())
-        {
-            ledger = Some(bcs::from_bytes(&bytes)?);
-        }
-        Ok(ledger)
-    }
-
-    fn get_by_ledger_hash(&self, ledger_hash: &str) -> anyhow::Result<Option<StakingLedger>> {
-        let mut ledger = None;
-        let key = ledger_hash.as_bytes();
-        let cf_handle = self
-            .database
-            .cf_handle("staking_ledgers")
-            .expect("column family exists");
-
-        self.database.try_catch_up_with_primary().ok();
-
-        if let Some(bytes) = self
-            .database
-            .get_pinned_cf(&cf_handle, key)?
-            .map(|bytes| bytes.to_vec())
-        {
-            ledger = Some(bcs::from_bytes(&bytes)?);
-        }
-        Ok(ledger)
-    }
-
-    fn get_by_epoch(&self, epoch_number: u32) -> anyhow::Result<Option<StakingLedger>> {
+    fn get_epoch(&self, epoch_number: u32) -> anyhow::Result<Option<StakingLedger>> {
         let mut ledger = None;
         let key = epoch_number.to_be_bytes();
         let cf_handle = self

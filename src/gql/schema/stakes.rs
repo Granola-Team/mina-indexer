@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     gql::root::Context,
-    staking_ledger::{StakingLedger, StakingLedgerAccount},
+    staking_ledger::{
+        staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
+    },
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -23,23 +25,34 @@ impl Stakes {
     }
 }
 
+pub fn get_accounts(ctx: &Context, query: Option<StakesQueryInput>) -> Vec<StakingLedgerAccount> {
+    let mut accounts: Vec<StakingLedgerAccount> = Vec::new();
+    if let Some(ref query_input) = query {
+        if let Some(epoch) = query_input.epoch {
+            accounts = ctx
+                .db
+                .get_epoch(epoch as u32)
+                .unwrap_or(None)
+                .map(|ledger| Stakes::from_staking_ledger(&ledger))
+                .map(|foo| foo.accounts)
+                .unwrap();
+        }
+    }
+    accounts
+}
+
 #[juniper::graphql_object(Context = Context)]
 #[graphql(description = "Stakes")]
-impl Stakes {
+impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
-    fn epochNumber(&self) -> &i32 {
+    fn epoch(&self) -> &i32 {
         &self.epoch_number
-    }
-
-    #[graphql(description = "Ledger Hash")]
-    fn ledgerHash(&self) -> &str {
-        &self.ledger_hash
     }
 }
 
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Stakes query input")]
 pub struct StakesQueryInput {
-    pub epoch_number: Option<i32>,
-    pub ledger_hash: Option<String>,
+    pub epoch: Option<i32>,
+    pub public_key: Option<String>,
 }

@@ -1,4 +1,4 @@
-pub(crate) mod staking_ledger_store;
+pub mod staking_ledger_store;
 
 use anyhow::Context;
 use rust_decimal::{prelude::ToPrimitive, Decimal};

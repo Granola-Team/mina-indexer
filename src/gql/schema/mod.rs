@@ -3,5 +3,5 @@ pub use crate::gql::schema::stakes::StakesQueryInput;
 pub use crate::gql::schema::transaction::Transaction;
 pub use crate::gql::schema::transaction::TransactionQueryInput;
 
-mod stakes;
+pub mod stakes;
 pub mod transaction;
