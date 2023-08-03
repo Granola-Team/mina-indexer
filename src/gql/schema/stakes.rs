@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Stakes {
-    pub epoch_number: i32,
+    pub epoch_number: u32,
     pub ledger_hash: String,
     pub accounts: Vec<StakingLedgerAccount>,
 }

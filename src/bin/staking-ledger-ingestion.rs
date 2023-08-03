@@ -2,8 +2,12 @@ use clap::Parser;
 
 use glob::glob;
 
-use mina_indexer::staking_ledger::StakingLedger;
+use mina_indexer::{
+    staking_ledger::{StakingLedger, StakingLedgerAccount},
+    store::IndexerStore,
+};
 
+use mina_indexer::staking_ledger::staking_ledger_store::StakingLedgerStore;
 use std::{ffi::OsStr, fs::File, io::Read, path::PathBuf, time::Instant, u32::MAX};
 
 #[derive(Parser, Debug)]
@@ -11,6 +15,8 @@ use std::{ffi::OsStr, fs::File, io::Read, path::PathBuf, time::Instant, u32::MAX
 struct Args {
     #[arg(short, long)]
     staking_ledgers_dir: PathBuf,
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
+    database_dir: PathBuf,
 }
 
 /// extract epoch from filename
@@ -23,9 +29,13 @@ fn get_epoch(file_name: &OsStr) -> Option<u32> {
             Ok(x) => Some(x),
         })
 }
+
 fn main() {
     let args = Args::parse();
     let staking_ledgers_dir = args.staking_ledgers_dir;
+    let database_dir = args.database_dir;
+    let db = IndexerStore::new(&database_dir).unwrap();
+
     let pattern = format!("{}/*.json", staking_ledgers_dir.display());
 
     let mut paths: Vec<PathBuf> = glob(&pattern)
@@ -44,12 +54,30 @@ fn main() {
     let start_time = Instant::now();
 
     for path in paths {
+        let epoch = get_epoch(path.file_name().unwrap()).unwrap();
+        let ledger_hash = "foobar".to_string();
+        let display = path.display();
+        let mut file = match File::open(&path) {
+            Err(why) => panic!("couldn't open {}: {}", display, why),
+            Ok(file) => file,
+        };
         let mut bytes = Vec::new();
+        let _ = file.read_to_end(&mut bytes);
 
-        let _ = File::open(path).unwrap().read_to_end(&mut bytes);
+        let accounts = match serde_json::from_slice::<Vec<StakingLedgerAccount>>(&bytes) {
+            Err(why) => panic!("Unable to parse JSON {}: {}", display, why),
+            Ok(file) => file,
+        };
+        let ledger = StakingLedger {
+            epoch_number: epoch,
+            ledger_hash: ledger_hash,
+            accounts: accounts.clone(),
+        };
 
-        let _ = serde_json::from_slice::<StakingLedger>(&bytes);
-
+        match db.add_epoch(epoch, &ledger) {
+            Ok(_) => println!("Successfully persisted staking ledger: {}", epoch),
+            Err(why) => panic!("Failed to persist staking ledger {}: {}", epoch, why),
+        }
         count += 1;
     }
     let delta = Instant::now().duration_since(start_time).as_millis();
