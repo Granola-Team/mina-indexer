@@ -29,10 +29,12 @@ pub fn get_accounts(ctx: &Context, query: Option<StakesQueryInput>) -> Vec<Staki
     let mut accounts: Vec<StakingLedgerAccount> = Vec::new();
     if let Some(ref query_input) = query {
         if let Some(epoch) = query_input.epoch {
-            accounts = ctx
+            let ledger = ctx
                 .db
-                .get_epoch(epoch as u32)
-                .unwrap_or(None)
+                .get_epoch(epoch as u32);
+            println!("******* LEDGER: {:?}", ledger);
+            accounts = ledger
+                .unwrap()
                 .map(|ledger| Stakes::from_staking_ledger(&ledger))
                 .map(|foo| foo.accounts)
                 .unwrap();

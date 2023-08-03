@@ -253,7 +253,8 @@ impl StakingLedgerStore for IndexerStore {
 
     fn get_epoch(&self, epoch_number: u32) -> anyhow::Result<Option<StakingLedger>> {
         let mut ledger = None;
-        let key = epoch_number.to_be_bytes();
+        let key_str = format!("epoch:{}", epoch_number);
+        let key = key_str.as_bytes();
         let cf_handle = self
             .database
             .cf_handle("staking-ledgers")
@@ -266,7 +267,10 @@ impl StakingLedgerStore for IndexerStore {
             .get_pinned_cf(&cf_handle, key)?
             .map(|bytes| bytes.to_vec())
         {
+
+
             ledger = Some(bcs::from_bytes(&bytes)?);
+            println!("LEDGER GET EPOCH: {:?}", ledger)
         }
         Ok(ledger)
     }
