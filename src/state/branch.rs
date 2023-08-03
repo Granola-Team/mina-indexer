@@ -110,7 +110,7 @@ impl Branch {
         best_tip_id
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     /// Returns the node id of the canonical tip, if it exists
     pub fn canonical_tip_id(&self, _canonical_update_threshold: u32) -> Option<NodeId> {
         for (n, ancestor_id) in self

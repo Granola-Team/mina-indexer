@@ -283,6 +283,9 @@ impl IndexerState {
                 .root_node_id()
                 .expect("root node id exists")
                 .clone();
+
+            trace!("snapshot root brach: {:?}", snapshot.root_branch);
+
             let best_tip_id = snapshot.root_branch.best_tip_id();
             let best_tip = Tip {
                 state_hash: snapshot
