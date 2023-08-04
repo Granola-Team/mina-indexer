@@ -29,9 +29,8 @@ pub fn get_accounts(ctx: &Context, query: Option<StakesQueryInput>) -> Vec<Staki
     let mut accounts: Vec<StakingLedgerAccount> = Vec::new();
     if let Some(ref query_input) = query {
         if let Some(epoch) = query_input.epoch {
-            let ledger = ctx
-                .db
-                .get_epoch(epoch as u32);
+            println!("***** {}", epoch);
+            let ledger = ctx.db.get_epoch(epoch as u32);
             println!("******* LEDGER: {:?}", ledger);
             accounts = ledger
                 .unwrap()
@@ -61,7 +60,7 @@ impl StakingLedgerAccount {
     }
     #[graphql(description = "Account balance")]
     fn balance(&self) -> f64 {
-        self.balance.0 as f64 / 1_000_000_000_f64
+        self.balance.parse::<f64>().unwrap()
     }
 }
 

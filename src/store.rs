@@ -267,8 +267,6 @@ impl StakingLedgerStore for IndexerStore {
             .get_pinned_cf(&cf_handle, key)?
             .map(|bytes| bytes.to_vec())
         {
-
-
             ledger = Some(bcs::from_bytes(&bytes)?);
             println!("LEDGER GET EPOCH: {:?}", ledger)
         }

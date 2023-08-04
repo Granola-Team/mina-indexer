@@ -3,11 +3,12 @@ use clap::Parser;
 use glob::glob;
 
 use mina_indexer::{
-    staking_ledger::{StakingLedger, StakingLedgerAccount},
+    staking_ledger::{
+        staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
+    },
     store::IndexerStore,
 };
 
-use mina_indexer::staking_ledger::staking_ledger_store::StakingLedgerStore;
 use std::{ffi::OsStr, fs::File, io::Read, path::PathBuf, time::Instant, u32::MAX};
 
 #[derive(Parser, Debug)]
@@ -48,7 +49,6 @@ fn main() {
             .unwrap_or(MAX)
             .cmp(&get_epoch(y.file_name().unwrap()).unwrap_or(MAX))
     });
-    //  println!("{:?}", paths);
 
     let mut count = 0;
     let start_time = Instant::now();
