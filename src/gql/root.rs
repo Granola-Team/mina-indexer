@@ -49,8 +49,9 @@ impl QueryRoot {
     fn stakes(
         ctx: &Context,
         query: Option<StakesQueryInput>,
+        limit: Option<i32>,
     ) -> FieldResult<Vec<StakingLedgerAccount>> {
-        Ok(stakes::get_accounts(ctx, query))
+        Ok(stakes::get_accounts(ctx, query, limit))
     }
 }
 

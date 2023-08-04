@@ -268,7 +268,6 @@ impl StakingLedgerStore for IndexerStore {
             .map(|bytes| bytes.to_vec())
         {
             ledger = Some(bcs::from_bytes(&bytes)?);
-            println!("LEDGER GET EPOCH: {:?}", ledger)
         }
         Ok(ledger)
     }
