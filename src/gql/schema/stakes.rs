@@ -72,8 +72,12 @@ impl StakingLedgerAccount {
         let epoch = &self.epoch_number.unwrap();
         *epoch
     }
-    #[graphql(description = "Public Key")]
+    #[graphql(description = "Public Key", name = "public_key")]
     fn public_key(&self) -> &str {
+        &self.pk
+    }
+    #[graphql(description = "Public Key")]
+    fn pk(&self) -> &str {
         &self.pk
     }
     #[graphql(description = "Delegate Key")]
@@ -90,6 +94,7 @@ impl StakingLedgerAccount {
 #[graphql(description = "Stakes query input")]
 pub struct StakesQueryInput {
     pub epoch: Option<i32>,
+    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
     // Logical  operators
     #[graphql(name = "OR")]
