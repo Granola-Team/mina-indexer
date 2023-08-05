@@ -172,9 +172,6 @@ impl BlockParser {
                 if let Some(successive_start_idx) = next_length_start_index(&paths, curr_length_idx)
                 {
                     debug!("Handle successive blocks");
-
-                    println!("{:?}", paths[successive_start_idx].file_name().unwrap());
-
                     if successive_start_idx < length_start_indices_and_diffs.len() {
                         for path in paths[successive_start_idx..]
                             .iter()
