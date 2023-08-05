@@ -6,6 +6,7 @@ use crate::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
         BlockWithoutHeight,
     },
+    display_duration,
     state::{
         branch::Branch,
         ledger::{
@@ -385,9 +386,9 @@ impl IndexerState {
                     let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                     info!(
-                        "{} blocks parsed and applied in {:?}",
+                        "{} blocks parsed and applied in {}",
                         self.blocks_processed,
-                        total_time.elapsed()
+                        display_duration(total_time.elapsed()),
                     );
                     info!(
                         "Estimated time: {} min",
@@ -471,9 +472,9 @@ impl IndexerState {
                 let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                 info!(
-                    "Parsed and added {} blocks to the witness tree in {:?}",
+                    "Parsed and added {} blocks to the witness tree in {}",
                     self.blocks_processed,
-                    total_time.elapsed()
+                    display_duration(total_time.elapsed()),
                 );
 
                 debug!("Root height:       {}", self.root_branch.height());
@@ -493,9 +494,9 @@ impl IndexerState {
         }
 
         info!(
-            "Ingested {} blocks in {:?}",
+            "Ingested {} blocks in {}",
             self.blocks_processed,
-            total_time.elapsed()
+            display_duration(total_time.elapsed()),
         );
 
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);

@@ -3,7 +3,7 @@ use crate::{
         get_blockchain_length, get_state_hash, is_valid_block_file,
         precomputed::{BlockLogContents, PrecomputedBlock},
     },
-    BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
+    display_duration, BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
 };
 use glob::glob;
 use std::{
@@ -96,9 +96,9 @@ impl BlockParser {
                 paths.sort_by_key(|x| length_from_path_or_max(x));
 
                 info!(
-                    "{} blocks sorted by length in {:?}",
+                    "{} blocks sorted by length in {}",
                     paths.len(),
-                    time.elapsed()
+                    display_duration(time.elapsed()),
                 );
                 info!("Searching for canonical chain in startup blocks");
 
@@ -162,10 +162,10 @@ impl BlockParser {
                 let mut curr_path = &paths[curr_length_idx];
 
                 info!(
-                    "Found canonical tip with length {} and hash {} in {:?}",
+                    "Found canonical tip with length {} and hash {} in {}",
                     length_from_path(curr_path).unwrap_or(0),
                     hash_from_path(curr_path),
-                    time.elapsed()
+                    display_duration(time.elapsed()),
                 );
 
                 // handle all blocks that are higher than the canonical tip
@@ -198,7 +198,10 @@ impl BlockParser {
                 // segment by segment, searching for ancestors
                 while curr_start_idx > 0 {
                     if count % BLOCK_REPORTING_FREQ_NUM == 0 {
-                        info!("Found {count} canonical blocks in {:?}", time.elapsed());
+                        info!(
+                            "Found {count} canonical blocks in {}",
+                            display_duration(time.elapsed())
+                        );
                     }
 
                     // search for parent in previous segment's blocks
@@ -245,9 +248,9 @@ impl BlockParser {
 
                 info!("Canonical chain discovery finished!");
                 info!(
-                    "Found {} blocks in the canonical chain in {:?}",
+                    "Found {} blocks in the canonical chain in {}",
                     canonical_paths.len(),
-                    time.elapsed()
+                    display_duration(time.elapsed()),
                 );
 
                 // sort lowest to highest
