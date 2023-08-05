@@ -3,6 +3,7 @@ use clap::Parser;
 use glob::glob;
 
 use mina_indexer::{
+    delegation_total::{delegation_total_store::DelegationTotalStore, DelegationTotal},
     staking_ledger::{
         staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
     },
@@ -63,21 +64,61 @@ fn main() {
         };
         let mut bytes = Vec::new();
         let _ = file.read_to_end(&mut bytes);
+        drop(file);
 
         let accounts = match serde_json::from_slice::<Vec<StakingLedgerAccount>>(&bytes) {
             Err(why) => panic!("Unable to parse JSON {}: {}", display, why),
             Ok(file) => file,
         };
+
         let ledger = StakingLedger {
             epoch_number: epoch,
             ledger_hash,
             accounts: accounts.clone(),
         };
-
         match db.add_epoch(epoch, &ledger) {
             Ok(_) => println!("Successfully persisted staking ledger: {}", epoch),
             Err(why) => panic!("Failed to persist staking ledger {}: {}", epoch, why),
         }
+
+        let mut accs = accounts.clone();
+
+        println!("{} accounts in staking ledger {}", accs.len(), epoch);
+        let now = Instant::now();
+        while !accs.is_empty() {
+            let account = accs.pop().unwrap();
+            let mut count_delegates = 0;
+            let mut total_delegations = 0;
+            if account.pk == account.delegate {
+                count_delegates += 1;
+                total_delegations += account.balance.parse::<i64>().unwrap_or(0);
+            }
+            for j in 0..accs.len() {
+                if account.pk == accs[j].pk {
+                    count_delegates += 1;
+                    total_delegations += accs[j].balance.parse::<i64>().unwrap_or(0);
+                    accs.swap_remove(j);
+                }
+            }
+            let dt = DelegationTotal {
+                count_delegates,
+                total_delegations,
+            };
+            match db.add_delegation_total(epoch, &account.pk, dt) {
+                Ok(_) => (),
+                Err(why) => {
+                    panic!(
+                        "Failed to persist delegation total {}: {}",
+                        &account.pk, why
+                    )
+                }
+            }
+        }
+        let delta = Instant::now().duration_since(now).as_millis();
+        println!(
+            "Processed {} staking ledger in {} milliseconds",
+            epoch, delta
+        );
         count += 1;
     }
     let delta = Instant::now().duration_since(start_time).as_millis();

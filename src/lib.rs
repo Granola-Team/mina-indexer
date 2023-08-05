@@ -1,5 +1,6 @@
 pub mod block;
 pub mod client;
+pub mod delegation_total;
 pub mod gql;
 pub mod receiver;
 pub mod server;
