@@ -70,7 +70,7 @@ impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
     fn epoch(&self) -> i32 {
         let epoch = &self.epoch_number.unwrap();
-        return epoch.clone();
+        *epoch
     }
     #[graphql(description = "Public Key")]
     fn public_key(&self) -> &str {
