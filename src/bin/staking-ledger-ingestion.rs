@@ -70,7 +70,7 @@ fn main() {
         };
         let ledger = StakingLedger {
             epoch_number: epoch,
-            ledger_hash: ledger_hash,
+            ledger_hash,
             accounts: accounts.clone(),
         };
 
