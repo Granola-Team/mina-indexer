@@ -27,7 +27,12 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn from_cmd(cmd: UserCommandWithStatusJson, height: i32, timestamp: u64, hash: &str) -> Self {
+    pub fn from_cmd(
+        cmd: UserCommandWithStatusJson,
+        height: i32,
+        timestamp: u64,
+        hash: &str,
+    ) -> Self {
         match cmd.data {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;

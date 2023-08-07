@@ -1,5 +1,5 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash, signed_command},
+    block::{precomputed::PrecomputedBlock, signed_command, store::BlockStore, BlockHash},
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
@@ -7,7 +7,9 @@ use crate::{
     },
 };
 use mina_serialization_types::{
-    signatures::SignatureJson, staged_ledger_diff::{UserCommand, SignedCommand}, v1::UserCommandWithStatusV1,
+    signatures::SignatureJson,
+    staged_ledger_diff::{SignedCommand, UserCommand},
+    v1::UserCommandWithStatusV1,
 };
 use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
 use std::{
