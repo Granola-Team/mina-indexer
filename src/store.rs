@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
-use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB, backup::{BackupEngineOptions, BackupEngine, RestoreOptions}};
 use std::{
     fs::remove_dir_all,
     path::{Path, PathBuf},
