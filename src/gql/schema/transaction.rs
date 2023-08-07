@@ -121,6 +121,9 @@ impl TransactionQueryInput {
     fn matches(&self, transaction: &Transaction) -> bool {
         let mut matches = true;
 
+        if let Some(ref hash) = self.hash {
+            matches = matches && transaction.hash == *hash;
+        }
         if let Some(ref fee) = self.fee {
             matches = matches && transaction.fee == *fee;
         }

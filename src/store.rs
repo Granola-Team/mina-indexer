@@ -6,10 +6,7 @@ use crate::{
         Canonicity,
     },
 };
-use mina_serialization_types::{
-    staged_ledger_diff::UserCommand,
-    v1::UserCommandWithStatusV1,
-};
+use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
 use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
 use std::{
     path::{Path, PathBuf},
