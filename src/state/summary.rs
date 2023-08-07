@@ -1,4 +1,3 @@
-use crate::display_duration;
 use bytesize::ByteSize;
 use serde_derive::{Deserialize, Serialize};
 use std::str::Lines;
@@ -130,7 +129,7 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
-    writeln!(f, "  Uptime:       {}", display_duration(state.uptime()))?;
+    writeln!(f, "  Uptime:       {}", state.uptime())?;
     writeln!(f, "  Started:      {}", state.date_time())?;
     writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
 
