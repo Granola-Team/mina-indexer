@@ -1,6 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
-use mina_indexer::block::receiver::BlockReceiver;
+use mina_indexer::receiver::{BlockReceiver, filesystem::FilesystemReceiver};
 use tokio::{
     fs::{create_dir, metadata, remove_dir_all, File},
     io::AsyncWriteExt,
@@ -24,13 +24,13 @@ async fn detects_new_block_written() {
 
         pretest(TEST_DIR).await;
 
-        let mut block_receiver = BlockReceiver::new().await.unwrap();
-        block_receiver.load_directory(&test_dir_path).await.unwrap();
+        let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
+        block_receiver.load_source(&test_dir_path).await.unwrap();
 
         let mut file = File::create(test_block_path.clone()).await.unwrap();
         file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
 
-        block_receiver.recv().await.unwrap().unwrap();
+        block_receiver.recv_block().await.unwrap().unwrap();
         success = true;
     })
     .await
@@ -54,8 +54,8 @@ async fn detects_new_block_copied() {
 
         pretest(TEST_DIR).await;
 
-        let mut block_receiver = BlockReceiver::new().await.unwrap();
-        block_receiver.load_directory(&test_dir_path).await.unwrap();
+        let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
+        block_receiver.load_source(&test_dir_path).await.unwrap();
 
         let mut command = Command::new("cp")
             .arg(TEST_BLOCK_PATH)
@@ -64,7 +64,7 @@ async fn detects_new_block_copied() {
             .unwrap();
         command.wait().await.unwrap();
 
-        block_receiver.recv().await.unwrap().unwrap();
+        block_receiver.recv_block().await.unwrap().unwrap();
         success = true;
     })
     .await

@@ -12,11 +12,12 @@ use futures::{
     AsyncReadExt,
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
+use serde_derive::{Serialize, Deserialize};
 use std::{path::PathBuf, process, time::Duration};
 use tokio::time::sleep;
 use tracing::instrument;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
     /// Display the account info for the given public key
@@ -31,7 +32,7 @@ pub enum ClientCli {
     SaveState { out_dir: PathBuf },
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct AccountArgs {
     /// Retrieve this public key's account info
@@ -39,7 +40,7 @@ pub struct AccountArgs {
     public_key: String,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ChainArgs {
     /// Number of blocks to include
@@ -53,7 +54,7 @@ pub struct ChainArgs {
     verbose: bool,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct LedgerArgs {
     /// Path to write the ledger
@@ -61,7 +62,7 @@ pub struct LedgerArgs {
     path: PathBuf,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct SummaryArgs {
     /// Verbose output should be redirected to a file
