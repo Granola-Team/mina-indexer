@@ -62,22 +62,62 @@ For example, from the root of this project, you can start the `mina-indexer` for
 mina-indexer server -l tests/data/genesis_ledgers/mainnet.json -s path/to/your/precomputed/blocks/dir
 ```
 
-### Some useful `server` options
+### Server Commands
 
-* `--ledger`, `-l`
-  * genesis ledger `.json` file to use to initialize the indexer
-* `--root-hash`, `-r`
-  * state hash of the genesis block
-  * defaults to mainnet genesis state hash `3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ`
-* `--startup-dir`, `-s`
-  * directory of precomputed blocks to initialize the indexer's state
-  * defaults to `$HOME/.mina-indexer/startup-blocks`
-* `--watch-dir`, `-w`
-  * directory the block receiver watches to keep the indexer up to date
-  * defaults to `$HOME/.mina-indexer/watch-blocks`
-* `--database-dir`, `-d`
-  * directory to store the indexer's internal RocksDB database
-  * defaults to `$HOME/.mina-indexer/database`
+```bash
+Server commands
+
+Usage: mina-indexer server [OPTIONS] --ledger <LEDGER>
+
+Options:
+  -l, --ledger <LEDGER>
+          Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
+  -n, --non-genesis-ledger
+          Use a non-genesis ledger
+      --root-hash <ROOT_HASH>
+          Hash of the base ledger [default: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ]
+  -s, --startup-dir <STARTUP_DIR>
+          Path to startup blocks directory [default: $HOME/.mina-indexer/startup-blocks]
+  -w, --watch-dir <WATCH_DIR>
+          Path to directory to watch for new blocks [default: $HOME/.mina-indexer/watch-blocks]
+  -d, --database-dir <DATABASE_DIR>
+          Path to directory for rocksdb [default: $HOME/.mina-indexer/database]
+      --log-dir <LOG_DIR>
+          Path to directory for logs [default: $HOME/.mina-indexer/logs]
+  -k, --keep-non-canonical-blocks
+          Only store canonical blocks in the db
+      --log-level <LOG_LEVEL>
+          Max file log level [default: debug]
+      --log-level-stdout <LOG_LEVEL_STDOUT>
+          Max stdout log level [default: info]
+  -p, --prune-interval <PRUNE_INTERVAL>
+          Interval for pruning the root branch [default: 10]
+  -c, --canonical-update-threshold <CANONICAL_UPDATE_THRESHOLD>
+          Threshold for updating the canonical tip/ledger [default: 2]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+```
+
+### Client Commands
+
+```bash
+Client commands
+
+Usage: mina-indexer client <COMMAND>
+
+Commands:
+  account      Display the account info for the given public key
+  best-chain   Display the best chain
+  best-ledger  Dump the best ledger to a file
+  summary      Show summary of indexer state
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
 
 ### Some useful `client` commands
 
@@ -85,17 +125,17 @@ Query data with the `mina-indexer` client (from another terminal window)
 
 * Get the account info for a specific Public Key
 ```sh
-mina-indexer client account --public-key PUBLIC_KEY
+mina-indexer client account --public-key $PUBLIC_KEY
 ```
 
 * Get the current best chain of blocks from the tip, length `NUM`
 ```sh
-mina-indexer client best-chain --num NUM
+mina-indexer client best-chain --num $NUM
 ```
 
 * Dump the best ledger to a file
 ```sh
-mina-indexer client best-ledger --path PATH
+mina-indexer client best-ledger --path $PATH
 ```
 
 * Get a summary of the indexer state
