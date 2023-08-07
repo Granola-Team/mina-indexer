@@ -17,13 +17,14 @@ pub const SOCKET_NAME: &str = "@mina-indexer.sock";
 
 pub fn display_duration(duration: std::time::Duration) -> String {
     let duration_as_secs = duration.as_secs();
-    if duration_as_secs < 60 * 2 {
+    let duration_as_mins = duration_as_secs as f32 / 60.;
+    let duration_as_hrs = duration_as_mins / 60.;
+
+    if duration_as_mins < 2. {
         format!("{duration:?}")
-    } else if duration_as_secs < 60 * 60 * 2 {
-        let duration_as_mins = duration_as_secs * 60;
-        format!("{duration_as_mins}min")
+    } else if duration_as_hrs < 2. {
+        format!("{duration_as_mins} min")
     } else {
-        let duration_as_hrs = duration_as_secs * 60 * 60;
-        format!("{duration_as_hrs}hr")
+        format!("{duration_as_hrs} hr")
     }
 }

@@ -2,6 +2,7 @@ use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
+    display_duration,
     state::{ledger::genesis, IndexerMode, IndexerState},
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
@@ -41,6 +42,9 @@ struct Args {
     verbose: bool,
 }
 
+const DB_PATH: &str = "./mainnet-test-block-store";
+const GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -55,17 +59,13 @@ async fn main() -> anyhow::Result<()> {
     assert!(blocks_dir.is_dir(), "Should be a dir path");
 
     let mut bp = BlockParser::new(&blocks_dir).unwrap();
-
-    const DB_PATH: &str = "./mainnet-test-block-store";
     let store_dir = &PathBuf::from(DB_PATH);
     let indexer_store = Arc::new(IndexerStore::new(store_dir).unwrap());
-
-    const GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
     let genesis_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
-
     let parse_genesis_time = Instant::now();
     let genesis_root = genesis::parse_file(genesis_path).await.unwrap();
     let parse_genesis_time = parse_genesis_time.elapsed();
+
     println!("Genesis ledger parsing time: {parse_genesis_time:?}");
 
     let total_time = Instant::now();
@@ -100,9 +100,11 @@ async fn main() -> anyhow::Result<()> {
     let mut parsing_time = Duration::new(0, 0);
 
     for _ in 1..max_block_count {
+        let display_elapsed = display_duration(total_time.elapsed());
+
         // Report every passing minute
         if verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
-            println!("Time elapsed: {:?}", total_time.elapsed());
+            println!("Time elapsed: {display_elapsed}");
             floor_minutes += 1;
         }
 
@@ -110,7 +112,7 @@ async fn main() -> anyhow::Result<()> {
         if block_count % freq == 0 {
             println!("=== Progress #{} ===", block_count / freq);
             println!("Blocks:  {block_count}");
-            println!("Total:   {:?}", total_time.elapsed());
+            println!("Total:   {display_elapsed}");
 
             let blocks_per_sec = block_count as f64 / adding_time.as_secs_f64();
             println!("\n~~~ Add to state ~~~");
