@@ -12,6 +12,10 @@ use tokio::{
     process,
     time::{Duration, Instant},
 };
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::prelude::*;
+
+// Assumed to be run on a block directory with almost all mainnet blocks.
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -22,14 +26,20 @@ struct Args {
     /// Watch blocks directory path
     #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
+    /// Max blockchain_length of blocks to parse
+    #[arg(short = 'l', long, default_value_t = 10_000)]
+    max_block_length: u32,
     /// Max number of blocks to parse
-    #[arg(short, long, default_value_t = 10_000)]
+    #[arg(short = 'n', long, default_value_t = 10_000)]
     max_block_count: u32,
+    /// Max console log level
+    #[arg(long, default_value_t = LevelFilter::INFO)]
+    log_level: LevelFilter,
     /// Report frequency (number of blocks)
     #[arg(short, long, default_value_t = 5000)]
     report_freq: u32,
     /// Watch duration (sec)
-    #[arg(short, long, default_value_t = 600)]
+    #[arg(short, long, default_value_t = 0)]
     duration: u64,
     /// To keep the db or not, that is the question
     #[arg(short, long, default_value_t = false)]
@@ -50,15 +60,23 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let blocks_dir = args.blocks_dir;
     let watch_dir = args.watch_dir;
+    let max_block_length = args.max_block_length;
+    let max_block_count = args.max_block_count;
+    let log_level = args.log_level;
     let freq = args.report_freq;
     let duration = args.duration;
+    let persist_db = args.persist_db;
     let mode = args.mode;
     let verbose = args.verbose;
-    let max_block_count = args.max_block_count;
 
     assert!(blocks_dir.is_dir(), "Should be a dir path");
 
-    let mut bp = BlockParser::new(&blocks_dir).unwrap();
+    let stdout_layer = tracing_subscriber::fmt::layer();
+    tracing_subscriber::registry()
+        .with(stdout_layer.with_filter(log_level))
+        .init();
+
+    let mut bp = BlockParser::new_filtered(&blocks_dir, max_block_length).unwrap();
     let store_dir = &PathBuf::from(DB_PATH);
     let indexer_store = Arc::new(IndexerStore::new(store_dir).unwrap());
     let genesis_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
@@ -99,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
     let mut adding_time = Duration::new(0, 0);
     let mut parsing_time = Duration::new(0, 0);
 
-    for _ in 1..max_block_count {
+    for _ in 2..max_block_count.min(max_block_length) {
         let display_elapsed = display_duration(total_time.elapsed());
 
         // Report every passing minute
@@ -186,14 +204,14 @@ async fn main() -> anyhow::Result<()> {
     let total_add = adding_time;
     let total_time = total_time.elapsed();
 
-    println!("\n~~~~~~~~~~~~~~~~~~");
+    println!("~~~~~~~~~~~~~~~~~~");
     println!("~~~ Benchmarks ~~~");
     println!("~~~~~~~~~~~~~~~~~~");
     println!("Sorting: {sorting_time:?}");
     println!("Blocks:  {block_count}");
     println!("Total:   {total_time:?}");
 
-    println!("~~~ Parsing ~~~");
+    println!("\n~~~ Parsing ~~~");
     println!("Genesis ledger: {parse_genesis_time:?}");
     println!("Blocks:         {parsing_time:?}");
 
@@ -211,7 +229,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Max dangling length: {max_dangling_len}");
     println!("Max dangling height: {max_dangling_height}\n");
 
-    println!("Estimated time to ingest all (~640_000) mainnet blocks at this rate:");
+    println!("Estimated time to ingest all mainnet blocks at this rate:");
     println!(
         "{} hrs",
         (640_000. * total_add.as_secs_f64()) / (3600. * block_count as f64)
@@ -279,7 +297,7 @@ async fn main() -> anyhow::Result<()> {
         thread::sleep(Duration::new(180, 0));
     }
 
-    if !args.persist_db {
+    if !persist_db {
         tokio::fs::remove_dir_all(store_dir).await.unwrap();
     }
 

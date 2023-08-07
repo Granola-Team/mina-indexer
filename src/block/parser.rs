@@ -35,11 +35,15 @@ pub struct BlockParser {
 
 impl BlockParser {
     pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::None)
+        Self::new_internal(blocks_dir, SearchRecursion::None, None)
     }
 
     pub fn new_recursive(blocks_dir: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::Recursive)
+        Self::new_internal(blocks_dir, SearchRecursion::Recursive, None)
+    }
+
+    pub fn new_filtered(blocks_dir: &Path, blocklength: u32) -> anyhow::Result<Self> {
+        Self::new_internal(blocks_dir, SearchRecursion::None, Some(blocklength))
     }
 
     /// Simplified `BlockParser` for testing without canonical chain discovery.
@@ -70,7 +74,11 @@ impl BlockParser {
     /// separating the block paths into two categories:
     /// - blocks known to be _canonical_
     /// - blocks that are higher than the canonical tip
-    fn new_internal(blocks_dir: &Path, recursion: SearchRecursion) -> anyhow::Result<Self> {
+    fn new_internal(
+        blocks_dir: &Path,
+        recursion: SearchRecursion,
+        length_filter: Option<u32>,
+    ) -> anyhow::Result<Self> {
         debug!("Building parser");
         if blocks_dir.exists() {
             let pattern = match &recursion {
@@ -100,7 +108,21 @@ impl BlockParser {
                     paths.len(),
                     display_duration(time.elapsed()),
                 );
-                info!("Searching for canonical chain in startup blocks");
+
+                if let Some(blockchain_length) = length_filter {
+                    info!("Applying block filter: blockchain_length < {blockchain_length}");
+                    let filtered_paths: Vec<PathBuf> = paths
+                        .iter()
+                        .map_while(|path| {
+                            if length_from_path_or_max(path) < blockchain_length {
+                                Some(path.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    paths = filtered_paths;
+                }
 
                 // keep track of:
                 // - diffs between blocks of successive lengths (to find gaps)
@@ -108,6 +130,8 @@ impl BlockParser {
                 // - length of the current path under investigation
                 let mut length_start_indices_and_diffs = vec![];
                 let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
+
+                info!("Searching for canonical chain in startup blocks");
 
                 for (idx, path) in paths.iter().enumerate() {
                     let length = length_from_path_or_max(path);
