@@ -1,5 +1,5 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{precomputed::PrecomputedBlock, signed_command, store::BlockStore, BlockHash},
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
@@ -7,13 +7,8 @@ use crate::{
         Canonicity,
     },
 };
-use mina_serialization_types::{
-    signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
-};
-use rocksdb::{
-    backup::{BackupEngine, BackupEngineOptions, RestoreOptions},
-    ColumnFamilyDescriptor, DBIterator, DB,
-};
+use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
 use std::{
     fs::remove_dir_all,
     path::{Path, PathBuf},
@@ -22,8 +17,7 @@ use std::{
 use tracing::{info, instrument, trace};
 use zstd::DEFAULT_COMPRESSION_LEVEL;
 
-/// T-{Height}-{Timestamp}-{Signature} -> Transaction
-/// We use the signature as key until we have a better way to identify transactions (e.g. hash)
+/// T-{Height}-{Timestamp}-{Hash} -> Transaction
 /// The height is padded to 12 digits for sequential iteration
 #[derive(Debug, Clone)]
 pub struct TransactionKey(u32, u64, String);
@@ -74,16 +68,16 @@ impl TransactionKey {
         self.1
     }
 
-    /// Returns the signature of the transaction
-    pub fn signature(&self) -> &str {
+    /// Returns the hash of the transaction
+    pub fn hash(&self) -> &str {
         &self.2
     }
 }
 
 #[derive(Debug)]
 pub struct IndexerStore {
-    db_path: PathBuf,
-    database: DB,
+    pub db_path: PathBuf,
+    pub database: DB,
 }
 
 impl IndexerStore {
@@ -106,7 +100,8 @@ impl IndexerStore {
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
-        let tx = ColumnFamilyDescriptor::new("tx", cf_opts);
+        let tx = ColumnFamilyDescriptor::new("tx", cf_opts.clone());
+        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -114,7 +109,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity, tx],
+            vec![blocks, ledgers, canonicity, tx, staking_ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -136,10 +131,10 @@ impl IndexerStore {
 
         match tx.clone().inner().data.inner().inner() {
             UserCommand::SignedCommand(cmd) => {
-                let json_sig = SignatureJson::from(cmd.inner().inner().signature);
-                let sig = serde_json::to_string(&json_sig)?;
-
-                let key = TransactionKey::new(height, timestamp, sig).bytes();
+                let hash = signed_command::SignedCommand(cmd)
+                    .hash_signed_command()
+                    .unwrap();
+                let key = TransactionKey::new(height, timestamp, hash).bytes();
                 let value = bcs::to_bytes(&tx)?;
 
                 self.database.put_cf(&cf_handle, key, value)?;
@@ -353,22 +348,23 @@ impl StakingLedgerStore for IndexerStore {
     fn add_epoch(&self, epoch: u32, ledger: &StakingLedger) -> anyhow::Result<()> {
         let cf_handle = self
             .database
-            .cf_handle("epochs")
+            .cf_handle("staking-ledgers")
             .expect("column family exists");
 
-        let key = epoch.to_be_bytes();
+        let key = format!("epoch:{}", epoch);
         let value = bcs::to_bytes(ledger)?;
 
-        self.database.put_cf(&cf_handle, key, value)?;
+        self.database.put_cf(&cf_handle, key.as_bytes(), value)?;
         Ok(())
     }
 
-    fn get_epoch(&self, ledger_hash: &str) -> anyhow::Result<Option<StakingLedger>> {
+    fn get_epoch(&self, epoch_number: u32) -> anyhow::Result<Option<StakingLedger>> {
         let mut ledger = None;
-        let key = ledger_hash.as_bytes();
+        let key_str = format!("epoch:{}", epoch_number);
+        let key = key_str.as_bytes();
         let cf_handle = self
             .database
-            .cf_handle("staking_ledgers")
+            .cf_handle("staking-ledgers")
             .expect("column family exists");
 
         self.database.try_catch_up_with_primary().ok();

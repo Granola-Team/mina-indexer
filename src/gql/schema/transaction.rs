@@ -12,6 +12,7 @@ use mina_serialization_types::v1::UserCommandWithStatusV1;
 use crate::gql::root::Context;
 use crate::store::TransactionKey;
 pub struct Transaction {
+    pub hash: String,
     pub from: String,
     pub to: String,
     pub memo: String,
@@ -26,7 +27,12 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn from_cmd(cmd: UserCommandWithStatusJson, height: i32, timestamp: u64) -> Self {
+    pub fn from_cmd(
+        cmd: UserCommandWithStatusJson,
+        height: i32,
+        timestamp: u64,
+        hash: &str,
+    ) -> Self {
         match cmd.data {
             UserCommandJson::SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.payload;
@@ -56,6 +62,7 @@ impl Transaction {
                 let datetime = DateTime::<Utc>::from_utc(naive_dt, Utc);
 
                 Self {
+                    hash: hash.to_owned(),
                     from: sanitize_json(sender),
                     to: sanitize_json(receiver),
                     memo: sanitize_json(payload.common.memo),
@@ -89,6 +96,7 @@ pub enum SortBy {
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Transaction query input")]
 pub struct TransactionQueryInput {
+    pub hash: Option<String>,
     pub from: Option<String>,
     pub to: Option<String>,
     pub memo: Option<String>,
@@ -113,6 +121,9 @@ impl TransactionQueryInput {
     fn matches(&self, transaction: &Transaction) -> bool {
         let mut matches = true;
 
+        if let Some(ref hash) = self.hash {
+            matches = matches && transaction.hash == *hash;
+        }
         if let Some(ref fee) = self.fee {
             matches = matches && transaction.fee == *fee;
         }
@@ -162,6 +173,10 @@ impl TransactionQueryInput {
 #[juniper::graphql_object(Context = Context)]
 #[graphql(description = "Transaction")]
 impl Transaction {
+    #[graphql(description = "Hash")]
+    fn hash(&self) -> &str {
+        &self.hash
+    }
     #[graphql(description = "From")]
     fn from(&self) -> &str {
         &self.from
@@ -240,6 +255,7 @@ pub fn get_transactions(
             UserCommandWithStatusJson::from(cmd),
             key.height() as i32,
             key.timestamp(),
+            key.hash(),
         );
 
         // If query is provided, only add transactions that satisfy the query

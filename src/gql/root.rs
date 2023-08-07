@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
-use crate::gql::schema::transaction;
-use crate::gql::schema::Transaction;
-use crate::gql::schema::TransactionQueryInput;
-use crate::store::IndexerStore;
 use juniper::EmptyMutation;
 use juniper::EmptySubscription;
 use juniper::FieldResult;
 use juniper::RootNode;
+
+use crate::gql::schema::stakes;
+use crate::gql::schema::transaction;
+use crate::gql::schema::Transaction;
+use crate::gql::schema::TransactionQueryInput;
+use crate::staking_ledger::StakingLedgerAccount;
+use crate::store::IndexerStore;
+
+use super::schema::StakesQueryInput;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
@@ -38,6 +43,15 @@ impl QueryRoot {
         sort_by: Option<transaction::SortBy>,
     ) -> FieldResult<Vec<Transaction>> {
         Ok(transaction::get_transactions(ctx, query, limit, sort_by))
+    }
+
+    #[graphql(description = "Get staking ledger entry")]
+    fn stakes(
+        ctx: &Context,
+        query: Option<StakesQueryInput>,
+        limit: Option<i32>,
+    ) -> FieldResult<Vec<StakingLedgerAccount>> {
+        Ok(stakes::get_accounts(ctx, query, limit))
     }
 }
 

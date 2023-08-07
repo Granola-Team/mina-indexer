@@ -19,6 +19,9 @@ test = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+bin-prot = {git = "https://github.com/ChainSafe/mina-rs", rev = "0b4883170505cadad2edc2d041330b2433f762fa"}
+
 actix-web = "4.3.1"
 actix-web-lab = "0.19.1"
 actix-cors = "0.6.4"
@@ -40,7 +43,7 @@ chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", version = "0.1.0" }
 versioned = { path = "./mina-rs/protocol/versioned", version = "0.1.0" }
 mina-signer = { path = "./mina-rs/proof-systems/signer", version = "0.1.0" }
-rocksdb = "0.20.1"
+rocksdb = "0.21.0"
 bcs = "0.1.5"
 id_tree = { version = "1.8.0", features = ["serde_support"]}
 async-recursion = "1.0.4"
@@ -60,6 +63,8 @@ rust_decimal_macros = "1.30"
 zstd = "0.12.4"
 tar = "0.4.39"
 spmc = "0.3.0"
+bs58 = { version = "0.5.0", features = ["check"] }
+blake2 = "0.10.6"
 
 [dependencies.tokio]
 version = "1.25.0"
