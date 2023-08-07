@@ -4,7 +4,7 @@ use mina_serialization_types::staged_ledger_diff::{SignedCommandPayload, UserCom
 use std::io::Write;
 use versioned::Versioned;
 
-pub struct SignedCommand(mina_serialization_types::staged_ledger_diff::SignedCommandV1);
+pub struct SignedCommand(pub mina_serialization_types::staged_ledger_diff::SignedCommandV1);
 
 impl SignedCommand {
     pub fn payload(&self) -> &SignedCommandPayload {

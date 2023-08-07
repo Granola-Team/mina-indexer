@@ -1,5 +1,5 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash, signed_command},
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use mina_serialization_types::{
-    signatures::SignatureJson, staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1,
+    signatures::SignatureJson, staged_ledger_diff::{UserCommand, SignedCommand}, v1::UserCommandWithStatusV1,
 };
 use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
 use std::{
@@ -15,8 +15,7 @@ use std::{
     str::FromStr,
 };
 
-/// T-{Height}-{Timestamp}-{Signature} -> Transaction
-/// We use the signature as key until we have a better way to identify transactions (e.g. hash)
+/// T-{Height}-{Timestamp}-{Hash} -> Transaction
 /// The height is padded to 12 digits for sequential iteration
 #[derive(Debug, Clone)]
 pub struct TransactionKey(u32, u64, String);
@@ -67,8 +66,8 @@ impl TransactionKey {
         self.1
     }
 
-    /// Returns the signature of the transaction
-    pub fn signature(&self) -> &str {
+    /// Returns the hash of the transaction
+    pub fn hash(&self) -> &str {
         &self.2
     }
 }
@@ -130,10 +129,10 @@ impl IndexerStore {
 
         match tx.clone().inner().data.inner().inner() {
             UserCommand::SignedCommand(cmd) => {
-                let json_sig = SignatureJson::from(cmd.inner().inner().signature);
-                let sig = serde_json::to_string(&json_sig)?;
-
-                let key = TransactionKey::new(height, timestamp, sig).bytes();
+                let hash = signed_command::SignedCommand(cmd)
+                    .hash_signed_command()
+                    .unwrap();
+                let key = TransactionKey::new(height, timestamp, hash).bytes();
                 let value = bcs::to_bytes(&tx)?;
 
                 self.database.put_cf(&cf_handle, key, value)?;
