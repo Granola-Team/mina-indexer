@@ -16,10 +16,14 @@ use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use std::{io, path::PathBuf, process, sync::Arc};
-use tokio::fs::{self, create_dir_all, metadata};
+use serde_derive::{Deserialize, Serialize};
+use std::{path::PathBuf, process, sync::Arc};
+use tokio::{
+    fs::{self, create_dir_all, metadata},
+    io,
+    sync::mpsc,
+};
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
-use tracing_subscriber::prelude::*;
 use uuid::Uuid;
 
 #[derive(Parser, Debug, Clone)]
@@ -45,25 +49,28 @@ pub struct ServerArgs {
     watch_dir: PathBuf,
     /// Path to directory for rocksdb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
-    database_dir: PathBuf,
+    pub database_dir: PathBuf,
     /// Path to directory for logs
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
-    log_dir: PathBuf,
+    pub log_dir: PathBuf,
     /// Only store canonical blocks in the db
     #[arg(short, long, default_value_t = false)]
     keep_non_canonical_blocks: bool,
     /// Max file log level
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
-    log_level: LevelFilter,
+    pub log_level: LevelFilter,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
-    log_level_stdout: LevelFilter,
+    pub log_level_stdout: LevelFilter,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
     /// Threshold for updating the canonical tip/ledger
     #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
+    /// Path to an indexer snapshot
+    #[arg(long)]
+    pub snapshot_path: Option<PathBuf>,
 }
 
 pub struct IndexerConfiguration {
@@ -72,14 +79,17 @@ pub struct IndexerConfiguration {
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
-    pub database_dir: PathBuf,
     keep_noncanonical_blocks: bool,
-    log_file: PathBuf,
-    log_level: LevelFilter,
-    log_level_stdout: LevelFilter,
     prune_interval: u32,
     canonical_update_threshold: u32,
+    from_snapshot: bool,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SaveCommand(PathBuf);
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SaveResponse(String);
 
 #[instrument(skip_all)]
 pub async fn handle_command_line_arguments(
@@ -92,11 +102,7 @@ pub async fn handle_command_line_arguments(
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
-    let database_dir = args.database_dir;
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
-    let log_dir = args.log_dir;
-    let log_level = args.log_level;
-    let log_level_stdout = args.log_level_stdout;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
 
@@ -112,7 +118,6 @@ pub async fn handle_command_line_arguments(
     );
 
     create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
-    create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
 
     info!("Parsing ledger file at {}", ledger.display());
 
@@ -128,28 +133,16 @@ pub async fn handle_command_line_arguments(
         Ok(ledger) => {
             info!("Ledger parsed successfully!");
 
-            let mut log_number = 0;
-            let mut log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-
-            while tokio::fs::metadata(&log_fname).await.is_ok() {
-                log_number += 1;
-                log_fname = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-            }
-
             Ok(IndexerConfiguration {
                 ledger,
                 non_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
-                database_dir,
                 keep_noncanonical_blocks,
-                log_file: PathBuf::from(&log_fname),
-                log_level,
-                log_level_stdout,
-
                 prune_interval,
                 canonical_update_threshold,
+                from_snapshot: args.snapshot_path.is_some(),
             })
         }
     }
@@ -172,40 +165,25 @@ pub async fn run(
         root_hash,
         startup_dir,
         watch_dir,
-        database_dir,
         keep_noncanonical_blocks,
-        log_file,
-        log_level,
-        log_level_stdout,
         prune_interval,
         canonical_update_threshold,
+        from_snapshot,
     } = config;
 
-    // setup tracing
-    if let Some(parent) = log_file.parent() {
-        create_dir_if_non_existent(parent.to_str().unwrap()).await;
-    }
-
-    let log_file = std::fs::File::create(log_file)?;
-    let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
-
-    let stdout_layer = tracing_subscriber::fmt::layer();
-    tracing_subscriber::registry()
-        .with(stdout_layer.with_filter(log_level_stdout))
-        .with(file_layer.with_filter(log_level))
-        .init();
+    let database_dir = PathBuf::from(indexer_store.db_path());
 
     let mode = if keep_noncanonical_blocks {
         IndexerMode::Full
     } else {
         IndexerMode::Light
     };
-    let mut indexer_state = {
+    let mut indexer_state = if !from_snapshot {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
-        IndexerState::new(
+        let mut indexer_state = IndexerState::new(
             mode,
             root_hash.clone(),
             ledger.ledger,
@@ -213,18 +191,29 @@ pub async fn run(
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
+        )?;
+
+        let mut block_parser = BlockParser::new(&startup_dir)?;
+        if !non_genesis_ledger {
+            indexer_state
+                .initialize_with_contiguous_canonical(&mut block_parser)
+                .await?;
+        } else {
+            indexer_state
+                .initialize_without_contiguous_canonical(&mut block_parser)
+                .await?;
+        }
+
+        indexer_state
+    } else {
+        info!("initializing indexer state from snapshot");
+        IndexerState::from_state_snapshot(
+            indexer_store,
+            MAINNET_TRANSITION_FRONTIER_K,
+            prune_interval,
+            canonical_update_threshold,
         )?
     };
-    let mut block_parser = BlockParser::new(&startup_dir)?;
-    if !non_genesis_ledger {
-        indexer_state
-            .initialize_with_contiguous_canonical(&mut block_parser)
-            .await?;
-    } else {
-        indexer_state
-            .initialize_without_contiguous_canonical(&mut block_parser)
-            .await?;
-    }
 
     let mut block_receiver = BlockReceiver::new().await?;
     block_receiver.load_directory(&watch_dir).await?;
@@ -246,6 +235,11 @@ pub async fn run(
     });
 
     info!("Local socket listener started");
+
+    let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
+    let (mut save_resp_tx, save_resp_rx) = spmc::channel();
+    let save_tx = Arc::new(save_tx);
+    let save_resp_rx = Arc::new(save_resp_rx);
 
     loop {
         tokio::select! {
@@ -277,16 +271,29 @@ pub async fn run(
                 let summary = indexer_state.summary_verbose();
                 let ledger = indexer_state.best_ledger()?.unwrap();
 
+                let save_tx = save_tx.clone();
+                let save_resp_rx = save_resp_rx.clone();
+
                 // handle the connection
                 tokio::spawn(async move {
                     debug!("Handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_tip, ledger, summary).await {
+                    if let Err(e) = handle_conn(conn, block_store_readonly, best_tip, ledger, summary, save_tx, save_resp_rx).await {
                         error!("Error handling connection: {e}");
                     }
 
                     debug!("Removing readonly instance at {}", secondary_path.display());
                     tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
+            }
+
+            save_rx_fut = save_rx.recv() => {
+                if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
+                    trace!("saving snapshot in {}", &snapshot_path.display());
+                    match indexer_state.save_snapshot(snapshot_path) {
+                        Ok(_) => save_resp_tx.send(Some(SaveResponse("snapshot created".to_string())))?,
+                        Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
+                    }
+                }
             }
         }
     }
@@ -299,6 +306,8 @@ async fn handle_conn(
     best_tip: Block,
     ledger: Ledger,
     summary: SummaryVerbose,
+    save_tx: Arc<mpsc::Sender<SaveCommand>>,
+    _save_resp_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -364,6 +373,17 @@ async fn handle_conn(
                 writer.write_all(&bytes).await?;
             }
         }
+        "save_state" => {
+            info!("Received save_state command");
+            let data_buffer = buffers.next().unwrap();
+            let snapshot_path = PathBuf::from(String::from_utf8(
+                data_buffer[..data_buffer.len() - 1].to_vec(),
+            )?);
+            trace!("sending SaveCommand to primary indexer thread");
+            save_tx.send(SaveCommand(snapshot_path)).await?;
+            trace!("awaiting SaveResponse from primary indexer thread");
+            writer.write_all(b"saving snapshot...").await?;
+        }
         bad_request => {
             let err_msg = format!("Malformed request: {bad_request}");
             error!("{err_msg}");
@@ -374,7 +394,7 @@ async fn handle_conn(
     Ok(())
 }
 
-async fn create_dir_if_non_existent(path: &str) {
+pub async fn create_dir_if_non_existent(path: &str) {
     if metadata(path).await.is_err() {
         debug!("Creating directory {path}");
         create_dir_all(path).await.unwrap();

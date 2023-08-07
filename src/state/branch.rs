@@ -1,4 +1,7 @@
-use crate::block::{precomputed::PrecomputedBlock, Block, BlockHash};
+use crate::{
+    block::{precomputed::PrecomputedBlock, Block, BlockHash},
+    MAINNET_CANONICAL_THRESHOLD,
+};
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
     MoveBehavior::ToRoot,
@@ -6,9 +9,11 @@ use id_tree::{
     RemoveBehavior::{DropChildren, OrphanChildren},
     Tree,
 };
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::{instrument, trace};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Branch {
     pub root: NodeId,
     pub branches: Tree<Block>,
@@ -72,6 +77,56 @@ impl Branch {
 
     pub fn is_empty(&self) -> bool {
         self.branches.height() == 0
+    }
+
+    /// Returns the node id of the best tip
+    pub fn best_tip_id(&self) -> NodeId {
+        let mut best_tip_id = self
+            .branches
+            .root_node_id()
+            .expect("branch always has root node")
+            .clone();
+        for node_id in self
+            .branches
+            .traverse_post_order_ids(&best_tip_id)
+            .expect("branch always has root node")
+        {
+            let best_tip = self
+                .branches
+                .get(&best_tip_id)
+                .expect("branch always has root node")
+                .data()
+                .clone();
+            let node = self
+                .branches
+                .get(&node_id)
+                .expect("node_id from iterator")
+                .data()
+                .clone();
+            if best_tip.height < node.height {
+                best_tip_id = node_id.clone();
+            }
+        }
+        best_tip_id
+    }
+
+    #[instrument(skip(self))]
+    /// Returns the node id of the canonical tip, if it exists
+    pub fn canonical_tip_id(&self, _canonical_update_threshold: u32) -> Option<NodeId> {
+        for (n, ancestor_id) in self
+            .branches
+            .ancestor_ids(&self.best_tip_id())
+            .unwrap()
+            .enumerate()
+        {
+            let state_hash = &self.branches.get(ancestor_id).unwrap().data().state_hash;
+            trace!("{}th state_hash: {}", n, state_hash.0);
+            if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
+                trace!("returning id for {}", state_hash.0);
+                return Some(ancestor_id.clone());
+            }
+        }
+        None
     }
 
     /// Returns the new node's id in the branch and its data

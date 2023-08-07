@@ -12,7 +12,8 @@ use futures::{
     AsyncReadExt,
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
-use std::{path::PathBuf, process};
+use std::{path::PathBuf, process, time::Duration};
+use tokio::time::sleep;
 use tracing::instrument;
 
 #[derive(Parser, Debug)]
@@ -26,6 +27,8 @@ pub enum ClientCli {
     BestLedger(LedgerArgs),
     /// Show summary of indexer state
     Summary(SummaryArgs),
+    /// Save the current IndexerState to an indxr file
+    SaveState { out_dir: PathBuf },
 }
 
 #[derive(clap::Args, Debug)]
@@ -126,6 +129,18 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
                 let summary: SummaryShort = bcs::from_bytes(&buffer)?;
                 println!("{summary}");
             }
+        }
+        ClientCli::SaveState { out_dir } => {
+            if !out_dir.is_dir() {
+                process::exit(100);
+            }
+
+            let command = format!("save_state {}\0", out_dir.display());
+            writer.write_all(command.as_bytes()).await?;
+            sleep(Duration::from_secs(2)).await;
+            reader.read_to_end(&mut buffer).await?;
+            let response: String = bcs::from_bytes(&buffer)?;
+            println!("{response}");
         }
     }
 
