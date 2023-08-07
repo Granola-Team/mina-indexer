@@ -12,7 +12,7 @@ use futures::{
     AsyncReadExt,
 };
 use interprocess::local_socket::tokio::LocalSocketStream;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, time::Duration};
 use tokio::time::sleep;
 use tracing::instrument;

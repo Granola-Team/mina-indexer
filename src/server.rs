@@ -1,8 +1,6 @@
 use crate::{
-    block::{
-        parser::BlockParser, store::BlockStore, Block, BlockHash,
-        BlockWithoutHeight,
-    },
+    block::{parser::BlockParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
@@ -10,7 +8,7 @@ use crate::{
     },
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT, SOCKET_NAME, receiver::{filesystem::FilesystemReceiver, BlockReceiver},
+    PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
 };
 use clap::Parser;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};

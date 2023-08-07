@@ -1,13 +1,13 @@
-use async_trait::async_trait;
 use async_priority_channel as priority;
+use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
-use std::path::{PathBuf, Path};
 use tokio::sync::{
     mpsc,
     watch::{self, Sender},
 };
-use tracing::{instrument, info, debug};
+use tracing::{debug, info, instrument};
 use watchexec::{
     error::RuntimeError,
     event::{
@@ -20,12 +20,12 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-use crate::block::{parser::BlockParser, precomputed::PrecomputedBlock, parse_file};
+use crate::block::{parse_file, parser::BlockParser, precomputed::PrecomputedBlock};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
 pub enum FilesystemReceiverError {
     WatchTargetIsNotADirectory(PathBuf),
-    WorkerRuntimeError(String)
+    WorkerRuntimeError(String),
 }
 pub type FilesystemReceiverResult<T> = std::result::Result<T, FilesystemReceiverError>;
 pub struct FilesystemReceiver {
@@ -37,7 +37,10 @@ pub struct FilesystemReceiver {
 
 impl FilesystemReceiver {
     #[instrument]
-    pub async fn new(event_capacity: usize, error_capacity: usize) -> FilesystemReceiverResult<Self> {
+    pub async fn new(
+        event_capacity: usize,
+        error_capacity: usize,
+    ) -> FilesystemReceiverResult<Self> {
         info!("initializing new filesystem receiver");
         let (ev_s, worker_event_receiver) = priority::bounded(event_capacity);
         let (er_s, worker_error_receiver) = mpsc::channel(error_capacity);
@@ -53,12 +56,15 @@ impl FilesystemReceiver {
             parsers,
             worker_command_sender,
             worker_event_receiver,
-            worker_error_receiver
+            worker_error_receiver,
         })
     }
 
     pub fn watched_directories(&self) -> Vec<PathBuf> {
-        self.parsers.iter().map(|parser| parser.blocks_dir.clone()).collect()
+        self.parsers
+            .iter()
+            .map(|parser| parser.blocks_dir.clone())
+            .collect()
     }
 }
 
@@ -69,18 +75,27 @@ impl super::BlockReceiver for FilesystemReceiver {
     type Error = FilesystemReceiverError;
 
     async fn load_source(&mut self, source: &Self::BlockSource) -> Result<(), Self::Error> {
-        info!("loading directory {} into FilesystemReceiver", source.display());
+        info!(
+            "loading directory {} into FilesystemReceiver",
+            source.display()
+        );
 
         if !source.is_dir() {
-            return Err(FilesystemReceiverError::WatchTargetIsNotADirectory(source.clone()));
+            return Err(FilesystemReceiverError::WatchTargetIsNotADirectory(
+                source.clone(),
+            ));
         }
 
         debug!("sending command to worker with new working data");
         let mut working_data = WorkingData::default();
         let mut watched_directories = self.watched_directories();
         watched_directories.push(source.clone());
-        working_data.pathset = watched_directories.iter()
-            .map(|path_buf| {let path: &Path = path_buf.as_ref(); path.into()})
+        working_data.pathset = watched_directories
+            .iter()
+            .map(|path_buf| {
+                let path: &Path = path_buf.as_ref();
+                path.into()
+            })
             .collect();
         self.worker_command_sender.send_replace(working_data);
 
@@ -132,16 +147,21 @@ impl super::BlockReceiver for FilesystemReceiver {
             }
         }
     }
-
 }
 
 impl std::fmt::Display for FilesystemReceiverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FilesystemReceiverError::WatchTargetIsNotADirectory(directory) =>
-                f.write_str(&format!("cannot watch {} for new blocks, it is not a directory", directory.display())),
-            FilesystemReceiverError::WorkerRuntimeError(runtime_error) => 
-                f.write_str(&format!("encountered an error while running the filesystem worker: {}", runtime_error)),
+            FilesystemReceiverError::WatchTargetIsNotADirectory(directory) => {
+                f.write_str(&format!(
+                    "cannot watch {} for new blocks, it is not a directory",
+                    directory.display()
+                ))
+            }
+            FilesystemReceiverError::WorkerRuntimeError(runtime_error) => f.write_str(&format!(
+                "encountered an error while running the filesystem worker: {}",
+                runtime_error
+            )),
         }
     }
 }
