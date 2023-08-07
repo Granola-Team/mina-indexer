@@ -327,7 +327,7 @@ impl BlockParser {
             let mut log_file_contents = Vec::new();
 
             log_file.read_to_end(&mut log_file_contents).await?;
-
+            drop(log_file);
             let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
                 state_hash,
                 blockchain_length,
@@ -368,7 +368,7 @@ fn read_parent_hash(path: &Path, parent_hash_offset: u64) -> anyhow::Result<Stri
 
     f.seek(SeekFrom::Start(parent_hash_offset))?;
     f.read_exact(&mut buf)?;
-
+    drop(f);
     String::from_utf8(buf).map_err(anyhow::Error::from)
 }
 
