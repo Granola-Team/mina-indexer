@@ -10,8 +10,8 @@ use id_tree::{
     Tree,
 };
 use serde_derive::{Deserialize, Serialize};
-use tracing::{instrument, trace};
 use std::collections::HashMap;
+use tracing::{instrument, trace};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Branch {
@@ -114,18 +114,18 @@ impl Branch {
     /// Returns the node id of the canonical tip, if it exists
     pub fn canonical_tip_id(&self, _canonical_update_threshold: u32) -> Option<NodeId> {
         for (n, ancestor_id) in self
-                .branches
-                .ancestor_ids(&self.best_tip_id().clone())
-                .unwrap()
-                .enumerate()
-            {
-                let state_hash = &self.branches.get(ancestor_id).unwrap().data().state_hash;
-                trace!("{}th state_hash: {}", n, state_hash.0);
-                if n+1 == MAINNET_CANONICAL_THRESHOLD as usize {
-                    trace!("returning id for {}", state_hash.0);
-                    return Some(ancestor_id.clone());
-                }
+            .branches
+            .ancestor_ids(&self.best_tip_id())
+            .unwrap()
+            .enumerate()
+        {
+            let state_hash = &self.branches.get(ancestor_id).unwrap().data().state_hash;
+            trace!("{}th state_hash: {}", n, state_hash.0);
+            if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
+                trace!("returning id for {}", state_hash.0);
+                return Some(ancestor_id.clone());
             }
+        }
         None
     }
 
