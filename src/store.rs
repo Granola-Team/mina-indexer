@@ -7,8 +7,7 @@ use crate::{
     },
 };
 use mina_serialization_types::{
-    signatures::SignatureJson,
-    staged_ledger_diff::{SignedCommand, UserCommand},
+    staged_ledger_diff::UserCommand,
     v1::UserCommandWithStatusV1,
 };
 use rocksdb::{ColumnFamilyDescriptor, DBIterator, DB};
