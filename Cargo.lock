@@ -637,6 +637,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bin-prot"
+version = "0.1.0"
+source = "git+https://github.com/ChainSafe/mina-rs?rev=0b4883170505cadad2edc2d041330b2433f762fa#0b4883170505cadad2edc2d041330b2433f762fa"
+dependencies = [
+ "byteorder",
+ "num",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,6 +817,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 dependencies = [
  "sha2 0.9.9",
+]
+
+[[package]]
+name = "bs58"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
+dependencies = [
+ "sha2 0.10.7",
+ "tinyvec",
 ]
 
 [[package]]
@@ -2374,6 +2395,9 @@ dependencies = [
  "async-trait",
  "async_executors",
  "bcs",
+ "bin-prot 0.1.0 (git+https://github.com/ChainSafe/mina-rs?rev=0b4883170505cadad2edc2d041330b2433f762fa)",
+ "blake2",
+ "bs58 0.5.0",
  "bytesize",
  "chrono",
  "clap",
@@ -2427,8 +2451,8 @@ name = "mina-serialization-types"
 version = "0.1.0"
 dependencies = [
  "base64 0.13.1",
- "bin-prot",
- "bs58",
+ "bin-prot 0.1.0",
+ "bs58 0.4.0",
  "derive_more",
  "hex",
  "mina-serialization-types-macros",
@@ -2458,7 +2482,7 @@ dependencies = [
  "ark-ff",
  "bitvec",
  "blake2",
- "bs58",
+ "bs58 0.4.0",
  "hex",
  "mina-curves",
  "mina-hasher",
