@@ -3,6 +3,8 @@ pub mod staking_ledger_store;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::gql::schema::delegations::DelegationTotals;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StakingLedger {
     pub epoch_number: u32,
@@ -27,4 +29,5 @@ pub struct StakingLedgerAccount {
     pub receipt_chain_hash: String,
     pub token: String, // u32
     pub voting_for: String,
+    pub delegation_totals: Option<DelegationTotals>,
 }
