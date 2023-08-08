@@ -170,7 +170,6 @@ pub async fn run(
     } = config;
 
     let database_dir = PathBuf::from(indexer_store.db_path());
-
     let mode = if keep_noncanonical_blocks {
         IndexerMode::Full
     } else {

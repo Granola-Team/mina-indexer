@@ -103,6 +103,6 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisRoot> {
     genesis_ledger_file
         .read_to_end(&mut genesis_ledger_file_contents)
         .await?;
-
+    drop(genesis_ledger_file);
     Ok(serde_json::from_slice(&genesis_ledger_file_contents)?)
 }

@@ -181,7 +181,7 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
         let mut log_file_contents = Vec::new();
 
         log_file.read_to_end(&mut log_file_contents).await?;
-
+        drop(log_file);
         let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
             state_hash,
             blockchain_length,

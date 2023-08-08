@@ -24,8 +24,8 @@ pub fn display_duration(duration: std::time::Duration) -> String {
     if duration_as_mins < 2. {
         format!("{duration:?}")
     } else if duration_as_hrs < 2. {
-        format!("{duration_as_mins} min")
+        format!("{duration_as_mins}min")
     } else {
-        format!("{duration_as_hrs} hr")
+        format!("{duration_as_hrs}hr")
     }
 }
