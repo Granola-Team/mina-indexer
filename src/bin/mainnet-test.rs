@@ -7,7 +7,7 @@ use mina_indexer::{
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use std::{path::PathBuf, sync::Arc, thread};
+use std::{fs, path::PathBuf, sync::Arc, thread};
 use tokio::{
     process,
     time::{Duration, Instant},
@@ -78,6 +78,10 @@ async fn main() -> anyhow::Result<()> {
 
     let mut bp = BlockParser::new_filtered(&blocks_dir, max_block_length).unwrap();
     let store_dir = &PathBuf::from(DB_PATH);
+    if store_dir.exists() {
+        fs::remove_dir_all(store_dir)?;
+    }
+
     let indexer_store = Arc::new(IndexerStore::new(store_dir).unwrap());
     let genesis_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
     let parse_genesis_time = Instant::now();
