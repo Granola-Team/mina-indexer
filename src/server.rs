@@ -1,8 +1,6 @@
 use crate::{
-    block::{
-        parser::BlockParser, receiver::BlockReceiver, store::BlockStore, Block, BlockHash,
-        BlockWithoutHeight,
-    },
+    block::{parser::BlockParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
@@ -214,8 +212,8 @@ pub async fn run(
         )?
     };
 
-    let mut block_receiver = BlockReceiver::new().await?;
-    block_receiver.load_directory(&watch_dir).await?;
+    let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
+    filesystem_receiver.load_source(&watch_dir).await?;
     info!("Block receiver set to watch {watch_dir:?}");
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
@@ -242,7 +240,7 @@ pub async fn run(
 
     loop {
         tokio::select! {
-            block_fut = block_receiver.recv() => {
+            block_fut = filesystem_receiver.recv_block() => {
                 if let Some(block_result) = block_fut {
                     let precomputed_block = block_result?;
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
