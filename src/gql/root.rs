@@ -4,7 +4,10 @@ use juniper::EmptyMutation;
 use juniper::EmptySubscription;
 use juniper::FieldResult;
 use juniper::RootNode;
+use rocksdb::DB;
 
+use crate::gql::schema::delegations::get_delegation_totals_from_ctx;
+use crate::gql::schema::delegations::DelegationTotals;
 use crate::gql::schema::stakes;
 use crate::gql::schema::transaction;
 use crate::gql::schema::Transaction;
@@ -16,11 +19,15 @@ use super::schema::StakesQueryInput;
 
 pub struct Context {
     pub db: Arc<IndexerStore>,
+    pub delegation_totals_db: Arc<DB>,
 }
 
 impl Context {
-    pub fn new(db: Arc<IndexerStore>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<IndexerStore>, delegation_totals_db: Arc<DB>) -> Self {
+        Self {
+            db,
+            delegation_totals_db,
+        }
     }
 }
 
@@ -52,6 +59,17 @@ impl QueryRoot {
         limit: Option<i32>,
     ) -> FieldResult<Vec<StakingLedgerAccount>> {
         Ok(stakes::get_accounts(ctx, query, limit))
+    }
+
+    #[graphql(
+        description = "Get delegation totals from delegation_totals_db based on public key and epoch"
+    )]
+    async fn delegationTotals(
+        ctx: &Context,
+        public_key: String,
+        epoch: i32,
+    ) -> Option<DelegationTotals> {
+        get_delegation_totals_from_ctx(ctx, &public_key, epoch).await
     }
 }
 
