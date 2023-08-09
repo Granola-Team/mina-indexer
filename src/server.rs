@@ -156,6 +156,13 @@ pub async fn run(
         .await
         .expect_err("Server is already running... Exiting.");
 
+    debug!("Setting Ctrl-C handler");
+    ctrlc::set_handler(move || {
+        info!("SIGINT received. Exiting.");
+        process::exit(0);
+    })
+    .expect("Error setting Ctrl-C handler");
+
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
