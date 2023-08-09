@@ -1,9 +1,9 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration, sync::Arc, ops::Deref};
 
 use async_ringbuf::{AsyncHeapConsumer, AsyncHeapRb};
 use async_trait::async_trait;
 use serde_derive::{Serialize, Deserialize};
-use tokio::sync::{mpsc, watch};
+use tokio::{sync::{mpsc, watch}, task::JoinHandle};
 
 use crate::block::precomputed::PrecomputedBlock;
 
@@ -32,6 +32,7 @@ pub struct GoogleCloudBlockReceiver {
     error_receiver: watch::Receiver<Option<GoogleCloudBlockWorkerError>>,
     command_sender: mpsc::Sender<GoogleCloudBlockWorkerCommand>,
     worker_data_receiver: watch::Receiver<GoogleCloudBlockWorkerData>,
+    worker_join_handle: Option<JoinHandle<()>>,
 }
 
 impl GoogleCloudBlockReceiver {
@@ -69,7 +70,7 @@ impl GoogleCloudBlockReceiver {
             worker_data_sender
         )?;
 
-        tokio::spawn(async move { 
+        let worker_join_handle = tokio::spawn(async move { 
             worker.start_loop().await;
         });
 
@@ -78,6 +79,7 @@ impl GoogleCloudBlockReceiver {
             error_receiver,
             command_sender,
             worker_data_receiver,
+            worker_join_handle: Some(worker_join_handle)
         })
     }
 
@@ -117,8 +119,18 @@ impl BlockReceiver for GoogleCloudBlockReceiver {
 
 impl Drop for GoogleCloudBlockReceiver {
     fn drop(&mut self) {
-        self.command_sender.blocking_send(GoogleCloudBlockWorkerCommand::Shutdown)
-            .expect("shutdown command sends correctly");
+        let command_sender = self.command_sender.clone();
+        let worker_join_handle = self.worker_join_handle.take();
+        let temp_block_dir = self.worker_data_receiver.borrow().temp_blocks_dir.clone();
+        tokio::spawn(async move {
+            command_sender.clone().blocking_send(GoogleCloudBlockWorkerCommand::Shutdown)
+                .expect("shutdown command sends correctly");
+
+            if let Some(join_handle) = worker_join_handle {
+                join_handle.await.expect("worker fininshes successfully");
+            }
+        });
+        std::fs::remove_dir_all(temp_block_dir).expect("block dir exists");
     }
 }
 

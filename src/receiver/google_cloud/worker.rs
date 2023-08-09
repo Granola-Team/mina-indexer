@@ -2,7 +2,7 @@ use async_ringbuf::AsyncHeapProducer;
 use serde_derive::{Serialize, Deserialize};
 use thiserror::Error;
 use tracing::{instrument, trace, debug};
-use std::{time::{Duration, Instant}, path::{Path, PathBuf}};
+use std::{time::{Duration, Instant}, path::{Path, PathBuf}, process::Stdio};
 use tokio::{sync::{watch, mpsc}, time::sleep, process::Command, io::AsyncWriteExt, fs::read_dir};
 
 use crate::block::{precomputed::PrecomputedBlock, is_valid_block_file, parse_file};
@@ -113,6 +113,7 @@ async fn gsutil_download_blocks(
     network: MinaNetwork
 ) -> Result<(), GoogleCloudBlockWorkerError> {
     let mut child = Command::new("gsutil")
+        .stdin(Stdio::piped())
         .arg("-m")
         .arg("cp")
         .arg("-n")
