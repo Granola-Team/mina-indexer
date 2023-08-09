@@ -213,7 +213,7 @@ pub async fn run(
     };
 
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
-    filesystem_receiver.load_source(&watch_dir).await?;
+    filesystem_receiver.load_directory(&watch_dir)?;
     info!("Block receiver set to watch {watch_dir:?}");
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
@@ -241,8 +241,7 @@ pub async fn run(
     loop {
         tokio::select! {
             block_fut = filesystem_receiver.recv_block() => {
-                if let Some(block_result) = block_fut {
-                    let precomputed_block = block_result?;
+                if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
 
