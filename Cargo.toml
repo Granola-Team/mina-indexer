@@ -63,6 +63,7 @@ tar = "0.4.39"
 spmc = "0.3.0"
 bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
+async-ringbuf = "0.1.3"
 
 [dependencies.tokio]
 version = "1.25.0"

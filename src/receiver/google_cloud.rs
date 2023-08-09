@@ -1,3 +1,4 @@
+use async_ringbuf::{AsyncHeapConsumer, AsyncHeapProducer};
 use serde_derive::{Serialize, Deserialize};
 use thiserror::Error;
 use std::{time::{Duration, Instant}, path::{Path, PathBuf}};
@@ -44,7 +45,7 @@ pub struct GoogleCloudBlockWorker {
     update_freq: Duration,
     network: MinaNetwork,
     bucket: String,
-    blocks_sender: watch::Sender<PrecomputedBlock>,
+    blocks_sender: AsyncHeapProducer<PrecomputedBlock>,
     error_sender: watch::Sender<GoogleCloudBlockWorkerError>,
     command_receiver: mpsc::Receiver<GoogleCloudBlockWorkerCommand>
 }
@@ -57,7 +58,7 @@ impl GoogleCloudBlockWorker {
         update_freq: Duration, 
         network: MinaNetwork, 
         bucket: String, 
-        blocks_sender: watch::Sender<PrecomputedBlock>, 
+        blocks_sender: AsyncHeapProducer<PrecomputedBlock>,
         error_sender: watch::Sender<GoogleCloudBlockWorkerError>,
         command_receiver: mpsc::Receiver<GoogleCloudBlockWorkerCommand>)
     -> Result<Self, GoogleCloudBlockWorkerError> {
@@ -76,7 +77,13 @@ impl GoogleCloudBlockWorker {
 
             if let Ok(command) = self.command_receiver.try_recv() {
                 match command {
-                    GoogleCloudBlockWorkerCommand::Shutdown => return,
+                    GoogleCloudBlockWorkerCommand::Shutdown => {
+                        if tokio::fs::metadata(&self.temp_blocks_dir).await.is_ok() {
+                            tokio::fs::remove_dir_all(&self.temp_blocks_dir)
+                                .await.expect("remove temp dir works");
+                        }
+                        return;
+                    },
                 }
             }
 
@@ -89,7 +96,7 @@ impl GoogleCloudBlockWorker {
                 .spawn().map_err(|e| GoogleCloudBlockWorkerError::IOError(e)) {
                     Ok(child) => child,
                     Err(io_error) => {
-                        self.error_sender.send(io_error).expect("channel should not error");
+                        self.error_sender.send_replace(io_error);
                         continue;
                     },
                 };
@@ -102,15 +109,13 @@ impl GoogleCloudBlockWorker {
                 if let Err(e) = child_stdin.write_all(bucket_file_from_length(
                     self.network, &self.bucket, length).as_bytes()
                 ).await {
-                    self.error_sender.send(GoogleCloudBlockWorkerError::IOError(e))
-                        .expect("error sender channel works");
+                    self.error_sender.send_replace(GoogleCloudBlockWorkerError::IOError(e));
                 }
             }
 
             match read_dir(&self.temp_blocks_dir).await {
                 Err(io_error) => {
-                    self.error_sender.send(GoogleCloudBlockWorkerError::IOError(io_error))
-                        .expect("error_sender channel works");
+                    self.error_sender.send_replace(GoogleCloudBlockWorkerError::IOError(io_error));
                 },
                 Ok(mut read_dir) => {
                     while let Ok(Some(entry)) = read_dir.next_entry().await {
@@ -120,8 +125,9 @@ impl GoogleCloudBlockWorker {
 
                         match parse_file(&entry.path()).await {
                             Ok(precomputed_block) => {
-                                self.blocks_sender.send(precomputed_block)
-                                    .expect("blocks_sender works");
+                                self.blocks_sender.push(precomputed_block)
+                                    .await
+                                    .expect("consumer not dropped");
 
                                 if entry.metadata().await.is_ok() {
                                     tokio::fs::remove_file(entry.path()).await
@@ -129,9 +135,9 @@ impl GoogleCloudBlockWorker {
                                 }
                             },
                             Err(parse_error) => {
-                                self.error_sender.send(GoogleCloudBlockWorkerError::BlockParseError(
-                                    parse_error.to_string()
-                                )).expect("error_sender works");
+                                self.error_sender.send_replace(
+                                    GoogleCloudBlockWorkerError::BlockParseError(parse_error.to_string())
+                                );
                             },
                         }
                     }
