@@ -1,4 +1,4 @@
-use std::{ops::Deref, path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use async_ringbuf::{AsyncHeapConsumer, AsyncHeapRb};
 use async_trait::async_trait;
@@ -94,7 +94,7 @@ impl GoogleCloudBlockReceiver {
         self.command_sender
             .send(GoogleCloudBlockWorkerCommand::SetWorkerData(worker_data))
             .await
-            .map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))
+            .map_err(GoogleCloudBlockReceiverError::CommandError)
     }
 
     pub async fn get_worker_data(
@@ -103,7 +103,7 @@ impl GoogleCloudBlockReceiver {
         self.command_sender
             .send(GoogleCloudBlockWorkerCommand::GetWorkerData)
             .await
-            .map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))?;
+            .map_err(GoogleCloudBlockReceiverError::CommandError)?;
         Ok(self.worker_data_receiver.borrow().clone())
     }
 }
@@ -147,9 +147,9 @@ impl Drop for GoogleCloudBlockReceiver {
     }
 }
 
-impl MinaNetwork {
-    pub fn to_string(&self) -> String {
-        String::from(match self {
+impl std::fmt::Display for MinaNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             MinaNetwork::Mainnet => "mainnet",
             MinaNetwork::Berkeley => "berkeley",
             MinaNetwork::Testnet => "testnet",
@@ -158,5 +158,5 @@ impl MinaNetwork {
 }
 
 pub fn bucket_file_from_length(network: MinaNetwork, bucket: &str, length: u64) -> String {
-    format!("gs://{bucket}/{}-{length}-*.json\n", network.to_string())
+    format!("gs://{bucket}/{}-{length}-*.json\n", network)
 }

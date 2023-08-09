@@ -220,7 +220,7 @@ impl std::fmt::Display for GoogleCloudBlockWorkerError {
                     not_directory.display()
                 )),
             GoogleCloudBlockWorkerError::IOError(io_error) => {
-                f.write_str(&format!("encountered an IOError: {}", io_error.to_string()))
+                f.write_str(&format!("encountered an IOError: {}", io_error))
             }
             GoogleCloudBlockWorkerError::BlockParseError(block_file, parse_error) => {
                 f.write_str(&format!(
