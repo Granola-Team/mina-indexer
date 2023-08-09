@@ -30,7 +30,7 @@ impl MinaNetwork {
 pub enum GoogleCloudBlockWorkerError {
     TempBlocksDirIsNotADirectory(PathBuf),
     IOError(tokio::io::Error),
-    BlockParseError(String),
+    BlockParseError(PathBuf, String),
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -136,7 +136,7 @@ impl GoogleCloudBlockWorker {
                             },
                             Err(parse_error) => {
                                 self.error_sender.send_replace(
-                                    GoogleCloudBlockWorkerError::BlockParseError(parse_error.to_string())
+                                    GoogleCloudBlockWorkerError::BlockParseError(entry.path(), parse_error.to_string())
                                 );
                             },
                         }
@@ -164,8 +164,10 @@ impl std::fmt::Display for GoogleCloudBlockWorkerError {
         match self {
             GoogleCloudBlockWorkerError::TempBlocksDirIsNotADirectory(not_directory) 
                 => f.write_str(&format!("temporary block directory {} is not a directory", not_directory.display())),
-            GoogleCloudBlockWorkerError::IOError(_) => todo!(),
-            GoogleCloudBlockWorkerError::BlockParseError(_) => todo!(),
+            GoogleCloudBlockWorkerError::IOError(io_error) 
+                => f.write_str(&format!("encountered an IOError: {}", io_error.to_string())),
+            GoogleCloudBlockWorkerError::BlockParseError(block_file, parse_error) 
+                => f.write_str(&format!("could not parse block file {}: {}", block_file.display(), parse_error)),
         }
     }
 }
