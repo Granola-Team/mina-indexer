@@ -2,10 +2,7 @@ use juniper::GraphQLInputObject;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    gql::{
-        root::Context,
-        schema::delegations::DelegationTotals,
-    },
+    gql::{root::Context, schema::delegations::DelegationTotals},
     staking_ledger::{
         staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
     },

@@ -1,6 +1,8 @@
+use actix_web::web::Data;
 use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
+    delegation_totals_store::create_delegation_totals_db,
     server::{self, create_dir_if_non_existent, handle_command_line_arguments},
     store::IndexerStore,
 };
@@ -67,8 +69,15 @@ pub async fn main() -> anyhow::Result<()> {
             } else {
                 Arc::new(IndexerStore::new(&database_dir)?)
             };
+
+            let delegation_totals_db = Data::new(Arc::new(create_delegation_totals_db(
+                "/path/to/delegation_totals_db", // will need to add a CLI in server args for new db
+            )?));
+
             tokio::spawn(server::run(config, db.clone()));
-            mina_indexer::gql::start_gql(db).await.unwrap();
+            mina_indexer::gql::start_gql(db, delegation_totals_db)
+                .await
+                .unwrap();
             Ok(())
         }
     }
