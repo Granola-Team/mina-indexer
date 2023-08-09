@@ -2,15 +2,13 @@ use juniper::GraphQLInputObject;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    delegation_totals_store::{self, get_delegation_totals_from_db, update_delegation_totals},
     gql::{
         root::Context,
-        schema::delegations::{DelegationTotals, TotalDelegated},
+        schema::delegations::DelegationTotals,
     },
     staking_ledger::{
         staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
     },
-    state::ledger::public_key,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -37,6 +35,8 @@ pub fn get_accounts(
 ) -> Vec<StakingLedgerAccount> {
     let limit = limit.unwrap_or(100);
     let limit_idx = limit as usize;
+
+    let _epoch = query.as_ref().and_then(|query| query.epoch).unwrap_or(1); // Default to epoch 1
 
     let mut raw_accounts: Vec<StakingLedgerAccount> = Vec::new();
     if let Some(ref query_input) = query {
@@ -91,33 +91,7 @@ impl StakingLedgerAccount {
     }
     #[graphql(description = "Delegation Totals")]
     fn delegation_totals(&self) -> Option<DelegationTotals> {
-        // delegation totals for the default epoch (1) here
-        let epoch_number = 1;
-        let public_key = &self.pk; // Use a public key from genesis as default?
-
-        let mut total_delegated = TotalDelegated(0.0);
-        let mut count_delegates = 0;
-
-        if let Some(staking_ledger) = staking_ledger {
-            for account in staking_ledger.accounts {
-                if let Some(delegation_totals) =
-                    get_delegation_totals_from_db(&delegation_totals_db, &account.pk, epoch_number)
-                        .expect("Failed to fetch delegation totals")
-                {
-                    total_delegated.0 += delegation_totals.total_delegated.0;
-                    count_delegates += delegation_totals.count_delegates;
-                }
-            }
-        }
-
-        update_delegation_totals(
-            &delegation_totals_db,
-            "public_key_here", // placeholder code for public key
-            epoch_number,
-            total_delegated,
-            count_delegates,
-        )
-        .expect("Failed to update delegation totals");
+        self.delegation_totals.clone()
     }
 }
 
