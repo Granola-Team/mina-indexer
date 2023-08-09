@@ -1,13 +1,19 @@
-use std::{path::PathBuf, time::Duration, sync::Arc, ops::Deref};
+use std::{ops::Deref, path::PathBuf, sync::Arc, time::Duration};
 
 use async_ringbuf::{AsyncHeapConsumer, AsyncHeapRb};
 use async_trait::async_trait;
-use serde_derive::{Serialize, Deserialize};
-use tokio::{sync::{mpsc, watch}, task::JoinHandle};
+use serde_derive::{Deserialize, Serialize};
+use tokio::{
+    sync::{mpsc, watch},
+    task::JoinHandle,
+};
 
 use crate::block::precomputed::PrecomputedBlock;
 
-use self::worker::{GoogleCloudBlockWorkerError, GoogleCloudBlockWorkerCommand, GoogleCloudBlockWorker, GoogleCloudBlockWorkerData};
+use self::worker::{
+    GoogleCloudBlockWorker, GoogleCloudBlockWorkerCommand, GoogleCloudBlockWorkerData,
+    GoogleCloudBlockWorkerError,
+};
 
 use super::BlockReceiver;
 
@@ -24,7 +30,7 @@ pub enum MinaNetwork {
 }
 
 pub enum GoogleCloudBlockReceiverError {
-    CommandError(mpsc::error::SendError<GoogleCloudBlockWorkerCommand>)
+    CommandError(mpsc::error::SendError<GoogleCloudBlockWorkerCommand>),
 }
 
 pub struct GoogleCloudBlockReceiver {
@@ -44,33 +50,31 @@ impl GoogleCloudBlockReceiver {
         network: MinaNetwork,
         bucket: String,
     ) -> Result<Self, anyhow::Error> {
-        let (blocks_producer, blocks_consumer) = 
+        let (blocks_producer, blocks_consumer) =
             AsyncHeapRb::new((overlap_num * 2) as usize).split();
-        let (error_sender, error_receiver) = 
-            watch::channel(None);
-        let (command_sender, command_receiver) =
-            mpsc::channel(1);
+        let (error_sender, error_receiver) = watch::channel(None);
+        let (command_sender, command_receiver) = mpsc::channel(1);
 
         let worker_data = GoogleCloudBlockWorkerData {
             max_length,
             overlap_num,
-            temp_blocks_dir, 
-            update_freq, 
-            network, 
-            bucket, 
+            temp_blocks_dir,
+            update_freq,
+            network,
+            bucket,
         };
 
         let (worker_data_sender, worker_data_receiver) = watch::channel(worker_data.clone());
 
         let mut worker = GoogleCloudBlockWorker::new(
             worker_data,
-            blocks_producer, 
-            error_sender, 
+            blocks_producer,
+            error_sender,
             command_receiver,
-            worker_data_sender
+            worker_data_sender,
         )?;
 
-        let worker_join_handle = tokio::spawn(async move { 
+        let worker_join_handle = tokio::spawn(async move {
             worker.start_loop().await;
         });
 
@@ -79,20 +83,27 @@ impl GoogleCloudBlockReceiver {
             error_receiver,
             command_sender,
             worker_data_receiver,
-            worker_join_handle: Some(worker_join_handle)
+            worker_join_handle: Some(worker_join_handle),
         })
     }
 
-    pub async fn set_worker_data(&self, worker_data: GoogleCloudBlockWorkerData) -> Result<(), GoogleCloudBlockReceiverError> {
-        self.command_sender.send(
-            GoogleCloudBlockWorkerCommand::SetWorkerData(worker_data)
-        ).await.map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))
+    pub async fn set_worker_data(
+        &self,
+        worker_data: GoogleCloudBlockWorkerData,
+    ) -> Result<(), GoogleCloudBlockReceiverError> {
+        self.command_sender
+            .send(GoogleCloudBlockWorkerCommand::SetWorkerData(worker_data))
+            .await
+            .map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))
     }
 
-    pub async fn get_worker_data(&self) -> Result<GoogleCloudBlockWorkerData, GoogleCloudBlockReceiverError> {
-        self.command_sender.send(
-            GoogleCloudBlockWorkerCommand::GetWorkerData
-        ).await.map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))?;
+    pub async fn get_worker_data(
+        &self,
+    ) -> Result<GoogleCloudBlockWorkerData, GoogleCloudBlockReceiverError> {
+        self.command_sender
+            .send(GoogleCloudBlockWorkerCommand::GetWorkerData)
+            .await
+            .map_err(|send_error| GoogleCloudBlockReceiverError::CommandError(send_error))?;
         Ok(self.worker_data_receiver.borrow().clone())
     }
 }
@@ -123,7 +134,9 @@ impl Drop for GoogleCloudBlockReceiver {
         let worker_join_handle = self.worker_join_handle.take();
         let temp_block_dir = self.worker_data_receiver.borrow().temp_blocks_dir.clone();
         tokio::spawn(async move {
-            command_sender.clone().blocking_send(GoogleCloudBlockWorkerCommand::Shutdown)
+            command_sender
+                .clone()
+                .blocking_send(GoogleCloudBlockWorkerCommand::Shutdown)
                 .expect("shutdown command sends correctly");
 
             if let Some(join_handle) = worker_join_handle {

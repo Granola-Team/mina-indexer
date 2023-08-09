@@ -67,7 +67,10 @@ impl FilesystemReceiver {
             .collect()
     }
 
-    pub fn load_directory(&mut self, directory: impl AsRef<Path>) -> Result<(), FilesystemReceiverError> {
+    pub fn load_directory(
+        &mut self,
+        directory: impl AsRef<Path>,
+    ) -> Result<(), FilesystemReceiverError> {
         info!(
             "loading directory {} into FilesystemReceiver",
             directory.as_ref().display()
