@@ -16,7 +16,7 @@ async fn receives_new_block() {
     let mut block_receiver = GoogleCloudBlockReceiver::new(
         1,
         1,
-        temp_block_dir.into(),
+        temp_block_dir,
         Duration::from_secs(1),
         MinaNetwork::Mainnet,
         bucket,

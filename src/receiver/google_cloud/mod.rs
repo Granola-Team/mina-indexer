@@ -1,4 +1,7 @@
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use async_ringbuf::{AsyncHeapConsumer, AsyncHeapRb};
 use async_trait::async_trait;
@@ -7,6 +10,7 @@ use tokio::{
     sync::{mpsc, watch},
     task::JoinHandle,
 };
+use tracing::{debug, error, info, instrument, trace};
 
 use crate::block::precomputed::PrecomputedBlock;
 
@@ -42,14 +46,17 @@ pub struct GoogleCloudBlockReceiver {
 }
 
 impl GoogleCloudBlockReceiver {
+    #[instrument]
     pub async fn new(
         max_length: u64,
         overlap_num: u64,
-        temp_blocks_dir: PathBuf,
+        temp_blocks_dir: impl AsRef<Path> + std::fmt::Debug,
         update_freq: Duration,
         network: MinaNetwork,
         bucket: String,
     ) -> Result<Self, anyhow::Error> {
+        info!("initializing new GoogleCloudBlockReceiver");
+        let temp_blocks_dir = PathBuf::from(temp_blocks_dir.as_ref());
         let (blocks_producer, blocks_consumer) =
             AsyncHeapRb::new((overlap_num * 2) as usize).split();
         let (error_sender, error_receiver) = watch::channel(None);
@@ -74,6 +81,7 @@ impl GoogleCloudBlockReceiver {
             worker_data_sender,
         )?;
 
+        debug!("spawning new GoogleCloudBlockWorker");
         let worker_join_handle = tokio::spawn(async move {
             worker.start_loop().await;
         });
@@ -87,19 +95,23 @@ impl GoogleCloudBlockReceiver {
         })
     }
 
+    #[instrument(skip(self))]
     pub async fn set_worker_data(
         &self,
         worker_data: GoogleCloudBlockWorkerData,
     ) -> Result<(), GoogleCloudBlockReceiverError> {
+        trace!("updating worker data for GoogleCloudBlockWorker");
         self.command_sender
             .send(GoogleCloudBlockWorkerCommand::SetWorkerData(worker_data))
             .await
             .map_err(GoogleCloudBlockReceiverError::CommandError)
     }
 
+    #[instrument(skip(self))]
     pub async fn get_worker_data(
         &self,
     ) -> Result<GoogleCloudBlockWorkerData, GoogleCloudBlockReceiverError> {
+        trace!("getting worker data from GoogleCloudBlockWorker");
         self.command_sender
             .send(GoogleCloudBlockWorkerCommand::GetWorkerData)
             .await
@@ -110,15 +122,18 @@ impl GoogleCloudBlockReceiver {
 
 #[async_trait]
 impl BlockReceiver for GoogleCloudBlockReceiver {
+    #[instrument(skip(self))]
     async fn recv_block(&mut self) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
         tokio::select! {
             block = self.blocks_consumer.pop() => {
+                info!("received block from GoogleCloudBlockWorker");
                 return Ok(block);
             },
             error = self.error_receiver.changed() => {
                 match error {
                     Ok(_) => {
                         let error = self.error_receiver.borrow().clone();
+                        error!("GoogleCloudBlockWorker errored: {:?}", error);
                         return Err(error.expect("error channel only changes when an error is present").into());
                     },
                     Err(receiver_error) => return Err(receiver_error.into()),
@@ -130,6 +145,7 @@ impl BlockReceiver for GoogleCloudBlockReceiver {
 
 impl Drop for GoogleCloudBlockReceiver {
     fn drop(&mut self) {
+        info!("shutting down GoogleCloudBlockWorker");
         let command_sender = self.command_sender.clone();
         let worker_join_handle = self.worker_join_handle.take();
         let temp_block_dir = self.worker_data_receiver.borrow().temp_blocks_dir.clone();
@@ -143,6 +159,10 @@ impl Drop for GoogleCloudBlockReceiver {
                 join_handle.await.expect("worker fininshes successfully");
             }
         });
+        debug!(
+            "removing temporary block directory at {}",
+            temp_block_dir.display()
+        );
         std::fs::remove_dir_all(temp_block_dir).expect("block dir exists");
     }
 }
