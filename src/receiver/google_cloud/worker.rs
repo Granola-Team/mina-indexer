@@ -13,7 +13,7 @@ use tokio::{
     sync::{mpsc, watch},
     time::sleep,
 };
-use tracing::{debug, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
 use crate::block::{is_valid_block_file, parse_file, precomputed::PrecomputedBlock};
 
@@ -83,26 +83,23 @@ impl GoogleCloudBlockWorker {
                 match command {
                     GoogleCloudBlockWorkerCommand::Shutdown => {
                         trace!("shutting down GoogleCloudBlockWorker");
-                        if tokio::fs::metadata(&self.worker_data.temp_blocks_dir)
-                            .await
-                            .is_ok()
-                        {
-                            tokio::fs::remove_dir_all(&self.worker_data.temp_blocks_dir)
-                                .await
-                                .expect("remove temp dir works");
-                        }
                         return;
                     }
                     GoogleCloudBlockWorkerCommand::GetWorkerData => {
+                        trace!("sending GoogleCloudBlockWorkerData to BlockReceiver");
                         self.worker_data_sender
                             .send_replace(self.worker_data.clone());
                     }
                     GoogleCloudBlockWorkerCommand::SetWorkerData(new_worker_data) => {
+                        trace!("changing worker data for GoogleCloudBlockWorker");
                         self.worker_data = new_worker_data;
                     }
                 }
             }
 
+            trace!("downloading blocks within radius of {} from the best tip at length {} from google cloud bucket {} on network {}"
+                , self.worker_data.overlap_num, self.worker_data.max_length, self.worker_data.bucket, self.worker_data.network
+            );
             if let Err(worker_error) = gsutil_download_blocks(
                 &self.worker_data.temp_blocks_dir,
                 self.worker_data.max_length,
@@ -112,9 +109,14 @@ impl GoogleCloudBlockWorker {
             )
             .await
             {
+                error!("GoogleCloudBlockWorker error: {}", worker_error);
                 self.error_sender.send_replace(Some(worker_error));
             }
 
+            trace!(
+                "parsing downloaded blocks from temporary directory {}",
+                self.worker_data.temp_blocks_dir.display()
+            );
             match parse_temp_blocks_dir(
                 &mut self.worker_data.max_length,
                 &self.worker_data.temp_blocks_dir,
@@ -122,15 +124,26 @@ impl GoogleCloudBlockWorker {
             .await
             {
                 Err(e) => {
+                    error!(
+                        "parsing error for latest GoogleCloudBlockWorker download: {}",
+                        e
+                    );
                     self.error_sender.send_replace(Some(e));
                 }
-                Ok(precomputed_blocks) => self
-                    .blocks_sender
-                    .push_iter(precomputed_blocks.into_iter())
-                    .await
-                    .expect("consumer will not be dropped as long as worker is active"),
+                Ok(precomputed_blocks) => {
+                    debug!(
+                        "parsed {} blocks successfully from {}, pushing to receiver",
+                        precomputed_blocks.len(),
+                        self.worker_data.temp_blocks_dir.display()
+                    );
+                    self.blocks_sender
+                        .push_iter(precomputed_blocks.into_iter())
+                        .await
+                        .expect("consumer will not be dropped as long as worker is active")
+                }
             }
 
+            debug!("GoogleCloudBlockWorker finished work unit, waiting until next cycle");
             let work_unit_finished = Instant::now();
             let work_unit_duration = work_unit_finished.duration_since(work_unit_started);
             if work_unit_duration < self.worker_data.update_freq {
@@ -140,13 +153,15 @@ impl GoogleCloudBlockWorker {
     }
 }
 
+#[instrument]
 async fn gsutil_download_blocks(
-    temp_blocks_dir: impl AsRef<Path>,
+    temp_blocks_dir: impl AsRef<Path> + std::fmt::Debug,
     max_height: u64,
     overlap_num: u64,
-    blocks_bucket: impl AsRef<str>,
+    blocks_bucket: impl AsRef<str> + std::fmt::Debug,
     network: MinaNetwork,
 ) -> Result<(), GoogleCloudBlockWorkerError> {
+    trace!("spawning child gsutil process");
     let mut child = Command::new("gsutil")
         .stdin(Stdio::piped())
         .arg("-m")
@@ -162,8 +177,10 @@ async fn gsutil_download_blocks(
     let end = max_height + overlap_num;
 
     for length in start..=end {
+        let bucket_file = bucket_file_from_length(network, blocks_bucket.as_ref(), length);
+        trace!("downloading bucket file {}", bucket_file);
         child_stdin
-            .write_all(bucket_file_from_length(network, blocks_bucket.as_ref(), length).as_bytes())
+            .write_all(bucket_file.as_bytes())
             .await
             .map_err(|e| GoogleCloudBlockWorkerError::IOError(e.to_string()))?;
     }
@@ -171,10 +188,15 @@ async fn gsutil_download_blocks(
     Ok(())
 }
 
+#[instrument]
 async fn parse_temp_blocks_dir(
     max_length: &mut u64,
-    temp_blocks_dir: impl AsRef<Path>,
+    temp_blocks_dir: impl AsRef<Path> + std::fmt::Debug,
 ) -> Result<Vec<PrecomputedBlock>, GoogleCloudBlockWorkerError> {
+    trace!(
+        "opening temporary blocks directory at {}",
+        temp_blocks_dir.as_ref().display()
+    );
     let mut precomputed_blocks = vec![];
     let mut temp_dir_entries = read_dir(temp_blocks_dir).await.map_err(|read_dir_error| {
         GoogleCloudBlockWorkerError::IOError(read_dir_error.to_string())
@@ -186,6 +208,10 @@ async fn parse_temp_blocks_dir(
             GoogleCloudBlockWorkerError::IOError(next_entry_error.to_string())
         })?
     {
+        trace!(
+            "parsing potential PrecomputedBlock from file at {}",
+            &entry.path().display()
+        );
         if !is_valid_block_file(&entry.path()) {
             continue;
         }
@@ -194,14 +220,23 @@ async fn parse_temp_blocks_dir(
             GoogleCloudBlockWorkerError::BlockParseError(entry.path(), parse_error.to_string())
         })?;
 
+        trace!(
+            "PrecomputedBlock parsed with state hash {}",
+            &precomputed_block.state_hash
+        );
         if let Some(length) = precomputed_block.blockchain_length {
             if length as u64 > *max_length {
+                trace!("new max blockchain length found");
                 *max_length = length as u64;
             }
         }
         precomputed_blocks.push(precomputed_block);
 
         if entry.metadata().await.is_ok() {
+            trace!(
+                "removing temporary block file from {}",
+                &entry.path().display()
+            );
             tokio::fs::remove_file(entry.path())
                 .await
                 .expect("file guaranteed to exist");

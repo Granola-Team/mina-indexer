@@ -28,5 +28,4 @@ async fn receives_new_block() {
         .recv_block()
         .await
         .expect("block is received successfully");
-    drop(block_receiver);
 }
