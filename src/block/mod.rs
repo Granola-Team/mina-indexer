@@ -226,7 +226,7 @@ fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
         })
 }
 
-fn is_valid_block_file(path: &Path) -> bool {
+pub fn is_valid_block_file(path: &Path) -> bool {
     let file_name = path.file_name();
     if let Some(file_name) = file_name {
         get_state_hash(file_name).is_some()

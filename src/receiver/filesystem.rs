@@ -66,30 +66,26 @@ impl FilesystemReceiver {
             .map(|parser| parser.blocks_dir.clone())
             .collect()
     }
-}
 
-#[async_trait]
-impl super::BlockReceiver for FilesystemReceiver {
-    type BlockSource = PathBuf;
-
-    type Error = FilesystemReceiverError;
-
-    async fn load_source(&mut self, source: &Self::BlockSource) -> Result<(), Self::Error> {
+    pub fn load_directory(
+        &mut self,
+        directory: impl AsRef<Path>,
+    ) -> Result<(), FilesystemReceiverError> {
         info!(
             "loading directory {} into FilesystemReceiver",
-            source.display()
+            directory.as_ref().display()
         );
 
-        if !source.is_dir() {
+        if !directory.as_ref().is_dir() {
             return Err(FilesystemReceiverError::WatchTargetIsNotADirectory(
-                source.clone(),
+                PathBuf::from(directory.as_ref()),
             ));
         }
 
         debug!("sending command to worker with new working data");
         let mut working_data = WorkingData::default();
         let mut watched_directories = self.watched_directories();
-        watched_directories.push(source.clone());
+        watched_directories.push(PathBuf::from(directory.as_ref()));
         working_data.pathset = watched_directories
             .iter()
             .map(|path_buf| {
@@ -101,17 +97,20 @@ impl super::BlockReceiver for FilesystemReceiver {
 
         Ok(())
     }
+}
 
-    async fn recv_block(&mut self) -> Option<Result<PrecomputedBlock, Self::Error>> {
+#[async_trait]
+impl super::BlockReceiver for FilesystemReceiver {
+    async fn recv_block(&mut self) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
         loop {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
                     if let Some(error) = error_fut {
-                        return Some(Err(error)
-                            .map_err(|e| FilesystemReceiverError::WorkerRuntimeError(e.to_string()))
+                        return Err(error)
+                            .map_err(|e| FilesystemReceiverError::WorkerRuntimeError(e.to_string()).into()
                         );
                     }
-                    return None;
+                    return Ok(None);
                 },
                 event_fut = self.worker_event_receiver.recv() => {
                     if let Ok((event, _priority)) = event_fut {
@@ -136,7 +135,7 @@ impl super::BlockReceiver for FilesystemReceiver {
 
                             if let Some((path, Some(_filetype))) = path_and_filetype {
                                 match parse_file(path.as_path()).await {
-                                    Ok(block) => return Some(Ok(block)),
+                                    Ok(block) => return Ok(Some(block)),
                                     Err(_) => continue,
                                 }
                             }

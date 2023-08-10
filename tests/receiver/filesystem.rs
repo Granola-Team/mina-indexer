@@ -25,7 +25,7 @@ async fn detects_new_block_written() {
         pretest(TEST_DIR).await;
 
         let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
-        block_receiver.load_source(&test_dir_path).await.unwrap();
+        block_receiver.load_directory(&test_dir_path).unwrap();
 
         let mut file = File::create(test_block_path.clone()).await.unwrap();
         file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
@@ -55,7 +55,7 @@ async fn detects_new_block_copied() {
         pretest(TEST_DIR).await;
 
         let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
-        block_receiver.load_source(&test_dir_path).await.unwrap();
+        block_receiver.load_directory(&test_dir_path).unwrap();
 
         let mut command = Command::new("cp")
             .arg(TEST_BLOCK_PATH)
