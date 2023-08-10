@@ -32,6 +32,13 @@ fn get_epoch(file_name: &OsStr) -> Option<u32> {
         })
 }
 
+fn extract_epoch_and_hash(file_name: &OsStr) -> Option<(u32, &str)> {
+    let mut chunks = file_name.to_str()?.split('-');
+    let foo = chunks.next().unwrap().parse::<u32>().unwrap();
+    let bar = chunks.next().unwrap();
+    return Some((foo, bar));
+}
+
 fn main() {
     let args = Args::parse();
     let staking_ledgers_dir = args.staking_ledgers_dir;
@@ -55,8 +62,8 @@ fn main() {
     let start_time = Instant::now();
 
     for path in paths {
-        let epoch = get_epoch(path.file_name().unwrap()).unwrap();
-        let ledger_hash = "foobar".to_string();
+        let (epoch, ledger_hash) = extract_epoch_and_hash(path.file_name().unwrap()).unwrap();
+
         let display = path.display();
         let mut file = match File::open(&path) {
             Err(why) => panic!("couldn't open {}: {}", display, why),
@@ -73,7 +80,7 @@ fn main() {
 
         let ledger = StakingLedger {
             epoch_number: epoch,
-            ledger_hash,
+            ledger_hash: ledger_hash.to_string(),
             accounts: accounts.clone(),
         };
         match db.add_epoch(epoch, &ledger) {
