@@ -36,6 +36,7 @@ fn extract_epoch_and_hash(file_name: &OsStr) -> Option<(u32, &str)> {
     let mut chunks = file_name.to_str()?.split('-');
     let foo = chunks.next().unwrap().parse::<u32>().unwrap();
     let bar = chunks.next().unwrap();
+
     return Some((foo, bar));
 }
 
@@ -62,8 +63,8 @@ fn main() {
     let start_time = Instant::now();
 
     for path in paths {
-        let (epoch, ledger_hash) = extract_epoch_and_hash(path.file_name().unwrap()).unwrap();
-
+        let (epoch, ledger_hash) = extract_epoch_and_hash(path.file_stem().unwrap()).unwrap();
+        println!("{}:{}", epoch, ledger_hash);
         let display = path.display();
         let mut file = match File::open(&path) {
             Err(why) => panic!("couldn't open {}: {}", display, why),
@@ -73,23 +74,27 @@ fn main() {
         let _ = file.read_to_end(&mut bytes);
         drop(file);
 
-        let accounts = match serde_json::from_slice::<Vec<StakingLedgerAccount>>(&bytes) {
+        let mut accounts = match serde_json::from_slice::<Vec<StakingLedgerAccount>>(&bytes) {
             Err(why) => panic!("Unable to parse JSON {}: {}", display, why),
             Ok(file) => file,
         };
+
+        for account in accounts.iter_mut() {
+            account.ledger_hash = Some(ledger_hash.to_string());
+            account.epoch_number = Some(epoch as i32);
+        }
 
         let ledger = StakingLedger {
             epoch_number: epoch,
             ledger_hash: ledger_hash.to_string(),
             accounts: accounts.clone(),
         };
+
         match db.add_epoch(epoch, &ledger) {
             Ok(_) => println!("Successfully persisted staking ledger: {}", epoch),
             Err(why) => panic!("Failed to persist staking ledger {}: {}", epoch, why),
         }
-
         let mut accs = accounts.clone();
-
         println!("{} accounts in staking ledger {}", accs.len(), epoch);
         let now = Instant::now();
         while !accs.is_empty() {

@@ -69,7 +69,7 @@ pub fn get_accounts(
 impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
     fn epoch(&self) -> i32 {
-        let epoch = &self.epoch_number.unwrap();
+        let epoch = &self.epoch_number.unwrap_or(-1);
         *epoch
     }
     #[graphql(description = "Public Key", name = "public_key")]
@@ -87,6 +87,15 @@ impl StakingLedgerAccount {
     #[graphql(description = "Account balance")]
     fn balance(&self) -> f64 {
         self.balance.parse::<f64>().unwrap()
+    }
+
+    #[graphql(description = "Ledger hash")]
+    fn ledger_hash(&self) -> &str {
+        println!("ledger_hash: {:?}", self);
+        self.ledger_hash
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or("N/A")
     }
 }
 
