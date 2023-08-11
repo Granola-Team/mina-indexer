@@ -34,10 +34,10 @@ fn get_epoch(file_name: &OsStr) -> Option<u32> {
 
 fn extract_epoch_and_hash(file_name: &OsStr) -> Option<(u32, &str)> {
     let mut chunks = file_name.to_str()?.split('-');
-    let foo = chunks.next().unwrap().parse::<u32>().unwrap();
-    let bar = chunks.next().unwrap();
+    let epoch = chunks.next().unwrap().parse::<u32>().unwrap();
+    let ledger_hash = chunks.next().unwrap();
 
-    return Some((foo, bar));
+    return Some((epoch, ledger_hash));
 }
 
 fn main() {
