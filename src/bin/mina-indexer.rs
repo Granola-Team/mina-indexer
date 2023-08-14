@@ -4,7 +4,8 @@ use mina_indexer::{
     server::{self, create_dir_if_non_existent, handle_command_line_arguments},
     store::IndexerStore,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
+use tracing::debug;
 use tracing_subscriber::prelude::*;
 
 #[derive(Parser, Debug)]
@@ -68,6 +69,10 @@ pub async fn main() -> anyhow::Result<()> {
                 let indexer_store = IndexerStore::from_backup(&snapshot_path, &database_dir)?;
                 Arc::new(indexer_store)
             } else {
+                if database_dir.exists() {
+                    debug!("Deleting the existing db and creating a fresh one just for you!");
+                    fs::remove_dir_all(database_dir.clone())?;
+                }
                 Arc::new(IndexerStore::new(&database_dir)?)
             };
             tokio::spawn(server::run(config, db.clone()));
