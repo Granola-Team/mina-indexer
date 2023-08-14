@@ -31,11 +31,13 @@ enum IndexerCommand {
 
 #[derive(Subcommand, Debug)]
 enum ServerCommand {
+    /// Start the mina indexer with a config file
     Config {
         #[arg(short, long)]
-        config_path: PathBuf,
+        path: PathBuf,
     },
-    Arguments(server::ServerArgs),
+    /// Start the mina indexer by passing in arguments manually on the command line
+    Cli(server::ServerArgs),
 }
 
 #[tokio::main]
@@ -44,9 +46,9 @@ pub async fn main() -> anyhow::Result<()> {
         IndexerCommand::Client { args } => client::run(&args).await,
         IndexerCommand::Server { server_command } => {
             let args = match server_command {
-                ServerCommand::Arguments(args) => args,
-                ServerCommand::Config { config_path } => {
-                    let config_file = tokio::fs::read(config_path).await?;
+                ServerCommand::Cli(args) => args,
+                ServerCommand::Config { path } => {
+                    let config_file = tokio::fs::read(path).await?;
                     serde_yaml::from_reader(&config_file[..])?
                 }
             };
