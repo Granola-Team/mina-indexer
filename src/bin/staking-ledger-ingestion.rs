@@ -101,7 +101,7 @@ fn main() {
                         .balance
                         .parse::<Decimal>()
                         .map(|a| a * dec!(1_000_000_000))
-                        .unwrap()
+                        .unwrap_or_else(|_| Decimal::ZERO)
                         .to_i64()
                         .unwrap();
 
