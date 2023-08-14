@@ -18,7 +18,10 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum IndexerCommand {
     /// Server commands
-    Server(server::ServerArgs),
+    Server { 
+        #[command(subcommand)]
+        server_command: ServerCommand 
+    },
     /// Client commands
     Client {
         #[command(subcommand)]
@@ -26,11 +29,27 @@ enum IndexerCommand {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum ServerCommand {
+    Config {
+        #[arg(short, long)]
+        config_path: PathBuf
+    },
+    Arguments(server::ServerArgs)
+}
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client { args } => client::run(&args).await,
-        IndexerCommand::Server(args) => {
+        IndexerCommand::Server { server_command } => {
+            let args = match server_command {
+                ServerCommand::Arguments(args) => args,
+                ServerCommand::Config {config_path } => {
+                    let config_file = tokio::fs::read(config_path).await?;
+                    serde_yaml::from_reader(&config_file[..])?
+                }
+            };
             let option_snapshot_path = args.snapshot_path.clone();
             let database_dir = args.database_dir.clone();
             let log_dir = args.log_dir.clone();
