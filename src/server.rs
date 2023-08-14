@@ -407,8 +407,9 @@ pub async fn create_dir_if_non_existent(path: &str) {
     }
 }
 
-pub fn level_filter_deserializer<'de, D>(deserializer: D) -> Result<LevelFilter, D::Error> 
-    where D: Deserializer<'de> 
+pub fn level_filter_deserializer<'de, D>(deserializer: D) -> Result<LevelFilter, D::Error>
+where
+    D: Deserializer<'de>,
 {
     struct YAMLStringVisitor;
 
@@ -433,7 +434,7 @@ pub fn level_filter_deserializer<'de, D>(deserializer: D) -> Result<LevelFilter,
                 "trace" => Ok(LevelFilter::TRACE),
                 "warn" => Ok(LevelFilter::TRACE),
                 "off" => Ok(LevelFilter::OFF),
-                other => Err(E::custom(format!("{} is not a valid level filter", other)))
+                other => Err(E::custom(format!("{} is not a valid level filter", other))),
             }
         }
     }
