@@ -14,7 +14,10 @@ use futures::{
 use interprocess::local_socket::tokio::LocalSocketStream;
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, time::Duration};
-use tokio::{time::sleep, io::{stdout, AsyncWriteExt as OtherAsyncWriteExt}};
+use tokio::{
+    io::{stdout, AsyncWriteExt as OtherAsyncWriteExt},
+    time::sleep,
+};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -97,9 +100,13 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             reader.read_to_end(&mut buffer).await?;
             let account: Account = bcs::from_bytes(&buffer)?;
             if output_json {
-                stdout().write_all(serde_json::to_string(&account)?.as_bytes()).await?;
+                stdout()
+                    .write_all(serde_json::to_string(&account)?.as_bytes())
+                    .await?;
             } else {
-                stdout().write_all(format!("{account:?}").as_bytes()).await?;
+                stdout()
+                    .write_all(format!("{account:?}").as_bytes())
+                    .await?;
             }
         }
         ClientCli::BestChain(chain_args) => {
@@ -109,7 +116,9 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             let blocks: Vec<PrecomputedBlock> = bcs::from_bytes(&buffer)?;
             for block in blocks.iter() {
                 if output_json {
-                    stdout().write_all(serde_json::to_string(block)?.as_bytes()).await?;
+                    stdout()
+                        .write_all(serde_json::to_string(block)?.as_bytes())
+                        .await?;
                 } else {
                     let block = Block::from_precomputed(block, block.blockchain_length.unwrap());
                     stdout().write_all(block.summary().as_bytes()).await?;
@@ -130,16 +139,20 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             if summary_args.verbose {
                 let summary: SummaryVerbose = bcs::from_bytes(&buffer)?;
                 if output_json {
-                    stdout().write(serde_json::to_string(&summary)?.as_bytes()).await?;
+                    stdout()
+                        .write_all(serde_json::to_string(&summary)?.as_bytes())
+                        .await?;
                 } else {
-                    stdout().write(format!("{summary:?}").as_bytes()).await?;
+                    stdout().write_all(format!("{summary:?}").as_bytes()).await?;
                 }
             } else {
                 let summary: SummaryShort = bcs::from_bytes(&buffer)?;
                 if output_json {
-                    stdout().write(serde_json::to_string(&summary)?.as_bytes()).await?;
+                    stdout()
+                        .write_all(serde_json::to_string(&summary)?.as_bytes())
+                        .await?;
                 } else {
-                    stdout().write(format!("{summary:?}").as_bytes()).await?;
+                    stdout().write_all(format!("{summary:?}").as_bytes()).await?;
                 }
             }
         }
