@@ -109,7 +109,7 @@ pub async fn handle_command_line_arguments(
 
     assert!(
         ledger.is_file(),
-        "Ledger file does not exist at ./{}",
+        "Ledger file does not exist at {}",
         ledger.display()
     );
     assert!(
