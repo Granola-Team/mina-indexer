@@ -14,7 +14,7 @@ use futures::{
 use interprocess::local_socket::tokio::LocalSocketStream;
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, time::Duration};
-use tokio::time::sleep;
+use tokio::{time::sleep, io::{stdout, AsyncWriteExt as OtherAsyncWriteExt}};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -71,7 +71,7 @@ pub struct SummaryArgs {
 }
 
 #[instrument]
-pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
+pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::Error> {
     let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
@@ -96,21 +96,25 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             let account: Account = bcs::from_bytes(&buffer)?;
-            println!("{account:?}");
+            if output_json {
+                stdout().write_all(serde_json::to_string(&account)?.as_bytes()).await?;
+            } else {
+                stdout().write_all(format!("{account:?}").as_bytes()).await?;
+            }
         }
         ClientCli::BestChain(chain_args) => {
             let command = format!("best_chain {}\0", chain_args.num);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             let blocks: Vec<PrecomputedBlock> = bcs::from_bytes(&buffer)?;
-            blocks.iter().for_each(|block| {
-                if chain_args.verbose {
-                    println!("{}", serde_json::to_string(block).unwrap());
+            for block in blocks.iter() {
+                if output_json {
+                    stdout().write_all(serde_json::to_string(block)?.as_bytes()).await?;
                 } else {
                     let block = Block::from_precomputed(block, block.blockchain_length.unwrap());
-                    println!("{}", block.summary());
+                    stdout().write_all(block.summary().as_bytes()).await?;
                 }
-            });
+            }
         }
         ClientCli::BestLedger(ledger_args) => {
             let command = format!("best_ledger {}\0", ledger_args.path.display());
@@ -125,10 +129,18 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             reader.read_to_end(&mut buffer).await?;
             if summary_args.verbose {
                 let summary: SummaryVerbose = bcs::from_bytes(&buffer)?;
-                println!("{summary}");
+                if output_json {
+                    stdout().write(serde_json::to_string(&summary)?.as_bytes()).await?;
+                } else {
+                    stdout().write(format!("{summary:?}").as_bytes()).await?;
+                }
             } else {
                 let summary: SummaryShort = bcs::from_bytes(&buffer)?;
-                println!("{summary}");
+                if output_json {
+                    stdout().write(serde_json::to_string(&summary)?.as_bytes()).await?;
+                } else {
+                    stdout().write(format!("{summary:?}").as_bytes()).await?;
+                }
             }
         }
         ClientCli::SaveState { out_dir } => {
@@ -141,7 +153,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             sleep(Duration::from_secs(2)).await;
             reader.read_to_end(&mut buffer).await?;
             let response: String = bcs::from_bytes(&buffer)?;
-            println!("{response}");
+            stdout().write_all(response.as_bytes()).await?;
         }
     }
 
