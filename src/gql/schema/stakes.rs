@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     gql::root::Context,
     staking_ledger::{
-        staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
+        staking_ledger_store::StakingLedgerStore, DelegationTotals, StakingLedger,
+        StakingLedgerAccount,
     },
 };
 
@@ -65,6 +66,19 @@ pub fn get_accounts(
 }
 
 #[juniper::graphql_object(Context = Context)]
+#[graphql(description = "Deletation Totals")]
+impl DelegationTotals {
+    #[graphql(description = "Delegate Count")]
+    fn count_delegates(&self) -> i32 {
+        self.count_delegates
+    }
+    #[graphql(description = "Delegation Totals")]
+    fn total_delegations(&self) -> f64 {
+        return self.total_delegations as f64 / 1_000_000_000_f64;
+    }
+}
+
+#[juniper::graphql_object(Context = Context)]
 #[graphql(description = "Stakes")]
 impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
@@ -88,7 +102,6 @@ impl StakingLedgerAccount {
     fn balance(&self) -> f64 {
         self.balance.parse::<f64>().unwrap()
     }
-
     #[graphql(description = "Ledger hash")]
     fn ledger_hash(&self) -> &str {
         println!("ledger_hash: {:?}", self);
@@ -96,6 +109,10 @@ impl StakingLedgerAccount {
             .as_ref()
             .map(String::as_str)
             .unwrap_or("N/A")
+    }
+    #[graphql(description = "Delegation Totals")]
+    fn delegation_totals(&self) -> DelegationTotals {
+        return self.delegation_totals.clone().unwrap();
     }
 }
 
