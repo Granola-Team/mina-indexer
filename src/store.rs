@@ -1,6 +1,5 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, signed_command, store::BlockStore, BlockHash},
-    delegation_total::delegation_total_store::DelegationTotalStore,
     staking_ledger::{staking_ledger_store::StakingLedgerStore, StakingLedger},
     state::{
         ledger::{store::LedgerStore, Ledger},
@@ -453,50 +452,5 @@ impl IndexerStore {
             .property_int_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
-    }
-}
-
-impl DelegationTotalStore for IndexerStore {
-    fn get_delegation_total(
-        &self,
-        epoch: u32,
-        public_key: &str,
-    ) -> anyhow::Result<Option<crate::delegation_total::DelegationTotal>> {
-        let mut delegation_total = None;
-        let key_str = format!("epoch:{}:{}", epoch, public_key);
-        let key = key_str.as_bytes();
-        let cf_handle = self
-            .database
-            .cf_handle("delegation-totals")
-            .expect("column family exists");
-
-        self.database.try_catch_up_with_primary().ok();
-
-        if let Some(bytes) = self
-            .database
-            .get_pinned_cf(&cf_handle, key)?
-            .map(|bytes| bytes.to_vec())
-        {
-            delegation_total = Some(bcs::from_bytes(&bytes)?);
-        }
-        Ok(delegation_total)
-    }
-
-    fn add_delegation_total(
-        &self,
-        epoch: u32,
-        public_key: &str,
-        delegation_total: crate::delegation_total::DelegationTotal,
-    ) -> anyhow::Result<()> {
-        let cf_handle = self
-            .database
-            .cf_handle("delegation-totals")
-            .expect("column family exists");
-
-        let key = format!("epoch:{}:{}", epoch, public_key);
-        let value = bcs::to_bytes(&delegation_total)?;
-
-        self.database.put_cf(&cf_handle, key.as_bytes(), value)?;
-        Ok(())
     }
 }
