@@ -54,20 +54,40 @@ docker build -t mina-indexer:latest .
 docker run --rm mina-indexer --help
 ```
 
-### Starting the indexer
+### Starting the Indexer with a Config file
 
-For example, from the root of this project, you can start the `mina-indexer` for mainnet via
+```bash
+Server Config Commands
 
-```sh
-mina-indexer server -l tests/data/genesis_ledgers/mainnet.json -s path/to/your/precomputed/blocks/dir
+Usage: mina-indexer server config --path <PATH>
+
+Options:
+  -p, --path <PATH>  
+  -h, --help         Print help
 ```
+
+```yaml
+ledger: /home/jenr/.mina-indexer/mainnet.json
+non_genesis_ledger: false
+root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
+startup_dir: /home/jenr/.mina-indexer/startup-blocks
+watch_dir: /home/jenr/.mina-indexer/watch-blocks
+database_dir: /home/jenr/.mina-indexer/database
+log_dir: /home/jenr/.mina-indexer/logs
+keep_non_canonical_blocks: true
+log_level: info
+log_level_stdout: trace
+prune_interval: 10
+canonical_update_threshold: 2
+```
+
 
 ### Server Commands
 
 ```bash
-Server commands
+Server Cli Commands
 
-Usage: mina-indexer server [OPTIONS] --ledger <LEDGER>
+Usage: mina-indexer server cli [OPTIONS] --ledger <LEDGER>
 
 Options:
   -l, --ledger <LEDGER>
