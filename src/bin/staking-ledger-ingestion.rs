@@ -3,9 +3,9 @@ use clap::Parser;
 use glob::glob;
 
 use mina_indexer::{
-    delegation_total::{delegation_total_store::DelegationTotalStore, DelegationTotal},
     staking_ledger::{
-        staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
+        staking_ledger_store::StakingLedgerStore, DelegationTotals, StakingLedger,
+        StakingLedgerAccount,
     },
     store::IndexerStore,
 };
@@ -59,8 +59,8 @@ fn main() {
             .cmp(&get_epoch(y.file_name().unwrap()).unwrap_or(MAX))
     });
 
-    let mut count = 0;
     let start_time = Instant::now();
+    let mut count = 0;
 
     for path in paths {
         let (epoch, ledger_hash) = extract_epoch_and_hash(path.file_stem().unwrap()).unwrap();
@@ -84,6 +84,38 @@ fn main() {
             account.epoch_number = Some(epoch as i32);
         }
 
+        let mut accs = accounts.clone();
+        println!("{} accounts in staking ledger {}", accs.len(), epoch);
+        let now = Instant::now();
+        let mut processed = 0;
+        for account in &mut accounts {
+            let mut count_delegates = 0;
+            let mut total_delegations = 0;
+
+            for j in 0..accs.len() {
+                // Counting delgations for account.pk
+                if j >= accs.len() {
+                    break;
+                }
+                if account.pk == accs[j].delegate {
+                    count_delegates += 1;
+                    total_delegations += accs[j].balance.parse::<i64>().unwrap_or(0);
+                    accs.swap_remove(j);
+                }
+            }
+            account.delegation_totals = Some(DelegationTotals {
+                count_delegates,
+                total_delegations,
+            });
+            processed += 1;
+            if processed % 5000 == 0 {
+                let delta: u128 = Instant::now().duration_since(now).as_millis();
+                println!(
+                    "Processed {} ledger accounts in {} milliseconds",
+                    processed, delta
+                );
+            }
+        }
         let ledger = StakingLedger {
             epoch_number: epoch,
             ledger_hash: ledger_hash.to_string(),
@@ -94,45 +126,14 @@ fn main() {
             Ok(_) => println!("Successfully persisted staking ledger: {}", epoch),
             Err(why) => panic!("Failed to persist staking ledger {}: {}", epoch, why),
         }
-        let mut accs = accounts.clone();
-        println!("{} accounts in staking ledger {}", accs.len(), epoch);
-        let now = Instant::now();
-        while !accs.is_empty() {
-            let account = accs.pop().unwrap();
-            let mut count_delegates = 0;
-            let mut total_delegations = 0;
-            if account.pk == account.delegate {
-                count_delegates += 1;
-                total_delegations += account.balance.parse::<i64>().unwrap_or(0);
-            }
-            for j in 0..accs.len() {
-                if account.pk == accs[j].pk {
-                    count_delegates += 1;
-                    total_delegations += accs[j].balance.parse::<i64>().unwrap_or(0);
-                    accs.swap_remove(j);
-                }
-            }
-            let dt = DelegationTotal {
-                count_delegates,
-                total_delegations,
-            };
-            match db.add_delegation_total(epoch, &account.pk, dt) {
-                Ok(_) => (),
-                Err(why) => {
-                    panic!(
-                        "Failed to persist delegation total {}: {}",
-                        &account.pk, why
-                    )
-                }
-            }
-        }
-        let delta = Instant::now().duration_since(now).as_millis();
+        let delta: u128 = Instant::now().duration_since(now).as_millis();
         println!(
             "Processed {} staking ledger in {} milliseconds",
             epoch, delta
         );
         count += 1;
     }
+
     let delta = Instant::now().duration_since(start_time).as_millis();
     println!(
         "Processed {} staking ledgers in {} milliseconds",
