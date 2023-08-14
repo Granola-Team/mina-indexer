@@ -21,6 +21,7 @@ enum IndexerCommand {
     Server(server::ServerArgs),
     /// Client commands
     Client {
+        /// Output JSON data when possible
         #[arg(short, long, default_value_t = false)]
         output_json: bool,
         #[command(subcommand)]
