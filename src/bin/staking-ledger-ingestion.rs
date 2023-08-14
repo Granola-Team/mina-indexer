@@ -9,7 +9,8 @@ use mina_indexer::{
     },
     store::IndexerStore,
 };
-
+use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal_macros::dec;
 use std::{ffi::OsStr, fs::File, io::Read, path::PathBuf, time::Instant, u32::MAX};
 
 #[derive(Parser, Debug)]
@@ -90,17 +91,24 @@ fn main() {
         let mut processed = 0;
         for account in &mut accounts {
             let mut count_delegates = 0;
-            let mut total_delegations = 0;
-
-            for j in 0..accs.len() {
+            let mut total_delegations: i64 = 0;
+            let mut j = 0;
+            while j < accs.len() {
                 // Counting delgations for account.pk
-                if j >= accs.len() {
-                    break;
-                }
                 if account.pk == accs[j].delegate {
                     count_delegates += 1;
-                    total_delegations += accs[j].balance.parse::<i64>().unwrap_or(0);
+                    let amount = accs[j]
+                        .balance
+                        .parse::<Decimal>()
+                        .map(|a| a * dec!(1_000_000_000))
+                        .unwrap()
+                        .to_i64()
+                        .unwrap();
+
+                    total_delegations += amount;
                     accs.swap_remove(j);
+                } else {
+                    j += 1;
                 }
             }
             account.delegation_totals = Some(DelegationTotals {
