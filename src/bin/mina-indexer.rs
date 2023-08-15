@@ -22,6 +22,9 @@ enum IndexerCommand {
     Server(server::ServerArgs),
     /// Client commands
     Client {
+        /// Output JSON data when possible
+        #[arg(short, long, default_value_t = false)]
+        output_json: bool,
         #[command(subcommand)]
         args: client::ClientCli,
     },
@@ -30,7 +33,7 @@ enum IndexerCommand {
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
-        IndexerCommand::Client { args } => client::run(&args).await,
+        IndexerCommand::Client { output_json, args } => client::run(&args, output_json).await,
         IndexerCommand::Server(args) => {
             let option_snapshot_path = args.snapshot_path.clone();
             let database_dir = args.database_dir.clone();
