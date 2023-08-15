@@ -19,7 +19,10 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum IndexerCommand {
     /// Server commands
-    Server(server::ServerArgs),
+    Server {
+        #[command(subcommand)]
+        server_command: ServerCommand,
+    },
     /// Client commands
     Client {
         /// Output JSON data when possible
@@ -30,11 +33,29 @@ enum IndexerCommand {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum ServerCommand {
+    /// Start the mina indexer with a config file
+    Config {
+        #[arg(short, long)]
+        path: PathBuf,
+    },
+    /// Start the mina indexer by passing in arguments manually on the command line
+    Cli(server::ServerArgs),
+}
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client { output_json, args } => client::run(&args, output_json).await,
-        IndexerCommand::Server(args) => {
+        IndexerCommand::Server { server_command } => {
+            let args = match server_command {
+                ServerCommand::Cli(args) => args,
+                ServerCommand::Config { path } => {
+                    let config_file = tokio::fs::read(path).await?;
+                    serde_yaml::from_reader(&config_file[..])?
+                }
+            };
             let option_snapshot_path = args.snapshot_path.clone();
             let database_dir = args.database_dir.clone();
             let log_dir = args.log_dir.clone();
