@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     gql::root::Context,
     staking_ledger::{
-        staking_ledger_store::StakingLedgerStore, StakingLedger, StakingLedgerAccount,
+        staking_ledger_store::StakingLedgerStore, DelegationTotals, StakingLedger,
+        StakingLedgerAccount,
     },
 };
 
@@ -65,15 +66,32 @@ pub fn get_accounts(
 }
 
 #[juniper::graphql_object(Context = Context)]
+#[graphql(description = "Deletation Totals")]
+impl DelegationTotals {
+    #[graphql(description = "Delegate Count")]
+    fn count_delegates(&self) -> i32 {
+        self.count_delegates
+    }
+    #[graphql(description = "Delegation Totals")]
+    fn total_delegations(&self) -> f64 {
+        self.total_delegations as f64 / 1_000_000_000_f64
+    }
+}
+
+#[juniper::graphql_object(Context = Context)]
 #[graphql(description = "Stakes")]
 impl StakingLedgerAccount {
     #[graphql(description = "Epoch Number")]
     fn epoch(&self) -> i32 {
-        let epoch = &self.epoch_number.unwrap();
+        let epoch = &self.epoch_number.unwrap_or(-1);
         *epoch
     }
-    #[graphql(description = "Public Key")]
+    #[graphql(description = "Public Key", name = "public_key")]
     fn public_key(&self) -> &str {
+        &self.pk
+    }
+    #[graphql(description = "Public Key")]
+    fn pk(&self) -> &str {
         &self.pk
     }
     #[graphql(description = "Delegate Key")]
@@ -84,12 +102,21 @@ impl StakingLedgerAccount {
     fn balance(&self) -> f64 {
         self.balance.parse::<f64>().unwrap()
     }
+    #[graphql(description = "Ledger hash")]
+    fn ledger_hash(&self) -> &str {
+        self.ledger_hash.as_deref().unwrap_or("N/A")
+    }
+    #[graphql(description = "Delegation Totals")]
+    fn delegation_totals(&self) -> DelegationTotals {
+        self.delegation_totals.clone().unwrap()
+    }
 }
 
 #[derive(GraphQLInputObject)]
 #[graphql(description = "Stakes query input")]
 pub struct StakesQueryInput {
     pub epoch: Option<i32>,
+    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
     // Logical  operators
     #[graphql(name = "OR")]

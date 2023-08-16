@@ -104,7 +104,8 @@ impl IndexerStore {
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
         let tx = ColumnFamilyDescriptor::new("tx", cf_opts.clone());
-        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts);
+        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts.clone());
+        let delegation_totals = ColumnFamilyDescriptor::new("delegation-totals", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -112,7 +113,14 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity, tx, staking_ledgers],
+            vec![
+                blocks,
+                ledgers,
+                canonicity,
+                tx,
+                staking_ledgers,
+                delegation_totals,
+            ],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
