@@ -22,12 +22,13 @@ use crate::{
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use std::{
     collections::HashMap,
     process,
     str::FromStr,
     sync::Arc,
-    time::{Duration, Instant}, rc::Rc, ops::DerefMut, cell::RefCell, borrow::BorrowMut,
+    time::{Duration, Instant}, rc::Rc, ops::DerefMut, cell::RefCell, borrow::{BorrowMut, Borrow},
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, error, info, instrument, trace};
@@ -470,22 +471,22 @@ impl IndexerState {
     /// Initialize indexer state from a collection of contiguous canonical blocks
     pub async fn initialize_with_contiguous_canonical(
         &mut self,
-        block_parser: Box<dyn BlockParser>,
+        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
     ) -> anyhow::Result<()> {
-        let block_parser = RefCell::new(block_parser);
+        let block_parser = RwLock::new(block_parser);
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger = indexer_store
                 .get_ledger(&self.canonical_tip.state_hash)?
                 .unwrap();
             let total_time = Instant::now();
 
-            if block_parser.borrow_mut().num_canonical().await > BLOCK_REPORTING_FREQ_NUM {
+            if block_parser.blocking_read().borrow().num_canonical().await > BLOCK_REPORTING_FREQ_NUM {
                 info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
             } else {
                 info!("Adding blocks to the state...");
             }
 
-            while self.blocks_processed < block_parser.borrow().num_canonical().await {
+            while self.blocks_processed < block_parser.blocking_read().borrow().num_canonical().await {
                 self.blocks_processed += 1;
 
                 if should_report_from_block_count(self.blocks_processed) {
@@ -498,13 +499,13 @@ impl IndexerState {
                     );
                     info!(
                         "Estimated time: {} min",
-                        (block_parser.borrow().total_num_blocks().await - self.blocks_processed) as f64
+                        (block_parser.blocking_read().borrow().total_num_blocks().await - self.blocks_processed) as f64
                             / (rate * 60_f64)
                     );
                     debug!("Rate: {rate} blocks/s");
                 }
 
-                let precomputed_block = block_parser.borrow_mut().next().await?.unwrap();
+                let precomputed_block = block_parser.blocking_write().borrow_mut().next().await?.unwrap();
 
                 // apply and add to db
                 ledger.apply_post_balances(&precomputed_block);
@@ -527,7 +528,7 @@ impl IndexerState {
                     )?;
                 }
 
-                if self.blocks_processed == block_parser.borrow().num_canonical().await {
+                if self.blocks_processed == block_parser.blocking_read().borrow().num_canonical().await {
                     // update root branch
                     self.root_branch = Branch::new(&precomputed_block)?;
                     self.best_tip = Tip {
@@ -549,16 +550,15 @@ impl IndexerState {
     /// Initialize indexer state without contiguous canonical blocks
     pub async fn initialize_without_contiguous_canonical(
         &mut self,
-        block_parser: Box<dyn BlockParser>,
+        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
     ) -> anyhow::Result<()> {
-        let block_parser = RefCell::new(block_parser);
-        self.add_blocks(block_parser).await
+        self.add_blocks(RwLock::new(block_parser)).await
     }
 
     /// Adds blocks to the state according to block_parser then changes phase to Watching
     ///
     /// Returns the number of blocks parsed
-    pub async fn add_blocks(&mut self, block_parser: RefCell<Box<dyn BlockParser>>) -> anyhow::Result<()> {
+    pub async fn add_blocks(&mut self, block_parser: RwLock<Box<dyn BlockParser + Send + Sync + 'static>>) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let mut step_time = total_time;
 
@@ -567,6 +567,8 @@ impl IndexerState {
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
             );
         }
+
+        let mut block_parser = block_parser.blocking_write();
 
         while let Some(block) = block_parser.borrow_mut().next().await? {
             if should_report_from_block_count(self.blocks_processed)

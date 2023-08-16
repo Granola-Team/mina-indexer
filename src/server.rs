@@ -200,7 +200,7 @@ pub async fn run(
             canonical_update_threshold,
         )?;
 
-        let mut block_parser = FilesystemParser::new(&startup_dir)?;
+        let block_parser = FilesystemParser::new(&startup_dir)?;
         if !non_genesis_ledger {
             indexer_state
                 .initialize_with_contiguous_canonical(Box::new(block_parser))
