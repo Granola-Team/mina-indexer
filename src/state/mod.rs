@@ -6,7 +6,7 @@ use self::{
 };
 use crate::{
     block::{
-        parser::{FilesystemParser, BlockParser}, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
+        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
         BlockWithoutHeight,
     },
     display_duration,
@@ -28,7 +28,8 @@ use std::{
     process,
     str::FromStr,
     sync::Arc,
-    time::{Duration, Instant}, rc::Rc, ops::DerefMut, cell::RefCell, borrow::{BorrowMut, Borrow},
+    time::{Duration, Instant}, 
+    borrow::{BorrowMut, Borrow},
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tracing::{debug, error, info, instrument, trace};

@@ -17,16 +17,23 @@ use std::{
 use tokio::io::AsyncReadExt;
 use tracing::{debug, info};
 
+use super::BlockParser;
+
 pub enum SearchRecursion {
     None,
     Recursive,
 }
 
-#[async_trait]
-pub trait BlockParser {
-    async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>>;
-    async fn total_num_blocks(&self) -> u32;
-    async fn num_canonical(&self) -> u32;
+/// Splits block paths into two collections: canonical and successive
+///
+/// Traverses canoncial paths first, then successive
+pub struct FilesystemParser {
+    pub num_canonical: u32,
+    pub total_num_blocks: u32,
+    pub blocks_dir: PathBuf,
+    pub recursion: SearchRecursion,
+    canonical_paths: IntoIter<PathBuf>,
+    successive_paths: IntoIter<PathBuf>,
 }
 
 #[async_trait]
@@ -44,17 +51,6 @@ impl BlockParser for FilesystemParser {
     }
 }
 
-/// Splits block paths into two collections: canonical and successive
-///
-/// Traverses canoncial paths first, then successive
-pub struct FilesystemParser {
-    pub num_canonical: u32,
-    pub total_num_blocks: u32,
-    pub blocks_dir: PathBuf,
-    pub recursion: SearchRecursion,
-    canonical_paths: IntoIter<PathBuf>,
-    successive_paths: IntoIter<PathBuf>,
-}
 
 impl FilesystemParser {
     pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
