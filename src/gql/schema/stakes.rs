@@ -74,7 +74,7 @@ impl DelegationTotals {
     }
     #[graphql(description = "Delegation Totals")]
     fn total_delegations(&self) -> f64 {
-        return self.total_delegations as f64 / 1_000_000_000_f64;
+        self.total_delegations as f64 / 1_000_000_000_f64
     }
 }
 
@@ -104,15 +104,11 @@ impl StakingLedgerAccount {
     }
     #[graphql(description = "Ledger hash")]
     fn ledger_hash(&self) -> &str {
-        println!("ledger_hash: {:?}", self);
-        self.ledger_hash
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("N/A")
+        self.ledger_hash.as_deref().unwrap_or("N/A")
     }
     #[graphql(description = "Delegation Totals")]
     fn delegation_totals(&self) -> DelegationTotals {
-        return self.delegation_totals.clone().unwrap();
+        self.delegation_totals.clone().unwrap()
     }
 }
 

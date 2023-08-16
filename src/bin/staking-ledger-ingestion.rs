@@ -38,7 +38,7 @@ fn extract_epoch_and_hash(file_name: &OsStr) -> Option<(u32, &str)> {
     let epoch = chunks.next().unwrap().parse::<u32>().unwrap();
     let ledger_hash = chunks.next().unwrap();
 
-    return Some((epoch, ledger_hash));
+    Some((epoch, ledger_hash))
 }
 
 fn main() {
