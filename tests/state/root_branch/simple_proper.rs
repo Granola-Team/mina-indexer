@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::BlockParser, Block},
+    block::{parser::FilesystemParser, Block},
     state::branch::Branch,
 };
 
@@ -13,7 +13,7 @@ async fn extension() {
     // 0 => |
     //      1
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = FilesystemParser::new_testing(&log_dir).unwrap();
 
     // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let root_block = block_parser

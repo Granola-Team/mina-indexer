@@ -5,6 +5,7 @@ use crate::{
     },
     display_duration, BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
 };
+use async_trait::async_trait;
 use glob::glob;
 use std::{
     fs::File,
@@ -21,10 +22,32 @@ pub enum SearchRecursion {
     Recursive,
 }
 
+#[async_trait]
+pub trait BlockParser {
+    async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>>;
+    async fn total_num_blocks(&self) -> u32;
+    async fn num_canonical(&self) -> u32;
+}
+
+#[async_trait]
+impl BlockParser for FilesystemParser {
+    async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+        self.next().await
+    }
+
+    async fn total_num_blocks(&self) -> u32 {
+        self.total_num_blocks
+    }
+
+    async fn num_canonical(&self) -> u32 {
+        self.num_canonical
+    }
+}
+
 /// Splits block paths into two collections: canonical and successive
 ///
 /// Traverses canoncial paths first, then successive
-pub struct BlockParser {
+pub struct FilesystemParser {
     pub num_canonical: u32,
     pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
@@ -33,7 +56,7 @@ pub struct BlockParser {
     successive_paths: IntoIter<PathBuf>,
 }
 
-impl BlockParser {
+impl FilesystemParser {
     pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
         Self::new_internal(blocks_dir, SearchRecursion::None, None)
     }

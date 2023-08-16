@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::parser::BlockParser,
+    block::parser::FilesystemParser,
     state::ledger::{diff::LedgerDiff, Ledger},
 };
 
 #[tokio::test]
 async fn account_diffs() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = FilesystemParser::new_testing(&log_dir).unwrap();
 
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
     let block = block_parser

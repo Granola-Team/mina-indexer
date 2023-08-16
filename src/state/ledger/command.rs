@@ -165,13 +165,13 @@ mod test {
     use std::path::PathBuf;
 
     use super::{Command, Delegation, Payment};
-    use crate::{block::parser::BlockParser, state::ledger::PublicKey};
+    use crate::{block::parser::FilesystemParser, state::ledger::PublicKey};
 
     #[tokio::test]
     async fn from_precomputed() {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
         let log_dir = PathBuf::from("./tests/data/non_sequential_blocks");
-        let mut bp = BlockParser::new(&log_dir).unwrap();
+        let mut bp = FilesystemParser::new(&log_dir).unwrap();
         let block = bp
             .get_precomputed_block("3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw")
             .await

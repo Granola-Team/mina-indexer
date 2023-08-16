@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use mina_indexer::{block::parser::BlockParser, state::ledger::Ledger};
+use mina_indexer::{block::parser::FilesystemParser, state::ledger::Ledger};
 
 #[tokio::test]
 async fn post_balances() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = FilesystemParser::new_testing(&log_dir).unwrap();
 
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
     let block = block_parser

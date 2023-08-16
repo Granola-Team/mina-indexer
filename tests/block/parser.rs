@@ -1,4 +1,4 @@
-use mina_indexer::block::parser::BlockParser;
+use mina_indexer::block::parser::FilesystemParser;
 use std::path::PathBuf;
 use tokio::time::Instant;
 
@@ -6,7 +6,7 @@ use tokio::time::Instant;
 async fn representative_benches() {
     let start = Instant::now();
     let sample_dir0 = PathBuf::from("./tests/data/non_sequential_blocks");
-    let mut block_parser0 = BlockParser::new_testing(&sample_dir0).unwrap();
+    let mut block_parser0 = FilesystemParser::new_testing(&sample_dir0).unwrap();
     let mut logs_processed = 0;
 
     while let Some(precomputed_block) = block_parser0
@@ -25,7 +25,7 @@ async fn representative_benches() {
 
     let start = Instant::now();
     let sample_dir1 = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser1 = BlockParser::new_testing(&sample_dir1).unwrap();
+    let mut block_parser1 = FilesystemParser::new_testing(&sample_dir1).unwrap();
 
     logs_processed = 0;
     while let Some(precomputed_block) = block_parser1
@@ -46,7 +46,7 @@ async fn representative_benches() {
 #[tokio::test]
 async fn get_global_slot_since_genesis() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = FilesystemParser::new_testing(&log_dir).unwrap();
 
     // block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let block = block_parser

@@ -1,7 +1,7 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
+    block::{parser::FilesystemParser, BlockHash},
     display_duration,
     state::{ledger::genesis, IndexerMode, IndexerState},
     store::IndexerStore,
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         .with(stdout_layer.with_filter(log_level))
         .init();
 
-    let mut bp = BlockParser::new_filtered(&blocks_dir, max_block_length).unwrap();
+    let mut bp = FilesystemParser::new_filtered(&blocks_dir, max_block_length).unwrap();
     let store_dir = &PathBuf::from(DB_PATH);
     if store_dir.exists() {
         fs::remove_dir_all(store_dir)?;

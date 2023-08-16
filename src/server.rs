@@ -1,5 +1,5 @@
 use crate::{
-    block::{parser::BlockParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    block::{parser::FilesystemParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
@@ -200,14 +200,14 @@ pub async fn run(
             canonical_update_threshold,
         )?;
 
-        let mut block_parser = BlockParser::new(&startup_dir)?;
+        let mut block_parser = FilesystemParser::new(&startup_dir)?;
         if !non_genesis_ledger {
             indexer_state
-                .initialize_with_contiguous_canonical(&mut block_parser)
+                .initialize_with_contiguous_canonical(Box::new(block_parser))
                 .await?;
         } else {
             indexer_state
-                .initialize_without_contiguous_canonical(&mut block_parser)
+                .initialize_without_contiguous_canonical(Box::new(block_parser))
                 .await?;
         }
 

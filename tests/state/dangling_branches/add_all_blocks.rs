@@ -1,4 +1,4 @@
-use mina_indexer::{block::parser::BlockParser, state::IndexerState};
+use mina_indexer::{block::parser::FilesystemParser, state::IndexerState};
 use std::path::PathBuf;
 
 /// Parses all blocks in ./tests/data/sequential_blocks
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[tokio::test]
 async fn extension() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = FilesystemParser::new_testing(&log_dir).unwrap();
 
     let mut n = 0;
     if let Some(precomputed_block) = block_parser.next().await.unwrap() {

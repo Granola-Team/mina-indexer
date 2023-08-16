@@ -20,7 +20,7 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-use crate::block::{parse_file, parser::BlockParser, precomputed::PrecomputedBlock};
+use crate::block::{parse_file, parser::FilesystemParser, precomputed::PrecomputedBlock};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
 pub enum FilesystemReceiverError {
@@ -29,7 +29,7 @@ pub enum FilesystemReceiverError {
 }
 pub type FilesystemReceiverResult<T> = std::result::Result<T, FilesystemReceiverError>;
 pub struct FilesystemReceiver {
-    parsers: Vec<BlockParser>,
+    parsers: Vec<FilesystemParser>,
     worker_command_sender: Sender<WorkingData>,
     worker_event_receiver: priority::Receiver<Event, Priority>,
     worker_error_receiver: mpsc::Receiver<RuntimeError>,
