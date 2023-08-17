@@ -66,6 +66,7 @@ blake2 = "0.10.6"
 async-ringbuf = "0.1.3"
 ctrlc = "3.4.0"
 serde_yaml = "0.9.25"
+data-encoding = "2.4.0"
 
 [dependencies.tokio]
 version = "1.25.0"

@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use data_encoding::BASE32HEX;
 use juniper::GraphQLEnum;
 use juniper::GraphQLInputObject;
 use mina_serialization_types::json::UserCommandWithStatusJson;
@@ -8,6 +9,8 @@ use mina_serialization_types::staged_ledger_diff::SignedCommandPayloadBodyJson;
 use mina_serialization_types::staged_ledger_diff::StakeDelegationJson;
 use mina_serialization_types::staged_ledger_diff::UserCommandJson;
 use mina_serialization_types::v1::UserCommandWithStatusV1;
+use rocksdb::Direction;
+use rocksdb::IteratorMode;
 
 use crate::gql::root::Context;
 use crate::store::TransactionKey;
@@ -243,7 +246,23 @@ pub fn get_transactions(
     let limit_idx = limit as usize;
 
     let mut transactions: Vec<Transaction> = Vec::new();
-    for entry in ctx.db.iter_prefix_cf("tx", b"T") {
+
+    let iter = if let Some(ref query_input) = query {
+        if let Some(datetime_gte) = query_input.datetime_gte {
+            let bytes = datetime_gte.timestamp_millis().to_string().into_bytes();
+            let key = BASE32HEX.encode(&bytes);
+
+            let mut iter = ctx.db.iterator_cf("tx");
+            iter.set_mode(IteratorMode::From(&key.into_bytes(), Direction::Forward));
+            iter
+        } else {
+            ctx.db.iterator_cf("tx")
+        }
+    } else {
+        ctx.db.iterator_cf("tx")
+    };
+
+    for entry in iter {
         let (key, value) = entry.unwrap();
 
         let key = TransactionKey::from_slice(&key).unwrap();
