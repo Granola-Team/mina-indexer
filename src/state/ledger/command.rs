@@ -165,7 +165,9 @@ mod test {
     use std::path::PathBuf;
 
     use super::{Command, Delegation, Payment};
-    use crate::{block::parser::filesystem::FilesystemParser, state::ledger::public_key::PublicKey};
+    use crate::{
+        block::parser::filesystem::FilesystemParser, state::ledger::public_key::PublicKey,
+    };
 
     #[tokio::test]
     async fn from_precomputed() {

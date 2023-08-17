@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use mina_indexer::{
-    block::parser::FilesystemParser,
+    block::parser::filesystem::FilesystemParser,
     state::ledger::{
         diff::{
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},

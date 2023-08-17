@@ -48,7 +48,8 @@ impl std::fmt::Debug for FilesystemParser {
         let recursion = match self.recursion {
             SearchRecursion::None => "None",
             SearchRecursion::Recursive => "Recursive",
-        }.to_string();
+        }
+        .to_string();
         f.debug_struct("FilesystemParser")
             .field("num_canonical", &self.num_canonical)
             .field("total_num_blocks", &self.total_num_blocks)

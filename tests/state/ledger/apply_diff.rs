@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::parser::FilesystemParser,
+    block::parser::filesystem::FilesystemParser,
     state::ledger::{diff::LedgerDiff, Ledger},
 };
 

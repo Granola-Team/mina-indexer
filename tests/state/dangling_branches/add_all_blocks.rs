@@ -1,4 +1,4 @@
-use mina_indexer::{block::parser::FilesystemParser, state::IndexerState};
+use mina_indexer::{block::parser::filesystem::FilesystemParser, state::IndexerState};
 use std::path::PathBuf;
 
 /// Parses all blocks in ./tests/data/sequential_blocks

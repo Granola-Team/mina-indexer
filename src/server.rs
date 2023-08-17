@@ -1,5 +1,9 @@
 use crate::{
-    block::{parser::{filesystem::FilesystemParser, BlockParser}, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    block::{
+        parser::{filesystem::FilesystemParser, BlockParser},
+        store::BlockStore,
+        Block, BlockHash, BlockWithoutHeight,
+    },
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
@@ -31,9 +35,6 @@ pub struct ServerArgs {
     /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
     #[arg(short, long)]
     ledger: PathBuf,
-    /// Use a non-genesis ledger
-    #[arg(short, long, default_value_t = false)]
-    non_genesis_ledger: bool,
     /// Hash of the base ledger
     #[arg(
         long,
@@ -76,7 +77,6 @@ pub struct ServerArgs {
 
 pub struct IndexerConfiguration {
     ledger: GenesisRoot,
-    non_genesis_ledger: bool,
     root_hash: BlockHash,
     startup_dir: PathBuf,
     watch_dir: PathBuf,
@@ -99,7 +99,6 @@ pub async fn handle_command_line_arguments(
     trace!("Parsing server args");
 
     let ledger = args.ledger;
-    let non_genesis_ledger = args.non_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
@@ -136,7 +135,6 @@ pub async fn handle_command_line_arguments(
 
             Ok(IndexerConfiguration {
                 ledger,
-                non_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
@@ -169,7 +167,6 @@ pub async fn run(
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
-        non_genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir,
@@ -200,12 +197,9 @@ pub async fn run(
             canonical_update_threshold,
         )?;
 
-        let block_parser = Box::new(
-            FilesystemParser::new(&startup_dir)?
-        ) as Box<dyn BlockParser + Send + Sync + 'static>;
-        indexer_state
-            .initialize_with_parser(block_parser)
-            .await?;
+        let block_parser = Box::new(FilesystemParser::new(&startup_dir)?)
+            as Box<dyn BlockParser + Send + Sync + 'static>;
+        indexer_state.initialize_with_parser(block_parser).await?;
 
         indexer_state
     } else {

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use mina_indexer::{block::parser::FilesystemParser, state::ledger::Ledger};
+use mina_indexer::{block::parser::filesystem::FilesystemParser, state::ledger::Ledger};
 
 #[tokio::test]
 async fn post_balances() {

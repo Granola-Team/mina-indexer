@@ -1,6 +1,6 @@
 use id_tree::NodeId;
 use mina_indexer::{
-    block::{parser::FilesystemParser, Block},
+    block::{parser::filesystem::FilesystemParser, Block},
     state::{ExtensionType, IndexerState},
 };
 use std::path::PathBuf;

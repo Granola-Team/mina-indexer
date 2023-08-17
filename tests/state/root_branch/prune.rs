@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use mina_indexer::{
-    block::{parser::FilesystemParser, Block},
+    block::{parser::filesystem::FilesystemParser, Block},
     state::branch::Branch,
 };
 

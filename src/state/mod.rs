@@ -7,7 +7,6 @@ use self::{
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
-        BlockWithoutHeight,
     },
     display_duration,
     state::{
@@ -17,21 +16,16 @@ use crate::{
         },
     },
     store::IndexerStore,
-    BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-    MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    BLOCK_REPORTING_FREQ_NUM, CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD,
+    MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use std::{
-    collections::HashMap,
-    process,
-    str::FromStr,
-    sync::Arc,
-    time::{Duration, Instant}, 
-    borrow::{BorrowMut, Borrow},
+    borrow::BorrowMut, collections::HashMap, process, str::FromStr, sync::Arc, time::Instant,
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, instrument, trace};
 
 pub mod branch;
@@ -472,7 +466,7 @@ impl IndexerState {
     #[instrument]
     pub async fn initialize_with_parser(
         &mut self,
-        block_parser: Box<dyn BlockParser + Send + Sync + 'static>
+        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
     ) -> anyhow::Result<()> {
         let mut highest_is_in_tree = true;
         let mut highest_block = self.best_tip.state_hash.clone();
@@ -486,26 +480,29 @@ impl IndexerState {
 
             info!("adding all blocks from BlockParser {block_parser:?} to the RocksDB database");
             debug!("reporting every {BLOCK_REPORTING_FREQ_NUM}");
-            while let Some(precomputed_block) = block_parser
-                .blocking_write().borrow_mut().next().await? 
+            while let Some(precomputed_block) =
+                block_parser.blocking_write().borrow_mut().next().await?
             {
                 ledger.apply_post_balances(&precomputed_block);
                 store.add_block(&precomputed_block)?;
 
                 if self.blocks_processed + 1 % BLOCK_REPORTING_FREQ_NUM == 0 {
                     store.add_ledger(
-                        &BlockHash(precomputed_block.state_hash.clone()), 
-                        ledger.clone()
+                        &BlockHash(precomputed_block.state_hash.clone()),
+                        ledger.clone(),
                     )?
                 }
 
                 let highest_block_height = if highest_is_in_tree {
-                    let highest_block = self.root_branch
-                        .branches.get(&self.best_tip.node_id)
+                    let highest_block = self
+                        .root_branch
+                        .branches
+                        .get(&self.best_tip.node_id)
                         .expect("best tip exists");
                     highest_block.data().height
                 } else {
-                    let highest_block = store.get_block(&highest_block)?
+                    let highest_block = store
+                        .get_block(&highest_block)?
                         .expect("highest block in block store");
                     highest_block.blockchain_length.expect("exists")
                 };
@@ -515,10 +512,10 @@ impl IndexerState {
                         highest_is_in_tree = false;
                         highest_block = BlockHash(precomputed_block.state_hash);
                     }
-                
 
                     if should_report_from_block_count(self.blocks_processed) {
-                        let rate = self.blocks_processed as f64 / initialization_start.elapsed().as_secs() as f64;
+                        let rate = self.blocks_processed as f64
+                            / initialization_start.elapsed().as_secs() as f64;
 
                         info!(
                             "{} blocks parsed and applied in {}",
@@ -531,21 +528,21 @@ impl IndexerState {
 
                 self.blocks_processed += 1;
             }
-            
+
             info!("added all blocks to the database, found highest block {highest_block:?}");
             debug!("tracing the highest block back {MAINNET_CANONICAL_THRESHOLD} blocks to find the canonical tip");
             let mut canonical_tip = highest_block;
             let mut add_to_state = vec![];
             for _ in 0..MAINNET_CANONICAL_THRESHOLD {
                 let parent_hash = BlockHash::from_bytes(
-                    store.get_block(&canonical_tip)?
-                    .expect("tip in store")
-                    .protocol_state
-                    .previous_state_hash.t
+                    store
+                        .get_block(&canonical_tip)?
+                        .expect("tip in store")
+                        .protocol_state
+                        .previous_state_hash
+                        .t,
                 );
-                let next_ancestor = store
-                    .get_block(&parent_hash)?
-                    .expect("is in store");
+                let next_ancestor = store.get_block(&parent_hash)?.expect("is in store");
                 canonical_tip = BlockHash(next_ancestor.state_hash.clone());
                 add_to_state.push(next_ancestor);
             }
@@ -1147,15 +1144,6 @@ impl IndexerState {
             witness_tree,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
-    }
-
-    fn is_initializing(&self) -> bool {
-        self.phase == IndexerPhase::InitializingFromBlockDir
-            || self.phase == IndexerPhase::InitializingFromDB
-    }
-
-    fn should_report_from_time(&self, duration: Duration) -> bool {
-        self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
     }
 }
 

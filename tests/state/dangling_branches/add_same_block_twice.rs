@@ -1,5 +1,5 @@
 use mina_indexer::{
-    block::parser::FilesystemParser,
+    block::parser::filesystem::FilesystemParser,
     state::{ExtensionType, IndexerState},
 };
 use std::path::PathBuf;
