@@ -20,7 +20,7 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-use crate::block::{parse_file, parser::FilesystemParser, precomputed::PrecomputedBlock};
+use crate::block::{parse_file, parser::filesystem::FilesystemParser, precomputed::PrecomputedBlock};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
 pub enum FilesystemReceiverError {

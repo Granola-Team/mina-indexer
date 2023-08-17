@@ -469,150 +469,240 @@ impl IndexerState {
         Ok(())
     }
 
-    /// Initialize indexer state from a collection of contiguous canonical blocks
-    pub async fn initialize_with_contiguous_canonical(
+    #[instrument]
+    pub async fn initialize_with_parser(
         &mut self,
-        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
+        block_parser: Box<dyn BlockParser + Send + Sync + 'static>
     ) -> anyhow::Result<()> {
+        let mut highest_is_in_tree = true;
+        let mut highest_block = self.best_tip.state_hash.clone();
         let block_parser = RwLock::new(block_parser);
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let mut ledger = indexer_store
+
+        if let Some(store) = self.indexer_store.as_ref() {
+            let initialization_start = Instant::now();
+            let mut ledger = store
                 .get_ledger(&self.canonical_tip.state_hash)?
-                .unwrap();
-            let total_time = Instant::now();
+                .expect("A ledger is inserted into the indexer_store in the constructor");
 
-            if block_parser.blocking_read().borrow().num_canonical().await > BLOCK_REPORTING_FREQ_NUM {
-                info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
-            } else {
-                info!("Adding blocks to the state...");
-            }
+            info!("adding all blocks from BlockParser {block_parser:?} to the RocksDB database");
+            debug!("reporting every {BLOCK_REPORTING_FREQ_NUM}");
+            while let Some(precomputed_block) = block_parser
+                .blocking_write().borrow_mut().next().await? 
+            {
+                ledger.apply_post_balances(&precomputed_block);
+                store.add_block(&precomputed_block)?;
 
-            while self.blocks_processed < block_parser.blocking_read().borrow().num_canonical().await {
-                self.blocks_processed += 1;
-
-                if should_report_from_block_count(self.blocks_processed) {
-                    let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
-
-                    info!(
-                        "{} blocks parsed and applied in {}",
-                        self.blocks_processed,
-                        display_duration(total_time.elapsed()),
-                    );
-                    info!(
-                        "Estimated time: {} min",
-                        (block_parser.blocking_read().borrow().total_num_blocks().await - self.blocks_processed) as f64
-                            / (rate * 60_f64)
-                    );
-                    debug!("Rate: {rate} blocks/s");
+                if self.blocks_processed + 1 % BLOCK_REPORTING_FREQ_NUM == 0 {
+                    store.add_ledger(
+                        &BlockHash(precomputed_block.state_hash.clone()), 
+                        ledger.clone()
+                    )?
                 }
 
-                let precomputed_block = block_parser.blocking_write().borrow_mut().next().await?.unwrap();
-
-                // apply and add to db
-                ledger.apply_post_balances(&precomputed_block);
-                indexer_store.add_block(&precomputed_block)?;
+                let highest_block_height = if highest_is_in_tree {
+                    let highest_block = self.root_branch
+                        .branches.get(&self.best_tip.node_id)
+                        .expect("best tip exists");
+                    highest_block.data().height
+                } else {
+                    let highest_block = store.get_block(&highest_block)?
+                        .expect("highest block in block store");
+                    highest_block.blockchain_length.expect("exists")
+                };
 
                 if let Some(height) = precomputed_block.blockchain_length {
-                    let timestamp = precomputed_block.timestamp();
+                    if height > highest_block_height {
+                        highest_is_in_tree = false;
+                        highest_block = BlockHash(precomputed_block.state_hash);
+                    }
+                
 
-                    for cmd in precomputed_block.commands() {
-                        indexer_store.put_tx(height, timestamp, cmd)?;
+                    if should_report_from_block_count(self.blocks_processed) {
+                        let rate = self.blocks_processed as f64 / initialization_start.elapsed().as_secs() as f64;
+
+                        info!(
+                            "{} blocks parsed and applied in {}",
+                            self.blocks_processed,
+                            display_duration(initialization_start.elapsed()),
+                        );
+                        debug!("Rate: {rate} blocks/s");
                     }
                 }
 
-                // TODO: store ledger at specified cadence, e.g. at epoch boundaries
-                // for now, just store every 1000 blocks
-                if self.blocks_processed % 1000 == 0 {
-                    indexer_store.add_ledger(
-                        &BlockHash(precomputed_block.state_hash.clone()),
-                        ledger.clone(),
-                    )?;
-                }
-
-                if self.blocks_processed == block_parser.blocking_read().borrow().num_canonical().await {
-                    // update root branch
-                    self.root_branch = Branch::new(&precomputed_block)?;
-                    self.best_tip = Tip {
-                        state_hash: self.root_branch.root_block().state_hash.clone(),
-                        node_id: self.root_branch.root.clone(),
-                    };
-                    self.canonical_tip = self.best_tip.clone();
-                }
+                self.blocks_processed += 1;
             }
-
-            // store the most recent canonical ledger
-            indexer_store.add_ledger(&self.root_branch.root_block().state_hash, ledger.clone())?;
+            
+            info!("added all blocks to the database, found highest block {highest_block:?}");
+            debug!("tracing the highest block back {MAINNET_CANONICAL_THRESHOLD} blocks to find the canonical tip");
+            let mut canonical_tip = highest_block;
+            let mut add_to_state = vec![];
+            for _ in 0..MAINNET_CANONICAL_THRESHOLD {
+                let parent_hash = BlockHash::from_bytes(
+                    store.get_block(&canonical_tip)?
+                    .expect("tip in store")
+                    .protocol_state
+                    .previous_state_hash.t
+                );
+                let next_ancestor = store
+                    .get_block(&parent_hash)?
+                    .expect("is in store");
+                canonical_tip = BlockHash(next_ancestor.state_hash.clone());
+                add_to_state.push(next_ancestor);
+            }
+            add_to_state.reverse();
+            info!("adding blocks from {canonical_tip:?} forward to state");
+            for state_block in add_to_state {
+                self.add_block(&state_block)?;
+            }
+            self.update_canonical()?;
         }
-
-        // now add the successive non-canonical blocks
-        self.add_blocks(block_parser).await
+        Ok(())
     }
 
-    /// Initialize indexer state without contiguous canonical blocks
-    pub async fn initialize_without_contiguous_canonical(
-        &mut self,
-        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
-    ) -> anyhow::Result<()> {
-        self.add_blocks(RwLock::new(block_parser)).await
-    }
+    // /// Initialize indexer state from a collection of contiguous canonical blocks
+    // pub async fn initialize_with_contiguous_canonical(
+    //     &mut self,
+    //     block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
+    // ) -> anyhow::Result<()> {
+    //     let block_parser = RwLock::new(block_parser);
+    //     if let Some(indexer_store) = self.indexer_store.as_ref() {
+    //         let mut ledger = indexer_store
+    //             .get_ledger(&self.canonical_tip.state_hash)?
+    //             .unwrap();
+    //         let total_time = Instant::now();
+
+    //         if block_parser.blocking_read().borrow().num_canonical().await > BLOCK_REPORTING_FREQ_NUM {
+    //             info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
+    //         } else {
+    //             info!("Adding blocks to the state...");
+    //         }
+
+    //         while self.blocks_processed < block_parser.blocking_read().borrow().num_canonical().await {
+    //             self.blocks_processed += 1;
+
+    //             if should_report_from_block_count(self.blocks_processed) {
+    //                 let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+
+    //                 info!(
+    //                     "{} blocks parsed and applied in {}",
+    //                     self.blocks_processed,
+    //                     display_duration(total_time.elapsed()),
+    //                 );
+    //                 info!(
+    //                     "Estimated time: {} min",
+    //                     (block_parser.blocking_read().borrow().total_num_blocks().await - self.blocks_processed) as f64
+    //                         / (rate * 60_f64)
+    //                 );
+    //                 debug!("Rate: {rate} blocks/s");
+    //             }
+
+    //             let precomputed_block = block_parser.blocking_write().borrow_mut().next().await?.unwrap();
+
+    //             // apply and add to db
+    //             ledger.apply_post_balances(&precomputed_block);
+    //             indexer_store.add_block(&precomputed_block)?;
+
+    //             if let Some(height) = precomputed_block.blockchain_length {
+    //                 let timestamp = precomputed_block.timestamp();
+
+    //                 for cmd in precomputed_block.commands() {
+    //                     indexer_store.put_tx(height, timestamp, cmd)?;
+    //                 }
+    //             }
+
+    //             // TODO: store ledger at specified cadence, e.g. at epoch boundaries
+    //             // for now, just store every 1000 blocks
+    //             if self.blocks_processed % 1000 == 0 {
+    //                 indexer_store.add_ledger(
+    //                     &BlockHash(precomputed_block.state_hash.clone()),
+    //                     ledger.clone(),
+    //                 )?;
+    //             }
+
+    //             if self.blocks_processed == block_parser.blocking_read().borrow().num_canonical().await {
+    //                 // update root branch
+    //                 self.root_branch = Branch::new(&precomputed_block)?;
+    //                 self.best_tip = Tip {
+    //                     state_hash: self.root_branch.root_block().state_hash.clone(),
+    //                     node_id: self.root_branch.root.clone(),
+    //                 };
+    //                 self.canonical_tip = self.best_tip.clone();
+    //             }
+    //         }
+
+    //         // store the most recent canonical ledger
+    //         indexer_store.add_ledger(&self.root_branch.root_block().state_hash, ledger.clone())?;
+    //     }
+
+    //     // now add the successive non-canonical blocks
+    //     self.add_blocks(block_parser).await
+    // }
+
+    // /// Initialize indexer state without contiguous canonical blocks
+    // pub async fn initialize_without_contiguous_canonical(
+    //     &mut self,
+    //     block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
+    // ) -> anyhow::Result<()> {
+    //     self.add_blocks(RwLock::new(block_parser)).await
+    // }
 
     /// Adds blocks to the state according to block_parser then changes phase to Watching
     ///
     /// Returns the number of blocks parsed
-    pub async fn add_blocks(&mut self, block_parser: RwLock<Box<dyn BlockParser + Send + Sync + 'static>>) -> anyhow::Result<()> {
-        let total_time = Instant::now();
-        let mut step_time = total_time;
+    // pub async fn add_blocks(&mut self, block_parser: RwLock<Box<dyn BlockParser + Send + Sync + 'static>>) -> anyhow::Result<()> {
+    //     let total_time = Instant::now();
+    //     let mut step_time = total_time;
 
-        if self.blocks_processed == 0 {
-            info!(
-                "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
-            );
-        }
+    //     if self.blocks_processed == 0 {
+    //         info!(
+    //             "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
+    //         );
+    //     }
 
-        let mut block_parser = block_parser.blocking_write();
+    //     let mut block_parser = block_parser.blocking_write();
 
-        while let Some(block) = block_parser.borrow_mut().next().await? {
-            if should_report_from_block_count(self.blocks_processed)
-                || self.should_report_from_time(step_time.elapsed())
-            {
-                step_time = Instant::now();
+    //     while let Some(block) = block_parser.borrow_mut().next().await? {
+    //         if should_report_from_block_count(self.blocks_processed)
+    //             || self.should_report_from_time(step_time.elapsed())
+    //         {
+    //             step_time = Instant::now();
 
-                let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
-                let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
-                let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+    //             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
+    //             let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
+    //             let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
-                info!(
-                    "Parsed and added {} blocks to the witness tree in {}",
-                    self.blocks_processed,
-                    display_duration(total_time.elapsed()),
-                );
+    //             info!(
+    //                 "Parsed and added {} blocks to the witness tree in {}",
+    //                 self.blocks_processed,
+    //                 display_duration(total_time.elapsed()),
+    //             );
 
-                debug!("Root height:       {}", self.root_branch.height());
-                debug!("Root length:       {}", self.root_branch.len());
-                debug!("Rate:              {rate} blocks/s");
+    //             debug!("Root height:       {}", self.root_branch.height());
+    //             debug!("Root length:       {}", self.root_branch.len());
+    //             debug!("Rate:              {rate} blocks/s");
 
-                info!(
-                    "Estimate rem time: {} hr",
-                    (block_parser.borrow().total_num_blocks().await - self.blocks_processed) as f64
-                        / (rate * 3600_f64)
-                );
-                info!("Best tip:          {best_tip:?}");
-                info!("Canonical tip:     {canonical_tip:?}");
-            }
+    //             info!(
+    //                 "Estimate rem time: {} hr",
+    //                 (block_parser.borrow().total_num_blocks().await - self.blocks_processed) as f64
+    //                     / (rate * 3600_f64)
+    //             );
+    //             info!("Best tip:          {best_tip:?}");
+    //             info!("Canonical tip:     {canonical_tip:?}");
+    //         }
 
-            self.add_block(&block)?;
-        }
+    //         self.add_block(&block)?;
+    //     }
 
-        info!(
-            "Ingested {} blocks in {}",
-            self.blocks_processed,
-            display_duration(total_time.elapsed()),
-        );
+    //     info!(
+    //         "Ingested {} blocks in {}",
+    //         self.blocks_processed,
+    //         display_duration(total_time.elapsed()),
+    //     );
 
-        debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
-        self.phase = IndexerPhase::Watching;
-        Ok(())
-    }
+    //     debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
+    //     self.phase = IndexerPhase::Watching;
+    //     Ok(())
+    // }
 
     /// Adds the block to the witness tree and the precomputed block to the db
     ///

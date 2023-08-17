@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use mina_indexer::{
-    block::{parser::FilesystemParser, store::BlockStore},
+    block::{parser::filesystem::FilesystemParser, store::BlockStore},
     store::IndexerStore,
 };
 use tokio::time::Instant;

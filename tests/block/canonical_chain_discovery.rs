@@ -1,4 +1,4 @@
-use mina_indexer::block::parser::FilesystemParser;
+use mina_indexer::block::parser::filesystem::FilesystemParser;
 use std::path::PathBuf;
 
 #[tokio::test]

@@ -1,7 +1,7 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::{parser::FilesystemParser, BlockHash},
+    block::{parser::filesystem::FilesystemParser, BlockHash},
     display_duration,
     state::{ledger::genesis, IndexerMode, IndexerState},
     store::IndexerStore,

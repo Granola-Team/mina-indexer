@@ -41,16 +41,24 @@ impl BlockParser for FilesystemParser {
     async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         self.next().await
     }
-
-    async fn total_num_blocks(&self) -> u32 {
-        self.total_num_blocks
-    }
-
-    async fn num_canonical(&self) -> u32 {
-        self.num_canonical
-    }
 }
 
+impl std::fmt::Debug for FilesystemParser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let recursion = match self.recursion {
+            SearchRecursion::None => "None",
+            SearchRecursion::Recursive => "Recursive",
+        }.to_string();
+        f.debug_struct("FilesystemParser")
+            .field("num_canonical", &self.num_canonical)
+            .field("total_num_blocks", &self.total_num_blocks)
+            .field("blocks_dir", &self.blocks_dir)
+            .field("recursion", &recursion)
+            .field("canonical_paths", &self.canonical_paths)
+            .field("successive_paths", &self.successive_paths)
+            .finish()
+    }
+}
 
 impl FilesystemParser {
     pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
