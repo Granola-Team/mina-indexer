@@ -480,7 +480,7 @@ impl IndexerState {
 
             info!("adding all blocks from BlockParser {block_parser:?} to the RocksDB database");
             debug!("reporting every {BLOCK_REPORTING_FREQ_NUM}");
-            let mut block_parser_writable = block_parser.blocking_write();
+            let mut block_parser_writable = block_parser.write().await;
             while let Some(precomputed_block) =
                 block_parser_writable.borrow_mut().next().await?
             {
