@@ -55,8 +55,6 @@ impl std::fmt::Debug for FilesystemParser {
             .field("total_num_blocks", &self.total_num_blocks)
             .field("blocks_dir", &self.blocks_dir)
             .field("recursion", &recursion)
-            .field("canonical_paths", &self.canonical_paths)
-            .field("successive_paths", &self.successive_paths)
             .finish()
     }
 }
