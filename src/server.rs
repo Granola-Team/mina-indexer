@@ -276,12 +276,22 @@ pub async fn run(
                 // handle the connection
                 tokio::spawn(async move {
                     debug!("Handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_tip, ledger, summary, save_tx, save_resp_rx).await {
-                        error!("Error handling connection: {e}");
-                    }
-
-                    debug!("Removing readonly instance at {}", secondary_path.display());
-                    tokio::fs::remove_dir_all(&secondary_path).await.ok();
+                    tokio::spawn(async move {
+                        if let Err(e) = handle_conn(
+                            conn, 
+                            block_store_readonly, 
+                            best_tip, 
+                            ledger, 
+                            summary, 
+                            save_tx, 
+                            save_resp_rx
+                        ).await {
+                            error!("Error handling connection: {e}");
+                        }
+    
+                        debug!("Removing readonly instance at {}", secondary_path.display());
+                        tokio::fs::remove_dir_all(&secondary_path).await.ok();
+                    });
                 });
             }
 
