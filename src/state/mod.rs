@@ -539,6 +539,7 @@ impl IndexerState {
             debug!("tracing the highest block back {MAINNET_CANONICAL_THRESHOLD} blocks to find the canonical tip");
             let mut canonical_tip = highest_block;
             let mut add_to_state = vec![];
+            trace!("starting at {}", canonical_tip);
             for _ in 0..MAINNET_CANONICAL_THRESHOLD {
                 let parent_hash = BlockHash::from_bytes(
                     store
@@ -548,6 +549,7 @@ impl IndexerState {
                         .previous_state_hash
                         .t,
                 );
+                trace!("reading ancestor with state hash {}", parent_hash);
                 let next_ancestor = store.get_block(&parent_hash)?.expect("is in store");
                 canonical_tip = BlockHash(next_ancestor.state_hash.clone());
                 add_to_state.push(next_ancestor);
