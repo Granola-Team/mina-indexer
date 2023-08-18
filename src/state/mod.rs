@@ -490,7 +490,7 @@ impl IndexerState {
                 let ledger_apply_start = Instant::now();
                 ledger.apply_post_balances(&precomputed_block);
                 if let Some(avg) = ledger_apply_average {
-                    ledger_apply_average = Some(avg + ledger_apply_start.elapsed() / 2);
+                    ledger_apply_average = Some(avg + ledger_apply_start.elapsed() / self.blocks_processed);
                 } else {
                     ledger_apply_average = Some(ledger_apply_start.elapsed());
                 }
@@ -498,7 +498,7 @@ impl IndexerState {
                 let block_store_add_start = Instant::now();
                 store.add_block(&precomputed_block)?;
                 if let Some(avg) = add_to_block_store_average {
-                    add_to_block_store_average = Some(avg + block_store_add_start.elapsed() / 2);
+                    add_to_block_store_average = Some(avg + block_store_add_start.elapsed() / self.blocks_processed);
                 } else {
                     add_to_block_store_average = Some(block_store_add_start.elapsed());
                 }
@@ -534,7 +534,7 @@ impl IndexerState {
                 }
 
                 if let Some(avg) = update_highest_average {
-                    update_highest_average = Some(avg + update_highest_start.elapsed() / 2);
+                    update_highest_average = Some(avg + update_highest_start.elapsed() / self.blocks_processed);
                 } else {
                     update_highest_average = Some(update_highest_start.elapsed());
                 }
