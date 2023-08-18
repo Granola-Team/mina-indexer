@@ -5,7 +5,11 @@ RUN apt-get update && apt-get install -y libclang-dev && rm -rf /var/lib/apt/lis
 RUN RUST_BACKTRACE=1 cargo build --release
 
 FROM debian:bullseye-slim as runner
-RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl ca-certificates curl && rm -rf /var/lib/apt/lists/*
+
+RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-410.0.0-linux-x86_64.tar.gz
+RUN tar xzf google-cloud-sdk-410.0.0-linux-x86_64.tar.gz && rm google-cloud-sdk-410.0.0-linux-x86_64.tar.gz
+RUN ln -s /lib /lib64
 
 COPY --from=builder /usr/src/mina-indexer/target/release/mina-indexer /usr/local/bin/mina-indexer
 ENTRYPOINT ["mina-indexer"]
