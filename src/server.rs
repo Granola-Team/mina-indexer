@@ -295,9 +295,10 @@ pub async fn run(
             Some(SaveCommand(snapshot_path)) = save_rx.recv() => {
                 trace!("saving snapshot in {}", &snapshot_path.display());
                 match indexer_state.save_snapshot(snapshot_path) {
-                    Ok(_) => save_resp_tx.send(Some(
-                        SaveResponse(String::from(
-                            "snapshot created"
+                    Ok(path) => save_resp_tx.send(Some(
+                        SaveResponse(format!(
+                            "snapshot created at {}\n",
+                            path.display()
                     ))))?,
                     Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
                 }

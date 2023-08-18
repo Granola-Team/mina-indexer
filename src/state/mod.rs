@@ -22,7 +22,7 @@ use crate::{
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    borrow::BorrowMut, collections::HashMap, process, str::FromStr, sync::Arc, time::Instant,
+    borrow::BorrowMut, collections::HashMap, process, str::FromStr, sync::Arc, time::Instant, path::PathBuf,
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tokio::sync::RwLock;
@@ -240,7 +240,7 @@ impl IndexerState {
     pub fn save_snapshot<SnapshotDirectory>(
         &mut self,
         snapshot_directory: SnapshotDirectory,
-    ) -> anyhow::Result<()>
+    ) -> anyhow::Result<PathBuf>
     where
         SnapshotDirectory: AsRef<std::path::Path> + std::fmt::Debug,
     {
@@ -253,9 +253,10 @@ impl IndexerState {
                 OffsetDateTime::now_utc().format(&snapshot_format_description)?
             );
             indexer_store.store_state_snapshot(&snapshot)?;
-            indexer_store.create_backup(snapshot_name, snapshot_directory.as_ref())?;
+            indexer_store.create_backup(snapshot_name.clone(), snapshot_directory.as_ref())?;
+            return Ok(PathBuf::from(snapshot_name));
         }
-        Ok(())
+        Err(anyhow::Error::msg("no indexer store, cannot create backup!"))
     }
 
     pub fn to_state_snapshot(&self) -> StateSnapshot {
