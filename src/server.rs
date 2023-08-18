@@ -65,11 +65,11 @@ pub struct ServerArgs {
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
     #[arg(long, default_value_t = String::from("mina_network_block_data"))]
-    watch_bucket: String,
+    google_cloud_watch_bucket: String,
     #[arg(long)]
     google_cloud_watcher_lookup_num: Option<u64>,
     #[arg(long)]
-    google_cloud_watcher_lookup_feq: Option<u64>,
+    google_cloud_watcher_lookup_freq: Option<u64>,
     #[arg(long)]
     google_cloud_watcher_lookup_network: Option<MinaNetwork>,
     #[arg(long, default_value_t = WatchMode::Filesystem)]
@@ -104,7 +104,7 @@ pub struct ServerArgs {
 
 pub enum ConfigWatchMode {
     Filesystem(PathBuf),
-    GoogleCloud(String)
+    GoogleCloud(String, u64, u64, MinaNetwork)
 }
 
 pub struct IndexerConfiguration {
@@ -134,13 +134,21 @@ pub async fn handle_command_line_arguments(
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
     let watch_mode = args.watch_mode;
-    let watch_bucket = args.watch_bucket; 
+    let watch_bucket = args.google_cloud_watch_bucket; 
+    let google_cloud_watcher_lookup_num = args.google_cloud_watcher_lookup_num.unwrap_or(20);
+    let google_cloud_watcher_lookup_freq = args.google_cloud_watcher_lookup_freq.unwrap_or(30);
+    let google_cloud_watcher_lookup_network = args.google_cloud_watcher_lookup_network.unwrap_or(MinaNetwork::Mainnet);
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
     let watch_mode = match watch_mode {
         WatchMode::Filesystem => ConfigWatchMode::Filesystem(watch_dir),
-        WatchMode::GoogleCloud => ConfigWatchMode::GoogleCloud(watch_bucket),
+        WatchMode::GoogleCloud => ConfigWatchMode::GoogleCloud(
+            watch_bucket, 
+            google_cloud_watcher_lookup_num, 
+            google_cloud_watcher_lookup_freq, 
+            google_cloud_watcher_lookup_network
+        ),
     };
 
     assert!(
@@ -254,13 +262,13 @@ pub async fn run(
             info!("Block receiver set to watch {path:?}");
             Box::new(filesystem_receiver)
         },
-        ConfigWatchMode::GoogleCloud(bucket) => {
+        ConfigWatchMode::GoogleCloud(bucket, lookup_num, lookup_freq, network) => {
             let best_tip_height = indexer_state.root_branch.best_tip().unwrap().blockchain_length.unwrap();
             let mut temp_blocks_dir = database_dir.clone();
             temp_blocks_dir.push("temp_blocks");
             create_dir_all(&temp_blocks_dir).await?;
             let google_cloud_receiver = GoogleCloudBlockReceiver::new(
-                best_tip_height as u64, 20, temp_blocks_dir, Duration::from_secs(30), MinaNetwork::Mainnet, bucket
+                best_tip_height as u64, lookup_num, temp_blocks_dir, Duration::from_secs(lookup_freq), network, bucket
             ).await?;
             Box::new(google_cloud_receiver)
         }

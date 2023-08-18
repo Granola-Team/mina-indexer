@@ -3,6 +3,7 @@ non_genesis_ledger: false
 root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
 startup_dir: /home/jenr/.mina-indexer/startup-blocks
 watch_dir: /home/jenr/.mina-indexer/watch-blocks
+watch_mode: filesystem # google_cloud to use iggy
 database_dir: /home/jenr/.mina-indexer/database
 log_dir: /home/jenr/.mina-indexer/logs
 keep_non_canonical_blocks: true
@@ -10,3 +11,12 @@ log_level: info
 log_level_stdout: trace
 prune_interval: 10
 canonical_update_threshold: 2
+
+# optional: to initialize with a snapshot
+snapshot_path: /home/jenr24/.mina-indexer/snapshot-20230821043522.tar.zst
+
+# optional: configuration for google cloud block receiver (iggy)
+google_cloud_watch_bucket: mina_network_block_data
+google_cloud_watcher_lookup_num: 20
+google_cloud_watcher_lookup_freq: 30
+google_cloud_watcher_lookup_network: mainnet
