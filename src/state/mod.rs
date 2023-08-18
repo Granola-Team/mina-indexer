@@ -549,9 +549,9 @@ impl IndexerState {
                         self.blocks_processed,
                         display_duration(initialization_start.elapsed()),
                     );
-                    trace!("average time to update the ledger: {ledger_apply_average}");
-                    trace!("average time to add a block to the store: {add_to_block_store_average}");
-                    trace!("average time to update the max height: {update_highest_average}");
+                    trace!("average time to update the ledger: {ledger_apply_average:?}");
+                    trace!("average time to add a block to the store: {add_to_block_store_average:?}");
+                    trace!("average time to update the max height: {update_highest_average:?}");
                     debug!("Rate: {rate} blocks/s");
                 }
 
