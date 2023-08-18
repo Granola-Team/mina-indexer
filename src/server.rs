@@ -299,6 +299,7 @@ pub async fn run(
                         debug!("Receiving block {block:?}");
 
                         indexer_state.add_block(&precomputed_block)?;
+                        indexer_state.update_canonical()?;
                         info!("Added {block:?}");
                     }
                 }
