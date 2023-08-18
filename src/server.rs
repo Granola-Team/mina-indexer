@@ -391,27 +391,33 @@ async fn handle_conn(
             let snapshot_path = PathBuf::from(String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?);
+
             trace!("sending SaveCommand to primary indexer thread");
             save_tx.send(SaveCommand(snapshot_path)).await?;
+
             trace!("awaiting SaveResponse from primary indexer thread");
             let mut save_result = None;
-            loop {
-                match save_rx.try_recv() {
-                    Ok(save_response) => {
-                        save_result = save_response;
-                        break;
-                    },
-                    Err(e) => match e {
-                        spmc::TryRecvError::Empty => continue,
-                        spmc::TryRecvError::Disconnected => break,
+            tokio::spawn(async move {
+                loop {
+                    match save_rx.try_recv() {
+                        Ok(save_response) => {
+                            save_result = save_response;
+                            break;
+                        },
+                        Err(e) => match e {
+                            spmc::TryRecvError::Empty => continue,
+                            spmc::TryRecvError::Disconnected => break,
+                        }
                     }
                 }
-            }
-            if let Some(save_response) = save_result {
-                writer.write_all(&bcs::to_bytes(&save_response)?).await?;
-            } else {
-                writer.write_all(b"handler was disconnected from main thread!").await?;
-            }
+                if let Some(save_response) = save_result {
+                    writer.write_all(&bcs::to_bytes(&save_response)?).await?;
+                } else {
+                    writer.write_all(b"handler was disconnected from main thread!").await?;
+                }
+
+                Ok::<(), anyhow::Error>(())
+            });
         }
         bad_request => {
             let err_msg = format!("Malformed request: {bad_request}");
