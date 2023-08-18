@@ -66,6 +66,12 @@ pub struct ServerArgs {
     watch_dir: PathBuf,
     #[arg(long, default_value_t = String::from("mina_network_block_data"))]
     watch_bucket: String,
+    #[arg(long)]
+    google_cloud_watcher_lookup_num: Option<u64>,
+    #[arg(long)]
+    google_cloud_watcher_lookup_feq: Option<u64>,
+    #[arg(long)]
+    google_cloud_watcher_lookup_network: Option<MinaNetwork>,
     #[arg(long, default_value_t = WatchMode::Filesystem)]
     watch_mode: WatchMode,
     /// Path to directory for rocksdb
