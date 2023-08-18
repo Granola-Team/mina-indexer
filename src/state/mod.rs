@@ -463,7 +463,7 @@ impl IndexerState {
         Ok(())
     }
 
-    #[instrument]
+    #[instrument(skip(self, block_parser))]
     pub async fn initialize_with_parser(
         &mut self,
         block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
@@ -484,16 +484,20 @@ impl IndexerState {
             while let Some(precomputed_block) =
                 block_parser_writable.borrow_mut().next().await?
             {
+                trace!("applying ledger data from block");
                 ledger.apply_post_balances(&precomputed_block);
+                trace!("adding block to database");
                 store.add_block(&precomputed_block)?;
 
                 if self.blocks_processed + 1 % BLOCK_REPORTING_FREQ_NUM == 0 {
+                    trace!("adding ledger to database");
                     store.add_ledger(
                         &BlockHash(precomputed_block.state_hash.clone()),
                         ledger.clone(),
                     )?
                 }
 
+                trace!("getting height of current highest");
                 let highest_block_height = if highest_is_in_tree {
                     let highest_block = self
                         .root_branch
@@ -506,8 +510,9 @@ impl IndexerState {
                         .get_block(&highest_block)?
                         .expect("highest block in block store");
                     highest_block.blockchain_length.expect("exists")
-                };
+                }; 
 
+                trace!("updating highest block");
                 if let Some(height) = precomputed_block.blockchain_length {
                     if height > highest_block_height {
                         highest_is_in_tree = false;
