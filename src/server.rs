@@ -239,8 +239,10 @@ pub async fn run(
     let save_resp_rx = Arc::new(save_resp_rx);
 
     loop {
+        debug!("waiting for future on main thread");
         tokio::select! {
             block_fut = filesystem_receiver.recv_block() => {
+                trace!("got block from block receiver");
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
@@ -254,6 +256,7 @@ pub async fn run(
             }
 
             conn_fut = listener.accept() => {
+                trace!("got connection from client");
                 let conn = conn_fut?;
                 info!("Receiving connection");
                 let best_tip = indexer_state.best_tip_block().clone();
@@ -283,6 +286,7 @@ pub async fn run(
             }
 
             save_rx_fut = save_rx.recv() => {
+                trace!("got save command from handler");
                 if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
                     trace!("saving snapshot in {}", &snapshot_path.display());
                     match indexer_state.save_snapshot(snapshot_path) {
