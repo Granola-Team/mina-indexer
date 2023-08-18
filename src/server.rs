@@ -241,68 +241,65 @@ pub async fn run(
     loop {
         debug!("waiting for future on main thread");
         tokio::select! {
-            block_fut = filesystem_receiver.recv_block() => {
+            Ok(block_response) = filesystem_receiver.recv_block() => {
                 trace!("got block from block receiver");
-                if let Some(precomputed_block) = block_fut? {
-                    let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-                    debug!("Receiving block {block:?}");
+                match block_response {
+                    None => {
+                        info!("Block receiver shutdown, system exit");
+                        return Ok(())
+                    }
+                    Some(precomputed_block) => {
+                        let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
+                        debug!("Receiving block {block:?}");
 
-                    indexer_state.add_block(&precomputed_block)?;
-                    info!("Added {block:?}");
-                } else {
-                    info!("Block receiver shutdown, system exit");
-                    return Ok(())
+                        indexer_state.add_block(&precomputed_block)?;
+                        info!("Added {block:?}");
+                    }
                 }
             }
 
-            conn_fut = listener.accept() => {
-                trace!("got connection from client");
-                let conn = conn_fut?;
+            Ok(conn) = listener.accept() => {
                 info!("Receiving connection");
                 let best_tip = indexer_state.best_tip_block().clone();
-
-                let primary_path = database_dir.clone();
-                let mut secondary_path = primary_path.clone();
-                secondary_path.push(Uuid::new_v4().to_string());
-
-                debug!("Spawning secondary readonly RocksDB instance");
-                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
                 let summary = indexer_state.summary_verbose();
                 let ledger = indexer_state.best_ledger()?.unwrap();
-
                 let save_tx = save_tx.clone();
                 let save_resp_rx = save_resp_rx.clone();
 
+                debug!("Spawning secondary readonly RocksDB instance");
+                let primary_path = database_dir.clone();
+                let mut secondary_path = primary_path.clone();
+                secondary_path.push(Uuid::new_v4().to_string());
+                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
+
                 // handle the connection
+                debug!("Handling connection");
                 tokio::spawn(async move {
-                    debug!("Handling connection");
-                    tokio::spawn(async move {
-                        if let Err(e) = handle_conn(
-                            conn, 
-                            block_store_readonly, 
-                            best_tip, 
-                            ledger, 
-                            summary, 
-                            save_tx, 
-                            save_resp_rx
-                        ).await {
-                            error!("Error handling connection: {e}");
-                        }
-    
-                        debug!("Removing readonly instance at {}", secondary_path.display());
-                        tokio::fs::remove_dir_all(&secondary_path).await.ok();
-                    });
+                    if let Err(e) = handle_conn(
+                        conn, 
+                        block_store_readonly, 
+                        best_tip, 
+                        ledger, 
+                        summary, 
+                        save_tx, 
+                        save_resp_rx
+                    ).await {
+                        error!("Error handling connection: {e}");
+                    }
+
+                    debug!("Removing readonly instance at {}", secondary_path.display());
+                    tokio::fs::remove_dir_all(&secondary_path).await.ok();
                 });
             }
 
-            save_rx_fut = save_rx.recv() => {
-                trace!("got save command from handler");
-                if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
-                    trace!("saving snapshot in {}", &snapshot_path.display());
-                    match indexer_state.save_snapshot(snapshot_path) {
-                        Ok(_) => save_resp_tx.send(Some(SaveResponse("snapshot created".to_string())))?,
-                        Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
-                    }
+            Some(SaveCommand(snapshot_path)) = save_rx.recv() => {
+                trace!("saving snapshot in {}", &snapshot_path.display());
+                match indexer_state.save_snapshot(snapshot_path) {
+                    Ok(_) => save_resp_tx.send(Some(
+                        SaveResponse(String::from(
+                            "snapshot created"
+                    ))))?,
+                    Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
                 }
             }
         }
@@ -402,6 +399,7 @@ async fn handle_conn(
                 match save_rx.try_recv() {
                     Ok(save_response) => {
                         save_result = save_response;
+                        break;
                     },
                     Err(e) => match e {
                         spmc::TryRecvError::Empty => continue,
