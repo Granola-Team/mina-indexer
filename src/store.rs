@@ -7,10 +7,11 @@ use crate::{
         Canonicity,
     },
 };
+use data_encoding::BASE32HEX;
 use mina_serialization_types::{staged_ledger_diff::UserCommand, v1::UserCommandWithStatusV1};
 use rocksdb::{
     backup::{BackupEngine, BackupEngineOptions, RestoreOptions},
-    ColumnFamilyDescriptor, DBIterator, DB,
+    ColumnFamilyDescriptor, DBIterator, DBRawIterator, DB,
 };
 use std::{
     fs::remove_dir_all,
@@ -20,14 +21,18 @@ use std::{
 use tracing::{info, instrument, trace};
 use zstd::DEFAULT_COMPRESSION_LEVEL;
 
-/// T-{Height}-{Timestamp}-{Hash} -> Transaction
+/// {Timestamp}-{Height}-{Hash} -> Transaction
 /// The height is padded to 12 digits for sequential iteration
 #[derive(Debug, Clone)]
-pub struct TransactionKey(u32, u64, String);
+pub struct TransactionKey(u64, u32, String);
 
 impl std::fmt::Display for TransactionKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "T-{:012}-{}-{}", self.0, self.1, self.2)
+        // base32hex encode the timestamp so we can maintain datatime sorted order in the keys
+        let bytes = self.0.to_string().into_bytes();
+        let timestamp_hash = BASE32HEX.encode(&bytes);
+
+        write!(f, "{}-{:012}-{}", timestamp_hash, self.1, self.2)
     }
 }
 
@@ -37,7 +42,7 @@ impl TransactionKey {
     where
         S: Into<String>,
     {
-        Self(h, t, s.into())
+        Self(t, h, s.into())
     }
 
     /// Returns the key as bytes
@@ -50,24 +55,28 @@ impl TransactionKey {
         let key = std::str::from_utf8(bytes)?;
         let parts: Vec<&str> = key.split('-').collect();
 
-        if parts.len() != 4 {
+        if parts.len() != 3 {
             anyhow::bail!("Invalid transaction key: {}", key);
         }
-
+        // decode timestamp hash
+        let input = parts[0].as_bytes();
+        let mut output = vec![0; BASE32HEX.decode_len(input.len()).unwrap()];
+        let len = BASE32HEX.decode_mut(input, &mut output).unwrap();
+        let millis_str = std::str::from_utf8(&output[0..len]).unwrap();
         Ok(Self(
+            u64::from_str(millis_str)?,
             u32::from_str(parts[1])?,
-            u64::from_str(parts[2])?,
-            parts[3].to_string(),
+            parts[2].to_string(),
         ))
-    }
-
-    /// Returns the height of the transaction
-    pub fn height(&self) -> u32 {
-        self.0
     }
 
     /// Returns the timestamp of the transaction
     pub fn timestamp(&self) -> u64 {
+        self.0
+    }
+
+    /// Returns the height of the transaction
+    pub fn height(&self) -> u32 {
         self.1
     }
 
@@ -104,8 +113,7 @@ impl IndexerStore {
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
         let tx = ColumnFamilyDescriptor::new("tx", cf_opts.clone());
-        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts.clone());
-        let delegation_totals = ColumnFamilyDescriptor::new("delegation-totals", cf_opts);
+        let staking_ledgers = ColumnFamilyDescriptor::new("staking-ledgers", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -113,14 +121,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![
-                blocks,
-                ledgers,
-                canonicity,
-                tx,
-                staking_ledgers,
-                delegation_totals,
-            ],
+            vec![blocks, ledgers, canonicity, tx, staking_ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -159,6 +160,17 @@ impl IndexerStore {
     pub fn iter_prefix_cf(&self, cf: &str, prefix: &[u8]) -> DBIterator<'_> {
         let cf_handle = self.database.cf_handle(cf).expect("column family exists");
         self.database.prefix_iterator_cf(&cf_handle, prefix)
+    }
+
+    pub fn iterator_cf(&self, cf: &str) -> DBIterator<'_> {
+        let cf_handle = self.database.cf_handle(cf).expect("column family exists");
+        self.database
+            .iterator_cf(cf_handle, rocksdb::IteratorMode::Start)
+    }
+
+    pub fn raw_iterator_cf(&self, cf: &str) -> DBRawIterator<'_> {
+        let cf_handle = self.database.cf_handle(cf).expect("column family exists");
+        self.database.raw_iterator_cf(cf_handle)
     }
 
     #[instrument(skip(self))]
@@ -453,4 +465,11 @@ impl IndexerStore {
             .unwrap()
             .unwrap()
     }
+}
+
+#[test]
+fn base32hex() {
+    use data_encoding::BASE32HEX;
+    let encoded = BASE32HEX.encode(b"1692269981257");
+    println!("{}", encoded);
 }
