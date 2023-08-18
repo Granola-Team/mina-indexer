@@ -4,7 +4,7 @@ use crate::{
         store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
     },
-    receiver::{filesystem::FilesystemReceiver, BlockReceiver},
+    receiver::{filesystem::FilesystemReceiver, BlockReceiver, google_cloud::{GoogleCloudBlockReceiver, MinaNetwork}},
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
@@ -14,13 +14,13 @@ use crate::{
     CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
     PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
 use serde::Deserializer;
 use serde_derive::{Deserialize, Serialize};
-use std::{path::PathBuf, process, sync::Arc};
+use std::{path::PathBuf, process, sync::Arc, time::Duration};
 use tokio::{
     fs::{self, create_dir_all, metadata},
     io,
@@ -28,6 +28,23 @@ use tokio::{
 };
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use uuid::Uuid;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize)]
+pub enum WatchMode {
+    #[serde(rename = "filesystem")]
+    Filesystem,
+    #[serde(rename = "google_cloud")]
+    GoogleCloud
+}
+
+impl std::fmt::Display for WatchMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            WatchMode::Filesystem => "filesystem",
+            WatchMode::GoogleCloud => "google_cloud",
+        })
+    }
+}
 
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[command(author, version, about, long_about = None)]
@@ -47,6 +64,10 @@ pub struct ServerArgs {
     /// Path to directory to watch for new blocks
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
+    #[arg(long, default_value_t = String::from("mina_network_block_data"))]
+    watch_bucket: String,
+    #[arg(long, default_value_t = WatchMode::Filesystem)]
+    watch_mode: WatchMode,
     /// Path to directory for rocksdb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     pub database_dir: PathBuf,
@@ -75,11 +96,16 @@ pub struct ServerArgs {
     pub snapshot_path: Option<PathBuf>,
 }
 
+pub enum ConfigWatchMode {
+    Filesystem(PathBuf),
+    GoogleCloud(String)
+}
+
 pub struct IndexerConfiguration {
     ledger: GenesisRoot,
     root_hash: BlockHash,
     startup_dir: PathBuf,
-    watch_dir: PathBuf,
+    watch_mode: ConfigWatchMode,
     keep_noncanonical_blocks: bool,
     prune_interval: u32,
     canonical_update_threshold: u32,
@@ -92,7 +118,6 @@ struct SaveCommand(PathBuf);
 #[derive(Debug, Serialize, Deserialize)]
 struct SaveResponse(String);
 
-#[instrument(skip_all)]
 pub async fn handle_command_line_arguments(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
@@ -102,9 +127,15 @@ pub async fn handle_command_line_arguments(
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
+    let watch_mode = args.watch_mode;
+    let watch_bucket = args.watch_bucket; 
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
+    let watch_mode = match watch_mode {
+        WatchMode::Filesystem => ConfigWatchMode::Filesystem(watch_dir),
+        WatchMode::GoogleCloud => ConfigWatchMode::GoogleCloud(watch_bucket),
+    };
 
     assert!(
         ledger.is_file(),
@@ -116,8 +147,6 @@ pub async fn handle_command_line_arguments(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
-
-    create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
 
     info!("Parsing ledger file at {}", ledger.display());
 
@@ -137,7 +166,7 @@ pub async fn handle_command_line_arguments(
                 ledger,
                 root_hash,
                 startup_dir,
-                watch_dir,
+                watch_mode,
                 keep_noncanonical_blocks,
                 prune_interval,
                 canonical_update_threshold,
@@ -169,7 +198,7 @@ pub async fn run(
         ledger,
         root_hash,
         startup_dir,
-        watch_dir,
+        watch_mode,
         keep_noncanonical_blocks,
         prune_interval,
         canonical_update_threshold,
@@ -212,9 +241,26 @@ pub async fn run(
         )?
     };
 
-    let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
-    filesystem_receiver.load_directory(&watch_dir)?;
-    info!("Block receiver set to watch {watch_dir:?}");
+    let mut block_receiver: Box<dyn BlockReceiver> = match watch_mode {
+        ConfigWatchMode::Filesystem(path) => {
+            let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
+            filesystem_receiver.load_directory(&path)?;
+            info!("Block receiver set to watch {path:?}");
+            Box::new(filesystem_receiver)
+        },
+        ConfigWatchMode::GoogleCloud(bucket) => {
+            let best_tip_height = indexer_state.root_branch.best_tip().unwrap().blockchain_length.unwrap();
+            let mut temp_blocks_dir = database_dir.clone();
+            temp_blocks_dir.push("temp_blocks");
+            create_dir_all(&temp_blocks_dir).await?;
+            let google_cloud_receiver = GoogleCloudBlockReceiver::new(
+                best_tip_height as u64, 20, temp_blocks_dir, Duration::from_secs(1), MinaNetwork::Mainnet, bucket
+            ).await?;
+            Box::new(google_cloud_receiver)
+        }
+    };
+
+    
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
             let name = &SOCKET_NAME[1..];
@@ -241,7 +287,7 @@ pub async fn run(
     loop {
         debug!("waiting for future on main thread");
         tokio::select! {
-            Ok(block_response) = filesystem_receiver.recv_block() => {
+            Ok(block_response) = block_receiver.recv_block() => {
                 trace!("got block from block receiver");
                 match block_response {
                     None => {
