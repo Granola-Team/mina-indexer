@@ -303,7 +303,7 @@ async fn handle_conn(
     ledger: Ledger,
     summary: SummaryVerbose,
     save_tx: Arc<mpsc::Sender<SaveCommand>>,
-    _save_resp_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
+    save_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -316,17 +316,22 @@ async fn handle_conn(
 
     match command_string.as_str() {
         "account" => {
+            info!("Received account command");
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
-            info!("Received account command for {public_key:?}");
-            debug!("Using ledger {ledger:?}");
             let account = ledger.accounts.get(&public_key);
             if let Some(account) = account {
                 debug!("Writing account {account:?} to client");
                 let bytes = bcs::to_bytes(account)?;
                 writer.write_all(&bytes).await?;
+            } else {
+                debug!("Got bad public key, writing error message");
+                writer.write_all(format!(
+                    "{:?} is not in the ledger!", public_key)
+                    .as_bytes()
+                ).await?;
             }
         }
         "best_chain" => {
@@ -378,7 +383,23 @@ async fn handle_conn(
             trace!("sending SaveCommand to primary indexer thread");
             save_tx.send(SaveCommand(snapshot_path)).await?;
             trace!("awaiting SaveResponse from primary indexer thread");
-            writer.write_all(b"saving snapshot...").await?;
+            let mut save_result = None;
+            loop {
+                match save_rx.try_recv() {
+                    Ok(save_response) => {
+                        save_result = save_response;
+                    },
+                    Err(e) => match e {
+                        spmc::TryRecvError::Empty => continue,
+                        spmc::TryRecvError::Disconnected => break,
+                    }
+                }
+            }
+            if let Some(save_response) = save_result {
+                writer.write_all(&bcs::to_bytes(&save_response)?).await?;
+            } else {
+                writer.write_all(b"handler was disconnected from main thread!").await?;
+            }
         }
         bad_request => {
             let err_msg = format!("Malformed request: {bad_request}");
