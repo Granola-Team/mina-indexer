@@ -68,10 +68,10 @@ Options:
 
 ```yaml
 ledger: /home/jenr/.mina-indexer/mainnet.json
-non_genesis_ledger: false
 root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
 startup_dir: /home/jenr/.mina-indexer/startup-blocks
 watch_dir: /home/jenr/.mina-indexer/watch-blocks
+watch_mode: filesystem # set to 'google_cloud' to use iggy
 database_dir: /home/jenr/.mina-indexer/database
 log_dir: /home/jenr/.mina-indexer/logs
 keep_non_canonical_blocks: true
@@ -79,31 +79,48 @@ log_level: info
 log_level_stdout: trace
 prune_interval: 10
 canonical_update_threshold: 2
+
+# optional: to initialize with a snapshot
+snapshot_path: /home/jenr/.mina-indexer/snapshot-20230821043522.tar.zst
+
+# optional: configuration for google cloud block receiver (iggy)
+google_cloud_watch_bucket: mina_network_block_data
+google_cloud_watcher_lookup_num: 20
+google_cloud_watcher_lookup_freq: 30 # seconds
+google_cloud_watcher_lookup_network: mainnet
 ```
 
 
 ### Server Commands
 
 ```bash
-Server Cli Commands
+Start the mina indexer by passing in arguments manually on the command line
 
 Usage: mina-indexer server cli [OPTIONS] --ledger <LEDGER>
 
 Options:
   -l, --ledger <LEDGER>
-          Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-  -n, --non-genesis-ledger
-          Use a non-genesis ledger
+          Path to the root ledger
       --root-hash <ROOT_HASH>
-          Hash of the base ledger [default: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ]
+          Hash of the root ledger [default: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ]
   -s, --startup-dir <STARTUP_DIR>
-          Path to startup blocks directory [default: $HOME/.mina-indexer/startup-blocks]
+          Path to startup blocks directory [default: /Users/jenr24/.mina-indexer/startup-blocks]
   -w, --watch-dir <WATCH_DIR>
-          Path to directory to watch for new blocks [default: $HOME/.mina-indexer/watch-blocks]
+          Path to directory to watch for new blocks, if using the filesystem block receiver [default: /Users/jenr24/.mina-indexer/watch-blocks]
+      --google-cloud-watch-bucket <GOOGLE_CLOUD_WATCH_BUCKET>
+          Google Cloud bucket to watch for new blocks, if using the Google Cloud Block Receiver (iggy) [default: mina_network_block_data]
+      --google-cloud-watcher-lookup-num <GOOGLE_CLOUD_WATCHER_LOOKUP_NUM>
+          number of blocks to lookup on each query of the Google Cloud Block Receiver
+      --google-cloud-watcher-lookup-freq <GOOGLE_CLOUD_WATCHER_LOOKUP_FREQ>
+          Frequency to lookup blocks with iggy (seconds)
+      --google-cloud-watcher-lookup-network <GOOGLE_CLOUD_WATCHER_LOOKUP_NETWORK>
+          Mina Network to query when using iggy [possible values: mainnet, berkeley, testnet]
+      --watch-mode <WATCH_MODE>
+          Which mode to receive new blocks in (goole cloud or filesystem) [default: filesystem] [possible values: filesystem, google-cloud]
   -d, --database-dir <DATABASE_DIR>
-          Path to directory for rocksdb [default: $HOME/.mina-indexer/database]
+          Path to directory for rocksdb [default: /Users/jenr24/.mina-indexer/database]
       --log-dir <LOG_DIR>
-          Path to directory for logs [default: $HOME/.mina-indexer/logs]
+          Path to directory for logs [default: /Users/jenr24/.mina-indexer/logs]
   -k, --keep-non-canonical-blocks
           Only store canonical blocks in the db
       --log-level <LOG_LEVEL>
@@ -114,6 +131,8 @@ Options:
           Interval for pruning the root branch [default: 10]
   -c, --canonical-update-threshold <CANONICAL_UPDATE_THRESHOLD>
           Threshold for updating the canonical tip/ledger [default: 2]
+      --snapshot-path <SNAPSHOT_PATH>
+          Path to an indexer snapshot
   -h, --help
           Print help
   -V, --version

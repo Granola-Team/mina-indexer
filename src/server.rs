@@ -53,10 +53,10 @@ impl std::fmt::Display for WatchMode {
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
+    /// Path to the root ledger
     #[arg(short, long)]
     ledger: PathBuf,
-    /// Hash of the base ledger
+    /// Hash of the root ledger
     #[arg(
         long,
         default_value = MAINNET_GENESIS_HASH
@@ -65,17 +65,22 @@ pub struct ServerArgs {
     /// Path to startup blocks directory
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
     startup_dir: PathBuf,
-    /// Path to directory to watch for new blocks
+    /// Path to directory to watch for new blocks, if using the filesystem block receiver
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
+    /// Google Cloud bucket to watch for new blocks, if using the Google Cloud Block Receiver (iggy)
     #[arg(long, default_value_t = String::from("mina_network_block_data"))]
     google_cloud_watch_bucket: String,
+    /// number of blocks to lookup on each query of the Google Cloud Block Receiver
     #[arg(long)]
     google_cloud_watcher_lookup_num: Option<u64>,
+    /// Frequency to lookup blocks with iggy (seconds)
     #[arg(long)]
     google_cloud_watcher_lookup_freq: Option<u64>,
+    /// Mina Network to query when using iggy
     #[arg(long)]
     google_cloud_watcher_lookup_network: Option<MinaNetwork>,
+    /// Which mode to receive new blocks in (goole cloud or filesystem)
     #[arg(long, default_value_t = WatchMode::Filesystem)]
     watch_mode: WatchMode,
     /// Path to directory for rocksdb
