@@ -152,7 +152,7 @@ impl Drop for GoogleCloudBlockReceiver {
         tokio::spawn(async move {
             command_sender
                 .clone()
-                .blocking_send(GoogleCloudBlockWorkerCommand::Shutdown)
+                .send(GoogleCloudBlockWorkerCommand::Shutdown).await
                 .expect("shutdown command sends correctly");
 
             if let Some(join_handle) = worker_join_handle {

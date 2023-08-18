@@ -254,7 +254,7 @@ pub async fn run(
             temp_blocks_dir.push("temp_blocks");
             create_dir_all(&temp_blocks_dir).await?;
             let google_cloud_receiver = GoogleCloudBlockReceiver::new(
-                best_tip_height as u64, 20, temp_blocks_dir, Duration::from_secs(1), MinaNetwork::Mainnet, bucket
+                best_tip_height as u64, 20, temp_blocks_dir, Duration::from_secs(10), MinaNetwork::Mainnet, bucket
             ).await?;
             Box::new(google_cloud_receiver)
         }
