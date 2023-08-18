@@ -143,9 +143,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                         .write_all(serde_json::to_string(&summary)?.as_bytes())
                         .await?;
                 } else {
-                    stdout()
-                        .write_all(format!("{summary}").as_bytes())
-                        .await?;
+                    stdout().write_all(format!("{summary}").as_bytes()).await?;
                 }
             } else {
                 let summary: SummaryShort = bcs::from_bytes(&buffer)?;
@@ -154,9 +152,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                         .write_all(serde_json::to_string(&summary)?.as_bytes())
                         .await?;
                 } else {
-                    stdout()
-                        .write_all(format!("{summary}").as_bytes())
-                        .await?;
+                    stdout().write_all(format!("{summary}").as_bytes()).await?;
                 }
             }
         }

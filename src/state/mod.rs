@@ -22,7 +22,8 @@ use crate::{
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    borrow::BorrowMut, collections::HashMap, process, str::FromStr, sync::Arc, time::Instant, path::PathBuf,
+    borrow::BorrowMut, collections::HashMap, path::PathBuf, process, str::FromStr, sync::Arc,
+    time::Instant,
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tokio::sync::RwLock;
@@ -256,7 +257,9 @@ impl IndexerState {
             indexer_store.create_backup(snapshot_name.clone(), snapshot_directory.as_ref())?;
             return Ok(PathBuf::from(snapshot_name));
         }
-        Err(anyhow::Error::msg("no indexer store, cannot create backup!"))
+        Err(anyhow::Error::msg(
+            "no indexer store, cannot create backup!",
+        ))
     }
 
     pub fn to_state_snapshot(&self) -> StateSnapshot {
@@ -485,21 +488,21 @@ impl IndexerState {
             let mut ledger_apply_average = None;
             let mut add_to_block_store_average = None;
             let mut update_highest_average = None;
-            while let Some(precomputed_block) =
-                block_parser_writable.borrow_mut().next().await?
-            {
+            while let Some(precomputed_block) = block_parser_writable.borrow_mut().next().await? {
                 let ledger_apply_start = Instant::now();
                 ledger.apply_post_balances(&precomputed_block);
                 if let Some(avg) = ledger_apply_average {
-                    ledger_apply_average = Some(avg + ledger_apply_start.elapsed() / self.blocks_processed);
+                    ledger_apply_average =
+                        Some(avg + ledger_apply_start.elapsed() / self.blocks_processed);
                 } else {
                     ledger_apply_average = Some(ledger_apply_start.elapsed());
                 }
-                
+
                 let block_store_add_start = Instant::now();
                 store.add_block(&precomputed_block)?;
                 if let Some(avg) = add_to_block_store_average {
-                    add_to_block_store_average = Some(avg + block_store_add_start.elapsed() / self.blocks_processed);
+                    add_to_block_store_average =
+                        Some(avg + block_store_add_start.elapsed() / self.blocks_processed);
                 } else {
                     add_to_block_store_average = Some(block_store_add_start.elapsed());
                 }
@@ -525,7 +528,7 @@ impl IndexerState {
                         .get_block(&highest_block)?
                         .expect("highest block in block store");
                     highest_block.blockchain_length.expect("exists")
-                }; 
+                };
 
                 if let Some(height) = precomputed_block.blockchain_length {
                     if height > highest_block_height {
@@ -535,11 +538,11 @@ impl IndexerState {
                 }
 
                 if let Some(avg) = update_highest_average {
-                    update_highest_average = Some(avg + update_highest_start.elapsed() / self.blocks_processed);
+                    update_highest_average =
+                        Some(avg + update_highest_start.elapsed() / self.blocks_processed);
                 } else {
                     update_highest_average = Some(update_highest_start.elapsed());
                 }
-
 
                 if should_report_from_block_count(self.blocks_processed) {
                     let rate = self.blocks_processed as f64
@@ -551,7 +554,9 @@ impl IndexerState {
                         display_duration(initialization_start.elapsed()),
                     );
                     trace!("average time to update the ledger: {ledger_apply_average:?}");
-                    trace!("average time to add a block to the store: {add_to_block_store_average:?}");
+                    trace!(
+                        "average time to add a block to the store: {add_to_block_store_average:?}"
+                    );
                     trace!("average time to update the max height: {update_highest_average:?}");
                     debug!("Rate: {rate} blocks/s");
                 }

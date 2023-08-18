@@ -40,7 +40,7 @@ enum ServerCommand {
         path: PathBuf,
     },
     /// Start the mina indexer by passing in arguments manually on the command line
-    Cli(server::ServerArgs),
+    Cli(Box<server::ServerArgs>),
 }
 
 #[tokio::main]
@@ -60,7 +60,7 @@ pub async fn main() -> anyhow::Result<()> {
             let log_dir = args.log_dir.clone();
             let log_level = args.log_level;
             let log_level_stdout = args.log_level_stdout;
-            let config = handle_command_line_arguments(args).await?;
+            let config = handle_command_line_arguments(*args).await?;
 
             let mut log_number = 0;
             let mut log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);

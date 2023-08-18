@@ -24,7 +24,9 @@ use super::BlockReceiver;
 
 pub mod worker;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum)]
+#[derive(
+    Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum,
+)]
 pub enum MinaNetwork {
     #[serde(rename = "mainnet")]
     Mainnet,
@@ -58,8 +60,7 @@ impl GoogleCloudBlockReceiver {
     ) -> Result<Self, anyhow::Error> {
         info!("initializing new GoogleCloudBlockReceiver");
         let temp_blocks_dir = PathBuf::from(temp_blocks_dir.as_ref());
-        let (blocks_producer, blocks_consumer) =
-            AsyncHeapRb::new((lookup_num) as usize).split();
+        let (blocks_producer, blocks_consumer) = AsyncHeapRb::new((lookup_num) as usize).split();
         let (error_sender, error_receiver) = watch::channel(None);
         let (command_sender, command_receiver) = mpsc::channel(1);
 
@@ -153,7 +154,8 @@ impl Drop for GoogleCloudBlockReceiver {
         tokio::spawn(async move {
             command_sender
                 .clone()
-                .send(GoogleCloudBlockWorkerCommand::Shutdown).await
+                .send(GoogleCloudBlockWorkerCommand::Shutdown)
+                .await
                 .expect("shutdown command sends correctly");
 
             if let Some(join_handle) = worker_join_handle {

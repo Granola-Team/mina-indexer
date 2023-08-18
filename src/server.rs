@@ -4,7 +4,11 @@ use crate::{
         store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
     },
-    receiver::{filesystem::FilesystemReceiver, BlockReceiver, google_cloud::{GoogleCloudBlockReceiver, MinaNetwork}},
+    receiver::{
+        filesystem::FilesystemReceiver,
+        google_cloud::{GoogleCloudBlockReceiver, MinaNetwork},
+        BlockReceiver,
+    },
     state::{
         ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
@@ -34,7 +38,7 @@ pub enum WatchMode {
     #[serde(rename = "filesystem")]
     Filesystem,
     #[serde(rename = "google_cloud")]
-    GoogleCloud
+    GoogleCloud,
 }
 
 impl std::fmt::Display for WatchMode {
@@ -104,7 +108,7 @@ pub struct ServerArgs {
 
 pub enum ConfigWatchMode {
     Filesystem(PathBuf),
-    GoogleCloud(String, u64, u64, MinaNetwork)
+    GoogleCloud(String, u64, u64, MinaNetwork),
 }
 
 pub struct IndexerConfiguration {
@@ -134,20 +138,22 @@ pub async fn handle_command_line_arguments(
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
     let watch_mode = args.watch_mode;
-    let watch_bucket = args.google_cloud_watch_bucket; 
+    let watch_bucket = args.google_cloud_watch_bucket;
     let google_cloud_watcher_lookup_num = args.google_cloud_watcher_lookup_num.unwrap_or(20);
     let google_cloud_watcher_lookup_freq = args.google_cloud_watcher_lookup_freq.unwrap_or(30);
-    let google_cloud_watcher_lookup_network = args.google_cloud_watcher_lookup_network.unwrap_or(MinaNetwork::Mainnet);
+    let google_cloud_watcher_lookup_network = args
+        .google_cloud_watcher_lookup_network
+        .unwrap_or(MinaNetwork::Mainnet);
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
     let canonical_update_threshold = args.canonical_update_threshold;
     let watch_mode = match watch_mode {
         WatchMode::Filesystem => ConfigWatchMode::Filesystem(watch_dir),
         WatchMode::GoogleCloud => ConfigWatchMode::GoogleCloud(
-            watch_bucket, 
-            google_cloud_watcher_lookup_num, 
-            google_cloud_watcher_lookup_freq, 
-            google_cloud_watcher_lookup_network
+            watch_bucket,
+            google_cloud_watcher_lookup_num,
+            google_cloud_watcher_lookup_freq,
+            google_cloud_watcher_lookup_network,
         ),
     };
 
@@ -261,20 +267,30 @@ pub async fn run(
             filesystem_receiver.load_directory(&path)?;
             info!("Block receiver set to watch {path:?}");
             Box::new(filesystem_receiver)
-        },
+        }
         ConfigWatchMode::GoogleCloud(bucket, lookup_num, lookup_freq, network) => {
-            let best_tip_height = indexer_state.root_branch.best_tip().unwrap().blockchain_length.unwrap();
+            let best_tip_height = indexer_state
+                .root_branch
+                .best_tip()
+                .unwrap()
+                .blockchain_length
+                .unwrap();
             let mut temp_blocks_dir = database_dir.clone();
             temp_blocks_dir.push("temp_blocks");
             create_dir_all(&temp_blocks_dir).await?;
             let google_cloud_receiver = GoogleCloudBlockReceiver::new(
-                best_tip_height as u64, lookup_num, temp_blocks_dir, Duration::from_secs(lookup_freq), network, bucket
-            ).await?;
+                best_tip_height as u64,
+                lookup_num,
+                temp_blocks_dir,
+                Duration::from_secs(lookup_freq),
+                network,
+                bucket,
+            )
+            .await?;
             Box::new(google_cloud_receiver)
         }
     };
 
-    
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
             let name = &SOCKET_NAME[1..];
@@ -337,12 +353,12 @@ pub async fn run(
                 debug!("Handling connection");
                 tokio::spawn(async move {
                     if let Err(e) = handle_conn(
-                        conn, 
-                        block_store_readonly, 
-                        best_tip, 
-                        ledger, 
-                        summary, 
-                        save_tx, 
+                        conn,
+                        block_store_readonly,
+                        best_tip,
+                        ledger,
+                        summary,
+                        save_tx,
                         save_resp_rx
                     ).await {
                         error!("Error handling connection: {e}");
@@ -401,10 +417,9 @@ async fn handle_conn(
                 writer.write_all(&bytes).await?;
             } else {
                 debug!("Got bad public key, writing error message");
-                writer.write_all(format!(
-                    "{:?} is not in the ledger!", public_key)
-                    .as_bytes()
-                ).await?;
+                writer
+                    .write_all(format!("{:?} is not in the ledger!", public_key).as_bytes())
+                    .await?;
             }
         }
         "best_chain" => {
@@ -465,17 +480,19 @@ async fn handle_conn(
                         Ok(save_response) => {
                             save_result = save_response;
                             break;
-                        },
+                        }
                         Err(e) => match e {
                             spmc::TryRecvError::Empty => continue,
                             spmc::TryRecvError::Disconnected => break,
-                        }
+                        },
                     }
                 }
                 if let Some(save_response) = save_result {
                     writer.write_all(&bcs::to_bytes(&save_response)?).await?;
                 } else {
-                    writer.write_all(b"handler was disconnected from main thread!").await?;
+                    writer
+                        .write_all(b"handler was disconnected from main thread!")
+                        .await?;
                 }
 
                 Ok::<(), anyhow::Error>(())
