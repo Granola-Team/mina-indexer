@@ -241,7 +241,7 @@ pub async fn run(
         )?
     };
 
-    let mut block_receiver: Box<dyn BlockReceiver> = match watch_mode {
+    let mut block_receiver: Box<dyn BlockReceiver + Send + Sync + 'static> = match watch_mode {
         ConfigWatchMode::Filesystem(path) => {
             let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
             filesystem_receiver.load_directory(&path)?;
