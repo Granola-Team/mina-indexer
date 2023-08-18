@@ -49,7 +49,7 @@ impl GoogleCloudBlockReceiver {
     #[instrument]
     pub async fn new(
         max_length: u64,
-        overlap_num: u64,
+        lookup_num: u64,
         temp_blocks_dir: impl AsRef<Path> + std::fmt::Debug,
         update_freq: Duration,
         network: MinaNetwork,
@@ -58,13 +58,13 @@ impl GoogleCloudBlockReceiver {
         info!("initializing new GoogleCloudBlockReceiver");
         let temp_blocks_dir = PathBuf::from(temp_blocks_dir.as_ref());
         let (blocks_producer, blocks_consumer) =
-            AsyncHeapRb::new((overlap_num * 2) as usize).split();
+            AsyncHeapRb::new((lookup_num) as usize).split();
         let (error_sender, error_receiver) = watch::channel(None);
         let (command_sender, command_receiver) = mpsc::channel(1);
 
         let worker_data = GoogleCloudBlockWorkerData {
             max_length,
-            overlap_num,
+            lookup_num,
             temp_blocks_dir,
             update_freq,
             network,

@@ -22,7 +22,7 @@ use super::{bucket_file_from_length, MinaNetwork};
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GoogleCloudBlockWorkerData {
     pub max_length: u64,
-    pub overlap_num: u64,
+    pub lookup_num: u64,
     pub temp_blocks_dir: PathBuf,
     pub update_freq: Duration,
     pub network: MinaNetwork,
@@ -98,12 +98,12 @@ impl GoogleCloudBlockWorker {
             }
 
             trace!("downloading blocks within radius of {} from the best tip at length {} from google cloud bucket {} on network {}"
-                , self.worker_data.overlap_num, self.worker_data.max_length, self.worker_data.bucket, self.worker_data.network
+                , self.worker_data.lookup_num, self.worker_data.max_length, self.worker_data.bucket, self.worker_data.network
             );
             if let Err(worker_error) = gsutil_download_blocks(
                 &self.worker_data.temp_blocks_dir,
                 self.worker_data.max_length,
-                self.worker_data.overlap_num,
+                self.worker_data.lookup_num,
                 &self.worker_data.bucket,
                 self.worker_data.network,
             )
@@ -157,7 +157,7 @@ impl GoogleCloudBlockWorker {
 async fn gsutil_download_blocks(
     temp_blocks_dir: impl AsRef<Path> + std::fmt::Debug,
     max_height: u64,
-    overlap_num: u64,
+    lookup_num: u64,
     blocks_bucket: impl AsRef<str> + std::fmt::Debug,
     network: MinaNetwork,
 ) -> Result<(), GoogleCloudBlockWorkerError> {
@@ -173,8 +173,8 @@ async fn gsutil_download_blocks(
         .map_err(|e| GoogleCloudBlockWorkerError::IOError(e.to_string()))?;
     let mut child_stdin = child.stdin.take().unwrap();
 
-    let start = 2.max(max_height.saturating_sub(overlap_num));
-    let end = max_height + overlap_num;
+    let start = max_height;
+    let end = max_height + lookup_num;
 
     for length in start..=end {
         let bucket_file = bucket_file_from_length(network, blocks_bucket.as_ref(), length);
