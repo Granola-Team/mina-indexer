@@ -481,13 +481,27 @@ impl IndexerState {
             info!("adding all blocks from BlockParser {block_parser:?} to the RocksDB database");
             debug!("reporting every {BLOCK_REPORTING_FREQ_NUM}");
             let mut block_parser_writable = block_parser.write().await;
+            let mut ledger_apply_average = None;
+            let mut add_to_block_store_average = None;
+            let mut update_highest_average = None;
             while let Some(precomputed_block) =
                 block_parser_writable.borrow_mut().next().await?
             {
-                trace!("applying ledger data from block");
+                let ledger_apply_start = Instant::now();
                 ledger.apply_post_balances(&precomputed_block);
-                trace!("adding block to database");
+                if let Some(avg) = ledger_apply_average {
+                    ledger_apply_average = Some(avg + ledger_apply_start.elapsed() / 2);
+                } else {
+                    ledger_apply_average = Some(ledger_apply_start.elapsed());
+                }
+                
+                let block_store_add_start = Instant::now();
                 store.add_block(&precomputed_block)?;
+                if let Some(avg) = add_to_block_store_average {
+                    add_to_block_store_average = Some(avg + block_store_add_start.elapsed() / 2);
+                } else {
+                    add_to_block_store_average = Some(block_store_add_start.elapsed());
+                }
 
                 if self.blocks_processed + 1 % BLOCK_REPORTING_FREQ_NUM == 0 {
                     trace!("adding ledger to database");
@@ -497,7 +511,7 @@ impl IndexerState {
                     )?
                 }
 
-                trace!("getting height of current highest");
+                let update_highest_start = Instant::now();
                 let highest_block_height = if highest_is_in_tree {
                     let highest_block = self
                         .root_branch
@@ -512,24 +526,33 @@ impl IndexerState {
                     highest_block.blockchain_length.expect("exists")
                 }; 
 
-                trace!("updating highest block");
                 if let Some(height) = precomputed_block.blockchain_length {
                     if height > highest_block_height {
                         highest_is_in_tree = false;
                         highest_block = BlockHash(precomputed_block.state_hash);
                     }
+                }
 
-                    if should_report_from_block_count(self.blocks_processed) {
-                        let rate = self.blocks_processed as f64
-                            / initialization_start.elapsed().as_secs() as f64;
+                if let Some(avg) = update_highest_average {
+                    update_highest_average = Some(avg + update_highest_start.elapsed() / 2);
+                } else {
+                    update_highest_average = Some(update_highest_start.elapsed());
+                }
 
-                        info!(
-                            "{} blocks parsed and applied in {}",
-                            self.blocks_processed,
-                            display_duration(initialization_start.elapsed()),
-                        );
-                        debug!("Rate: {rate} blocks/s");
-                    }
+
+                if should_report_from_block_count(self.blocks_processed) {
+                    let rate = self.blocks_processed as f64
+                        / initialization_start.elapsed().as_secs() as f64;
+
+                    info!(
+                        "{} blocks parsed and applied in {}",
+                        self.blocks_processed,
+                        display_duration(initialization_start.elapsed()),
+                    );
+                    trace!("average time to update the ledger: {ledger_apply_average}");
+                    trace!("average time to add a block to the store: {add_to_block_store_average}");
+                    trace!("average time to update the max height: {update_highest_average}");
+                    debug!("Rate: {rate} blocks/s");
                 }
 
                 self.blocks_processed += 1;
