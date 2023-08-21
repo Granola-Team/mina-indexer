@@ -570,13 +570,12 @@ impl IndexerState {
             let mut add_to_state = vec![];
             trace!("starting at {:?}", canonical_tip);
             for _ in 0..MAINNET_CANONICAL_THRESHOLD {
-                let parent_hash = BlockHash::from_bytes(
+                let parent_hash = BlockHash::from_hashv1(
                     store
                         .get_block(&canonical_tip)?
                         .expect("tip in store")
                         .protocol_state
-                        .previous_state_hash
-                        .t,
+                        .previous_state_hash,
                 );
                 trace!("reading ancestor with state hash {:?}", parent_hash);
                 let next_ancestor = store.get_block(&parent_hash)?.expect("is in store");

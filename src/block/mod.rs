@@ -32,11 +32,6 @@ pub struct BlockWithoutHeight {
 pub struct BlockHash(pub String);
 
 impl BlockHash {
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let block_hash = unsafe { String::from_utf8_unchecked(Vec::from(bytes)) };
-        Self(block_hash)
-    }
-
     pub fn from_hashv1(hashv1: HashV1) -> Self {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
