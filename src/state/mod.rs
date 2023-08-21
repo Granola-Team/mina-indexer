@@ -19,7 +19,7 @@ use crate::{
     BLOCK_REPORTING_FREQ_NUM, CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD,
     MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use id_tree::{NodeId, Tree, Node, InsertBehavior};
+use id_tree::{InsertBehavior, Node, NodeId, Tree};
 use serde_derive::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut, collections::HashMap, path::PathBuf, process, str::FromStr, sync::Arc,
@@ -481,13 +481,22 @@ impl IndexerState {
             debug!("Adding block {:?}", &precomputed_block.state_hash);
             self.add_block(&precomputed_block)?;
             let add_block_time = add_block_start.elapsed();
-            trace!("Added block {:?} in {add_block_time:?}", &precomputed_block.state_hash);
-            add_block_time_avg = if self.blocks_processed == 0 
-                { add_block_time } else { add_block_time_avg + add_block_time / 2 };
+            trace!(
+                "Added block {:?} in {add_block_time:?}",
+                &precomputed_block.state_hash
+            );
+            add_block_time_avg = if self.blocks_processed == 0 {
+                add_block_time
+            } else {
+                add_block_time_avg + add_block_time / self.blocks_processed
+            };
             trace!("Average time to add a block to the IndexerStore: {add_block_time_avg:?}");
         }
 
-        info!("Added all blocks from {block_parser:?} in {:?}", initialization_start.elapsed());
+        info!(
+            "Added all blocks from {block_parser:?} in {:?}",
+            initialization_start.elapsed()
+        );
         Ok(())
     }
 
@@ -607,17 +616,25 @@ impl IndexerState {
                 add_to_state.push(next_ancestor);
             }
             add_to_state.reverse();
-            
+
             let mut new_root = Tree::new();
             let canonical_tip = add_to_state.first().unwrap();
-            let root_id = new_root.insert(Node::new(Block::from_precomputed(canonical_tip, 0)), InsertBehavior::AsRoot)?;
-            self.canonical_tip = Tip { state_hash: BlockHash(canonical_tip.state_hash.clone()), node_id: new_root.root_node_id().unwrap().clone() };
+            let root_id = new_root.insert(
+                Node::new(Block::from_precomputed(canonical_tip, 0)),
+                InsertBehavior::AsRoot,
+            )?;
+            self.canonical_tip = Tip {
+                state_hash: BlockHash(canonical_tip.state_hash.clone()),
+                node_id: new_root.root_node_id().unwrap().clone(),
+            };
             self.best_tip = self.canonical_tip.clone();
-            self.root_branch = Branch { root: root_id, branches: new_root};
+            self.root_branch = Branch {
+                root: root_id,
+                branches: new_root,
+            };
 
             info!("adding blocks from {canonical_tip:?} forward to state");
             for state_block in add_to_state {
-                
                 self.add_block(&state_block)?;
             }
             self.update_canonical()?;

@@ -253,7 +253,9 @@ pub async fn run(
 
         let block_parser = Box::new(FilesystemParser::new(&startup_dir)?)
             as Box<dyn BlockParser + Send + Sync + 'static>;
-        indexer_state.initialize_with_parser_alt(block_parser).await?;
+        indexer_state
+            .initialize_with_parser_alt(block_parser)
+            .await?;
 
         indexer_state
     } else {
