@@ -19,7 +19,7 @@ use crate::{
     BLOCK_REPORTING_FREQ_NUM, CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD,
     MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use id_tree::NodeId;
+use id_tree::{NodeId, Tree, Node, InsertBehavior};
 use serde_derive::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut, collections::HashMap, path::PathBuf, process, str::FromStr, sync::Arc,
@@ -583,6 +583,14 @@ impl IndexerState {
                 add_to_state.push(next_ancestor);
             }
             add_to_state.reverse();
+            
+            let mut new_root = Tree::new();
+            let canonical_tip = add_to_state.first().unwrap();
+            new_root.insert(Node::new(Block::from_precomputed(canonical_tip, 0)), InsertBehavior::AsRoot);
+            self.canonical_tip = Tip { state_hash: BlockHash(canonical_tip.state_hash.clone()), node_id: new_root.root_node_id().unwrap().clone() };
+            self.best_tip = self.canonical_tip.clone();
+            self.root_branch = Branch { root: new_root.root_node_id().unwrap().clone(), branches: new_root};
+
             info!("adding blocks from {canonical_tip:?} forward to state");
             for state_block in add_to_state {
                 self.add_block(&state_block)?;
