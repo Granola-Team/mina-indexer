@@ -601,14 +601,6 @@ impl IndexerState {
     ) -> anyhow::Result<ExtensionType> {
         self.prune_root_branch()?;
 
-        if self.is_block_already_in_db(precomputed_block)? {
-            debug!(
-                "Block with state hash {:?} is already present in the block store",
-                precomputed_block.state_hash
-            );
-            return Ok(ExtensionType::BlockNotAdded);
-        }
-
         let incoming_length = precomputed_block.blockchain_length.unwrap_or(u32::MAX);
         if self.root_branch.root_block().blockchain_length.unwrap_or(0) > incoming_length {
             debug!(
@@ -619,18 +611,19 @@ impl IndexerState {
         }
 
         // add block to the db
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            indexer_store.add_block(precomputed_block)?;
+        if !self.is_block_already_in_db(&precomputed_block)? {
+            if let Some(indexer_store) = self.indexer_store.as_ref() {
+                indexer_store.add_block(precomputed_block)?;
 
-            if let Some(height) = precomputed_block.blockchain_length {
-                let tmstmp = precomputed_block.timestamp();
+                if let Some(height) = precomputed_block.blockchain_length {
+                    let tmstmp = precomputed_block.timestamp();
 
-                for cmd in precomputed_block.commands() {
-                    indexer_store.put_tx(height, tmstmp, cmd)?;
+                    for cmd in precomputed_block.commands() {
+                        indexer_store.put_tx(height, tmstmp, cmd)?;
+                    }
                 }
             }
         }
-
         self.blocks_processed += 1;
         self.diffs_map.insert(
             BlockHash(precomputed_block.state_hash.clone()),
