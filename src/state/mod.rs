@@ -467,6 +467,30 @@ impl IndexerState {
         Ok(())
     }
 
+    pub async fn initialize_with_parser_alt(
+        &mut self,
+        block_parser: Box<dyn BlockParser + Send + Sync + 'static>,
+    ) -> anyhow::Result<()> {
+        let mut block_parser = block_parser;
+        let initialization_start = Instant::now();
+        let mut add_block_time_avg = std::time::Duration::ZERO;
+        info!("Adding all blocks from {block_parser:?} to the IndexerState");
+
+        while let Some(precomputed_block) = block_parser.next().await? {
+            let add_block_start = Instant::now();
+            debug!("Adding block {:?}", &precomputed_block.state_hash);
+            self.add_block(&precomputed_block)?;
+            let add_block_time = add_block_start.elapsed();
+            trace!("Added block {:?} in {add_block_time:?}", &precomputed_block.state_hash);
+            add_block_time_avg = if self.blocks_processed == 0 
+                { add_block_time } else { add_block_time_avg + add_block_time / 2 };
+            trace!("Average time to add a block to the IndexerStore: {add_block_time_avg:?}");
+        }
+
+        info!("Added all blocks from {block_parser:?} in {:?}", initialization_start.elapsed());
+        Ok(())
+    }
+
     #[instrument(skip(self, block_parser))]
     pub async fn initialize_with_parser(
         &mut self,
@@ -593,6 +617,7 @@ impl IndexerState {
 
             info!("adding blocks from {canonical_tip:?} forward to state");
             for state_block in add_to_state {
+                
                 self.add_block(&state_block)?;
             }
             self.update_canonical()?;
