@@ -586,10 +586,10 @@ impl IndexerState {
             
             let mut new_root = Tree::new();
             let canonical_tip = add_to_state.first().unwrap();
-            new_root.insert(Node::new(Block::from_precomputed(canonical_tip, 0)), InsertBehavior::AsRoot);
+            let root_id = new_root.insert(Node::new(Block::from_precomputed(canonical_tip, 0)), InsertBehavior::AsRoot)?;
             self.canonical_tip = Tip { state_hash: BlockHash(canonical_tip.state_hash.clone()), node_id: new_root.root_node_id().unwrap().clone() };
             self.best_tip = self.canonical_tip.clone();
-            self.root_branch = Branch { root: new_root.root_node_id().unwrap().clone(), branches: new_root};
+            self.root_branch = Branch { root: root_id, branches: new_root};
 
             info!("adding blocks from {canonical_tip:?} forward to state");
             for state_block in add_to_state {
