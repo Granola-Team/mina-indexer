@@ -611,7 +611,7 @@ impl IndexerState {
         }
 
         // add block to the db
-        if !self.is_block_already_in_db(&precomputed_block)? {
+        if !self.is_block_already_in_db(precomputed_block)? {
             if let Some(indexer_store) = self.indexer_store.as_ref() {
                 indexer_store.add_block(precomputed_block)?;
 
