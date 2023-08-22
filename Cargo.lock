@@ -1966,8 +1966,6 @@ dependencies = [
 [[package]]
 name = "id_tree"
 version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcd9db8dd5be8bde5a2624ed4b2dfb74368fe7999eb9c4940fd3ca344b61071a"
 dependencies = [
  "serde",
  "serde_derive",

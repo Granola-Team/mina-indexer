@@ -22,7 +22,7 @@ use crate::{
 use id_tree::{InsertBehavior, Node, NodeId, Tree};
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    borrow::BorrowMut, collections::HashMap, path::PathBuf, process, str::FromStr, sync::Arc,
+    borrow::BorrowMut, path::PathBuf, process, str::FromStr, sync::Arc,
     time::Instant,
 };
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
