@@ -1,5 +1,20 @@
-query Transactions {
-  transactions(limit: 10000, query: {canonical: true, kind: "PAYMENT", OR: [{memo: "bUeKKPB3UehQ"}, {memo: "E4Mw6WPPoZpTVmbnH6uTsPy9QGX6wD6AYt"}, {memo: "E4YbUmaZZqAoURRyPFxvfHRXHC1k7nufTxYGAc8cA"}], dateTime_gte: "2023-05-20T06:00:00Z", dateTime_lte: "2023-05-28T06:00:00Z"}, sortBy: NONCE_DESC) {
+query Transactions(
+  $memos: [String!]!,
+  $dateTime_gte: String!,
+  $dateTime_lte: String!,
+  $limit: Float! = 1000
+) {
+  transactions(
+    limit: $limit,
+    query: {
+      canonical: true,
+      kind: "PAYMENT",
+      OR: $memos,
+      dateTime_gte: $dateTime_gte,
+      dateTime_lte: $dateTime_lte,
+      sortBy: NONCE_DESC
+    }
+  ) {
     memo
     canonical
     from
@@ -8,4 +23,3 @@ query Transactions {
     dateTime
   }
 }
-
