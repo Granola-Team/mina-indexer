@@ -1,0 +1,12 @@
+query Transactions {
+    {
+    transactions(limit: 10000, query: {canonical: true, kind: "PAYMENT" OR: [{memo: "E4YVe5wRA2xyvXqWe9NdCi2mijqEfo8Ja6eDCyiBhbUeKKPB3UehQ"}, {memo: "E4YVPwLUQj7Y1f6gquzvyMw6WPPoZpTVmbnH6uTsPy9QGX6wD6AYt"}, {memo: "E4YbUmaZZqAoURqWNQSpdwiFZURyPFxvfHRXHC1k7nufTxYGAc8cA"}], dateTime_gte: "2023-05-20T06:00:00Z", dateTime_lte: "2023-05-28T06:00:00Z"}, sortBy: NONCE_DESC) {
+        memo
+        canonical
+        from
+        hash
+        blockHeight
+        dateTime
+    }
+    }
+}
