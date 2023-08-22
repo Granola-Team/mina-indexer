@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rustc_hash::FxHashMap;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::block::BlockHash;
@@ -9,7 +10,7 @@ use super::{branch::Branch, ledger::diff::LedgerDiff};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StateSnapshot {
     pub root_branch: Branch,
-    pub diffs_map: HashMap<BlockHash, LedgerDiff>,
+    pub diffs_map: FxHashMap<BlockHash, LedgerDiff>,
 }
 
 pub trait StateStore {

@@ -28,6 +28,7 @@ use std::{
 use time::{format_description, OffsetDateTime, PrimitiveDateTime};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, instrument, trace};
+use rustc_hash::FxHashMap;
 
 pub mod branch;
 pub mod ledger;
@@ -48,7 +49,7 @@ pub struct IndexerState {
     /// Highest known canonical block
     pub canonical_tip: Tip,
     /// Map of ledger diffs following the canonical tip
-    pub diffs_map: HashMap<BlockHash, LedgerDiff>,
+    pub diffs_map: FxHashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
     /// Dynamic, dangling branches eventually merged into the `root_branch`
@@ -138,7 +139,7 @@ impl IndexerState {
             mode,
             phase: IndexerPhase::InitializingFromBlockDir,
             canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
+            diffs_map: FxHashMap::default(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -183,7 +184,7 @@ impl IndexerState {
             mode,
             phase: IndexerPhase::InitializingFromDB,
             canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
+            diffs_map: FxHashMap::default(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -223,7 +224,7 @@ impl IndexerState {
             mode: IndexerMode::Test,
             phase: IndexerPhase::Testing,
             canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
+            diffs_map: FxHashMap::default(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -399,11 +400,11 @@ impl IndexerState {
                 .enumerate()
             {
                 // only add blocks between the old_canonical_tip and the new one
-                if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
+                if n + 1 == self.canonical_update_threshold as usize {
                     self.canonical_tip.node_id = ancestor_id.clone();
                     self.canonical_tip.state_hash =
                         self.get_block_from_id(ancestor_id).state_hash.clone();
-                } else if n > MAINNET_CANONICAL_THRESHOLD as usize
+                } else if n > self.canonical_update_threshold as usize
                     && ancestor_id != &old_canonical_tip_id
                 {
                     let ancestor_block = self.get_block_from_id(ancestor_id);
@@ -478,7 +479,6 @@ impl IndexerState {
 
         while let Some(precomputed_block) = block_parser.next().await? {
             let add_block_start = Instant::now();
-            debug!("Adding block {:?}", &precomputed_block.state_hash);
             self.add_block(&precomputed_block)?;
             let add_block_time = add_block_start.elapsed();
             trace!(
@@ -645,12 +645,14 @@ impl IndexerState {
     /// Adds the block to the witness tree and the precomputed block to the db
     ///
     /// Errors if the block is already present in the witness tree
+    #[instrument(skip(self, precomputed_block))]
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
         self.prune_root_branch()?;
 
+        /// O(1)
         let incoming_length = precomputed_block.blockchain_length.unwrap_or(u32::MAX);
         if self.root_branch.root_block().blockchain_length.unwrap_or(0) > incoming_length {
             debug!(
