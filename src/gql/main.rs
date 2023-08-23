@@ -11,7 +11,7 @@ use reqwest;
 
 use generated::Transactions;
 
-async fn perform_my_query(variables: union_query::Variables) -> Result<(), Box<dyn Error>> {
+async fn perform_my_query(variables: transactions::Variables) -> Result<(), Box<dyn Error>> {
     let variables = Variables {
         // Create and set variable values here
     };
