@@ -1,4 +1,4 @@
-query Transactions(
+query Transaction(
   $memos: [String!]!,
   $dateTime_gte: String!,
   $dateTime_lte: String!,

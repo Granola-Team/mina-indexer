@@ -1,10 +1,10 @@
 #![allow(clippy::all, warnings)]
-pub struct Transactions;
-pub mod transactions {
+pub struct Transaction;
+pub mod transaction {
     #![allow(dead_code)]
     use std::result::Result;
-    pub const OPERATION_NAME: &str = "Transactions";
-    pub const QUERY : & str = "query Transactions(\n  $memos: [String!]!,\n  $dateTime_gte: String!,\n  $dateTime_lte: String!,\n  $limit: Float! = 1000\n) {\n  transactions(\n    limit: $limit,\n    query: {\n      canonical: true,\n      kind: \"PAYMENT\",\n      OR: $memos,\n      dateTime_gte: $dateTime_gte,\n      dateTime_lte: $dateTime_lte,\n      sortBy: NONCE_DESC\n    }\n  ) {\n    memo\n    canonical\n    from\n    hash\n    blockHeight\n    dateTime\n  }\n}\n" ;
+    pub const OPERATION_NAME: &str = "Transaction";
+    pub const QUERY : & str = "query Transaction(\n  $memos: [String!]!,\n  $dateTime_gte: String!,\n  $dateTime_lte: String!,\n  $limit: Float! = 1000\n) {\n  transactions(\n    limit: $limit,\n    query: {\n      canonical: true,\n      kind: \"PAYMENT\",\n      OR: $memos,\n      dateTime_gte: $dateTime_gte,\n      dateTime_lte: $dateTime_lte,\n      sortBy: NONCE_DESC\n    }\n  ) {\n    memo\n    canonical\n    from\n    hash\n    blockHeight\n    dateTime\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -32,10 +32,10 @@ pub mod transactions {
     }
     #[derive(Deserialize)]
     pub struct ResponseData {
-        pub transactions: Vec<TransactionsTransactions>,
+        pub transactions: Vec<TransactionTransactions>,
     }
     #[derive(Deserialize)]
-    pub struct TransactionsTransactions {
+    pub struct TransactionTransactions {
         pub memo: String,
         pub canonical: Boolean,
         pub from: String,
@@ -46,14 +46,14 @@ pub mod transactions {
         pub date_time: DateTimeUtc,
     }
 }
-impl graphql_client::GraphQLQuery for Transactions {
-    type Variables = transactions::Variables;
-    type ResponseData = transactions::ResponseData;
+impl graphql_client::GraphQLQuery for Transaction {
+    type Variables = transaction::Variables;
+    type ResponseData = transaction::ResponseData;
     fn build_query(variables: Self::Variables) -> ::graphql_client::QueryBody<Self::Variables> {
         graphql_client::QueryBody {
             variables,
-            query: transactions::QUERY,
-            operation_name: transactions::OPERATION_NAME,
+            query: transaction::QUERY,
+            operation_name: transaction::OPERATION_NAME,
         }
     }
 }

@@ -4,16 +4,16 @@ use reqwest;
 
 #[derive(GraphQLQuery)]
 #[graphql(
-    query_path = "gql/query/transactions.graphql",
+    query_path = "gql/query/transaction.graphql",
     schema_path = "gql/query/schema.json",
     response_derives = "Debug",
 )]
 
-use generated::Transactions;
+use generated::Transaction;
 
-async fn perform_my_query(variables: transactions::Variables) -> Result<(), Box<dyn Error>> {
+async fn perform_my_query(variables: transaction::Variables) -> Result<(), Box<dyn Error>> {
     // This is the important line = Build the query and send the request
-    let request_body = Transactions::build_query(variables);
+    let request_body = Transaction::build_query(variables);
 
     let mina_explorer_gql_api_url = "https://graphql.minaexplorer.com";
 
@@ -25,7 +25,7 @@ async fn perform_my_query(variables: transactions::Variables) -> Result<(), Box<
         .await?;
 
     // Parse the response and access the data
-    let response_body: Response<generated::Transactions::ResponseData> = res.json().await?;
+    let response_body: Response<generated::Transaction::ResponseData> = res.json().await?;
     println!("{:#?}", response_body);
     let data = response_body.data.unwrap();
 
