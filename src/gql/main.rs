@@ -12,10 +12,6 @@ use reqwest;
 use generated::Transactions;
 
 async fn perform_my_query(variables: transactions::Variables) -> Result<(), Box<dyn Error>> {
-    let variables = Variables {
-        // Create and set variable values here
-    };
-
     // This is the important line = Build the query and send the request
     let request_body = Transactions::build_query(variables);
 
