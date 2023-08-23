@@ -117,8 +117,8 @@ impl BlockWithoutHeight {
     }
 }
 
-#[deny(clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl std::cmp::PartialOrd for Block {
+    #[deny(clippy::incorrect_partial_ord_impl_on_ord_type)]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.state_hash == other.state_hash {
             Some(std::cmp::Ordering::Equal)
