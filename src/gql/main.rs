@@ -19,9 +19,11 @@ async fn perform_my_query(variables: transactions::Variables) -> Result<(), Box<
     // This is the important line = Build the query and send the request
     let request_body = Transactions::build_query(variables);
 
+    let mina_explorer_gql_api_url = "https://graphql.minaexplorer.com";
+
     let client = reqwest::Client::new();
     let mut res = client
-        .post("/gql")
+        .post(mina_explorer_gql_api_url)
         .json(&request_body)
         .send()
         .await?;
