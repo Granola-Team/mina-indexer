@@ -68,6 +68,7 @@ ctrlc = "3.4.0"
 serde_yaml = "0.9.25"
 data-encoding = "2.4.0"
 actix-rt = "2.8.0"
+oneshot = "0.1.5"
 
 [dependencies.tokio]
 version = "1.25.0"

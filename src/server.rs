@@ -4,7 +4,7 @@ use crate::{
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
-        IndexerMode, IndexerState,
+        IndexerMode, IndexerState, Tip,
     },
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K,
@@ -16,7 +16,7 @@ use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
 
 use serde_derive::{Deserialize, Serialize};
-use std::{path::PathBuf, process, sync::Arc};
+use std::{path::PathBuf, process, sync::Arc, time::Duration};
 use tokio::{
     fs::{self, create_dir_all, metadata},
     io,
@@ -57,26 +57,50 @@ pub enum MinaIndexerRunPhase {
     SavingStateSnapshot,
 }
 
+pub enum MinaIndexerQuery {
+    NumBlocksProcessed,
+    BestTip,
+    CanonicalTip,
+    Uptime,
+}
+
+pub enum MinaIndexerQueryResponse {
+    NumBlocksProcessed(u32),
+    BestTip(Tip),
+    CanonicalTip(Tip),
+    Uptime(Duration)
+}
+
 pub struct MinaIndexer {
-    _indexer_loop_join_handle: JoinHandle<anyhow::Result<()>>,
-    indexer_phase_receiver: watch::Receiver<MinaIndexerRunPhase>
+    _loop_join_handle: JoinHandle<anyhow::Result<()>>,
+    phase_receiver: watch::Receiver<MinaIndexerRunPhase>,
+    query_sender: mpsc::Sender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
 }
 
 impl MinaIndexer {
     pub async fn new(config: IndexerConfiguration, store: Arc<IndexerStore>) -> anyhow::Result<Self> {
-        let (indexer_phase_sender, indexer_phase_receiver) = 
+        let (phase_sender, phase_receiver) = 
             watch::channel(MinaIndexerRunPhase::JustStarted);
 
-        let _indexer_loop_join_handle = tokio::spawn(async move {
-            run(config, store, indexer_phase_sender).await
+        let (command_sender, command_receiver) = mpsc::channel(1);
+
+        let _loop_join_handle = tokio::spawn(async move {
+            run(config, store, phase_sender, command_receiver).await
         });
 
-        Ok(Self { _indexer_loop_join_handle, indexer_phase_receiver })
+        Ok(Self { _loop_join_handle, phase_receiver: phase_receiver, query_sender: command_sender })
+    }
+
+    async fn send_command(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.query_sender.send((command, response_sender)).await
+            .map_err(|_| anyhow::Error::msg("could not send command to running Mina Indexer"))?;
+        response_receiver.recv().map_err(|recv_err| recv_err.into())
     }
 
     pub fn initialized(&self) -> bool {
         use MinaIndexerRunPhase::*;
-        match *self.indexer_phase_receiver.borrow() {
+        match *self.phase_receiver.borrow() {
             JustStarted => false,
             IPCSocketConnected => false,
             SIGINTHandlerSet => false,
@@ -85,7 +109,14 @@ impl MinaIndexer {
     }
 
     pub fn state(&self) -> MinaIndexerRunPhase {
-        *self.indexer_phase_receiver.borrow()
+        *self.phase_receiver.borrow()
+    }
+
+    pub async fn blocks_processed(&self) -> anyhow::Result<u32> {
+        match self.send_command(MinaIndexerQuery::NumBlocksProcessed).await? {
+            MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
+            _ => Err(anyhow::Error::msg("unexpected response!"))
+        }
     }
 }
 
@@ -94,6 +125,7 @@ pub async fn run(
     config: IndexerConfiguration,
     indexer_store: Arc<IndexerStore>,
     indexer_phase_sender: watch::Sender<MinaIndexerRunPhase>,
+    mut query_receiver: mpsc::Receiver<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
     debug!("Checking that a server instance isn't already running");
@@ -201,6 +233,25 @@ pub async fn run(
 
     loop {
         tokio::select! {
+            Some((command, response_sender)) = query_receiver.recv() => {
+                use MinaIndexerQuery::*;
+                let response = match command {
+                    NumBlocksProcessed 
+                        => MinaIndexerQueryResponse::NumBlocksProcessed(indexer_state.blocks_processed),
+                    BestTip => {
+                        let best_tip = indexer_state.best_tip.clone();
+                        MinaIndexerQueryResponse::BestTip(best_tip)
+                    },
+                    CanonicalTip => {
+                        let canonical_tip = indexer_state.canonical_tip.clone();
+                        MinaIndexerQueryResponse::CanonicalTip(canonical_tip)
+                    },
+                    Uptime 
+                        => MinaIndexerQueryResponse::Uptime(indexer_state.init_time.elapsed())
+                };
+                response_sender.send(response)?;
+            }
+
             block_fut = filesystem_receiver.recv_block() => {
                 indexer_phase_sender.send_replace(ReceivingBlock);
                 if let Some(precomputed_block) = block_fut? {

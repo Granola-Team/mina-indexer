@@ -1,11 +1,9 @@
 use bytesize::ByteSize;
 use serde_derive::{Deserialize, Serialize};
 use std::str::Lines;
-use time::{Duration, PrimitiveDateTime};
 
 pub trait Summary {
-    fn uptime(&self) -> Duration;
-    fn date_time(&self) -> PrimitiveDateTime;
+    fn uptime(&self) -> std::time::Duration;
     fn blocks_processed(&self) -> u32;
     fn best_tip_length(&self) -> u32;
     fn best_tip_hash(&self) -> String;
@@ -23,8 +21,7 @@ pub trait Summary {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummaryShort {
-    pub uptime: Duration,
-    pub date_time: PrimitiveDateTime,
+    pub uptime: std::time::Duration,
     pub blocks_processed: u32,
     pub witness_tree: WitnessTreeSummaryShort,
     pub db_stats: Option<DbStats>,
@@ -32,8 +29,7 @@ pub struct SummaryShort {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummaryVerbose {
-    pub uptime: Duration,
-    pub date_time: PrimitiveDateTime,
+    pub uptime: std::time::Duration,
     pub blocks_processed: u32,
     pub witness_tree: WitnessTreeSummaryVerbose,
     pub db_stats: Option<DbStats>,
@@ -101,7 +97,6 @@ impl From<SummaryVerbose> for SummaryShort {
     fn from(value: SummaryVerbose) -> Self {
         Self {
             uptime: value.uptime,
-            date_time: value.date_time,
             blocks_processed: value.blocks_processed,
             witness_tree: value.witness_tree.into(),
             db_stats: value.db_stats,
@@ -129,8 +124,7 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
-    writeln!(f, "  Uptime:       {}", state.uptime())?;
-    writeln!(f, "  Started:      {}", state.date_time())?;
+    writeln!(f, "  Uptime:       {:?}", state.uptime())?;
     writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
 
     writeln!(f, "\n=== Root branch ===")?;
@@ -193,10 +187,6 @@ impl Summary for SummaryShort {
         self.witness_tree.canonical_tip_length
     }
 
-    fn date_time(&self) -> PrimitiveDateTime {
-        self.date_time
-    }
-
     fn db_stats(&self) -> DbStats {
         self.db_stats.as_ref().unwrap().clone()
     }
@@ -229,7 +219,7 @@ impl Summary for SummaryShort {
         self.witness_tree.root_length
     }
 
-    fn uptime(&self) -> Duration {
+    fn uptime(&self) -> std::time::Duration {
         self.uptime
     }
 }
@@ -255,10 +245,6 @@ impl Summary for SummaryVerbose {
         self.witness_tree.canonical_tip_length
     }
 
-    fn date_time(&self) -> PrimitiveDateTime {
-        self.date_time
-    }
-
     fn db_stats(&self) -> DbStats {
         self.db_stats.as_ref().unwrap().clone()
     }
@@ -291,7 +277,7 @@ impl Summary for SummaryVerbose {
         self.witness_tree.root_length
     }
 
-    fn uptime(&self) -> Duration {
+    fn uptime(&self) -> std::time::Duration {
         self.uptime
     }
 }
