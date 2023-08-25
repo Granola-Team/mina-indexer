@@ -50,8 +50,9 @@ struct SaveResponse(String);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum MinaIndexerRunPhase {
     JustStarted,
-    IPCSocketConnected,
-    SIGINTHandlerSet,
+    ConnectingToIPCSocket,
+    SettingSIGINTHandler,
+    InitializingState,
     StateInitializedFromParser,
     StateInitializedFromSnapshot,
     StartedBlockReceiver,
@@ -119,7 +120,7 @@ impl MinaIndexer {
         use MinaIndexerRunPhase::*;
         !matches!(
             *self.phase_receiver.borrow(),
-            JustStarted | IPCSocketConnected | SIGINTHandlerSet
+            JustStarted | SettingSIGINTHandler | InitializingState
         )
     }
 
@@ -145,19 +146,20 @@ pub async fn initialize(
 ) -> anyhow::Result<(IndexerState, watch::Sender<MinaIndexerRunPhase>)> {
     use MinaIndexerRunPhase::*;
     debug!("Checking that a server instance isn't already running");
+    phase_sender.send_replace(ConnectingToIPCSocket);
     LocalSocketStream::connect(SOCKET_NAME)
         .await
         .expect_err("Server is already running... Exiting.");
-    phase_sender.send_replace(IPCSocketConnected);
 
+    phase_sender.send_replace(SettingSIGINTHandler);
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
         info!("SIGINT received. Exiting.");
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
-    phase_sender.send_replace(SIGINTHandlerSet);
 
+    phase_sender.send_replace(InitializingState);
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
@@ -200,8 +202,8 @@ pub async fn initialize(
                 .initialize_without_contiguous_canonical(&mut block_parser)
                 .await?;
         }
-        phase_sender.send_replace(StateInitializedFromParser);
 
+        phase_sender.send_replace(StateInitializedFromParser);
         state
     } else {
         info!("initializing indexer state from snapshot");
@@ -213,7 +215,6 @@ pub async fn initialize(
         )?;
 
         phase_sender.send_replace(StateInitializedFromSnapshot);
-
         state
     };
 
