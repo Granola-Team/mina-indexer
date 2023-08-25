@@ -22,6 +22,7 @@ use crate::{
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
+use uuid::Uuid;
 use std::{
     collections::HashMap,
     process,
@@ -238,6 +239,17 @@ impl IndexerState {
             blocks_processed: 0,
             init_time: Instant::now(),
         })
+    }
+
+    #[instrument(skip_all)]
+    pub fn spawn_secondary_database(&self) -> anyhow::Result<IndexerStore> {
+        let primary_path = self.indexer_store.as_ref().unwrap().db_path.clone();
+        let mut secondary_path = primary_path.clone();
+        secondary_path.push(Uuid::new_v4().to_string());
+
+        debug!("Spawning secondary readonly RocksDB instance");
+        let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
+        Ok(block_store_readonly)
     }
 
     #[instrument(skip(self))]

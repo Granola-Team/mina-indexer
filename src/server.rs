@@ -16,14 +16,13 @@ use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
 
 use serde_derive::{Deserialize, Serialize};
-use std::{path::PathBuf, process, sync::Arc, time::Duration};
+use std::{path::{PathBuf, Path}, process, sync::Arc, time::Duration};
 use tokio::{
     fs::{self, create_dir_all, metadata},
     io,
     sync::{mpsc, watch}, task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument};
-use uuid::Uuid;
 
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
@@ -82,16 +81,18 @@ impl MinaIndexer {
         let (phase_sender, phase_receiver) = 
             watch::channel(MinaIndexerRunPhase::JustStarted);
 
-        let (command_sender, command_receiver) = mpsc::channel(1);
+        let (query_sender, query_receiver) = mpsc::channel(1);
 
         let _loop_join_handle = tokio::spawn(async move {
-            run(config, store, phase_sender, command_receiver).await
+            let watch_dir = config.watch_dir.clone();
+            let (state, phase_sender) = initialize(config, store, phase_sender).await?;
+            run(watch_dir, state, phase_sender, query_receiver).await
         });
 
-        Ok(Self { _loop_join_handle, phase_receiver: phase_receiver, query_sender: command_sender })
+        Ok(Self { _loop_join_handle, phase_receiver: phase_receiver, query_sender })
     }
 
-    async fn send_command(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
+    async fn send_query(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.query_sender.send((command, response_sender)).await
             .map_err(|_| anyhow::Error::msg("could not send command to running Mina Indexer"))?;
@@ -113,26 +114,27 @@ impl MinaIndexer {
     }
 
     pub async fn blocks_processed(&self) -> anyhow::Result<u32> {
-        match self.send_command(MinaIndexerQuery::NumBlocksProcessed).await? {
+        match self.send_query(MinaIndexerQuery::NumBlocksProcessed).await? {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
             _ => Err(anyhow::Error::msg("unexpected response!"))
         }
     }
 }
 
-#[instrument(skip_all)]
-pub async fn run(
-    config: IndexerConfiguration,
-    indexer_store: Arc<IndexerStore>,
-    indexer_phase_sender: watch::Sender<MinaIndexerRunPhase>,
-    mut query_receiver: mpsc::Receiver<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
-) -> Result<(), anyhow::Error> {
+pub async fn initialize(
+    config: IndexerConfiguration, 
+    store: Arc<IndexerStore>, 
+    phase_sender: watch::Sender<MinaIndexerRunPhase>, 
+) -> anyhow::Result<(
+    IndexerState, 
+    watch::Sender<MinaIndexerRunPhase>, 
+)> {
     use MinaIndexerRunPhase::*;
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
         .await
         .expect_err("Server is already running... Exiting.");
-    indexer_phase_sender.send_replace(IPCSocketConnected);
+    phase_sender.send_replace(IPCSocketConnected);
 
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
@@ -140,7 +142,7 @@ pub async fn run(
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
-    indexer_phase_sender.send_replace(SIGINTHandlerSet);
+    phase_sender.send_replace(SIGINTHandlerSet);
 
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
@@ -148,29 +150,27 @@ pub async fn run(
         non_genesis_ledger,
         root_hash,
         startup_dir,
-        watch_dir,
+        watch_dir: _,
         keep_noncanonical_blocks,
         prune_interval,
         canonical_update_threshold,
         from_snapshot,
     } = config;
-
-    let database_dir = PathBuf::from(indexer_store.db_path());
     let mode = if keep_noncanonical_blocks {
         IndexerMode::Full
     } else {
         IndexerMode::Light
     };
-    let mut indexer_state = if !from_snapshot {
+    let state = if !from_snapshot {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
-        let mut indexer_state = IndexerState::new(
+        let mut state = IndexerState::new(
             mode,
             root_hash.clone(),
             ledger.ledger,
-            indexer_store,
+            store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
@@ -178,35 +178,47 @@ pub async fn run(
 
         let mut block_parser = BlockParser::new(&startup_dir)?;
         if !non_genesis_ledger {
-            indexer_state
+            state
                 .initialize_with_contiguous_canonical(&mut block_parser)
                 .await?;
         } else {
-            indexer_state
+            state
                 .initialize_without_contiguous_canonical(&mut block_parser)
                 .await?;
         }
-        indexer_phase_sender.send_replace(StateInitializedFromParser);
+        phase_sender.send_replace(StateInitializedFromParser);
 
-        indexer_state
+        state
     } else {
         info!("initializing indexer state from snapshot");
-        let indexer_state = IndexerState::from_state_snapshot(
-            indexer_store,
+        let state = IndexerState::from_state_snapshot(
+            store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
         )?;
 
-        indexer_phase_sender.send_replace(StateInitializedFromSnapshot);
+        phase_sender.send_replace(StateInitializedFromSnapshot);
 
-        indexer_state
+        state
     };
 
+    Ok((state, phase_sender))
+}
+
+#[instrument(skip_all)]
+pub async fn run(
+    block_watch_dir: impl AsRef<Path>,
+    mut state: IndexerState,
+    phase_sender: watch::Sender<MinaIndexerRunPhase>,
+    mut query_receiver: mpsc::Receiver<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
+) -> Result<(), anyhow::Error> {
+    use MinaIndexerRunPhase::*;
+
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
-    filesystem_receiver.load_directory(&watch_dir)?;
-    info!("Block receiver set to watch {watch_dir:?}");
-    indexer_phase_sender.send_replace(StartedBlockReceiver);
+    filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
+    info!("Block receiver set to watch {:?}", block_watch_dir.as_ref());
+    phase_sender.send_replace(StartedBlockReceiver);
 
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
@@ -224,7 +236,7 @@ pub async fn run(
         }
     });
     info!("Local socket listener started");
-    indexer_phase_sender.send_replace(IPCSocketListenerStarted);
+    phase_sender.send_replace(IPCSocketListenerStarted);
 
     let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
     let (mut save_resp_tx, save_resp_rx) = spmc::channel();
@@ -237,28 +249,28 @@ pub async fn run(
                 use MinaIndexerQuery::*;
                 let response = match command {
                     NumBlocksProcessed 
-                        => MinaIndexerQueryResponse::NumBlocksProcessed(indexer_state.blocks_processed),
+                        => MinaIndexerQueryResponse::NumBlocksProcessed(state.blocks_processed),
                     BestTip => {
-                        let best_tip = indexer_state.best_tip.clone();
+                        let best_tip = state.best_tip.clone();
                         MinaIndexerQueryResponse::BestTip(best_tip)
                     },
                     CanonicalTip => {
-                        let canonical_tip = indexer_state.canonical_tip.clone();
+                        let canonical_tip = state.canonical_tip.clone();
                         MinaIndexerQueryResponse::CanonicalTip(canonical_tip)
                     },
                     Uptime 
-                        => MinaIndexerQueryResponse::Uptime(indexer_state.init_time.elapsed())
+                        => MinaIndexerQueryResponse::Uptime(state.init_time.elapsed())
                 };
                 response_sender.send(response)?;
             }
 
             block_fut = filesystem_receiver.recv_block() => {
-                indexer_phase_sender.send_replace(ReceivingBlock);
+                phase_sender.send_replace(ReceivingBlock);
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
 
-                    indexer_state.add_block(&precomputed_block)?;
+                    state.add_block(&precomputed_block)?;
                     info!("Added {block:?}");
                 } else {
                     info!("Block receiver shutdown, system exit");
@@ -269,17 +281,13 @@ pub async fn run(
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
                 info!("Receiving connection");
-                indexer_phase_sender.send_replace(ReceivingIPCConnection);
-                let best_tip = indexer_state.best_tip_block().clone();
+                phase_sender.send_replace(ReceivingIPCConnection);
+                let best_tip = state.best_tip_block().clone();
 
-                let primary_path = database_dir.clone();
-                let mut secondary_path = primary_path.clone();
-                secondary_path.push(Uuid::new_v4().to_string());
+                let block_store_readonly = Arc::new(state.spawn_secondary_database()?);
 
-                debug!("Spawning secondary readonly RocksDB instance");
-                let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
-                let summary = indexer_state.summary_verbose();
-                let ledger = indexer_state.best_ledger()?.unwrap();
+                let summary = state.summary_verbose();
+                let ledger = state.best_ledger()?.unwrap();
 
                 let save_tx = save_tx.clone();
                 let save_resp_rx = save_resp_rx.clone();
@@ -287,20 +295,20 @@ pub async fn run(
                 // handle the connection
                 tokio::spawn(async move {
                     debug!("Handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly, best_tip, ledger, summary, save_tx, save_resp_rx).await {
+                    if let Err(e) = handle_conn(conn, block_store_readonly.clone(), best_tip, ledger, summary, save_tx, save_resp_rx).await {
                         error!("Error handling connection: {e}");
                     }
 
-                    debug!("Removing readonly instance at {}", secondary_path.display());
-                    tokio::fs::remove_dir_all(&secondary_path).await.ok();
+                    debug!("Removing readonly instance at {}", block_store_readonly.db_path.clone().display());
+                    tokio::fs::remove_dir_all(&block_store_readonly.db_path).await.ok();
                 });
             }
 
             save_rx_fut = save_rx.recv() => {
                 if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
-                    indexer_phase_sender.send_replace(SavingStateSnapshot);
+                    phase_sender.send_replace(SavingStateSnapshot);
                     trace!("saving snapshot in {}", &snapshot_path.display());
-                    match indexer_state.save_snapshot(snapshot_path) {
+                    match state.save_snapshot(snapshot_path) {
                         Ok(_) => save_resp_tx.send(Some(SaveResponse("snapshot created".to_string())))?,
                         Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
                     }
@@ -313,7 +321,7 @@ pub async fn run(
 #[instrument(skip_all)]
 async fn handle_conn(
     conn: LocalSocketStream,
-    db: IndexerStore,
+    db: Arc<IndexerStore>,
     best_tip: Block,
     ledger: Ledger,
     summary: SummaryVerbose,
