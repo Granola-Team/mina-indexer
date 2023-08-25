@@ -20,7 +20,7 @@ use std::{path::PathBuf, process, sync::Arc};
 use tokio::{
     fs::{self, create_dir_all, metadata},
     io,
-    sync::mpsc,
+    sync::{mpsc, watch}, task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
 use uuid::Uuid;
@@ -86,6 +86,38 @@ pub struct IndexerConfiguration {
     from_snapshot: bool,
 }
 
+pub struct MinaIndexer {
+    _indexer_loop_join_handle: JoinHandle<anyhow::Result<()>>,
+    indexer_phase_receiver: watch::Receiver<MinaIndexerRunPhase>
+}
+
+impl MinaIndexer {
+    pub async fn new(config: IndexerConfiguration, store: Arc<IndexerStore>) -> anyhow::Result<Self> {
+        let (indexer_phase_sender, indexer_phase_receiver) = 
+            watch::channel(MinaIndexerRunPhase::JustStarted);
+
+        let _indexer_loop_join_handle = tokio::spawn(async move {
+            run(config, store, indexer_phase_sender).await
+        });
+
+        Ok(Self { _indexer_loop_join_handle, indexer_phase_receiver })
+    }
+
+    pub fn initialized(&self) -> bool {
+        use MinaIndexerRunPhase::*;
+        match *self.indexer_phase_receiver.borrow() {
+            JustStarted => false,
+            IPCSocketConnected => false,
+            SIGINTHandlerSet => false,
+            _ => true,
+        }
+    }
+
+    pub fn state(&self) -> MinaIndexerRunPhase {
+        *self.indexer_phase_receiver.borrow()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct SaveCommand(PathBuf);
 
@@ -149,15 +181,32 @@ pub async fn handle_command_line_arguments(
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum MinaIndexerRunPhase {
+    JustStarted,
+    IPCSocketConnected,
+    SIGINTHandlerSet,
+    StateInitializedFromParser,
+    StateInitializedFromSnapshot,
+    StartedBlockReceiver,
+    IPCSocketListenerStarted,
+    ReceivingBlock,
+    ReceivingIPCConnection,
+    SavingStateSnapshot,
+}
+
 #[instrument(skip_all)]
 pub async fn run(
     config: IndexerConfiguration,
     indexer_store: Arc<IndexerStore>,
+    indexer_phase_sender: watch::Sender<MinaIndexerRunPhase>,
 ) -> Result<(), anyhow::Error> {
+    use MinaIndexerRunPhase::*;
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
         .await
         .expect_err("Server is already running... Exiting.");
+    indexer_phase_sender.send_replace(IPCSocketConnected);
 
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
@@ -165,6 +214,7 @@ pub async fn run(
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
+    indexer_phase_sender.send_replace(SIGINTHandlerSet);
 
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
@@ -210,21 +260,28 @@ pub async fn run(
                 .initialize_without_contiguous_canonical(&mut block_parser)
                 .await?;
         }
+        indexer_phase_sender.send_replace(StateInitializedFromParser);
 
         indexer_state
     } else {
         info!("initializing indexer state from snapshot");
-        IndexerState::from_state_snapshot(
+        let indexer_state = IndexerState::from_state_snapshot(
             indexer_store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
-        )?
+        )?;
+
+        indexer_phase_sender.send_replace(StateInitializedFromSnapshot);
+
+        indexer_state
     };
 
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
     filesystem_receiver.load_directory(&watch_dir)?;
     info!("Block receiver set to watch {watch_dir:?}");
+    indexer_phase_sender.send_replace(StartedBlockReceiver);
+
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
             let name = &SOCKET_NAME[1..];
@@ -240,8 +297,8 @@ pub async fn run(
             panic!("Unable to bind domain socket {:?}", e);
         }
     });
-
     info!("Local socket listener started");
+    indexer_phase_sender.send_replace(IPCSocketListenerStarted);
 
     let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
     let (mut save_resp_tx, save_resp_rx) = spmc::channel();
@@ -251,6 +308,7 @@ pub async fn run(
     loop {
         tokio::select! {
             block_fut = filesystem_receiver.recv_block() => {
+                indexer_phase_sender.send_replace(ReceivingBlock);
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
@@ -266,6 +324,7 @@ pub async fn run(
             conn_fut = listener.accept() => {
                 let conn = conn_fut?;
                 info!("Receiving connection");
+                indexer_phase_sender.send_replace(ReceivingIPCConnection);
                 let best_tip = indexer_state.best_tip_block().clone();
 
                 let primary_path = database_dir.clone();
@@ -294,6 +353,7 @@ pub async fn run(
 
             save_rx_fut = save_rx.recv() => {
                 if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
+                    indexer_phase_sender.send_replace(SavingStateSnapshot);
                     trace!("saving snapshot in {}", &snapshot_path.display());
                     match indexer_state.save_snapshot(snapshot_path) {
                         Ok(_) => save_resp_tx.send(Some(SaveResponse("snapshot created".to_string())))?,

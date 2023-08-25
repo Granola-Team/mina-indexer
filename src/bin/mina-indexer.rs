@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
-    server::{self, create_dir_if_non_existent, handle_command_line_arguments},
+    server::{self, create_dir_if_non_existent, handle_command_line_arguments, MinaIndexer},
     store::IndexerStore,
 };
 use std::{path::PathBuf, sync::Arc};
@@ -91,7 +91,8 @@ pub async fn main() -> anyhow::Result<()> {
             } else {
                 Arc::new(IndexerStore::new(&database_dir)?)
             };
-            tokio::spawn(server::run(config, db.clone()));
+
+            MinaIndexer::new(config, db.clone()).await?;
             mina_indexer::gql::start_gql(db).await.unwrap();
             Ok(())
         }
