@@ -55,8 +55,9 @@ pub enum MinaIndexerRunPhase {
     InitializingState,
     StateInitializedFromParser,
     StateInitializedFromSnapshot,
-    StartedBlockReceiver,
-    IPCSocketListenerStarted,
+    StartingBlockReceiver,
+    StartingIPCSocketListener,
+    StartingMainServerLoop,
     ReceivingBlock,
     ReceivingIPCConnection,
     SavingStateSnapshot,
@@ -233,11 +234,12 @@ pub async fn run(
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
 
+    phase_sender.send_replace(StartingBlockReceiver);
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
     filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
     info!("Block receiver set to watch {:?}", block_watch_dir.as_ref());
-    phase_sender.send_replace(StartedBlockReceiver);
 
+    phase_sender.send_replace(StartingIPCSocketListener);
     let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
         if e.kind() == io::ErrorKind::AddrInUse {
             let name = &SOCKET_NAME[1..];
@@ -254,13 +256,12 @@ pub async fn run(
         }
     });
     info!("Local socket listener started");
-    phase_sender.send_replace(IPCSocketListenerStarted);
 
+    phase_sender.send_replace(StartingMainServerLoop);
     let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
     let (mut save_resp_tx, save_resp_rx) = spmc::channel();
     let save_tx = Arc::new(save_tx);
     let save_resp_rx = Arc::new(save_resp_rx);
-
     loop {
         tokio::select! {
             Some((command, response_sender)) = query_receiver.recv() => {
