@@ -2,19 +2,19 @@ use crate::{
     block::{parser::BlockParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
-        ledger::{self, genesis::GenesisRoot, public_key::PublicKey, Ledger},
+        ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
         IndexerMode, IndexerState,
     },
     store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT, SOCKET_NAME,
+    MAINNET_TRANSITION_FRONTIER_K,
+    SOCKET_NAME,
 };
-use clap::Parser;
+
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
-use serde::Deserializer;
+
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::{
@@ -22,68 +22,39 @@ use tokio::{
     io,
     sync::{mpsc, watch}, task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument, level_filters::LevelFilter};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
-#[derive(Parser, Debug, Clone, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct ServerArgs {
-    /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-    #[arg(short, long)]
-    ledger: PathBuf,
-    /// Use a non-genesis ledger
-    #[arg(short, long, default_value_t = false)]
-    non_genesis_ledger: bool,
-    /// Hash of the base ledger
-    #[arg(
-        long,
-        default_value = MAINNET_GENESIS_HASH
-    )]
-    root_hash: String,
-    /// Path to startup blocks directory
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
-    startup_dir: PathBuf,
-    /// Path to directory to watch for new blocks
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
-    watch_dir: PathBuf,
-    /// Path to directory for rocksdb
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
-    pub database_dir: PathBuf,
-    /// Path to directory for logs
-    #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
-    pub log_dir: PathBuf,
-    /// Only store canonical blocks in the db
-    #[arg(short, long, default_value_t = false)]
-    keep_non_canonical_blocks: bool,
-    /// Max file log level
-    #[serde(deserialize_with = "level_filter_deserializer")]
-    #[arg(long, default_value_t = LevelFilter::DEBUG)]
-    pub log_level: LevelFilter,
-    /// Max stdout log level
-    #[serde(deserialize_with = "level_filter_deserializer")]
-    #[arg(long, default_value_t = LevelFilter::INFO)]
-    pub log_level_stdout: LevelFilter,
-    /// Interval for pruning the root branch
-    #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
-    prune_interval: u32,
-    /// Threshold for updating the canonical tip/ledger
-    #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
-    canonical_update_threshold: u32,
-    /// Path to an indexer snapshot
-    #[arg(long)]
-    pub snapshot_path: Option<PathBuf>,
+pub struct IndexerConfiguration {
+    pub ledger: GenesisRoot,
+    pub non_genesis_ledger: bool,
+    pub root_hash: BlockHash,
+    pub startup_dir: PathBuf,
+    pub watch_dir: PathBuf,
+    pub keep_noncanonical_blocks: bool,
+    pub prune_interval: u32,
+    pub canonical_update_threshold: u32,
+    pub from_snapshot: bool,
 }
 
-pub struct IndexerConfiguration {
-    ledger: GenesisRoot,
-    non_genesis_ledger: bool,
-    root_hash: BlockHash,
-    startup_dir: PathBuf,
-    watch_dir: PathBuf,
-    keep_noncanonical_blocks: bool,
-    prune_interval: u32,
-    canonical_update_threshold: u32,
-    from_snapshot: bool,
+#[derive(Debug, Serialize, Deserialize)]
+struct SaveCommand(PathBuf);
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SaveResponse(String);
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum MinaIndexerRunPhase {
+    JustStarted,
+    IPCSocketConnected,
+    SIGINTHandlerSet,
+    StateInitializedFromParser,
+    StateInitializedFromSnapshot,
+    StartedBlockReceiver,
+    IPCSocketListenerStarted,
+    ReceivingBlock,
+    ReceivingIPCConnection,
+    SavingStateSnapshot,
 }
 
 pub struct MinaIndexer {
@@ -116,83 +87,6 @@ impl MinaIndexer {
     pub fn state(&self) -> MinaIndexerRunPhase {
         *self.indexer_phase_receiver.borrow()
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveCommand(PathBuf);
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveResponse(String);
-
-#[instrument(skip_all)]
-pub async fn handle_command_line_arguments(
-    args: ServerArgs,
-) -> anyhow::Result<IndexerConfiguration> {
-    trace!("Parsing server args");
-
-    let ledger = args.ledger;
-    let non_genesis_ledger = args.non_genesis_ledger;
-    let root_hash = BlockHash(args.root_hash.to_string());
-    let startup_dir = args.startup_dir;
-    let watch_dir = args.watch_dir;
-    let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
-    let prune_interval = args.prune_interval;
-    let canonical_update_threshold = args.canonical_update_threshold;
-
-    assert!(
-        ledger.is_file(),
-        "Ledger file does not exist at {}",
-        ledger.display()
-    );
-    assert!(
-        // bad things happen if this condition fails
-        canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
-        "canonical update threshold must be strictly less than the transition frontier length!"
-    );
-
-    create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
-
-    info!("Parsing ledger file at {}", ledger.display());
-
-    match ledger::genesis::parse_file(&ledger).await {
-        Err(err) => {
-            error!(
-                reason = "Unable to parse ledger",
-                error = err.to_string(),
-                path = &ledger.display().to_string()
-            );
-            process::exit(100)
-        }
-        Ok(ledger) => {
-            info!("Ledger parsed successfully!");
-
-            Ok(IndexerConfiguration {
-                ledger,
-                non_genesis_ledger,
-                root_hash,
-                startup_dir,
-                watch_dir,
-                keep_noncanonical_blocks,
-                prune_interval,
-                canonical_update_threshold,
-                from_snapshot: args.snapshot_path.is_some(),
-            })
-        }
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum MinaIndexerRunPhase {
-    JustStarted,
-    IPCSocketConnected,
-    SIGINTHandlerSet,
-    StateInitializedFromParser,
-    StateInitializedFromSnapshot,
-    StartedBlockReceiver,
-    IPCSocketListenerStarted,
-    ReceivingBlock,
-    ReceivingIPCConnection,
-    SavingStateSnapshot,
 }
 
 #[instrument(skip_all)]
@@ -465,39 +359,4 @@ pub async fn create_dir_if_non_existent(path: &str) {
         debug!("Creating directory {path}");
         create_dir_all(path).await.unwrap();
     }
-}
-
-pub fn level_filter_deserializer<'de, D>(deserializer: D) -> Result<LevelFilter, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct YAMLStringVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for YAMLStringVisitor {
-        type Value = LevelFilter;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a string containing yaml data")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            // unfortunately we lose some typed information
-            // from errors deserializing the json string
-            let level_filter_str: &str = serde_yaml::from_str(v).map_err(E::custom)?;
-            match level_filter_str {
-                "info" => Ok(LevelFilter::INFO),
-                "debug" => Ok(LevelFilter::DEBUG),
-                "error" => Ok(LevelFilter::ERROR),
-                "trace" => Ok(LevelFilter::TRACE),
-                "warn" => Ok(LevelFilter::TRACE),
-                "off" => Ok(LevelFilter::OFF),
-                other => Err(E::custom(format!("{} is not a valid level filter", other))),
-            }
-        }
-    }
-
-    deserializer.deserialize_any(YAMLStringVisitor)
 }
