@@ -22,7 +22,6 @@ use crate::{
 };
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::{
     collections::HashMap,
     process,
@@ -32,6 +31,7 @@ use std::{
 };
 use time::{format_description, OffsetDateTime};
 use tracing::{debug, error, info, instrument, trace};
+use uuid::Uuid;
 
 pub mod branch;
 pub mod ledger;

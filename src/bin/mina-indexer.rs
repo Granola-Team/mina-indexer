@@ -1,15 +1,18 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
-    MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT, CANONICAL_UPDATE_THRESHOLD,
+    block::BlockHash,
     client,
-    server::{create_dir_if_non_existent, MinaIndexer, IndexerConfiguration},
-    store::IndexerStore, block::BlockHash, state::ledger,
+    server::{create_dir_if_non_existent, IndexerConfiguration, MinaIndexer},
+    state::ledger,
+    store::IndexerStore,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
+    PRUNE_INTERVAL_DEFAULT,
 };
 use serde::Deserializer;
 use serde_derive::Deserialize;
-use tracing::{trace, instrument, info, error};
 use std::{path::PathBuf, sync::Arc};
-use tracing_subscriber::{prelude::*, filter::LevelFilter};
+use tracing::{error, info, instrument, trace};
+use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\

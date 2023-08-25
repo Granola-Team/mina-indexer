@@ -7,8 +7,7 @@ use crate::{
         IndexerMode, IndexerState, Tip,
     },
     store::IndexerStore,
-    MAINNET_TRANSITION_FRONTIER_K,
-    SOCKET_NAME,
+    MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -16,11 +15,17 @@ use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
 
 use serde_derive::{Deserialize, Serialize};
-use std::{path::{PathBuf, Path}, process, sync::Arc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     fs::{self, create_dir_all, metadata},
     io,
-    sync::{mpsc, watch}, task::JoinHandle,
+    sync::{mpsc, watch},
+    task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument};
 
@@ -67,19 +72,21 @@ pub enum MinaIndexerQueryResponse {
     NumBlocksProcessed(u32),
     BestTip(Tip),
     CanonicalTip(Tip),
-    Uptime(Duration)
+    Uptime(Duration),
 }
 
 pub struct MinaIndexer {
     _loop_join_handle: JoinHandle<anyhow::Result<()>>,
     phase_receiver: watch::Receiver<MinaIndexerRunPhase>,
-    query_sender: mpsc::Sender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
+    query_sender: mpsc::Sender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
 }
 
 impl MinaIndexer {
-    pub async fn new(config: IndexerConfiguration, store: Arc<IndexerStore>) -> anyhow::Result<Self> {
-        let (phase_sender, phase_receiver) = 
-            watch::channel(MinaIndexerRunPhase::JustStarted);
+    pub async fn new(
+        config: IndexerConfiguration,
+        store: Arc<IndexerStore>,
+    ) -> anyhow::Result<Self> {
+        let (phase_sender, phase_receiver) = watch::channel(MinaIndexerRunPhase::JustStarted);
 
         let (query_sender, query_receiver) = mpsc::channel(1);
 
@@ -89,24 +96,31 @@ impl MinaIndexer {
             run(watch_dir, state, phase_sender, query_receiver).await
         });
 
-        Ok(Self { _loop_join_handle, phase_receiver: phase_receiver, query_sender })
+        Ok(Self {
+            _loop_join_handle,
+            phase_receiver,
+            query_sender,
+        })
     }
 
-    async fn send_query(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
+    async fn send_query(
+        &self,
+        command: MinaIndexerQuery,
+    ) -> anyhow::Result<MinaIndexerQueryResponse> {
         let (response_sender, response_receiver) = oneshot::channel();
-        self.query_sender.send((command, response_sender)).await
+        self.query_sender
+            .send((command, response_sender))
+            .await
             .map_err(|_| anyhow::Error::msg("could not send command to running Mina Indexer"))?;
         response_receiver.recv().map_err(|recv_err| recv_err.into())
     }
 
     pub fn initialized(&self) -> bool {
         use MinaIndexerRunPhase::*;
-        match *self.phase_receiver.borrow() {
-            JustStarted => false,
-            IPCSocketConnected => false,
-            SIGINTHandlerSet => false,
-            _ => true,
-        }
+        !matches!(
+            *self.phase_receiver.borrow(),
+            JustStarted | IPCSocketConnected | SIGINTHandlerSet
+        )
     }
 
     pub fn state(&self) -> MinaIndexerRunPhase {
@@ -114,21 +128,21 @@ impl MinaIndexer {
     }
 
     pub async fn blocks_processed(&self) -> anyhow::Result<u32> {
-        match self.send_query(MinaIndexerQuery::NumBlocksProcessed).await? {
+        match self
+            .send_query(MinaIndexerQuery::NumBlocksProcessed)
+            .await?
+        {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
-            _ => Err(anyhow::Error::msg("unexpected response!"))
+            _ => Err(anyhow::Error::msg("unexpected response!")),
         }
     }
 }
 
 pub async fn initialize(
-    config: IndexerConfiguration, 
-    store: Arc<IndexerStore>, 
-    phase_sender: watch::Sender<MinaIndexerRunPhase>, 
-) -> anyhow::Result<(
-    IndexerState, 
-    watch::Sender<MinaIndexerRunPhase>, 
-)> {
+    config: IndexerConfiguration,
+    store: Arc<IndexerStore>,
+    phase_sender: watch::Sender<MinaIndexerRunPhase>,
+) -> anyhow::Result<(IndexerState, watch::Sender<MinaIndexerRunPhase>)> {
     use MinaIndexerRunPhase::*;
     debug!("Checking that a server instance isn't already running");
     LocalSocketStream::connect(SOCKET_NAME)
@@ -211,7 +225,10 @@ pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
     phase_sender: watch::Sender<MinaIndexerRunPhase>,
-    mut query_receiver: mpsc::Receiver<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>
+    mut query_receiver: mpsc::Receiver<(
+        MinaIndexerQuery,
+        oneshot::Sender<MinaIndexerQueryResponse>,
+    )>,
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
 
@@ -248,7 +265,7 @@ pub async fn run(
             Some((command, response_sender)) = query_receiver.recv() => {
                 use MinaIndexerQuery::*;
                 let response = match command {
-                    NumBlocksProcessed 
+                    NumBlocksProcessed
                         => MinaIndexerQueryResponse::NumBlocksProcessed(state.blocks_processed),
                     BestTip => {
                         let best_tip = state.best_tip.clone();
@@ -258,7 +275,7 @@ pub async fn run(
                         let canonical_tip = state.canonical_tip.clone();
                         MinaIndexerQueryResponse::CanonicalTip(canonical_tip)
                     },
-                    Uptime 
+                    Uptime
                         => MinaIndexerQueryResponse::Uptime(state.init_time.elapsed())
                 };
                 response_sender.send(response)?;
