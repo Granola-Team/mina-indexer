@@ -180,7 +180,7 @@ mina-indexer client --help
 
 ## About the development environment
 
-This repository uses Nix Flakes as a development environment and build system. You can install Nix [here](https://nixos.org/download.html) Sand you can visit [this page](https://nixos.wiki/wiki/Flakes) for instructions on enabling Nix Flakes on your system. Apart from Nix, there are no external dependencies for this project!
+This repository uses Nix Flakes as a development environment and build system. You can install Nix [here](https://nixos.org/download.html) and you can visit [this page](https://nixos.wiki/wiki/Flakes) for instructions on enabling Nix Flakes on your system. Apart from Nix, there are no external dependencies for this project!
 
 ## Building the Project
 
