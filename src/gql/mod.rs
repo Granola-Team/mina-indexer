@@ -17,7 +17,7 @@ use juniper::http::GraphQLRequest;
 use crate::gql::root::Context;
 use crate::store::IndexerStore;
 
-mod root;
+pub mod root;
 mod schema;
 
 #[get("/graphql")]

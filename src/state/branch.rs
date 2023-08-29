@@ -240,7 +240,7 @@ impl Branch {
     /// the `incoming` tree is placed under `junction_id` in `self`
     ///
     /// Returns the id of the best tip in the merged subtree
-    pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &mut Branch) -> Option<NodeId> {
+    pub fn merge_on(&mut self, junction_id: &NodeId, incoming: &Branch) -> Option<NodeId> {
         let (merged_tip_id, _) = incoming.best_tip_with_id().unwrap();
         let mut merge_id_map = HashMap::new();
 

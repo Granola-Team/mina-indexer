@@ -29,8 +29,9 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use time::{format_description, OffsetDateTime, PrimitiveDateTime};
+use time::{format_description, OffsetDateTime};
 use tracing::{debug, error, info, instrument, trace};
+use uuid::Uuid;
 
 pub mod branch;
 pub mod ledger;
@@ -68,7 +69,7 @@ pub struct IndexerState {
     /// Number of blocks added to the state
     pub blocks_processed: u32,
     /// Datetime the indexer started running
-    pub init_time: OffsetDateTime,
+    pub init_time: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -150,7 +151,7 @@ impl IndexerState {
             prune_interval,
             canonical_update_threshold,
             blocks_processed: 0,
-            init_time: OffsetDateTime::now_utc(),
+            init_time: Instant::now(),
         })
     }
 
@@ -195,7 +196,7 @@ impl IndexerState {
             prune_interval,
             canonical_update_threshold,
             blocks_processed: 0,
-            init_time: OffsetDateTime::now_utc(),
+            init_time: Instant::now(),
         })
     }
 
@@ -236,8 +237,19 @@ impl IndexerState {
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 0,
-            init_time: OffsetDateTime::now_utc(),
+            init_time: Instant::now(),
         })
+    }
+
+    #[instrument(skip_all)]
+    pub fn spawn_secondary_database(&self) -> anyhow::Result<IndexerStore> {
+        let primary_path = self.indexer_store.as_ref().unwrap().db_path.clone();
+        let mut secondary_path = primary_path.clone();
+        secondary_path.push(Uuid::new_v4().to_string());
+
+        debug!("Spawning secondary readonly RocksDB instance");
+        let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
+        Ok(block_store_readonly)
     }
 
     #[instrument(skip(self))]
@@ -336,7 +348,7 @@ impl IndexerState {
                 prune_interval,
                 canonical_update_threshold,
                 blocks_processed: 0,
-                init_time: time::OffsetDateTime::now_utc(),
+                init_time: Instant::now(),
             })
         } else {
             Err(anyhow::Error::msg(
@@ -708,7 +720,7 @@ impl IndexerState {
                     .data()
                     .clone();
 
-                if merged_tip_block > self.best_tip_block().clone() {
+                if merged_tip_block.state_hash.0 > self.best_tip_block().state_hash.0 {
                     self.update_best_tip(&merged_tip_block, &merged_tip_id);
                 }
             }
@@ -1003,8 +1015,7 @@ impl IndexerState {
         };
 
         SummaryShort {
-            uptime: OffsetDateTime::now_utc() - self.init_time,
-            date_time: PrimitiveDateTime::new(self.init_time.date(), self.init_time.time()),
+            uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
             witness_tree,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
@@ -1046,8 +1057,7 @@ impl IndexerState {
         };
 
         SummaryVerbose {
-            uptime: OffsetDateTime::now_utc() - self.init_time,
-            date_time: PrimitiveDateTime::new(self.init_time.date(), self.init_time.time()),
+            uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
             witness_tree,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
