@@ -122,7 +122,6 @@ impl std::cmp::PartialOrd for Block {
         if self.state_hash == other.state_hash {
             Some(std::cmp::Ordering::Equal)
         } else if self.height > other.height
-            || self.height == other.height && self.state_hash.0 > other.state_hash.0
         {
             Some(std::cmp::Ordering::Greater)
         } else {

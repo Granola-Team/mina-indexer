@@ -720,7 +720,7 @@ impl IndexerState {
                     .data()
                     .clone();
 
-                if merged_tip_block > self.best_tip_block().clone() {
+                if merged_tip_block.state_hash.0 > self.best_tip_block().state_hash.0 {
                     self.update_best_tip(&merged_tip_block, &merged_tip_id);
                 }
             }
