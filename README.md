@@ -70,7 +70,7 @@ or
 result/bin/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
 ```
 
-With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the above corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
+With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the below corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
 
 5. **Additional Options**
 Depending on your use case, you may need to include additional CLI flags or run different binaries such as `target/release/staking-ledger-ingestion`.
@@ -78,11 +78,6 @@ Depending on your use case, you may need to include additional CLI flags or run 
 ## Getting Started (Detailed)
 
 Clone the repo
-
-```sh
-git clone git@github.com:Granola-Team/mina-indexer.git
-cd mina-indexer
-```
 
 ### Building with nix
 
