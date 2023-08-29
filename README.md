@@ -24,7 +24,7 @@ The indexer project is in constant development and is in an alpha
 state. Functionality and API definitions will be in flux and are
 subject to change without notice. With that being said, happy hacking!
 
-### Quick Start Guide
+## Quick Start Guide
 
 Follow these steps to quickly set up and run the Mina Indexer on your machine.
 
