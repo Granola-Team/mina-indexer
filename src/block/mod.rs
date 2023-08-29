@@ -119,19 +119,19 @@ impl BlockWithoutHeight {
 
 impl std::cmp::PartialOrd for Block {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.state_hash == other.state_hash {
-            Some(std::cmp::Ordering::Equal)
-        } else if self.height > other.height {
-            Some(std::cmp::Ordering::Greater)
-        } else {
-            Some(std::cmp::Ordering::Less)
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl std::cmp::Ord for Block {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        if self.state_hash == other.state_hash {
+            std::cmp::Ordering::Equal
+        } else if self.height > other.height {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Less
+        }
     }
 }
 
