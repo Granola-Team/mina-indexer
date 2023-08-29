@@ -238,7 +238,11 @@ docker build -t mina-indexer:latest .
 
 Using Nix as an example, in your initial terminal window where you ran the aforementioned Nix commands, now run:
 ```sh
-RUST_BACKTRACE=1 target/release/mina-indexer server -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
+target/release/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
+```
+or
+```sh
+result/bin/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
 ```
 
 With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the above corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
