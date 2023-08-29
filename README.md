@@ -83,12 +83,7 @@ Clone the repo
 
 Build (install [nix](#about-the-development-environment) first)
 
-```sh
-nix develop
-nix build '.?submodules=1'
-```
-
-Alternatively, you can build with `cargo` inside the nix shell
+Use the Nix commands written in the Quick Start Guide above. Alternatively, you can build with `cargo` inside the nix shell
 (replace `mina-indexer` by `cargo run --release --bin mina-indexer --` in all following commands).
 
 ### Building the indexer in Docker
