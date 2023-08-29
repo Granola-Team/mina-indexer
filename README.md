@@ -24,7 +24,58 @@ The indexer project is in constant development and is in an alpha
 state. Functionality and API definitions will be in flux and are
 subject to change without notice. With that being said, happy hacking!
 
-## Getting Started
+### Quick Start Guide
+
+Follow these steps to quickly set up and run the Mina Indexer on your machine.
+
+1. **Clone the Repository**
+
+Open your terminal and run the following commands:
+```sh
+git clone git@github.com:Granola-Team/mina-indexer.git
+cd mina-indexer
+```
+
+2. **Download Blocks**
+
+Download blocks from the Google Cloud bucket. For convenience, we at Granola created a repository, [download Mina blocks](https://github.com/Granola-Team/iggy), which helps you keep your Mina block data up to date. Make sure you have `gustil` installed.
+
+3. **Build the Indexer**
+
+Build the project using one of the following methods:
+* Using Cargo:
+```sh
+cargo build --release
+```
+
+Using Nix (Recommended):
+```sh
+nix develop
+nix build '.?submodules=1'
+```
+
+Using Docker:
+```sh
+docker build -t mina-indexer:latest .
+```
+
+4. **Run the Indexer**
+
+Using Nix as an example, in your initial terminal window where you ran the aforementioned Nix commands, now run:
+```sh
+target/release/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
+```
+or
+```sh
+result/bin/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
+```
+
+With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the above corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
+
+5. **Additional Options**
+Depending on your use case, you may need to include additional CLI flags or run different binaries such as `target/release/staking-ledger-ingestion`.
+
+## Getting Started (Detailed)
 
 Clone the repo
 
@@ -202,50 +253,3 @@ Copyright 2022-2023 Mina Foundation, Inc.
 
 Free use of this software is granted under the terms of the Mozilla
 Public License 2.0.
-
-### Quick Start Guide
-
-Follow these steps to quickly set up and run the Mina Indexer on your machine.
-
-1. **Clone the Repository**
-
-Open your terminal and run the following commands:
-```sh
-git clone git@github.com:Granola-Team/mina-indexer.git
-cd mina-indexer
-```
-
-2. **Build the Indexer**
-
-Build the project using one of the following methods:
-* Using Cargo:
-```sh
-cargo build --release
-```
-
-Using Nix (Recommended):
-```sh
-nix develop
-nix build '.?submodules=1'
-```
-
-Using Docker:
-```sh
-docker build -t mina-indexer:latest .
-```
-
-3. **Run the Indexer**
-
-Using Nix as an example, in your initial terminal window where you ran the aforementioned Nix commands, now run:
-```sh
-target/release/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
-```
-or
-```sh
-result/bin/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
-```
-
-With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the above corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
-
-4. **Additional Options**
-Depending on your use case, you may need to include additional CLI flags or run different binaries such as `target/release/staking-ledger-ingestion`.
