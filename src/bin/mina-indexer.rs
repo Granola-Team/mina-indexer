@@ -5,8 +5,8 @@ use mina_indexer::{
     server::{create_dir_if_non_existent, IndexerConfiguration, MinaIndexer},
     state::ledger,
     store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
+    MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use serde::Deserializer;
 use serde_derive::Deserialize;
@@ -91,6 +91,9 @@ pub struct ServerArgs {
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
+    /// Threshold for determining the canonicity of a block
+    #[arg(short, long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
+    canonical_threshold: u32,
     /// Threshold for updating the canonical tip/ledger
     #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
@@ -168,6 +171,7 @@ pub async fn handle_command_line_arguments(
     let watch_dir = args.watch_dir;
     let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
+    let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
 
     assert!(
@@ -205,6 +209,7 @@ pub async fn handle_command_line_arguments(
                 watch_dir,
                 keep_noncanonical_blocks,
                 prune_interval,
+                canonical_threshold,
                 canonical_update_threshold,
                 from_snapshot: args.snapshot_path.is_some(),
             })
