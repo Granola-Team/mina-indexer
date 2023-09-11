@@ -3,7 +3,7 @@ use crate::{
         get_blockchain_length, get_state_hash, is_valid_block_file,
         precomputed::{BlockLogContents, PrecomputedBlock},
     },
-    display_duration, BLOCK_REPORTING_FREQ_NUM, MAINNET_CANONICAL_THRESHOLD,
+    display_duration, BLOCK_REPORTING_FREQ_NUM,
 };
 use glob::glob;
 use std::{
@@ -34,16 +34,30 @@ pub struct BlockParser {
 }
 
 impl BlockParser {
-    pub fn new(blocks_dir: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::None, None)
+    pub fn new(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
+        Self::new_internal(blocks_dir, SearchRecursion::None, None, canonical_threshold)
     }
 
-    pub fn new_recursive(blocks_dir: &Path) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::Recursive, None)
+    pub fn new_recursive(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
+        Self::new_internal(
+            blocks_dir,
+            SearchRecursion::Recursive,
+            None,
+            canonical_threshold,
+        )
     }
 
-    pub fn new_filtered(blocks_dir: &Path, blocklength: u32) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::None, Some(blocklength))
+    pub fn new_filtered(
+        blocks_dir: &Path,
+        blocklength: u32,
+        canonical_threshold: u32,
+    ) -> anyhow::Result<Self> {
+        Self::new_internal(
+            blocks_dir,
+            SearchRecursion::None,
+            Some(blocklength),
+            canonical_threshold,
+        )
     }
 
     /// Simplified `BlockParser` for testing without canonical chain discovery.
@@ -78,6 +92,7 @@ impl BlockParser {
         blocks_dir: &Path,
         recursion: SearchRecursion,
         length_filter: Option<u32>,
+        canonical_threshold: u32,
     ) -> anyhow::Result<Self> {
         debug!("Building parser");
         if blocks_dir.exists() {
@@ -160,13 +175,14 @@ impl BlockParser {
                         .position(|x| x.0 == last_contiguous_start_idx)
                         .unwrap_or(0),
                     last_contiguous_idx,
+                    canonical_threshold,
                 );
 
                 if canonical_tip_opt.is_none()
                     || max_num_canonical_blocks(
                         &length_start_indices_and_diffs,
                         last_contiguous_start_idx,
-                    ) < MAINNET_CANONICAL_THRESHOLD
+                    ) < canonical_threshold
                 {
                     info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
                     return Ok(Self {
@@ -423,10 +439,11 @@ fn find_canonical_tip(
     length_start_indices_and_diffs: &[(usize, u32)],
     mut curr_start_idx: usize,
     mut curr_length_idx: usize,
+    canonical_threshold: u32,
 ) -> Option<(usize, usize)> {
     let mut curr_path = &paths[curr_length_idx];
 
-    for n in 1..=MAINNET_CANONICAL_THRESHOLD {
+    for n in 1..=canonical_threshold {
         let mut parent_found = false;
         let prev_length_start_idx = if curr_start_idx > 0 {
             length_start_indices_and_diffs[curr_start_idx - 1].0
@@ -448,12 +465,13 @@ fn find_canonical_tip(
         // if a parent was not found
         if !parent_found {
             // begin the search again at the previous length
-            if curr_start_idx > MAINNET_CANONICAL_THRESHOLD as usize {
+            if curr_start_idx > canonical_threshold as usize {
                 return find_canonical_tip(
                     paths,
                     length_start_indices_and_diffs,
                     curr_start_idx.saturating_sub(1),
                     prev_length_start_idx,
+                    canonical_threshold,
                 );
             } else {
                 // canonical tip cannot be found
@@ -462,7 +480,7 @@ fn find_canonical_tip(
         }
 
         // canonical tip found
-        if n == MAINNET_CANONICAL_THRESHOLD && parent_found {
+        if n == canonical_threshold && parent_found {
             break;
         }
     }

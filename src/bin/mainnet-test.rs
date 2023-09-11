@@ -5,7 +5,8 @@ use mina_indexer::{
     display_duration,
     state::{ledger::genesis, IndexerMode, IndexerState},
     store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
+    PRUNE_INTERVAL_DEFAULT,
 };
 use std::{fs, path::PathBuf, sync::Arc, thread};
 use tokio::{
@@ -76,7 +77,9 @@ async fn main() -> anyhow::Result<()> {
         .with(stdout_layer.with_filter(log_level))
         .init();
 
-    let mut bp = BlockParser::new_filtered(&blocks_dir, max_block_length).unwrap();
+    let mut bp =
+        BlockParser::new_filtered(&blocks_dir, max_block_length, MAINNET_CANONICAL_THRESHOLD)
+            .unwrap();
     let store_dir = &PathBuf::from(DB_PATH);
     if store_dir.exists() {
         fs::remove_dir_all(store_dir)?;

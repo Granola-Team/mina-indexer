@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     store::IndexerStore,
+    MAINNET_CANONICAL_THRESHOLD,
 };
 use tokio::time::Instant;
 
@@ -12,7 +13,7 @@ async fn rocksdb() {
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
     let db = IndexerStore::new(store_dir).unwrap();
-    let mut bp = BlockParser::new(log_dir).unwrap();
+    let mut bp = BlockParser::new(log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     let mut blocks = HashMap::new();
 

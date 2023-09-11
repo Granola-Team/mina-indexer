@@ -1,10 +1,10 @@
-use mina_indexer::block::parser::BlockParser;
+use mina_indexer::{block::parser::BlockParser, MAINNET_CANONICAL_THRESHOLD};
 use std::path::PathBuf;
 
 #[tokio::test]
 async fn gaps() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/gaps");
-    let mut block_parser = BlockParser::new(&blocks_dir).unwrap();
+    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(
@@ -22,7 +22,7 @@ async fn gaps() {
 #[tokio::test]
 async fn contiguous() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new(&blocks_dir).unwrap();
+    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(
@@ -40,7 +40,7 @@ async fn contiguous() {
 #[tokio::test]
 async fn missing_parent() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/missing_parent");
-    let mut block_parser = BlockParser::new(&blocks_dir).unwrap();
+    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(

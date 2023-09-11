@@ -313,15 +313,13 @@ impl IndexerState {
             };
             trace!("read best tip {:?}", best_tip.state_hash);
 
-            let canonical_tip_id = if let Some(canonical_tip_id) = snapshot
-                .root_branch
-                .canonical_tip_id(canonical_update_threshold)
-            {
-                canonical_tip_id
-            } else {
-                error!("branch has no canonical tip!");
-                process::exit(100);
-            };
+            let canonical_tip_id =
+                if let Some(canonical_tip_id) = snapshot.root_branch.canonical_tip_id() {
+                    canonical_tip_id
+                } else {
+                    error!("branch has no canonical tip!");
+                    process::exit(100);
+                };
             let canonical_tip = Tip {
                 state_hash: snapshot
                     .root_branch

@@ -37,6 +37,7 @@ pub struct IndexerConfiguration {
     pub watch_dir: PathBuf,
     pub keep_noncanonical_blocks: bool,
     pub prune_interval: u32,
+    pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
     pub from_snapshot: bool,
 }
@@ -170,6 +171,7 @@ pub async fn initialize(
         watch_dir: _,
         keep_noncanonical_blocks,
         prune_interval,
+        canonical_threshold,
         canonical_update_threshold,
         from_snapshot,
     } = config;
@@ -193,7 +195,7 @@ pub async fn initialize(
             canonical_update_threshold,
         )?;
 
-        let mut block_parser = BlockParser::new(&startup_dir)?;
+        let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
         if !non_genesis_ledger {
             state
                 .initialize_with_contiguous_canonical(&mut block_parser)
