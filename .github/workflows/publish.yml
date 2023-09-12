@@ -15,7 +15,7 @@ jobs:
           submodules: recursive
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ghcr.io/Granola-Team/publish-packages/mina-indexer
           tags: type=sha
