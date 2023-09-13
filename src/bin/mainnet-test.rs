@@ -173,15 +173,13 @@ async fn main() -> anyhow::Result<()> {
                 if verbose {
                     println!(
                         "Added block (length: {}, state_hash: {:?})",
-                        block.blockchain_length,
-                        block.state_hash
+                        block.blockchain_length, block.state_hash
                     );
                     match block.blockchain_length.cmp(&highest_seq_height) {
                         std::cmp::Ordering::Less => {
                             println!(
                                 "Another block of height: {}! state_hash: {:?}",
-                                block.blockchain_length,
-                                block.state_hash
+                                block.blockchain_length, block.state_hash
                             )
                         }
                         std::cmp::Ordering::Equal => highest_seq_height += 1,

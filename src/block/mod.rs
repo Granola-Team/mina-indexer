@@ -75,8 +75,7 @@ impl Block {
     pub fn summary(&self) -> String {
         format!(
             "{{ len: {}, state: {} }}",
-            self.blockchain_length,
-            self.state_hash.0
+            self.blockchain_length, self.state_hash.0
         )
     }
 }

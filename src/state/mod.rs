@@ -743,14 +743,12 @@ impl IndexerState {
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
             let min_length = dangling_branch.root_block().blockchain_length;
-            let max_length = dangling_branch
-                .best_tip()
-                .unwrap()
-                .blockchain_length
-                ;
+            let max_length = dangling_branch.best_tip().unwrap().blockchain_length;
 
             // check incoming block is within the length bounds
-            if max_length + 1 >= precomputed_block.blockchain_length && precomputed_block.blockchain_length + 1 >= min_length {
+            if max_length + 1 >= precomputed_block.blockchain_length
+                && precomputed_block.blockchain_length + 1 >= min_length
+            {
                 // simple reverse
                 if is_reverse_extension(dangling_branch, precomputed_block) {
                     dangling_branch.new_root(precomputed_block);
@@ -767,8 +765,7 @@ impl IndexerState {
                 }
 
                 // simple forward
-                if let Some((new_node_id, _)) =
-                    dangling_branch.simple_extension(precomputed_block)
+                if let Some((new_node_id, _)) = dangling_branch.simple_extension(precomputed_block)
                 {
                     extension = Some((index, new_node_id, ExtensionDirection::Forward));
                     break;
@@ -834,8 +831,7 @@ impl IndexerState {
 
     /// Checks if it's even possible to add block to the root branch
     fn is_length_within_root_bounds(&self, precomputed_block: &PrecomputedBlock) -> bool {
-        self.best_tip_block().blockchain_length + 1
-            >= precomputed_block.blockchain_length
+        self.best_tip_block().blockchain_length + 1 >= precomputed_block.blockchain_length
     }
 
     fn is_block_already_in_db(&self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<bool> {
@@ -854,7 +850,8 @@ impl IndexerState {
         let best_tip_length = self.best_tip_block().blockchain_length;
 
         if incoming_block.blockchain_length == best_tip_length + 1
-            || incoming_block.blockchain_length == best_tip_length && incoming_block > self.best_tip_block()
+            || incoming_block.blockchain_length == best_tip_length
+                && incoming_block > self.best_tip_block()
         {
             self.best_tip.node_id = node_id.clone();
             self.best_tip.state_hash = incoming_block.state_hash.clone();
