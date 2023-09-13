@@ -78,8 +78,8 @@ async fn extension() {
                     let child_block = &dangling_branch.branches.get(child_id).unwrap().data();
                     assert_eq!(child_block.height, 1 + parent_block.height);
                     assert_eq!(
-                        child_block.blockchain_length.unwrap(),
-                        1 + parent_block.blockchain_length.unwrap()
+                        child_block.blockchain_length,
+                        1 + parent_block.blockchain_length
                     );
                     assert_eq!(
                         node.data().state_hash,

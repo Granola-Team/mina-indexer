@@ -173,25 +173,21 @@ async fn main() -> anyhow::Result<()> {
                 if verbose {
                     println!(
                         "Added block (length: {}, state_hash: {:?})",
-                        block.blockchain_length.unwrap_or(0),
+                        block.blockchain_length,
                         block.state_hash
                     );
-                    match block.blockchain_length {
-                        None => {
-                            println!("Block with no height! state_hash: {:?}", block.state_hash)
+                    match block.blockchain_length.cmp(&highest_seq_height) {
+                        std::cmp::Ordering::Less => {
+                            println!(
+                                "Another block of height: {}! state_hash: {:?}",
+                                block.blockchain_length,
+                                block.state_hash
+                            )
                         }
-                        Some(n) => match n.cmp(&highest_seq_height) {
-                            std::cmp::Ordering::Less => {
-                                println!(
-                                    "Another block of height: {n}! state_hash: {:?}",
-                                    block.state_hash
-                                )
-                            }
-                            std::cmp::Ordering::Equal => highest_seq_height += 1,
-                            std::cmp::Ordering::Greater => {
-                                println!("Expected {highest_seq_height}, instead got height {n}, state_hash: {:?}", block.state_hash)
-                            }
-                        },
+                        std::cmp::Ordering::Equal => highest_seq_height += 1,
+                        std::cmp::Ordering::Greater => {
+                            println!("Expected {highest_seq_height}, instead got height {}, state_hash: {:?}", block.blockchain_length, block.state_hash)
+                        }
                     }
                 }
 
@@ -276,7 +272,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Initial ingestion complete!");
     println!("Watching {} now", watch_dir.display());
 
-    let mut next_length = state.best_tip_block().blockchain_length.unwrap() + 1;
+    let mut next_length = state.best_tip_block().blockchain_length + 1;
     let watch_duration = Duration::new(duration, 0);
     let watch_time = Instant::now();
 

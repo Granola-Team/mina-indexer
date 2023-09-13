@@ -120,7 +120,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                         .write_all(serde_json::to_string(block)?.as_bytes())
                         .await?;
                 } else {
-                    let block = Block::from_precomputed(block, block.blockchain_length.unwrap());
+                    let block = Block::from_precomputed(block, block.blockchain_length);
                     stdout().write_all(block.summary().as_bytes()).await?;
                 }
             }

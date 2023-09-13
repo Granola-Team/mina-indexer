@@ -161,7 +161,7 @@ impl IndexerState {
         mode: IndexerMode,
         root_hash: BlockHash,
         ledger: Ledger,
-        blockchain_length: Option<u32>,
+        blockchain_length: u32,
         global_slot_since_genesis: u32,
         indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
@@ -365,8 +365,8 @@ impl IndexerState {
             debug!(
                 "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
                 k,
-                self.best_tip_block().blockchain_length.unwrap_or(0),
-                self.canonical_tip_block().blockchain_length.unwrap_or(0),
+                self.best_tip_block().blockchain_length,
+                self.canonical_tip_block().blockchain_length,
             );
 
             self.root_branch
@@ -519,12 +519,10 @@ impl IndexerState {
                 ledger.apply_post_balances(&precomputed_block);
                 indexer_store.add_block(&precomputed_block)?;
 
-                if let Some(height) = precomputed_block.blockchain_length {
-                    let timestamp = precomputed_block.timestamp();
+                let timestamp = precomputed_block.timestamp();
 
-                    for cmd in precomputed_block.commands() {
-                        indexer_store.put_tx(height, timestamp, cmd)?;
-                    }
+                for cmd in precomputed_block.commands() {
+                    indexer_store.put_tx(precomputed_block.blockchain_length, timestamp, cmd)?;
                 }
 
                 // TODO: store ledger at specified cadence, e.g. at epoch boundaries
@@ -636,8 +634,8 @@ impl IndexerState {
             return Ok(ExtensionType::BlockNotAdded);
         }
 
-        let incoming_length = precomputed_block.blockchain_length.unwrap_or(u32::MAX);
-        if self.root_branch.root_block().blockchain_length.unwrap_or(0) > incoming_length {
+        let incoming_length = precomputed_block.blockchain_length;
+        if self.root_branch.root_block().blockchain_length > incoming_length {
             debug!(
                 "Block with state hash {:?} has length {incoming_length} which is too low to add to the witness tree",
                 precomputed_block.state_hash,
@@ -649,12 +647,10 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
 
-            if let Some(height) = precomputed_block.blockchain_length {
-                let tmstmp = precomputed_block.timestamp();
+            let tmstmp = precomputed_block.timestamp();
 
-                for cmd in precomputed_block.commands() {
-                    indexer_store.put_tx(height, tmstmp, cmd)?;
-                }
+            for cmd in precomputed_block.commands() {
+                indexer_store.put_tx(precomputed_block.blockchain_length, tmstmp, cmd)?;
             }
         }
 
@@ -746,44 +742,15 @@ impl IndexerState {
     ) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
-            let min_length = dangling_branch.root_block().blockchain_length.unwrap_or(0);
+            let min_length = dangling_branch.root_block().blockchain_length;
             let max_length = dangling_branch
                 .best_tip()
                 .unwrap()
                 .blockchain_length
-                .unwrap_or(0);
+                ;
 
             // check incoming block is within the length bounds
-            if let Some(length) = precomputed_block.blockchain_length {
-                if max_length + 1 >= length && length + 1 >= min_length {
-                    // simple reverse
-                    if is_reverse_extension(dangling_branch, precomputed_block) {
-                        dangling_branch.new_root(precomputed_block);
-                        extension = Some((
-                            index,
-                            dangling_branch
-                                .branches
-                                .root_node_id()
-                                .expect("has root")
-                                .clone(),
-                            ExtensionDirection::Reverse,
-                        ));
-                        break;
-                    }
-
-                    // simple forward
-                    if let Some((new_node_id, _)) =
-                        dangling_branch.simple_extension(precomputed_block)
-                    {
-                        extension = Some((index, new_node_id, ExtensionDirection::Forward));
-                        break;
-                    }
-
-                    same_block_added_twice(dangling_branch, precomputed_block)?;
-                }
-            } else {
-                // we don't know the blockchain_length for the incoming block, so we can't discriminate
-
+            if max_length + 1 >= precomputed_block.blockchain_length && precomputed_block.blockchain_length + 1 >= min_length {
                 // simple reverse
                 if is_reverse_extension(dangling_branch, precomputed_block) {
                     dangling_branch.new_root(precomputed_block);
@@ -800,7 +767,8 @@ impl IndexerState {
                 }
 
                 // simple forward
-                if let Some((new_node_id, _)) = dangling_branch.simple_extension(precomputed_block)
+                if let Some((new_node_id, _)) =
+                    dangling_branch.simple_extension(precomputed_block)
                 {
                     extension = Some((index, new_node_id, ExtensionDirection::Forward));
                     break;
@@ -866,10 +834,8 @@ impl IndexerState {
 
     /// Checks if it's even possible to add block to the root branch
     fn is_length_within_root_bounds(&self, precomputed_block: &PrecomputedBlock) -> bool {
-        (precomputed_block.blockchain_length.is_some()
-            && self.best_tip_block().blockchain_length.unwrap_or(0) + 1
-                >= precomputed_block.blockchain_length.unwrap())
-            || precomputed_block.blockchain_length.is_none()
+        self.best_tip_block().blockchain_length + 1
+            >= precomputed_block.blockchain_length
     }
 
     fn is_block_already_in_db(&self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<bool> {
@@ -885,15 +851,13 @@ impl IndexerState {
 
     /// Update the best tip of the root branch
     fn update_best_tip(&mut self, incoming_block: &Block, node_id: &NodeId) {
-        if let Some(incoming_length) = incoming_block.blockchain_length {
-            let best_tip_length = self.best_tip_block().blockchain_length.unwrap_or(0);
+        let best_tip_length = self.best_tip_block().blockchain_length;
 
-            if incoming_length == best_tip_length + 1
-                || incoming_length == best_tip_length && incoming_block > self.best_tip_block()
-            {
-                self.best_tip.node_id = node_id.clone();
-                self.best_tip.state_hash = incoming_block.state_hash.clone();
-            }
+        if incoming_block.blockchain_length == best_tip_length + 1
+            || incoming_block.blockchain_length == best_tip_length && incoming_block > self.best_tip_block()
+        {
+            self.best_tip.node_id = node_id.clone();
+            self.best_tip.state_hash = incoming_block.state_hash.clone();
         }
 
         let (id, block) = self.root_branch.best_tip_with_id().unwrap();
@@ -1000,9 +964,9 @@ impl IndexerState {
             .unwrap_or_default();
         let witness_tree = WitnessTreeSummaryShort {
             best_tip_hash: self.best_tip_block().state_hash.0.clone(),
-            best_tip_length: self.best_tip_block().blockchain_length.unwrap_or(0),
+            best_tip_length: self.best_tip_block().blockchain_length,
             canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
-            canonical_tip_length: self.canonical_tip_block().blockchain_length.unwrap_or(0),
+            canonical_tip_length: self.canonical_tip_block().blockchain_length,
             root_hash: self.root_branch.root_block().state_hash.0.clone(),
             root_height: self.root_branch.height(),
             root_length: self.root_branch.len(),
@@ -1041,9 +1005,9 @@ impl IndexerState {
             .unwrap_or_default();
         let witness_tree = WitnessTreeSummaryVerbose {
             best_tip_hash: self.best_tip_block().state_hash.0.clone(),
-            best_tip_length: self.best_tip_block().blockchain_length.unwrap_or(0),
+            best_tip_length: self.best_tip_block().blockchain_length,
             canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
-            canonical_tip_length: self.canonical_tip_block().blockchain_length.unwrap_or(0),
+            canonical_tip_length: self.canonical_tip_block().blockchain_length,
             root_hash: self.root_branch.root_block().state_hash.0.clone(),
             root_height: self.root_branch.height(),
             root_length: self.root_branch.len(),

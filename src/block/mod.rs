@@ -16,7 +16,7 @@ pub struct Block {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
     pub height: u32,
-    pub blockchain_length: Option<u32>,
+    pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
 }
 
@@ -24,7 +24,7 @@ pub struct Block {
 pub struct BlockWithoutHeight {
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
-    pub blockchain_length: Option<u32>,
+    pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
 }
 
@@ -75,8 +75,7 @@ impl Block {
     pub fn summary(&self) -> String {
         format!(
             "{{ len: {}, state: {} }}",
-            self.blockchain_length
-                .map_or("unknown".to_string(), |len| len.to_string()),
+            self.blockchain_length,
             self.state_hash.0
         )
     }
@@ -141,7 +140,7 @@ impl std::fmt::Debug for Block {
             f,
             "Block {{ height: {}, len: {}, slot: {}, state: {}, parent: {} }}",
             self.height,
-            self.blockchain_length.unwrap_or(0),
+            self.blockchain_length,
             self.global_slot_since_genesis,
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12]
@@ -154,7 +153,7 @@ impl std::fmt::Debug for BlockWithoutHeight {
         write!(
             f,
             "Block {{ len: {}, slot: {}, state: {}, parent: {} }}",
-            self.blockchain_length.unwrap_or(0),
+            self.blockchain_length,
             self.global_slot_since_genesis,
             &self.state_hash.0[0..12],
             &self.parent_hash.0[0..12]
