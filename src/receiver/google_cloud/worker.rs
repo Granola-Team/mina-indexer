@@ -224,11 +224,9 @@ async fn parse_temp_blocks_dir(
             "PrecomputedBlock parsed with state hash {}",
             &precomputed_block.state_hash
         );
-        if let Some(length) = precomputed_block.blockchain_length {
-            if length as u64 > *max_length {
-                trace!("new max blockchain length found");
-                *max_length = length as u64;
-            }
+        if precomputed_block.blockchain_length as u64 > *max_length {
+            trace!("new max blockchain length found");
+            *max_length = precomputed_block.blockchain_length as u64;
         }
         precomputed_blocks.push(precomputed_block);
 

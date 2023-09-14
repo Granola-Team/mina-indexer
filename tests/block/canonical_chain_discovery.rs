@@ -9,8 +9,7 @@ async fn gaps() {
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length.unwrap_or(0),
-            precomputed_block.state_hash
+            precomputed_block.blockchain_length, precomputed_block.state_hash
         );
     }
 
@@ -27,8 +26,7 @@ async fn contiguous() {
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length.unwrap_or(0),
-            precomputed_block.state_hash
+            precomputed_block.blockchain_length, precomputed_block.state_hash
         );
     }
 
@@ -45,8 +43,7 @@ async fn missing_parent() {
     while let Some(precomputed_block) = block_parser.next().await.unwrap() {
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length.unwrap_or(0),
-            precomputed_block.state_hash
+            precomputed_block.blockchain_length, precomputed_block.state_hash
         );
     }
 

@@ -26,7 +26,7 @@ impl Branch {
             state_hash: root_hash.clone(),
             parent_hash: root_hash,
             height: 0,
-            blockchain_length: Some(1),
+            blockchain_length: 1,
             global_slot_since_genesis: 0,
         };
         let mut branches = Tree::new();
@@ -39,7 +39,7 @@ impl Branch {
     /// Creates a new `Branch` from an arbitrary starting hash
     pub fn new_non_genesis(
         root_hash: BlockHash,
-        blockchain_length: Option<u32>,
+        blockchain_length: u32,
         global_slot_since_genesis: u32,
     ) -> Self {
         let root_block = Block {
@@ -261,19 +261,9 @@ impl Branch {
             .expect("junction node exists in self")
             .data()
             .height;
-        let junction_length = self
-            .branches
-            .get(junction_id)
-            .expect("junction node exists in self")
-            .data()
-            .blockchain_length
-            .unwrap_or(0);
 
         // adjust the height of the incoming branch's root block
         incoming_root_data.height = junction_height + 1;
-        if incoming_root_data.blockchain_length.is_none() {
-            incoming_root_data.blockchain_length = Some(junction_length + 1)
-        }
 
         let new_node_id = self
             .branches
@@ -305,11 +295,6 @@ impl Branch {
                     .clone();
 
                 child_node_data.height += junction_height + 1;
-
-                if child_node_data.blockchain_length.is_none() {
-                    child_node_data.blockchain_length =
-                        Some(junction_length + child_node_data.height + 1 - junction_height)
-                }
 
                 let new_child_id = self
                     .branches

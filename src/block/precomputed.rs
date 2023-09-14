@@ -37,7 +37,7 @@ pub struct PrecomputedBlock {
     pub state_hash: String,
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
-    pub blockchain_length: Option<u32>,
+    pub blockchain_length: u32,
     pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: StagedLedgerDiff,
     pub delta_transition_chain_proof: DeltaTransitionChainProof,
@@ -46,7 +46,6 @@ pub struct PrecomputedBlock {
 impl PrecomputedBlock {
     pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
-        let blockchain_length = log_contents.blockchain_length;
         let str = String::from_utf8_lossy(&log_contents.contents);
         let BlockLog {
             scheduled_time,
@@ -55,6 +54,11 @@ impl PrecomputedBlock {
             staged_ledger_diff,
             delta_transition_chain_proof,
         } = serde_json::from_str::<BlockLog>(&str).unwrap();
+        let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
+            blockchain_length
+        } else {
+            protocol_state.body.consensus_state.blockchain_length.0
+        };
         Ok(Self {
             canonicity: None,
             state_hash,
