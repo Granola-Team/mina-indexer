@@ -102,7 +102,7 @@ impl IndexerStore {
             vec!["blocks", "ledgers"],
         )?;
         Ok(Self {
-            db_path: PathBuf::from(path),
+            db_path: PathBuf::from(secondary),
             database,
         })
     }
