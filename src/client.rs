@@ -144,7 +144,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                         .await?;
                 } else {
                     stdout()
-                        .write_all(format!("{summary:?}").as_bytes())
+                        .write_all(format!("{summary}").as_bytes())
                         .await?;
                 }
             } else {
@@ -155,7 +155,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                         .await?;
                 } else {
                     stdout()
-                        .write_all(format!("{summary:?}").as_bytes())
+                        .write_all(format!("{summary}").as_bytes())
                         .await?;
                 }
             }
