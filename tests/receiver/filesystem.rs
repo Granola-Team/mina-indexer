@@ -1,4 +1,7 @@
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use mina_indexer::receiver::{filesystem::FilesystemReceiver, BlockReceiver};
 use tokio::{
@@ -41,21 +44,21 @@ async fn detects_new_block_written() {
 
 #[tokio::test]
 async fn detects_new_block_copied() {
-    const TEST_DIR: &'static str = "./receiver_copy_test";
+    let mut test_dir = std::env::temp_dir();
+    test_dir.push("receiver_copy_test");
     const TEST_BLOCK_PATH: &'static str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
 
     let timeout = Duration::new(5, 0);
     let mut success = false;
 
     tokio::time::timeout(timeout, async {
-        let test_dir_path = PathBuf::from(TEST_DIR);
-        let mut test_block_path = test_dir_path.clone();
+        let mut test_block_path = test_dir.clone();
         test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
-        pretest(TEST_DIR).await;
+        pretest(&test_dir).await;
 
         let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
-        block_receiver.load_directory(&test_dir_path).unwrap();
+        block_receiver.load_directory(&test_dir).unwrap();
 
         let mut command = Command::new("cp")
             .arg(TEST_BLOCK_PATH)
@@ -70,19 +73,19 @@ async fn detects_new_block_copied() {
     .await
     .unwrap();
 
-    posttest(TEST_DIR, success).await;
+    posttest(&test_dir, success).await;
 }
 
-async fn pretest(path: &str) {
-    if metadata(path).await.is_ok() {
-        remove_dir_all(path).await.unwrap();
+async fn pretest(path: impl AsRef<Path>) {
+    if metadata(path.as_ref()).await.is_ok() {
+        remove_dir_all(path.as_ref()).await.unwrap();
     }
-    create_dir(path).await.unwrap_or(());
+    create_dir(path.as_ref()).await.unwrap_or(());
 }
 
-async fn posttest(path: &str, success: bool) {
-    if metadata(path).await.is_ok() {
-        remove_dir_all(path).await.unwrap();
+async fn posttest(path: impl AsRef<Path>, success: bool) {
+    if metadata(path.as_ref()).await.is_ok() {
+        remove_dir_all(path.as_ref()).await.unwrap();
     }
 
     if !success {
