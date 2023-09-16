@@ -91,13 +91,14 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
 
-    let mut buffer = Vec::with_capacity(1280000);
+    let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
     match command {
         ClientCli::Account(account_args) => {
             let command = format!("account {}\0", account_args.public_key);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let account: Account = bcs::from_bytes(&buffer)?;
             if output_json {
                 stdout()
