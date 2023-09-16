@@ -401,10 +401,18 @@ async fn handle_conn(
             let data_buffer = buffers.next().unwrap();
             let path = &String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<PathBuf>()?;
-            debug!("Writing ledger to {}", path.display());
-            fs::write(path, format!("{ledger:?}")).await?;
-            let bytes = bcs::to_bytes(&format!("Ledger written to {}", path.display()))?;
-            writer.write_all(&bytes).await?;
+            if !path.is_dir() {
+                debug!("Writing ledger to {}", path.display());
+                fs::write(path, format!("{ledger:?}")).await?;
+                let bytes = bcs::to_bytes(&format!("Ledger written to {}", path.display()))?;
+                writer.write_all(&bytes).await?;
+            } else {
+                let bytes = bcs::to_bytes(&format!(
+                    "The path provided must be a file: {}",
+                    path.display()
+                ))?;
+                writer.write_all(&bytes).await?;
+            }
         }
         "summary" => {
             info!("Received summary command");
