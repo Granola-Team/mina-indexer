@@ -9,7 +9,7 @@ use crate::{
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
-
+use anyhow::anyhow;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
@@ -114,7 +114,7 @@ impl MinaIndexer {
         self.query_sender
             .send((command, response_sender))
             .await
-            .map_err(|_| anyhow::Error::msg("could not send command to running Mina Indexer"))?;
+            .map_err(|_| anyhow!("could not send command to running Mina Indexer"))?;
         response_receiver.recv().map_err(|recv_err| recv_err.into())
     }
 
@@ -136,7 +136,7 @@ impl MinaIndexer {
             .await?
         {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
-            _ => Err(anyhow::Error::msg("unexpected response!")),
+            _ => Err(anyhow!("unexpected response!")),
         }
     }
 }
@@ -300,29 +300,34 @@ pub async fn run(
             }
 
             conn_fut = listener.accept() => {
-                let conn = conn_fut?;
-                info!("Receiving connection");
-                phase_sender.send_replace(ReceivingIPCConnection);
-                let best_tip = state.best_tip_block().clone();
+                match conn_fut {
+                    Ok(stream) => {
+                        info!("Accepted client connection");
+                        phase_sender.send_replace(ReceivingIPCConnection);
 
-                let block_store_readonly = Arc::new(state.spawn_secondary_database()?);
+                        let best_tip = state.best_tip_block().clone();
+                        let block_store_readonly = Arc::new(state.spawn_secondary_database()?);
+                        let summary = state.summary_verbose();
+                        let ledger = state.best_ledger()?.unwrap();
 
-                let summary = state.summary_verbose();
-                let ledger = state.best_ledger()?.unwrap();
+                        let save_tx = save_tx.clone();
+                        let save_resp_rx = save_resp_rx.clone();
 
-                let save_tx = save_tx.clone();
-                let save_resp_rx = save_resp_rx.clone();
-
-                // handle the connection
-                tokio::spawn(async move {
-                    debug!("Handling connection");
-                    if let Err(e) = handle_conn(conn, block_store_readonly.clone(), best_tip, ledger, summary, save_tx, save_resp_rx).await {
-                        error!("Error handling connection: {e}");
+                        // handle the connection
+                        tokio::spawn(async move {
+                            debug!("Handling client connection");
+                            if let Err(e) = handle_conn(stream, block_store_readonly.clone(), best_tip, ledger, summary, save_tx, save_resp_rx).await {
+                                error!("Error handling connection: {e}");
+                            }
+                            debug!("Removing readonly instance at {}", block_store_readonly.db_path.clone().display());
+                            tokio::fs::remove_dir_all(&block_store_readonly.db_path).await.ok();
+                        });
                     }
+                    Err(e) => {
+                        error!("Error accepting connection: {}", e);
+                    }
+                }
 
-                    debug!("Removing readonly instance at {}", block_store_readonly.db_path.clone().display());
-                    tokio::fs::remove_dir_all(&block_store_readonly.db_path).await.ok();
-                });
             }
 
             save_rx_fut = save_rx.recv() => {
@@ -351,12 +356,14 @@ async fn handle_conn(
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
-    let mut buffer = Vec::with_capacity(128);
-    let _read = reader.read_until(0, &mut buffer).await?;
-
-    let mut buffers = buffer.split(|byte| *byte == 32);
+    let mut buffer = Vec::with_capacity(1024);
+    let read_size = reader.read_until(0, &mut buffer).await?;
+    if read_size == 0 {
+        return Err(anyhow!("Unexpected EOF"));
+    }
+    let mut buffers = buffer.split(|byte| *byte == b' ');
     let command = buffers.next().unwrap();
-    let command_string = String::from_utf8(command.to_vec())?;
+    let command_string = String::from_utf8(command.to_vec()).unwrap();
 
     match command_string.as_str() {
         "account" => {
@@ -365,7 +372,7 @@ async fn handle_conn(
                 data_buffer[..data_buffer.len() - 1].to_vec(),
             )?)?;
             info!("Received account command for {public_key:?}");
-            debug!("Using ledger {ledger:?}");
+            trace!("Using ledger {ledger:?}");
             let account = ledger.accounts.get(&public_key);
             if let Some(account) = account {
                 debug!("Writing account {account:?} to client");
@@ -425,9 +432,7 @@ async fn handle_conn(
             writer.write_all(b"saving snapshot...").await?;
         }
         bad_request => {
-            let err_msg = format!("Malformed request: {bad_request}");
-            error!("{err_msg}");
-            return Err(anyhow::Error::msg(err_msg));
+            return Err(anyhow!("Malformed request: {bad_request}"));
         }
     }
 
