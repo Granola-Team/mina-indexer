@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use super::PublicKey;
@@ -72,6 +73,23 @@ impl Ord for Account {
     }
 }
 
+const MINA_SCALE: u32 = 9;
+
+fn nanomina_to_mina(num: u64) -> String {
+    let mut dec = Decimal::from(num);
+    dec.set_scale(MINA_SCALE).unwrap();
+    let mut dec_str = dec.to_string();
+    if dec_str.contains('.') {
+        while dec_str.ends_with('0') {
+            dec_str.pop();
+        }
+        if dec_str.ends_with('.') {
+            dec_str.pop();
+        }
+    }
+    dec_str
+}
+
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let pk = self.public_key.to_address();
@@ -82,9 +100,20 @@ impl std::fmt::Debug for Account {
             .unwrap_or(pk.clone());
         writeln!(f, "{{")?;
         writeln!(f, "  pk:       {pk}")?;
-        writeln!(f, "  balance:  {}", self.balance.0)?;
+        writeln!(f, "  balance:  {}", nanomina_to_mina(self.balance.0))?;
         writeln!(f, "  nonce:    {}", self.nonce.0)?;
         writeln!(f, "  delegate: {delegate}")?;
         writeln!(f, "}}")
     }
+}
+
+#[test]
+fn test_nanomina_to_mina_conversion() {
+    let actual = 1_000_000_001;
+    let val = nanomina_to_mina(actual);
+    assert_eq!("1.000000001", val);
+
+    let actual = 1_000_000_000;
+    let val = nanomina_to_mina(actual);
+    assert_eq!("1", val);
 }
