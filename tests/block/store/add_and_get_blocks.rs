@@ -9,10 +9,16 @@ use tokio::time::Instant;
 
 #[tokio::test]
 async fn rocksdb() {
-    let store_dir = &PathBuf::from("./block-store-test");
+    let mut store_dir = std::env::temp_dir();
+    store_dir.push("./block-store-test");
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
-    let db = IndexerStore::new(store_dir).unwrap();
+    if tokio::fs::metadata(&store_dir).await.is_ok() {
+        tokio::fs::remove_dir_all(&store_dir).await.unwrap();
+    }
+    tokio::fs::create_dir(&store_dir).await.unwrap_or(());
+
+    let db = IndexerStore::new(&store_dir).unwrap();
     let mut bp = BlockParser::new(log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     let mut blocks = HashMap::new();
@@ -40,5 +46,7 @@ async fn rocksdb() {
     println!("To insert all:    {add_time:?}");
     println!("To fetch all:     {:?}\n", fetching.elapsed());
 
-    tokio::fs::remove_dir_all(store_dir).await.unwrap();
+    if tokio::fs::metadata(&store_dir).await.is_ok() {
+        tokio::fs::remove_dir_all(&store_dir).await.unwrap();
+    }
 }

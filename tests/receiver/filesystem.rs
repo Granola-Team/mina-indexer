@@ -1,5 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
 
@@ -12,7 +12,8 @@ use tokio::{
 
 #[tokio::test]
 async fn detects_new_block_written() {
-    const TEST_DIR: &'static str = "./receiver_write_test";
+    let mut test_dir = std::env::temp_dir();
+    test_dir.push("receiver_write_test");
     const TEST_BLOCK: &'static str = include_str!(
         "../data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
@@ -21,11 +22,11 @@ async fn detects_new_block_written() {
     let mut success = false;
 
     tokio::time::timeout(timeout, async {
-        let test_dir_path = PathBuf::from(TEST_DIR);
+        let test_dir_path = test_dir.clone();
         let mut test_block_path = test_dir_path.clone();
         test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
-        pretest(TEST_DIR).await;
+        pretest(&test_dir).await;
 
         let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
         block_receiver.load_directory(&test_dir_path).unwrap();
@@ -39,7 +40,7 @@ async fn detects_new_block_written() {
     .await
     .unwrap();
 
-    posttest(TEST_DIR, success).await;
+    posttest(&test_dir, success).await;
 }
 
 #[tokio::test]

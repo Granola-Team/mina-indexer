@@ -10,7 +10,10 @@ async fn receives_new_block() {
     let mut temp_block_dir = std::env::temp_dir();
     temp_block_dir.push("test_temp_block_dir");
     let bucket = "mina_network_block_data".to_string();
-    tokio::fs::create_dir(&temp_block_dir).await.unwrap();
+    if tokio::fs::metadata(&temp_block_dir).await.is_ok() {
+        tokio::fs::remove_dir_all(&temp_block_dir).await.unwrap();
+    }
+    tokio::fs::create_dir(&temp_block_dir).await.unwrap_or(());
 
     let mut block_receiver = GoogleCloudBlockReceiver::new(
         1,
@@ -27,8 +30,4 @@ async fn receives_new_block() {
         .recv_block()
         .await
         .expect("block is received successfully");
-
-    tokio::fs::remove_dir_all(&temp_block_dir)
-        .await
-        .expect("directory was created earlier in same test");
 }
