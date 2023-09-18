@@ -9,7 +9,7 @@ use crate::{
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
-
+use anyhow::anyhow;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use log::trace;
@@ -114,7 +114,7 @@ impl MinaIndexer {
         self.query_sender
             .send((command, response_sender))
             .await
-            .map_err(|_| anyhow::Error::msg("could not send command to running Mina Indexer"))?;
+            .map_err(|_| anyhow!("could not send command to running Mina Indexer"))?;
         response_receiver.recv().map_err(|recv_err| recv_err.into())
     }
 
@@ -136,7 +136,7 @@ impl MinaIndexer {
             .await?
         {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
-            _ => Err(anyhow::Error::msg("unexpected response!")),
+            _ => Err(anyhow!("unexpected response!")),
         }
     }
 }
@@ -425,9 +425,7 @@ async fn handle_conn(
             writer.write_all(b"saving snapshot...").await?;
         }
         bad_request => {
-            let err_msg = format!("Malformed request: {bad_request}");
-            error!("{err_msg}");
-            return Err(anyhow::Error::msg(err_msg));
+            return Err(anyhow!("Malformed request: {bad_request}"));
         }
     }
 
