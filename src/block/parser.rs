@@ -5,6 +5,7 @@ use crate::{
     },
     display_duration, BLOCK_REPORTING_FREQ_NUM,
 };
+use anyhow::anyhow;
 use glob::glob;
 use std::{
     fs::File,
@@ -78,9 +79,9 @@ impl BlockParser {
                 successive_paths: paths.into_iter(),
             })
         } else {
-            Err(anyhow::Error::msg(format!(
+            Err(anyhow!(
                 "[BlockParser::new_testing] log path {blocks_dir:?} does not exist!"
-            )))
+            ))
         }
     }
 
@@ -306,9 +307,9 @@ impl BlockParser {
                 successive_paths: successive_paths.into_iter(),
             })
         } else {
-            Err(anyhow::Error::msg(format!(
+            Err(anyhow!(
                 "[BlockParser::new_internal] log path {blocks_dir:?} does not exist!"
-            )))
+            ))
         }
     }
 
@@ -331,24 +332,24 @@ impl BlockParser {
         &mut self,
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
-        let mut next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
+        let mut next_block = self.next().await?.ok_or(anyhow!(
             "
 [BlockPasrser::get_precomputed_block]
     Looking in blocks dir: {}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!",
             self.blocks_dir.display()
-        )))?;
+        ))?;
 
         while next_block.state_hash != state_hash {
-            next_block = self.next().await?.ok_or(anyhow::Error::msg(format!(
+            next_block = self.next().await?.ok_or(anyhow!(
                 "
 [BlockPasrser::get_precomputed_block]
     Looking in blocks dir: {}
     Did not find state hash: {state_hash}
     It may have been skipped unintentionally!",
                 self.blocks_dir.display()
-            )))?;
+            ))?;
         }
 
         Ok(next_block)
@@ -376,13 +377,13 @@ impl BlockParser {
 
             Ok(precomputed_block)
         } else {
-            Err(anyhow::Error::msg(format!(
+            Err(anyhow!(
                 "
 [BlockParser::parse_file]
     Could not find valid block!
     {} is not a valid precomputed block",
                 filename.display()
-            )))
+            ))
         }
     }
 }
