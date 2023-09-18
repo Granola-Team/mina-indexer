@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::{ffi::OsStr, path::Path};
 
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
@@ -186,13 +187,10 @@ pub async fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
 
         Ok(precomputed_block)
     } else {
-        Err(anyhow::Error::msg(format!(
-            "
-[PrecomputedBlock::parse_file]
-    Could not find valid block!
-    {} is not a valid Precomputed Block",
+        Err(anyhow!(
+            "Could not find valid block! {} is not a valid Precomputed Block",
             filename.display()
-        )))
+        ))
     }
 }
 
