@@ -20,6 +20,7 @@ use crate::{
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
+use anyhow::anyhow;
 use id_tree::NodeId;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -349,9 +350,7 @@ impl IndexerState {
                 init_time: Instant::now(),
             })
         } else {
-            Err(anyhow::Error::msg(
-                "No state snapshot stored in rocksdb backup",
-            ))
+            Err(anyhow!("No state snapshot stored in rocksdb backup"))
         }
     }
 
@@ -1044,10 +1043,10 @@ fn same_block_added_twice(
     precomputed_block: &PrecomputedBlock,
 ) -> anyhow::Result<()> {
     if precomputed_block.state_hash == branch.root_block().state_hash.0 {
-        return Err(anyhow::Error::msg(format!(
+        return Err(anyhow!(
             "Block with hash {:?} added twice to the indexer state",
             precomputed_block.state_hash,
-        )));
+        ));
     }
     Ok(())
 }
