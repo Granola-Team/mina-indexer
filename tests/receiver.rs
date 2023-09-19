@@ -1,6 +1,6 @@
 use std::{
     path::Path,
-    time::Duration,
+    time::Duration, 
 };
 
 use mina_indexer::receiver::{filesystem::FilesystemReceiver, BlockReceiver};
@@ -15,25 +15,26 @@ async fn detects_new_block_written() {
     let mut test_dir = std::env::temp_dir();
     test_dir.push("receiver_write_test");
     const TEST_BLOCK: &'static str = include_str!(
-        "../data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
+        "data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
 
     let timeout = Duration::new(5, 0);
     let mut success = false;
 
+    let test_dir_path = test_dir.clone();
+    let mut test_block_path = test_dir_path.clone();
+    test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+
+    pretest(&test_dir).await;
+
+    let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
+    block_receiver.load_directory(&test_dir_path).unwrap();
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let mut file = File::create(test_block_path.clone()).await.unwrap();
+    file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
     tokio::time::timeout(timeout, async {
-        let test_dir_path = test_dir.clone();
-        let mut test_block_path = test_dir_path.clone();
-        test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
-
-        pretest(&test_dir).await;
-
-        let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
-        block_receiver.load_directory(&test_dir_path).unwrap();
-
-        let mut file = File::create(test_block_path.clone()).await.unwrap();
-        file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
-
         block_receiver.recv_block().await.unwrap().unwrap();
         success = true;
     })
@@ -52,22 +53,24 @@ async fn detects_new_block_copied() {
     let timeout = Duration::new(5, 0);
     let mut success = false;
 
+    let mut test_block_path = test_dir.clone();
+    test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+
+    pretest(&test_dir).await;
+
+    let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
+    block_receiver.load_directory(&test_dir).unwrap();
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let mut command = Command::new("cp")
+        .arg(TEST_BLOCK_PATH)
+        .arg(&test_block_path)
+        .spawn()
+        .unwrap();
+    command.wait().await.unwrap();
+
     tokio::time::timeout(timeout, async {
-        let mut test_block_path = test_dir.clone();
-        test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
-
-        pretest(&test_dir).await;
-
-        let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
-        block_receiver.load_directory(&test_dir).unwrap();
-
-        let mut command = Command::new("cp")
-            .arg(TEST_BLOCK_PATH)
-            .arg(&test_block_path)
-            .spawn()
-            .unwrap();
-        command.wait().await.unwrap();
-
         block_receiver.recv_block().await.unwrap().unwrap();
         success = true;
     })
