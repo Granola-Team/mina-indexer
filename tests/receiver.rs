@@ -1,7 +1,4 @@
-use std::{
-    path::Path,
-    time::Duration, 
-};
+use std::{path::Path, time::Duration};
 
 use mina_indexer::receiver::{filesystem::FilesystemReceiver, BlockReceiver};
 use tokio::{
