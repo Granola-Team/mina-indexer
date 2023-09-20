@@ -2,3 +2,7 @@
 /result
 .gitconfig
 .direnv/
+
+# Editor Droppings
+.idea*
+.*.swp
