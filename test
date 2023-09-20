@@ -1,0 +1,8 @@
+#!/bin/sh
+set -ex
+
+cargo fmt --check
+cargo check
+cargo clippy
+cargo build
+cargo nextest run
