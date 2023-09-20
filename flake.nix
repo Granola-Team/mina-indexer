@@ -59,7 +59,6 @@
             rust-analyzer
             rnix-lsp
             alejandra
-            pre-commit
             cargo-nextest
             cargo-audit
             bacon
