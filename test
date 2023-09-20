@@ -1,0 +1,9 @@
+#!/bin/sh
+set -ex
+
+cargo fmt --check
+cargo check
+cargo audit -D unmaintained -D yanked
+cargo clippy
+cargo build
+cargo nextest run

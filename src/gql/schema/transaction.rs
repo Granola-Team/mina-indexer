@@ -62,7 +62,7 @@ impl Transaction {
                 };
 
                 let naive_dt = NaiveDateTime::from_timestamp_millis(timestamp as i64).unwrap();
-                let datetime = DateTime::<Utc>::from_utc(naive_dt, Utc);
+                let datetime = DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc);
 
                 Self {
                     hash: hash.to_owned(),

@@ -26,7 +26,7 @@
           inherit system overlays;
         };
 
-        rust = pkgs.rust-bin.fromRustupToolchainFile ./toolchain.toml;
+        rust = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rust;
@@ -59,7 +59,6 @@
             rust-analyzer
             rnix-lsp
             alejandra
-            pre-commit
             cargo-nextest
             cargo-audit
             bacon

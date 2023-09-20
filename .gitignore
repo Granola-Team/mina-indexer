@@ -1,6 +1,8 @@
 /target
-.idea/*
 /result
 .gitconfig
-result
-/testing
+.direnv/
+
+# Editor Droppings
+.idea*
+.*.swp
