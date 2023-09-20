@@ -1,4 +1,4 @@
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use mina_indexer::receiver::{
     google_cloud::{GoogleCloudBlockReceiver, MinaNetwork},
@@ -7,16 +7,18 @@ use mina_indexer::receiver::{
 
 #[tokio::test]
 async fn receives_new_block() {
-    let temp_block_dir: &Path = &Path::new("./test_temp_block_dir");
+    let mut temp_block_dir = std::env::temp_dir();
+    temp_block_dir.push("test_temp_block_dir");
     let bucket = "mina_network_block_data".to_string();
-    tokio::fs::create_dir(temp_block_dir)
-        .await
-        .expect("parent directory exists");
+    if tokio::fs::metadata(&temp_block_dir).await.is_ok() {
+        tokio::fs::remove_dir_all(&temp_block_dir).await.unwrap();
+    }
+    tokio::fs::create_dir(&temp_block_dir).await.unwrap_or(());
 
     let mut block_receiver = GoogleCloudBlockReceiver::new(
         1,
         1,
-        temp_block_dir,
+        &temp_block_dir,
         Duration::from_secs(1),
         MinaNetwork::Mainnet,
         bucket,

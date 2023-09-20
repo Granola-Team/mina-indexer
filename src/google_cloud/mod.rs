@@ -148,7 +148,6 @@ impl Drop for GoogleCloudBlockReceiver {
         info!("shutting down GoogleCloudBlockWorker");
         let command_sender = self.command_sender.clone();
         let worker_join_handle = self.worker_join_handle.take();
-        let temp_block_dir = self.worker_data_receiver.borrow().temp_blocks_dir.clone();
         tokio::spawn(async move {
             command_sender
                 .clone()
@@ -159,11 +158,6 @@ impl Drop for GoogleCloudBlockReceiver {
                 join_handle.await.expect("worker fininshes successfully");
             }
         });
-        debug!(
-            "removing temporary block directory at {}",
-            temp_block_dir.display()
-        );
-        std::fs::remove_dir_all(temp_block_dir).expect("block dir exists");
     }
 }
 

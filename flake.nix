@@ -61,6 +61,8 @@
             alejandra
             pre-commit
             cargo-nextest
+            cargo-audit
+            bacon
           ]
           ++ buildDependencies;
 
