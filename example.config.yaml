@@ -10,3 +10,4 @@ log_level: info
 log_level_stdout: trace
 prune_interval: 10
 canonical_update_threshold: 2
+canonical_threshold: 2
