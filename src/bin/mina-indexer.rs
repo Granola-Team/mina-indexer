@@ -58,7 +58,7 @@ pub struct ServerArgs {
     initial_ledger: PathBuf,
     /// Use a non-genesis ledger
     #[arg(short, long, default_value_t = false)]
-    non_genesis_ledger: bool,
+    is_genesis_ledger: bool,
     /// Hash of the base ledger
     #[arg(
         long,
@@ -165,7 +165,7 @@ pub async fn handle_command_line_arguments(
     trace!("Parsing server args");
 
     let ledger = args.initial_ledger;
-    let non_genesis_ledger = args.non_genesis_ledger;
+    let is_genesis_ledger = args.is_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
@@ -203,7 +203,7 @@ pub async fn handle_command_line_arguments(
 
             Ok(IndexerConfiguration {
                 ledger,
-                non_genesis_ledger,
+                is_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,

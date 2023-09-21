@@ -31,7 +31,7 @@ use tracing::{debug, error, info, instrument};
 
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
-    pub non_genesis_ledger: bool,
+    pub is_genesis_ledger: bool,
     pub root_hash: BlockHash,
     pub startup_dir: PathBuf,
     pub watch_dir: PathBuf,
@@ -165,7 +165,7 @@ pub async fn initialize(
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
-        non_genesis_ledger,
+        is_genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir: _,
@@ -196,7 +196,7 @@ pub async fn initialize(
         )?;
 
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-        if !non_genesis_ledger {
+        if is_genesis_ledger {
             state
                 .initialize_with_contiguous_canonical(&mut block_parser)
                 .await?;
