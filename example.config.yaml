@@ -1,4 +1,4 @@
-ledger: /home/jenr/.mina-indexer/mainnet.json
+initial_ledger: /home/jenr/.mina-indexer/mainnet.json
 non_genesis_ledger: false
 root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
 startup_dir: /home/jenr/.mina-indexer/startup-blocks
