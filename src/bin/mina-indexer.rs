@@ -92,10 +92,10 @@ pub struct ServerArgs {
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
     /// Threshold for determining the canonicity of a block
-    #[arg(short, long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
+    #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
     canonical_threshold: u32,
     /// Threshold for updating the canonical tip/ledger
-    #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
+    #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
     /// Path to an indexer snapshot
     #[arg(long)]

@@ -33,6 +33,9 @@ idxr client 2>&1 |
 idxr server config 2>&1 | 
     grep -iq "Usage: mina-indexer server config"
 
+# Indexer server cli subcommand works
+idxr server cli --help > /dev/null
+
 # Indexer server config parses example yaml config file
 idxr server config --path ./tests/empty.config.yaml 2>&1 |
     grep -iq "Error:"
