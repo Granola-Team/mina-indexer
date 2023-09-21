@@ -34,6 +34,10 @@ idxr server config 2>&1 |
     grep -iq "Usage: mina-indexer server config"
 
 # Indexer server config parses example yaml config file
-idxr server config --path ./tests/example.config.yaml
+idxr server config --path ./tests/empty.config.yaml 2>&1 |
+    grep -iq "Error:"
 
-echo "Done" s
+# Indexer server config parses example yaml config file
+idxr server config --path ./tests/minimal.config.yaml 
+
+echo "Done"
