@@ -55,7 +55,7 @@ enum ServerCommand {
 pub struct ServerArgs {
     /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
     #[arg(short, long)]
-    ledger: PathBuf,
+    initial_ledger: PathBuf,
     /// Use a non-genesis ledger
     #[arg(short, long, default_value_t = false)]
     non_genesis_ledger: bool,
@@ -164,7 +164,7 @@ pub async fn handle_command_line_arguments(
 ) -> anyhow::Result<IndexerConfiguration> {
     trace!("Parsing server args");
 
-    let ledger = args.ledger;
+    let ledger = args.initial_ledger;
     let non_genesis_ledger = args.non_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
