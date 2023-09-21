@@ -54,10 +54,10 @@ enum ServerCommand {
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-    #[arg(short, long)]
+    #[arg(long)]
     initial_ledger: PathBuf,
     /// Use a non-genesis ledger
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     is_genesis_ledger: bool,
     /// Hash of the base ledger
     #[arg(
