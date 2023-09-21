@@ -1,0 +1,2 @@
+initial_ledger: ./ledgers/mainnet-genesis.json
+non_genesis_ledger: false
