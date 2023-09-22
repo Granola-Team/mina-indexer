@@ -3,7 +3,7 @@ use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     display_duration,
-    state::{ledger::genesis, IndexerMode, IndexerState},
+    state::{ledger::genesis, IndexerState},
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
     PRUNE_INTERVAL_DEFAULT,
@@ -45,9 +45,6 @@ struct Args {
     /// To keep the db or not, that is the question
     #[arg(short, long, default_value_t = false)]
     persist_db: bool,
-    /// Indexer mode
-    #[arg(long, default_value_t = IndexerMode::Light)]
-    mode: IndexerMode,
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
@@ -67,7 +64,6 @@ async fn main() -> anyhow::Result<()> {
     let freq = args.report_freq;
     let duration = args.duration;
     let persist_db = args.persist_db;
-    let mode = args.mode;
     let verbose = args.verbose;
 
     assert!(blocks_dir.is_dir(), "Should be a dir path");
@@ -95,7 +91,6 @@ async fn main() -> anyhow::Result<()> {
 
     let total_time = Instant::now();
     let mut state = IndexerState::new(
-        mode,
         BlockHash(GENESIS_HASH.to_string()),
         genesis_root.ledger,
         indexer_store,

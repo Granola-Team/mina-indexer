@@ -77,9 +77,6 @@ pub struct ServerArgs {
     /// Path to directory for logs
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     pub log_dir: PathBuf,
-    /// Only store canonical blocks in the db
-    #[arg(short, long, default_value_t = false)]
-    keep_non_canonical_blocks: bool,
     /// Max file log level
     #[serde(deserialize_with = "level_filter_deserializer")]
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
@@ -169,7 +166,6 @@ pub async fn handle_command_line_arguments(
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
-    let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -207,7 +203,6 @@ pub async fn handle_command_line_arguments(
                 root_hash,
                 startup_dir,
                 watch_dir,
-                keep_noncanonical_blocks,
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,

@@ -37,10 +37,10 @@ idxr server config 2>&1 |
 idxr server cli --help > /dev/null
 
 # Indexer server config parses example yaml config file
-idxr server config --path ./tests/empty.config.yaml 2>&1 |
-    grep -iq "Error:"
-
-# Indexer server config parses example yaml config file
-idxr server config --path ./tests/minimal.config.yaml 
+idxr server cli \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ \
+    
 
 echo "Done"
