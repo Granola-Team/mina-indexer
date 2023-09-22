@@ -44,8 +44,6 @@ pub mod summary;
 /// `dangling_branches` - trees of blocks stemming from an unknown ledger state
 #[derive(Debug)]
 pub struct IndexerState {
-    /// Indexer mode
-    pub mode: IndexerMode,
     /// Indexer phase
     pub phase: IndexerPhase,
     /// Block representing the best tip of the root branch
@@ -87,13 +85,6 @@ pub enum IndexerPhase {
     Testing,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum IndexerMode {
-    Light,
-    Full,
-    Test,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum ExtensionType {
     DanglingNew,
@@ -120,7 +111,6 @@ pub enum Canonicity {
 impl IndexerState {
     /// Creates a new indexer state from the genesis ledger
     pub fn new(
-        mode: IndexerMode,
         root_hash: BlockHash,
         genesis_ledger: GenesisLedger,
         indexer_store: Arc<IndexerStore>,
@@ -140,7 +130,6 @@ impl IndexerState {
         };
 
         Ok(Self {
-            mode,
             phase: IndexerPhase::InitializingFromBlockDir,
             canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
@@ -159,7 +148,6 @@ impl IndexerState {
     /// Creates a new indexer state from a "canonical" ledger
     #[allow(clippy::too_many_arguments)]
     pub fn new_non_genesis(
-        mode: IndexerMode,
         root_hash: BlockHash,
         ledger: Ledger,
         blockchain_length: u32,
@@ -185,7 +173,6 @@ impl IndexerState {
         };
 
         Ok(Self {
-            mode,
             phase: IndexerPhase::InitializingFromDB,
             canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
@@ -225,7 +212,6 @@ impl IndexerState {
         };
 
         Ok(Self {
-            mode: IndexerMode::Test,
             phase: IndexerPhase::Testing,
             canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
@@ -335,7 +321,6 @@ impl IndexerState {
             trace!("read canonical tip {:?}", canonical_tip.state_hash);
 
             Ok(Self {
-                mode: IndexerMode::Full,
                 phase: IndexerPhase::Watching,
                 best_tip,
                 canonical_tip,
@@ -1069,16 +1054,6 @@ impl std::fmt::Display for IndexerState {
         }
 
         Ok(())
-    }
-}
-
-impl std::fmt::Display for IndexerMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexerMode::Full => write!(f, "full"),
-            IndexerMode::Light => write!(f, "light"),
-            IndexerMode::Test => write!(f, "test"),
-        }
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
-        IndexerMode, IndexerState, Tip,
+        IndexerState, Tip,
     },
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
@@ -31,11 +31,10 @@ use tracing::{debug, error, info, instrument};
 
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
-    pub non_genesis_ledger: bool,
+    pub is_genesis_ledger: bool,
     pub root_hash: BlockHash,
     pub startup_dir: PathBuf,
     pub watch_dir: PathBuf,
-    pub keep_noncanonical_blocks: bool,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
@@ -165,28 +164,22 @@ pub async fn initialize(
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
-        non_genesis_ledger,
+        is_genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir: _,
-        keep_noncanonical_blocks,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
         from_snapshot,
     } = config;
-    let mode = if keep_noncanonical_blocks {
-        IndexerMode::Full
-    } else {
-        IndexerMode::Light
-    };
+
     let state = if !from_snapshot {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
         let mut state = IndexerState::new(
-            mode,
             root_hash.clone(),
             ledger.ledger,
             store,
@@ -196,7 +189,7 @@ pub async fn initialize(
         )?;
 
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-        if !non_genesis_ledger {
+        if is_genesis_ledger {
             state
                 .initialize_with_contiguous_canonical(&mut block_parser)
                 .await?;

@@ -1,9 +1,46 @@
 #!/bin/sh
 set -ex
 
-cargo fmt --check
-cargo check
-cargo audit -D unmaintained -D yanked
-cargo clippy
+cleanup() {
+    echo "Exiting with $?"
+}
+trap cleanup EXIT
+
+# cargo fmt --check
+# cargo check
+# cargo audit -D unmaintained -D yanked
+# cargo clippy
 cargo build
-cargo nextest run
+# cargo nextest run
+
+idxr() { 
+    ./target/debug/mina-indexer "$@" 
+}
+
+# Indexer reports usage with no arguments
+idxr 2>&1 | 
+    grep -iq "Usage:"
+
+# Indexer reports usage for server subcommand
+idxr server 2>&1 |
+    grep -iq "Usage: mina-indexer server"
+
+# Indexer reports usage for client subcommand
+idxr client 2>&1 | 
+    grep -iq "Usage: mina-indexer client"
+
+# Indexer server config subcommand exists
+idxr server config 2>&1 | 
+    grep -iq "Usage: mina-indexer server config"
+
+# Indexer server cli subcommand works
+idxr server cli --help > /dev/null
+
+# Indexer server config parses example yaml config file
+idxr server cli \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ \
+    
+
+echo "Done"

@@ -54,11 +54,11 @@ enum ServerCommand {
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-    #[arg(short, long)]
-    ledger: PathBuf,
+    #[arg(long)]
+    initial_ledger: PathBuf,
     /// Use a non-genesis ledger
-    #[arg(short, long, default_value_t = false)]
-    non_genesis_ledger: bool,
+    #[arg(long, default_value_t = false)]
+    is_genesis_ledger: bool,
     /// Hash of the base ledger
     #[arg(
         long,
@@ -77,9 +77,6 @@ pub struct ServerArgs {
     /// Path to directory for logs
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     pub log_dir: PathBuf,
-    /// Only store canonical blocks in the db
-    #[arg(short, long, default_value_t = false)]
-    keep_non_canonical_blocks: bool,
     /// Max file log level
     #[serde(deserialize_with = "level_filter_deserializer")]
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
@@ -92,10 +89,10 @@ pub struct ServerArgs {
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
     /// Threshold for determining the canonicity of a block
-    #[arg(short, long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
+    #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
     canonical_threshold: u32,
     /// Threshold for updating the canonical tip/ledger
-    #[arg(short, long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
+    #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
     /// Path to an indexer snapshot
     #[arg(long)]
@@ -164,12 +161,11 @@ pub async fn handle_command_line_arguments(
 ) -> anyhow::Result<IndexerConfiguration> {
     trace!("Parsing server args");
 
-    let ledger = args.ledger;
-    let non_genesis_ledger = args.non_genesis_ledger;
+    let ledger = args.initial_ledger;
+    let is_genesis_ledger = args.is_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
-    let keep_noncanonical_blocks = args.keep_non_canonical_blocks;
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -203,11 +199,10 @@ pub async fn handle_command_line_arguments(
 
             Ok(IndexerConfiguration {
                 ledger,
-                non_genesis_ledger,
+                is_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
-                keep_noncanonical_blocks,
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,
