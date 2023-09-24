@@ -64,7 +64,7 @@ async fn extension() {
 
     // before extension quantities
     let before_root = state.dangling_branches.get(0).unwrap().root_block().clone();
-    let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
+    let before_leaves = state.dangling_branches.get(0).unwrap().leaves();
     let before_root_leaf = state
         .dangling_branches
         .get(0)
@@ -96,7 +96,7 @@ async fn extension() {
     let branches1 = &after_branch.branches;
     let leaves1 = &after_branch.leaves();
     let after_root_id = branches1.root_node_id().unwrap();
-    let after_root_block = branches1.get(&after_root_id).unwrap().data().clone();
+    let after_root_block = branches1.get(after_root_id).unwrap().data().clone();
 
     assert_eq!(leaves1.len(), 1);
     assert_eq!(branches1.height(), 2);
@@ -105,7 +105,7 @@ async fn extension() {
 
     // after root has one child
     let after_children = branches1
-        .children_ids(&after_root_id)
+        .children_ids(after_root_id)
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
     assert_eq!(after_children.len(), 1);
@@ -124,7 +124,7 @@ async fn extension() {
     assert_eq!(after_root, after_root_block);
 
     // leaf checks
-    let leaves: Vec<Block> = leaves1.iter().map(|x| x.clone()).collect();
+    let leaves: Vec<Block> = leaves1.to_vec();
     let leaf = leaves.get(0).unwrap();
 
     // height differs, hashes agree

@@ -432,7 +432,7 @@ mod tests {
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
-        let account_before = account.clone();
+        let account_before = account;
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
         assert_eq!(account_before.balance, account_after.balance);

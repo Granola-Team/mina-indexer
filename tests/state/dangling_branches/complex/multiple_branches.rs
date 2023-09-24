@@ -147,17 +147,16 @@ async fn merge() {
     let root0 = state.root_branch.root_block();
     let branches0 = state.root_branch.clone().branches;
     let branch_root0 = branches0
-        .get(&branches0.root_node_id().unwrap())
+        .get(branches0.root_node_id().unwrap())
         .unwrap()
         .data();
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
-    let leaves0: HashSet<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
+    let leaves0: HashSet<Block> = root_branch.leaves().iter().cloned().collect();
 
     assert_eq!(
         leaves0
-            .iter()
-            .map(|x| x.clone())
+            .iter().cloned()
             .collect::<HashSet<Block>>(),
         HashSet::from([leaf0, leaf1])
     );

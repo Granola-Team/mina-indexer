@@ -31,8 +31,8 @@ async fn extension() {
     let before_root = root_tree.root_block();
     let before_branches = root_tree.branches.clone();
     let before_root_id = before_branches.root_node_id().unwrap();
-    let before_root_leaf = before_branches.get(&before_root_id).unwrap().data();
-    let before_leaf_block = before_branches.get(&before_root_id).unwrap().data();
+    let before_root_leaf = before_branches.get(before_root_id).unwrap().data();
+    let before_leaf_block = before_branches.get(before_root_id).unwrap().data();
 
     // before root is also a leaf
     assert_eq!(before_root_leaf, before_leaf_block);
@@ -55,7 +55,7 @@ async fn extension() {
     let after_root = tree2.root_block();
     let after_branches = tree2.branches.clone();
     let after_root_id = after_branches.root_node_id().unwrap();
-    let after_root_leaf = after_branches.get(&after_root_id).unwrap().data();
+    let after_root_leaf = after_branches.get(after_root_id).unwrap().data();
 
     // branch root should match the tree's root
     assert_eq!(before_root, before_root_leaf);
@@ -70,14 +70,14 @@ async fn extension() {
     // extension-specific checks
     // before root has no children
     assert!(before_branches
-        .children_ids(&before_root_id)
+        .children_ids(before_root_id)
         .expect("before branch child")
         .next()
         .is_none());
 
     // after root has one child
     let mut after_children = after_branches
-        .children_ids(&after_root_id)
+        .children_ids(after_root_id)
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
     assert_eq!(after_children.len(), 1);
@@ -107,13 +107,12 @@ async fn extension() {
     // before root is also a leaf
     assert_eq!(
         before_root,
-        before_branches.get(&before_root_id).unwrap().data()
+        before_branches.get(before_root_id).unwrap().data()
     );
 
     // after root isn't a leaf
     assert!(tree2
         .leaves()
-        .iter()
-        .map(|leaf| leaf.clone())
+        .iter().cloned()
         .all(|x| x != after_root.clone()));
 }

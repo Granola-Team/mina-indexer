@@ -534,7 +534,7 @@ mod tests {
 
     use crate::block::{get_blockchain_length, is_valid_block_file};
 
-    const FILENAMES_VALID: [&'static str; 23] = [
+    const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
         "mainnet-113518-3NLQ2Zop9dfDKvffNg9EBzSmBqyjYgCi2E1zAuLGFzUfJk6uq7YK.json",
         "mainnet-175222-3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby.json",
@@ -560,7 +560,7 @@ mod tests {
         "mainnet-9644-3NK4apiDvnT4ywWEw6KBEk1UzTd1XK7SGXFZDVC9GPCDaT3EXdsv.json",
     ];
 
-    const FILENAMES_INVALID: [&'static str; 6] = [
+    const FILENAMES_INVALID: [&str; 6] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u",
         "mainnet-113518-3NLQ2Zop9dfDKvffNg9EBzSmBqyjYgCi2E1zAuLGFzUfJk6uq7YK.j",
         "mainnet-175222.json",
@@ -600,7 +600,7 @@ mod tests {
             })
             .for_each(|(os_string, result)| {
                 dbg!(os_string);
-                assert!(result == false)
+                assert!(!result)
             });
     }
 
@@ -617,7 +617,7 @@ mod tests {
             })
             .for_each(|(os_string, result)| {
                 dbg!(os_string);
-                assert!(result == true)
+                assert!(result)
             });
     }
 }

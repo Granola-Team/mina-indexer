@@ -171,12 +171,12 @@ mod tests {
 
         let expected_result = vec![
             AccountDiff::Payment(PaymentDiff {
-                public_key: source_public_key_result.into(),
+                public_key: source_public_key_result,
                 amount: 536900000000.into(),
                 update_type: UpdateType::Deduction,
             }),
             AccountDiff::Payment(PaymentDiff {
-                public_key: receiver_public_key_result.into(),
+                public_key: receiver_public_key_result,
                 amount: 536900000000.into(),
                 update_type: UpdateType::Deposit,
             }),
@@ -201,8 +201,8 @@ mod tests {
         });
 
         let expected_result = vec![AccountDiff::Delegation(DelegationDiff {
-            delegator: delegator_public_key_result.into(),
-            delegate: delegate_public_key_result.into(),
+            delegator: delegator_public_key_result,
+            delegate: delegate_public_key_result,
         })];
 
         assert_eq!(
@@ -220,10 +220,10 @@ mod tests {
         let supercharge_coinbase = true;
 
         let account_diff =
-            AccountDiff::from_coinbase(coinbase_receiver_result.into(), supercharge_coinbase);
+            AccountDiff::from_coinbase(coinbase_receiver_result, supercharge_coinbase);
 
         let expected_payment_diff = PaymentDiff {
-            public_key: coinbase_receiver.into(),
+            public_key: coinbase_receiver,
             amount: Amount(1440 * (1e9 as u64)),
             update_type: UpdateType::Deposit,
         };

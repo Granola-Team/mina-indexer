@@ -3,7 +3,7 @@ use std::path::Path;
 use mina_indexer::state::ledger::{genesis::GenesisRoot, Ledger};
 use tokio::{fs::File, io::AsyncReadExt};
 
-const GENESIS_LEDGERS_PATH: &'static str = "./tests/data/genesis_ledgers";
+const GENESIS_LEDGERS_PATH: &str = "./tests/data/genesis_ledgers";
 
 pub async fn read_genesis_ledger_to_string(ledger: &str) -> Result<String, anyhow::Error> {
     let mut ledger_file = File::open(Path::new(GENESIS_LEDGERS_PATH).join(ledger)).await?;

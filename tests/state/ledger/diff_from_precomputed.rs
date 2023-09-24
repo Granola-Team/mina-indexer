@@ -135,7 +135,7 @@ async fn account_diffs() {
     ]);
 
     for pk in ledger.keys() {
-        let diff = ledger.get(&pk).unwrap() - initial_ledger.get(&pk).unwrap();
-        assert_eq!(delta.get(&pk).unwrap(), &diff);
+        let diff = ledger.get(pk).unwrap() - initial_ledger.get(pk).unwrap();
+        assert_eq!(delta.get(pk).unwrap(), &diff);
     }
 }
