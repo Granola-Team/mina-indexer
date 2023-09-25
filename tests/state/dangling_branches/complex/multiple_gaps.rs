@@ -133,9 +133,7 @@ async fn extension() {
         .get(branches.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves: Vec<Block> = state
-        .root_branch
-        .leaves().to_vec();
+    let leaves: Vec<Block> = state.root_branch.leaves().to_vec();
     let leaf = Block::from_precomputed(&leaf_block, 2);
 
     println!("Root Leaves: {:?}", leaves);

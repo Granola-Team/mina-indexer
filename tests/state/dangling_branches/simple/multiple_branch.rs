@@ -171,11 +171,7 @@ async fn extensions() {
         .get(branches1.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves1: Vec<Block> = state
-        .dangling_branches
-        .get(1)
-        .unwrap()
-        .leaves().to_vec();
+    let leaves1: Vec<Block> = state.dangling_branches.get(1).unwrap().leaves().to_vec();
 
     // root1 is not a leaf
     assert_ne!(root1, leaves1.get(0).unwrap());

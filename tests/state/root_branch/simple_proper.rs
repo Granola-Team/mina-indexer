@@ -113,6 +113,7 @@ async fn extension() {
     // after root isn't a leaf
     assert!(tree2
         .leaves()
-        .iter().cloned()
+        .iter()
+        .cloned()
         .all(|x| x != after_root.clone()));
 }
