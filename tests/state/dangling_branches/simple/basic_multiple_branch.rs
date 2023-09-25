@@ -105,7 +105,7 @@ async fn extensions() {
     let root1 = state.root_branch.root_block();
     let branches1 = &state.root_branch.branches;
     let branch_root1 = branches1
-        .get(&branches1.root_node_id().unwrap())
+        .get(branches1.root_node_id().unwrap())
         .unwrap()
         .data();
     let leaves1 = state.root_branch.leaves();

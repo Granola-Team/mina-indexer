@@ -285,7 +285,7 @@ mod test {
                 expected_payments,
                 payments
                     .iter()
-                    .map(|(s, r, a)| (s.to_address(), r.to_address(), (*a).0))
+                    .map(|(s, r, a)| (s.to_address(), r.to_address(), a.0))
                     .collect::<Vec<(String, String, u64)>>()
             );
         }

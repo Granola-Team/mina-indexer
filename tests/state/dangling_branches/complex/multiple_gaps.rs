@@ -130,15 +130,10 @@ async fn extension() {
     let root = state.root_branch.root_block();
     let branches = state.root_branch.clone().branches;
     let branch_root = branches
-        .get(&branches.root_node_id().unwrap())
+        .get(branches.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves: Vec<Block> = state
-        .root_branch
-        .leaves()
-        .iter()
-        .map(|x| x.clone())
-        .collect();
+    let leaves: Vec<Block> = state.root_branch.leaves().to_vec();
     let leaf = Block::from_precomputed(&leaf_block, 2);
 
     println!("Root Leaves: {:?}", leaves);

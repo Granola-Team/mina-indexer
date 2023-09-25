@@ -168,17 +168,10 @@ async fn extensions() {
     let root1 = state.dangling_branches.get(1).unwrap().root_block();
     let branches1 = &state.dangling_branches.get(1).unwrap().branches;
     let branch_root1 = &branches1
-        .get(&branches1.root_node_id().unwrap())
+        .get(branches1.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves1: Vec<Block> = state
-        .dangling_branches
-        .get(1)
-        .unwrap()
-        .leaves()
-        .iter()
-        .map(|x| x.clone())
-        .collect();
+    let leaves1: Vec<Block> = state.dangling_branches.get(1).unwrap().leaves().to_vec();
 
     // root1 is not a leaf
     assert_ne!(root1, leaves1.get(0).unwrap());

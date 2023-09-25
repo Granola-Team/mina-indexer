@@ -107,7 +107,7 @@ async fn extension() {
     let after_root_leaf = {
         let child_ids: Vec<&NodeId> = branches1
             .branches
-            .children_ids(&after_root_id)
+            .children_ids(after_root_id)
             .unwrap()
             .collect();
         assert_eq!(child_ids.len(), 1);

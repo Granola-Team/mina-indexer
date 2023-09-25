@@ -11,7 +11,7 @@ use tokio::{
 async fn detects_new_block_written() {
     let mut test_dir = std::env::temp_dir();
     test_dir.push("receiver_write_test");
-    const TEST_BLOCK: &'static str = include_str!(
+    const TEST_BLOCK: &str = include_str!(
         "data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
 
@@ -45,7 +45,7 @@ async fn detects_new_block_written() {
 async fn detects_new_block_copied() {
     let mut test_dir = std::env::temp_dir();
     test_dir.push("receiver_copy_test");
-    const TEST_BLOCK_PATH: &'static str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
+    const TEST_BLOCK_PATH: &str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
 
     let timeout = Duration::new(5, 0);
     let mut success = false;

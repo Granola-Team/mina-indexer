@@ -146,10 +146,10 @@ async fn extension() {
     let root = root_branch.root_block();
     let branches = root_branch.clone().branches;
     let branch_root = branches
-        .get(&branches.root_node_id().unwrap())
+        .get(branches.root_node_id().unwrap())
         .unwrap()
         .data();
-    let leaves: Vec<Block> = root_branch.leaves().iter().map(|x| x.clone()).collect();
+    let leaves: Vec<Block> = root_branch.leaves().to_vec();
 
     assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);
 

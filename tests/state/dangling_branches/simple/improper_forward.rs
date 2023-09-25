@@ -125,7 +125,7 @@ async fn extension() {
 
     // after root has one child
     let after_children = branches1
-        .children_ids(&after_root_id)
+        .children_ids(after_root_id)
         .expect("after branch child")
         .collect::<Vec<&NodeId>>();
     assert_eq!(after_children.len(), 2);
@@ -135,35 +135,17 @@ async fn extension() {
     let after_child2_block = Block::from_precomputed(&child2, 1);
 
     // child1 is a leaf
-    assert!(leaves1
-        .iter()
-        .map(|x| x.clone())
-        .collect::<Vec<Block>>()
-        .contains(&after_child1_block));
+    assert!(leaves1.to_vec().contains(&after_child1_block));
 
     // child2 is a leaf
-    assert!(leaves1
-        .iter()
-        .map(|x| x.clone())
-        .collect::<Vec<Block>>()
-        .contains(&after_child2_block));
+    assert!(leaves1.to_vec().contains(&after_child2_block));
 
     println!("=== After Root Branch Leaves ===");
-    println!(
-        "{:?}",
-        leaves1
-            .iter()
-            .map(|leaf| leaf.clone())
-            .collect::<Vec<Block>>()
-    );
+    println!("{:?}", leaves1.to_vec());
 
     // root doesn't change
     assert_eq!(before_root, after_root);
 
     // after root isn't a leaf
-    assert!(!leaves1
-        .iter()
-        .map(|x| x.clone())
-        .collect::<Vec<Block>>()
-        .contains(&after_root));
+    assert!(!leaves1.to_vec().contains(&after_root));
 }
