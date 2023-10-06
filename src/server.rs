@@ -38,7 +38,6 @@ pub struct IndexerConfiguration {
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
-    pub from_snapshot: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,7 +53,6 @@ pub enum MinaIndexerRunPhase {
     SettingSIGINTHandler,
     InitializingState,
     StateInitializedFromParser,
-    StateInitializedFromSnapshot,
     StartingBlockReceiver,
     StartingIPCSocketListener,
     StartingMainServerLoop,
@@ -171,10 +169,9 @@ pub async fn initialize(
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
-        from_snapshot,
     } = config;
 
-    let state = if !from_snapshot {
+    let state = {
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
@@ -200,17 +197,6 @@ pub async fn initialize(
         }
 
         phase_sender.send_replace(StateInitializedFromParser);
-        state
-    } else {
-        info!("initializing indexer state from snapshot");
-        let state = IndexerState::from_state_snapshot(
-            store,
-            MAINNET_TRANSITION_FRONTIER_K,
-            prune_interval,
-            canonical_update_threshold,
-        )?;
-
-        phase_sender.send_replace(StateInitializedFromSnapshot);
         state
     };
 
@@ -253,10 +239,7 @@ pub async fn run(
     info!("Local socket listener started");
 
     phase_sender.send_replace(StartingMainServerLoop);
-    let (save_tx, mut save_rx) = tokio::sync::mpsc::channel(1);
-    let (mut save_resp_tx, save_resp_rx) = spmc::channel();
-    let save_tx = Arc::new(save_tx);
-    let save_resp_rx = Arc::new(save_resp_rx);
+
     loop {
         tokio::select! {
             Some((command, response_sender)) = query_receiver.recv() => {
@@ -303,13 +286,10 @@ pub async fn run(
                         let summary = state.summary_verbose();
                         let ledger = state.best_ledger()?.unwrap();
 
-                        let save_tx = save_tx.clone();
-                        let save_resp_rx = save_resp_rx.clone();
-
                         // handle the connection
                         tokio::spawn(async move {
                             debug!("Handling client connection");
-                            if let Err(e) = handle_conn(stream, block_store_readonly.clone(), best_tip, ledger, summary, save_tx, save_resp_rx).await {
+                            if let Err(e) = handle_conn(stream, block_store_readonly.clone(), best_tip, ledger, summary).await {
                                 error!("Error handling connection: {e}");
                             }
                             debug!("Removing readonly instance at {}", block_store_readonly.db_path.clone().display());
@@ -322,17 +302,6 @@ pub async fn run(
                 }
 
             }
-
-            save_rx_fut = save_rx.recv() => {
-                if let Some(SaveCommand(snapshot_path)) = save_rx_fut {
-                    phase_sender.send_replace(SavingStateSnapshot);
-                    trace!("saving snapshot in {}", &snapshot_path.display());
-                    match state.save_snapshot(snapshot_path) {
-                        Ok(_) => save_resp_tx.send(Some(SaveResponse("snapshot created".to_string())))?,
-                        Err(e) => save_resp_tx.send(Some(SaveResponse(e.to_string())))?,
-                    }
-                }
-            }
         }
     }
 }
@@ -344,8 +313,6 @@ async fn handle_conn(
     best_tip: Block,
     ledger: Ledger,
     summary: SummaryVerbose,
-    save_tx: Arc<mpsc::Sender<SaveCommand>>,
-    _save_resp_rx: Arc<spmc::Receiver<Option<SaveResponse>>>,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -420,17 +387,6 @@ async fn handle_conn(
                 let bytes = bcs::to_bytes(&summary)?;
                 writer.write_all(&bytes).await?;
             }
-        }
-        "save_state" => {
-            info!("Received save_state command");
-            let data_buffer = buffers.next().unwrap();
-            let snapshot_path = PathBuf::from(String::from_utf8(
-                data_buffer[..data_buffer.len() - 1].to_vec(),
-            )?);
-            trace!("sending SaveCommand to primary indexer thread");
-            save_tx.send(SaveCommand(snapshot_path)).await?;
-            trace!("awaiting SaveResponse from primary indexer thread");
-            writer.write_all(b"saving snapshot...").await?;
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
