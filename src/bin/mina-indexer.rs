@@ -94,9 +94,6 @@ pub struct ServerArgs {
     /// Threshold for updating the canonical tip/ledger
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
-    /// Path to an indexer snapshot
-    #[arg(long)]
-    pub snapshot_path: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -111,7 +108,6 @@ pub async fn main() -> anyhow::Result<()> {
                     serde_yaml::from_reader(&config_file[..])?
                 }
             };
-            let option_snapshot_path = args.snapshot_path.clone();
             let database_dir = args.database_dir.clone();
             let log_dir = args.log_dir.clone();
             let log_level = args.log_level;
@@ -141,12 +137,7 @@ pub async fn main() -> anyhow::Result<()> {
                 .with(file_layer.with_filter(log_level))
                 .init();
 
-            let db = if let Some(snapshot_path) = option_snapshot_path {
-                let indexer_store = IndexerStore::from_backup(&snapshot_path, &database_dir)?;
-                Arc::new(indexer_store)
-            } else {
-                Arc::new(IndexerStore::new(&database_dir)?)
-            };
+            let db = Arc::new(IndexerStore::new(&database_dir)?);
 
             MinaIndexer::new(config, db.clone()).await?;
             mina_indexer::gql::start_gql(db).await.unwrap();
@@ -206,7 +197,6 @@ pub async fn handle_command_line_arguments(
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,
-                from_snapshot: args.snapshot_path.is_some(),
             })
         }
     }
