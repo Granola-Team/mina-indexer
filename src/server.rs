@@ -53,7 +53,6 @@ pub enum MinaIndexerRunPhase {
     SettingSIGINTHandler,
     InitializingState,
     StateInitializedFromParser,
-    StateInitializedFromSnapshot,
     StartingBlockReceiver,
     StartingIPCSocketListener,
     StartingMainServerLoop,
