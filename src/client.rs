@@ -94,7 +94,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
-            let account: Account = bcs::from_bytes(&buffer)?;
+            let account: Account = serde_json::from_slice(&buffer)?;
             if output_json {
                 stdout()
                     .write_all(serde_json::to_string(&account)?.as_bytes())
@@ -109,7 +109,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             let command = format!("best_chain {}\0", chain_args.num);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let blocks: Vec<PrecomputedBlock> = bcs::from_bytes(&buffer)?;
+            let blocks: Vec<PrecomputedBlock> = serde_json::from_slice(&buffer)?;
             for block in blocks.iter() {
                 if output_json {
                     stdout()
@@ -125,7 +125,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             let command = format!("best_ledger {}\0", ledger_args.path.display());
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let msg: String = bcs::from_bytes(&buffer)?;
+            let msg: String = serde_json::from_slice(&buffer)?;
             println!("{msg}");
         }
         ClientCli::Summary(summary_args) => {
@@ -133,7 +133,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             if summary_args.verbose {
-                let summary: SummaryVerbose = bcs::from_bytes(&buffer)?;
+                let summary: SummaryVerbose = serde_json::from_slice(&buffer)?;
                 if output_json {
                     stdout()
                         .write_all(serde_json::to_string(&summary)?.as_bytes())
@@ -142,7 +142,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                     stdout().write_all(format!("{summary}").as_bytes()).await?;
                 }
             } else {
-                let summary: SummaryShort = bcs::from_bytes(&buffer)?;
+                let summary: SummaryShort = serde_json::from_slice(&buffer)?;
                 if output_json {
                     stdout()
                         .write_all(serde_json::to_string(&summary)?.as_bytes())
