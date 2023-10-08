@@ -84,7 +84,7 @@ idxr server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=$(pgrep mina-indexer)
+IDXR_PID=IDXR_PID=$(echo $!)
 kill $IDXR_PID
 
 # Indexer server starts up on a minimal selection of blocks
@@ -95,7 +95,7 @@ server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=$(pgrep mina-indexer)
+IDXR_PID=$(echo $!)
 sleep 3
 echo $(client -o summary -v) |
     jq .witness_tree.canonical_tip_hash | 
