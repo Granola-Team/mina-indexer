@@ -1,0 +1,19 @@
+#!/bin/sh
+set -ex
+
+touch $TMP/block_urls
+cleanup() {
+    rm $TMP/block_urls
+}
+trap cleanup EXIT
+
+BUCKET=$1
+MAX_SLOT=$2
+NETWORK=$3
+OUT_DIR=$4
+
+for SLOT in `seq 2 $MAX_SLOT`
+do
+	echo "gs://${BUCKET}/${NETWORK}-${SLOT}-*.json" >> $TMP/block_urls
+done
+cat $TMP/block_urls | gsutil -m cp -I $OUT_DIR
