@@ -3,7 +3,7 @@ use crate::{
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
-        summary::{SummaryVerbose, SummaryShort},
+        summary::{SummaryShort, SummaryVerbose},
         IndexerState, Tip,
     },
     store::IndexerStore,
