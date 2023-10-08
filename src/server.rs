@@ -496,6 +496,14 @@ async fn handle_conn(
                 ))?)
             }
         }
+        "shutdown" => {
+            info!("Received shutdown command");
+            writer
+                .write_all(b"Shutting down the Mina Indexer daemon...")
+                .await?;
+            info!("Shutting down the indexer...");
+            process::exit(0);
+        }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
         }

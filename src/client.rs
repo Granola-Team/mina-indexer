@@ -28,6 +28,8 @@ pub enum ClientCli {
     BestLedger(LedgerArgs),
     /// Show summary of indexer state
     Summary(SummaryArgs),
+    /// Signal Mina Indexer server to shutdown
+    Shutdown,
 }
 
 #[derive(clap::Args, Debug, Serialize, Deserialize)]
@@ -151,6 +153,13 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                     stdout().write_all(format!("{summary}").as_bytes()).await?;
                 }
             }
+        }
+        ClientCli::Shutdown => {
+            let command = format!("shutdown \0");
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+            let msg: String = bcs::from_bytes(&buffer)?;
+            println!("{msg}");
         }
     }
 
