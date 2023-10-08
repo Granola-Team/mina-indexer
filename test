@@ -1,8 +1,10 @@
 #!/bin/sh
 set -ex
 
+mkdir -p $TMP/blocks
 cleanup() {
     echo "Exiting with $?"
+    rm -rf $TMP/blocks
 }
 trap cleanup EXIT
 
@@ -13,8 +15,49 @@ trap cleanup EXIT
 cargo build
 # cargo nextest run
 
+DOMAIN_SOCKET=/var/run/mina-indexer.sock
+
+shutdown() {
+    echo "shutdown\0" | nc -U $DOMAIN_SOCKET
+}
+
+account_balance() {
+    echo "account $1\0" | nc -U $DOMAIN_SOCKET | jq .balance
+}
+
+best_ledger() {
+    echo "best-ledger\0" | nc -U $DOMAIN_SOCKET | jq .ledger
+}
+
+summary() {
+    echo "summary\0" | nc -U $DOMAIN_SOCKET | jq .summary
+}
+
 idxr() { 
     ./target/debug/mina-indexer "$@" 
+}
+
+server() {
+    ./target/debug/mina-indexer server "$@"
+}
+
+client() {
+    ./target/debug/mina-indexer client "$@"
+}
+
+dl() {
+    BUCKET=$1; MAX_SLOT=$2; NETWORK=$3; OUT_DIR=$4
+    ./download_blocks $BUCKET $MAX_SLOT $NETWORK $OUT_DIR
+}
+
+dl_mainnet() {
+    MAX_SLOT=$1; OUT_DIR=$2
+    ./download_blocks mina_network_block_data $MAX_SLOT mainnet $OUT_DIR
+}
+
+dl_berkeley() {
+    MAX_SLOT=$1; OUT_DIR=$2
+    ./download_blocks mina_network_block_data $MAX_SLOT berkeley $OUT_DIR
 }
 
 # Indexer reports usage with no arguments
@@ -36,11 +79,27 @@ idxr server config 2>&1 |
 # Indexer server cli subcommand works
 idxr server cli --help > /dev/null
 
-# Indexer server config parses example yaml config file
+# Indexer server config passes cli with minimal args
 idxr server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
-    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ \
-    
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+IDXR_PID=IDXR_PID=$(echo $!)
+kill $IDXR_PID
+
+# Indexer server starts up on a minimal selection of blocks
+dl_mainnet 50 $TMP/blocks
+server cli \
+    --startup-dir $TMP/blocks \
+    --watch-dir $TMP/blocks \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+IDXR_PID=$(echo $!)
+sleep 3
+echo $(client -o summary -v) |
+    jq .witness_tree.canonical_tip_hash | 
+    grep -iq "3NKjssd1iCRU3aQPdi6o4AueRiaSMVk8NhVw48DSMQzBwrexCnDr"
+kill $IDXR_PID
 
 echo "Done"
