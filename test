@@ -96,7 +96,7 @@ server cli \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
-sleep 5
+sleep 3
 echo $(client -o summary -v) |
     jq .witness_tree.canonical_tip_hash | 
     grep -iq "3NKjssd1iCRU3aQPdi6o4AueRiaSMVk8NhVw48DSMQzBwrexCnDr"
