@@ -16,5 +16,5 @@ OUT_DIR=$4
 for SLOT in `seq 2 $MAX_SLOT`
 do
 	echo "gs://${BUCKET}/${NETWORK}-${SLOT}-*.json" >> $TMPDIR/block_urls
-done
-cat $TMPDIR/block_urls | gsutil -m cp -I $OUT_DIR
+done 2>/dev/null
+gsutil -m cp -I $OUT_DIR < $TMPDIR/block_urls
