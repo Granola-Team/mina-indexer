@@ -3,7 +3,7 @@ use crate::{
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
-        summary::{SummaryShort, SummaryVerbose},
+        summary::{SummaryVerbose, SummaryShort},
         IndexerState, Tip,
     },
     store::IndexerStore,
@@ -397,7 +397,10 @@ async fn handle_conn(
             if !path.is_dir() {
                 debug!("Writing ledger to {}", path.display());
                 fs::write(path, format!("{ledger:?}")).await?;
-                Some(serde_json::to_string(&format!("Ledger written to {}", path.display()))?)
+                Some(serde_json::to_string(&format!(
+                    "Ledger written to {}",
+                    path.display()
+                ))?)
             } else {
                 Some(serde_json::to_string(&format!(
                     "The path provided must be a file: {}",
@@ -411,9 +414,9 @@ async fn handle_conn(
             let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<bool>()?;
             if verbose {
-                Some(serde_json::to_string(&summary)?)
+                Some(serde_json::to_string::<SummaryVerbose>(&summary)?)
             } else {
-                Some(serde_json::to_string(&summary)?)
+                Some(serde_json::to_string::<SummaryShort>(&summary.into())?)
             }
         }
         "save_state" => {
@@ -433,9 +436,11 @@ async fn handle_conn(
     };
 
     if let Some(response_json) = response_json {
-        writer.write_all(&response_json.as_bytes()).await?;
+        writer.write_all(response_json.as_bytes()).await?;
     } else {
-        writer.write_all(serde_json::to_string("no response 404")?.as_bytes()).await?;
+        writer
+            .write_all(serde_json::to_string("no response 404")?.as_bytes())
+            .await?;
     }
 
     Ok(())
