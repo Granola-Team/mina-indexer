@@ -243,3 +243,7 @@ Copyright 2022-2023 Mina Foundation, Inc.
 
 Free use of this software is granted under the terms of the Mozilla
 Public License 2.0.
+
+## Contributing
+
+This project uses [C4(Collective Code Construction Contract)](https://rfc.zeromq.org/spec/42/) process for contributions.
