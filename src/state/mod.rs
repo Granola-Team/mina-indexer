@@ -1,7 +1,5 @@
-use self::{
-    summary::{
-        DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
-    },
+use self::summary::{
+    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
 };
 use crate::{
     block::{
