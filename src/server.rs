@@ -358,7 +358,7 @@ async fn handle_conn(
     let command = buffers.next().unwrap();
     let command_string = String::from_utf8(command.to_vec()).unwrap();
 
-    match command_string.as_str() {
+    let response_json = match command_string.as_str() {
         "account" => {
             let data_buffer = buffers.next().unwrap();
             let public_key = PublicKey::from_address(&String::from_utf8(
@@ -369,8 +369,9 @@ async fn handle_conn(
             let account = ledger.accounts.get(&public_key);
             if let Some(account) = account {
                 debug!("Writing account {account:?} to client");
-                let bytes = bcs::to_bytes(account)?;
-                writer.write_all(&bytes).await?;
+                Some(serde_json::to_string(account)?)
+            } else {
+                None
             }
         }
         "best_chain" => {
@@ -386,8 +387,7 @@ async fn handle_conn(
                     BlockHash::from_hashv1(parent_pcb.protocol_state.previous_state_hash.clone());
                 best_chain.push(parent_pcb);
             }
-            let bytes = bcs::to_bytes(&best_chain)?;
-            writer.write_all(&bytes).await?;
+            Some(serde_json::to_string(&best_chain)?)
         }
         "best_ledger" => {
             info!("Received best_ledger command");
@@ -397,14 +397,12 @@ async fn handle_conn(
             if !path.is_dir() {
                 debug!("Writing ledger to {}", path.display());
                 fs::write(path, format!("{ledger:?}")).await?;
-                let bytes = bcs::to_bytes(&format!("Ledger written to {}", path.display()))?;
-                writer.write_all(&bytes).await?;
+                Some(serde_json::to_string(&format!("Ledger written to {}", path.display()))?)
             } else {
-                let bytes = bcs::to_bytes(&format!(
+                Some(serde_json::to_string(&format!(
                     "The path provided must be a file: {}",
                     path.display()
-                ))?;
-                writer.write_all(&bytes).await?;
+                ))?)
             }
         }
         "summary" => {
@@ -413,12 +411,9 @@ async fn handle_conn(
             let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<bool>()?;
             if verbose {
-                let bytes = bcs::to_bytes(&summary)?;
-                writer.write_all(&bytes).await?;
+                Some(serde_json::to_string(&summary)?)
             } else {
-                let summary: SummaryShort = summary.into();
-                let bytes = bcs::to_bytes(&summary)?;
-                writer.write_all(&bytes).await?;
+                Some(serde_json::to_string(&summary)?)
             }
         }
         "save_state" => {
@@ -430,11 +425,17 @@ async fn handle_conn(
             trace!("sending SaveCommand to primary indexer thread");
             save_tx.send(SaveCommand(snapshot_path)).await?;
             trace!("awaiting SaveResponse from primary indexer thread");
-            writer.write_all(b"saving snapshot...").await?;
+            Some(serde_json::to_string("saving snapshot...")?)
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
         }
+    };
+
+    if let Some(response_json) = response_json {
+        writer.write_all(&response_json.as_bytes()).await?;
+    } else {
+        writer.write_all(serde_json::to_string("no response 404")?.as_bytes()).await?;
     }
 
     Ok(())
