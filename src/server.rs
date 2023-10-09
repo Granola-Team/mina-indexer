@@ -4,7 +4,7 @@ use crate::{
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
-        IndexerState, Tip,
+        IndexerState, Tip
     },
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
@@ -19,7 +19,7 @@ use std::{
     path::{Path, PathBuf},
     process,
     sync::Arc,
-    time::Duration,
+    time::Duration, cell::RefCell
 };
 use tokio::{
     fs::{self, create_dir_all, metadata},
@@ -29,6 +29,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, instrument};
 
+#[derive(Clone)]
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
     pub is_genesis_ledger: bool,
@@ -81,19 +82,126 @@ pub struct MinaIndexer {
     query_sender: mpsc::Sender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
 }
 
+pub enum IpcChannelUpdate {
+    NewState {
+        best_tip: Block,
+        ledger: Ledger,
+        summary: SummaryVerbose,
+    },
+    NewStore {
+        store: Arc<IndexerStore>,
+    }
+}
+
+pub async fn ipc_handler(
+    config: IndexerConfiguration, 
+    mut ipc_update_receiver: mpsc::Receiver<IpcChannelUpdate>, 
+    listener: LocalSocketListener,
+) {
+    let best_tip = RefCell::new(Block { 
+        parent_hash: config.root_hash.clone(), 
+        state_hash: config.root_hash, 
+        height: 1, 
+        blockchain_length: 1, 
+        global_slot_since_genesis: 0 
+    });
+    let summary = RefCell::new(None);
+    let ledger: RefCell<Ledger> = RefCell::new(config.ledger.ledger.into());
+    let block_store_readonly: RefCell<Option<Arc<IndexerStore>>> = RefCell::new(None);
+    loop {
+        tokio::select! {
+            ipc_update = ipc_update_receiver.recv() => {
+                match ipc_update {
+                    Some(ipc_update) => match ipc_update {
+                        IpcChannelUpdate::NewState { best_tip: new_best_tip, ledger: new_ledger, summary: new_summary } => {
+                            *best_tip.borrow_mut() = new_best_tip;
+                            *ledger.borrow_mut() = new_ledger;
+                            *summary.borrow_mut() = Some(new_summary);
+                        },
+                        IpcChannelUpdate::NewStore { store } => {
+                            *block_store_readonly.borrow_mut() = Some(store);
+                        },
+                    },
+                    None => continue,
+                }
+            }
+
+            conn_fut = listener.accept() => {
+                match conn_fut {
+                    Ok(stream) => {
+                        info!("Accepted client connection");
+                        // handle the connection
+                        if let Some(block_store) = block_store_readonly.borrow().as_ref() {
+                            info!("found block store");
+                            let block_store = block_store.clone();
+                            let ledger = ledger.borrow().clone();
+                            let summary = summary.borrow().clone();
+                            let best_tip = best_tip.borrow().clone();
+                            tokio::spawn(async move {
+                                info!("handling connection");
+                                debug!("Handling client connection");
+                                match handle_conn(stream, block_store.clone(), &best_tip, ledger, summary).await {
+                                    Err(e) => {
+                                        info!("error {e}");
+                                        error!("Error handling connection: {e}");
+                                    },
+                                    Ok(_) => { info!("handled connection"); },
+                                };
+                                debug!("Removing readonly instance at {}", block_store.db_path.clone().display());
+                                tokio::fs::remove_dir_all(&block_store.db_path).await.ok();
+                            });
+                        } else {
+                            info!("No store was found :(");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error accepting connection: {}", e);
+                    }
+                }
+            }
+        
+        }
+    }
+}
+
 impl MinaIndexer {
     pub async fn new(
         config: IndexerConfiguration,
         store: Arc<IndexerStore>,
     ) -> anyhow::Result<Self> {
         let (phase_sender, phase_receiver) = watch::channel(MinaIndexerRunPhase::JustStarted);
+        let phase_sender = Arc::new(phase_sender);
 
         let (query_sender, query_receiver) = mpsc::channel(1);
 
         let _loop_join_handle = tokio::spawn(async move {
+            use MinaIndexerRunPhase::*;
+            phase_sender.send_replace(StartingIPCSocketListener);
+            // LocalSocketStream::connect(SOCKET_NAME)
+            //     .await
+            //     .expect_err("Server is already running... Exiting.");
+            let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(50);
+            let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+                if e.kind() == io::ErrorKind::AddrInUse {
+                    let name = &SOCKET_NAME[1..];
+                    debug!(
+                        "Domain socket: {} already in use. Removing old vestige",
+                        name
+                    );
+                    std::fs::remove_file(name).expect("Should be able to remove socket file");
+                    LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
+                        panic!("Unable to bind domain socket {:?}", e);
+                    })
+                } else {
+                    panic!("Unable to bind domain socket {:?}", e);
+                }
+            });
+            info!("Local socket listener started");
             let watch_dir = config.watch_dir.clone();
-            let (state, phase_sender) = initialize(config, store, phase_sender).await?;
-            run(watch_dir, state, phase_sender, query_receiver).await
+            let config_new = config.clone();
+            tokio::spawn(async move { ipc_handler(config_new, ipc_update_receiver, listener).await;});
+            let (state, phase_sender) = initialize(config, store, phase_sender, ipc_update_sender.clone()).await?;
+            run(watch_dir, state, phase_sender, query_receiver, ipc_update_sender).await
         });
 
         Ok(Self {
@@ -141,14 +249,10 @@ impl MinaIndexer {
 pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
-    phase_sender: watch::Sender<MinaIndexerRunPhase>,
-) -> anyhow::Result<(IndexerState, watch::Sender<MinaIndexerRunPhase>)> {
+    phase_sender: Arc<watch::Sender<MinaIndexerRunPhase>>,
+    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>,
+) -> anyhow::Result<(IndexerState, Arc<watch::Sender<MinaIndexerRunPhase>>)> {
     use MinaIndexerRunPhase::*;
-    debug!("Checking that a server instance isn't already running");
-    phase_sender.send_replace(ConnectingToIPCSocket);
-    LocalSocketStream::connect(SOCKET_NAME)
-        .await
-        .expect_err("Server is already running... Exiting.");
 
     phase_sender.send_replace(SettingSIGINTHandler);
     debug!("Setting Ctrl-C handler");
@@ -185,6 +289,9 @@ pub async fn initialize(
             canonical_update_threshold,
         )?;
 
+        ipc_update_sender.send(IpcChannelUpdate::NewStore { store: Arc::new(state.spawn_secondary_database()?) }).await?;
+        ipc_update_sender.send(IpcChannelUpdate::NewState { best_tip: state.best_tip_block().clone(), ledger: state.best_ledger()?.unwrap(), summary: state.summary_verbose() }).await?;
+
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
         if is_genesis_ledger {
             state
@@ -197,6 +304,8 @@ pub async fn initialize(
         }
 
         phase_sender.send_replace(StateInitializedFromParser);
+        ipc_update_sender.send(IpcChannelUpdate::NewState { best_tip: state.best_tip_block().clone(), ledger: state.best_ledger()?.unwrap(), summary: state.summary_verbose() }).await?;
+        ipc_update_sender.send(IpcChannelUpdate::NewStore { store: Arc::new(state.spawn_secondary_database()?) }).await?;
         state
     };
 
@@ -207,11 +316,12 @@ pub async fn initialize(
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
-    phase_sender: watch::Sender<MinaIndexerRunPhase>,
+    phase_sender: Arc<watch::Sender<MinaIndexerRunPhase>>,
     mut query_receiver: mpsc::Receiver<(
         MinaIndexerQuery,
         oneshot::Sender<MinaIndexerQueryResponse>,
     )>,
+    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
 
@@ -219,24 +329,6 @@ pub async fn run(
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
     filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
     info!("Block receiver set to watch {:?}", block_watch_dir.as_ref());
-
-    phase_sender.send_replace(StartingIPCSocketListener);
-    let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
-        if e.kind() == io::ErrorKind::AddrInUse {
-            let name = &SOCKET_NAME[1..];
-            debug!(
-                "Domain socket: {} already in use. Removing old vestige",
-                name
-            );
-            std::fs::remove_file(name).expect("Should be able to remove socket file");
-            LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
-                panic!("Unable to bind domain socket {:?}", e);
-            })
-        } else {
-            panic!("Unable to bind domain socket {:?}", e);
-        }
-    });
-    info!("Local socket listener started");
 
     phase_sender.send_replace(StartingMainServerLoop);
 
@@ -269,38 +361,19 @@ pub async fn run(
 
                     state.add_block(&precomputed_block)?;
                     info!("Added {block:?}");
+
+                    ipc_update_sender.send(IpcChannelUpdate::NewState { 
+                        best_tip: state.best_tip_block().clone(), 
+                        ledger: state.best_ledger()?.unwrap(), 
+                        summary: state.summary_verbose() 
+                    }).await?;
+                    ipc_update_sender.send(IpcChannelUpdate::NewStore { 
+                        store: Arc::new(state.spawn_secondary_database()?) 
+                    }).await?;
                 } else {
                     info!("Block receiver shutdown, system exit");
                     return Ok(())
                 }
-            }
-
-            conn_fut = listener.accept() => {
-                match conn_fut {
-                    Ok(stream) => {
-                        info!("Accepted client connection");
-                        phase_sender.send_replace(ReceivingIPCConnection);
-
-                        let best_tip = state.best_tip_block().clone();
-                        let block_store_readonly = Arc::new(state.spawn_secondary_database()?);
-                        let summary = state.summary_verbose();
-                        let ledger = state.best_ledger()?.unwrap();
-
-                        // handle the connection
-                        tokio::spawn(async move {
-                            debug!("Handling client connection");
-                            if let Err(e) = handle_conn(stream, block_store_readonly.clone(), best_tip, ledger, summary).await {
-                                error!("Error handling connection: {e}");
-                            }
-                            debug!("Removing readonly instance at {}", block_store_readonly.db_path.clone().display());
-                            tokio::fs::remove_dir_all(&block_store_readonly.db_path).await.ok();
-                        });
-                    }
-                    Err(e) => {
-                        error!("Error accepting connection: {}", e);
-                    }
-                }
-
             }
         }
     }
@@ -310,9 +383,9 @@ pub async fn run(
 async fn handle_conn(
     conn: LocalSocketStream,
     db: Arc<IndexerStore>,
-    best_tip: Block,
+    best_tip: &Block,
     ledger: Ledger,
-    summary: SummaryVerbose,
+    summary: Option<SummaryVerbose>,
 ) -> Result<(), anyhow::Error> {
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
@@ -346,7 +419,7 @@ async fn handle_conn(
             let data_buffer = buffers.next().unwrap();
             let num = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<usize>()?;
-            let mut parent_hash = best_tip.parent_hash;
+            let mut parent_hash = best_tip.parent_hash.clone();
             let mut best_chain = vec![db.get_block(&best_tip.state_hash)?.unwrap()];
             for _ in 1..num {
                 let parent_pcb = db.get_block(&parent_hash)?.unwrap();
@@ -380,10 +453,14 @@ async fn handle_conn(
             let data_buffer = buffers.next().unwrap();
             let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
                 .parse::<bool>()?;
-            if verbose {
-                Some(serde_json::to_string::<SummaryVerbose>(&summary)?)
+            if let Some(summary) = summary {
+                if verbose {
+                    Some(serde_json::to_string::<SummaryVerbose>(&summary)?)
+                } else {
+                    Some(serde_json::to_string::<SummaryShort>(&summary.into())?)
+                }
             } else {
-                Some(serde_json::to_string::<SummaryShort>(&summary.into())?)
+                Some(serde_json::to_string(&String::from("No summary available yet"))?)
             }
         }
         bad_request => {
@@ -407,4 +484,14 @@ pub async fn create_dir_if_non_existent(path: &str) {
         debug!("Creating directory {path}");
         create_dir_all(path).await.unwrap();
     }
+}
+
+
+pub async fn spawn_readonly_rocksdb(primary_path: PathBuf) -> anyhow::Result<IndexerStore> {
+    let mut secondary_path = primary_path.clone();
+    secondary_path.push(uuid::Uuid::new_v4().to_string());
+
+    debug!("Spawning secondary readonly RocksDB instance");
+    let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
+    Ok(block_store_readonly)
 }
