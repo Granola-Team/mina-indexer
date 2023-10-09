@@ -4,7 +4,7 @@ use crate::{
     state::{
         ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
         summary::{SummaryShort, SummaryVerbose},
-        IndexerState, Tip
+        IndexerState, Tip,
     },
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
@@ -16,10 +16,11 @@ use log::trace;
 
 use serde_derive::{Deserialize, Serialize};
 use std::{
+    cell::RefCell,
     path::{Path, PathBuf},
     process,
     sync::Arc,
-    time::Duration, cell::RefCell
+    time::Duration,
 };
 use tokio::{
     fs::{self, create_dir_all, metadata},
@@ -86,24 +87,24 @@ pub enum IpcChannelUpdate {
     NewState {
         best_tip: Block,
         ledger: Ledger,
-        summary: SummaryVerbose,
+        summary: Box<SummaryVerbose>,
     },
     NewStore {
         store: Arc<IndexerStore>,
-    }
+    },
 }
 
 pub async fn ipc_handler(
-    config: IndexerConfiguration, 
-    mut ipc_update_receiver: mpsc::Receiver<IpcChannelUpdate>, 
+    config: IndexerConfiguration,
+    mut ipc_update_receiver: mpsc::Receiver<IpcChannelUpdate>,
     listener: LocalSocketListener,
 ) {
-    let best_tip = RefCell::new(Block { 
-        parent_hash: config.root_hash.clone(), 
-        state_hash: config.root_hash, 
-        height: 1, 
-        blockchain_length: 1, 
-        global_slot_since_genesis: 0 
+    let best_tip = RefCell::new(Block {
+        parent_hash: config.root_hash.clone(),
+        state_hash: config.root_hash,
+        height: 1,
+        blockchain_length: 1,
+        global_slot_since_genesis: 0,
     });
     let summary = RefCell::new(None);
     let ledger: RefCell<Ledger> = RefCell::new(config.ledger.ledger.into());
@@ -135,7 +136,7 @@ pub async fn ipc_handler(
                             info!("found block store");
                             let block_store = block_store.clone();
                             let ledger = ledger.borrow().clone();
-                            let summary = summary.borrow().clone();
+                            let summary = summary.borrow().clone().map(|summary| *summary);
                             let best_tip = best_tip.borrow().clone();
                             tokio::spawn(async move {
                                 info!("handling connection");
@@ -159,7 +160,7 @@ pub async fn ipc_handler(
                     }
                 }
             }
-        
+
         }
     }
 }
@@ -199,9 +200,19 @@ impl MinaIndexer {
             info!("Local socket listener started");
             let watch_dir = config.watch_dir.clone();
             let config_new = config.clone();
-            tokio::spawn(async move { ipc_handler(config_new, ipc_update_receiver, listener).await;});
-            let (state, phase_sender) = initialize(config, store, phase_sender, ipc_update_sender.clone()).await?;
-            run(watch_dir, state, phase_sender, query_receiver, ipc_update_sender).await
+            tokio::spawn(async move {
+                ipc_handler(config_new, ipc_update_receiver, listener).await;
+            });
+            let (state, phase_sender) =
+                initialize(config, store, phase_sender, ipc_update_sender.clone()).await?;
+            run(
+                watch_dir,
+                state,
+                phase_sender,
+                query_receiver,
+                ipc_update_sender,
+            )
+            .await
         });
 
         Ok(Self {
@@ -289,8 +300,18 @@ pub async fn initialize(
             canonical_update_threshold,
         )?;
 
-        ipc_update_sender.send(IpcChannelUpdate::NewStore { store: Arc::new(state.spawn_secondary_database()?) }).await?;
-        ipc_update_sender.send(IpcChannelUpdate::NewState { best_tip: state.best_tip_block().clone(), ledger: state.best_ledger()?.unwrap(), summary: state.summary_verbose() }).await?;
+        ipc_update_sender
+            .send(IpcChannelUpdate::NewStore {
+                store: Arc::new(state.spawn_secondary_database()?),
+            })
+            .await?;
+        ipc_update_sender
+            .send(IpcChannelUpdate::NewState {
+                best_tip: state.best_tip_block().clone(),
+                ledger: state.best_ledger()?.unwrap(),
+                summary: Box::new(state.summary_verbose()),
+            })
+            .await?;
 
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
         if is_genesis_ledger {
@@ -304,8 +325,18 @@ pub async fn initialize(
         }
 
         phase_sender.send_replace(StateInitializedFromParser);
-        ipc_update_sender.send(IpcChannelUpdate::NewState { best_tip: state.best_tip_block().clone(), ledger: state.best_ledger()?.unwrap(), summary: state.summary_verbose() }).await?;
-        ipc_update_sender.send(IpcChannelUpdate::NewStore { store: Arc::new(state.spawn_secondary_database()?) }).await?;
+        ipc_update_sender
+            .send(IpcChannelUpdate::NewState {
+                best_tip: state.best_tip_block().clone(),
+                ledger: state.best_ledger()?.unwrap(),
+                summary: Box::new(state.summary_verbose()),
+            })
+            .await?;
+        ipc_update_sender
+            .send(IpcChannelUpdate::NewStore {
+                store: Arc::new(state.spawn_secondary_database()?),
+            })
+            .await?;
         state
     };
 
@@ -321,7 +352,7 @@ pub async fn run(
         MinaIndexerQuery,
         oneshot::Sender<MinaIndexerQueryResponse>,
     )>,
-    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>
+    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>,
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
 
@@ -362,13 +393,13 @@ pub async fn run(
                     state.add_block(&precomputed_block)?;
                     info!("Added {block:?}");
 
-                    ipc_update_sender.send(IpcChannelUpdate::NewState { 
-                        best_tip: state.best_tip_block().clone(), 
-                        ledger: state.best_ledger()?.unwrap(), 
-                        summary: state.summary_verbose() 
+                    ipc_update_sender.send(IpcChannelUpdate::NewState {
+                        best_tip: state.best_tip_block().clone(),
+                        ledger: state.best_ledger()?.unwrap(),
+                        summary: Box::new(state.summary_verbose())
                     }).await?;
-                    ipc_update_sender.send(IpcChannelUpdate::NewStore { 
-                        store: Arc::new(state.spawn_secondary_database()?) 
+                    ipc_update_sender.send(IpcChannelUpdate::NewStore {
+                        store: Arc::new(state.spawn_secondary_database()?)
                     }).await?;
                 } else {
                     info!("Block receiver shutdown, system exit");
@@ -460,7 +491,9 @@ async fn handle_conn(
                     Some(serde_json::to_string::<SummaryShort>(&summary.into())?)
                 }
             } else {
-                Some(serde_json::to_string(&String::from("No summary available yet"))?)
+                Some(serde_json::to_string(&String::from(
+                    "No summary available yet",
+                ))?)
             }
         }
         bad_request => {
@@ -485,7 +518,6 @@ pub async fn create_dir_if_non_existent(path: &str) {
         create_dir_all(path).await.unwrap();
     }
 }
-
 
 pub async fn spawn_readonly_rocksdb(primary_path: PathBuf) -> anyhow::Result<IndexerStore> {
     let mut secondary_path = primary_path.clone();
