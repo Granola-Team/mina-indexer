@@ -5,6 +5,7 @@ mkdir -p $TMP/blocks
 cleanup() {
     echo "Exiting with $?"
     rm -rf $TMP/blocks
+    kill $(pgrep mina-indexer)
 }
 trap cleanup EXIT
 
@@ -84,22 +85,37 @@ idxr server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=IDXR_PID=$(echo $!)
+IDXR_PID=$(pgrep mina-indexer)
 kill $IDXR_PID
 
 # Indexer server starts up on a minimal selection of blocks
-dl_mainnet 50 $TMP/blocks
+dl_mainnet 15 $TMP/blocks
 server cli \
     --startup-dir $TMP/blocks \
     --watch-dir $TMP/blocks \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=$(echo $!)
+IDXR_PID=$(pgrep mina-indexer)
+sleep 2
+echo $(client -o summary -v) |
+    jq .witness_tree.canonical_tip_hash | 
+    grep -iq "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
+kill $IDXR_PID
+
+# Indexer server ipc is available during initialization
+dl_mainnet 250 $TMP/blocks
+server cli \
+    --startup-dir $TMP/blocks \
+    --watch-dir $TMP/blocks \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+IDXR_PID=$(pgrep mina-indexer)
 sleep 3
 echo $(client -o summary -v) |
     jq .witness_tree.canonical_tip_hash | 
-    grep -iq "3NKjssd1iCRU3aQPdi6o4AueRiaSMVk8NhVw48DSMQzBwrexCnDr"
+    grep -iq "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
 kill $IDXR_PID
 
 echo "Done"
