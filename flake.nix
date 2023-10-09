@@ -62,6 +62,7 @@
             cargo-nextest
             cargo-audit
             bacon
+            google-cloud-sdk
           ]
           ++ buildDependencies;
 
