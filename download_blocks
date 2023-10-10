@@ -1,9 +1,10 @@
 #!/bin/sh
 set -ex
 
-touch $TMP/block_urls
+TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+touch $TMPDIR/block_urls
 cleanup() {
-    rm $TMP/block_urls
+    rm $TMPDIR/block_urls
 }
 trap cleanup EXIT
 
@@ -14,6 +15,6 @@ OUT_DIR=$4
 
 for SLOT in `seq 2 $MAX_SLOT`
 do
-	echo "gs://${BUCKET}/${NETWORK}-${SLOT}-*.json" >> $TMP/block_urls
+	echo "gs://${BUCKET}/${NETWORK}-${SLOT}-*.json" >> $TMPDIR/block_urls
 done
-cat $TMP/block_urls | gsutil -m cp -I $OUT_DIR
+cat $TMPDIR/block_urls | gsutil -m cp -I $OUT_DIR
