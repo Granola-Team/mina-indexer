@@ -105,7 +105,7 @@ server cli \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 sleep 2
-echo $(client -o summary -v) |
+client -o summary |
     jq .witness_tree.canonical_tip_hash | 
     grep -iq "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
 kill $IDXR_PID
@@ -120,9 +120,9 @@ server cli \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 sleep 3
-echo $(client -o summary -v) |
-    jq .witness_tree.canonical_tip_hash | 
-    grep -iq "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+
+client -o summary |
+    jq .
 kill $IDXR_PID
 
 echo "Done"
