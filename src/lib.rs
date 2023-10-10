@@ -14,7 +14,7 @@ pub const MAINNET_CANONICAL_THRESHOLD: u32 = 10;
 pub const MAINNET_GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
 pub const MAINNET_TRANSITION_FRONTIER_K: u32 = 290;
 pub const PRUNE_INTERVAL_DEFAULT: u32 = 10;
-pub const SOCKET_NAME: &str = "@mina-indexer.sock";
+pub const SOCKET_NAME: &str = "mina-indexer.sock";
 
 pub fn display_duration(duration: std::time::Duration) -> String {
     let duration_as_secs = duration.as_secs();
