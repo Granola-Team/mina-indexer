@@ -87,7 +87,6 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
     };
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
-
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
     match command {
@@ -155,7 +154,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             }
         }
         ClientCli::Shutdown => {
-            let command = format!("shutdown \0");
+            let command = "shutdown \0".to_string();
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             let msg: String = bcs::from_bytes(&buffer)?;
