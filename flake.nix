@@ -63,6 +63,7 @@
             cargo-audit
             bacon
             google-cloud-sdk
+            just
           ]
           ++ buildDependencies;
 
