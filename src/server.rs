@@ -184,7 +184,7 @@ impl MinaIndexer {
             let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(50);
             let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
                 if e.kind() == io::ErrorKind::AddrInUse {
-                    let name = &SOCKET_NAME[1..];
+                    let name = &SOCKET_NAME;
                     debug!(
                         "Domain socket: {} already in use. Removing old vestige",
                         name

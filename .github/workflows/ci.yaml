@@ -1,4 +1,4 @@
-name: CI
+name: Continuous Integration
 on:
   push:
     branches: [main]
@@ -11,118 +11,112 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  Nextest:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-        rust:
-          - stable
+  build:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup Toolchain
+      - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           profile: minimal
-          toolchain: ${{ matrix.rust }}
           override: true
 
-      - name: Run cargo-nextest
-        uses: taiki-e/install-action@nextest
-        with:
-          command: nextest
-          args: run --all-features --profile ci
-
-  Rustfmt:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-        rust:
-          - stable
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-          components: rustfmt
-
-      - name: Setup Rust Cache
+      - name: Set up rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Run Rustfmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --package mina-indexer -- --check
+      - name: Build Mina Indexer
+        run: cargo build
 
-  Clippy:
+  lints:
+    needs: build
     runs-on: ubuntu-latest
-    name: ${{ matrix.toolchain }} / clippy
-    permissions:
-      contents: read
-      checks: write
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain: [stable, beta]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup Toolchain
+      - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           profile: minimal
-          toolchain: ${{ matrix.toolchain }}
           override: true
-          components: clippy
-      - name: Run Clippy
-        if: github.event_name == 'pull_request'
-        uses: actions-rs/clippy-check@v1
+
+      - name: Install just
+        uses: extractions/setup-just@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
-  Build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-        rust:
-          - stable
+          just-version: 1.13
+
+      - name: Set up rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run lints
+        run: just lint
+  unit_tests:
+    needs: build
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup Toolchain
+      - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           profile: minimal
-          toolchain: ${{ matrix.rust }}
           override: true
 
-      - name: Release Build
-        uses: actions-rs/cargo@v1
+      - name: Install just
+        uses: extractions/setup-just@v1
         with:
-          command: build
-          args: --release --all-features
+          just-version: 1.13
+
+      - name: Set up rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Run Unit Tests
+        run: just test-unit
+  regression_tests:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Install just
+        uses: extractions/setup-just@v1
+        with:
+          just-version: 1.13
+
+      - name: Set up rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Run Regression Tests
+        run: just test-regression

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ex
 
-DOMAIN_SOCKET="${PWD}/mina-indexer.sock"
+DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
 
 # Create temporary directory for blocks and things in a cross platform
 # compatible way
@@ -12,10 +12,6 @@ mkdir $BLOCKS_DIR
 cleanup() {
     echo "Exiting with $?"
     rm -rf $TMPDIR
-    IDXR_PID=$(pgrep mina-indexer)
-    if [ -z "$IDXR_PID" ]; then
-        kill $IDXR_PID
-    fi
 }
 trap cleanup EXIT
 
@@ -96,7 +92,7 @@ server cli \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
-sleep 2
+sleep 5
 client -o summary |
     jq .witness_tree.canonical_tip_hash | 
     grep -iq "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
@@ -112,20 +108,20 @@ server cli \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
-sleep 3
+sleep 5
 
 client -o summary |
     jq .
 kill $IDXR_PID
 teardown
-sleep 2
+sleep 5
 
 # Signal indexer to shutdown
 idxr server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-sleep 1
+sleep 3
 shutdown
 
 echo "Done"
