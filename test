@@ -121,6 +121,7 @@ idxr server cli \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+sleep 3
 shutdown
 
 echo "Done"
