@@ -56,3 +56,12 @@ async fn missing_parent() {
     assert_eq!(block_parser.num_canonical, 4);
     assert_eq!(block_parser.total_num_blocks, 35)
 }
+
+#[tokio::test]
+async fn one_block() {
+    let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/one_block");
+    let block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+
+    assert_eq!(block_parser.num_canonical, 0);
+    assert_eq!(block_parser.total_num_blocks, 1)
+}
