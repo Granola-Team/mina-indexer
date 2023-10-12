@@ -279,7 +279,7 @@ pub async fn initialize(
         ledger,
         is_genesis_ledger,
         root_hash,
-        startup_dir: _,
+        startup_dir,
         watch_dir: _,
         prune_interval,
         canonical_threshold,
@@ -287,12 +287,10 @@ pub async fn initialize(
     } = config;
 
     let state = {
-        /*
         info!(
             "Initializing indexer state from blocks in {}",
             startup_dir.display()
         );
-         */
         let mut state = IndexerState::new(
             root_hash.clone(),
             ledger.ledger,
@@ -315,8 +313,7 @@ pub async fn initialize(
             })
             .await?;
 
-        let blocks_dir = &config.startup_dir;
-        let mut block_parser = BlockParser::new(blocks_dir, canonical_threshold)?;
+        let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
         if is_genesis_ledger {
             state
                 .initialize_with_contiguous_canonical(&mut block_parser)
