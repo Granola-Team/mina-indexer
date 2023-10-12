@@ -124,8 +124,6 @@ shutdown
 
 # Indexer server reports correct balance for Genesis Ledger Account
 server cli \
-    --startup-dir $TMP/blocks \
-    --watch-dir $TMP/blocks \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
