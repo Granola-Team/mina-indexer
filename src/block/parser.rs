@@ -151,7 +151,7 @@ impl BlockParser {
 
                 for (idx, path) in paths.iter().enumerate() {
                     let length = length_from_path_or_max(path);
-                    if length > curr_length {
+                    if length > curr_length || idx == 0 {
                         length_start_indices_and_diffs.push((idx, length - curr_length));
                         curr_length = length;
                     } else {
@@ -363,7 +363,6 @@ impl BlockParser {
             let state_hash =
                 get_state_hash(filename.file_name().expect("filename already checked"))
                     .expect("state hash already checked");
-
             let mut log_file = tokio::fs::File::open(&filename).await?;
             let mut log_file_contents = Vec::new();
 
@@ -430,7 +429,7 @@ fn next_length_start_index(paths: &[PathBuf], path_idx: usize) -> Option<usize> 
 }
 
 /// Finds the _canonical tip_, i.e. the _highest_ block in the
-/// _lowest contiguous chain_ with `MAINNET_CANONICAL_THRESHOLD` ancestors.
+/// _lowest contiguous chain_ with `cacnonical_threshold` ancestors.
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///
@@ -442,50 +441,54 @@ fn find_canonical_tip(
     mut curr_length_idx: usize,
     canonical_threshold: u32,
 ) -> Option<(usize, usize)> {
-    let mut curr_path = &paths[curr_length_idx];
+    if length_start_indices_and_diffs.len() <= canonical_threshold as usize {
+        None
+    } else {
+        let mut curr_path = &paths[curr_length_idx];
 
-    for n in 1..=canonical_threshold {
-        let mut parent_found = false;
-        let prev_length_start_idx = if curr_start_idx > 0 {
-            length_start_indices_and_diffs[curr_start_idx - 1].0
-        } else {
-            0
-        };
-
-        for path in paths[prev_length_start_idx..curr_length_idx].iter() {
-            // if the parent is found, check that it has a parent, etc
-            if is_parent(path, curr_path) {
-                curr_path = path;
-                curr_length_idx = prev_length_start_idx;
-                curr_start_idx = curr_start_idx.saturating_sub(1);
-                parent_found = true;
-                continue;
-            }
-        }
-
-        // if a parent was not found
-        if !parent_found {
-            // begin the search again at the previous length
-            if curr_start_idx > canonical_threshold as usize {
-                return find_canonical_tip(
-                    paths,
-                    length_start_indices_and_diffs,
-                    curr_start_idx.saturating_sub(1),
-                    prev_length_start_idx,
-                    canonical_threshold,
-                );
+        for n in 1..=canonical_threshold {
+            let mut parent_found = false;
+            let prev_length_start_idx = if curr_start_idx > 0 {
+                length_start_indices_and_diffs[curr_start_idx - 1].0
             } else {
-                // canonical tip cannot be found
-                return None;
+                0
+            };
+
+            for path in paths[prev_length_start_idx..curr_length_idx].iter() {
+                // if the parent is found, check that it has a parent, etc
+                if is_parent(path, curr_path) {
+                    curr_path = path;
+                    curr_length_idx = prev_length_start_idx;
+                    curr_start_idx = curr_start_idx.saturating_sub(1);
+                    parent_found = true;
+                    continue;
+                }
+            }
+
+            // if a parent was not found
+            if !parent_found {
+                // begin the search again at the previous length
+                if curr_start_idx > canonical_threshold as usize {
+                    return find_canonical_tip(
+                        paths,
+                        length_start_indices_and_diffs,
+                        curr_start_idx.saturating_sub(1),
+                        prev_length_start_idx,
+                        canonical_threshold,
+                    );
+                } else {
+                    // canonical tip cannot be found
+                    return None;
+                }
+            }
+
+            // canonical tip found
+            if n == canonical_threshold && parent_found {
+                break;
             }
         }
-
-        // canonical tip found
-        if n == canonical_threshold && parent_found {
-            break;
-        }
+        Some((curr_length_idx, curr_start_idx))
     }
-    Some((curr_length_idx, curr_start_idx))
 }
 
 /// Finds the index of the _highest possible block in the lowest contiguous chain_

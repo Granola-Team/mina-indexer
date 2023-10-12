@@ -63,6 +63,10 @@
             cargo-audit
             bacon
             google-cloud-sdk
+<<<<<<< HEAD
+=======
+            just
+>>>>>>> 17f973ea8e655e32227c3dccaf347d70d5d6d064
           ]
           ++ buildDependencies;
 

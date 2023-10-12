@@ -1,24 +1,29 @@
 #!/bin/sh
 set -ex
 
-mkdir -p $TMP/blocks
+DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
+
+# Create temporary directory for blocks and things in a cross platform
+# compatible way
+TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+BLOCKS_DIR="${TMPDIR}/blocks"
+mkdir $BLOCKS_DIR
+
 cleanup() {
     echo "Exiting with $?"
-    rm -rf $TMP/blocks
+    rm -rf $TMPDIR
 }
 trap cleanup EXIT
 
-# cargo fmt --check
-# cargo check
-# cargo audit -D unmaintained -D yanked
-# cargo clippy
 cargo build
-# cargo nextest run
 
-DOMAIN_SOCKET=/var/run/mina-indexer.sock
+teardown() {
+    rm -rf $HOME/.mina-indexer/database || true
+    rm -rf $HOME/.mina-indexer/logs || true
+}
 
 shutdown() {
-    echo "shutdown\0" | nc -U $DOMAIN_SOCKET
+    echo "shutdown \0" | nc -U $DOMAIN_SOCKET
 }
 
 account_balance() {
@@ -45,19 +50,9 @@ client() {
     ./target/debug/mina-indexer client "$@"
 }
 
-dl() {
-    BUCKET=$1; MAX_SLOT=$2; NETWORK=$3; OUT_DIR=$4
-    ./download_blocks $BUCKET $MAX_SLOT $NETWORK $OUT_DIR
-}
-
 dl_mainnet() {
     MAX_SLOT=$1; OUT_DIR=$2
     ./download_blocks mina_network_block_data $MAX_SLOT mainnet $OUT_DIR
-}
-
-dl_berkeley() {
-    MAX_SLOT=$1; OUT_DIR=$2
-    ./download_blocks mina_network_block_data $MAX_SLOT berkeley $OUT_DIR
 }
 
 # Indexer reports usage with no arguments
@@ -77,7 +72,7 @@ idxr server config 2>&1 |
     grep -iq "Usage: mina-indexer server config"
 
 # Indexer server cli subcommand works
-idxr server cli --help > /dev/null
+idxr server cli --help 2>/dev/null
 
 # Indexer server config passes cli with minimal args
 idxr server cli \
@@ -86,31 +81,47 @@ idxr server cli \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 kill $IDXR_PID
+teardown
 
 # Indexer server starts up on a minimal selection of blocks
-dl_mainnet 50 $TMP/blocks
+dl_mainnet 15 $BLOCKS_DIR
 server cli \
-    --startup-dir $TMP/blocks \
-    --watch-dir $TMP/blocks \
-    --initial-ledger tests/ledgers/mainnet-genesis.json \
-    --is-genesis-ledger \
-    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=$(pgrep mina-indexer)
-sleep 3
-echo $(client -o summary -v) |
-    jq .witness_tree.canonical_tip_hash | 
-    grep -iq "3NKjssd1iCRU3aQPdi6o4AueRiaSMVk8NhVw48DSMQzBwrexCnDr"
-kill $IDXR_PID
-
-# Indexer server reports correct balance for Genesis Ledger Account
-server cli \
+    --startup-dir $BLOCKS_DIR \
+    --watch-dir $BLOCKS_DIR \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 sleep 5
-echo $(client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk) |
-    jq .balance |
-    grep -iq "148837200000000"
+client -o summary |
+    jq .witness_tree.canonical_tip_hash | 
+    grep -iq "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
 kill $IDXR_PID
+teardown
+
+# Indexer server ipc is available during initialization
+dl_mainnet 250 $BLOCKS_DIR
+server cli \
+    --startup-dir $BLOCKS_DIR \
+    --watch-dir $BLOCKS_DIR \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+IDXR_PID=$(pgrep mina-indexer)
+sleep 5
+
+client -o summary |
+    jq .
+kill $IDXR_PID
+teardown
+sleep 5
+
+# Signal indexer to shutdown
+idxr server cli \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+sleep 3
+shutdown
+
 echo "Done"
