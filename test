@@ -109,23 +109,9 @@ server cli \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 sleep 5
-
 client -o summary |
-    jq .
-kill $IDXR_PID
-teardown
-sleep 5
-
-# Indexer server reports correct balance for Genesis Ledger Account
-server cli \
-    --initial-ledger tests/ledgers/mainnet-genesis.json \
-    --is-genesis-ledger \
-    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-IDXR_PID=$(pgrep mina-indexer)
-sleep 5
-client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk |
-    jq .balance |
-    grep -iq "148837200000000"
+    jq .witness_tree.canonical_tip_hash | 
+    grep -iq "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
 kill $IDXR_PID
 teardown
 
@@ -138,7 +124,6 @@ sleep 3
 shutdown
 
 # Indexer server reports correct balance for Genesis Ledger Account
-dl_mainnet 5 $TMP/blocks
 server cli \
     --startup-dir $TMP/blocks \
     --watch-dir $TMP/blocks \
@@ -146,9 +131,10 @@ server cli \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
-sleep 3
-echo $(client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk) |
+sleep 5
+client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk) |
     jq .balance |
     grep -iq "148837200000000"
 kill $IDXR_PID
+teardown
 echo "Done"
