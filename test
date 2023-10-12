@@ -103,15 +103,12 @@ echo $(client -o summary -v) |
 kill $IDXR_PID
 
 # Indexer server reports correct balance for Genesis Ledger Account
-dl_mainnet 5 $TMP/blocks
 server cli \
-    --startup-dir $TMP/blocks \
-    --watch-dir $TMP/blocks \
     --initial-ledger tests/ledgers/mainnet-genesis.json \
     --is-genesis-ledger \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
-sleep 3
+sleep 5
 echo $(client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk) |
     jq .balance |
     grep -iq "148837200000000"
