@@ -109,12 +109,10 @@ server cli \
     --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
 IDXR_PID=$(pgrep mina-indexer)
 sleep 5
-
 client -o summary |
     jq .
 kill $IDXR_PID
 teardown
-sleep 5
 
 # Signal indexer to shutdown
 idxr server cli \
@@ -124,4 +122,16 @@ idxr server cli \
 sleep 3
 shutdown
 
+# Indexer server reports correct balance for Genesis Ledger Account
+server cli \
+    --initial-ledger tests/ledgers/mainnet-genesis.json \
+    --is-genesis-ledger \
+    --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+IDXR_PID=$(pgrep mina-indexer)
+sleep 5
+client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk |
+    jq .balance |
+    grep -iq "148837200000000"
+kill $IDXR_PID
+teardown
 echo "Done"

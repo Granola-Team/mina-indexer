@@ -7,6 +7,8 @@ use mina_serialization_types::{
     v1::PublicKeyV1,
 };
 use mina_signer::CompressedPubKey;
+use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, path::Path};
 use tokio::io::AsyncReadExt;
@@ -62,10 +64,12 @@ impl From<GenesisLedger> for Ledger {
     fn from(genesis_ledger: GenesisLedger) -> Ledger {
         let mut accounts = HashMap::new();
         for genesis_account in genesis_ledger.accounts {
-            let balance = match str::parse::<u64>(&genesis_account.balance) {
-                Ok(amt) => Amount(amt * 1_000_000_000),
-                Err(_) => Amount::default(),
-            };
+            let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
+                Ok(amt) => (amt * dec!(1_000_000_000))
+                    .to_u64()
+                    .expect("Parsed Genesis Balance has wrong format"),
+                Err(_) => panic!("Unable to parse Genesis Balance"),
+            });
             // Temporary hack to ignore bad PKs in mainnet genesis ledger
             if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW"
                 || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1"
