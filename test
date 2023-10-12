@@ -5,11 +5,11 @@ DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
 
 TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 BLOCKS_DIR="${TMPDIR}/blocks"
-mkdir $BLOCKS_DIR
+mkdir "${BLOCKS_DIR}"
 
 cleanup() {
     echo "Exiting with $?"
-    rm -rf $TMPDIR 2>/dev/null
+    rm -rf ${TMPDIR} 2>/dev/null
 }
 
 trap cleanup EXIT
@@ -20,7 +20,7 @@ idxr() {
 
 dl_mainnet() {
     MAX_SLOT=$1; OUT_DIR=$2
-    ./download_blocks mina_network_block_data $MAX_SLOT mainnet $OUT_DIR
+    ./download_blocks mina_network_block_data "${MAX_SLOT}" mainnet "${OUT_DIR}"
 }
 
 assert() {
@@ -40,10 +40,10 @@ setup() {
 }
 
 teardown() {
-    echo "Cleaning up and killing the background indexer with PID: $idxr_pid"
-    kill $idxr_pid 2>/dev/null
-    rm -rf $HOME/.mina-indexer/database || true
-    rm -rf $HOME/.mina-indexer/logs || true
+    echo "Cleaning up and killing the background indexer with PID: ${idxr_pid}"
+    kill "${idxr_pid}" 2>/dev/null
+    rm -rf "${HOME}/.mina-indexer/database" || true
+    rm -rf "${HOME}/.mina-indexer/logs" || true
 }
 
 
@@ -153,4 +153,5 @@ else
         esac
     done
 fi
+
 echo "Done"
