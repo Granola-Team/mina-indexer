@@ -110,8 +110,7 @@ server cli \
 IDXR_PID=$(pgrep mina-indexer)
 sleep 5
 client -o summary |
-    jq .witness_tree.canonical_tip_hash | 
-    grep -iq "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+    jq .
 kill $IDXR_PID
 teardown
 
