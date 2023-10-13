@@ -10,7 +10,6 @@ mkdir "${BLOCKS_DIR}"
 cleanup() {
     echo "Exiting with $?"
     rm -rf ${TMPDIR} 2>/dev/null
-    teardown
 }
 
 trap cleanup EXIT
