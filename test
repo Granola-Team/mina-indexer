@@ -10,6 +10,7 @@ mkdir "${BLOCKS_DIR}"
 cleanup() {
     echo "Exiting with $?"
     rm -rf ${TMPDIR} 2>/dev/null
+    teardown
 }
 
 trap cleanup EXIT
@@ -130,6 +131,21 @@ test_account_balance_cli() {
     teardown
 }
 
+test_account_public_key_json() {
+    setup
+
+    idxr server cli \
+        --initial-ledger tests/ledgers/mainnet-genesis.json \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+    idxr_pid=$(pgrep mina-indexer)
+    sleep 5
+    result = $(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
+    assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
+
+    teardown
+}
+
 cargo build
 
 # Check command-line arguments
@@ -140,6 +156,7 @@ if [[ "$#" -eq 0 ]]; then
     test_best_canonical_tip
     test_ipc_is_available_immediately
     test_account_balance_cli
+    test_account_public_key_json
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -149,6 +166,7 @@ else
             "test_best_canonical_tip") test_best_canonical_tip ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
             "test_account_balance_cli") ;;
+            "test_account_public_key_json") test_account_public_key_json ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
