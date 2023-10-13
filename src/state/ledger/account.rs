@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
 use super::PublicKey;
 
@@ -13,6 +13,8 @@ pub struct Nonce(pub u32);
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Account {
+    #[serde(serialize_with = "serialize_public_key")]
+    #[serde(deserialize_with = "deserialize_public_key")]
     pub public_key: PublicKey,
     pub balance: Amount,
     pub nonce: Nonce,
@@ -116,4 +118,42 @@ fn test_nanomina_to_mina_conversion() {
     let actual = 1_000_000_000;
     let val = nanomina_to_mina(actual);
     assert_eq!("1", val);
+}
+
+fn serialize_public_key<S>(
+    public_key: &PublicKey,
+    s: S,
+) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+where
+    S: Serializer,
+{
+    let pub_key_address = public_key.to_address();
+    s.serialize_str(&pub_key_address)
+}
+
+fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PublicKey, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    pub struct StringVisitor;
+
+    impl<'de> Visitor<'de> for StringVisitor {
+        type Value = PublicKey;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a valid Mina public key address")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            match PublicKey::from_address(v) {
+                Err(e) => Err(E::custom(e.to_string())),
+                Ok(public_key) => Ok(public_key),
+            }
+        }
+    }
+
+    deserializer.deserialize_any(StringVisitor)
 }
