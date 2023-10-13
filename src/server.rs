@@ -286,6 +286,8 @@ pub async fn initialize(
         canonical_update_threshold,
     } = config;
 
+    create_dir_if_non_existent(startup_dir.to_str().unwrap()).await;
+
     let state = {
         info!(
             "Initializing indexer state from blocks in {}",
@@ -522,7 +524,7 @@ async fn handle_conn(
 
 pub async fn create_dir_if_non_existent(path: &str) {
     if metadata(path).await.is_err() {
-        debug!("Creating directory {path}");
+        debug!("Creating directory {path:?}");
         create_dir_all(path).await.unwrap();
     }
 }
