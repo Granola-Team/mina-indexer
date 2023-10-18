@@ -429,7 +429,7 @@ fn next_length_start_index(paths: &[PathBuf], path_idx: usize) -> Option<usize> 
 }
 
 /// Finds the _canonical tip_, i.e. the _highest_ block in the
-/// _lowest contiguous chain_ with `cacnonical_threshold` ancestors.
+/// _lowest contiguous chain_ with `canonical_threshold` ancestors.
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///

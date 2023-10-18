@@ -63,5 +63,26 @@ async fn one_block() {
     let block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     assert_eq!(block_parser.num_canonical, 0);
-    assert_eq!(block_parser.total_num_blocks, 1)
+    assert_eq!(block_parser.total_num_blocks, 1);
+}
+
+#[tokio::test]
+async fn canonical_threshold() {
+    let canonical_threshold = 2;
+    let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+    let mut block_parser = BlockParser::new(&blocks_dir, canonical_threshold).unwrap();
+
+    while let Some(precomputed_block) = block_parser.next().await.unwrap() {
+        println!(
+            "length: {}, hash: {}",
+            precomputed_block.blockchain_length, precomputed_block.state_hash
+        );
+    }
+
+    // lengths 2..19 are known to be canonical
+    assert_eq!(
+        block_parser.num_canonical,
+        block_parser.total_num_blocks - canonical_threshold
+    );
+    assert_eq!(block_parser.total_num_blocks, 20);
 }
