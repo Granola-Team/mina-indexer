@@ -23,12 +23,9 @@ actix-web = "4.3.1"
 actix-web-lab = "0.19.1"
 actix-cors = "0.6.4"
 anyhow = {version = "1.0.69"}
-async_executors = { version = "0.7.0", features = ["tokio_tp"] }
 async-trait = "0.1.64"
-env_logger = "0.10.0"
 futures = "0.3.26"
 futures-util = "0.3.26"
-log = "0.4.17"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 serde_json = {version = "1.0.92", features = [ "raw_value" ] }
@@ -44,30 +41,24 @@ mina-signer = { path = "./mina-rs/proof-systems/signer", version = "0.1.0" }
 rocksdb = "0.21.0"
 bcs = "0.1.5"
 id_tree = { version = "1.8.0", features = ["serde_support"]}
-async-recursion = "1.0.4"
 watchexec = "2.3.0"
 async-priority-channel = "0.1.0"
 interprocess = {version = "1.2.1", features = ["tokio", "tokio_support"]}
-r2d2 = "0.8.10"
 uuid = { version = "1.3.1", features = [ "v4"] }
 time = { version = "0.3.20", features = ["serde", "serde-human-readable"] }
-serde_test = "1.0.160"
 tracing = "0.1.37"
-tracing-appender = "0.2.2"
 tracing-subscriber = "0.3.17"
 bytesize = "1.2.0"
 rust_decimal = {version = "1.32.0", features = ["serde"]}
 rust_decimal_macros = "1.32.0"
 zstd = "0.12.4"
 tar = "0.4.39"
-spmc = "0.3.0"
 bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
 async-ringbuf = "0.1.3"
 ctrlc = "3.4.0"
 serde_yaml = "0.9.25"
 data-encoding = "2.4.0"
-actix-rt = "2.8.0"
 oneshot = "0.1.5"
 
 [dependencies.tokio]
