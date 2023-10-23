@@ -10,6 +10,9 @@ mkdir "${BLOCKS_DIR}"
 cleanup() {
     echo "Exiting with $?"
     rm -rf ${TMPDIR} 2>/dev/null
+    rm -rf "${HOME}/.mina-indexer/database" || true
+    rm -rf "${HOME}/.mina-indexer/logs" || true
+    rm ${DOMAIN_SOCKET} || true
 }
 
 trap cleanup EXIT
@@ -41,9 +44,10 @@ setup() {
 
 teardown() {
     echo "Cleaning up and killing the background indexer with PID: ${idxr_pid}"
-    kill "${idxr_pid}" 2>/dev/null
+    kill "${idxr_pid}" 2>/dev/null || true
     rm -rf "${HOME}/.mina-indexer/database" || true
     rm -rf "${HOME}/.mina-indexer/logs" || true
+    rm ${DOMAIN_SOCKET} || true
 }
 
 
@@ -76,6 +80,7 @@ test_indexer_basic_start() {
          --is-genesis-ledger \
          --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     idxr_pid=$(pgrep mina-indexer)
+    kill $idxr_pid
     teardown
 }
 
@@ -90,10 +95,10 @@ test_best_canonical_tip() {
            --initial-ledger tests/ledgers/mainnet-genesis.json \
            --is-genesis-ledger \
            --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    idxr_pid=$(pgrep mina-indexer)
     sleep 5
     result=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
-    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $result
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
+    idxr_pid=$(pgrep mina-indexer)
     teardown
 }
 
@@ -108,9 +113,9 @@ test_ipc_is_available_immediately() {
            --initial-ledger tests/ledgers/mainnet-genesis.json \
            --is-genesis-ledger \
            --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    idxr_pid=$(pgrep mina-indexer)
     sleep 5
     idxr client -o summary | jq .
+    idxr_pid=$(pgrep mina-indexer)
     teardown
 }
 
@@ -122,26 +127,25 @@ test_account_balance_cli() {
            --initial-ledger tests/ledgers/mainnet-genesis.json \
            --is-genesis-ledger \
            --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    idxr_pid=$(pgrep mina-indexer)
     sleep 5
     result=$(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
-
+    idxr_pid=$(pgrep mina-indexer)
     teardown
 }
 
 test_account_public_key_json() {
     setup
+    mkdir $TMPDIR/database
 
     idxr server cli \
         --initial-ledger tests/ledgers/mainnet-genesis.json \
         --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    idxr_pid=$(pgrep mina-indexer)
     sleep 5
     result=$(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
-
+    idxr_pid=$(pgrep mina-indexer)
     teardown
 }
 
