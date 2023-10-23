@@ -1,48 +1,55 @@
-use std::{sync::Arc, path::PathBuf, process};
+use std::{path::PathBuf, process, sync::Arc};
 
 use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, instrument, error, debug, trace};
+use tracing::{debug, error, info, instrument, trace};
 
-use crate::{server::{IndexerConfiguration, IpcChannelUpdate}, store::IndexerStore, block::{Block, BlockHash, store::BlockStore}, state::{summary::{SummaryVerbose, SummaryShort}, ledger::{Ledger, public_key::PublicKey}}};
+use crate::{
+    block::{store::BlockStore, Block, BlockHash},
+    server::{IndexerConfiguration, IpcChannelUpdate},
+    state::{
+        ledger::{public_key::PublicKey, Ledger},
+        summary::{SummaryShort, SummaryVerbose},
+    },
+    store::IndexerStore,
+};
 
 #[derive(Debug)]
 pub struct IpcActor {
-    state_recv : IpcStateReceiver,
-    listener   : LocalSocketListener,
-    best_tip   : RwLock<Block>,
-    ledger     : RwLock<Ledger>,
-    summary    : RwLock<Option<SummaryVerbose>>,
-    store      : RwLock<Arc<IndexerStore>>,
+    state_recv: IpcStateReceiver,
+    listener: LocalSocketListener,
+    best_tip: RwLock<Block>,
+    ledger: RwLock<Ledger>,
+    summary: RwLock<Option<SummaryVerbose>>,
+    store: RwLock<Arc<IndexerStore>>,
 }
 type IpcStateReceiver = mpsc::Receiver<IpcChannelUpdate>;
 #[derive(Debug, Hash, PartialEq, Eq)]
-pub enum IpcActorError {
-
-}
+pub enum IpcActorError {}
 
 impl IpcActor {
     #[instrument(skip_all)]
     pub fn new(
-        config     : IndexerConfiguration,
-        listener   : LocalSocketListener,
-        store      : Arc<IndexerStore>,
-        state_recv : IpcStateReceiver
+        config: IndexerConfiguration,
+        listener: LocalSocketListener,
+        store: Arc<IndexerStore>,
+        state_recv: IpcStateReceiver,
     ) -> Self {
         info!("Creating new IPC Actor");
-        Self { 
-            state_recv, listener,
-            best_tip   : RwLock::new(Block {
+        Self {
+            state_recv,
+            listener,
+            best_tip: RwLock::new(Block {
                 parent_hash: config.root_hash.clone(),
                 state_hash: config.root_hash,
                 height: 1,
                 blockchain_length: 1,
                 global_slot_since_genesis: 0,
-            }), 
-            ledger     : RwLock::new(config.ledger.ledger.into()), 
-            summary    : RwLock::new(None), 
-            store      : RwLock::new(store), 
+            }),
+            ledger: RwLock::new(config.ledger.ledger.into()),
+            summary: RwLock::new(None),
+            store: RwLock::new(store),
         }
     }
 
@@ -75,10 +82,10 @@ impl IpcActor {
                             info!("Accepted client connection");
                             tokio::spawn(async move {
                                 debug!("Handling client connection");
-                                match handle_conn(stream, 
-                                    &store, 
+                                match handle_conn(stream,
+                                    &store,
                                     &best_tip,
-                                    &ledger, 
+                                    &ledger,
                                     summary.as_ref()
                                 ).await {
                                     Err(e) => {
@@ -90,7 +97,7 @@ impl IpcActor {
                                 debug!("Removing readonly instance at {}", store.db_path.clone().display());
                                 tokio::fs::remove_dir_all(&store.db_path).await.ok();
                             });
-                        } 
+                        }
                     }
                 }
             }
@@ -177,7 +184,9 @@ async fn handle_conn(
                 if verbose {
                     Some(serde_json::to_string::<SummaryVerbose>(summary)?)
                 } else {
-                    Some(serde_json::to_string::<SummaryShort>(&summary.clone().into())?)
+                    Some(serde_json::to_string::<SummaryShort>(
+                        &summary.clone().into(),
+                    )?)
                 }
             } else {
                 Some(serde_json::to_string(&String::from(
