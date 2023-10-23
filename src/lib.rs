@@ -1,6 +1,7 @@
 pub mod block;
 pub mod client;
 pub mod gql;
+pub mod ipc;
 pub mod receiver;
 pub mod server;
 pub mod staking_ledger;

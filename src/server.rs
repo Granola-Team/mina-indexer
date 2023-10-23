@@ -1,36 +1,37 @@
 use crate::{
-    block::{parser::BlockParser, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
+    ipc::IpcActor,
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{
-        ledger::{genesis::GenesisRoot, public_key::PublicKey, Ledger},
-        summary::{SummaryShort, SummaryVerbose},
+        ledger::{genesis::GenesisRoot, Ledger},
+        summary::SummaryVerbose,
         IndexerState, Tip,
     },
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 use anyhow::anyhow;
-use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-use log::trace;
+use interprocess::local_socket::tokio::LocalSocketListener;
 
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
     path::{Path, PathBuf},
     process,
     sync::Arc,
     time::Duration,
 };
 use tokio::{
-    fs::{self, create_dir_all, metadata},
+    fs::{create_dir_all, metadata},
     io,
-    sync::{mpsc, watch},
+    sync::{
+        mpsc::{self, Sender},
+        watch,
+    },
     task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, info, instrument};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
     pub is_genesis_ledger: bool,
@@ -80,89 +81,17 @@ pub enum MinaIndexerQueryResponse {
 pub struct MinaIndexer {
     _loop_join_handle: JoinHandle<anyhow::Result<()>>,
     phase_receiver: watch::Receiver<MinaIndexerRunPhase>,
-    query_sender: mpsc::Sender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
+    query_sender:
+        mpsc::UnboundedSender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
+    _ipc_update_sender: Sender<IpcChannelUpdate>,
 }
 
-pub enum IpcChannelUpdate {
-    NewState {
-        best_tip: Block,
-        ledger: Ledger,
-        summary: Box<SummaryVerbose>,
-    },
-    NewStore {
-        store: Arc<IndexerStore>,
-    },
-}
-
-pub async fn ipc_handler(
-    config: IndexerConfiguration,
-    mut ipc_update_receiver: mpsc::Receiver<IpcChannelUpdate>,
-    listener: LocalSocketListener,
-) {
-    let best_tip = RefCell::new(Block {
-        parent_hash: config.root_hash.clone(),
-        state_hash: config.root_hash,
-        height: 1,
-        blockchain_length: 1,
-        global_slot_since_genesis: 0,
-    });
-    let summary = RefCell::new(None);
-    let ledger: RefCell<Ledger> = RefCell::new(config.ledger.ledger.into());
-    let block_store_readonly: RefCell<Option<Arc<IndexerStore>>> = RefCell::new(None);
-    loop {
-        tokio::select! {
-            ipc_update = ipc_update_receiver.recv() => {
-                match ipc_update {
-                    Some(ipc_update) => match ipc_update {
-                        IpcChannelUpdate::NewState { best_tip: new_best_tip, ledger: new_ledger, summary: new_summary } => {
-                            *best_tip.borrow_mut() = new_best_tip;
-                            *ledger.borrow_mut() = new_ledger;
-                            *summary.borrow_mut() = Some(new_summary);
-                        },
-                        IpcChannelUpdate::NewStore { store } => {
-                            *block_store_readonly.borrow_mut() = Some(store);
-                        },
-                    },
-                    None => continue,
-                }
-            }
-
-            conn_fut = listener.accept() => {
-                match conn_fut {
-                    Ok(stream) => {
-                        info!("Accepted client connection");
-                        // handle the connection
-                        if let Some(block_store) = block_store_readonly.borrow().as_ref() {
-                            info!("found block store");
-                            let block_store = block_store.clone();
-                            let ledger = ledger.borrow().clone();
-                            let summary = summary.borrow().clone().map(|summary| *summary);
-                            let best_tip = best_tip.borrow().clone();
-                            tokio::spawn(async move {
-                                info!("handling connection");
-                                debug!("Handling client connection");
-                                match handle_conn(stream, block_store.clone(), &best_tip, ledger, summary).await {
-                                    Err(e) => {
-                                        info!("error {e}");
-                                        error!("Error handling connection: {e}");
-                                    },
-                                    Ok(_) => { info!("handled connection"); },
-                                };
-                                debug!("Removing readonly instance at {}", block_store.db_path.clone().display());
-                                tokio::fs::remove_dir_all(&block_store.db_path).await.ok();
-                            });
-                        } else {
-                            info!("No store was found :(");
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error accepting connection: {}", e);
-                    }
-                }
-            }
-
-        }
-    }
+#[derive(Debug)]
+pub struct IpcChannelUpdate {
+    pub best_tip: Block,
+    pub ledger: Ledger,
+    pub summary: Box<SummaryVerbose>,
+    pub store: Arc<IndexerStore>,
 }
 
 impl MinaIndexer {
@@ -172,8 +101,12 @@ impl MinaIndexer {
     ) -> anyhow::Result<Self> {
         let (phase_sender, phase_receiver) = watch::channel(MinaIndexerRunPhase::JustStarted);
         let phase_sender = Arc::new(phase_sender);
-
-        let (query_sender, query_receiver) = mpsc::channel(1);
+        let (query_sender, query_receiver) = mpsc::unbounded_channel();
+        let watch_dir = config.watch_dir.clone();
+        let config_new = config.clone();
+        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
+        let ipc_store = store.clone();
+        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
 
         let _loop_join_handle = tokio::spawn(async move {
             use MinaIndexerRunPhase::*;
@@ -181,7 +114,6 @@ impl MinaIndexer {
             // LocalSocketStream::connect(SOCKET_NAME)
             //     .await
             //     .expect_err("Server is already running... Exiting.");
-            let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(50);
             let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
                 if e.kind() == io::ErrorKind::AddrInUse {
                     let name = &SOCKET_NAME;
@@ -198,19 +130,20 @@ impl MinaIndexer {
                 }
             });
             info!("Local socket listener started");
-            let watch_dir = config.watch_dir.clone();
-            let config_new = config.clone();
             tokio::spawn(async move {
-                ipc_handler(config_new, ipc_update_receiver, listener).await;
+                let mut ipc_actor =
+                    IpcActor::new(config_new, listener, ipc_store, ipc_update_receiver);
+                info!("Spawning IPC Actor");
+                ipc_actor.run().await
             });
             let (state, phase_sender) =
-                initialize(config, store, phase_sender, ipc_update_sender.clone()).await?;
+                initialize(config, store, phase_sender, ipc_update_arc.clone()).await?;
             run(
                 watch_dir,
                 state,
                 phase_sender,
                 query_receiver,
-                ipc_update_sender,
+                ipc_update_arc.clone(),
             )
             .await
         });
@@ -219,7 +152,12 @@ impl MinaIndexer {
             _loop_join_handle,
             phase_receiver,
             query_sender,
+            _ipc_update_sender: ipc_update_sender,
         })
+    }
+
+    pub async fn await_loop(self) {
+        let _ = self._loop_join_handle.await;
     }
 
     async fn send_query(
@@ -229,7 +167,6 @@ impl MinaIndexer {
         let (response_sender, response_receiver) = oneshot::channel();
         self.query_sender
             .send((command, response_sender))
-            .await
             .map_err(|_| anyhow!("could not send command to running Mina Indexer"))?;
         response_receiver.recv().map_err(|recv_err| recv_err.into())
     }
@@ -261,7 +198,7 @@ pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     phase_sender: Arc<watch::Sender<MinaIndexerRunPhase>>,
-    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>,
+    ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<(IndexerState, Arc<watch::Sender<MinaIndexerRunPhase>>)> {
     use MinaIndexerRunPhase::*;
 
@@ -295,26 +232,32 @@ pub async fn initialize(
         );
         let mut state = IndexerState::new(
             root_hash.clone(),
-            ledger.ledger,
+            ledger.ledger.clone(),
             store,
             MAINNET_TRANSITION_FRONTIER_K,
             prune_interval,
             canonical_update_threshold,
         )?;
 
+        info!("Getting best tip");
+        let best_tip = state.best_tip_block().clone();
+        info!("Getting best ledger");
+        let ledger = ledger.ledger.into();
+        info!("Getting summary");
+        let summary = Box::new(state.summary_verbose());
+        info!("Getting store");
+        let store = Arc::new(state.spawn_secondary_database()?);
+        info!("Updating IPC state");
         ipc_update_sender
-            .send(IpcChannelUpdate::NewStore {
-                store: Arc::new(state.spawn_secondary_database()?),
-            })
-            .await?;
-        ipc_update_sender
-            .send(IpcChannelUpdate::NewState {
-                best_tip: state.best_tip_block().clone(),
-                ledger: state.best_ledger()?.unwrap(),
-                summary: Box::new(state.summary_verbose()),
+            .send(IpcChannelUpdate {
+                best_tip,
+                ledger,
+                summary,
+                store,
             })
             .await?;
 
+        info!("Parsing blocks");
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
         if is_genesis_ledger {
             state
@@ -328,14 +271,10 @@ pub async fn initialize(
 
         phase_sender.send_replace(StateInitializedFromParser);
         ipc_update_sender
-            .send(IpcChannelUpdate::NewState {
+            .send(IpcChannelUpdate {
                 best_tip: state.best_tip_block().clone(),
                 ledger: state.best_ledger()?.unwrap(),
                 summary: Box::new(state.summary_verbose()),
-            })
-            .await?;
-        ipc_update_sender
-            .send(IpcChannelUpdate::NewStore {
                 store: Arc::new(state.spawn_secondary_database()?),
             })
             .await?;
@@ -350,11 +289,11 @@ pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
     phase_sender: Arc<watch::Sender<MinaIndexerRunPhase>>,
-    mut query_receiver: mpsc::Receiver<(
+    mut query_receiver: mpsc::UnboundedReceiver<(
         MinaIndexerQuery,
         oneshot::Sender<MinaIndexerQueryResponse>,
     )>,
-    ipc_update_sender: mpsc::Sender<IpcChannelUpdate>,
+    ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> Result<(), anyhow::Error> {
     use MinaIndexerRunPhase::*;
 
@@ -395,13 +334,11 @@ pub async fn run(
                     state.add_block(&precomputed_block)?;
                     info!("Added {block:?}");
 
-                    ipc_update_sender.send(IpcChannelUpdate::NewState {
+                    ipc_update_sender.send(IpcChannelUpdate {
                         best_tip: state.best_tip_block().clone(),
                         ledger: state.best_ledger()?.unwrap(),
-                        summary: Box::new(state.summary_verbose())
-                    }).await?;
-                    ipc_update_sender.send(IpcChannelUpdate::NewStore {
-                        store: Arc::new(state.spawn_secondary_database()?)
+                        summary: Box::new(state.summary_verbose()),
+                        store: Arc::new(state.spawn_secondary_database()?),
                     }).await?;
                 } else {
                     info!("Block receiver shutdown, system exit");
@@ -410,116 +347,6 @@ pub async fn run(
             }
         }
     }
-}
-
-#[instrument(skip_all)]
-async fn handle_conn(
-    conn: LocalSocketStream,
-    db: Arc<IndexerStore>,
-    best_tip: &Block,
-    ledger: Ledger,
-    summary: Option<SummaryVerbose>,
-) -> Result<(), anyhow::Error> {
-    let (reader, mut writer) = conn.into_split();
-    let mut reader = BufReader::new(reader);
-    let mut buffer = Vec::with_capacity(1024);
-    let read_size = reader.read_until(0, &mut buffer).await?;
-    if read_size == 0 {
-        return Err(anyhow!("Unexpected EOF"));
-    }
-    let mut buffers = buffer.split(|byte| *byte == b' ');
-    let command = buffers.next().unwrap();
-    let command_string = String::from_utf8(command.to_vec()).unwrap();
-
-    let response_json = match command_string.as_str() {
-        "account" => {
-            let data_buffer = buffers.next().unwrap();
-            let public_key = PublicKey::from_address(&String::from_utf8(
-                data_buffer[..data_buffer.len() - 1].to_vec(),
-            )?)?;
-            info!("Received account command for {public_key:?}");
-            trace!("Using ledger {ledger:?}");
-            let account = ledger.accounts.get(&public_key);
-            if let Some(account) = account {
-                debug!("Writing account {account:?} to client");
-                Some(serde_json::to_string(account)?)
-            } else {
-                None
-            }
-        }
-        "best_chain" => {
-            info!("Received best_chain command");
-            let data_buffer = buffers.next().unwrap();
-            let num = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
-                .parse::<usize>()?;
-            let mut parent_hash = best_tip.parent_hash.clone();
-            let mut best_chain = vec![db.get_block(&best_tip.state_hash)?.unwrap()];
-            for _ in 1..num {
-                let parent_pcb = db.get_block(&parent_hash)?.unwrap();
-                parent_hash =
-                    BlockHash::from_hashv1(parent_pcb.protocol_state.previous_state_hash.clone());
-                best_chain.push(parent_pcb);
-            }
-            Some(serde_json::to_string(&best_chain)?)
-        }
-        "best_ledger" => {
-            info!("Received best_ledger command");
-            let data_buffer = buffers.next().unwrap();
-            let path = &String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
-                .parse::<PathBuf>()?;
-            if !path.is_dir() {
-                debug!("Writing ledger to {}", path.display());
-                fs::write(path, format!("{ledger:?}")).await?;
-                Some(serde_json::to_string(&format!(
-                    "Ledger written to {}",
-                    path.display()
-                ))?)
-            } else {
-                Some(serde_json::to_string(&format!(
-                    "The path provided must be a file: {}",
-                    path.display()
-                ))?)
-            }
-        }
-        "summary" => {
-            info!("Received summary command");
-            let data_buffer = buffers.next().unwrap();
-            let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
-                .parse::<bool>()?;
-            if let Some(summary) = summary {
-                if verbose {
-                    Some(serde_json::to_string::<SummaryVerbose>(&summary)?)
-                } else {
-                    Some(serde_json::to_string::<SummaryShort>(&summary.into())?)
-                }
-            } else {
-                Some(serde_json::to_string(&String::from(
-                    "No summary available yet",
-                ))?)
-            }
-        }
-        "shutdown" => {
-            info!("Received shutdown command");
-            writer
-                .write_all(b"Shutting down the Mina Indexer daemon...")
-                .await?;
-            info!("Shutting down the indexer...");
-            process::exit(0);
-        }
-        bad_request => {
-            return Err(anyhow!("Malformed request: {bad_request}"));
-        }
-    };
-
-    if let Some(response_json) = response_json {
-        writer.write_all(response_json.as_bytes()).await?;
-    } else {
-        writer
-            .write_all(serde_json::to_string("no response 404")?.as_bytes())
-            .await?;
-    }
-
-    Ok(())
 }
 
 pub async fn create_dir_if_non_existent(path: &str) {
