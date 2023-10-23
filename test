@@ -152,7 +152,7 @@ test_account_public_key_json() {
 cargo build
 
 # Check command-line arguments
-if [[ "$#" -eq 0 ]]; then
+if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
     test_indexer_cli_reports
     test_indexer_basic_start
