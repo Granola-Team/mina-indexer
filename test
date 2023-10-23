@@ -79,8 +79,8 @@ test_indexer_basic_start() {
          --initial-ledger tests/ledgers/mainnet-genesis.json \
          --is-genesis-ledger \
          --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+    sleep 1
     idxr_pid=$(pgrep mina-indexer)
-    kill $idxr_pid
     teardown
 }
 
