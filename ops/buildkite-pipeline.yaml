@@ -17,11 +17,11 @@ steps:
 - label: "Build"
   command: |
     nix-shell ops/shell.nix --run "just build"
-  key: audit
+  key: build
   depends_on: lint
 
 - label: "Regression Test"
   command: |
     nix-shell ops/shell.nix --run "just test-regression"
-  key: audit
+  key: test-regression
   depends_on: build
