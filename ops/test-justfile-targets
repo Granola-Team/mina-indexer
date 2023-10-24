@@ -1,0 +1,13 @@
+#! /bin/sh
+
+set -ex
+
+just
+just clean
+just audit
+just lint
+just build
+# just test-unit
+# just test-regression
+# just test
+# just test-ci

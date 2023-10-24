@@ -12,9 +12,6 @@ build:
 clean:
   cargo clean
 
-install-server:
-  cargo install cargo-audit
-
 test: test-unit test-regression
 
 test-ci: lint test-unit test-regression
@@ -25,11 +22,13 @@ test-unit: build
 test-regression: build
   ./test
 
-lint:
+audit:
+  cargo audit
+
+lint: && audit
   cargo clippy -- -D warnings
   cargo clippy --all-targets --all-features -- -D warnings
   cargo check
-  cargo audit
 
 images:
   docker build .

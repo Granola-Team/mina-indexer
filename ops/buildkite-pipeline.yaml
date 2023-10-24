@@ -1,14 +1,21 @@
 steps:
+
 - label: "Prereqs"
   command: |
-    echo $HOME
-    echo $PATH
-    echo $TMPDIR
+    echo HOME=$HOME
+    echo PATH=$PATH
+    echo TMPDIR=$TMPDIR
     nix-shell ops/shell.nix --run just
   key: prereqs
 
-- label: "Audit"
+- label: "Lint and Audit"
   command: |
-    nix-shell ops/shell.nix --run "just audit"
-  key: audit
+    nix-shell ops/shell.nix --run "just lint"
+  key: lint
   depends_on: prereqs
+
+- label: "Build"
+  command: |
+    nix-shell ops/shell.nix --run "just build"
+  key: audit
+  depends_on: lint
