@@ -8,6 +8,7 @@ pkgs.mkShell {
     pkgs.cargo-nextest
     pkgs.clang
     pkgs.clippy
+    pkgs.google-cloud-sdk  # For 'gsutil' in testing.
     pkgs.just
     pkgs.llvmPackages_16.bintools
   ];

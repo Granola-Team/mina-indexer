@@ -19,3 +19,9 @@ steps:
     nix-shell ops/shell.nix --run "just build"
   key: audit
   depends_on: lint
+
+- label: "Regression Test"
+  command: |
+    nix-shell ops/shell.nix --run "just test-regression"
+  key: audit
+  depends_on: build
