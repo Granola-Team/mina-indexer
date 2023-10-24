@@ -3,19 +3,19 @@ set -ex
 
 DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
 
-TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
 BLOCKS_DIR="${TMPDIR}/blocks"
 mkdir "${BLOCKS_DIR}"
 
-cleanup() {
-    echo "Exiting with $?"
-    rm -rf ${TMPDIR} 2>/dev/null
-    rm -rf "${HOME}/.mina-indexer/database" || true
-    rm -rf "${HOME}/.mina-indexer/logs" || true
-    rm ${DOMAIN_SOCKET} || true
+test_cleanup() {
+    echo "Test result: $?"
+    rm -rf "${TMPDIR}"
+    rm -rf "${HOME}/.mina-indexer/database"
+    rm -rf "${HOME}/.mina-indexer/logs"
+    rm -rf "${DOMAIN_SOCKET}"
 }
 
-trap cleanup EXIT
+trap test_cleanup EXIT
 
 idxr() {
     ./target/debug/mina-indexer "$@"
@@ -45,9 +45,9 @@ setup() {
 teardown() {
     echo "Cleaning up and killing the background indexer with PID: ${idxr_pid}"
     kill "${idxr_pid}" 2>/dev/null || true
-    rm -rf "${HOME}/.mina-indexer/database" || true
-    rm -rf "${HOME}/.mina-indexer/logs" || true
-    rm ${DOMAIN_SOCKET} || true
+    rm -rf "${HOME}/.mina-indexer/database"
+    rm -rf "${HOME}/.mina-indexer/logs"
+    rm -f "${DOMAIN_SOCKET}"
 }
 
 
