@@ -1,0 +1,14 @@
+steps:
+- label: "Prereqs"
+  command: |
+    echo $HOME
+    echo $PATH
+    echo $TMPDIR
+    nix-shell ops/shell.nix --run just
+  key: prereqs
+
+- label: "Audit"
+  command: |
+    nix-shell ops/shell.nix --run "just audit"
+  key: audit
+  depends_on: prereqs

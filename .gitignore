@@ -1,8 +1,8 @@
-/target
-.idea/*
-/result
-.gitconfig
-result
-/testing
-/fn
-test_temp_block_dir
+#/target
+#.idea/*
+#/result
+#.gitconfig
+#result
+#/testing
+#/fn
+#test_temp_block_dir
