@@ -1,0 +1,27 @@
+steps:
+
+- label: "Prereqs"
+  command: |
+    echo HOME=$HOME
+    echo PATH=$PATH
+    echo TMPDIR=$TMPDIR
+    nix-shell ops/shell.nix --run just
+  key: prereqs
+
+- label: "Lint and Audit"
+  command: |
+    nix-shell ops/shell.nix --run "just lint"
+  key: lint
+  depends_on: prereqs
+
+- label: "Build"
+  command: |
+    nix-shell ops/shell.nix --run "just build"
+  key: build
+  depends_on: lint
+
+- label: "Regression Test"
+  command: |
+    nix-shell ops/shell.nix --run "just test-regression"
+  key: test-regression
+  depends_on: build

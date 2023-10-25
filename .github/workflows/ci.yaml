@@ -15,55 +15,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Set up rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build Mina Indexer
-        run: cargo build
-
-  lints:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Install just
-        uses: extractions/setup-just@v1
-        with:
-          just-version: 1.13
-
-      - name: Set up rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run lints
-        run: just lint
   unit_tests:
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -91,32 +43,3 @@ jobs:
 
       - name: Run Unit Tests
         run: just test-unit
-  regression_tests:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Install just
-        uses: extractions/setup-just@v1
-        with:
-          just-version: 1.13
-
-      - name: Set up rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-
-      - name: Run Regression Tests
-        run: just test-regression
