@@ -20,7 +20,13 @@ steps:
   key: build
   depends_on: lint
 
-- label: "Regression Test"
+- label: "Unit Tests"
+  command: |
+    nix-shell ops/shell.nix --run "just test-unit"
+  key: test-unit
+  depends_on: build
+
+- label: "Regression (System) Tests"
   command: |
     nix-shell ops/shell.nix --run "just test-regression"
   key: test-regression
