@@ -12,4 +12,7 @@ pkgs.mkShell {
     pkgs.just
     pkgs.llvmPackages_16.bintools
   ];
+  shellHook = ''
+    export TMPDIR='/var/tmp'
+  '';
 }

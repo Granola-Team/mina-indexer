@@ -3,13 +3,11 @@ set -ex
 
 DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
 
-TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
-BLOCKS_DIR="${TMPDIR}/blocks"
-mkdir "${BLOCKS_DIR}"
+BLOCKS_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
 
 test_cleanup() {
     echo "Test result: $?"
-    rm -rf "${TMPDIR}"
+    rm -rf "${BLOCKS_DIR}"
     rm -rf "${HOME}/.mina-indexer/database"
     rm -rf "${HOME}/.mina-indexer/logs"
     rm -rf "${DOMAIN_SOCKET}"
@@ -88,10 +86,10 @@ test_indexer_basic_start() {
 test_best_canonical_tip() {
     setup
 
-    dl_mainnet 15 $BLOCKS_DIR
+    dl_mainnet 15 "$BLOCKS_DIR"
     idxr server cli \
-           --startup-dir $BLOCKS_DIR \
-           --watch-dir $BLOCKS_DIR \
+           --startup-dir "$BLOCKS_DIR" \
+           --watch-dir "$BLOCKS_DIR" \
            --initial-ledger tests/ledgers/mainnet-genesis.json \
            --is-genesis-ledger \
            --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
@@ -106,10 +104,10 @@ test_best_canonical_tip() {
 test_ipc_is_available_immediately() {
     setup
 
-    dl_mainnet 250 $BLOCKS_DIR
+    dl_mainnet 250 "$BLOCKS_DIR"
     idxr server cli \
-           --startup-dir $BLOCKS_DIR \
-           --watch-dir $BLOCKS_DIR \
+           --startup-dir "$BLOCKS_DIR" \
+           --watch-dir "$BLOCKS_DIR" \
            --initial-ledger tests/ledgers/mainnet-genesis.json \
            --is-genesis-ledger \
            --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
@@ -136,7 +134,7 @@ test_account_balance_cli() {
 
 test_account_public_key_json() {
     setup
-    mkdir $TMPDIR/database
+    mkdir "$BLOCKS_DIR"/database
 
     idxr server cli \
         --initial-ledger tests/ledgers/mainnet-genesis.json \
