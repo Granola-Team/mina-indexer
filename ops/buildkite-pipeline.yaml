@@ -4,7 +4,6 @@ steps:
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
-    echo TMPDIR=$TMPDIR
     nix-shell ops/shell.nix --run just
   key: prereqs
 
@@ -20,8 +19,15 @@ steps:
   key: build
   depends_on: lint
 
-- label: "Regression Test"
+- label: "Unit Tests"
   command: |
+    nix-shell ops/shell.nix --run "just test-unit"
+  key: test-unit
+  depends_on: build
+
+- label: "Regression (System) Tests"
+  command: |
+    echo TMPDIR=$TMPDIR
     nix-shell ops/shell.nix --run "just test-regression"
   key: test-regression
   depends_on: build
