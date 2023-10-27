@@ -1,0 +1,172 @@
+* Rosetta Database Requirements
+
+This document describes the historical information that Rosetta server
+requires access to in order to operate correctly. Rosetta is a generic
+API used mainly by Coinbase (but also possibly by some other software
+like wallets) to access nodes of multiple blockchains in a unified
+manner. For this reason this API is focused on the most common
+features of blockchains and does not concern itself with features
+specific to Mina, like zkApps. Somewhat similarly to an indexer,
+however, it does require not only current, but also historic data
+about the blockchain.
+
+Contrary to most blockchains, Mina node does not store historic
+information indefinitely. Indeed, it only remembers blocks from
+approximately 1 epoch back in time. Older information is included in
+SNARK proofs of the blockchain and therefore may safely be forgotten.
+This allows Mina nodes to be more efficient in memory and disk space
+consumption, but it also means that in order to work, Rosetta
+implementation requires access to a database storing this historic
+data. For the moment this is done by the Mina archive, but this
+solution is very fragile, because there's no interface whatsoever
+between Rosetta and the archive. Indeed, currently Rosetta works by
+accessing the archive underlying Postgres database directly, which is
+very error-prone.
+
+The particular information Rosetta needs access to is listed below:
+
+** Block data
+
+Rosetta needs to be able to find:
+- any block by its height
+- any block by state hash
+- the oldest and the latest block.
+- count canonical chain blocks at a particular height
+
+The last one is mysterious. I think this should always return either 0
+or 1…
+
+NOTE: the latest block is being searched with a peculiar query, which
+allows to pass in some *delta*. The query finds the block with height
+smaller than the maximum height by the given *delta* (which defaults
+to 0).
+
+NOTE: when asked for a block with certain height, we're interested in
+searching the current canonical chain, not just any chain. Therefore
+it is important to be able to reconstruct the current canonical chain
+quickly at any time.
+
+*** Data to return
+
+| Name                | Description                                                      |
+|---------------------+------------------------------------------------------------------|
+| state_hash          |                                                                  |
+| block_height        |                                                                  |
+| timestamp           |                                                                  |
+| parent_block        |                                                                  |
+| creator             |                                                                  |
+| block_winner        |                                                                  |
+| snarked_ledger_hash |                                                                  |
+| staking_epoch_data  | Ledger and seed                                                  |
+| next_epoch_data     |                                                                  |
+| ledger_hash         |                                                                  |
+| global_slot         | The global cumulative count of all slots since the genesis block |
+| block_status        | pending, canonical, orphaned                                     |
+
+A note on block status:
+|           |                                                                                                    |
+| Status    | Description                                                                                        |
+|-----------+----------------------------------------------------------------------------------------------------|
+| Pending   | The block has not achieved *finality* yet and may be disregarded later, if a concurrent chain wins |
+| Canonical | The block has achieved *finality* and is now apart of all the competing chains                     |
+| Orphaned  | The block belongs to a side chain which lost to competition and will never achieve *finality*      |
+|           |                                                                                                    |
+
+Additionally, a response to a block query should contain information
+on operations included. These fall into 3 general categories describes
+below.
+
+** User commands (Transactions)
+
+As of now there are 2 types of user commands: payments and
+delegations. Rosetta needs to find user commands:
+- included in a particular block
+- by accounts involved, amount, fee and nonce
+
+*** Data to return
+| Name                 | Description                       |
+|----------------------+-----------------------------------|
+| command_type         | payment, delegation               |
+| fee_payer_account    |                                   |
+| source_account       |                                   |
+| receiver_account     |                                   |
+| nonce                | Included in the command           |
+| amount               | For delegation always is 0        |
+| fee                  |                                   |
+| valid_util           | Valid until globel slot           |
+| memo                 |                                   |
+| hash                 |                                   |
+| status               |                                   |
+| failure_reason       |                                   |
+| account_creation_fee |                                   |
+| block_hash           | in which the command was included |
+
+** Internal commands
+
+These are commands related to the internal workings of the protocol
+algorithm rather than any particular transaction, such as coinbase
+rewards.
+
+Rosetta needs to find internal commands:
+- included in a particular block
+
+*** Data to return
+
+| Name                  | Description |
+|-----------------------+-------------|
+| command_type          |             |
+| receiver account      |             |
+| fee                   |             |
+| hash                  |             |
+| account_creattion_fee |             |
+| block                 | in which the command was included |
+
+
+** Zkapp commands
+
+Rosetta needs to find zkApp commands:
+- included in a particular block
+
+*** Data to return
+
+| Name              | Description             |
+|-------------------+-------------------------|
+| memo              |                         |
+| hash              |                         |
+| fee_payer_account |                         |
+| fee               |                         |
+| valid_until       | Valid until global slot |
+| nonce             |                         |
+| failure_reason    |                         |
+
+Each zkapp command contains one or more zkapp account updates. The
+system is required to also access these by zkapp command
+identifier. These updates include:
+- account being updated
+- balance change
+- nonce increment (whether or not account nonce has been incremented)
+- events generated by the update
+- actions generated by the update
+- authorisation used (signature or proof)
+- zkApp arguments
+
+** Accounts
+
+Rosetta needs to be able to determine the balance of a given account
+at a particular block. To this end the current implementation builds
+the current best chain in a temporary DB table, searches for the right
+block and for the last operation involving the account that block. If
+there is none, it goes back block by block until such an operations is
+found and balance after the operation can be retrieved.
+
+This of course can (and probably should) be implemented differently,
+but it's important to remember to narrow the search to the current
+best chain as opposed to any block with the given height.
+
+*** Data to return
+
+| Name    | Description          |
+|---------+----------------------|
+| balance | The accounts balance |
+| nonce   | The current nonce    |
+

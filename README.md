@@ -13,7 +13,7 @@ The indexer replaces the archive node trio of architectural elements
 system that reconstitutes the network’s historical state solely from
 the precomputed blocks logged from the Mina daemon.
 
-![High Level Architecture](notes/architecture/indexer_components.png)
+![High Level Architecture](docs/architecture/indexer_components.png)
 
 The indexer's primary goals are to be easier to operate and maintain
 while being a superset of the data available in the archive node.
