@@ -1,27 +1,29 @@
 #!/bin/sh
 set -ex
 
-DOMAIN_SOCKET="$(pwd)/mina-indexer.sock"
+# Collect the binaries under test and the test ledger.
+IDXR="$(pwd)"/target/debug/mina-indexer
+LEDGER="$(pwd)"/tests/ledgers/mainnet-genesis.json
+BLOCKS_FETCHER="$(pwd)"/download_blocks
 
-BLOCKS_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
+# The rest of this script's logic assumes that the testing is done from within
+# this temporary directory.
+TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
+cd "$TEST_DIR"
 
+# Invoke this function when exiting this script for any reason.
 test_cleanup() {
     echo "Test result: $?"
-    rm -rf "${BLOCKS_DIR}"
-    rm -rf "${HOME}/.mina-indexer/database"
-    rm -rf "${HOME}/.mina-indexer/logs"
-    rm -rf "${DOMAIN_SOCKET}"
+    rm -rf "${TEST_DIR}"
 }
-
 trap test_cleanup EXIT
 
 idxr() {
-    ./target/debug/mina-indexer "$@"
+    "$IDXR" "$@"
 }
 
 dl_mainnet() {
-    MAX_SLOT=$1; OUT_DIR=$2
-    ./download_blocks mina_network_block_data "${MAX_SLOT}" mainnet "${OUT_DIR}"
+    "$BLOCKS_FETCHER" mina_network_block_data "$1" mainnet "$2"
 }
 
 assert() {
@@ -38,16 +40,19 @@ assert() {
 
 setup() {
     echo "setup"
+    mkdir blocks
+    mkdir database
+    mkdir logs
 }
 
 teardown() {
     echo "Cleaning up and killing the background indexer with PID: ${idxr_pid}"
     kill "${idxr_pid}" 2>/dev/null || true
-    rm -rf "${HOME}/.mina-indexer/database"
-    rm -rf "${HOME}/.mina-indexer/logs"
-    rm -f "${DOMAIN_SOCKET}"
+    rm -rf ./blocks
+    rm -rf ./database
+    rm -rf ./logs
+    rm -f ./mina-indexer.sock
 }
-
 
 test_indexer_cli_reports() {
     # Indexer reports usage with no arguments
@@ -67,16 +72,25 @@ test_indexer_cli_reports() {
         grep -iq "Usage: mina-indexer server config"
 
     # Indexer server cli subcommand works
-    idxr server cli --help 2>/dev/null
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+	--help 2>/dev/null
 }
 
 # Indexer server config passes cli with minimal args
 test_indexer_basic_start() {
     setup
     idxr server cli \
-         --initial-ledger tests/ledgers/mainnet-genesis.json \
-         --is-genesis-ledger \
-         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 1
     idxr_pid=$(pgrep mina-indexer)
     teardown
@@ -86,13 +100,15 @@ test_indexer_basic_start() {
 test_best_canonical_tip() {
     setup
 
-    dl_mainnet 15 "$BLOCKS_DIR"
+    dl_mainnet 15 ./blocks
     idxr server cli \
-           --startup-dir "$BLOCKS_DIR" \
-           --watch-dir "$BLOCKS_DIR" \
-           --initial-ledger tests/ledgers/mainnet-genesis.json \
-           --is-genesis-ledger \
-           --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
     result=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
@@ -104,13 +120,15 @@ test_best_canonical_tip() {
 test_ipc_is_available_immediately() {
     setup
 
-    dl_mainnet 250 "$BLOCKS_DIR"
+    dl_mainnet 250 ./blocks
     idxr server cli \
-           --startup-dir "$BLOCKS_DIR" \
-           --watch-dir "$BLOCKS_DIR" \
-           --initial-ledger tests/ledgers/mainnet-genesis.json \
-           --is-genesis-ledger \
-           --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
     idxr client -o summary | jq .
     idxr_pid=$(pgrep mina-indexer)
@@ -122,9 +140,13 @@ test_account_balance_cli() {
     setup
 
     idxr server cli \
-           --initial-ledger tests/ledgers/mainnet-genesis.json \
-           --is-genesis-ledger \
-           --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
     result=$(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
@@ -134,10 +156,13 @@ test_account_balance_cli() {
 
 test_account_public_key_json() {
     setup
-    mkdir "$BLOCKS_DIR"/database
 
     idxr server cli \
-        --initial-ledger tests/ledgers/mainnet-genesis.json \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
         --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
@@ -146,8 +171,6 @@ test_account_public_key_json() {
     idxr_pid=$(pgrep mina-indexer)
     teardown
 }
-
-cargo build
 
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
@@ -166,7 +189,7 @@ else
             "test_indexer_basic_start") test_indexer_basic_start ;;
             "test_best_canonical_tip") test_best_canonical_tip ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
-            "test_account_balance_cli") ;;
+            "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
             *) echo "Unknown test: $test_name" ;;
         esac
