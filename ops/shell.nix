@@ -6,6 +6,7 @@ pkgs.mkShell {
   buildInputs = [
     pkgs.cargo
     pkgs.cargo-nextest
+    pkgs.cargo-machete
     pkgs.clang
     pkgs.clippy
     pkgs.google-cloud-sdk  # For 'gsutil' in testing.
