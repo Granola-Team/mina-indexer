@@ -61,6 +61,7 @@
             alejandra
             cargo-nextest
             cargo-audit
+            cargo-machete
             bacon
             google-cloud-sdk
             just
