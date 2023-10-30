@@ -17,11 +17,6 @@ use std::{
 use tokio::io::AsyncReadExt;
 use tracing::{debug, info};
 
-pub enum SearchRecursion {
-    None,
-    Recursive,
-}
-
 /// Splits block paths into two collections: canonical and successive
 ///
 /// Traverses canoncial paths first, then successive
@@ -29,23 +24,13 @@ pub struct BlockParser {
     pub num_canonical: u32,
     pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
-    pub recursion: SearchRecursion,
     canonical_paths: IntoIter<PathBuf>,
     successive_paths: IntoIter<PathBuf>,
 }
 
 impl BlockParser {
     pub fn new(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, SearchRecursion::None, None, canonical_threshold)
-    }
-
-    pub fn new_recursive(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
-        Self::new_internal(
-            blocks_dir,
-            SearchRecursion::Recursive,
-            None,
-            canonical_threshold,
-        )
+        Self::new_internal(blocks_dir, None, canonical_threshold)
     }
 
     pub fn new_filtered(
@@ -53,12 +38,7 @@ impl BlockParser {
         blocklength: u32,
         canonical_threshold: u32,
     ) -> anyhow::Result<Self> {
-        Self::new_internal(
-            blocks_dir,
-            SearchRecursion::None,
-            Some(blocklength),
-            canonical_threshold,
-        )
+        Self::new_internal(blocks_dir, Some(blocklength), canonical_threshold)
     }
 
     /// Simplified `BlockParser` for testing without canonical chain discovery.
@@ -74,7 +54,6 @@ impl BlockParser {
                 num_canonical: 0,
                 total_num_blocks: paths.len() as u32,
                 blocks_dir,
-                recursion: SearchRecursion::None,
                 canonical_paths: vec![].into_iter(),
                 successive_paths: paths.into_iter(),
             })
@@ -91,16 +70,12 @@ impl BlockParser {
     /// - blocks that are higher than the canonical tip
     fn new_internal(
         blocks_dir: &Path,
-        recursion: SearchRecursion,
         length_filter: Option<u32>,
         canonical_threshold: u32,
     ) -> anyhow::Result<Self> {
         debug!("Building parser");
         if blocks_dir.exists() {
-            let pattern = match &recursion {
-                SearchRecursion::None => format!("{}/*.json", blocks_dir.display()),
-                SearchRecursion::Recursive => format!("{}/**/*.json", blocks_dir.display()),
-            };
+            let pattern = format!("{}/*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
             let mut paths: Vec<PathBuf> = glob(&pattern)
                 .expect("Failed to read glob pattern")
@@ -190,7 +165,6 @@ impl BlockParser {
                         num_canonical: 0,
                         total_num_blocks: paths.len() as u32,
                         blocks_dir,
-                        recursion,
                         canonical_paths: vec![].into_iter(),
                         successive_paths: paths.into_iter(),
                     });
@@ -272,7 +246,6 @@ impl BlockParser {
                             num_canonical: 0,
                             total_num_blocks: paths.len() as u32,
                             blocks_dir,
-                            recursion,
                             canonical_paths: vec![].into_iter(),
                             successive_paths: paths.into_iter(),
                         });
@@ -302,7 +275,6 @@ impl BlockParser {
                 num_canonical: canonical_paths.len() as u32,
                 total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,
                 blocks_dir,
-                recursion,
                 canonical_paths: canonical_paths.into_iter(),
                 successive_paths: successive_paths.into_iter(),
             })
