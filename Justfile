@@ -23,10 +23,13 @@ test-unit: build
 test-regression: build
   ./test
 
+disallow-unused-cargo-deps:
+  cargo machete Cargo.toml
+
 audit:
   cargo audit
 
-lint: && audit
+lint: && audit disallow-unused-cargo-deps
   cargo clippy -- -D warnings
   cargo clippy --all-targets --all-features -- -D warnings
   cargo check
