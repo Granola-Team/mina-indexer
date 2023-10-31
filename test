@@ -67,12 +67,8 @@ test_indexer_cli_reports() {
     idxr client 2>&1 |
         grep -iq "Usage: mina-indexer client"
 
-    # Indexer server config subcommand exists
-    idxr server config 2>&1 |
-        grep -iq "Usage: mina-indexer server config"
-
-    # Indexer server cli subcommand works
-    idxr server cli \
+    # Indexer server subcommand works
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -83,7 +79,7 @@ test_indexer_cli_reports() {
 # Indexer server config passes cli with minimal args
 test_indexer_basic_start() {
     setup
-    idxr server cli \
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -101,7 +97,7 @@ test_best_canonical_tip() {
     setup
 
     dl_mainnet 15 ./blocks
-    idxr server cli \
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -121,7 +117,7 @@ test_ipc_is_available_immediately() {
     setup
 
     dl_mainnet 250 ./blocks
-    idxr server cli \
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -139,7 +135,7 @@ test_ipc_is_available_immediately() {
 test_account_balance_cli() {
     setup
 
-    idxr server cli \
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -157,7 +153,7 @@ test_account_balance_cli() {
 test_account_public_key_json() {
     setup
 
-    idxr server cli \
+    idxr server \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -186,13 +182,12 @@ assert_directory_exists() {
 test_startup_dirs_get_created () {
     setup
 
-    idxr server cli \
+    idxr server \
         --startup-dir ./startup-blocks \
         --watch-dir ./watch-blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
 

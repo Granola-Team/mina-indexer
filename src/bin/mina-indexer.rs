@@ -24,11 +24,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum IndexerCommand {
-    /// Server commands
-    Server {
-        #[command(subcommand)]
-        server_command: ServerCommand,
-    },
+    /// Server arguments
+    Server(ServerArgs),
+
     /// Client commands
     Client {
         /// Output JSON data when possible
@@ -39,25 +37,14 @@ enum IndexerCommand {
     },
 }
 
-#[derive(Subcommand, Debug)]
-enum ServerCommand {
-    /// Start the mina indexer with a config file
-    Config {
-        #[arg(short, long)]
-        path: PathBuf,
-    },
-    /// Start the mina indexer by passing in arguments manually on the command line
-    Cli(ServerArgs),
-}
-
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
+    /// Path to the root ledger
     #[arg(long)]
     initial_ledger: PathBuf,
     /// Use a non-genesis ledger
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     is_genesis_ledger: bool,
     /// Hash of the base ledger
     #[arg(
@@ -100,14 +87,7 @@ pub struct ServerArgs {
 pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client { output_json, args } => client::run(&args, output_json).await,
-        IndexerCommand::Server { server_command } => {
-            let args = match server_command {
-                ServerCommand::Cli(args) => args,
-                ServerCommand::Config { path } => {
-                    let config_file = tokio::fs::read(path).await?;
-                    serde_yaml::from_reader(&config_file[..])?
-                }
-            };
+        IndexerCommand::Server(args) => {
             let database_dir = args.database_dir.clone();
             let log_dir = args.log_dir.clone();
             let log_level = args.log_level;
