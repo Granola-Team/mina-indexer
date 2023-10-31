@@ -26,7 +26,6 @@ struct Cli {
 enum IndexerCommand {
     /// Server arguments
     Server(ServerArgs),
-
     /// Client commands
     Client {
         /// Output JSON data when possible
