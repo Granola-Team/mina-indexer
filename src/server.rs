@@ -79,7 +79,8 @@ pub enum MinaIndexerQueryResponse {
 }
 
 pub struct MinaIndexer {
-    _loop_join_handle: JoinHandle<anyhow::Result<()>>,
+    _ipc_join_handle: JoinHandle<()>,
+    _witness_join_handle: JoinHandle<anyhow::Result<()>>,
     phase_receiver: watch::Receiver<MinaIndexerRunPhase>,
     query_sender:
         mpsc::UnboundedSender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
@@ -100,42 +101,30 @@ impl MinaIndexer {
         store: Arc<IndexerStore>,
     ) -> anyhow::Result<Self> {
         let (phase_sender, phase_receiver) = watch::channel(MinaIndexerRunPhase::JustStarted);
-        let phase_sender = Arc::new(phase_sender);
         let (query_sender, query_receiver) = mpsc::unbounded_channel();
-        let watch_dir = config.watch_dir.clone();
-        let config_new = config.clone();
         let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-        let ipc_store = store.clone();
+
+        let phase_sender = Arc::new(phase_sender);
         let ipc_update_arc = Arc::new(ipc_update_sender.clone());
 
-        let _loop_join_handle = tokio::spawn(async move {
+        let watch_dir = config.watch_dir.clone();
+        let ipc_store = store.clone();
+        let ipc_config = config.clone();
+
+        let listener = LocalSocketListener::bind(SOCKET_NAME)
+            .or_else(try_remove_old_socket)
+            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
+        info!("Local socket listener started");
+        let _ipc_join_handle = tokio::spawn(async move {
+            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
+            info!("Spawning IPC Actor");
+            ipc_actor.run().await
+        });
+
+        let _witness_join_handle = tokio::spawn(async move {
             use MinaIndexerRunPhase::*;
             phase_sender.send_replace(StartingIPCSocketListener);
-            // LocalSocketStream::connect(SOCKET_NAME)
-            //     .await
-            //     .expect_err("Server is already running... Exiting.");
-            let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
-                if e.kind() == io::ErrorKind::AddrInUse {
-                    let name = &SOCKET_NAME;
-                    debug!(
-                        "Domain socket: {} already in use. Removing old vestige",
-                        name
-                    );
-                    std::fs::remove_file(name).expect("Should be able to remove socket file");
-                    LocalSocketListener::bind(SOCKET_NAME).unwrap_or_else(|e| {
-                        panic!("Unable to bind domain socket {:?}", e);
-                    })
-                } else {
-                    panic!("Unable to bind domain socket {:?}", e);
-                }
-            });
-            info!("Local socket listener started");
-            tokio::spawn(async move {
-                let mut ipc_actor =
-                    IpcActor::new(config_new, listener, ipc_store, ipc_update_receiver);
-                info!("Spawning IPC Actor");
-                ipc_actor.run().await
-            });
+
             let (state, phase_sender) =
                 initialize(config, store, phase_sender, ipc_update_arc.clone()).await?;
             run(
@@ -149,7 +138,8 @@ impl MinaIndexer {
         });
 
         Ok(Self {
-            _loop_join_handle,
+            _ipc_join_handle,
+            _witness_join_handle,
             phase_receiver,
             query_sender,
             _ipc_update_sender: ipc_update_sender,
@@ -157,7 +147,8 @@ impl MinaIndexer {
     }
 
     pub async fn await_loop(self) {
-        let _ = self._loop_join_handle.await;
+        let _ = self._witness_join_handle.await;
+        let _ = self._ipc_join_handle.await;
     }
 
     async fn send_query(
@@ -363,4 +354,17 @@ pub async fn spawn_readonly_rocksdb(primary_path: PathBuf) -> anyhow::Result<Ind
     debug!("Spawning secondary readonly RocksDB instance");
     let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
     Ok(block_store_readonly)
+}
+
+fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
+    if e.kind() == io::ErrorKind::AddrInUse {
+        debug!(
+            "Domain socket: {} already in use. Removing old vestige",
+            &SOCKET_NAME
+        );
+        std::fs::remove_file(SOCKET_NAME).expect("Should be able to remove socket file");
+        LocalSocketListener::bind(SOCKET_NAME)
+    } else {
+        Err(e)
+    }
 }
