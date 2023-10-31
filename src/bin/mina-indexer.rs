@@ -140,7 +140,6 @@ pub async fn main() -> anyhow::Result<()> {
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
             let indexer = MinaIndexer::new(config, db.clone()).await?;
-            mina_indexer::gql::start_gql(db).await.unwrap();
             indexer.await_loop().await;
             Ok(())
         }
