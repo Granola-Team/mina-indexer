@@ -148,12 +148,6 @@ impl LedgerStore for IndexerStore {
 }
 
 impl IndexerStore {
-    pub fn test_conn(&mut self) -> anyhow::Result<()> {
-        self.database.put("test", "value")?;
-        self.database.delete("test")?;
-        Ok(())
-    }
-
     pub fn db_stats(&self) -> String {
         self.database
             .property_value(rocksdb::properties::DBSTATS)
