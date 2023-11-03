@@ -11,7 +11,6 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, path::Path};
-use tokio::io::AsyncReadExt;
 use tracing::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,13 +99,7 @@ impl From<GenesisLedger> for Ledger {
     }
 }
 
-pub async fn parse_file(filename: &Path) -> anyhow::Result<GenesisRoot> {
-    let mut genesis_ledger_file = tokio::fs::File::open(&filename).await?;
-    let mut genesis_ledger_file_contents = Vec::new();
-
-    genesis_ledger_file
-        .read_to_end(&mut genesis_ledger_file_contents)
-        .await?;
-    drop(genesis_ledger_file);
-    Ok(serde_json::from_slice(&genesis_ledger_file_contents)?)
+pub fn parse_file(filename: &Path) -> anyhow::Result<GenesisRoot> {
+    let data = std::fs::read(filename)?;
+    Ok(serde_json::from_slice(&data)?)
 }

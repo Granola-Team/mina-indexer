@@ -176,7 +176,7 @@ pub async fn handle_command_line_arguments(
 
     info!("Parsing ledger file at {}", ledger.display());
 
-    match ledger::genesis::parse_file(&ledger).await {
+    match ledger::genesis::parse_file(&ledger) {
         Err(err) => {
             error!(
                 reason = "Unable to parse ledger",
