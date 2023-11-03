@@ -99,7 +99,7 @@ impl From<GenesisLedger> for Ledger {
     }
 }
 
-pub fn parse_file(filename: &Path) -> anyhow::Result<GenesisRoot> {
+pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
     let data = std::fs::read(filename)?;
     Ok(serde_json::from_slice(&data)?)
 }
