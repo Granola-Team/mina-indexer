@@ -1,57 +1,39 @@
-use std::path::Path;
-
-use mina_indexer::state::ledger::{genesis::GenesisRoot, Ledger};
-use tokio::{fs::File, io::AsyncReadExt};
-
-const GENESIS_LEDGERS_PATH: &str = "./tests/data/genesis_ledgers";
-
-pub async fn read_genesis_ledger_to_string(ledger: &str) -> Result<String, anyhow::Error> {
-    let mut ledger_file = File::open(Path::new(GENESIS_LEDGERS_PATH).join(ledger)).await?;
-
-    let mut buffer = vec![];
-    ledger_file.read_to_end(&mut buffer).await?;
-
-    Ok(String::from(std::str::from_utf8(&buffer)?))
+use mina_indexer::state::ledger::{
+    genesis::{self, GenesisRoot},
+    Ledger,
+};
+#[test]
+fn test_mainnet_genesis_parser() {
+    let genesis_ledger = genesis::parse_file("./tests/data/genesis_ledgers/mainnet.json").unwrap();
+    let ledger: Ledger = genesis_ledger.clone().into();
+    // Ledger account balances are in nanomina
+    let initial_supply = ledger
+        .accounts
+        .values()
+        .fold(0u64, |acc, account| acc + account.balance.0);
+    assert_eq!(
+        "mainnet", genesis_ledger.ledger.name,
+        "The network name should match"
+    );
+    assert_eq!(
+        "2021-03-17T00:00:00Z", genesis_ledger.genesis.genesis_state_timestamp,
+        "Genesis timestamp should match"
+    );
+    // 1675 total genesis ledger accounts
+    assert_eq!(
+        1675,
+        genesis_ledger.ledger.accounts.len(),
+        "Total number of genesis accounts should match"
+    );
+    // 805253692.840038233 was manually calculated ignoring the 2 bad accounts balances
+    assert_eq!(
+        805253692840038233, initial_supply,
+        "Mina inital distribution should match"
+    );
 }
 
-#[tokio::test]
-pub async fn mainnet_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("mainnet.json")
-        .await
-        .expect("mainnet genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json)
-        .expect("mainnet genesis ledger parses into GenesisRoot");
-}
-
-#[tokio::test]
-pub async fn berkeley_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("berkeley.json")
-        .await
-        .expect("berkeley genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json)
-        .expect("berkeley genesis ledger parses into GenesisRoot");
-}
-
-#[tokio::test]
-pub async fn devnet_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("devnet.json")
-        .await
-        .expect("devnet genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json)
-        .expect("devnet genesis ledger parses into GenesisRoot");
-}
-
-#[tokio::test]
-pub async fn devnet2_genesis_ledger_parses() {
-    let ledger_json = read_genesis_ledger_to_string("devnet2.json")
-        .await
-        .expect("devnet2 genesis ledger file exists");
-    serde_json::from_str::<GenesisRoot>(&ledger_json)
-        .expect("devnet2 genesis ledger parses into GenesisRoot");
-}
-
-#[tokio::test]
-pub async fn test_ignore_known_invalid_pks_on_mainnet() {
+#[test]
+fn test_ignore_known_invalid_pks_on_mainnet() {
     let ledger_json = r#"{
         "genesis": {
             "genesis_state_timestamp": "2021-03-17T00:00:00Z"

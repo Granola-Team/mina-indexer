@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     let indexer_store = Arc::new(IndexerStore::new(store_dir).unwrap());
     let genesis_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
     let parse_genesis_time = Instant::now();
-    let genesis_root = genesis::parse_file(genesis_path).await.unwrap();
+    let genesis_root = genesis::parse_file(genesis_path).unwrap();
     let parse_genesis_time = parse_genesis_time.elapsed();
 
     println!("Genesis ledger parsing time: {parse_genesis_time:?}");
