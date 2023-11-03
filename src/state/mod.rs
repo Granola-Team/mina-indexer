@@ -399,12 +399,6 @@ impl IndexerState {
                 ledger.apply_post_balances(&precomputed_block);
                 indexer_store.add_block(&precomputed_block)?;
 
-                let timestamp = precomputed_block.timestamp();
-
-                for cmd in precomputed_block.commands() {
-                    indexer_store.put_tx(precomputed_block.blockchain_length, timestamp, cmd)?;
-                }
-
                 // TODO: store ledger at specified cadence, e.g. at epoch boundaries
                 // for now, just store every 1000 blocks
                 if self.blocks_processed % 1000 == 0 {
@@ -526,12 +520,6 @@ impl IndexerState {
         // add block to the db
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
-
-            let tmstmp = precomputed_block.timestamp();
-
-            for cmd in precomputed_block.commands() {
-                indexer_store.put_tx(precomputed_block.blockchain_length, tmstmp, cmd)?;
-            }
         }
 
         self.blocks_processed += 1;
