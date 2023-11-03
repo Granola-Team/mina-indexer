@@ -10,7 +10,6 @@ fn test_mainnet_genesis_parser() {
     let initial_supply = ledger
         .accounts
         .values()
-        .into_iter()
         .fold(0u64, |acc, account| acc + account.balance.0);
     assert_eq!(
         "mainnet", genesis_ledger.ledger.name,
