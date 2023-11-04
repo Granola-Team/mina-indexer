@@ -3,7 +3,6 @@ pub mod client;
 pub mod ipc;
 pub mod receiver;
 pub mod server;
-pub mod staking_ledger;
 pub mod state;
 pub mod store;
 
