@@ -32,7 +32,6 @@ use uuid::Uuid;
 
 pub mod branch;
 pub mod ledger;
-pub mod snapshot;
 pub mod summary;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
