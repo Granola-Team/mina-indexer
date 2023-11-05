@@ -5,14 +5,8 @@ use crate::{
         Canonicity,
     },
 };
-use rocksdb::{
-    ColumnFamilyDescriptor, DB,
-};
-use std::{
-    path::{Path, PathBuf},
-};
-
-
+use rocksdb::{ColumnFamilyDescriptor, DB};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -38,8 +32,7 @@ impl IndexerStore {
         let mut cf_opts = rocksdb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
-        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
-        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts);
+        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -47,7 +40,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, ledgers, canonicity],
+            vec![blocks, ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
