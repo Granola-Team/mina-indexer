@@ -3,239 +3,89 @@
 [![Build
 status](https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg)](https://buildkite.com/granola/mina-indexer)
 
-The Mina indexer ("indexer") is a simplified, and improved version of
-the software collectively called the "[archive
-node](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive)"
-in the Mina codebase.
+The Mina Indexer is a redesigned version of the software collectively
+called the "[Mina archive
+node](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive)."
 
-The indexer replaces the archive node trio of architectural elements
-(Postgres database, Mina daemon, "mina-archiver" process) with a
-system that reconstitutes the network’s historical state solely from
-the precomputed blocks logged from the Mina daemon.
+**Note:** As the project is in active development, be aware that the
+public APIs and functionalities are subject to change.
 
-![High Level Architecture](docs/architecture/indexer_components.png)
+## Motivation
 
-The indexer's primary goals are to be easier to operate and maintain
-while being a superset of the data available in the archive node.
+Building applications with the Mina Archive Node is intricate and
+requires significant time investment. It demands precise configuration
+of a Mina Node, an Archive Node, and a Postgres database. Proficiency
+in SQL and an in-depth understanding of the Mina blockchain are
+crucial for effective operation.
 
-## Warning
+One major challenge with the Archive Node is its reliance on a
+`pg_dump` from an existing node for bootstrapping, ideally within the
+transition frontier. The Mina Indexer addresses this challenge by
+relying on precomputed blocks as the source of truth, eliminating the
+need to rely on someone else's database dump.
 
-The indexer project is in constant development and is in an alpha
-state. Functionality and API definitions will be in flux and are
-subject to change without notice. With that being said, happy hacking!
+Even with proper setup, the system may not capture every block, often
+leading to gaps in the data. These gaps must be manually addressed by
+the operator, adding to the complexity of managing the system.
 
-## Quick Start Guide
+## Project Goals
 
-Follow these steps to quickly set up and run the Mina Indexer on your machine.
+In response to these challenges, we designed the Mina Indexer to be a
+comprehensive replacement for the Mina Archive Node, providing an
+easier to use and a more accessible platform with integrated full
+support for the [Rosetta
+API](https://www.rosetta-api.org/docs/welcome.html). Our goal is to
+streamline blockchain interaction for developers within the Mina
+ecosystem by providing developers and operators with a better toolset
+optimized for the Mina ecosystem.
 
-1. **Clone the Repository**
+## Getting Started
 
-Open your terminal and run the following commands:
-```sh
-git clone git@github.com:Granola-Team/mina-indexer.git
-cd mina-indexer
-```
+### Prerequisites
 
-2. **Download Blocks**
+This project utilizes Nix Flakes for development and building. Install
+Nix [here](https://nixos.org/download.html) and enable Flakes using
+the guide [here](https://nixos.wiki/wiki/Flakes). No additional
+dependencies are needed.
 
-Download blocks from the Google Cloud bucket. For convenience, we at Granola created a repository, [download Mina blocks](https://github.com/Granola-Team/iggy), which helps you keep your Mina block data up to date. Make sure you have `gustil` installed.
+### Setting Up the Development Environment
 
-3. **Build the Indexer**
+Create your development environment using `nix develop
+'.?submodules=1'`. This prepares your system with the necessary
+dependencies, compilers, and development tools, eliminating the need
+for an independent Rust installation. For VSCode, enhance your
+experience with the `Nix Environment Selector` extension by linking it
+to `shell.nix`. Alternatively, configure your IDE environment with
+`direnv`.
 
-Build the project using one of the following methods:
-* Using Cargo:
-```sh
-cargo build --release
-```
+### Building the Project
 
-Using Nix (Recommended):
-```sh
-nix develop
+To build the mina-indexer binaries, run the following command:
+
+```bash
 nix build '.?submodules=1'
 ```
 
-Using Docker:
-```sh
-docker build -t mina-indexer:latest .
-```
+This will compile the binaries and place them in `./result/bin`.
 
-4. **Run the Indexer**
+### Running Tests
 
-Using Nix as an example, in your initial terminal window where you ran the aforementioned Nix commands, now run:
-```sh
-target/release/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
-```
-or
-```sh
-result/bin/mina-indexer server cli -l tests/data/genesis_ledgers/mainnet.json -s /path/to/setup_directory_containing_blocks
-```
+#### Unit Tests
 
-With the indexer running, you can now execute various mina-indexer client and server commands mentioned in the below corresponding README sections by opening another terminal window and staying in the Nix shell (or whichever build you choose).
-
-5. **Additional Options**
-Depending on your use case, you may need to include additional CLI flags or run different binaries such as `target/release/staking-ledger-ingestion`.
-
-## Getting Started (Detailed)
-
-Clone the repo
-
-### Building with nix
-
-Build (install [nix](#about-the-development-environment) first)
-
-Use the Nix commands written in the Quick Start Guide above. Alternatively, you can build with `cargo` inside the nix shell
-(replace `mina-indexer` by `cargo run --release --bin mina-indexer --` in all following commands).
-
-### Building the indexer in Docker
-
-To build the indexer in docker run the following command:
-
-```sh
-docker build -t mina-indexer:latest .
-docker run --rm mina-indexer --help
-```
-
-### Starting the Indexer with a Config file
+Execute unit tests to validate code functionality with:
 
 ```bash
-Server Config Commands
-
-Usage: mina-indexer server config --path <PATH>
-
-Options:
-  -p, --path <PATH>
-  -h, --help         Print help
+nix-shell shell.nix --run "just test-regression"
 ```
 
-```yaml
-ledger: /home/jenr/.mina-indexer/mainnet.json
-non_genesis_ledger: false
-root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-startup_dir: /home/jenr/.mina-indexer/startup-blocks
-watch_dir: /home/jenr/.mina-indexer/watch-blocks
-database_dir: /home/jenr/.mina-indexer/database
-log_dir: /home/jenr/.mina-indexer/logs
-keep_non_canonical_blocks: true
-log_level: info
-log_level_stdout: trace
-prune_interval: 10
-canonical_update_threshold: 2
-```
+#### Regression Tests
 
-
-### Server Commands
+To perform regression tests, which check for new bugs in existing
+features after updates, use:
 
 ```bash
-Server Cli Commands
-
-Usage: mina-indexer server cli [OPTIONS] --ledger <LEDGER>
-
-Options:
-  -l, --ledger <LEDGER>
-          Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-  -n, --non-genesis-ledger
-          Use a non-genesis ledger
-      --root-hash <ROOT_HASH>
-          Hash of the base ledger [default: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ]
-  -s, --startup-dir <STARTUP_DIR>
-          Path to startup blocks directory [default: $HOME/.mina-indexer/startup-blocks]
-  -w, --watch-dir <WATCH_DIR>
-          Path to directory to watch for new blocks [default: $HOME/.mina-indexer/watch-blocks]
-  -d, --database-dir <DATABASE_DIR>
-          Path to directory for rocksdb [default: $HOME/.mina-indexer/database]
-      --log-dir <LOG_DIR>
-          Path to directory for logs [default: $HOME/.mina-indexer/logs]
-  -k, --keep-non-canonical-blocks
-          Only store canonical blocks in the db
-      --log-level <LOG_LEVEL>
-          Max file log level [default: debug]
-      --log-level-stdout <LOG_LEVEL_STDOUT>
-          Max stdout log level [default: info]
-  -p, --prune-interval <PRUNE_INTERVAL>
-          Interval for pruning the root branch [default: 10]
-  -c, --canonical-update-threshold <CANONICAL_UPDATE_THRESHOLD>
-          Threshold for updating the canonical tip/ledger [default: 2]
-  -h, --help
-          Print help
-  -V, --version
-          Print version
+nix-shell shell.nix --run "just test-unit"
 ```
-
-### Client Commands
-
-```bash
-Client commands
-
-Usage: mina-indexer client <COMMAND>
-
-Commands:
-  account      Display the account info for the given public key
-  best-chain   Display the best chain
-  best-ledger  Dump the best ledger to a file
-  summary      Show summary of indexer state
-  help         Print this message or the help of the given subcommand(s)
-
-Options:
-  -o, --output-json Output JSON data when possible
-  -h, --help        Print help
-  -V, --version     Print version
-```
-
-### Some useful `client` commands
-
-Query data with the `mina-indexer` client (from another terminal window)
-
-* Get the account info for a specific Public Key
-```sh
-mina-indexer client account --public-key $PUBLIC_KEY
-```
-
-* Get the current best chain of blocks from the tip, length `NUM`
-```sh
-mina-indexer client best-chain --num $NUM
-```
-
-* Dump the best ledger to a file
-```sh
-mina-indexer client best-ledger --path $PATH
-```
-
-* Get a summary of the indexer state
-```sh
-mina-indexer client summary
-```
-
-* Get a verbose summary of the indexer state (pretty pictures included!)
-```sh
-mina-indexer client summary -v
-```
-
-### Help
-
-For more information, check out the help menus
-
-```sh
-mina-indexer server --help
-mina-indexer client --help
-```
-
-## About the development environment
-
-This repository uses Nix Flakes as a development environment and build system. You can install Nix [here](https://nixos.org/download.html) and you can visit [this page](https://nixos.wiki/wiki/Flakes) for instructions on enabling Nix Flakes on your system. Apart from Nix, there are no external dependencies for this project!
-
-## Building the Project
-
-Binaries for `mina-indexer` can be built by running `nix build '.?submodules=1'` with Flakes enabled (see above). All binaries are output to `./result/bin`
-
-## Entering a Development Environment
-
-You can enter a development environment by running `nix develop` at the command line. The development environment for this project takes care of installing all dependencies, compilers, and development tools (this means that you don't even need rustup installed!), including the `rust-analyzer` language server. For VSCode, we recommend the `Nix Environment Selector` extension pointed at `shell.nix` to tell your IDE about the installed tools, though you can also use direnv for this same purpose.
-
-## Running unit tests
-
-In the nix shell issue the following command to run the unit tests.
-
-`cargo nextest run`
 
 ## License (See LICENSE file for full license)
 
