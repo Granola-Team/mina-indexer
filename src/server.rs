@@ -340,15 +340,6 @@ pub async fn run(
     }
 }
 
-pub async fn spawn_readonly_rocksdb(primary_path: PathBuf) -> anyhow::Result<IndexerStore> {
-    let mut secondary_path = primary_path.clone();
-    secondary_path.push(uuid::Uuid::new_v4().to_string());
-
-    debug!("Spawning secondary readonly RocksDB instance");
-    let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
-    Ok(block_store_readonly)
-}
-
 fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
     if e.kind() == io::ErrorKind::AddrInUse {
         debug!(
