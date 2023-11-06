@@ -105,9 +105,9 @@
             buildInputs = developmentDependencies;
             shellHook = ''
               git submodule update --init --recursive
-              export PATH=.$out/bin:$PATH
               export LIBCLANG_PATH="${LIBCLANG_PATH}"
               export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
+              export TMPDIR=/var/tmp
             '';
           };
         }
