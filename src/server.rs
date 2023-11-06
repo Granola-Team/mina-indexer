@@ -15,13 +15,13 @@ use interprocess::local_socket::tokio::LocalSocketListener;
 
 use serde_derive::{Deserialize, Serialize};
 use std::{
+    fs,
     path::{Path, PathBuf},
     process,
     sync::Arc,
     time::Duration,
 };
 use tokio::{
-    fs::{create_dir_all, metadata},
     io,
     sync::{
         mpsc::{self, Sender},
@@ -214,7 +214,7 @@ pub async fn initialize(
         canonical_update_threshold,
     } = config;
 
-    create_dir_if_non_existent(startup_dir.to_str().unwrap()).await;
+    fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
 
     let state = {
         info!(
@@ -337,13 +337,6 @@ pub async fn run(
                 }
             }
         }
-    }
-}
-
-pub async fn create_dir_if_non_existent(path: &str) {
-    if metadata(path).await.is_err() {
-        debug!("Creating directory {path:?}");
-        create_dir_all(path).await.unwrap();
     }
 }
 
