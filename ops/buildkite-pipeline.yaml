@@ -7,14 +7,8 @@ steps:
     nix-shell --run just
   key: prereqs
 
-- label: "Lint and Audit"
+- label: "Lint, Audit, Build, and Test"
   command: |
-    nix-shell --run "just lint"
-  key: lint
+    nix-shell --run "just lint && just test"
+  key: build
   depends_on: prereqs
-
-- label: "Build and Test"
-  command: |
-    nix-shell --run "just test"
-  key: test
-  depends_on: lint
