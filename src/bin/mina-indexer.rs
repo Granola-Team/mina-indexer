@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use mina_indexer::{
     block::BlockHash,
     client,
-    server::{create_dir_if_non_existent, IndexerConfiguration, MinaIndexer},
+    server::{IndexerConfiguration, MinaIndexer},
     state::ledger,
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
@@ -10,7 +10,7 @@ use mina_indexer::{
 };
 use serde::Deserializer;
 use serde_derive::Deserialize;
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 use tracing::{error, info, instrument, trace};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
@@ -116,7 +116,8 @@ pub async fn main() -> anyhow::Result<()> {
 
             let mut log_number = 0;
             let mut log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-            create_dir_if_non_existent(log_dir.to_str().unwrap()).await;
+            fs::create_dir_all(log_dir.clone()).expect("log_dir should be created");
+
             while tokio::fs::metadata(&log_file).await.is_ok() {
                 log_number += 1;
                 log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
@@ -125,7 +126,7 @@ pub async fn main() -> anyhow::Result<()> {
 
             // setup tracing
             if let Some(parent) = log_file.parent() {
-                create_dir_if_non_existent(parent.to_str().unwrap()).await;
+                fs::create_dir_all(parent).expect("log_file parent should be created");
             }
 
             let log_file = std::fs::File::create(log_file.clone())?;
@@ -171,8 +172,7 @@ pub async fn handle_command_line_arguments(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
-
-    create_dir_if_non_existent(watch_dir.to_str().unwrap()).await;
+    fs::create_dir_all(watch_dir.clone()).expect("watch_dir should be created");
 
     info!("Parsing ledger file at {}", ledger.display());
 
