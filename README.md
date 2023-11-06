@@ -12,29 +12,30 @@ public APIs and functionalities are subject to change.
 
 ## Motivation
 
-Building applications with the Mina Archive Node is intricate and
-requires significant time investment. It demands precise configuration
-of a Mina Node, an Archive Node, and a Postgres database. Proficiency
-in SQL and an in-depth understanding of the Mina blockchain are
-crucial for effective operation.
+Working with the Mina Archive Node can be complex and
+time-consuming. It requires the exact configuration of multiple
+components — a Mina Node, an Archive Node, and a Postgres database —
+and an in-depth knowledge of SQL and the Mina blockchain.
 
-One major challenge with the Archive Node is its reliance on a
-`pg_dump` from an existing node for bootstrapping, ideally within the
-transition frontier. The Mina Indexer addresses this challenge by
-relying on precomputed blocks as the source of truth, eliminating the
-need to rely on someone else's database dump.
+Additionally, even with a proper setup, the Archive Node system is
+prone to missing blocks, creating gaps in the data. These gaps require
+manual intervention for resolution, which adds layers of complexity to
+the system's management.
 
-Even with proper setup, the system may not capture every block, often
-leading to gaps in the data. These gaps must be manually addressed by
-the operator, adding to the complexity of managing the system.
+A major problem with the Archive Node is its reliance on a `pg_dump`
+from a currently active node for initial setup. This approach
+centralizes data, necessitating trust from the operator's side.
 
-## Project Goals
+## Solution
 
-In response to these challenges, we designed the Mina Indexer to be a
-comprehensive replacement for the Mina Archive Node, providing an
-easier to use and a more accessible platform with integrated full
-support for the [Rosetta
-API](https://www.rosetta-api.org/docs/welcome.html). Our goal is to
+The Mina Indexer addresses this by simplifying the initial
+configuration by using precomputed blocks as the source of truth,
+bypassing the need for external database dumps.
+
+We designed the Mina Indexer to be a comprehensive replacement for the
+Mina Archive Node, providing an easier-to-use and more accessible
+platform with integrated full support for the [Rosetta
+API](https://www.rosetta-api.org/docs/welcome.html). We aim to
 streamline blockchain interaction for developers within the Mina
 ecosystem by providing developers and operators with a better toolset
 optimized for the Mina ecosystem.
@@ -75,7 +76,7 @@ This will compile the binaries and place them in `./result/bin`.
 Execute unit tests to validate code functionality with:
 
 ```bash
-nix-shell shell.nix --run "just test-regression"
+nix-shell --run "just test-unit"
 ```
 
 #### Regression Tests
@@ -84,7 +85,7 @@ To perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-nix-shell shell.nix --run "just test-unit"
+nix-shell --run "just test-regression"
 ```
 
 ## License (See LICENSE file for full license)
