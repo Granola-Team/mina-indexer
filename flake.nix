@@ -35,7 +35,6 @@
 
         runtimeDependencies = with pkgs; [
           openssl
-          zstd
         ];
 
         frameworks = pkgs.darwin.apple_sdk.frameworks;
