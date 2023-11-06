@@ -172,6 +172,39 @@ test_account_public_key_json() {
     teardown
 }
 
+assert_directory_exists() {
+    directory="$1"
+
+    if [ ! -d "$directory" ]; then
+        echo "Test Failed: Expected directory $directory to exist, but it does not."
+        exit 1
+    else
+        echo "Test Passed: Directory $directory exists."
+    fi
+}
+
+test_startup_dirs_get_created () {
+    setup
+
+    idxr server cli \
+        --startup-dir ./startup-blocks \
+        --watch-dir ./watch-blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+    sleep 5
+
+    assert_directory_exists "./startup-blocks"
+    assert_directory_exists "./watch-blocks"
+    assert_directory_exists "./database"
+    assert_directory_exists "./logs"
+
+    idxr_pid=$(pgrep mina-indexer)
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -181,6 +214,7 @@ if [ "$#" -eq 0 ]; then
     test_ipc_is_available_immediately
     test_account_balance_cli
     test_account_public_key_json
+    test_startup_dirs_get_created
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -191,6 +225,7 @@ else
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
+            "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
