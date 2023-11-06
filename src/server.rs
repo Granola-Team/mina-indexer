@@ -43,12 +43,6 @@ pub struct IndexerConfiguration {
     pub canonical_update_threshold: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveCommand(PathBuf);
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveResponse(String);
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum MinaIndexerRunPhase {
     JustStarted,
@@ -61,7 +55,6 @@ pub enum MinaIndexerRunPhase {
     StartingMainServerLoop,
     ReceivingBlock,
     ReceivingIPCConnection,
-    SavingStateSnapshot,
 }
 
 pub enum MinaIndexerQuery {
