@@ -13,21 +13,8 @@ steps:
   key: lint
   depends_on: prereqs
 
-- label: "Build"
+- label: "Build and Test"
   command: |
-    nix-shell --run "just build"
-  key: build
+    nix-shell --run "just test"
+  key: test
   depends_on: lint
-
-- label: "Unit Tests"
-  command: |
-    nix-shell --run "just test-unit"
-  key: test-unit
-  depends_on: build
-
-- label: "Regression (System) Tests"
-  command: |
-    echo TMPDIR=$TMPDIR
-    nix-shell --run "just test-regression"
-  key: test-regression
-  depends_on: build
