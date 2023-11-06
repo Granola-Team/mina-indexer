@@ -144,7 +144,7 @@ impl MinaIndexer {
         let _ = self._ipc_join_handle.await;
     }
 
-    async fn send_query(
+    fn send_query(
         &self,
         command: MinaIndexerQuery,
     ) -> anyhow::Result<MinaIndexerQueryResponse> {
@@ -167,10 +167,9 @@ impl MinaIndexer {
         *self.phase_receiver.borrow()
     }
 
-    pub async fn blocks_processed(&self) -> anyhow::Result<u32> {
+    pub fn blocks_processed(&self) -> anyhow::Result<u32> {
         match self
-            .send_query(MinaIndexerQuery::NumBlocksProcessed)
-            .await?
+            .send_query(MinaIndexerQuery::NumBlocksProcessed)?
         {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
             _ => Err(anyhow!("unexpected response!")),
