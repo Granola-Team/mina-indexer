@@ -4,30 +4,17 @@ steps:
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
-    nix-shell ops/shell.nix --run just
+    nix-shell --run just
   key: prereqs
 
 - label: "Lint and Audit"
   command: |
-    nix-shell ops/shell.nix --run "just lint"
+    nix-shell --run "just lint"
   key: lint
   depends_on: prereqs
 
-- label: "Build"
+- label: "Build and Test"
   command: |
-    nix-shell ops/shell.nix --run "just build"
-  key: build
+    nix-shell --run "just test"
+  key: test
   depends_on: lint
-
-- label: "Unit Tests"
-  command: |
-    nix-shell ops/shell.nix --run "just test-unit"
-  key: test-unit
-  depends_on: build
-
-- label: "Regression (System) Tests"
-  command: |
-    echo TMPDIR=$TMPDIR
-    nix-shell ops/shell.nix --run "just test-regression"
-  key: test-regression
-  depends_on: build
