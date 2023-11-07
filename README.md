@@ -33,8 +33,8 @@ configuration by using precomputed blocks as the source of truth,
 bypassing the need for external database dumps.
 
 We designed the Mina Indexer to be a comprehensive replacement for the
-Mina Archive Node, providing an easier-to-use and more accessible
-platform with integrated full support for the [Rosetta
+Mina Archive Node, providing an easier-to-use platform with native
+support for the [Rosetta
 API](https://www.rosetta-api.org/docs/welcome.html). We aim to
 streamline blockchain interaction for developers within the Mina
 ecosystem by providing developers and operators with a better toolset
