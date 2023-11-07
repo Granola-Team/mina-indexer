@@ -8,14 +8,13 @@ use crate::{
 use anyhow::anyhow;
 use glob::glob;
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{prelude::*, SeekFrom},
     path::{Path, PathBuf},
     time::Instant,
     vec::IntoIter,
 };
-use tokio::io::AsyncReadExt;
-use tracing::{debug, info};
+    use tracing::{debug, info};
 
 /// Splits block paths into two collections: canonical and successive
 ///
@@ -288,11 +287,11 @@ impl BlockParser {
     /// Traverses `self`'s internal paths. First canonical, then successive.
     pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return self.parse_file(&next_path).await.map(Some);
+            return self.parse_file(&next_path).map(Some);
         }
 
         if let Some(next_path) = self.successive_paths.next() {
-            return self.parse_file(&next_path).await.map(Some);
+            return self.parse_file(&next_path).map(Some);
         }
 
         Ok(None)
@@ -328,31 +327,23 @@ impl BlockParser {
     }
 
     /// Parses the precomputed block's JSON file, throws if a read error occurs.
-    pub async fn parse_file(&mut self, filename: &Path) -> anyhow::Result<PrecomputedBlock> {
+    pub fn parse_file(&mut self, filename: &Path) -> anyhow::Result<PrecomputedBlock> {
         if is_valid_block_file(filename) {
             let blockchain_length =
                 get_blockchain_length(filename.file_name().expect("filename already checked"));
             let state_hash =
                 get_state_hash(filename.file_name().expect("filename already checked"))
                     .expect("state hash already checked");
-            let mut log_file = tokio::fs::File::open(&filename).await?;
-            let mut log_file_contents = Vec::new();
-
-            log_file.read_to_end(&mut log_file_contents).await?;
-            drop(log_file);
+            let log_file_contents = fs::read(filename)?;
             let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
                 state_hash,
                 blockchain_length,
                 contents: log_file_contents,
             })?;
-
             Ok(precomputed_block)
         } else {
             Err(anyhow!(
-                "
-[BlockParser::parse_file]
-    Could not find valid block!
-    {} is not a valid precomputed block",
+                "Unable to parse invalid precomputed block: {}",
                 filename.display()
             ))
         }
