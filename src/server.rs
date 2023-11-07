@@ -43,12 +43,6 @@ pub struct IndexerConfiguration {
     pub canonical_update_threshold: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveCommand(PathBuf);
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveResponse(String);
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum MinaIndexerRunPhase {
     JustStarted,
@@ -61,7 +55,6 @@ pub enum MinaIndexerRunPhase {
     StartingMainServerLoop,
     ReceivingBlock,
     ReceivingIPCConnection,
-    SavingStateSnapshot,
 }
 
 pub enum MinaIndexerQuery {
@@ -151,7 +144,7 @@ impl MinaIndexer {
         let _ = self._ipc_join_handle.await;
     }
 
-    async fn send_query(
+    fn send_query(
         &self,
         command: MinaIndexerQuery,
     ) -> anyhow::Result<MinaIndexerQueryResponse> {
@@ -174,10 +167,9 @@ impl MinaIndexer {
         *self.phase_receiver.borrow()
     }
 
-    pub async fn blocks_processed(&self) -> anyhow::Result<u32> {
+    pub fn blocks_processed(&self) -> anyhow::Result<u32> {
         match self
-            .send_query(MinaIndexerQuery::NumBlocksProcessed)
-            .await?
+            .send_query(MinaIndexerQuery::NumBlocksProcessed)?
         {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
             _ => Err(anyhow!("unexpected response!")),
@@ -338,15 +330,6 @@ pub async fn run(
             }
         }
     }
-}
-
-pub async fn spawn_readonly_rocksdb(primary_path: PathBuf) -> anyhow::Result<IndexerStore> {
-    let mut secondary_path = primary_path.clone();
-    secondary_path.push(uuid::Uuid::new_v4().to_string());
-
-    debug!("Spawning secondary readonly RocksDB instance");
-    let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
-    Ok(block_store_readonly)
 }
 
 fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {

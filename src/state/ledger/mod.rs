@@ -21,19 +21,6 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, result::Result};
 use tracing::debug;
 
-impl ExtendWithLedgerDiff for LedgerMock {
-    fn extend_with_diff(self, _ledger_diff: LedgerDiff) -> Self {
-        LedgerMock {}
-    }
-
-    fn from_diff(_ledger_diff: LedgerDiff) -> Self {
-        LedgerMock {}
-    }
-}
-
-#[derive(Default, Clone, Debug)]
-pub struct LedgerMock {}
-
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
     pub accounts: HashMap<PublicKey, Account>,
