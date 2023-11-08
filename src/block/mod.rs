@@ -173,7 +173,7 @@ pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
         let state_hash = get_state_hash(filename.file_name().expect("filename already checked"))
             .expect("state hash already checked");
 
-        let mut log_file = std::fs::File::open(&filename)?;
+        let mut log_file = std::fs::File::open(filename)?;
         let mut log_file_contents = Vec::new();
 
         log_file.read_to_end(&mut log_file_contents)?;
