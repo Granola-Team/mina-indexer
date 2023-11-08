@@ -14,7 +14,7 @@ use std::{
     time::Instant,
     vec::IntoIter,
 };
-    use tracing::{debug, info};
+use tracing::{debug, info};
 
 /// Splits block paths into two collections: canonical and successive
 ///
@@ -285,7 +285,7 @@ impl BlockParser {
     }
 
     /// Traverses `self`'s internal paths. First canonical, then successive.
-    pub async fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+    pub fn next(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
             return self.parse_file(&next_path).map(Some);
         }
@@ -303,7 +303,7 @@ impl BlockParser {
         &mut self,
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
-        let mut next_block = self.next().await?.ok_or(anyhow!(
+        let mut next_block = self.next()?.ok_or(anyhow!(
             "
 [BlockPasrser::get_precomputed_block]
     Looking in blocks dir: {}
@@ -313,7 +313,7 @@ impl BlockParser {
         ))?;
 
         while next_block.state_hash != state_hash {
-            next_block = self.next().await?.ok_or(anyhow!(
+            next_block = self.next()?.ok_or(anyhow!(
                 "
 [BlockPasrser::get_precomputed_block]
     Looking in blocks dir: {}
