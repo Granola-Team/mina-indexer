@@ -1,8 +1,5 @@
 use crate::{
-    block::{
-        get_blockchain_length, get_state_hash,
-        precomputed::PrecomputedBlock,
-    },
+    block::{get_blockchain_length, get_state_hash, precomputed::PrecomputedBlock},
     display_duration, BLOCK_REPORTING_FREQ_NUM,
 };
 use anyhow::anyhow;
@@ -302,12 +299,14 @@ impl BlockParser {
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
         let mut next_block = self
-            .next_block().await?
+            .next_block()
+            .await?
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.state_hash != state_hash {
             next_block = self
-                .next_block().await?
+                .next_block()
+                .await?
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
 
