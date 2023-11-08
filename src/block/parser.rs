@@ -57,9 +57,7 @@ impl BlockParser {
                 successive_paths: paths.into_iter(),
             })
         } else {
-            Err(anyhow!(
-                "[BlockParser::new_testing] log path {blocks_dir:?} does not exist!"
-            ))
+            Err(anyhow!("blocks_dir: {blocks_dir:?}, does not exist!"))
         }
     }
 
@@ -278,9 +276,7 @@ impl BlockParser {
                 successive_paths: successive_paths.into_iter(),
             })
         } else {
-            Err(anyhow!(
-                "[BlockParser::new_internal] log path {blocks_dir:?} does not exist!"
-            ))
+            Err(anyhow!("blocks_dir: {blocks_dir:?}, does not exist!"))
         }
     }
 
@@ -303,24 +299,14 @@ impl BlockParser {
         &mut self,
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
-        let mut next_block = self.next_block()?.ok_or(anyhow!(
-            "
-[BlockPasrser::get_precomputed_block]
-    Looking in blocks dir: {}
-    Did not find state hash: {state_hash}
-    It may have been skipped unintentionally!",
-            self.blocks_dir.display()
-        ))?;
+        let mut next_block = self
+            .next_block()?
+            .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.state_hash != state_hash {
-            next_block = self.next_block()?.ok_or(anyhow!(
-                "
-[BlockPasrser::get_precomputed_block]
-    Looking in blocks dir: {}
-    Did not find state hash: {state_hash}
-    It may have been skipped unintentionally!",
-                self.blocks_dir.display()
-            ))?;
+            next_block = self
+                .next_block()?
+                .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
 
         Ok(next_block)
