@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use std::{ffi::OsStr, io::Read, path::Path};
+use std::{ffi::OsStr, path::Path};
 
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
