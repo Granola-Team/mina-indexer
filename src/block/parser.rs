@@ -280,13 +280,13 @@ impl BlockParser {
     }
 
     /// Traverses `self`'s internal paths. First canonical, then successive.
-    pub async fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+    pub fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return parse_file(&next_path).await.map(Some);
+            return parse_file(&next_path).map(Some);
         }
 
         if let Some(next_path) = self.successive_paths.next() {
-            return parse_file(&next_path).await.map(Some);
+            return parse_file(&next_path).map(Some);
         }
 
         Ok(None)
@@ -299,14 +299,12 @@ impl BlockParser {
         state_hash: &str,
     ) -> anyhow::Result<PrecomputedBlock> {
         let mut next_block = self
-            .next_block()
-            .await?
+            .next_block()?
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.state_hash != state_hash {
             next_block = self
-                .next_block()
-                .await?
+                .next_block()?
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
 

@@ -116,7 +116,7 @@ mod tests {
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
 
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = parse_file(&block_file).await.unwrap();
+        let precomputed_block = parse_file(&block_file).unwrap();
         let commands = precomputed_block.commands();
         let hashes: Vec<String> = commands
             .iter()

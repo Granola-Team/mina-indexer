@@ -6,7 +6,7 @@ async fn gaps() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/gaps");
     let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().await.unwrap() {
+    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
             "length: {}, hash: {}",
             precomputed_block.blockchain_length, precomputed_block.state_hash
@@ -23,7 +23,7 @@ async fn contiguous() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().await.unwrap() {
+    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
             "length: {}, hash: {}",
             precomputed_block.blockchain_length, precomputed_block.state_hash
@@ -40,7 +40,7 @@ async fn missing_parent() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/missing_parent");
     let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().await.unwrap() {
+    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
             "length: {}, hash: {}",
             precomputed_block.blockchain_length, precomputed_block.state_hash
@@ -72,7 +72,7 @@ async fn canonical_threshold() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new(&blocks_dir, canonical_threshold).unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().await.unwrap() {
+    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
             "length: {}, hash: {}",
             precomputed_block.blockchain_length, precomputed_block.state_hash
