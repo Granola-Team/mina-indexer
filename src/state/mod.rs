@@ -392,7 +392,7 @@ impl IndexerState {
                     debug!("Rate: {rate} blocks/s");
                 }
 
-                let precomputed_block = block_parser.next()?.unwrap();
+                let precomputed_block = block_parser.next_block()?.unwrap();
 
                 // apply and add to db
                 ledger.apply_post_balances(&precomputed_block);
@@ -447,7 +447,7 @@ impl IndexerState {
             );
         }
 
-        while let Some(block) = block_parser.next()? {
+        while let Some(block) = block_parser.next_block()? {
             if should_report_from_block_count(self.blocks_processed)
                 || self.should_report_from_time(step_time.elapsed())
             {

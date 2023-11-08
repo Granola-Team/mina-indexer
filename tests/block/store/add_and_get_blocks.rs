@@ -25,7 +25,7 @@ async fn rocksdb() {
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some(block) = bp.next().unwrap() {
+    while let Some(block) = bp.next_block().unwrap() {
         let state_hash = block.state_hash.clone();
         db.add_block(&block).unwrap();
         blocks.insert(state_hash.clone(), block);

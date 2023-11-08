@@ -9,7 +9,10 @@ async fn representative_benches() {
     let mut block_parser0 = BlockParser::new_testing(&sample_dir0).unwrap();
     let mut logs_processed = 0;
 
-    while let Some(precomputed_block) = block_parser0.next().expect("IO Error on block_parser") {
+    while let Some(precomputed_block) = block_parser0
+        .next_block()
+        .expect("IO Error on block_parser")
+    {
         logs_processed += 1;
         dbg!(precomputed_block.state_hash);
     }
@@ -24,7 +27,10 @@ async fn representative_benches() {
     let mut block_parser1 = BlockParser::new_testing(&sample_dir1).unwrap();
 
     logs_processed = 0;
-    while let Some(precomputed_block) = block_parser1.next().expect("IO Error on block_parser") {
+    while let Some(precomputed_block) = block_parser1
+        .next_block()
+        .expect("IO Error on block_parser")
+    {
         logs_processed += 1;
         dbg!(precomputed_block.state_hash);
     }
