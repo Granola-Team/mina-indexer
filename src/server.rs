@@ -144,10 +144,7 @@ impl MinaIndexer {
         let _ = self._ipc_join_handle.await;
     }
 
-    fn send_query(
-        &self,
-        command: MinaIndexerQuery,
-    ) -> anyhow::Result<MinaIndexerQueryResponse> {
+    fn send_query(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.query_sender
             .send((command, response_sender))
@@ -168,9 +165,7 @@ impl MinaIndexer {
     }
 
     pub fn blocks_processed(&self) -> anyhow::Result<u32> {
-        match self
-            .send_query(MinaIndexerQuery::NumBlocksProcessed)?
-        {
+        match self.send_query(MinaIndexerQuery::NumBlocksProcessed)? {
             MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
             _ => Err(anyhow!("unexpected response!")),
         }

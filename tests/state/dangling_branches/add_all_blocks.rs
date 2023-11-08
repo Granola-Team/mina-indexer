@@ -11,11 +11,11 @@ async fn extension() {
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     let mut n = 0;
-    if let Some(precomputed_block) = block_parser.next().await.unwrap() {
+    if let Some(precomputed_block) = block_parser.next_block().unwrap() {
         let mut state = IndexerState::new_testing(&precomputed_block, None, None, None).unwrap();
         n += 1;
 
-        while let Some(precomputed_block) = block_parser.next().await.unwrap() {
+        while let Some(precomputed_block) = block_parser.next_block().unwrap() {
             state.add_block(&precomputed_block).unwrap();
             n += 1;
         }
