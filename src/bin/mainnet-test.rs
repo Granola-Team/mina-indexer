@@ -150,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let parse_time = Instant::now();
-        match bp.next_block() {
+        match bp.next_block().await {
             Err(err) => {
                 println!("{err:?}");
             }

@@ -10,7 +10,7 @@ async fn representative_benches() {
     let mut logs_processed = 0;
 
     while let Some(precomputed_block) = block_parser0
-        .next_block()
+        .next_block().await
         .expect("IO Error on block_parser")
     {
         logs_processed += 1;
@@ -28,7 +28,7 @@ async fn representative_benches() {
 
     logs_processed = 0;
     while let Some(precomputed_block) = block_parser1
-        .next_block()
+        .next_block().await
         .expect("IO Error on block_parser")
     {
         logs_processed += 1;
