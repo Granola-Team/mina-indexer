@@ -134,7 +134,7 @@ impl super::BlockReceiver for FilesystemReceiver {
                             }
 
                             if let Some((path, Some(_filetype))) = path_and_filetype {
-                                match parse_file(path.as_path()).await {
+                                match parse_file(path.as_path()) {
                                     Ok(block) => return Ok(Some(block)),
                                     Err(_) => continue,
                                 }

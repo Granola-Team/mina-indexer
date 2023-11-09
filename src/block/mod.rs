@@ -3,7 +3,6 @@ use std::{ffi::OsStr, path::Path};
 
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
 
 use self::precomputed::{BlockLogContents, PrecomputedBlock};
 
@@ -167,28 +166,23 @@ impl std::fmt::Debug for BlockHash {
     }
 }
 
-pub async fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
+pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
     if is_valid_block_file(filename) {
         let blockchain_length =
             get_blockchain_length(filename.file_name().expect("filename already checked"));
-        let state_hash = get_state_hash(filename.file_name().expect("filename already checked"))
-            .expect("state hash already checked");
-
-        let mut log_file = tokio::fs::File::open(&filename).await?;
-        let mut log_file_contents = Vec::new();
-
-        log_file.read_to_end(&mut log_file_contents).await?;
-        drop(log_file);
+        let state_hash =
+            get_state_hash(filename.file_name().expect("filename already checked"))
+                .expect("state hash already checked");
+        let log_file_contents = std::fs::read(filename)?;
         let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
             state_hash,
             blockchain_length,
             contents: log_file_contents,
         })?;
-
         Ok(precomputed_block)
     } else {
         Err(anyhow!(
-            "Could not find valid block! {} is not a valid Precomputed Block",
+            "Unable to parse invalid precomputed block: {}",
             filename.display()
         ))
     }
