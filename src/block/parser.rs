@@ -462,9 +462,12 @@ fn hash_from_path(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::OsString, path::PathBuf};
+    use std::{
+        ffi::OsString,
+        path::{Path, PathBuf},
+    };
 
-    use crate::block::{get_blockchain_length, is_valid_block_file};
+    use crate::block::{get_blockchain_length, is_valid_block_file, parser::length_from_path};
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -532,6 +535,15 @@ mod tests {
             .into_iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
+            .collect();
+
+        assert_eq!(expected, actual);
+
+        let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
+        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
+            .into_iter()
+            .map(OsString::from)
+            .map(|x| length_from_path(Path::new(&x)))
             .collect();
 
         assert_eq!(expected, actual);
