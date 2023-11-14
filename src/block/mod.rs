@@ -170,9 +170,8 @@ pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
     if is_valid_block_file(filename) {
         let blockchain_length =
             get_blockchain_length(filename.file_name().expect("filename already checked"));
-        let state_hash =
-            get_state_hash(filename.file_name().expect("filename already checked"))
-                .expect("state hash already checked");
+        let state_hash = get_state_hash(filename.file_name().expect("filename already checked"))
+            .expect("state hash already checked");
         let log_file_contents = std::fs::read(filename)?;
         let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
             state_hash,
@@ -215,8 +214,7 @@ fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
 }
 
 pub fn is_valid_block_file(path: &Path) -> bool {
-    let file_name = path.file_name();
-    if let Some(file_name) = file_name {
+    if let Some(file_name) = path.file_name() {
         get_state_hash(file_name).is_some()
             && file_name
                 .to_str()

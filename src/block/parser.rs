@@ -13,7 +13,7 @@ use std::{
 };
 use tracing::{debug, info};
 
-use super::parse_file;
+use super::{is_valid_block_file, parse_file};
 
 /// Splits block paths into two collections: canonical and successive
 ///
@@ -445,7 +445,11 @@ fn max_num_canonical_blocks(
 
 // path helpers
 fn length_from_path(path: &Path) -> Option<u32> {
-    get_blockchain_length(path.file_name()?)
+    if is_valid_block_file(path) {
+        get_blockchain_length(path.file_name()?)
+    } else {
+        None
+    }
 }
 
 fn length_from_path_or_max(path: &Path) -> u32 {
@@ -458,9 +462,12 @@ fn hash_from_path(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::OsString, path::PathBuf};
+    use std::{
+        ffi::OsString,
+        path::{Path, PathBuf},
+    };
 
-    use crate::block::{get_blockchain_length, is_valid_block_file};
+    use crate::block::{get_blockchain_length, is_valid_block_file, parser::length_from_path};
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -499,20 +506,47 @@ mod tests {
 
     #[test]
     fn blockchain_lengths_valid_or_default_none() {
-        Vec::from(FILENAMES_VALID)
+        let expected: Vec<Option<u32>> = vec![
+            Some(113512),
+            Some(113518),
+            Some(175222),
+            Some(179591),
+            Some(179594),
+            Some(195769),
+            Some(195770),
+            Some(196577),
+            Some(206418),
+            Some(216651),
+            Some(220897),
+            Some(2),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(40702),
+            Some(750),
+            Some(84160),
+            Some(84161),
+            Some(9638),
+            Some(9644),
+        ];
+        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_VALID)
             .into_iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
-            .for_each(|x| {
-                println!("{x:?}");
-            });
-        Vec::from(FILENAMES_INVALID)
+            .collect();
+
+        assert_eq!(expected, actual);
+
+        let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
+        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
             .into_iter()
             .map(OsString::from)
-            .map(|x| get_blockchain_length(&x))
-            .for_each(|x| {
-                println!("{x:?}");
-            });
+            .map(|x| length_from_path(Path::new(&x)))
+            .collect();
+
+        assert_eq!(expected, actual);
     }
 
     #[test]
