@@ -50,10 +50,10 @@ impl Ledger {
         }
     }
 
-    pub fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<i32>) {
+    pub fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<u32>) {
         if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
             if let Some(nonce) = nonce {
-                account.nonce = Nonce(nonce as u32 + 1);
+                account.nonce = Nonce(nonce + 1);
             }
             account.balance = Amount(balance_update.balance);
         } else {
@@ -61,7 +61,7 @@ impl Ledger {
                 public_key: balance_update.public_key.clone(),
                 balance: Amount(balance_update.balance),
                 nonce: if let Some(nonce) = nonce {
-                    Nonce(nonce as u32)
+                    Nonce(nonce)
                 } else {
                     Nonce(0)
                 },

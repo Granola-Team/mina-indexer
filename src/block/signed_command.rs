@@ -17,8 +17,8 @@ impl SignedCommand {
         }
     }
 
-    pub fn source_nonce(&self) -> i32 {
-        self.0.t.t.payload.t.t.common.t.t.t.nonce.t.t
+    pub fn source_nonce(&self) -> u32 {
+        self.0.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32
     }
 
     pub fn fee_payer(&self) -> PublicKey {
