@@ -75,13 +75,7 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
     let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
-            println!(
-                "Make sure the server has been started and initial block ingestion has completed."
-            );
-            println!(
-                "Initial block ingestion takes several minutes if ingesting all mainnet blocks."
-            );
-            println!("Error: {e}");
+            eprintln!("Unable to connect to the domain socket server: {e}");
             process::exit(111);
         }
     };
