@@ -17,7 +17,7 @@ pub struct PostBalance {
 }
 
 pub struct PostBalanceUpdate {
-    pub source_nonce: i32,
+    pub source_nonce: u32,
     pub command_type: UserCommandType,
     pub fee_payer: PostBalance,
     pub source: PostBalance,
