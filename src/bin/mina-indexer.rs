@@ -11,7 +11,7 @@ use mina_indexer::{
 use serde::Deserializer;
 use serde_derive::Deserialize;
 use std::{fs, path::PathBuf, sync::Arc};
-use tracing::{error, info, instrument, trace};
+use tracing::{error, info, instrument};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 #[derive(Parser, Debug)]
@@ -114,7 +114,7 @@ pub async fn main() -> anyhow::Result<()> {
             let log_level_stdout = args.log_level_stdout;
 
             init_tracing_logger(log_dir, log_level, log_level_stdout).await?;
-            let config = handle_command_line_arguments(args.clone()).await?;
+            let config = process_indexer_configuration(args)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
             let indexer = MinaIndexer::new(config, db.clone()).await?;
@@ -144,7 +144,7 @@ async fn init_tracing_logger(
         fs::create_dir_all(parent).expect("log_file parent should be created");
     }
 
-    let log_file = std::fs::File::create(log_file.clone())?;
+    let log_file = std::fs::File::create(log_file)?;
     let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
 
     let stdout_layer = tracing_subscriber::fmt::layer();
@@ -156,11 +156,9 @@ async fn init_tracing_logger(
 }
 
 #[instrument(skip_all)]
-pub async fn handle_command_line_arguments(
+pub fn process_indexer_configuration(
     args: ServerArgs,
 ) -> anyhow::Result<IndexerConfiguration> {
-    trace!("Parsing server args");
-
     let ledger = args.initial_ledger;
     let is_genesis_ledger = args.is_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
@@ -186,11 +184,7 @@ pub async fn handle_command_line_arguments(
 
     match ledger::genesis::parse_file(&ledger) {
         Err(err) => {
-            error!(
-                reason = "Unable to parse ledger",
-                error = err.to_string(),
-                path = &ledger.display().to_string()
-            );
+            error!("Unable to parse genesis ledger: {err}");
             std::process::exit(100)
         }
         Ok(ledger) => {
