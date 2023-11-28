@@ -156,9 +156,7 @@ async fn init_tracing_logger(
 }
 
 #[instrument(skip_all)]
-pub fn process_indexer_configuration(
-    args: ServerArgs,
-) -> anyhow::Result<IndexerConfiguration> {
+pub fn process_indexer_configuration(args: ServerArgs) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.initial_ledger;
     let is_genesis_ledger = args.is_genesis_ledger;
     let root_hash = BlockHash(args.root_hash.to_string());
