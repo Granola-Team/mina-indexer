@@ -43,8 +43,7 @@ impl BlockParser {
     pub fn new_testing(blocks_dir: &Path) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
-            let paths: Vec<PathBuf> = glob(&format!("{}/*.json", blocks_dir.display()))
-                .expect("Failed to read glob pattern")
+            let paths: Vec<PathBuf> = glob(&format!("{}/*.json", blocks_dir.display()))?
                 .filter_map(|x| x.ok())
                 .collect();
 
@@ -73,8 +72,7 @@ impl BlockParser {
         if blocks_dir.exists() {
             let pattern = format!("{}/*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
-            let mut paths: Vec<PathBuf> = glob(&pattern)
-                .expect("Failed to read glob pattern")
+            let mut paths: Vec<PathBuf> = glob(&pattern)?
                 .filter_map(|x| x.ok())
                 .filter(|path| length_from_path(path).is_some())
                 .collect();
