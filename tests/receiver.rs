@@ -2,21 +2,22 @@ use std::{path::Path, time::Duration};
 
 use mina_indexer::receiver::{filesystem::FilesystemReceiver, BlockReceiver};
 use tokio::{
-    fs::{create_dir, metadata, remove_dir_all, File},
+    fs::{create_dir_all, remove_dir_all, File},
     io::AsyncWriteExt,
     process::Command,
 };
 
 #[tokio::test]
 async fn detects_new_block_written() {
-    let mut test_dir = std::env::temp_dir();
-    test_dir.push("receiver_write_test");
     const TEST_BLOCK: &str = include_str!(
         "data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json"
     );
 
-    let timeout = Duration::new(5, 0);
+    let mut test_dir = std::env::temp_dir();
+    test_dir.push("receiver_write_test");
+
     let mut success = false;
+    let timeout = Duration::new(1, 0);
 
     let test_dir_path = test_dir.clone();
     let mut test_block_path = test_dir_path.clone();
@@ -27,10 +28,9 @@ async fn detects_new_block_written() {
     let mut block_receiver = FilesystemReceiver::new(1024, 64).await.unwrap();
     block_receiver.load_directory(&test_dir_path).unwrap();
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     let mut file = File::create(test_block_path.clone()).await.unwrap();
     file.write_all(TEST_BLOCK.as_bytes()).await.unwrap();
+
     tokio::time::timeout(timeout, async {
         block_receiver.recv_block().await.unwrap().unwrap();
         success = true;
@@ -43,12 +43,13 @@ async fn detects_new_block_written() {
 
 #[tokio::test]
 async fn detects_new_block_copied() {
-    let mut test_dir = std::env::temp_dir();
-    test_dir.push("receiver_copy_test");
     const TEST_BLOCK_PATH: &str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
 
-    let timeout = Duration::new(5, 0);
+    let mut test_dir = std::env::temp_dir();
+    test_dir.push("receiver_copy_test");
+
     let mut success = false;
+    let timeout = Duration::new(1, 0);
 
     let mut test_block_path = test_dir.clone();
     test_block_path.push("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
@@ -78,16 +79,12 @@ async fn detects_new_block_copied() {
 }
 
 async fn pretest(path: impl AsRef<Path>) {
-    if metadata(path.as_ref()).await.is_ok() {
-        remove_dir_all(path.as_ref()).await.unwrap();
-    }
-    create_dir(path.as_ref()).await.unwrap_or(());
+    println!("Pretest: {}", path.as_ref().display());
+    create_dir_all(path.as_ref()).await.unwrap_or(());
 }
 
 async fn posttest(path: impl AsRef<Path>, success: bool) {
-    if metadata(path.as_ref()).await.is_ok() {
-        remove_dir_all(path.as_ref()).await.unwrap();
-    }
+    remove_dir_all(path.as_ref()).await.unwrap_or(());
 
     if !success {
         panic!("Timed out");

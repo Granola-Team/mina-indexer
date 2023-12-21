@@ -51,9 +51,8 @@ impl FilesystemReceiver {
             worker(wd_r, er_s, ev_s).await.expect("should not crash");
         });
 
-        let parsers = vec![];
         Ok(Self {
-            parsers,
+            parsers: vec![],
             worker_command_sender,
             worker_event_receiver,
             worker_error_receiver,
@@ -85,6 +84,7 @@ impl FilesystemReceiver {
         debug!("sending command to worker with new working data");
         let mut working_data = WorkingData::default();
         let mut watched_directories = self.watched_directories();
+
         watched_directories.push(PathBuf::from(directory.as_ref()));
         working_data.pathset = watched_directories
             .iter()
@@ -114,29 +114,24 @@ impl super::BlockReceiver for FilesystemReceiver {
                 },
                 event_fut = self.worker_event_receiver.recv() => {
                     if let Ok((event, _priority)) = event_fut {
-                        if event
-                            .tags
-                            .iter()
-                            .any(|signal|
+                        let mut tags = event
+                        .tags
+                        .iter();
+                        if tags.any(|signal|
                                 matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
                                 ||
                                 matches!(signal, Tag::FileEventKind(Modify(_)))
                             )
                         {
-                            let mut path_and_filetype = None;
-                            for tag in event.tags.iter() {
+                            for tag in tags {
                                 match tag {
-                                    watchexec::event::Tag::Path { path, file_type } => {
-                                        path_and_filetype = Some((path, file_type))
+                                    Tag::Path { path, .. } => {
+                                        match parse_file(path.as_path()) {
+                                            Ok(block) => return Ok(Some(block)),
+                                            _ => continue,
+                                        }
                                     }
                                     _ => continue,
-                                }
-                            }
-
-                            if let Some((path, Some(_filetype))) = path_and_filetype {
-                                match parse_file(path.as_path()) {
-                                    Ok(block) => return Ok(Some(block)),
-                                    Err(_) => continue,
                                 }
                             }
                         }
