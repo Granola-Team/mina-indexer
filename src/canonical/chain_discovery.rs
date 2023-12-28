@@ -1,6 +1,6 @@
 use crate::{
     block::{get_blockchain_length, get_state_hash, is_valid_block_file},
-    display_duration, BLOCK_REPORTING_FREQ_NUM,
+    BLOCK_REPORTING_FREQ_NUM,
 };
 use std::{
     fs::File,
@@ -27,9 +27,9 @@ pub fn discovery(
         paths.sort_by_key(|x| length_from_path_or_max(x));
 
         info!(
-            "{} blocks sorted by length in {}",
+            "{} blocks sorted by length in {:?}",
             paths.len(),
-            display_duration(time.elapsed()),
+            time.elapsed(),
         );
 
         if let Some(blockchain_length) = length_filter {
@@ -96,15 +96,13 @@ pub fn discovery(
 
         // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
         // the `last_contiguous_idx` to find the canonical tip
-        let time = Instant::now();
         let (mut curr_length_idx, mut curr_start_idx) = canonical_tip_opt.unwrap();
         let mut curr_path = paths[curr_length_idx];
 
         info!(
-            "Found canonical tip with length {} and hash {} in {}",
+            "Found canonical tip (length {}): {}",
             length_from_path(curr_path).unwrap_or(0),
             hash_from_path(curr_path),
-            display_duration(time.elapsed()),
         );
 
         // handle all blocks that are higher than the canonical tip
@@ -126,9 +124,9 @@ pub fn discovery(
         canonical_paths.push(curr_path.clone());
 
         if canonical_paths.len() < BLOCK_REPORTING_FREQ_NUM as usize {
-            info!("Walking the canonical chain back to the beginning.");
+            info!("Walking the canonical chain back to the beginning");
         } else {
-            info!("Walking the canonical chain back to the beginning, reporting every {BLOCK_REPORTING_FREQ_NUM} blocks.");
+            info!("Walking the canonical chain back to the beginning, reporting every {BLOCK_REPORTING_FREQ_NUM} blocks");
         }
 
         let time = Instant::now();
@@ -138,10 +136,7 @@ pub fn discovery(
         // segment by segment, searching for ancestors
         while curr_start_idx > 0 {
             if count % BLOCK_REPORTING_FREQ_NUM == 0 {
-                info!(
-                    "Found {count} canonical blocks in {}",
-                    display_duration(time.elapsed())
-                );
+                info!("Found {count} canonical blocks in {:?}", time.elapsed());
             }
 
             // search for parent in previous segment's blocks
@@ -179,15 +174,14 @@ pub fn discovery(
             }
         }
 
-        info!("Canonical chain discovery finished!");
-        info!(
-            "Found {} blocks in the canonical chain in {}",
-            canonical_paths.len(),
-            display_duration(time.elapsed()),
-        );
-
         // sort lowest to highest
         canonical_paths.reverse();
+
+        info!(
+            "Found {} blocks in the canonical chain in {:?}",
+            canonical_paths.len() + 1,
+            time.elapsed(),
+        );
     }
 
     Ok((canonical_paths.to_vec(), successive_paths.to_vec()))
