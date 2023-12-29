@@ -7,9 +7,10 @@ use tracing::{debug, error, info, instrument, trace};
 
 use crate::{
     block::{store::BlockStore, Block, BlockHash},
+    canonical::store::CanonicityStore,
     server::{IndexerConfiguration, IpcChannelUpdate},
     state::{
-        ledger::{public_key::PublicKey, Ledger},
+        ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
         summary::{SummaryShort, SummaryVerbose},
     },
     store::IndexerStore,
@@ -36,7 +37,7 @@ impl IpcActor {
         store: Arc<IndexerStore>,
         state_recv: IpcStateReceiver,
     ) -> Self {
-        info!("Creating new IPC Actor");
+        info!("Creating new IPC actor");
         Self {
             state_recv,
             listener,
@@ -60,9 +61,9 @@ impl IpcActor {
                 state = self.state_recv.recv() => {
                     info!("Received IPC state update");
                     match state {
-                        None => panic!("IPC Channel closed"),
+                        None => panic!("IPC channel closed"),
                         Some(state) => {
-                            info!("Setting IPC State");
+                            info!("Setting IPC state");
                             *self.best_tip.write().await = state.best_tip;
                             *self.ledger.write().await = state.ledger;
                             *self.summary.write().await = Some(*state.summary);
@@ -89,7 +90,6 @@ impl IpcActor {
                                     summary.as_ref()
                                 ).await {
                                     Err(e) => {
-                                        info!("error {e}");
                                         error!("Error handling connection: {e}");
                                     },
                                     Ok(_) => { info!("handled connection"); },
@@ -118,13 +118,14 @@ async fn handle_conn(
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
     let read_size = reader.read_until(0, &mut buffer).await?;
+
     if read_size == 0 {
         return Err(anyhow!("Unexpected EOF"));
     }
+
     let mut buffers = buffer.split(|byte| *byte == b' ');
     let command = buffers.next().unwrap();
     let command_string = String::from_utf8(command.to_vec()).unwrap();
-
     let response_json = match command_string.as_str() {
         "account" => {
             let data_buffer = buffers.next().unwrap();
@@ -158,21 +159,103 @@ async fn handle_conn(
         }
         "best_ledger" => {
             info!("Received best_ledger command");
-            let data_buffer = buffers.next().unwrap();
-            let path = &String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
-                .parse::<PathBuf>()?;
-            if !path.is_dir() {
-                debug!("Writing ledger to {}", path.display());
-                tokio::fs::write(path, format!("{ledger:?}")).await?;
-                Some(serde_json::to_string(&format!(
-                    "Ledger written to {}",
-                    path.display()
-                ))?)
+            let ledger = ledger.to_string();
+            match buffers.next() {
+                Some(data_buffer) => {
+                    let data = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?;
+                    if data.is_empty() {
+                        debug!("Writing best ledger to stdout");
+                        Some(ledger)
+                    } else {
+                        let path = &data.parse::<PathBuf>()?;
+                        if !path.is_dir() {
+                            debug!("Writing best ledger to {}", path.display());
+                            tokio::fs::write(path, ledger).await?;
+                            Some(format!("Best ledger written to {}", path.display()))
+                        } else {
+                            Some(serde_json::to_string(&format!(
+                                "The path provided must not be a directory: {}",
+                                path.display()
+                            ))?)
+                        }
+                    }
+                }
+                _ => None,
+            }
+        }
+        "ledger" => {
+            let hash_buffer = buffers.next().unwrap();
+            let hash = String::from_utf8(hash_buffer[..hash_buffer.len() - 1].to_vec())?;
+            info!("Received ledger command for {hash}");
+
+            if let Some(ledger) = db.get_ledger(&hash.clone().into())? {
+                let ledger = ledger.to_string();
+                match buffers.next() {
+                    None => {
+                        debug!("Writing ledger at {hash} to stdout");
+                        Some(ledger)
+                    }
+                    Some(path_buffer) => {
+                        let path =
+                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                                .parse::<PathBuf>()?;
+                        if !path.is_dir() {
+                            debug!("Writing ledger at {hash} to {}", path.display());
+                            tokio::fs::write(path, ledger).await?;
+                            Some(serde_json::to_string(&format!(
+                                "Ledger at {hash} written to {}",
+                                path.display()
+                            ))?)
+                        } else {
+                            Some(serde_json::to_string(&format!(
+                                "The path provided must not be a directory: {}",
+                                path.display()
+                            ))?)
+                        }
+                    }
+                }
             } else {
-                Some(serde_json::to_string(&format!(
-                    "The path provided must be a file: {}",
-                    path.display()
-                ))?)
+                Some(format!(
+                    "Invalid query: ledger at {hash} cannot be determined"
+                ))
+            }
+        }
+        "ledger_at_height" => {
+            let height_buffer = buffers.next().unwrap();
+            let height = String::from_utf8(height_buffer[..height_buffer.len() - 1].to_vec())?
+                .parse::<u32>()?;
+            info!("Received ledger_at_height {height} command");
+
+            if height > db.get_max_canonical_blockchain_length()?.unwrap_or(0) {
+                Some(format!("Invalid query: ledger at height {height} cannot be determined from chain of length {}", best_tip.blockchain_length))
+            } else if let Some(ledger) = db.get_ledger_at_height(height)? {
+                let ledger = ledger.to_string();
+                match buffers.next() {
+                    None => {
+                        debug!("Writing ledger at height {height} to stdout");
+                        Some(ledger)
+                    }
+                    Some(path_buffer) => {
+                        let path =
+                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                                .parse::<PathBuf>()?;
+                        if !path.is_dir() {
+                            debug!("Writing ledger at height {height} to {}", path.display());
+                            tokio::fs::write(&path, ledger).await?;
+                            Some(serde_json::to_string(&format!(
+                                "Ledger at height {height} written to {}",
+                                path.display()
+                            ))?)
+                        } else {
+                            Some(serde_json::to_string(&format!(
+                                "The path provided must not be a directory: {}",
+                                path.display()
+                            ))?)
+                        }
+                    }
+                }
+            } else {
+                None
             }
         }
         "summary" => {

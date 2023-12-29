@@ -25,7 +25,11 @@ pub enum ClientCli {
     /// Display the best chain
     BestChain(ChainArgs),
     /// Dump the best ledger to a file
-    BestLedger(LedgerArgs),
+    BestLedger(BestLedgerArgs),
+    /// Dump the ledger at a specified state_hash
+    Ledger(LedgerArgs),
+    /// Dump the ledger at a specified blockchain_length
+    LedgerAtHeight(LedgerAtHeightArgs),
     /// Show summary of indexer state
     Summary(SummaryArgs),
     /// Signal Mina Indexer server to shutdown
@@ -56,10 +60,32 @@ pub struct ChainArgs {
 
 #[derive(clap::Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct LedgerArgs {
-    /// Path to write the ledger
+pub struct BestLedgerArgs {
+    /// Path to write the ledger (default: stdout)
     #[arg(short, long)]
-    path: PathBuf,
+    path: Option<PathBuf>,
+}
+
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct LedgerAtHeightArgs {
+    /// Path to write the ledger (default: stdout)
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Block height of the ledger
+    #[arg(long)]
+    height: u32,
+}
+
+#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct LedgerArgs {
+    /// Path to write the ledger (default: stdout)
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Block hash corresponding to the ledger
+    #[arg(long)]
+    hash: String,
 }
 
 #[derive(clap::Args, Debug, Serialize, Deserialize)]
@@ -116,11 +142,38 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                 }
             }
         }
-        ClientCli::BestLedger(ledger_args) => {
-            let command = format!("best_ledger {}\0", ledger_args.path.display());
+        ClientCli::BestLedger(best_ledger_args) => {
+            let command = match &best_ledger_args.path {
+                None => "best_ledger \0".to_string(),
+                Some(path) => format!("best_ledger {}\0", path.display()),
+            };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let msg: String = serde_json::from_slice(&buffer)?;
+            let msg = String::from_utf8(buffer)?;
+            println!("{msg}");
+        }
+        ClientCli::Ledger(ledger_args) => {
+            let command = match &ledger_args.path {
+                None => format!("ledger {}\0", ledger_args.hash),
+                Some(path) => format!("ledger {} {}\0", ledger_args.hash, path.display()),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+            let msg = String::from_utf8(buffer)?;
+            println!("{msg}");
+        }
+        ClientCli::LedgerAtHeight(ledger_at_height_args) => {
+            let command = match &ledger_at_height_args.path {
+                None => format!("ledger_at_height {}\0", ledger_at_height_args.height),
+                Some(path) => format!(
+                    "ledger_at_height {} {}\0",
+                    ledger_at_height_args.height,
+                    path.display()
+                ),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+            let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
         ClientCli::Summary(summary_args) => {
