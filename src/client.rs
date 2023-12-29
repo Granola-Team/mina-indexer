@@ -180,8 +180,22 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
             let command = format!("summary {}\0", summary_args.verbose);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             if summary_args.verbose {
-                let summary: SummaryVerbose = serde_json::from_slice(&buffer)?;
+                if let Ok(summary) = serde_json::from_slice::<SummaryVerbose>(&buffer) {
+                    if output_json {
+                        stdout()
+                            .write_all(serde_json::to_string(&summary)?.as_bytes())
+                            .await?;
+                    } else {
+                        stdout().write_all(format!("{summary}").as_bytes()).await?;
+                    }
+                } else {
+                    stdout()
+                        .write_all(serde_json::to_string("No summary available yet")?.as_bytes())
+                        .await?;
+                }
+            } else if let Ok(summary) = serde_json::from_slice::<SummaryShort>(&buffer) {
                 if output_json {
                     stdout()
                         .write_all(serde_json::to_string(&summary)?.as_bytes())
@@ -190,14 +204,9 @@ pub async fn run(command: &ClientCli, output_json: bool) -> Result<(), anyhow::E
                     stdout().write_all(format!("{summary}").as_bytes()).await?;
                 }
             } else {
-                let summary: SummaryShort = serde_json::from_slice(&buffer)?;
-                if output_json {
-                    stdout()
-                        .write_all(serde_json::to_string(&summary)?.as_bytes())
-                        .await?;
-                } else {
-                    stdout().write_all(format!("{summary}").as_bytes()).await?;
-                }
+                stdout()
+                    .write_all("No summary not available yet".as_bytes())
+                    .await?;
             }
         }
         ClientCli::Shutdown => {
