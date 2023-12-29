@@ -1,12 +1,9 @@
+use self::precomputed::{BlockLogContents, PrecomputedBlock};
 use anyhow::anyhow;
-use std::{ffi::OsStr, path::Path};
-
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
+use std::{ffi::OsStr, path::Path};
 
-use self::precomputed::{BlockLogContents, PrecomputedBlock};
-
-pub mod canonical_chain_discovery;
 pub mod parser;
 pub mod precomputed;
 pub mod signed_command;
@@ -42,10 +39,6 @@ impl BlockHash {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
         Self(versioned.to_base58_string().unwrap())
-    }
-
-    pub fn previous_state_hash(block: &PrecomputedBlock) -> Self {
-        Self::from_hashv1(block.protocol_state.previous_state_hash.clone())
     }
 }
 
@@ -113,6 +106,12 @@ impl BlockWithoutHeight {
                 .t,
             blockchain_length: precomputed_block.blockchain_length,
         }
+    }
+}
+
+impl From<String> for BlockHash {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
@@ -204,7 +203,7 @@ pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
 }
 
 /// Extracts a blockchain length from an OS file name
-fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
+pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
     file_name
         .to_str()?
         .split('-')

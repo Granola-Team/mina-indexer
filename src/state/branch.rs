@@ -146,7 +146,7 @@ impl Branch {
                 .expect("node_id comes from branches iterator, cannot be invalid");
 
             // incoming block is a child of node
-            let incoming_prev_hash = BlockHash::previous_state_hash(block);
+            let incoming_prev_hash = block.previous_state_hash();
             if incoming_prev_hash == node.data().state_hash {
                 let new_block = Block::from_precomputed(block, node.data().height + 1);
                 let new_node_id = self

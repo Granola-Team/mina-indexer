@@ -1,6 +1,7 @@
-use crate::block::precomputed::PrecomputedBlock;
-
-use super::{diff::account::AccountDiff, PublicKey};
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    state::ledger::{diff::account::AccountDiff, PublicKey},
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Coinbase {
@@ -19,7 +20,7 @@ impl Coinbase {
             .consensus_state
             .inner()
             .inner();
-        let receiver = consensus_state.coinbase_receiver.into();
+        let receiver: PublicKey = consensus_state.coinbase_receiver.into();
         let supercharge = consensus_state.supercharge_coinbase;
 
         Self {

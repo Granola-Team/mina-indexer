@@ -2,7 +2,6 @@ use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    display_duration,
     state::{ledger::genesis, IndexerState},
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
@@ -120,11 +119,11 @@ async fn main() -> anyhow::Result<()> {
     let mut parsing_time = Duration::new(0, 0);
 
     for _ in 2..max_block_count.min(max_block_length) {
-        let display_elapsed = display_duration(total_time.elapsed());
+        let display_elapsed = total_time.elapsed();
 
         // Report every passing minute
         if verbose && total_time.elapsed().as_secs() % 60 > floor_minutes {
-            println!("Time elapsed: {display_elapsed}");
+            println!("Time elapsed: {display_elapsed:?}");
             floor_minutes += 1;
         }
 
@@ -132,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
         if block_count % freq == 0 {
             println!("=== Progress #{} ===", block_count / freq);
             println!("Blocks:  {block_count}");
-            println!("Total:   {display_elapsed}");
+            println!("Total:   {display_elapsed:?}");
 
             let blocks_per_sec = block_count as f64 / adding_time.as_secs_f64();
             println!("\n~~~ Add to state ~~~");
