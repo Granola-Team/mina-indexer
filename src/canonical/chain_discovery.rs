@@ -28,7 +28,11 @@ pub fn discovery(
 
         info!(
             "{} blocks sorted by length in {:?}",
-            paths.len(),
+            if paths.iter().map(|path| length_from_path_or_max(path)).min() == Some(2) {
+                paths.len() + 1
+            } else {
+                paths.len()
+            },
             time.elapsed(),
         );
 
