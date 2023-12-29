@@ -90,7 +90,7 @@ async fn account_diffs() {
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
-            Some(7),
+            Some(6),
             None,
         ),
         (
