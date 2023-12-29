@@ -7,9 +7,10 @@ use mina_serialization_types::{
         SignedCommandPayloadBody, SignedCommandPayloadCommon, StakeDelegation,
         TransactionStatusBalanceData, UserCommand,
     },
-    v1::{PaymentPayloadV1, PublicKeyV1, SignedCommandV1, UserCommandWithStatusV1},
+    v1::{PaymentPayloadV1, SignedCommandV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TransactionType {
@@ -19,15 +20,15 @@ pub enum TransactionType {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Payment {
-    pub source: PublicKeyV1,
-    pub receiver: PublicKeyV1,
+    pub source: PublicKey,
+    pub receiver: PublicKey,
     pub amount: Amount,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Delegation {
-    pub delegator: PublicKeyV1,
-    pub delegate: PublicKeyV1,
+    pub delegator: PublicKey,
+    pub delegate: PublicKey,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -47,10 +48,37 @@ pub enum CommandStatusData {
     Failed,
 }
 
+impl CommandStatusData {
+    pub fn fee_payer_balance(data: &TransactionStatusBalanceData) -> Option<u64> {
+        data.fee_payer_balance.as_ref().map(|balance| balance.t.t.t)
+    }
+
+    pub fn receiver_balance(balance_data: &TransactionStatusBalanceData) -> Option<u64> {
+        balance_data
+            .receiver_balance
+            .as_ref()
+            .map(|balance| balance.t.t.t)
+    }
+
+    pub fn source_balance(balance_data: &TransactionStatusBalanceData) -> Option<u64> {
+        balance_data
+            .source_balance
+            .as_ref()
+            .map(|balance| balance.t.t.t)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
 
 impl UserCommandWithStatus {
+    pub fn is_applied(&self) -> bool {
+        if let CommandStatusData::Applied { .. } = self.status_data() {
+            return true;
+        }
+        false
+    }
+
     pub fn status_data(&self) -> CommandStatusData {
         match self.0.t.status.t.clone() {
             mina_serialization_types::staged_ledger_diff::TransactionStatus::Applied(
@@ -74,14 +102,22 @@ impl Command {
         precomputed_block
             .commands()
             .iter()
+            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
             .map(
                 |command| match UserCommandWithStatus(command.clone()).data() {
                     UserCommand::SignedCommand(signed_command) => {
                         match SignedCommand(signed_command).payload_body() {
                             SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                                let source = payment_payload.clone().inner().inner().source_pk;
-                                let receiver = payment_payload.clone().inner().inner().receiver_pk;
+                                let source: PublicKey =
+                                    payment_payload.clone().inner().inner().source_pk.into();
+                                let receiver: PublicKey =
+                                    payment_payload.clone().inner().inner().receiver_pk.into();
                                 let amount = payment_payload.inner().inner().amount.inner().inner();
+                                trace!(
+                                    "Payment {{ source: {}, receiver: {}, amount: {amount} }}",
+                                    source.to_address(),
+                                    receiver.to_address()
+                                );
                                 Self::Payment(Payment {
                                     source,
                                     receiver,
@@ -93,10 +129,19 @@ impl Command {
                                     StakeDelegation::SetDelegate {
                                         delegator,
                                         new_delegate,
-                                    } => Self::Delegation(Delegation {
-                                        delegate: new_delegate,
-                                        delegator,
-                                    }),
+                                    } => {
+                                        let delegator: PublicKey = delegator.into();
+                                        let new_delegate: PublicKey = new_delegate.into();
+                                        trace!(
+                                            "Delegation {{ delegator: {}, new_delegate: {} }}",
+                                            delegator.to_address(),
+                                            new_delegate.to_address()
+                                        );
+                                        Self::Delegation(Delegation {
+                                            delegate: new_delegate,
+                                            delegator,
+                                        })
+                                    }
                                 }
                             }
                         }
@@ -162,12 +207,9 @@ impl PaymentPayload {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-
     use super::{Command, Delegation, Payment};
-    use crate::{
-        block::parser::BlockParser, state::ledger::PublicKey, MAINNET_CANONICAL_THRESHOLD,
-    };
+    use crate::{block::parser::BlockParser, MAINNET_CANONICAL_THRESHOLD};
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn from_precomputed() {
@@ -188,8 +230,6 @@ mod test {
                     receiver,
                     amount,
                 }) => {
-                    let source = PublicKey::from(source);
-                    let receiver = PublicKey::from(receiver);
                     println!("s: {source:?}");
                     println!("r: {receiver:?}");
                     println!("a: {}", amount.0);
@@ -199,8 +239,6 @@ mod test {
                     delegate,
                     delegator,
                 }) => {
-                    let delegate = PublicKey::from(delegate);
-                    let delegator = PublicKey::from(delegator);
                     println!("d: {delegate:?}");
                     println!("t: {delegator:?}");
                     delegations.push((delegate, delegator));
