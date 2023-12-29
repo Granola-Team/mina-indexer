@@ -1,9 +1,8 @@
-use account::AccountDiff;
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    state::ledger::{coinbase::Coinbase, command::Command, diff::account::AccountDiff, PublicKey},
+};
 use serde::{Deserialize, Serialize};
-
-use crate::block::precomputed::PrecomputedBlock;
-
-use super::{coinbase::Coinbase, command::Command, PublicKey};
 
 pub mod account;
 
@@ -14,12 +13,10 @@ pub struct LedgerDiff {
 }
 
 impl LedgerDiff {
-    /// the deserialization used by the types used by this function has a lot of room for improvement
+    /// Compute a ledger diff from the specified precomputed block
     pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Self {
-        // [A] fallible deserialization function doesn't specify if it fails because it couldn't read a block or because there weren't any of the requested data in a block
         let coinbase = Coinbase::from_precomputed_block(precomputed_block);
         let coinbase_update = coinbase.clone().as_account_diff();
-
         let commands = Command::from_precomputed_block(precomputed_block); // [A]
         let mut account_diffs_fees: Vec<AccountDiff> =
             AccountDiff::from_block_fees(coinbase.receiver, precomputed_block); // [A]
@@ -34,10 +31,8 @@ impl LedgerDiff {
         account_diffs.append(&mut account_diffs_transactions);
         account_diffs.push(coinbase_update);
 
-        let public_keys_seen = precomputed_block.block_public_keys().into_iter().collect();
-
         LedgerDiff {
-            public_keys_seen,
+            public_keys_seen: precomputed_block.block_public_keys(),
             account_diffs,
         }
     }

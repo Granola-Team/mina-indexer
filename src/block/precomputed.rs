@@ -10,11 +10,14 @@ use mina_serialization_types::{
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
     staged_ledger_diff::{
-        self, SignedCommandPayloadBody, StagedLedgerDiff, StagedLedgerDiffJson, StakeDelegation,
+        self, InternalCommandBalanceData, SignedCommandPayloadBody, StagedLedgerDiff,
+        StagedLedgerDiffJson, StakeDelegation,
     },
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
+
+use super::BlockHash;
 
 pub struct BlockLogContents {
     pub(crate) state_hash: String,
@@ -82,6 +85,76 @@ impl PrecomputedBlock {
             .commands
     }
 
+    pub fn block_creator(&self) -> PublicKey {
+        self.protocol_state
+            .body
+            .clone()
+            .inner()
+            .inner()
+            .consensus_state
+            .inner()
+            .inner()
+            .block_creator
+            .into()
+    }
+
+    fn internal_command_balances(&self) -> Vec<InternalCommandBalanceData> {
+        self.staged_ledger_diff
+            .diff
+            .clone()
+            .inner()
+            .0
+            .inner()
+            .inner()
+            .internal_command_balances
+            .iter()
+            .map(|x| x.t.clone())
+            .collect()
+    }
+
+    pub fn coinbase_receiver_balance(&self) -> Option<u64> {
+        for internal_balance in self.internal_command_balances() {
+            if let InternalCommandBalanceData::CoinBase(x) = internal_balance {
+                return Some(x.t.coinbase_receiver_balance.t.t.t);
+            }
+        }
+
+        None
+    }
+
+    pub fn fee_transfer_receiver1_balance(&self) -> Option<u64> {
+        for internal_balance in self.internal_command_balances() {
+            if let InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
+                return Some(x.t.receiver1_balance.t.t.t);
+            }
+        }
+
+        None
+    }
+
+    pub fn fee_transfer_receiver2_balance(&self) -> Option<u64> {
+        for internal_balance in self.internal_command_balances() {
+            if let InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
+                return x.t.receiver2_balance.map(|balance| balance.t.t.t);
+            }
+        }
+
+        None
+    }
+
+    pub fn coinbase_receiver(&self) -> PublicKey {
+        self.protocol_state
+            .body
+            .clone()
+            .inner()
+            .inner()
+            .consensus_state
+            .inner()
+            .inner()
+            .coinbase_receiver
+            .into()
+    }
+
     pub fn block_public_keys(&self) -> Vec<PublicKey> {
         let mut public_keys: Vec<PublicKey> = vec![];
         let consenesus_state = self
@@ -100,29 +173,32 @@ impl PrecomputedBlock {
         ]);
 
         let commands = self.commands();
-        commands.iter().for_each(|command| {
-            let signed_command = match UserCommandWithStatus(command.clone()).data() {
-                staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
-                    SignedCommand(signed_command)
-                }
-            };
-            public_keys.push(signed_command.signer());
-            public_keys.push(signed_command.fee_payer_pk());
-            public_keys.append(&mut match signed_command.payload_body() {
-                SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
-                    PaymentPayload(payment_payload.clone()).source_pk(),
-                    PaymentPayload(payment_payload).receiver_pk(),
-                ],
-                SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
-                    match stake_delegation.inner() {
-                        StakeDelegation::SetDelegate {
-                            delegator,
-                            new_delegate,
-                        } => vec![delegator.into(), new_delegate.into()],
+        commands
+            .iter()
+            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
+            .for_each(|command| {
+                let signed_command = match UserCommandWithStatus(command.clone()).data() {
+                    staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
+                        SignedCommand(signed_command)
                     }
-                }
-            })
-        });
+                };
+                public_keys.push(signed_command.signer());
+                public_keys.push(signed_command.fee_payer_pk());
+                public_keys.append(&mut match signed_command.payload_body() {
+                    SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
+                        PaymentPayload(payment_payload.clone()).source_pk(),
+                        PaymentPayload(payment_payload).receiver_pk(),
+                    ],
+                    SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
+                        match stake_delegation.inner() {
+                            StakeDelegation::SetDelegate {
+                                delegator,
+                                new_delegate,
+                            } => vec![delegator.into(), new_delegate.into()],
+                        }
+                    }
+                })
+            });
 
         public_keys
     }
@@ -152,5 +228,9 @@ impl PrecomputedBlock {
             .timestamp
             .inner()
             .inner()
+    }
+
+    pub fn previous_state_hash(&self) -> BlockHash {
+        BlockHash::from_hashv1(self.protocol_state.previous_state_hash.clone())
     }
 }

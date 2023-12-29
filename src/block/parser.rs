@@ -1,6 +1,8 @@
-use crate::block::{
-    canonical_chain_discovery, get_blockchain_length, is_valid_block_file, parse_file,
-    precomputed::PrecomputedBlock,
+use crate::{
+    block::{
+        get_blockchain_length, is_valid_block_file, parse_file, precomputed::PrecomputedBlock,
+    },
+    canonical::chain_discovery::discovery,
 };
 use anyhow::anyhow;
 use glob::glob;
@@ -65,11 +67,9 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .filter(|path| length_from_path(path).is_some())
                 .collect();
-            if let Ok((canonical_paths, successive_paths)) = canonical_chain_discovery::discovery(
-                length_filter,
-                canonical_threshold,
-                paths.iter().collect(),
-            ) {
+            if let Ok((canonical_paths, successive_paths)) =
+                discovery(length_filter, canonical_threshold, paths.iter().collect())
+            {
                 Ok(Self {
                     num_canonical: canonical_paths.len() as u32,
                     total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,

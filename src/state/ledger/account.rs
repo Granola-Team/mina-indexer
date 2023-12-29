@@ -1,7 +1,7 @@
+use super::PublicKey;
+use crate::MAINNET_ACCOUNT_CREATION_FEE;
 use rust_decimal::Decimal;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
-
-use super::PublicKey;
 
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
@@ -22,12 +22,29 @@ pub struct Account {
 }
 
 impl Account {
+    pub fn is_empty(&self) -> bool {
+        self == &Self::empty(self.public_key.clone())
+    }
+
     pub fn empty(public_key: PublicKey) -> Self {
         Account {
             public_key,
             balance: Amount::default(),
             nonce: Nonce::default(),
             delegate: None,
+        }
+    }
+
+    pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
+        Account {
+            public_key: pre.public_key.clone(),
+            balance: if pre.balance.0 == 0 {
+                amount.sub(&MAINNET_ACCOUNT_CREATION_FEE)
+            } else {
+                pre.balance.add(&amount)
+            },
+            nonce: pre.nonce,
+            delegate: pre.delegate,
         }
     }
 
@@ -155,5 +172,5 @@ where
         }
     }
 
-    deserializer.deserialize_any(StringVisitor)
+    deserializer.deserialize_string(StringVisitor)
 }

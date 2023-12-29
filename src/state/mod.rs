@@ -1,16 +1,17 @@
-use self::summary::{
-    DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort, WitnessTreeSummaryVerbose,
-};
 use crate::{
     block::{
         parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
         BlockWithoutHeight,
     },
-    display_duration,
+    canonical::store::CanonicityStore,
     state::{
         branch::Branch,
         ledger::{
             command::Command, diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger,
+        },
+        summary::{
+            DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort,
+            WitnessTreeSummaryVerbose,
         },
     },
     store::IndexerStore,
@@ -26,7 +27,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
@@ -117,6 +117,12 @@ impl IndexerState {
 
         indexer_store
             .add_ledger(&root_hash, genesis_ledger.into())
+            .expect("ledger add succeeds");
+        indexer_store
+            .set_max_canonical_blockchain_length(1)
+            .expect("ledger add succeeds");
+        indexer_store
+            .add_canonical_block(1, &root_hash)
             .expect("ledger add succeeds");
 
         let tip = Tip {
@@ -260,7 +266,7 @@ impl IndexerState {
         self.get_block_from_id(&self.canonical_tip.node_id)
     }
 
-    /// The highest block known to be a descendant of the original root block
+    /// The highest block known to be a descendant of the root block
     pub fn best_tip_block(&self) -> &Block {
         self.get_block_from_id(&self.best_tip.node_id)
     }
@@ -272,68 +278,69 @@ impl IndexerState {
 
     /// Updates the canonical tip if the precondition is met
     pub fn update_canonical(&mut self) -> anyhow::Result<()> {
-        if self.best_tip_block().height - self.canonical_tip_block().height
-            > self.canonical_update_threshold
-        {
+        if self.is_canonical_updatable() {
             let mut canonical_hashes = vec![];
             let old_canonical_tip_id = self.canonical_tip.node_id.clone();
             let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
 
             // update canonical_tip
-            for (n, ancestor_id) in self
+            for ancestor_id in self
                 .root_branch
                 .branches
                 .ancestor_ids(&self.best_tip.node_id)
                 .unwrap()
-                .enumerate()
+                .skip(MAINNET_CANONICAL_THRESHOLD.saturating_sub(1) as usize)
             {
                 // only add blocks between the old_canonical_tip and the new one
-                if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
-                    self.canonical_tip.node_id = ancestor_id.clone();
-                    self.canonical_tip.state_hash =
-                        self.get_block_from_id(ancestor_id).state_hash.clone();
-                } else if n > MAINNET_CANONICAL_THRESHOLD as usize
-                    && ancestor_id != &old_canonical_tip_id
-                {
+                // canonical_hashes.push(self.canonical_tip.state_hash.clone());
+
+                if ancestor_id != &old_canonical_tip_id {
                     let ancestor_block = self.get_block_from_id(ancestor_id);
                     canonical_hashes.push(ancestor_block.state_hash.clone());
-                } else if ancestor_id == &old_canonical_tip_id {
-                    break;
+                } else {
+                    continue;
                 }
+
+                self.canonical_tip.node_id = ancestor_id.clone();
+                self.canonical_tip.state_hash =
+                    self.get_block_from_id(ancestor_id).state_hash.clone();
             }
 
             canonical_hashes.reverse();
 
-            // update canonical ledger
-            if let Some(indexer_store) = &self.indexer_store {
-                let mut ledger = indexer_store
-                    .get_ledger(&old_canonical_tip_hash)
-                    .unwrap()
-                    .unwrap();
+            // update ledger and canonicity stores
+            if let Some(indexer_store) = self.indexer_store.as_ref() {
+                let mut ledger = indexer_store.get_ledger(&old_canonical_tip_hash)?.unwrap();
 
-                // apply the new canonical diffs to the old canonical ledger
+                // apply the new canonical diffs and store each nth resulting ledger (n = 100)
                 for canonical_hash in &canonical_hashes {
                     if let Some(precomputed_block) = indexer_store.get_block(canonical_hash)? {
                         ledger.apply_post_balances(&precomputed_block);
+                        indexer_store.add_canonical_block(
+                            precomputed_block.blockchain_length,
+                            &precomputed_block.state_hash.into(),
+                        )?;
+                        indexer_store.set_max_canonical_blockchain_length(
+                            precomputed_block.blockchain_length,
+                        )?;
+
+                        if precomputed_block.blockchain_length % 100 == 0 {
+                            indexer_store.add_ledger(canonical_hash, ledger.clone())?;
+                        }
                     }
                 }
-
-                // update the ledger
-                indexer_store
-                    .add_ledger(&self.canonical_tip_block().state_hash, ledger)
-                    .unwrap();
             }
 
-            // update canonicity store
+            // update block canonicities
             for block_hash in self.diffs_map.keys() {
-                if let Some(indexer_store) = &self.indexer_store {
+                if let Some(indexer_store) = self.indexer_store.as_ref() {
                     if canonical_hashes.contains(block_hash) {
                         indexer_store
-                            .set_canonicity(block_hash, Canonicity::Canonical)
+                            .set_block_canonicity(block_hash, Canonicity::Canonical)
                             .unwrap();
                     } else {
                         indexer_store
-                            .set_canonicity(block_hash, Canonicity::Orphaned)
+                            .set_block_canonicity(block_hash, Canonicity::Orphaned)
                             .unwrap();
                     }
                 }
@@ -354,6 +361,11 @@ impl IndexerState {
         }
 
         Ok(())
+    }
+
+    fn is_canonical_updatable(&self) -> bool {
+        self.best_tip_block().height - self.canonical_tip_block().height
+            >= self.canonical_update_threshold
     }
 
     /// Initialize indexer state from a collection of contiguous canonical blocks
@@ -380,9 +392,9 @@ impl IndexerState {
                     let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                     info!(
-                        "{} blocks parsed and applied in {}",
+                        "{} blocks parsed and applied in {:?}",
                         self.blocks_processed,
-                        display_duration(total_time.elapsed()),
+                        total_time.elapsed(),
                     );
                     info!(
                         "Estimated time: {} min",
@@ -392,24 +404,26 @@ impl IndexerState {
                     debug!("Rate: {rate} blocks/s");
                 }
 
-                let precomputed_block = block_parser.next_block()?.unwrap();
+                let block = block_parser.next_block()?.unwrap();
+                let state_hash = BlockHash(block.state_hash.clone());
 
                 // apply and add to db
-                ledger.apply_post_balances(&precomputed_block);
-                indexer_store.add_block(&precomputed_block)?;
+                ledger.apply_post_balances(&block);
+                indexer_store.add_block(&block)?;
+                indexer_store.add_canonical_block(
+                    block.blockchain_length,
+                    &block.state_hash.clone().into(),
+                )?;
+                indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
 
-                // TODO: store ledger at specified cadence, e.g. at epoch boundaries
-                // for now, just store every 1000 blocks
-                if self.blocks_processed % 1000 == 0 {
-                    indexer_store.add_ledger(
-                        &BlockHash(precomputed_block.state_hash.clone()),
-                        ledger.clone(),
-                    )?;
+                // store ledger at specified cadence, e.g. every 100 blocks
+                if self.blocks_processed % 100 == 0 {
+                    indexer_store.add_ledger(&state_hash, ledger.clone())?;
                 }
 
                 if self.blocks_processed == block_parser.num_canonical {
                     // update root branch
-                    self.root_branch = Branch::new(&precomputed_block)?;
+                    self.root_branch = Branch::new(&block)?;
                     self.best_tip = Tip {
                         state_hash: self.root_branch.root_block().state_hash.clone(),
                         node_id: self.root_branch.root.clone(),
@@ -417,9 +431,6 @@ impl IndexerState {
                     self.canonical_tip = self.best_tip.clone();
                 }
             }
-
-            // store the most recent canonical ledger
-            indexer_store.add_ledger(&self.root_branch.root_block().state_hash, ledger.clone())?;
         }
 
         // now add the successive non-canonical blocks
@@ -458,9 +469,9 @@ impl IndexerState {
                 let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                 info!(
-                    "Parsed and added {} blocks to the witness tree in {}",
+                    "Parsed and added {} blocks to the witness tree in {:?}",
                     self.blocks_processed,
-                    display_duration(total_time.elapsed()),
+                    total_time.elapsed(),
                 );
 
                 debug!("Root height:       {}", self.root_branch.height());
@@ -480,9 +491,9 @@ impl IndexerState {
         }
 
         info!(
-            "Ingested {} blocks in {}",
+            "Ingested {} blocks in {:?}",
             self.blocks_processed,
-            display_duration(total_time.elapsed()),
+            total_time.elapsed(),
         );
 
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
@@ -497,8 +508,6 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.prune_root_branch()?;
-
         if self.is_block_already_in_db(precomputed_block)? {
             debug!(
                 "Block with state hash {:?} is already present in the block store",
@@ -515,7 +524,6 @@ impl IndexerState {
             );
             return Ok(ExtensionType::BlockNotAdded);
         }
-
         // add block to the db
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_block(precomputed_block)?;
@@ -530,6 +538,7 @@ impl IndexerState {
         // forward extension on root branch
         if self.is_length_within_root_bounds(precomputed_block) {
             if let Some(root_extension) = self.root_extension(precomputed_block)? {
+                self.prune_root_branch()?;
                 return Ok(root_extension);
             }
         }
@@ -556,8 +565,6 @@ impl IndexerState {
     ) -> anyhow::Result<Option<ExtensionType>> {
         if let Some((new_node_id, new_block)) = self.root_branch.simple_extension(precomputed_block)
         {
-            self.update_best_tip(&new_block, &new_node_id);
-
             // check if new block connects to a dangling branch
             let mut merged_tip_id = None;
             let mut branches_to_remove = Vec::new();
@@ -581,17 +588,20 @@ impl IndexerState {
                     .data()
                     .clone();
 
-                if merged_tip_block.state_hash.0 > self.best_tip_block().state_hash.0 {
+                if merged_tip_block.blockchain_length > self.best_tip_block().blockchain_length
+                    || merged_tip_block.state_hash.0 > self.best_tip_block().state_hash.0
+                {
                     self.update_best_tip(&merged_tip_block, &merged_tip_id);
                 }
             }
+
+            self.update_best_tip(&new_block, &new_node_id);
 
             if !branches_to_remove.is_empty() {
                 // the root branch is newly connected to dangling branches
                 for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                     self.dangling_branches.remove(index_to_remove - num_removed);
                 }
-
                 Ok(Some(ExtensionType::RootComplex))
             } else {
                 // there aren't any branches that are connected
@@ -720,6 +730,10 @@ impl IndexerState {
             || incoming_block.blockchain_length == best_tip_length
                 && incoming_block > self.best_tip_block()
         {
+            debug!(
+                "Update best tip: length = {}, state_hash = {}",
+                incoming_block.blockchain_length, incoming_block.state_hash.0
+            );
             self.best_tip.node_id = node_id.clone();
             self.best_tip.state_hash = incoming_block.state_hash.clone();
         }
@@ -742,10 +756,11 @@ impl IndexerState {
         }
         vec![]
     }
+
     pub fn get_block_status(&self, state_hash: &BlockHash) -> Option<Canonicity> {
         // first check the db, then diffs map
-        if let Some(indexer_store) = &self.indexer_store {
-            return indexer_store.get_canonicity(state_hash).unwrap();
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            return indexer_store.get_block_canonicity(state_hash).unwrap();
         } else if self.diffs_map.get(state_hash).is_some() {
             return Some(Canonicity::Pending);
         }
@@ -753,12 +768,10 @@ impl IndexerState {
         None
     }
 
-    // TODO: maybe we should add another function for getting a ledger at a specific slot/"height"?
+    /// Returns the ledger corresponding to the best tip
     pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
-        self.update_canonical()?;
-
         // get the most recent canonical ledger
-        if let Some(indexer_store) = &self.indexer_store {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
             if let Some(mut ledger) =
                 indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
             {
@@ -793,6 +806,27 @@ impl IndexerState {
 
                 return Ok(Some(ledger));
             }
+        }
+
+        Ok(None)
+    }
+
+    pub fn canonical_block_at_height(
+        &mut self,
+        height: u32,
+    ) -> anyhow::Result<Option<PrecomputedBlock>> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            if let Some(state_hash) = indexer_store.get_canonical_hash_at_height(height)? {
+                return indexer_store.get_block(&state_hash);
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub fn ledger_at_height(&mut self, height: u32) -> anyhow::Result<Option<Ledger>> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            return indexer_store.get_ledger_at_height(height);
         }
 
         Ok(None)
