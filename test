@@ -31,7 +31,7 @@ assert() {
     actual="$2"
 
     if [ "$expected" != "$actual" ]; then
-        echo "Test Failed: Expected $expected, but got $actual"
+        echo "\e[0;31mTest Failed: Expected $expected, but got $actual\e[0;37m"
         exit 1
     else
         echo "Test Passed!"
@@ -97,10 +97,10 @@ test_indexer_basic_start() {
 }
 
 # Indexer server starts up on a minimal selection of blocks
-test_best_canonical_tip() {
+test_canonical_tip_startup() {
     setup
 
-    dl_mainnet 15 ./blocks
+    dl_mainnet 9 ./blocks
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
@@ -154,6 +154,7 @@ test_account_balance_cli() {
     teardown
 }
 
+# Indexer server returns the correct account
 test_account_public_key_json() {
     setup
 
@@ -205,27 +206,92 @@ test_startup_dirs_get_created () {
     teardown
 }
 
+# Indexer server returns the correct canonical tip
+test_canonical_tip() {
+    setup
+
+    dl_mainnet 15 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+    sleep 20
+    
+    state_hash=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
+    blockchain_length=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_length)
+    
+    assert 5 $blockchain_length
+    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
+
+    idxr_pid=$(pgrep mina-indexer)
+    teardown
+}
+
+# Indexer server returns correct ledgers
+test_ledgers() {
+    setup
+
+    dl_mainnet 15 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --initial-ledger "$LEDGER" \
+        --is-genesis-ledger \
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+    sleep 20
+
+    pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
+
+    # canonical ledgers match
+    canonical_hash=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_length)
+    hash_result=$(idxr client ledger --hash $canonical_hash | jq -r .${pk}.balance)
+    length_result=$(idxr client ledger-at-height --height $canonical_length | jq -r .${pk}.balance)
+    assert $hash_result 607904750000000
+    assert $length_result 607904750000000
+
+    # best ledgers match
+    best_hash=$(idxr client -o summary | jq -r .witness_tree.best_tip_hash)
+    best_result=$(idxr client best-ledger | jq -r .${pk}.balance)
+    hash_result=$(idxr client ledger --hash $best_hash | jq -r .${pk}.balance)
+    assert $best_result $hash_result
+    assert $best_result 607904750000000
+
+    idxr_pid=$(pgrep mina-indexer)
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
     test_indexer_cli_reports
     test_indexer_basic_start
-    test_best_canonical_tip
+    test_canonical_tip_startup
     test_ipc_is_available_immediately
     test_account_balance_cli
     test_account_public_key_json
     test_startup_dirs_get_created
+    test_canonical_tip
+    test_ledgers
 else
     # Run only specified tests
     for test_name in "$@"; do
         case $test_name in
             "test_indexer_cli_reports") test_indexer_cli_reports ;;
             "test_indexer_basic_start") test_indexer_basic_start ;;
-            "test_best_canonical_tip") test_best_canonical_tip ;;
+            "test_canonical_tip_startup") test_canonical_tip_startup ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
+            "test_canonical_tip") test_canonical_tip ;;
+            "test_ledgers") test_ledgers ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
