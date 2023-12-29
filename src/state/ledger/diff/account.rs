@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     state::ledger::{
-        command::{Command, SignedCommand},
+        command::{Command, SignedCommand, UserCommandWithStatus},
         Amount, PublicKey,
     },
 };
@@ -28,9 +28,16 @@ pub struct DelegationDiff {
 }
 
 #[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+pub struct CoinbaseDiff {
+    pub public_key: PublicKey,
+    pub amount: Amount,
+}
+
+#[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum AccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
+    Coinbase(CoinbaseDiff),
 }
 
 impl AccountDiff {
@@ -38,19 +45,19 @@ impl AccountDiff {
         match command {
             Command::Payment(payment) => vec![
                 AccountDiff::Payment(PaymentDiff {
-                    public_key: payment.source.into(),
+                    public_key: payment.source,
                     amount: payment.amount,
                     update_type: UpdateType::Deduction,
                 }),
                 AccountDiff::Payment(PaymentDiff {
-                    public_key: payment.receiver.into(),
+                    public_key: payment.receiver,
                     amount: payment.amount,
                     update_type: UpdateType::Deposit,
                 }),
             ],
             Command::Delegation(delegation) => vec![AccountDiff::Delegation(DelegationDiff {
-                delegator: delegation.delegator.into(),
-                delegate: delegation.delegate.into(),
+                delegator: delegation.delegator,
+                delegate: delegation.delegate,
             })],
         }
     }
@@ -60,15 +67,15 @@ impl AccountDiff {
             true => 1440,
             false => 720,
         } * (1e9 as u64);
-        AccountDiff::Payment(PaymentDiff {
+        AccountDiff::Coinbase(CoinbaseDiff {
             public_key: coinbase_receiver,
             amount: amount.into(),
-            update_type: UpdateType::Deposit,
         })
     }
 
     pub fn public_key(&self) -> PublicKey {
         match self {
+            AccountDiff::Coinbase(coinbase_diff) => coinbase_diff.public_key.clone(),
             AccountDiff::Payment(payment_diff) => payment_diff.public_key.clone(),
             AccountDiff::Delegation(delegation_diff) => delegation_diff.delegator.clone(),
         }
@@ -81,6 +88,7 @@ impl AccountDiff {
         precomputed_block
             .commands()
             .iter()
+            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
             .flat_map(
                 |command| match command.clone().inner().data.inner().inner() {
                     UserCommand::SignedCommand(signed_command) => {
@@ -127,10 +135,17 @@ impl std::fmt::Debug for DelegationDiff {
     }
 }
 
+impl std::fmt::Debug for CoinbaseDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} | Coinbase  | {}", self.public_key, self.amount.0)
+    }
+}
+
 impl std::fmt::Debug for AccountDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AccountDiff::Payment(pay_diff) => write!(f, "Payment: {pay_diff:?}"),
+            AccountDiff::Coinbase(coin_diff) => write!(f, "Coinbase: {coin_diff:?}"),
+            AccountDiff::Payment(pay_diff) => write!(f, "Payment:  {pay_diff:?}"),
             AccountDiff::Delegation(del_diff) => write!(f, "Delegation: {del_diff:?}"),
         }
     }
@@ -140,17 +155,19 @@ impl std::fmt::Debug for UpdateType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             UpdateType::Deduction => write!(f, "Deduction"),
-            UpdateType::Deposit => write!(f, "Deposit  "),
+            UpdateType::Deposit => write!(f, "Deduction"),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType};
-    use crate::state::ledger::account::Amount;
-    use crate::state::ledger::command::{Command, Delegation, Payment};
-    use crate::state::ledger::PublicKey;
+    use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
+    use crate::state::ledger::{
+        account::Amount,
+        command::{Command, Delegation, Payment},
+        PublicKey,
+    };
 
     // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw for all tests below
     #[test]
@@ -158,17 +175,14 @@ mod tests {
         let source_str = "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG";
         let source_public_key_result = PublicKey::from_address(source_str).unwrap();
         let source_public_key = source_public_key_result.clone();
-
         let receiver_str = "B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs";
         let receiver_public_key_result = PublicKey::from_address(receiver_str).unwrap();
         let receiver_public_key = receiver_public_key_result.clone();
-
         let payment_command = Command::Payment(Payment {
-            source: source_public_key.into(),
-            receiver: receiver_public_key.into(),
+            source: source_public_key,
+            receiver: receiver_public_key,
             amount: 536900000000.into(),
         });
-
         let expected_result = vec![
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key_result,
@@ -190,16 +204,13 @@ mod tests {
         let delegator_str = "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi";
         let delegator_public_key_result = PublicKey::from_address(delegator_str).unwrap();
         let delegator_public_key = delegator_public_key_result.clone();
-
         let delegate_str = "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz";
         let delegate_public_key_result = PublicKey::from_address(delegate_str).unwrap();
         let delegate_public_key = delegate_public_key_result.clone();
-
         let delegation_command = Command::Delegation(Delegation {
-            delegator: delegator_public_key.into(),
-            delegate: delegate_public_key.into(),
+            delegator: delegator_public_key,
+            delegate: delegate_public_key,
         });
-
         let expected_result = vec![AccountDiff::Delegation(DelegationDiff {
             delegator: delegator_public_key_result,
             delegate: delegate_public_key_result,
@@ -216,18 +227,13 @@ mod tests {
         let coinbase_receiver_str = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw";
         let coinbase_receiver_result = PublicKey::from_address(coinbase_receiver_str).unwrap();
         let coinbase_receiver = coinbase_receiver_result.clone();
-
         let supercharge_coinbase = true;
-
         let account_diff =
             AccountDiff::from_coinbase(coinbase_receiver_result, supercharge_coinbase);
-
-        let expected_payment_diff = PaymentDiff {
+        let expected_account_diff = AccountDiff::Coinbase(CoinbaseDiff {
             public_key: coinbase_receiver,
             amount: Amount(1440 * (1e9 as u64)),
-            update_type: UpdateType::Deposit,
-        };
-        let expected_account_diff = AccountDiff::Payment(expected_payment_diff);
+        });
 
         assert_eq!(account_diff, expected_account_diff);
     }
@@ -243,9 +249,7 @@ mod tests {
             update_type: UpdateType::Deduction,
         };
         let account_diff = AccountDiff::Payment(payment_diff);
-
         let result = account_diff.public_key();
-
         let expected =
             PublicKey::from_address("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")
                 .unwrap();
@@ -265,9 +269,7 @@ mod tests {
             .unwrap(),
         };
         let account_diff = AccountDiff::Delegation(delegation_diff);
-
         let result = account_diff.public_key();
-
         let expected =
             PublicKey::from_address("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi")
                 .unwrap();
