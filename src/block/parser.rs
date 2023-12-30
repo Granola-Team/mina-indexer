@@ -1,7 +1,5 @@
 use crate::{
-    block::{
-        get_blockchain_length, is_valid_block_file, parse_file, precomputed::PrecomputedBlock,
-    },
+    block::{length_from_path, parse_file, precomputed::PrecomputedBlock},
     canonical::chain_discovery::discovery,
 };
 use anyhow::anyhow;
@@ -128,14 +126,6 @@ impl BlockParser {
     }
 }
 
-fn length_from_path(path: &Path) -> Option<u32> {
-    if is_valid_block_file(path) {
-        get_blockchain_length(path.file_name()?)
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -143,7 +133,7 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use crate::block::{get_blockchain_length, is_valid_block_file, parser::length_from_path};
+    use crate::block::{get_blockchain_length, is_valid_block_file, length_from_path};
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -208,7 +198,7 @@ mod tests {
             Some(9644),
         ];
         let actual: Vec<Option<u32>> = Vec::from(FILENAMES_VALID)
-            .into_iter()
+            .iter()
             .map(OsString::from)
             .map(|x| get_blockchain_length(&x))
             .collect();
@@ -217,9 +207,8 @@ mod tests {
 
         let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
         let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|x| length_from_path(Path::new(&x)))
+            .iter()
+            .map(|x| length_from_path(Path::new(x)))
             .collect();
 
         assert_eq!(expected, actual);
@@ -227,35 +216,17 @@ mod tests {
 
     #[test]
     fn invalid_filenames_have_invalid_state_hash_or_non_json_extension() {
-        Vec::from(FILENAMES_INVALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|os_string| {
-                (
-                    os_string.clone(),
-                    is_valid_block_file(&PathBuf::from(os_string)),
-                )
-            })
-            .for_each(|(os_string, result)| {
-                dbg!(os_string);
-                assert!(!result)
-            });
+        FILENAMES_INVALID
+            .map(PathBuf::from)
+            .iter()
+            .for_each(|file| assert!(!is_valid_block_file(file)))
     }
 
     #[test]
     fn valid_filenames_have_valid_state_hash_and_json_extension() {
-        Vec::from(FILENAMES_VALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|os_string| {
-                (
-                    os_string.clone(),
-                    is_valid_block_file(&PathBuf::from(os_string)),
-                )
-            })
-            .for_each(|(os_string, result)| {
-                dbg!(os_string);
-                assert!(result)
-            });
+        FILENAMES_VALID
+            .map(PathBuf::from)
+            .iter()
+            .for_each(|file| assert!(is_valid_block_file(file)))
     }
 }

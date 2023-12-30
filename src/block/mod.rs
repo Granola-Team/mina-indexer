@@ -166,13 +166,13 @@ impl std::fmt::Debug for BlockHash {
     }
 }
 
-pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
-    if is_valid_block_file(filename) {
-        let blockchain_length =
-            get_blockchain_length(filename.file_name().expect("filename already checked"));
-        let state_hash = get_state_hash(filename.file_name().expect("filename already checked"))
-            .expect("state hash already checked");
-        let log_file_contents = std::fs::read(filename)?;
+/// Parses the precomputed block if the path is a valid block file
+pub fn parse_file(path: &Path) -> anyhow::Result<PrecomputedBlock> {
+    if is_valid_block_file(path) {
+        let file_name = path.file_name().expect("filename already checked");
+        let blockchain_length = get_blockchain_length(file_name);
+        let state_hash = get_state_hash(file_name).expect("state hash already checked");
+        let log_file_contents = std::fs::read(path)?;
         let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
             state_hash,
             blockchain_length,
@@ -182,7 +182,7 @@ pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
     } else {
         Err(anyhow!(
             "Unable to parse invalid precomputed block: {}",
-            filename.display()
+            path.display()
         ))
     }
 }
@@ -190,16 +190,11 @@ pub fn parse_file(filename: &Path) -> anyhow::Result<PrecomputedBlock> {
 /// Extracts a state hash from an OS file name
 pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
     let last_part = file_name.to_str()?.split('-').last()?.to_string();
-    if last_part.starts_with('.') || !last_part.starts_with("3N") {
-        return None;
-    }
-
     let state_hash = last_part.split('.').next()?;
-    if state_hash.contains('.') {
-        return None;
+    if state_hash.starts_with("3N") {
+        return Some(state_hash.to_string());
     }
-
-    Some(state_hash.to_string())
+    None
 }
 
 /// Extracts a blockchain length from an OS file name
@@ -214,13 +209,43 @@ pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
 }
 
 pub fn is_valid_block_file(path: &Path) -> bool {
-    if let Some(file_name) = path.file_name() {
-        get_state_hash(file_name).is_some()
-            && file_name
-                .to_str()
-                .map(|file_name| file_name.ends_with(".json"))
-                .unwrap_or(false)
+    fn is_valid_state_hash(input: &str) -> bool {
+        input.starts_with("3N") && input.len() == 52
+    }
+    if let Some(ext) = path.extension() {
+        // check json extension
+        if ext.to_str() == Some("json") {
+            // check file stem
+            if let Some(file_name) = path.file_stem() {
+                if let Some(parts) = file_name
+                    .to_str()
+                    .map(|name| name.split('-').collect::<Vec<&str>>())
+                {
+                    let is_valid_hash = parts
+                        .last()
+                        .map(|hash| is_valid_state_hash(hash))
+                        .unwrap_or(false);
+                    if parts.len() == 2 {
+                        // e.g. mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json
+                        // check 2nd part is a state hash
+                        return is_valid_hash;
+                    } else if parts.len() == 3 {
+                        // e.g. mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json
+                        // check 2nd part is u32 and 3rd part is a state hash
+                        let is_valid_length = parts.get(1).unwrap().parse::<u32>().is_ok();
+                        return is_valid_hash && is_valid_length;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+pub fn length_from_path(path: &Path) -> Option<u32> {
+    if is_valid_block_file(path) {
+        get_blockchain_length(path.file_name()?)
     } else {
-        false
+        None
     }
 }
