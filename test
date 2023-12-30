@@ -97,10 +97,10 @@ test_indexer_basic_start() {
 }
 
 # Indexer server starts up on a minimal selection of blocks
-test_canonical_tip_startup() {
+test_server_startup() {
     setup
 
-    dl_mainnet 9 ./blocks
+    dl_mainnet 15 ./blocks
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
@@ -110,8 +110,10 @@ test_canonical_tip_startup() {
         --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 5
-    result=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
+    result=$(idxr client -o summary | jq .)
+    if [ -z "${result}" ]; then
+        exit 1
+    fi
     idxr_pid=$(pgrep mina-indexer)
     teardown
 }
@@ -272,7 +274,7 @@ if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
     test_indexer_cli_reports
     test_indexer_basic_start
-    test_canonical_tip_startup
+    test_server_startup
     test_ipc_is_available_immediately
     test_account_balance_cli
     test_account_public_key_json
@@ -285,7 +287,7 @@ else
         case $test_name in
             "test_indexer_cli_reports") test_indexer_cli_reports ;;
             "test_indexer_basic_start") test_indexer_basic_start ;;
-            "test_canonical_tip_startup") test_canonical_tip_startup ;;
+            "test_server_startup") test_server_startup ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;

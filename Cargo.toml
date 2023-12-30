@@ -48,6 +48,10 @@ ctrlc = "3.4.0"
 serde_yaml = "0.9.29"
 oneshot = "0.1.5"
 
+[dev-dependencies]
+quickcheck = "1.0.3"
+quickcheck_macros = "1.0.0"
+
 [dependencies.tokio]
 version = "1.25.0"
 features = ["full"]

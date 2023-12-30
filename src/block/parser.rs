@@ -128,12 +128,13 @@ impl BlockParser {
 
 #[cfg(test)]
 mod tests {
+    use crate::block::{get_blockchain_length, is_valid_block_file, length_from_path, BlockHash};
+    use quickcheck::{Arbitrary, Gen};
+    use quickcheck_macros::quickcheck;
     use std::{
         ffi::OsString,
         path::{Path, PathBuf},
     };
-
-    use crate::block::{get_blockchain_length, is_valid_block_file, length_from_path};
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -199,8 +200,7 @@ mod tests {
         ];
         let actual: Vec<Option<u32>> = Vec::from(FILENAMES_VALID)
             .iter()
-            .map(OsString::from)
-            .map(|x| get_blockchain_length(&x))
+            .map(|x| get_blockchain_length(&OsString::from(x)))
             .collect();
 
         assert_eq!(expected, actual);
@@ -228,5 +228,75 @@ mod tests {
             .map(PathBuf::from)
             .iter()
             .for_each(|file| assert!(is_valid_block_file(file)))
+    }
+
+    #[derive(Debug, Clone)]
+    struct BlockFileName(PathBuf);
+
+    #[derive(Debug, Clone)]
+    enum Network {
+        Mainnet,
+        Devnet,
+        Testworld,
+        Berkeley,
+    }
+
+    impl Arbitrary for Network {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let idx = usize::arbitrary(g) % 4;
+            match idx {
+                0 => Network::Mainnet,
+                1 => Network::Devnet,
+                2 => Network::Testworld,
+                3 => Network::Berkeley,
+                _ => panic!("should never happen"),
+            }
+        }
+    }
+
+    impl std::fmt::Display for Network {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let network = match self {
+                Network::Mainnet => "mainnet",
+                Network::Devnet => "devnet",
+                Network::Testworld => "testworld",
+                Network::Berkeley => "berkeley",
+            };
+            write!(f, "{}", network)
+        }
+    }
+
+    impl Arbitrary for BlockHash {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let mut hash = "3N".to_string();
+            for _ in 0..50 {
+                let mut x = char::arbitrary(g);
+                while !x.is_ascii_alphanumeric() {
+                    x = char::arbitrary(g);
+                }
+                hash.push(x)
+            }
+            Self(hash)
+        }
+    }
+
+    impl Arbitrary for BlockFileName {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let network = Network::arbitrary(g);
+            let height = u32::arbitrary(g);
+            let hash = BlockHash::arbitrary(g);
+            let is_first_pattern = bool::arbitrary(g);
+            let path = if is_first_pattern {
+                format!("{}-{}-{}.json", network, height, hash.0)
+            } else {
+                format!("{}-{}.json", network, hash.0)
+            };
+            Self(PathBuf::from(&path))
+        }
+    }
+
+    #[quickcheck]
+    fn check_for_block_file_validity(valid_block: BlockFileName) -> bool {
+        is_valid_block_file(valid_block.0.as_path())
     }
 }
