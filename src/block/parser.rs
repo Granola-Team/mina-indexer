@@ -1,7 +1,5 @@
 use crate::{
-    block::{
-        get_blockchain_length, is_valid_block_file, parse_file, precomputed::PrecomputedBlock,
-    },
+    block::{length_from_path, parse_file, precomputed::PrecomputedBlock},
     canonical::chain_discovery::discovery,
 };
 use anyhow::anyhow;
@@ -128,22 +126,15 @@ impl BlockParser {
     }
 }
 
-fn length_from_path(path: &Path) -> Option<u32> {
-    if is_valid_block_file(path) {
-        get_blockchain_length(path.file_name()?)
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::block::{get_blockchain_length, is_valid_block_file, length_from_path, BlockHash};
+    use quickcheck::{Arbitrary, Gen};
+    use quickcheck_macros::quickcheck;
     use std::{
         ffi::OsString,
         path::{Path, PathBuf},
     };
-
-    use crate::block::{get_blockchain_length, is_valid_block_file, parser::length_from_path};
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
@@ -208,18 +199,16 @@ mod tests {
             Some(9644),
         ];
         let actual: Vec<Option<u32>> = Vec::from(FILENAMES_VALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|x| get_blockchain_length(&x))
+            .iter()
+            .map(|x| get_blockchain_length(&OsString::from(x)))
             .collect();
 
         assert_eq!(expected, actual);
 
         let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
         let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|x| length_from_path(Path::new(&x)))
+            .iter()
+            .map(|x| length_from_path(Path::new(x)))
             .collect();
 
         assert_eq!(expected, actual);
@@ -227,35 +216,87 @@ mod tests {
 
     #[test]
     fn invalid_filenames_have_invalid_state_hash_or_non_json_extension() {
-        Vec::from(FILENAMES_INVALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|os_string| {
-                (
-                    os_string.clone(),
-                    is_valid_block_file(&PathBuf::from(os_string)),
-                )
-            })
-            .for_each(|(os_string, result)| {
-                dbg!(os_string);
-                assert!(!result)
-            });
+        FILENAMES_INVALID
+            .map(PathBuf::from)
+            .iter()
+            .for_each(|file| assert!(!is_valid_block_file(file)))
     }
 
     #[test]
     fn valid_filenames_have_valid_state_hash_and_json_extension() {
-        Vec::from(FILENAMES_VALID)
-            .into_iter()
-            .map(OsString::from)
-            .map(|os_string| {
-                (
-                    os_string.clone(),
-                    is_valid_block_file(&PathBuf::from(os_string)),
-                )
-            })
-            .for_each(|(os_string, result)| {
-                dbg!(os_string);
-                assert!(result)
-            });
+        FILENAMES_VALID
+            .map(PathBuf::from)
+            .iter()
+            .for_each(|file| assert!(is_valid_block_file(file)))
+    }
+
+    #[derive(Debug, Clone)]
+    struct BlockFileName(PathBuf);
+
+    #[derive(Debug, Clone)]
+    enum Network {
+        Mainnet,
+        Devnet,
+        Testworld,
+        Berkeley,
+    }
+
+    impl Arbitrary for Network {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let idx = usize::arbitrary(g) % 4;
+            match idx {
+                0 => Network::Mainnet,
+                1 => Network::Devnet,
+                2 => Network::Testworld,
+                3 => Network::Berkeley,
+                _ => panic!("should never happen"),
+            }
+        }
+    }
+
+    impl std::fmt::Display for Network {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let network = match self {
+                Network::Mainnet => "mainnet",
+                Network::Devnet => "devnet",
+                Network::Testworld => "testworld",
+                Network::Berkeley => "berkeley",
+            };
+            write!(f, "{}", network)
+        }
+    }
+
+    impl Arbitrary for BlockHash {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let mut hash = "3N".to_string();
+            for _ in 0..50 {
+                let mut x = char::arbitrary(g);
+                while !x.is_ascii_alphanumeric() {
+                    x = char::arbitrary(g);
+                }
+                hash.push(x)
+            }
+            Self(hash)
+        }
+    }
+
+    impl Arbitrary for BlockFileName {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let network = Network::arbitrary(g);
+            let height = u32::arbitrary(g);
+            let hash = BlockHash::arbitrary(g);
+            let is_first_pattern = bool::arbitrary(g);
+            let path = if is_first_pattern {
+                format!("{}-{}-{}.json", network, height, hash.0)
+            } else {
+                format!("{}-{}.json", network, hash.0)
+            };
+            Self(PathBuf::from(&path))
+        }
+    }
+
+    #[quickcheck]
+    fn check_for_block_file_validity(valid_block: BlockFileName) -> bool {
+        is_valid_block_file(valid_block.0.as_path())
     }
 }
