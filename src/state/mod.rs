@@ -452,7 +452,7 @@ impl IndexerState {
         let total_time = Instant::now();
         let mut step_time = total_time;
 
-        if self.blocks_processed == 0 {
+        if self.blocks_processed == 0 && block_parser.total_num_blocks > 500 {
             info!(
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
             );

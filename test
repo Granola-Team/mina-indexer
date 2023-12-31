@@ -96,11 +96,10 @@ test_indexer_basic_start() {
     teardown
 }
 
-# Indexer server starts up on a minimal selection of blocks
+# Indexer server starts up without any precomputed blocks
 test_server_startup() {
     setup
 
-    dl_mainnet 15 ./blocks
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
@@ -109,11 +108,9 @@ test_server_startup() {
         --initial-ledger "$LEDGER" \
         --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    sleep 5
-    result=$(idxr client -o summary | jq .)
-    if [ -z "${result}" ]; then
-        exit 1
-    fi
+    sleep 10
+    result=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
     idxr_pid=$(pgrep mina-indexer)
     teardown
 }
@@ -131,8 +128,8 @@ test_ipc_is_available_immediately() {
         --initial-ledger "$LEDGER" \
         --is-genesis-ledger \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
-    sleep 5
-    idxr client -o summary | jq .
+    sleep 1
+    idxr client -o summary
     idxr_pid=$(pgrep mina-indexer)
     teardown
 }
