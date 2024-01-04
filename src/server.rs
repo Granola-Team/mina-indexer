@@ -30,7 +30,6 @@ use tracing::{debug, info, instrument};
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub ledger: GenesisRoot,
-    pub is_genesis_ledger: bool,
     pub root_hash: BlockHash,
     pub startup_dir: PathBuf,
     pub watch_dir: PathBuf,
@@ -142,7 +141,6 @@ pub async fn initialize(
     info!("Starting mina-indexer server");
     let IndexerConfiguration {
         ledger,
-        is_genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir: _,
@@ -187,15 +185,9 @@ pub async fn initialize(
 
         info!("Parsing blocks");
         let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-        if is_genesis_ledger {
-            state
-                .initialize_with_contiguous_canonical(&mut block_parser)
-                .await?;
-        } else {
-            state
-                .initialize_without_contiguous_canonical(&mut block_parser)
-                .await?;
-        }
+        state
+            .initialize_with_contiguous_canonical(&mut block_parser)
+            .await?;
 
         ipc_update_sender
             .send(IpcChannelUpdate {
