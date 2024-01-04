@@ -146,49 +146,6 @@ impl IndexerState {
         })
     }
 
-    /// Creates a new indexer state from a "canonical" ledger
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_non_genesis(
-        root_hash: BlockHash,
-        ledger: Ledger,
-        blockchain_length: u32,
-        global_slot_since_genesis: u32,
-        indexer_store: Arc<IndexerStore>,
-        transition_frontier_length: u32,
-        prune_interval: u32,
-        canonical_update_threshold: u32,
-    ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_non_genesis(
-            root_hash.clone(),
-            blockchain_length,
-            global_slot_since_genesis,
-        );
-
-        indexer_store
-            .add_ledger(&root_hash, ledger)
-            .expect("ledger add succeeds");
-
-        let tip = Tip {
-            state_hash: root_branch.root_block().state_hash.clone(),
-            node_id: root_branch.root.clone(),
-        };
-
-        Ok(Self {
-            phase: IndexerPhase::InitializingFromDB,
-            canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
-            best_tip: tip,
-            root_branch,
-            dangling_branches: Vec::new(),
-            indexer_store: Some(indexer_store),
-            transition_frontier_length,
-            prune_interval,
-            canonical_update_threshold,
-            blocks_processed: 0,
-            init_time: Instant::now(),
-        })
-    }
-
     /// Creates a new indexer state for testing
     pub fn new_testing(
         root_block: &PrecomputedBlock,
