@@ -13,7 +13,11 @@ cd "$TEST_DIR"
 
 # Invoke this function when exiting this script for any reason.
 test_cleanup() {
-    echo "Test result: $?"
+    err=$?
+    if [ $err != 0 ]; then
+        echo "\e[0;31mTest failed ($test): $err\e[0;37m"
+        exit 1
+    fi
     rm -rf "${TEST_DIR}"
 }
 trap test_cleanup EXIT
@@ -55,6 +59,8 @@ teardown() {
 }
 
 test_indexer_cli_reports() {
+    test=test_indexer_cli_reports
+
     # Indexer reports usage with no arguments
     idxr 2>&1 |
         grep -iq "Usage:"
@@ -63,34 +69,46 @@ test_indexer_cli_reports() {
     idxr server 2>&1 |
         grep -iq "Usage: mina-indexer server"
 
-    # Indexer reports usage for client subcommand
-    idxr client 2>&1 |
-        grep -iq "Usage: mina-indexer client"
-
     # Indexer server config subcommand exists
     idxr server config 2>&1 |
         grep -iq "Usage: mina-indexer server config"
 
-    # Indexer server cli subcommand works
-    idxr server cli \
-        --startup-dir ./blocks \
-        --watch-dir ./blocks \
-        --database-dir ./database \
-        --log-dir ./logs \
-	--help 2>/dev/null
+    # Indexer server cli subcommand works with default args
+    idxr server cli --help 2>/dev/null
+
+    # Indexer reports usage for client subcommands
+    idxr account --help 2>&1 |
+        grep -iq "Usage: mina-indexer account"
+
+    idxr best-chain --help 2>&1 |
+        grep -iq "Usage: mina-indexer best-chain"
+
+    idxr best-ledger --help 2>&1 |
+        grep -iq "Usage: mina-indexer best-ledger"
+
+    idxr ledger --help 2>&1 |
+        grep -iq "Usage: mina-indexer ledger"
+
+    idxr ledger-at-height --help 2>&1 |
+        grep -iq "Usage: mina-indexer ledger-at-height"
+
+    idxr summary --help 2>&1 |
+        grep -iq "Usage: mina-indexer summary"
+
+    idxr shutdown --help 2>&1 |
+        grep -iq "Usage: mina-indexer shutdown"
 }
 
 # Indexer server config passes cli with minimal args
 test_indexer_basic_start() {
+    test=test_indexer_basic_start
+
     setup
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 1
     idxr_pid=$(pgrep mina-indexer)
     teardown
@@ -98,18 +116,17 @@ test_indexer_basic_start() {
 
 # Indexer server starts up without any precomputed blocks
 test_server_startup() {
+    test=test_server_startup
+    
     setup
-
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 10
-    result=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
+
+    result=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
     idxr_pid=$(pgrep mina-indexer)
     teardown
@@ -117,37 +134,38 @@ test_server_startup() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-    setup
+    test=test_ipc_is_available_immediately
 
+    setup
     dl_mainnet 250 ./blocks
+
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
+        --genesis-ledger "$LEDGER" \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
     sleep 1
-    idxr client -o summary
+
+    idxr summary
     idxr_pid=$(pgrep mina-indexer)
     teardown
 }
 
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
-    setup
+    test=test_account_balance_cli
 
+    setup
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 5
-    result=$(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
+
+    result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
     idxr_pid=$(pgrep mina-indexer)
     teardown
@@ -161,12 +179,9 @@ test_account_public_key_json() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 5
-    result=$(idxr client -o account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
+    result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
     idxr_pid=$(pgrep mina-indexer)
     teardown
@@ -190,10 +205,7 @@ test_startup_dirs_get_created () {
         --startup-dir ./startup-blocks \
         --watch-dir ./watch-blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 5
 
     assert_directory_exists "./startup-blocks"
@@ -214,14 +226,11 @@ test_canonical_tip() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 20
     
-    state_hash=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
-    blockchain_length=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_length)
+    state_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    blockchain_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     
     assert 5 $blockchain_length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
@@ -239,28 +248,25 @@ test_ledgers() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs \
-        --initial-ledger "$LEDGER" \
-        --is-genesis-ledger \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --log-dir ./logs &
     sleep 20
 
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
 
     # canonical ledgers match
-    canonical_hash=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr client -o summary | jq -r .witness_tree.canonical_tip_length)
-    hash_result=$(idxr client ledger --hash $canonical_hash | jq -r .${pk}.balance)
-    length_result=$(idxr client ledger-at-height --height $canonical_length | jq -r .${pk}.balance)
-    assert $hash_result 607904750000000
-    assert $length_result 607904750000000
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    hash_result=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
+    length_result=$(idxr ledger-at-height --height $canonical_length | jq -r .${pk}.balance)
+    assert $hash_result '607904750000000'
+    assert $length_result '607904750000000'
 
     # best ledgers match
-    best_hash=$(idxr client -o summary | jq -r .witness_tree.best_tip_hash)
-    best_result=$(idxr client best-ledger | jq -r .${pk}.balance)
-    hash_result=$(idxr client ledger --hash $best_hash | jq -r .${pk}.balance)
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_result=$(idxr best-ledger | jq -r .${pk}.balance)
+    hash_result=$(idxr ledger --hash $best_hash | jq -r .${pk}.balance)
     assert $best_result $hash_result
-    assert $best_result 607904750000000
+    assert $best_result '607904750000000'
 
     idxr_pid=$(pgrep mina-indexer)
     teardown

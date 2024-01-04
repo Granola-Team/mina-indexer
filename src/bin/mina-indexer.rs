@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
-    block::BlockHash,
     client,
     server::{IndexerConfiguration, MinaIndexer},
     state::ledger,
@@ -30,13 +29,8 @@ enum IndexerCommand {
         server_command: ServerCommand,
     },
     /// Client commands
-    Client {
-        /// Output JSON data when possible
-        #[arg(short, long, default_value_t = false)]
-        output_json: bool,
-        #[command(subcommand)]
-        args: client::ClientCli,
-    },
+    #[clap(flatten)]
+    Client(#[command(subcommand)] client::ClientCli),
 }
 
 #[derive(Subcommand, Debug)]
@@ -53,13 +47,14 @@ enum ServerCommand {
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to the root ledger (if non-genesis, set --non-genesis-ledger and --root-hash)
-    #[arg(long)]
-    initial_ledger: PathBuf,
-    /// Use a non-genesis ledger
-    #[arg(long, default_value_t = false)]
-    is_genesis_ledger: bool,
-    /// Hash of the base ledger
+    /// Path to the genesis ledger
+    #[arg(
+        short,
+        long,
+        default_value = concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json")
+    )]
+    genesis_ledger: PathBuf,
+    /// Hash of the initial state
     #[arg(
         long,
         default_value = MAINNET_GENESIS_HASH
@@ -99,7 +94,7 @@ pub struct ServerArgs {
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
-        IndexerCommand::Client { output_json, args } => client::run(&args, output_json).await,
+        IndexerCommand::Client(args) => client::run(&args).await,
         IndexerCommand::Server { server_command } => {
             let args = match server_command {
                 ServerCommand::Cli(args) => args,
@@ -157,9 +152,8 @@ async fn init_tracing_logger(
 
 #[instrument(skip_all)]
 pub fn process_indexer_configuration(args: ServerArgs) -> anyhow::Result<IndexerConfiguration> {
-    let ledger = args.initial_ledger;
-    let is_genesis_ledger = args.is_genesis_ledger;
-    let root_hash = BlockHash(args.root_hash.to_string());
+    let ledger = args.genesis_ledger;
+    let root_hash = args.root_hash.into();
     let startup_dir = args.startup_dir;
     let watch_dir = args.watch_dir;
     let prune_interval = args.prune_interval;
@@ -190,7 +184,6 @@ pub fn process_indexer_configuration(args: ServerArgs) -> anyhow::Result<Indexer
 
             Ok(IndexerConfiguration {
                 ledger,
-                is_genesis_ledger,
                 root_hash,
                 startup_dir,
                 watch_dir,
