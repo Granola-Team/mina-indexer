@@ -1,7 +1,8 @@
 use crate::{
+    block::{signed_command, BlockHash},
     state::{
         ledger::{
-            command::{PaymentPayload, SignedCommand, UserCommandWithStatus},
+            command::{self, PaymentPayload, UserCommandWithStatus},
             public_key::PublicKey,
         },
         Canonicity,
@@ -14,13 +15,11 @@ use mina_serialization_types::{
     protocol_state_proof::ProtocolStateProofBase64Json,
     staged_ledger_diff::{
         self, InternalCommandBalanceData, SignedCommandPayloadBody, StagedLedgerDiff,
-        StagedLedgerDiffJson, StakeDelegation,
+        StagedLedgerDiffJson, StakeDelegation, UserCommand,
     },
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
-
-use super::BlockHash;
 
 pub struct BlockFileContents {
     pub(crate) state_hash: String,
@@ -187,7 +186,7 @@ impl PrecomputedBlock {
             .for_each(|command| {
                 let signed_command = match UserCommandWithStatus(command.clone()).data() {
                     staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
-                        SignedCommand(signed_command)
+                        command::SignedCommand(signed_command)
                     }
                 };
                 public_keys.push(signed_command.signer());
@@ -240,5 +239,17 @@ impl PrecomputedBlock {
 
     pub fn previous_state_hash(&self) -> BlockHash {
         BlockHash::from_hashv1(self.protocol_state.previous_state_hash.clone())
+    }
+
+    pub fn transaction_hashes(&self) -> Vec<String> {
+        self.commands()
+            .iter()
+            .map(|commandv1| {
+                let UserCommand::SignedCommand(signed_commandv1) = commandv1.t.data.t.t.clone();
+                signed_command::SignedCommand(signed_commandv1)
+                    .hash_signed_command()
+                    .unwrap()
+            })
+            .collect()
     }
 }

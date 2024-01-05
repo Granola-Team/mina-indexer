@@ -104,9 +104,7 @@ impl From<Versioned<Versioned<mina_serialization_types::staged_ledger_diff::Sign
 
 #[cfg(test)]
 mod tests {
-    use super::SignedCommand;
     use crate::block::parse_file;
-    use mina_serialization_types::staged_ledger_diff::UserCommand;
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -117,16 +115,7 @@ mod tests {
 
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
         let precomputed_block = parse_file(&block_file).unwrap();
-        let commands = precomputed_block.commands();
-        let hashes: Vec<String> = commands
-            .iter()
-            .map(|commandv1| {
-                let UserCommand::SignedCommand(signed_commandv1) = commandv1.t.data.t.t.clone();
-                SignedCommand(signed_commandv1)
-                    .hash_signed_command()
-                    .unwrap()
-            })
-            .collect();
+        let hashes = precomputed_block.transaction_hashes();
         let expect = vec![
             "CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string(),
             "CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj".to_string(),

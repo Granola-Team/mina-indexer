@@ -9,6 +9,7 @@ pub mod parser;
 pub mod precomputed;
 pub mod signed_command;
 pub mod store;
+pub mod transaction;
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
