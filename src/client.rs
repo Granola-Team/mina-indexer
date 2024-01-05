@@ -221,7 +221,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let command = "shutdown \0".to_string();
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let msg: String = bcs::from_bytes(&buffer)?;
+            let msg: String = serde_json::from_slice(&buffer)?;
             println!("{msg}");
         }
     }

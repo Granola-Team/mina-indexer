@@ -1,6 +1,7 @@
 pub mod block;
 pub mod canonical;
 pub mod client;
+pub mod event;
 pub mod ipc;
 pub mod receiver;
 pub mod server;
