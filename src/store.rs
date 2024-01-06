@@ -236,7 +236,8 @@ impl LedgerStore for IndexerStore {
 
         // add ledger to db
         let key = state_hash.0.as_bytes();
-        let value = bcs::to_bytes(&ledger.to_string())?;
+        let value = ledger.to_string();
+        let value = value.as_bytes();
         let ledgers_cf = self.ledgers_cf();
         self.database.put_cf(&ledgers_cf, key, value)?;
 
@@ -276,7 +277,7 @@ impl LedgerStore for IndexerStore {
             .database
             .get_pinned_cf(&ledgers_cf, key)?
             .map(|bytes| bytes.to_vec())
-            .map(|bytes| Ledger::from_str(bcs::from_bytes(&bytes).unwrap()).unwrap())
+            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
         {
             for block in to_apply {
                 ledger.apply_post_balances(&block);

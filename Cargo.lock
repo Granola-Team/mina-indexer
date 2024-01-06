@@ -1681,7 +1681,6 @@ dependencies = [
  "anyhow",
  "async-priority-channel",
  "async-trait",
- "bcs",
  "bin-prot",
  "blake2",
  "bs58 0.5.0",
