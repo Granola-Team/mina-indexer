@@ -1,7 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
-    event::{store::EventStore, Event, db::{DbEvent, DbBlockEvent}},
+    event::{store::EventStore, Event, db::*},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -170,10 +170,15 @@ impl CanonicityStore for IndexerStore {
         );
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        // add canonicity info
         let key = height.to_be_bytes();
         let value = serde_json::to_vec(&state_hash)?;
         let canonicity_cf = self.canonicity_cf();
         self.database.put_cf(&canonicity_cf, key, value)?;
+        
+        // record new canonical block event
+        self.add_event(&Event::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock { state_hash: state_hash.0.clone(), blockchain_length: height })))?;
+        
         Ok(())
     }
 
@@ -229,10 +234,14 @@ impl LedgerStore for IndexerStore {
         trace!("Adding ledger at {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        // add ledger to db
         let key = state_hash.0.as_bytes();
         let value = bcs::to_bytes(&ledger.to_string())?;
         let ledgers_cf = self.ledgers_cf();
         self.database.put_cf(&ledgers_cf, key, value)?;
+
+        // add new ledger event
+        self.add_event(&Event::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger { path: ".".into(), hash: state_hash.0.clone() })))?;
         Ok(())
     }
 

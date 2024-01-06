@@ -526,8 +526,6 @@ impl IndexerState {
                     merged_tip_id = self.root_branch.merge_on(&new_node_id, dangling_branch);
                     branches_to_remove.push(index);
                 }
-
-                same_block_added_twice(dangling_branch, precomputed_block)?;
             }
 
             if let Some(merged_tip_id) = merged_tip_id {
@@ -598,8 +596,6 @@ impl IndexerState {
                     extension = Some((index, new_node_id, ExtensionDirection::Forward));
                     break;
                 }
-
-                same_block_added_twice(dangling_branch, precomputed_block)?;
             }
         }
 
@@ -980,20 +976,6 @@ impl IndexerState {
 /// Checks if the block is the parent of the branch's root
 fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
     precomputed_block.state_hash == branch.root_block().parent_hash.0
-}
-
-/// Errors if the blocks is added a second time
-fn same_block_added_twice(
-    branch: &Branch,
-    precomputed_block: &PrecomputedBlock,
-) -> anyhow::Result<()> {
-    if precomputed_block.state_hash == branch.root_block().state_hash.0 {
-        return Err(anyhow!(
-            "Block with hash {:?} added twice to the indexer state",
-            precomputed_block.state_hash,
-        ));
-    }
-    Ok(())
 }
 
 fn should_report_from_block_count(block_count: u32) -> bool {
