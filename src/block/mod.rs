@@ -166,6 +166,12 @@ impl std::fmt::Debug for BlockHash {
     }
 }
 
+impl std::fmt::Display for BlockHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Parses the precomputed block if the path is a valid block file
 pub fn parse_file(path: &Path) -> anyhow::Result<PrecomputedBlock> {
     if is_valid_block_file(path) {
