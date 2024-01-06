@@ -13,7 +13,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{instrument, trace};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Branch {
     pub root: NodeId,
     pub branches: Tree<Block>,
