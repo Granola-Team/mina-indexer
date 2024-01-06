@@ -1,14 +1,14 @@
+use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::parser::BlockParser,
     state::{ExtensionType, IndexerState},
 };
-use std::path::PathBuf;
-use tokio::fs::remove_dir_all;
+use std::{fs::remove_dir_all, path::PathBuf};
 
 /// Adds the same block twice, second time fails
 #[tokio::test]
 async fn test() {
-    let block_store_dir = PathBuf::from("./test_block_store");
+    let block_store_dir = setup_new_db_dir("./test_block_store");
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
@@ -33,7 +33,7 @@ async fn test() {
     );
 
     // block1 = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let block1 = block0.clone();
+    let block1 = &block0;
     assert_eq!(
         block1.state_hash,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
@@ -61,7 +61,7 @@ async fn test() {
 
     // block not added again
     assert_eq!(
-        state.add_block(&block1).unwrap(),
+        state.add_block(block1).unwrap(),
         ExtensionType::BlockNotAdded
     );
 
@@ -73,5 +73,5 @@ async fn test() {
     assert_eq!(state.dangling_branches.len(), 1);
     assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
 
-    remove_dir_all(block_store_dir).await.unwrap();
+    remove_dir_all(block_store_dir).unwrap();
 }

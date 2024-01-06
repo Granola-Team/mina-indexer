@@ -1,3 +1,4 @@
+use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
@@ -10,13 +11,13 @@ use mina_indexer::{
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
 };
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn test() {
+    let db_path = setup_new_db_dir("./test_canonical_ledgers_store");
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
-    let db_path = PathBuf::from("./test_canonical_ledgers_store");
     let indexer_store = Arc::new(IndexerStore::new(&db_path).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
@@ -120,5 +121,5 @@ async fn test() {
         assert!(ledger == ledger_post, "Different ledgers (post)");
     }
 
-    fs::remove_dir_all(db_path).unwrap();
+    remove_dir_all(db_path).unwrap();
 }
