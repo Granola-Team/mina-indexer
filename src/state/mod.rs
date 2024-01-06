@@ -4,6 +4,7 @@ use crate::{
         BlockWithoutHeight,
     },
     canonical::store::CanonicityStore,
+    event::{state::StateEvent, store::EventStore, Event},
     state::{
         branch::Branch,
         ledger::{
@@ -76,6 +77,7 @@ pub struct Tip {
 pub enum IndexerPhase {
     InitializingFromBlockDir,
     InitializingFromDB,
+    Replaying,
     Watching,
     Testing,
 }
@@ -465,14 +467,6 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        if self.is_block_already_in_db(precomputed_block)? {
-            debug!(
-                "Block with state hash {:?} is already present in the block store",
-                precomputed_block.state_hash
-            );
-            return Ok(ExtensionType::BlockNotAdded);
-        }
-
         let incoming_length = precomputed_block.blockchain_length;
         if self.root_branch.root_block().blockchain_length > incoming_length {
             debug!(
@@ -657,26 +651,13 @@ impl IndexerState {
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<ExtensionType> {
-        self.dangling_branches
-            .push(Branch::new(precomputed_block).expect("cannot fail"));
-
+        self.dangling_branches.push(Branch::new(precomputed_block)?);
         Ok(ExtensionType::DanglingNew)
     }
 
     /// Checks if it's even possible to add block to the root branch
     fn is_length_within_root_bounds(&self, precomputed_block: &PrecomputedBlock) -> bool {
         self.best_tip_block().blockchain_length + 1 >= precomputed_block.blockchain_length
-    }
-
-    fn is_block_already_in_db(&self, precomputed_block: &PrecomputedBlock) -> anyhow::Result<bool> {
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            match indexer_store.get_block(&BlockHash(precomputed_block.state_hash.to_string()))? {
-                None => Ok(false),
-                Some(_block) => Ok(true),
-            }
-        } else {
-            Ok(false)
-        }
     }
 
     /// Update the best tip of the root branch
@@ -789,13 +770,118 @@ impl IndexerState {
         Ok(None)
     }
 
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u32 {
         let mut len = self.root_branch.len();
         for dangling in &self.dangling_branches {
             len += dangling.len();
         }
         len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn sync_from_db(&mut self, db_path: &std::path::Path) -> anyhow::Result<()> {
+        // TODO sync from db:
+        // - find the last new canonical block event (invariant: Some(height) == max_canonical_height)
+        //   - if none
+        //     - canonical and best tip are genesis
+        //     - add all NewBlock's to the witness tree
+        //   - if some
+        //     - root branch is canonical block
+        //     - add all successive NewBlock's to the state
+        todo!("sync from db at {}", db_path.display());
+    }
+
+    pub fn replay_events(&mut self) -> anyhow::Result<()> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            let events = indexer_store.get_event_log()?;
+            events
+                .iter()
+                .for_each(|event| self.replay_event(event).unwrap());
+        }
+        Ok(())
+    }
+
+    fn replay_event(&mut self, event: &Event) -> anyhow::Result<()> {
+        use crate::event::{block::*, db::*, ledger::*};
+
+        match event {
+            Event::Block(block_event) => match block_event {
+                BlockEvent::SawBlock(path) => {
+                    info!("Replay block at {}", path.display());
+                    todo!("replay {:?}", block_event);
+                }
+                BlockEvent::WatchDir(path) => {
+                    info!("Replay watch dir {}", path.display());
+                    todo!("set fs block watcher {:?}", block_event);
+                }
+            },
+            Event::Ledger(ledger_event) => match ledger_event {
+                LedgerEvent::NewLedger { hash, path } => {
+                    info!("replay new ledger hash {hash} at {}", path.display());
+                    todo!("replay {:?}", ledger_event);
+                }
+                LedgerEvent::WatchDir(path) => {
+                    info!("replay watch ledger dir {}", path.display());
+                    todo!("set fs ledger watcher {:?}", ledger_event);
+                }
+            },
+            Event::Db(db_event) => match db_event {
+                DbEvent::Block(db_block_event) => match db_block_event {
+                    DbBlockEvent::AlreadySeenBlock {
+                        state_hash,
+                        blockchain_length,
+                    } => {
+                        info!("replay already seen block in db (height {blockchain_length}, hash {state_hash})");
+                        Ok(())
+                    }
+                    DbBlockEvent::NewBlock {
+                        path,
+                        blockchain_length,
+                        state_hash,
+                    } => {
+                        info!("replay db new block at {} (height: {blockchain_length}, hash: {state_hash})", path.display());
+                        if let Some(indexer_store) = self.indexer_store.as_ref() {
+                            if let Ok(Some(block)) =
+                                indexer_store.get_block(&state_hash.to_string().into())
+                            {
+                                self.add_block(&block)?;
+                                Ok(())
+                            } else {
+                                Err(anyhow!(""))
+                            }
+                        } else {
+                            Err(anyhow!("no indexer store"))
+                        }
+                    }
+                },
+                DbEvent::Ledger(ledger_event) => match ledger_event {
+                    DbLedgerEvent::AlreadySeenLedger(hash) => {
+                        info!("replay already seen db ledger with hash {hash}");
+                        Ok(())
+                    }
+                    DbLedgerEvent::NewLedger { path, hash } => {
+                        info!("replay new db ledger hash {hash} at {}", path.display());
+                        Ok(())
+                    }
+                },
+                DbEvent::Canonicity(canonicity_event) => match canonicity_event {
+                    DbCanonicityEvent::NewCanonicalBlock {
+                        blockchain_length,
+                        state_hash,
+                    } => {
+                        info!("replay new canonical block (height: {blockchain_length}, hash: {state_hash})");
+                        Ok(())
+                    }
+                },
+            },
+            Event::State(StateEvent::UpdateCanonicalChain(blocks)) => {
+                info!("replay update canonical chain {:?}", blocks);
+                Ok(())
+            }
+        }
     }
 
     pub fn summary_short(&self) -> SummaryShort {
@@ -937,6 +1023,7 @@ impl std::fmt::Display for IndexerPhase {
             IndexerPhase::InitializingFromBlockDir | IndexerPhase::InitializingFromDB => {
                 write!(f, "initializing")
             }
+            IndexerPhase::Replaying => write!(f, "replaying"),
             IndexerPhase::Watching => write!(f, "watching"),
             IndexerPhase::Testing => write!(f, "testing"),
         }
