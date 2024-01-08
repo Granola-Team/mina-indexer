@@ -14,6 +14,24 @@ pub enum Event {
     State(state::StateEvent),
 }
 
+impl Event {
+    pub fn is_canonical_block_event(&self) -> bool {
+        matches!(
+            self,
+            Event::Db(db::DbEvent::Canonicity(
+                db::DbCanonicityEvent::NewCanonicalBlock { .. }
+            ))
+        )
+    }
+
+    pub fn is_new_block_event(&self) -> bool {
+        matches!(
+            self,
+            Event::Db(db::DbEvent::Block(db::DbBlockEvent::NewBlock { .. }))
+        )
+    }
+}
+
 impl std::fmt::Debug for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
