@@ -118,6 +118,11 @@ pub async fn main() -> anyhow::Result<()> {
                 }
             };
             let database_dir = args.database_dir.clone();
+            if database_dir.exists() {
+                // sync from existing db
+                is_sync = true;
+            }
+
             let log_dir = args.log_dir.clone();
             let log_level = args.log_level;
             let log_level_stdout = args.log_level_stdout;
@@ -126,12 +131,12 @@ pub async fn main() -> anyhow::Result<()> {
             let config = process_indexer_configuration(args)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
-            let indexer = if is_sync {
-                MinaIndexer::from_sync(config, db.clone()).await?
+            let indexer = if !is_replay && !is_sync {
+                MinaIndexer::new(config, db.clone()).await?
             } else if is_replay {
                 MinaIndexer::from_replay(config, db.clone()).await?
             } else {
-                MinaIndexer::new(config, db.clone()).await?
+                MinaIndexer::from_sync(config, db.clone()).await?
             };
             indexer.await_loop().await;
             Ok(())

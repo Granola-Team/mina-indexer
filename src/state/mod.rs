@@ -4,7 +4,7 @@ use crate::{
         BlockWithoutHeight,
     },
     canonical::store::CanonicityStore,
-    event::{db::*, state::StateEvent, store::EventStore, Event},
+    event::{block::*, db::*, ledger::*, state::*, store::*, Event},
     state::{
         branch::Branch,
         ledger::{
@@ -17,7 +17,8 @@ use crate::{
     },
     store::IndexerStore,
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-    MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
+    PRUNE_INTERVAL_DEFAULT,
 };
 use anyhow::anyhow;
 use id_tree::NodeId;
@@ -810,16 +811,97 @@ impl IndexerState {
         Ok(())
     }
 
+    /// Sync from an existing db
+    ///
+    /// Short-circuits adding blocks to the witness tree by starting at
+    /// the most recent canonical block and only adding the succeeding blocks
     pub fn sync_from_db(&mut self) -> anyhow::Result<()> {
-        // TODO sync from db:
-        // - find the last new canonical block event (invariant: Some(height) == max_canonical_height)
-        //   - if none
-        //     - canonical and best tip are genesis
-        //     - add all NewBlock's to the witness tree
-        //   - if some
-        //     - root branch is canonical block
-        //     - add all successive NewBlock's to the state
-        todo!("sync from db");
+        let mut successive_blocks = vec![];
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            let event_log = indexer_store.get_event_log()?;
+            let canonical_block_events =
+                event_log.iter().cloned().enumerate().filter_map(|(n, e)| {
+                    if e.is_canonical_block_event() {
+                        Some((n, e))
+                    } else {
+                        None
+                    }
+                });
+            if let Some((
+                n,
+                Event::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
+                    blockchain_length,
+                    state_hash,
+                })),
+            )) = canonical_block_events.last()
+            {
+                // invariant
+                assert_eq!(
+                    Some(blockchain_length),
+                    indexer_store.get_max_canonical_blockchain_length()?
+                );
+
+                // root branch root is canonical block
+                // add all successive NewBlock's to the witness tree
+
+                // TODO remove once genesis block is included in the db
+                if state_hash != *MAINNET_GENESIS_HASH {
+                    if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
+                        self.root_branch = Branch::new(&block)?;
+                        for state_hash in event_log.iter().skip(n).filter_map(|e| match e {
+                            Event::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                                state_hash,
+                                ..
+                            })) => Some(state_hash.clone()),
+                            _ => None,
+                        }) {
+                            if let Some(block) = indexer_store.get_block(&state_hash.into())? {
+                                successive_blocks.push(block);
+                            } else {
+                                panic!(
+                                    "Fatal sync error: block missing from db {}",
+                                    block.state_hash
+                                )
+                            }
+                        }
+                    } else {
+                        panic!("Fatal sync error: block missing from db {}", state_hash)
+                    }
+                } else {
+                    // TODO remove once genesis block is included in the db
+                    for state_hash in event_log.iter().filter_map(|e| match e {
+                        Event::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                            state_hash, ..
+                        })) => Some(state_hash.clone()),
+                        _ => None,
+                    }) {
+                        if let Some(block) = indexer_store.get_block(&state_hash.into())? {
+                            successive_blocks.push(block);
+                        }
+                    }
+                }
+            } else {
+                // add all NewBlock's to the witness tree
+                for state_hash in event_log.iter().filter_map(|e| match e {
+                    Event::Db(DbEvent::Block(DbBlockEvent::NewBlock { state_hash, .. })) => {
+                        Some(state_hash.clone())
+                    }
+                    _ => None,
+                }) {
+                    if let Some(block) = indexer_store.get_block(&state_hash.into())? {
+                        successive_blocks.push(block);
+                    }
+                }
+            }
+        } else {
+            panic!("Fatal sync error: no indexer store");
+        };
+
+        for block in successive_blocks {
+            self.add_block(&block)?;
+        }
+
+        Ok(())
     }
 
     /// Replay events on a mutable state
@@ -834,8 +916,6 @@ impl IndexerState {
     }
 
     fn replay_event(&mut self, event: &Event) -> anyhow::Result<()> {
-        use crate::event::{block::*, db::*, ledger::*};
-
         match event {
             Event::Block(block_event) => match block_event {
                 BlockEvent::SawBlock(path) => {
