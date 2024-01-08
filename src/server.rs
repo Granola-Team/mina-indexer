@@ -68,6 +68,12 @@ pub struct IpcChannelUpdate {
     pub store: Arc<IndexerStore>,
 }
 
+pub enum InitializationMode {
+    New,
+    Replay,
+    Sync,
+}
+
 impl MinaIndexer {
     pub async fn new(
         config: IndexerConfiguration,
@@ -92,7 +98,13 @@ impl MinaIndexer {
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(config, store, ipc_update_arc.clone(), false, false).await?;
+            let state = initialize(
+                config,
+                store,
+                ipc_update_arc.clone(),
+                InitializationMode::New,
+            )
+            .await?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -127,7 +139,13 @@ impl MinaIndexer {
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let mut state = initialize(config, store, ipc_update_arc.clone(), true, false).await?;
+            let mut state = initialize(
+                config,
+                store,
+                ipc_update_arc.clone(),
+                InitializationMode::Replay,
+            )
+            .await?;
 
             state.replay_events()?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
@@ -164,9 +182,15 @@ impl MinaIndexer {
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let mut state = initialize(config, store, ipc_update_arc.clone(), false, true).await?;
+            let mut state = initialize(
+                config,
+                store,
+                ipc_update_arc.clone(),
+                InitializationMode::Sync,
+            )
+            .await?;
 
-            state.replay_events()?;
+            state.sync_from_db()?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -203,8 +227,7 @@ pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
-    replay: bool,
-    sync: bool,
+    initialization_mode: InitializationMode,
 ) -> anyhow::Result<IndexerState> {
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
@@ -259,18 +282,22 @@ pub async fn initialize(
             })
             .await?;
 
-        if !replay && !sync {
-            info!("Parsing blocks");
-            let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-            state
-                .initialize_with_canonical_chain_discovery(&mut block_parser)
-                .await?;
-        } else if replay {
-            info!("Replaying from db at {}", db_path.display());
-            state.replay_events()?;
-        } else {
-            info!("Syncing from db at {}", db_path.display());
-            state.sync_from_db()?;
+        match initialization_mode {
+            InitializationMode::New => {
+                info!("Parsing blocks");
+                let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
+                state
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)
+                    .await?;
+            }
+            InitializationMode::Replay => {
+                info!("Replaying from db at {}", db_path.display());
+                state.replay_events()?;
+            }
+            InitializationMode::Sync => {
+                info!("Syncing from db at {}", db_path.display());
+                state.sync_from_db()?;
+            }
         }
 
         ipc_update_sender
