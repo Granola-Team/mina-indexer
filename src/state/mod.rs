@@ -810,7 +810,7 @@ impl IndexerState {
         Ok(())
     }
 
-    pub fn sync_from_db(&mut self, db_path: &std::path::Path) -> anyhow::Result<()> {
+    pub fn sync_from_db(&mut self) -> anyhow::Result<()> {
         // TODO sync from db:
         // - find the last new canonical block event (invariant: Some(height) == max_canonical_height)
         //   - if none
@@ -819,7 +819,7 @@ impl IndexerState {
         //   - if some
         //     - root branch is canonical block
         //     - add all successive NewBlock's to the state
-        todo!("sync from db at {}", db_path.display());
+        todo!("sync from db");
     }
 
     /// Replay events on a mutable state

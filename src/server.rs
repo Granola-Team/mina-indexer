@@ -75,25 +75,98 @@ impl MinaIndexer {
     ) -> anyhow::Result<Self> {
         let (query_sender, query_receiver) = mpsc::unbounded_channel();
         let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-
         let ipc_update_arc = Arc::new(ipc_update_sender.clone());
-
         let watch_dir = config.watch_dir.clone();
         let ipc_store = store.clone();
         let ipc_config = config.clone();
-
         let listener = LocalSocketListener::bind(SOCKET_NAME)
             .or_else(try_remove_old_socket)
             .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
+
         info!("Local socket listener started");
+
         let _ipc_join_handle = tokio::spawn(async move {
-            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
             info!("Spawning IPC Actor");
+
+            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
             ipc_actor.run().await
         });
-
         let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(config, store, ipc_update_arc.clone()).await?;
+            let state = initialize(config, store, ipc_update_arc.clone(), false, false).await?;
+            run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
+        });
+
+        Ok(Self {
+            _ipc_join_handle,
+            _witness_join_handle,
+            query_sender,
+            _ipc_update_sender: ipc_update_sender,
+        })
+    }
+
+    pub async fn from_replay(
+        config: IndexerConfiguration,
+        store: Arc<IndexerStore>,
+    ) -> anyhow::Result<Self> {
+        let (query_sender, query_receiver) = mpsc::unbounded_channel();
+        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
+        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
+        let watch_dir = config.watch_dir.clone();
+        let ipc_store = store.clone();
+        let ipc_config = config.clone();
+        let listener = LocalSocketListener::bind(SOCKET_NAME)
+            .or_else(try_remove_old_socket)
+            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
+
+        info!("Local socket listener started");
+
+        let _ipc_join_handle = tokio::spawn(async move {
+            info!("Spawning IPC Actor");
+
+            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
+            ipc_actor.run().await
+        });
+        let _witness_join_handle = tokio::spawn(async move {
+            let mut state = initialize(config, store, ipc_update_arc.clone(), true, false).await?;
+
+            state.replay_events()?;
+            run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
+        });
+
+        Ok(Self {
+            _ipc_join_handle,
+            _witness_join_handle,
+            query_sender,
+            _ipc_update_sender: ipc_update_sender,
+        })
+    }
+
+    pub async fn from_sync(
+        config: IndexerConfiguration,
+        store: Arc<IndexerStore>,
+    ) -> anyhow::Result<Self> {
+        let (query_sender, query_receiver) = mpsc::unbounded_channel();
+        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
+        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
+        let watch_dir = config.watch_dir.clone();
+        let ipc_store = store.clone();
+        let ipc_config = config.clone();
+        let listener = LocalSocketListener::bind(SOCKET_NAME)
+            .or_else(try_remove_old_socket)
+            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
+
+        info!("Local socket listener started");
+
+        let _ipc_join_handle = tokio::spawn(async move {
+            info!("Spawning IPC Actor");
+
+            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
+            ipc_actor.run().await
+        });
+        let _witness_join_handle = tokio::spawn(async move {
+            let mut state = initialize(config, store, ipc_update_arc.clone(), false, true).await?;
+
+            state.replay_events()?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -130,6 +203,8 @@ pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
+    replay: bool,
+    sync: bool,
 ) -> anyhow::Result<IndexerState> {
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
@@ -139,6 +214,7 @@ pub async fn initialize(
     .expect("Error setting Ctrl-C handler");
 
     info!("Starting mina-indexer server");
+    let db_path = store.db_path.clone();
     let IndexerConfiguration {
         ledger,
         root_hash,
@@ -183,11 +259,19 @@ pub async fn initialize(
             })
             .await?;
 
-        info!("Parsing blocks");
-        let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-        state
-            .initialize_with_contiguous_canonical(&mut block_parser)
-            .await?;
+        if !replay && !sync {
+            info!("Parsing blocks");
+            let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
+            state
+                .initialize_with_canonical_chain_discovery(&mut block_parser)
+                .await?;
+        } else if replay {
+            info!("Replaying from db at {}", db_path.display());
+            state.replay_events()?;
+        } else {
+            info!("Syncing from db at {}", db_path.display());
+            state.sync_from_db()?;
+        }
 
         ipc_update_sender
             .send(IpcChannelUpdate {
