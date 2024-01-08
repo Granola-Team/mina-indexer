@@ -28,9 +28,7 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
-        state.add_block(&precomputed_block).unwrap();
-    }
+    state.add_blocks(&mut block_parser).await.unwrap();
 
     // fresh state to replay events on top of
     let mut new_state = IndexerState::new(

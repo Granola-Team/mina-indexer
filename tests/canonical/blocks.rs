@@ -18,7 +18,6 @@ async fn test() {
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
         .unwrap()
         .ledger;
-    let mut n = 0;
     let mut state = IndexerState::new(
         BlockHash(MAINNET_GENESIS_HASH.to_string()),
         genesis_ledger,
@@ -29,16 +28,13 @@ async fn test() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
-        n += 1;
-        state.add_block(&precomputed_block).unwrap();
-    }
+    state.add_blocks(&mut block_parser).await.unwrap();
 
     println!("CANONICAL TIP: {:?}", state.canonical_tip_block());
     println!("BEST TIP:      {:?}", state.best_tip_block());
     println!("{state}");
 
-    assert_eq!(n, 20);
+    assert_eq!(block_parser.total_num_blocks, 20);
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
     let max_canonical_height = indexer_store
@@ -72,7 +68,7 @@ async fn test() {
 
     for n in 2..=max_canonical_height {
         assert_eq!(
-            Canonicity::Canonical,
+            Some(Canonicity::Canonical),
             state
                 .get_block_status(&BlockHash(
                     canonical_hashes.get((n - 1) as usize).unwrap().to_string(),

@@ -17,7 +17,6 @@ async fn add_and_get_events() {
         state_hash: "state_hash".into(),
     }));
     let event3 = Event::Db(DbEvent::Block(DbBlockEvent::NewBlock {
-        path: "block".into(),
         state_hash: "hash".into(),
         blockchain_length: 0,
     }));
@@ -26,7 +25,6 @@ async fn add_and_get_events() {
     )));
     let event5 = Event::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
         hash: "hash".into(),
-        path: "./path".into(),
     }));
     let event6 = Event::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
