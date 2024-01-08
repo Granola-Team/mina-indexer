@@ -4,7 +4,7 @@ use crate::{
         BlockWithoutHeight,
     },
     canonical::store::CanonicityStore,
-    event::{state::StateEvent, store::EventStore, Event},
+    event::{db::*, state::StateEvent, store::EventStore, Event},
     state::{
         branch::Branch,
         ledger::{
@@ -76,7 +76,7 @@ pub struct Tip {
 #[derive(Debug, Clone, PartialEq)]
 pub enum IndexerPhase {
     InitializingFromBlockDir,
-    InitializingFromDB,
+    SyncingFromDB,
     Replaying,
     Watching,
     Testing,
@@ -119,13 +119,13 @@ impl IndexerState {
 
         indexer_store
             .add_ledger(&root_hash, genesis_ledger.into())
-            .expect("ledger add succeeds");
+            .expect("add genesis ledger succeeds");
         indexer_store
             .set_max_canonical_blockchain_length(1)
-            .expect("ledger add succeeds");
+            .expect("set genesis blockchain length succeeds");
         indexer_store
             .add_canonical_block(1, &root_hash)
-            .expect("ledger add succeeds");
+            .expect("add genesis canonical block succeeds");
 
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
@@ -200,24 +200,25 @@ impl IndexerState {
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) -> anyhow::Result<()> {
+    fn prune_root_branch(&mut self) -> anyhow::Result<Option<StateEvent>> {
         let k = self.transition_frontier_length;
-        self.update_canonical()?;
+        if let Some(event) = self.update_canonical()? {
+            if self.root_branch.height() > self.prune_interval * k {
+                let best_tip_block = self.best_tip_block().clone();
+                debug!(
+                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
+                    k,
+                    self.best_tip_block().blockchain_length,
+                    self.canonical_tip_block().blockchain_length,
+                );
 
-        if self.root_branch.height() > self.prune_interval * k {
-            let best_tip_block = self.best_tip_block().clone();
-            debug!(
-                "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
-                k,
-                self.best_tip_block().blockchain_length,
-                self.canonical_tip_block().blockchain_length,
-            );
-
-            self.root_branch
-                .prune_transition_frontier(k, &best_tip_block);
+                self.root_branch
+                    .prune_transition_frontier(k, &best_tip_block);
+            }
+            return Ok(Some(event));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     /// The highest known canonical block
@@ -236,9 +237,9 @@ impl IndexerState {
     }
 
     /// Updates the canonical tip if the precondition is met
-    pub fn update_canonical(&mut self) -> anyhow::Result<()> {
+    pub fn update_canonical(&mut self) -> anyhow::Result<Option<StateEvent>> {
         if self.is_canonical_updatable() {
-            let mut canonical_hashes = vec![];
+            let mut canonical_blocks = vec![];
             let old_canonical_tip_id = self.canonical_tip.node_id.clone();
             let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
 
@@ -251,56 +252,43 @@ impl IndexerState {
                 .skip(MAINNET_CANONICAL_THRESHOLD.saturating_sub(1) as usize)
             {
                 // only add blocks between the old_canonical_tip and the new one
-                // canonical_hashes.push(self.canonical_tip.state_hash.clone());
-
                 if ancestor_id != &old_canonical_tip_id {
                     let ancestor_block = self.get_block_from_id(ancestor_id);
-                    canonical_hashes.push(ancestor_block.state_hash.clone());
-                } else {
-                    continue;
-                }
+                    canonical_blocks.push(ancestor_block.clone());
 
-                self.canonical_tip.node_id = ancestor_id.clone();
-                self.canonical_tip.state_hash =
-                    self.get_block_from_id(ancestor_id).state_hash.clone();
+                    // update canonical tip
+                    self.canonical_tip.node_id = ancestor_id.clone();
+                    self.canonical_tip.state_hash =
+                        self.get_block_from_id(ancestor_id).state_hash.clone();
+                } else {
+                    break;
+                }
             }
 
-            canonical_hashes.reverse();
+            canonical_blocks.reverse();
 
             // update ledger and canonicity stores
             if let Some(indexer_store) = self.indexer_store.as_ref() {
-                let mut ledger = indexer_store.get_ledger(&old_canonical_tip_hash)?.unwrap();
+                if let Some(mut ledger) = indexer_store.get_ledger(&old_canonical_tip_hash)? {
+                    // apply the new canonical diffs and store each nth resulting ledger (n = 100)
+                    for canonical_block in &canonical_blocks {
+                        if let Some(precomputed_block) =
+                            indexer_store.get_block(&canonical_block.state_hash)?
+                        {
+                            ledger.apply_post_balances(&precomputed_block);
+                            indexer_store.add_canonical_block(
+                                precomputed_block.blockchain_length,
+                                &precomputed_block.state_hash.into(),
+                            )?;
+                            indexer_store.set_max_canonical_blockchain_length(
+                                precomputed_block.blockchain_length,
+                            )?;
 
-                // apply the new canonical diffs and store each nth resulting ledger (n = 100)
-                for canonical_hash in &canonical_hashes {
-                    if let Some(precomputed_block) = indexer_store.get_block(canonical_hash)? {
-                        ledger.apply_post_balances(&precomputed_block);
-                        indexer_store.add_canonical_block(
-                            precomputed_block.blockchain_length,
-                            &precomputed_block.state_hash.into(),
-                        )?;
-                        indexer_store.set_max_canonical_blockchain_length(
-                            precomputed_block.blockchain_length,
-                        )?;
-
-                        if precomputed_block.blockchain_length % 100 == 0 {
-                            indexer_store.add_ledger(canonical_hash, ledger.clone())?;
+                            if precomputed_block.blockchain_length % 100 == 0 {
+                                indexer_store
+                                    .add_ledger(&canonical_block.state_hash, ledger.clone())?;
+                            }
                         }
-                    }
-                }
-            }
-
-            // update block canonicities
-            for block_hash in self.diffs_map.keys() {
-                if let Some(indexer_store) = self.indexer_store.as_ref() {
-                    if canonical_hashes.contains(block_hash) {
-                        indexer_store
-                            .set_block_canonicity(block_hash, Canonicity::Canonical)
-                            .unwrap();
-                    } else {
-                        indexer_store
-                            .set_block_canonicity(block_hash, Canonicity::Orphaned)
-                            .unwrap();
                     }
                 }
             }
@@ -317,9 +305,11 @@ impl IndexerState {
                         .remove(&self.get_block_from_id(&node_id).state_hash.clone());
                 }
             }
+
+            return Ok(Some(StateEvent::UpdateCanonicalChain(canonical_blocks)));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     fn is_canonical_updatable(&self) -> bool {
@@ -328,7 +318,9 @@ impl IndexerState {
     }
 
     /// Initialize indexer state from a collection of contiguous canonical blocks
-    pub async fn initialize_with_contiguous_canonical(
+    ///
+    /// Short-circuits adding canonical blocks to the witness tree
+    pub async fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
@@ -344,6 +336,7 @@ impl IndexerState {
                 info!("Adding blocks to the state...");
             }
 
+            // process canonical blocks first
             while self.blocks_processed < block_parser.num_canonical {
                 self.blocks_processed += 1;
 
@@ -390,23 +383,22 @@ impl IndexerState {
                     self.canonical_tip = self.best_tip.clone();
                 }
             }
+            assert_eq!(self.blocks_processed, block_parser.num_canonical);
         }
 
         // now add the successive non-canonical blocks
         self.add_blocks(block_parser).await
     }
 
-    /// Initialize indexer state without contiguous canonical blocks
-    pub async fn initialize_without_contiguous_canonical(
+    /// Initialize indexer state without short-circuiting canonical blocks
+    pub async fn initialize_without_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
         self.add_blocks(block_parser).await
     }
 
-    /// Adds blocks to the state according to block_parser then changes phase to Watching
-    ///
-    /// Returns the number of blocks parsed
+    /// Adds blocks to the state according to `block_parser` then changes phase to Watching
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let mut step_time = total_time;
@@ -446,7 +438,22 @@ impl IndexerState {
                 info!("Canonical tip:     {canonical_tip:?}");
             }
 
-            self.add_block(&block)?;
+            // *** block pipeline ***
+            // - add to db
+            // - add to witness tree
+            // - db processes canonical blocks
+            if let Some(db_event) = self.add_block_to_store(&block)? {
+                let new_canonical_blocks = if db_event.is_new_block_event() {
+                    let (_, StateEvent::UpdateCanonicalChain(blocks)) = self.add_block(&block)?;
+                    blocks
+                } else {
+                    vec![]
+                };
+
+                new_canonical_blocks
+                    .iter()
+                    .for_each(|block| self.add_canonical_block(block).unwrap());
+            }
         }
 
         info!(
@@ -460,37 +467,31 @@ impl IndexerState {
         Ok(())
     }
 
-    /// Adds the block to the witness tree and the precomputed block to the db
-    ///
-    /// Errors if the block is already present in the witness tree
+    /// Adds the block to the witness tree
     pub fn add_block(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<ExtensionType> {
+    ) -> anyhow::Result<(ExtensionType, StateEvent)> {
         let incoming_length = precomputed_block.blockchain_length;
         if self.root_branch.root_block().blockchain_length > incoming_length {
             debug!(
                 "Block with state hash {:?} has length {incoming_length} which is too low to add to the witness tree",
                 precomputed_block.state_hash,
             );
-            return Ok(ExtensionType::BlockNotAdded);
-        }
-        // add block to the db
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            indexer_store.add_block(precomputed_block)?;
+            return Ok((ExtensionType::BlockNotAdded, StateEvent::empty()));
         }
 
         self.blocks_processed += 1;
         self.diffs_map.insert(
-            BlockHash(precomputed_block.state_hash.clone()),
+            precomputed_block.state_hash.clone().into(),
             LedgerDiff::from_precomputed_block(precomputed_block),
         );
 
         // forward extension on root branch
         if self.is_length_within_root_bounds(precomputed_block) {
             if let Some(root_extension) = self.root_extension(precomputed_block)? {
-                self.prune_root_branch()?;
-                return Ok(root_extension);
+                let event = self.prune_root_branch()?;
+                return Ok((root_extension, event.unwrap_or(StateEvent::empty())));
             }
         }
 
@@ -498,15 +499,18 @@ impl IndexerState {
         if let Some((extended_branch_index, new_node_id, direction)) =
             self.dangling_extension(precomputed_block)?
         {
-            return self.update_dangling(
-                precomputed_block,
-                extended_branch_index,
-                new_node_id,
-                direction,
-            );
+            return self
+                .update_dangling(
+                    precomputed_block,
+                    extended_branch_index,
+                    new_node_id,
+                    direction,
+                )
+                .map(|ext| (ext, StateEvent::empty()));
         }
 
         self.new_dangling(precomputed_block)
+            .map(|ext| (ext, StateEvent::empty()))
     }
 
     /// Extends the root branch forward, potentially causing dangling branches to be merged into it
@@ -691,15 +695,29 @@ impl IndexerState {
         vec![]
     }
 
-    pub fn get_block_status(&self, state_hash: &BlockHash) -> Option<Canonicity> {
-        // first check the db, then diffs map
+    pub fn get_block_status(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return indexer_store.get_block_canonicity(state_hash).unwrap();
-        } else if self.diffs_map.get(state_hash).is_some() {
-            return Some(Canonicity::Pending);
+            if let Some(PrecomputedBlock {
+                blockchain_length, ..
+            }) = indexer_store.get_block(state_hash)?
+            {
+                if let Some(max_canonical_length) =
+                    indexer_store.get_max_canonical_blockchain_length()?
+                {
+                    if blockchain_length > max_canonical_length {
+                        return Ok(Some(Canonicity::Pending));
+                    } else if indexer_store.get_canonical_hash_at_height(blockchain_length)?
+                        == Some(state_hash.clone())
+                    {
+                        return Ok(Some(Canonicity::Canonical));
+                    } else {
+                        return Ok(Some(Canonicity::Orphaned));
+                    }
+                }
+            }
         }
 
-        None
+        Ok(None)
     }
 
     /// Returns the ledger corresponding to the best tip
@@ -733,9 +751,9 @@ impl IndexerState {
                 // apply diffs from canonical tip to best tip
                 hashes_since_canonical_tip.reverse();
                 for hash in hashes_since_canonical_tip {
-                    if let Some(precomputed_block) = indexer_store.get_block(&hash)? {
-                        ledger.apply_post_balances(&precomputed_block);
-                    }
+                    ledger
+                        .apply_diff(self.diffs_map.get(&hash).unwrap())
+                        .unwrap();
                 }
 
                 return Ok(Some(ledger));
@@ -778,6 +796,20 @@ impl IndexerState {
         self.len() == 0
     }
 
+    fn add_block_to_store(&mut self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            return Ok(Some(indexer_store.add_block(block)?));
+        }
+        Ok(None)
+    }
+
+    fn add_canonical_block(&mut self, block: &Block) -> anyhow::Result<()> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            indexer_store.add_canonical_block(block.blockchain_length, &block.state_hash)?;
+        }
+        Ok(())
+    }
+
     pub fn sync_from_db(&mut self, db_path: &std::path::Path) -> anyhow::Result<()> {
         // TODO sync from db:
         // - find the last new canonical block event (invariant: Some(height) == max_canonical_height)
@@ -790,6 +822,7 @@ impl IndexerState {
         todo!("sync from db at {}", db_path.display());
     }
 
+    /// Replay events on a mutable state
     pub fn replay_events(&mut self) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let events = indexer_store.get_event_log()?;
@@ -824,55 +857,56 @@ impl IndexerState {
                     todo!("set fs ledger watcher {:?}", ledger_event);
                 }
             },
-            Event::Db(db_event) => match db_event {
-                DbEvent::Block(db_block_event) => match db_block_event {
-                    DbBlockEvent::AlreadySeenBlock {
-                        state_hash,
-                        blockchain_length,
-                    } => {
-                        info!("replay already seen block in db (height {blockchain_length}, hash {state_hash})");
-                        Ok(())
-                    }
-                    DbBlockEvent::NewBlock {
-                        path,
-                        blockchain_length,
-                        state_hash,
-                    } => {
-                        info!("replay db new block at {} (height: {blockchain_length}, hash: {state_hash})", path.display());
-                        if let Some(indexer_store) = self.indexer_store.as_ref() {
-                            if let Ok(Some(block)) =
-                                indexer_store.get_block(&state_hash.to_string().into())
-                            {
-                                self.add_block(&block)?;
-                                Ok(())
-                            } else {
-                                Err(anyhow!(""))
-                            }
-                        } else {
-                            Err(anyhow!("no indexer store"))
+            Event::Db(db_event) => {
+                match db_event {
+                    DbEvent::Block(db_block_event) => match db_block_event {
+                        DbBlockEvent::AlreadySeenBlock {
+                            state_hash,
+                            blockchain_length,
+                        } => {
+                            info!("replay already seen block in db (height {blockchain_length}, hash {state_hash})");
+                            Ok(())
                         }
-                    }
-                },
-                DbEvent::Ledger(ledger_event) => match ledger_event {
-                    DbLedgerEvent::AlreadySeenLedger(hash) => {
-                        info!("replay already seen db ledger with hash {hash}");
-                        Ok(())
-                    }
-                    DbLedgerEvent::NewLedger { path, hash } => {
-                        info!("replay new db ledger hash {hash} at {}", path.display());
-                        Ok(())
-                    }
-                },
-                DbEvent::Canonicity(canonicity_event) => match canonicity_event {
-                    DbCanonicityEvent::NewCanonicalBlock {
-                        blockchain_length,
-                        state_hash,
-                    } => {
-                        info!("replay new canonical block (height: {blockchain_length}, hash: {state_hash})");
-                        Ok(())
-                    }
-                },
-            },
+                        DbBlockEvent::NewBlock {
+                            blockchain_length,
+                            state_hash,
+                        } => {
+                            info!("replay db new block (height: {blockchain_length}, hash: {state_hash})");
+                            if let Some(indexer_store) = self.indexer_store.as_ref() {
+                                if let Ok(Some(block)) =
+                                    indexer_store.get_block(&state_hash.to_string().into())
+                                {
+                                    self.add_block(&block)?;
+                                    Ok(())
+                                } else {
+                                    Err(anyhow!(""))
+                                }
+                            } else {
+                                Err(anyhow!("no indexer store"))
+                            }
+                        }
+                    },
+                    DbEvent::Ledger(ledger_event) => match ledger_event {
+                        DbLedgerEvent::AlreadySeenLedger(hash) => {
+                            info!("replay already seen db ledger with hash {hash}");
+                            Ok(())
+                        }
+                        DbLedgerEvent::NewLedger { hash } => {
+                            info!("replay new db ledger hash {hash}");
+                            Ok(())
+                        }
+                    },
+                    DbEvent::Canonicity(canonicity_event) => match canonicity_event {
+                        DbCanonicityEvent::NewCanonicalBlock {
+                            blockchain_length,
+                            state_hash,
+                        } => {
+                            info!("replay new canonical block (height: {blockchain_length}, hash: {state_hash})");
+                            Ok(())
+                        }
+                    },
+                }
+            }
             Event::State(StateEvent::UpdateCanonicalChain(blocks)) => {
                 info!("replay update canonical chain {:?}", blocks);
                 Ok(())
@@ -965,7 +999,6 @@ impl IndexerState {
 
     fn is_initializing(&self) -> bool {
         self.phase == IndexerPhase::InitializingFromBlockDir
-            || self.phase == IndexerPhase::InitializingFromDB
     }
 
     fn should_report_from_time(&self, duration: Duration) -> bool {
@@ -1002,9 +1035,8 @@ impl std::fmt::Display for IndexerState {
 impl std::fmt::Display for IndexerPhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndexerPhase::InitializingFromBlockDir | IndexerPhase::InitializingFromDB => {
-                write!(f, "initializing")
-            }
+            IndexerPhase::InitializingFromBlockDir => write!(f, "initializing"),
+            IndexerPhase::SyncingFromDB => write!(f, "syncing"),
             IndexerPhase::Replaying => write!(f, "replaying"),
             IndexerPhase::Watching => write!(f, "watching"),
             IndexerPhase::Testing => write!(f, "testing"),
