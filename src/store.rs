@@ -1,7 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
-    event::{store::EventStore, Event, db::*},
+    event::{db::*, store::EventStore, Event},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -88,7 +88,7 @@ impl IndexerStore {
 
 impl BlockStore for IndexerStore {
     /// Add the specified block at its state hash
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
         trace!(
             "Adding block with height {} and hash {}",
             block.blockchain_length,
@@ -101,11 +101,15 @@ impl BlockStore for IndexerStore {
         let value = serde_json::to_vec(&block)?;
         let blocks_cf = self.blocks_cf();
         self.database.put_cf(&blocks_cf, key, value)?;
-        
-        // add new block event
-        self.add_event(&Event::Db(DbEvent::Block(DbBlockEvent::NewBlock { path: ".".into(), state_hash: block.state_hash.clone(), blockchain_length: block.blockchain_length })))?;
 
-        Ok(())
+        // add new block event
+        let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
+            state_hash: block.state_hash.clone(),
+            blockchain_length: block.blockchain_length,
+        });
+        self.add_event(&Event::Db(db_event.clone()))?;
+
+        Ok(db_event)
     }
 
     /// Get the block with the specified hash
@@ -141,7 +145,8 @@ impl BlockStore for IndexerStore {
                     canonicity: Some(canonicity),
                     ..precomputed_block
                 };
-                self.add_block(&with_canonicity)
+                self.add_block(&with_canonicity)?;
+                Ok(())
             }
         }
     }
@@ -175,10 +180,15 @@ impl CanonicityStore for IndexerStore {
         let value = serde_json::to_vec(&state_hash)?;
         let canonicity_cf = self.canonicity_cf();
         self.database.put_cf(&canonicity_cf, key, value)?;
-        
+
         // record new canonical block event
-        self.add_event(&Event::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock { state_hash: state_hash.0.clone(), blockchain_length: height })))?;
-        
+        self.add_event(&Event::Db(DbEvent::Canonicity(
+            DbCanonicityEvent::NewCanonicalBlock {
+                state_hash: state_hash.0.clone(),
+                blockchain_length: height,
+            },
+        )))?;
+
         Ok(())
     }
 
@@ -242,7 +252,9 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(&ledgers_cf, key, value)?;
 
         // add new ledger event
-        self.add_event(&Event::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger { path: ".".into(), hash: state_hash.0.clone() })))?;
+        self.add_event(&Event::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
+            hash: state_hash.0.clone(),
+        })))?;
         Ok(())
     }
 
