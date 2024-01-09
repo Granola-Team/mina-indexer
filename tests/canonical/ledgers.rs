@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, store::BlockStore, BlockHash},
+    block::{parser::BlockParser, store::BlockStore},
     canonical::store::CanonicityStore,
     state::{
         ledger::{
@@ -24,7 +24,7 @@ async fn test() {
         .unwrap()
         .ledger;
     let mut state = IndexerState::new(
-        BlockHash(MAINNET_GENESIS_HASH.to_string()),
+        &MAINNET_GENESIS_HASH.into(),
         genesis_ledger,
         indexer_store,
         10,

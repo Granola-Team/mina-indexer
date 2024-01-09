@@ -21,28 +21,26 @@ pub struct Branch {
 
 impl Branch {
     /// Creates a new `Branch` from a given `PrecomputedBlock`
-    pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
-        let root_block = Block::from_precomputed(root_precomputed, 0);
+    pub fn new(precomputed_block: &PrecomputedBlock) -> anyhow::Result<Self> {
+        let root_block = Block::from_precomputed(precomputed_block, 0);
         let mut branches = Tree::new();
         let root = branches.insert(Node::new(root_block), AsRoot)?;
-
         Ok(Self { root, branches })
     }
 
     /// Creates a new `Branch` from a genesis hash
-    pub fn new_genesis(root_hash: BlockHash) -> Self {
+    pub fn new_genesis(root_hash: &BlockHash) -> anyhow::Result<Self> {
         let genesis_block = Block {
             state_hash: root_hash.clone(),
-            parent_hash: root_hash,
+            parent_hash: root_hash.clone(),
             height: 0,
             blockchain_length: 1,
             global_slot_since_genesis: 0,
         };
         let mut branches = Tree::new();
+        let root = branches.insert(Node::new(genesis_block), AsRoot)?;
 
-        let root = branches.insert(Node::new(genesis_block), AsRoot).unwrap();
-
-        Self { root, branches }
+        Ok(Self { root, branches })
     }
 
     /// Creates a new `Branch` from a `PrecomputedBlock` for testing

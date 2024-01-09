@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
+    block::parser::BlockParser,
     state::{ledger::genesis::GenesisRoot, IndexerState},
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
@@ -18,7 +18,7 @@ async fn test() {
         .unwrap()
         .ledger;
     let mut state0 = IndexerState::new(
-        BlockHash(MAINNET_GENESIS_HASH.to_string()),
+        &MAINNET_GENESIS_HASH.into(),
         genesis_ledger.clone(),
         indexer_store.clone(),
         10,
@@ -32,7 +32,7 @@ async fn test() {
 
     // fresh state to sync events
     let mut state1 = IndexerState::new(
-        BlockHash(MAINNET_GENESIS_HASH.to_string()),
+        &MAINNET_GENESIS_HASH.into(),
         genesis_ledger,
         indexer_store,
         10,
