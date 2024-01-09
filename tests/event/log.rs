@@ -2,7 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
-    event::{state::StateEvent, store::EventStore},
+    event::{store::EventStore, witness_tree::WitnessTreeEvent},
     state::{ledger::genesis::GenesisRoot, IndexerState},
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
@@ -60,7 +60,7 @@ async fn test() {
             .map(|store| store.add_block(&block).unwrap())
         {
             let new_canonical_blocks = if db_event.is_new_block_event() {
-                let (_, StateEvent::UpdateCanonicalChain(blocks)) =
+                let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
                     state1.add_block(&block).unwrap();
                 blocks
             } else {

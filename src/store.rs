@@ -1,7 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
-    event::{db::*, store::EventStore, Event},
+    event::{db::*, store::EventStore, IndexerEvent},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -103,11 +103,11 @@ impl BlockStore for IndexerStore {
         self.database.put_cf(&blocks_cf, key, value)?;
 
         // add new block event
-        let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
+        let db_event = DbEvent::Block(DbBlockWatcherEvent::NewBlock {
             state_hash: block.state_hash.clone(),
             blockchain_length: block.blockchain_length,
         });
-        self.add_event(&Event::Db(db_event.clone()))?;
+        self.add_event(&IndexerEvent::Db(db_event.clone()))?;
 
         Ok(db_event)
     }
@@ -182,7 +182,7 @@ impl CanonicityStore for IndexerStore {
         self.database.put_cf(&canonicity_cf, key, value)?;
 
         // record new canonical block event
-        self.add_event(&Event::Db(DbEvent::Canonicity(
+        self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
             DbCanonicityEvent::NewCanonicalBlock {
                 state_hash: state_hash.0.clone(),
                 blockchain_length: height,
@@ -252,9 +252,11 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(&ledgers_cf, key, value)?;
 
         // add new ledger event
-        self.add_event(&Event::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
-            hash: state_hash.0.clone(),
-        })))?;
+        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+            DbLedgerWatcherEvent::NewLedger {
+                hash: state_hash.0.clone(),
+            },
+        )))?;
         Ok(())
     }
 
@@ -314,11 +316,11 @@ impl LedgerStore for IndexerStore {
 }
 
 impl EventStore for IndexerStore {
-    fn add_event(&self, event: &Event) -> anyhow::Result<u32> {
+    fn add_event(&self, event: &IndexerEvent) -> anyhow::Result<u32> {
         let seq_num = self.get_next_seq_num()?;
         trace!("Adding event {seq_num}: {:?}", event);
 
-        if let Event::State(_) = event {
+        if let IndexerEvent::WitnessTree(_) = event {
             return Ok(seq_num);
         }
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -339,7 +341,7 @@ impl EventStore for IndexerStore {
         Ok(next_seq_num)
     }
 
-    fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<Event>> {
+    fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
         trace!("Getting event {seq_num}");
         self.database.try_catch_up_with_primary().unwrap_or(());
 
@@ -363,7 +365,7 @@ impl EventStore for IndexerStore {
         }
     }
 
-    fn get_event_log(&self) -> anyhow::Result<Vec<Event>> {
+    fn get_event_log(&self) -> anyhow::Result<Vec<IndexerEvent>> {
         trace!("Getting event log");
 
         let mut events = vec![];

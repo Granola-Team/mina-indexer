@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbEvent {
-    Block(DbBlockEvent),
+    Block(DbBlockWatcherEvent),
     Canonicity(DbCanonicityEvent),
-    Ledger(DbLedgerEvent),
+    Ledger(DbLedgerWatcherEvent),
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum DbBlockEvent {
+pub enum DbBlockWatcherEvent {
     AlreadySeenBlock {
         state_hash: String,
         blockchain_length: u32,
@@ -20,7 +20,7 @@ pub enum DbBlockEvent {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum DbLedgerEvent {
+pub enum DbLedgerWatcherEvent {
     AlreadySeenLedger(String),
     NewLedger { hash: String },
 }
@@ -35,7 +35,7 @@ pub enum DbCanonicityEvent {
 
 impl DbEvent {
     pub fn is_new_block_event(&self) -> bool {
-        matches!(self, DbEvent::Block(DbBlockEvent::NewBlock { .. }))
+        matches!(self, DbEvent::Block(DbBlockWatcherEvent::NewBlock { .. }))
     }
 }
 
@@ -49,7 +49,7 @@ impl std::fmt::Debug for DbEvent {
     }
 }
 
-impl std::fmt::Debug for DbBlockEvent {
+impl std::fmt::Debug for DbBlockWatcherEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlreadySeenBlock {
@@ -82,7 +82,7 @@ impl std::fmt::Debug for DbCanonicityEvent {
     }
 }
 
-impl std::fmt::Debug for DbLedgerEvent {
+impl std::fmt::Debug for DbLedgerWatcherEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlreadySeenLedger(hash) => write!(f, "db: already seen ledger ({hash})"),

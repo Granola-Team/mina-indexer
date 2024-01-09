@@ -3,22 +3,22 @@ use serde::{Deserialize, Serialize};
 pub mod block;
 pub mod db;
 pub mod ledger;
-pub mod state;
 pub mod store;
+pub mod witness_tree;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum Event {
-    Block(block::BlockEvent),
+pub enum IndexerEvent {
+    BlockWatcher(block::BlockWatcherEvent),
     Db(db::DbEvent),
-    Ledger(ledger::LedgerEvent),
-    State(state::StateEvent),
+    LedgerWatcher(ledger::LedgerWatcherEvent),
+    WitnessTree(witness_tree::WitnessTreeEvent),
 }
 
-impl Event {
+impl IndexerEvent {
     pub fn is_canonical_block_event(&self) -> bool {
         matches!(
             self,
-            Event::Db(db::DbEvent::Canonicity(
+            Self::Db(db::DbEvent::Canonicity(
                 db::DbCanonicityEvent::NewCanonicalBlock { .. }
             ))
         )
@@ -27,18 +27,18 @@ impl Event {
     pub fn is_new_block_event(&self) -> bool {
         matches!(
             self,
-            Event::Db(db::DbEvent::Block(db::DbBlockEvent::NewBlock { .. }))
+            Self::Db(db::DbEvent::Block(db::DbBlockWatcherEvent::NewBlock { .. }))
         )
     }
 }
 
-impl std::fmt::Debug for Event {
+impl std::fmt::Debug for IndexerEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Block(block_event) => write!(f, "{:?}", block_event),
+            Self::BlockWatcher(block_event) => write!(f, "{:?}", block_event),
             Self::Db(db_event) => write!(f, "{:?}", db_event),
-            Self::Ledger(ledger_event) => write!(f, "{:?}", ledger_event),
-            Self::State(state_event) => write!(f, "{:?}", state_event),
+            Self::LedgerWatcher(ledger_event) => write!(f, "{:?}", ledger_event),
+            Self::WitnessTree(tree_event) => write!(f, "{:?}", tree_event),
         }
     }
 }
