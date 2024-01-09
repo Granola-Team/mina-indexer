@@ -109,6 +109,34 @@ fn nanomina_to_mina(num: u64) -> String {
     dec_str
 }
 
+impl std::fmt::Display for Account {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let pk = self.public_key.to_address();
+        let delegate = self
+            .delegate
+            .as_ref()
+            .map(|pk| pk.to_address())
+            .unwrap_or(pk.clone());
+
+        let mut map = Map::new();
+        map.insert("pk".to_string(), Value::String(pk));
+        map.insert(
+            "balance".to_string(),
+            json!(nanomina_to_mina(self.balance.0)),
+        );
+        map.insert("nonce".to_string(), json!(self.nonce.0));
+        map.insert("delegate".to_string(), Value::String(delegate));
+
+        let value = Value::Object(map);
+        match to_string_pretty(&value) {
+            Ok(s) => writeln!(f, "{}", s),
+            Err(_) => Err(std::fmt::Error),
+        }
+    }
+}
+
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let pk = self.public_key.to_address();
