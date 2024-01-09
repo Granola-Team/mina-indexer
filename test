@@ -276,6 +276,103 @@ test_ledgers() {
     teardown
 }
 
+# Indexer server syncs with existing rocksdb
+test_sync() {
+    test=test_sync
+    setup
+
+    dl_mainnet 15 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    # pre-sync results
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+
+    # kill running indexer and release db lock
+    idxr_pid=$(pgrep mina-indexer)
+    kill "${idxr_pid}" 2>/dev/null || true
+    rm ./database/LOCK
+
+    # sync from previous indexer db
+    idxr server sync \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    # post-sync reults
+    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+
+    assert $canonical_hash $canonical_hash_sync
+    assert $canonical_length $canonical_length_sync
+    assert $best_hash $best_hash_sync
+    assert $best_length $best_length_sync
+
+    idxr_pid=$(pgrep mina-indexer)
+    teardown
+}
+
+# Indexer server replays events
+test_replay() {
+    test=test_replay
+    setup
+
+    dl_mainnet 15 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    # pre-replay results
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    num_blocks=$(idxr summary -j | jq -r .block_processed)
+
+    # kill running indexer and release db lock
+    idxr_pid=$(pgrep mina-indexer)
+    kill "${idxr_pid}" 2>/dev/null || true
+    rm ./database/LOCK
+
+    # replay events from previous indexer instance
+    idxr server replay \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    # post-replay reults
+    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    num_blocks_sync=$(idxr summary -j | jq -r .block_processed)
+
+    assert $canonical_hash $canonical_hash_sync
+    assert $canonical_length $canonical_length_sync
+    assert $best_hash $best_hash_sync
+    assert $best_length $best_length_sync
+    assert $num_blocks $num_blocks_sync
+
+    idxr_pid=$(pgrep mina-indexer)
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -288,6 +385,8 @@ if [ "$#" -eq 0 ]; then
     test_startup_dirs_get_created
     test_canonical_tip
     test_ledgers
+    test_sync
+    test_replay
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -301,6 +400,8 @@ else
             "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
             "test_canonical_tip") test_canonical_tip ;;
             "test_ledgers") test_ledgers ;;
+            "test_sync") test_sync ;;
+            "test_replay") test_replay ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
