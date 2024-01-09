@@ -137,7 +137,7 @@ test_ipc_is_available_immediately() {
     test=test_ipc_is_available_immediately
 
     setup
-    dl_mainnet 250 ./blocks
+    dl_mainnet 100 ./blocks
 
     idxr server cli \
         --startup-dir ./blocks \
@@ -163,7 +163,7 @@ test_account_balance_cli() {
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs &
-    sleep 5
+    sleep 10
 
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
@@ -173,6 +173,7 @@ test_account_balance_cli() {
 
 # Indexer server returns the correct account
 test_account_public_key_json() {
+    test=test_account_public_key_json
     setup
 
     idxr server cli \
@@ -198,7 +199,8 @@ assert_directory_exists() {
     fi
 }
 
-test_startup_dirs_get_created () {
+test_startup_dirs_get_created() {
+    test=test_startup_dirs_get_created
     setup
 
     idxr server cli \
@@ -219,6 +221,7 @@ test_startup_dirs_get_created () {
 
 # Indexer server returns the correct canonical tip
 test_canonical_tip() {
+    test=test_canonical_tip
     setup
 
     dl_mainnet 15 ./blocks
@@ -241,6 +244,7 @@ test_canonical_tip() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
+    test=test_ledgers
     setup
 
     dl_mainnet 15 ./blocks

@@ -326,7 +326,10 @@ pub async fn run(
 ) -> Result<(), anyhow::Error> {
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
     filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
-    info!("Block receiver set to watch {:?}", block_watch_dir.as_ref());
+    info!(
+        "Block receiver set to watch {}",
+        block_watch_dir.as_ref().to_path_buf().display()
+    );
 
     loop {
         tokio::select! {

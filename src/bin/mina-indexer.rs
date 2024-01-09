@@ -118,9 +118,11 @@ pub async fn main() -> anyhow::Result<()> {
                 }
             };
             let database_dir = args.database_dir.clone();
-            if database_dir.exists() {
-                // sync from existing db
-                is_sync = true;
+            if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
+                if dir.count() != 0 {
+                    // sync from existing db
+                    is_sync = true;
+                }
             }
 
             let log_dir = args.log_dir.clone();

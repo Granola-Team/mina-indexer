@@ -29,7 +29,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, trace};
 use uuid::Uuid;
 
 pub mod branch;
@@ -903,6 +903,11 @@ impl IndexerState {
         };
 
         for block in successive_blocks {
+            trace!(
+                "Sync: add block (height: {}): {}",
+                block.blockchain_length,
+                block.state_hash
+            );
             self.add_block(&block)?;
         }
 
