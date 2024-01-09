@@ -89,10 +89,10 @@ impl MinaIndexer {
             .or_else(try_remove_old_socket)
             .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
 
-        info!("Local socket listener started");
+        debug!("Local socket listener started");
 
         let _ipc_join_handle = tokio::spawn(async move {
-            info!("Spawning IPC Actor");
+            debug!("Spawning IPC Actor");
 
             let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
             ipc_actor.run().await
@@ -130,16 +130,16 @@ impl MinaIndexer {
             .or_else(try_remove_old_socket)
             .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
 
-        info!("Local socket listener started");
+        debug!("Local socket listener started");
 
         let _ipc_join_handle = tokio::spawn(async move {
-            info!("Spawning IPC Actor");
+            debug!("Spawning IPC Actor");
 
             let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let mut state = initialize(
+            let state = initialize(
                 config,
                 store,
                 ipc_update_arc.clone(),
@@ -147,7 +147,6 @@ impl MinaIndexer {
             )
             .await?;
 
-            state.replay_events()?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -173,16 +172,16 @@ impl MinaIndexer {
             .or_else(try_remove_old_socket)
             .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
 
-        info!("Local socket listener started");
+        debug!("Local socket listener started");
 
         let _ipc_join_handle = tokio::spawn(async move {
-            info!("Spawning IPC Actor");
+            debug!("Spawning IPC Actor");
 
             let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let mut state = initialize(
+            let state = initialize(
                 config,
                 store,
                 ipc_update_arc.clone(),
@@ -190,7 +189,6 @@ impl MinaIndexer {
             )
             .await?;
 
-            state.sync_from_db()?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -251,18 +249,42 @@ pub async fn initialize(
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
 
     let state = {
-        info!(
-            "Initializing indexer state from blocks in {}",
-            startup_dir.display()
-        );
-        let mut state = IndexerState::new(
-            root_hash.clone(),
-            ledger.ledger.clone(),
-            store,
-            MAINNET_TRANSITION_FRONTIER_K,
-            prune_interval,
-            canonical_update_threshold,
-        )?;
+        let mut state = match initialization_mode {
+            InitializationMode::New => {
+                info!(
+                    "Initializing indexer state from blocks in {}",
+                    startup_dir.display()
+                );
+                IndexerState::new(
+                    &root_hash,
+                    ledger.ledger.clone(),
+                    store,
+                    MAINNET_TRANSITION_FRONTIER_K,
+                    prune_interval,
+                    canonical_update_threshold,
+                )?
+            }
+            InitializationMode::Replay => {
+                info!("Replaying indexer events from db at {}", db_path.display());
+                IndexerState::new_without_genesis_events(
+                    &root_hash,
+                    store,
+                    MAINNET_TRANSITION_FRONTIER_K,
+                    prune_interval,
+                    canonical_update_threshold,
+                )?
+            }
+            InitializationMode::Sync => {
+                info!("Syncing indexer state from db at {}", db_path.display());
+                IndexerState::new_without_genesis_events(
+                    &root_hash,
+                    store,
+                    MAINNET_TRANSITION_FRONTIER_K,
+                    prune_interval,
+                    canonical_update_threshold,
+                )?
+            }
+        };
 
         info!("Getting best tip");
         let best_tip = state.best_tip_block().clone();
@@ -291,11 +313,9 @@ pub async fn initialize(
                     .await?;
             }
             InitializationMode::Replay => {
-                info!("Replaying from db at {}", db_path.display());
                 state.replay_events()?;
             }
             InitializationMode::Sync => {
-                info!("Syncing from db at {}", db_path.display());
                 state.sync_from_db()?;
             }
         }

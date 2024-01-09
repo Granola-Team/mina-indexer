@@ -342,13 +342,15 @@ impl EventStore for IndexerStore {
     }
 
     fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
-        trace!("Getting event {seq_num}");
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = seq_num.to_be_bytes();
         let events_cf = self.events_cf();
         let event = self.database.get_cf(&events_cf, key)?;
-        Ok(event.map(|bytes| serde_json::from_slice(&bytes).unwrap()))
+        let event = event.map(|bytes| serde_json::from_slice(&bytes).unwrap());
+
+        trace!("Getting event {seq_num}: {:?}", event.clone().unwrap());
+        Ok(event)
     }
 
     fn get_next_seq_num(&self) -> anyhow::Result<u32> {

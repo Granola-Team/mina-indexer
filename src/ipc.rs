@@ -59,11 +59,11 @@ impl IpcActor {
         loop {
             tokio::select! {
                 state = self.state_recv.recv() => {
-                    info!("Received IPC state update");
+                    debug!("Received IPC state update");
                     match state {
                         None => panic!("IPC channel closed"),
                         Some(state) => {
-                            info!("Setting IPC state");
+                            debug!("Setting IPC state");
                             *self.best_tip.write().await = state.best_tip;
                             *self.ledger.write().await = state.ledger;
                             *self.summary.write().await = Some(*state.summary);
