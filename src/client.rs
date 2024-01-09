@@ -129,14 +129,14 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
 
     async fn write_output<T>(input: &T, output_json: bool) -> std::io::Result<()>
     where
-        T: ?Sized + serde::Serialize + std::fmt::Debug,
+        T: ?Sized + serde::Serialize + std::fmt::Display,
     {
         if output_json {
             stdout()
                 .write_all(serde_json::to_string(&input)?.as_bytes())
                 .await
         } else {
-            stdout().write_all(format!("{input:?}").as_bytes()).await
+            stdout().write_all(format!("{input}").as_bytes()).await
         }
     }
 
@@ -204,7 +204,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
-            let not_available = "No summary available yet".as_bytes();
+            let not_available = "No summary available yet";
             if summary_args.verbose {
                 if let Ok(summary) = serde_json::from_slice::<SummaryVerbose>(&buffer) {
                     write_output(&summary, summary_args.json).await?;
@@ -221,7 +221,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let command = "shutdown \0".to_string();
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let msg: String = bcs::from_bytes(&buffer)?;
+            let msg: String = serde_json::from_slice(&buffer)?;
             println!("{msg}");
         }
     }

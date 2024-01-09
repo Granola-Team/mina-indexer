@@ -1,10 +1,11 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
+    event::db::DbEvent,
     state::Canonicity,
 };
 
 pub trait BlockStore {
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent>;
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>>;
     fn set_block_canonicity(
         &self,

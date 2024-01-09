@@ -71,11 +71,11 @@ async fn extension() {
     let mut state = IndexerState::new_testing(&root_block, None, None, None).unwrap();
 
     // other in dangling branch 0
-    let extension_type = state.add_block(&other_block).unwrap();
+    let (extension_type, _) = state.add_block(&other_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // leaf in dangling branch 1
-    let extension_type = state.add_block(&leaf_block).unwrap();
+    let (extension_type, _) = state.add_block(&leaf_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 2 dangling branches
@@ -99,7 +99,7 @@ async fn extension() {
     // ----------------
 
     // merges branch 2 into 0
-    let extension_type = state.add_block(&middle_block).unwrap();
+    let (extension_type, _) = state.add_block(&middle_block).unwrap();
     assert_eq!(extension_type, ExtensionType::RootComplex);
 
     for (idx, branch) in state.dangling_branches.iter().enumerate() {

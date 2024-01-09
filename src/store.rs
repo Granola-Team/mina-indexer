@@ -1,6 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
+    event::{db::*, store::EventStore, IndexerEvent},
     state::{
         ledger::{store::LedgerStore, Ledger},
         Canonicity,
@@ -26,7 +27,7 @@ impl IndexerStore {
             &database_opts,
             path,
             secondary,
-            vec!["blocks", "canonicity", "ledgers"],
+            vec!["blocks", "canonicity", "events", "ledgers"],
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -39,6 +40,7 @@ impl IndexerStore {
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
+        let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
 
         let mut database_opts = rocksdb::Options::default();
@@ -47,7 +49,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, ledgers],
+            vec![blocks, canonicity, events, ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -76,11 +78,17 @@ impl IndexerStore {
             .cf_handle("ledgers")
             .expect("ledgers column family exists")
     }
+
+    fn events_cf(&self) -> &rocksdb::ColumnFamily {
+        self.database
+            .cf_handle("events")
+            .expect("events column family exists")
+    }
 }
 
 impl BlockStore for IndexerStore {
     /// Add the specified block at its state hash
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
         trace!(
             "Adding block with height {} and hash {}",
             block.blockchain_length,
@@ -88,11 +96,20 @@ impl BlockStore for IndexerStore {
         );
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        // add block to db
         let key = block.state_hash.as_bytes();
-        let value = bcs::to_bytes(&block)?;
+        let value = serde_json::to_vec(&block)?;
         let blocks_cf = self.blocks_cf();
         self.database.put_cf(&blocks_cf, key, value)?;
-        Ok(())
+
+        // add new block event
+        let db_event = DbEvent::Block(DbBlockWatcherEvent::NewBlock {
+            state_hash: block.state_hash.clone(),
+            blockchain_length: block.blockchain_length,
+        });
+        self.add_event(&IndexerEvent::Db(db_event.clone()))?;
+
+        Ok(db_event)
     }
 
     /// Get the block with the specified hash
@@ -108,7 +125,7 @@ impl BlockStore for IndexerStore {
             .map(|bytes| bytes.to_vec())
         {
             None => Ok(None),
-            Some(bytes) => Ok(Some(bcs::from_bytes(&bytes)?)),
+            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         }
     }
 
@@ -128,7 +145,8 @@ impl BlockStore for IndexerStore {
                     canonicity: Some(canonicity),
                     ..precomputed_block
                 };
-                self.add_block(&with_canonicity)
+                self.add_block(&with_canonicity)?;
+                Ok(())
             }
         }
     }
@@ -157,10 +175,20 @@ impl CanonicityStore for IndexerStore {
         );
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        // add canonicity info
         let key = height.to_be_bytes();
-        let value = bcs::to_bytes(&state_hash)?;
+        let value = serde_json::to_vec(&state_hash)?;
         let canonicity_cf = self.canonicity_cf();
         self.database.put_cf(&canonicity_cf, key, value)?;
+
+        // record new canonical block event
+        self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
+            DbCanonicityEvent::NewCanonicalBlock {
+                state_hash: state_hash.0.clone(),
+                blockchain_length: height,
+            },
+        )))?;
+
         Ok(())
     }
 
@@ -177,7 +205,7 @@ impl CanonicityStore for IndexerStore {
             .map(|bytes| bytes.to_vec())
         {
             None => Ok(None),
-            Some(bytes) => Ok(Some(bcs::from_bytes(&bytes)?)),
+            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         }
     }
 
@@ -193,7 +221,7 @@ impl CanonicityStore for IndexerStore {
             .map(|bytes| bytes.to_vec())
         {
             None => Ok(None),
-            Some(bytes) => Ok(Some(bcs::from_bytes(&bytes)?)),
+            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         }
     }
 
@@ -203,7 +231,7 @@ impl CanonicityStore for IndexerStore {
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         let canonicity_cf = self.canonicity_cf();
-        let value = bcs::to_bytes(&height)?;
+        let value = serde_json::to_vec(&height)?;
         self.database
             .put_cf(&canonicity_cf, Self::MAX_CANONICAL_KEY, value)?;
         Ok(())
@@ -216,10 +244,19 @@ impl LedgerStore for IndexerStore {
         trace!("Adding ledger at {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        // add ledger to db
         let key = state_hash.0.as_bytes();
-        let value = bcs::to_bytes(&ledger.to_string())?;
+        let value = ledger.to_string();
+        let value = value.as_bytes();
         let ledgers_cf = self.ledgers_cf();
         self.database.put_cf(&ledgers_cf, key, value)?;
+
+        // add new ledger event
+        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+            DbLedgerWatcherEvent::NewLedger {
+                hash: state_hash.0.clone(),
+            },
+        )))?;
         Ok(())
     }
 
@@ -254,7 +291,7 @@ impl LedgerStore for IndexerStore {
             .database
             .get_pinned_cf(&ledgers_cf, key)?
             .map(|bytes| bytes.to_vec())
-            .map(|bytes| Ledger::from_str(bcs::from_bytes(&bytes).unwrap()).unwrap())
+            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
         {
             for block in to_apply {
                 ledger.apply_post_balances(&block);
@@ -278,7 +315,72 @@ impl LedgerStore for IndexerStore {
     }
 }
 
+impl EventStore for IndexerStore {
+    fn add_event(&self, event: &IndexerEvent) -> anyhow::Result<u32> {
+        let seq_num = self.get_next_seq_num()?;
+        trace!("Adding event {seq_num}: {:?}", event);
+
+        if let IndexerEvent::WitnessTree(_) = event {
+            return Ok(seq_num);
+        }
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        // add event to db
+        let key = seq_num.to_be_bytes();
+        let value = serde_json::to_vec(&event)?;
+        let events_cf = self.events_cf();
+        self.database.put_cf(&events_cf, key, value)?;
+
+        // increment event sequence number
+        let next_seq_num = seq_num + 1;
+        let value = serde_json::to_vec(&next_seq_num)?;
+        self.database
+            .put_cf(&events_cf, Self::NEXT_EVENT_SEQ_NUM_KEY, value)?;
+
+        // return next event sequence number
+        Ok(next_seq_num)
+    }
+
+    fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
+        trace!("Getting event {seq_num}");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let key = seq_num.to_be_bytes();
+        let events_cf = self.events_cf();
+        let event = self.database.get_cf(&events_cf, key)?;
+        Ok(event.map(|bytes| serde_json::from_slice(&bytes).unwrap()))
+    }
+
+    fn get_next_seq_num(&self) -> anyhow::Result<u32> {
+        trace!("Getting next event sequence number");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        if let Some(bytes) = self
+            .database
+            .get_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
+        {
+            serde_json::from_slice(&bytes).map_err(anyhow::Error::from)
+        } else {
+            Ok(0)
+        }
+    }
+
+    fn get_event_log(&self) -> anyhow::Result<Vec<IndexerEvent>> {
+        trace!("Getting event log");
+
+        let mut events = vec![];
+
+        for n in 0..self.get_next_seq_num()? {
+            if let Some(event) = self.get_event(n)? {
+                events.push(event);
+            }
+        }
+        Ok(events)
+    }
+}
+
 impl IndexerStore {
+    const NEXT_EVENT_SEQ_NUM_KEY: &[u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &[u8] = "max_canonical_blockchain_length".as_bytes();
 
     pub fn db_stats(&self) -> String {

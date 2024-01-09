@@ -1,3 +1,4 @@
+use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     canonical::store::CanonicityStore,
@@ -5,19 +6,18 @@ use mina_indexer::{
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
 };
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn test() {
+    let db_path = setup_new_db_dir("./test_canonical_blocks_store");
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
-    let db_path = PathBuf::from("./test_canonical_blocks_store");
     let indexer_store = Arc::new(IndexerStore::new(&db_path).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
         .unwrap()
         .ledger;
-    let mut n = 0;
     let mut state = IndexerState::new(
         BlockHash(MAINNET_GENESIS_HASH.to_string()),
         genesis_ledger,
@@ -28,16 +28,13 @@ async fn test() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
-        n += 1;
-        state.add_block(&precomputed_block).unwrap();
-    }
+    state.add_blocks(&mut block_parser).await.unwrap();
 
     println!("CANONICAL TIP: {:?}", state.canonical_tip_block());
     println!("BEST TIP:      {:?}", state.best_tip_block());
     println!("{state}");
 
-    assert_eq!(n, 20);
+    assert_eq!(block_parser.total_num_blocks, 20);
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
     let max_canonical_height = indexer_store
@@ -71,7 +68,7 @@ async fn test() {
 
     for n in 2..=max_canonical_height {
         assert_eq!(
-            Canonicity::Canonical,
+            Some(Canonicity::Canonical),
             state
                 .get_block_status(&BlockHash(
                     canonical_hashes.get((n - 1) as usize).unwrap().to_string(),
@@ -80,5 +77,5 @@ async fn test() {
         );
     }
 
-    fs::remove_dir_all(db_path).unwrap();
+    remove_dir_all(db_path).unwrap();
 }

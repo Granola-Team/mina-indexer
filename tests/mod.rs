@@ -1,4 +1,17 @@
 mod block;
 mod canonical;
+mod event;
 mod receiver;
 mod state;
+
+pub mod helpers {
+    pub fn setup_new_db_dir(db_path: &str) -> std::path::PathBuf {
+        let mut store_dir = std::env::temp_dir();
+        store_dir.push(db_path);
+
+        if store_dir.exists() {
+            std::fs::remove_dir_all(store_dir.clone()).unwrap();
+        }
+        store_dir
+    }
+}

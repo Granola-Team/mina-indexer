@@ -42,6 +42,10 @@ enum ServerCommand {
     },
     /// Start the mina indexer by passing in arguments manually on the command line
     Cli(ServerArgs),
+    /// Replay the events from an existing db to start the indexer
+    Replay(ServerArgs),
+    /// Sync from events in an existing db to start the indexer
+    Sync(ServerArgs),
 }
 
 #[derive(Parser, Debug, Clone, Deserialize)]
@@ -96,14 +100,31 @@ pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client(args) => client::run(&args).await,
         IndexerCommand::Server { server_command } => {
+            let mut is_sync = false;
+            let mut is_replay = false;
             let args = match server_command {
                 ServerCommand::Cli(args) => args,
                 ServerCommand::Config { path } => {
                     let config_file = tokio::fs::read(path).await?;
                     serde_yaml::from_reader(&config_file[..])?
                 }
+                ServerCommand::Sync(args) => {
+                    is_sync = true;
+                    args
+                }
+                ServerCommand::Replay(args) => {
+                    is_replay = true;
+                    args
+                }
             };
             let database_dir = args.database_dir.clone();
+            if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
+                if dir.count() != 0 {
+                    // sync from existing db
+                    is_sync = true;
+                }
+            }
+
             let log_dir = args.log_dir.clone();
             let log_level = args.log_level;
             let log_level_stdout = args.log_level_stdout;
@@ -112,7 +133,13 @@ pub async fn main() -> anyhow::Result<()> {
             let config = process_indexer_configuration(args)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
-            let indexer = MinaIndexer::new(config, db.clone()).await?;
+            let indexer = if !is_replay && !is_sync {
+                MinaIndexer::new(config, db.clone()).await?
+            } else if is_replay {
+                MinaIndexer::from_replay(config, db.clone()).await?
+            } else {
+                MinaIndexer::from_sync(config, db.clone()).await?
+            };
             indexer.await_loop().await;
             Ok(())
         }

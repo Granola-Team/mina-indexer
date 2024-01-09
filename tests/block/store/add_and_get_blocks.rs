@@ -1,22 +1,16 @@
-use std::{collections::HashMap, path::PathBuf};
-
+use std::{fs::remove_dir_all, collections::HashMap, path::PathBuf};
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD,
 };
 use tokio::time::Instant;
+use crate::helpers::setup_new_db_dir;
 
 #[tokio::test]
 async fn rocksdb() {
-    let mut store_dir = std::env::temp_dir();
-    store_dir.push("./block-store-test");
+    let store_dir = setup_new_db_dir("./block-store-test");
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
-
-    if tokio::fs::metadata(&store_dir).await.is_ok() {
-        tokio::fs::remove_dir_all(&store_dir).await.unwrap();
-    }
-    tokio::fs::create_dir(&store_dir).await.unwrap_or(());
 
     let db = IndexerStore::new(&store_dir).unwrap();
     let mut bp = BlockParser::new(log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
@@ -46,7 +40,5 @@ async fn rocksdb() {
     println!("To insert all:    {add_time:?}");
     println!("To fetch all:     {:?}\n", fetching.elapsed());
 
-    if tokio::fs::metadata(&store_dir).await.is_ok() {
-        tokio::fs::remove_dir_all(&store_dir).await.unwrap();
-    }
+    remove_dir_all(store_dir).unwrap();
 }

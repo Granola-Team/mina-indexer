@@ -13,13 +13,22 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{instrument, trace};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Branch {
     pub root: NodeId,
     pub branches: Tree<Block>,
 }
 
 impl Branch {
+    /// Creates a new `Branch` from a given `PrecomputedBlock`
+    pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
+        let root_block = Block::from_precomputed(root_precomputed, 0);
+        let mut branches = Tree::new();
+        let root = branches.insert(Node::new(root_block), AsRoot)?;
+
+        Ok(Self { root, branches })
+    }
+
     /// Creates a new `Branch` from a genesis hash
     pub fn new_genesis(root_hash: BlockHash) -> Self {
         let genesis_block = Block {
@@ -36,25 +45,6 @@ impl Branch {
         Self { root, branches }
     }
 
-    /// Creates a new `Branch` from an arbitrary starting hash
-    pub fn new_non_genesis(
-        root_hash: BlockHash,
-        blockchain_length: u32,
-        global_slot_since_genesis: u32,
-    ) -> Self {
-        let root_block = Block {
-            state_hash: root_hash.clone(),
-            parent_hash: root_hash,
-            height: 0,
-            global_slot_since_genesis,
-            blockchain_length,
-        };
-        let mut branches = Tree::new();
-        let root = branches.insert(Node::new(root_block), AsRoot).unwrap();
-
-        Self { root, branches }
-    }
-
     /// Creates a new `Branch` from a `PrecomputedBlock` for testing
     pub fn new_testing(precomputed_block: &PrecomputedBlock) -> Self {
         let root_block = Block::from_precomputed(precomputed_block, 0);
@@ -62,17 +52,6 @@ impl Branch {
         let root = branches.insert(Node::new(root_block), AsRoot).unwrap();
 
         Self { root, branches }
-    }
-}
-
-impl Branch {
-    /// Creates a new `Branch` from a given `PrecomputedBlock`
-    pub fn new(root_precomputed: &PrecomputedBlock) -> anyhow::Result<Self> {
-        let root_block = Block::from_precomputed(root_precomputed, 0);
-        let mut branches = Tree::new();
-        let root = branches.insert(Node::new(root_block), AsRoot)?;
-
-        Ok(Self { root, branches })
     }
 
     pub fn is_empty(&self) -> bool {
