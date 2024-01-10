@@ -1,6 +1,6 @@
 use crate::{
     block::{length_from_path, parse_file, precomputed::PrecomputedBlock},
-    canonical::chain_discovery::discovery,
+    canonicity::canonical_chain_discovery::discovery,
 };
 use anyhow::anyhow;
 use glob::glob;

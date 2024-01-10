@@ -1,7 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
-    canonical::store::CanonicityStore,
+    canonicity::store::CanonicityStore,
     event::{store::EventStore, witness_tree::WitnessTreeEvent},
     ledger::genesis::GenesisRoot,
     state::IndexerState,

@@ -1,9 +1,8 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    canonical::store::CanonicityStore,
+    canonicity::{store::CanonicityStore, Canonicity},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{store::LedgerStore, Ledger},
-    state::Canonicity,
 };
 use rocksdb::{ColumnFamilyDescriptor, DB};
 use std::{

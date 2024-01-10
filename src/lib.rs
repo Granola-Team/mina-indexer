@@ -1,5 +1,5 @@
 pub mod block;
-pub mod canonical;
+pub mod canonicity;
 pub mod client;
 pub mod event;
 pub mod ipc;

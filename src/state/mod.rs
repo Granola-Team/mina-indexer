@@ -3,7 +3,7 @@ use crate::{
         genesis::GenesisBlock, parser::BlockParser, precomputed::PrecomputedBlock,
         store::BlockStore, Block, BlockHash, BlockWithoutHeight,
     },
-    canonical::store::CanonicityStore,
+    canonicity::{store::CanonicityStore, Canonicity},
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger},
     state::{
@@ -19,7 +19,6 @@ use crate::{
 };
 use anyhow::anyhow;
 use id_tree::NodeId;
-use serde_derive::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -93,13 +92,6 @@ pub enum ExtensionType {
 pub enum ExtensionDirection {
     Forward,
     Reverse,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub enum Canonicity {
-    Canonical,
-    Orphaned,
-    Pending,
 }
 
 impl IndexerState {
