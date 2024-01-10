@@ -3,7 +3,7 @@ set -ex
 
 # Collect the binaries under test and the test ledger.
 IDXR="$(pwd)"/target/debug/mina-indexer
-LEDGER="$(pwd)"/tests/ledgers/mainnet-genesis.json
+LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
 # The rest of this script's logic assumes that the testing is done from within
