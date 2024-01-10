@@ -175,11 +175,14 @@ impl CanonicityStore for IndexerStore {
         );
         self.database.try_catch_up_with_primary().unwrap_or(());
 
-        // add canonicity info
+        // height -> state hash
         let key = height.to_be_bytes();
         let value = serde_json::to_vec(&state_hash)?;
         let canonicity_cf = self.canonicity_cf();
         self.database.put_cf(&canonicity_cf, key, value)?;
+
+        // update canonical chain length
+        self.set_max_canonical_blockchain_length(height)?;
 
         // record new canonical block event
         self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
