@@ -105,6 +105,7 @@ impl MinaIndexer {
                 InitializationMode::New,
             )
             .await?;
+
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 

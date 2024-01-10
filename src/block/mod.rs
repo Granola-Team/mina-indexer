@@ -1,9 +1,10 @@
-use self::precomputed::{BlockLogContents, PrecomputedBlock};
+use self::precomputed::{BlockFileContents, PrecomputedBlock};
 use anyhow::anyhow;
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
+pub mod genesis;
 pub mod parser;
 pub mod precomputed;
 pub mod signed_command;
@@ -185,7 +186,7 @@ pub fn parse_file(path: &Path) -> anyhow::Result<PrecomputedBlock> {
         let blockchain_length = get_blockchain_length(file_name);
         let state_hash = get_state_hash(file_name).expect("state hash already checked");
         let log_file_contents = std::fs::read(path)?;
-        let precomputed_block = PrecomputedBlock::from_log_contents(BlockLogContents {
+        let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
             state_hash,
             blockchain_length,
             contents: log_file_contents,
@@ -193,7 +194,7 @@ pub fn parse_file(path: &Path) -> anyhow::Result<PrecomputedBlock> {
         Ok(precomputed_block)
     } else {
         Err(anyhow!(
-            "Unable to parse invalid precomputed block: {}",
+            "Invalid precomputed block file name: {}",
             path.display()
         ))
     }

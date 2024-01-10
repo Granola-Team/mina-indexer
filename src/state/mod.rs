@@ -1,7 +1,7 @@
 use crate::{
     block::{
-        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
-        BlockWithoutHeight,
+        genesis::GenesisBlock, parser::BlockParser, precomputed::PrecomputedBlock,
+        store::BlockStore, Block, BlockHash, BlockWithoutHeight,
     },
     canonical::store::CanonicityStore,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
@@ -118,9 +118,17 @@ impl IndexerState {
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash)?;
 
+        // add genesis block and ledger to indexer store
+        let genesis_block = GenesisBlock::new()?.into();
+        indexer_store.add_block(&genesis_block)?;
+        info!("Genesis block added to indexer store");
+
         indexer_store
             .add_ledger(root_hash, genesis_ledger.into())
             .expect("add genesis ledger succeeds");
+        info!("Genesis ledger added to indexer store");
+
+        // update genesis canonicity
         indexer_store
             .set_max_canonical_blockchain_length(1)
             .expect("set genesis blockchain length succeeds");
