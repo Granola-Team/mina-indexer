@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::parser::BlockParser,
+    block::{parser::BlockParser, BlockWithoutHeight},
     state::{ledger::genesis::GenesisRoot, IndexerState},
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
@@ -17,7 +17,7 @@ async fn test() {
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
         .unwrap()
         .ledger;
-    let mut state0 = IndexerState::new(
+    let mut state = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
         genesis_ledger.clone(),
         indexer_store.clone(),
@@ -28,12 +28,11 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    state0.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).await.unwrap();
 
-    // fresh state to sync events
-    let mut state1 = IndexerState::new(
+    // fresh state to sync events with no genesis events
+    let mut state_sync = IndexerState::new_without_genesis_events(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger,
         indexer_store,
         10,
         PRUNE_INTERVAL_DEFAULT,
@@ -41,13 +40,24 @@ async fn test() {
     )
     .unwrap();
 
-    // sync state1 from state0's db
-    state1.sync_from_db().unwrap();
+    // sync from state's event store
+    state_sync.sync_from_db().unwrap();
 
     // witness trees are functionally equal
-    assert_eq!(state0.best_tip_block(), state1.best_tip_block());
-    assert_eq!(state0.canonical_tip_block(), state1.canonical_tip_block());
-    assert_eq!(state0.diffs_map, state1.diffs_map);
+    let best_tip: BlockWithoutHeight = state.best_tip_block().clone().into();
+    let canonical_tip: BlockWithoutHeight = state.canonical_tip_block().clone().into();
+    let best_tip_sync: BlockWithoutHeight = state_sync.best_tip_block().clone().into();
+    let canonical_tip_sync: BlockWithoutHeight = state_sync.canonical_tip_block().clone().into();
+
+    assert_eq!(best_tip, best_tip_sync);
+    assert_eq!(canonical_tip, canonical_tip_sync);
+
+    for state_hash in state_sync.diffs_map.keys() {
+        assert_eq!(
+            state.diffs_map.get(state_hash),
+            state_sync.diffs_map.get(state_hash)
+        );
+    }
 
     remove_dir_all(db_path).unwrap();
 }
