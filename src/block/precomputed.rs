@@ -1,11 +1,8 @@
 use crate::{
     block::{signed_command, BlockHash},
-    state::{
-        ledger::{
-            command::{self, PaymentPayload, UserCommandWithStatus},
-            public_key::PublicKey,
-        },
-        Canonicity,
+    ledger::{
+        command::{self, PaymentPayload, UserCommandWithStatus},
+        public_key::PublicKey,
     },
     MAINNET_GENESIS_TIMESTAMP,
 };
@@ -43,7 +40,6 @@ fn genesis_timestamp() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlock {
-    pub canonicity: Option<Canonicity>,
     pub state_hash: String,
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
@@ -70,7 +66,6 @@ impl PrecomputedBlock {
             protocol_state.body.consensus_state.blockchain_length.0
         };
         Ok(Self {
-            canonicity: None,
             state_hash,
             scheduled_time,
             blockchain_length,
