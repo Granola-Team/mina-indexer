@@ -27,7 +27,7 @@ impl IndexerEvent {
     pub fn is_new_block_event(&self) -> bool {
         matches!(
             self,
-            Self::Db(db::DbEvent::Block(db::DbBlockWatcherEvent::NewBlock { .. }))
+            Self::Db(db::DbEvent::Block(db::DbBlockEvent::NewBlock { .. }))
         )
     }
 }
