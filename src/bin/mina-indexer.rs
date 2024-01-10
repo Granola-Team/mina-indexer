@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
-    server::{IndexerConfiguration, MinaIndexer},
+    server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     state::ledger,
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
@@ -130,16 +130,18 @@ pub async fn main() -> anyhow::Result<()> {
             let log_level_stdout = args.log_level_stdout;
 
             init_tracing_logger(log_dir, log_level, log_level_stdout).await?;
-            let config = process_indexer_configuration(args)?;
-            let db = Arc::new(IndexerStore::new(&database_dir)?);
 
-            let indexer = if !is_replay && !is_sync {
-                MinaIndexer::new(config, db.clone()).await?
+            let mode = if !is_replay && !is_sync {
+                InitializationMode::New
             } else if is_replay {
-                MinaIndexer::from_replay(config, db.clone()).await?
+                InitializationMode::Replay
             } else {
-                MinaIndexer::from_sync(config, db.clone()).await?
+                InitializationMode::Sync
             };
+            let config = process_indexer_configuration(args, mode)?;
+            let db = Arc::new(IndexerStore::new(&database_dir)?);
+            let indexer = MinaIndexer::new(config, db.clone()).await?;
+
             indexer.await_loop().await;
             Ok(())
         }
@@ -178,7 +180,10 @@ async fn init_tracing_logger(
 }
 
 #[instrument(skip_all)]
-pub fn process_indexer_configuration(args: ServerArgs) -> anyhow::Result<IndexerConfiguration> {
+pub fn process_indexer_configuration(
+    args: ServerArgs,
+    mode: InitializationMode,
+) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.genesis_ledger;
     let root_hash = args.root_hash.into();
     let startup_dir = args.startup_dir;
@@ -217,6 +222,7 @@ pub fn process_indexer_configuration(args: ServerArgs) -> anyhow::Result<Indexer
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,
+                initialization_mode: mode,
             })
         }
     }
