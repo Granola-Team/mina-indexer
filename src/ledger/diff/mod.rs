@@ -1,10 +1,11 @@
+pub mod account;
+
 use crate::{
     block::precomputed::PrecomputedBlock,
-    ledger::{coinbase::Coinbase, command::Command, diff::account::AccountDiff, PublicKey},
+    command::Command,
+    ledger::{coinbase::Coinbase, diff::account::AccountDiff, PublicKey},
 };
 use serde::{Deserialize, Serialize};
-
-pub mod account;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
@@ -13,11 +14,11 @@ pub struct LedgerDiff {
 }
 
 impl LedgerDiff {
-    /// Compute a ledger diff from the specified precomputed block
+    /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed_block(precomputed_block: &PrecomputedBlock) -> Self {
         let coinbase = Coinbase::from_precomputed_block(precomputed_block);
         let coinbase_update = coinbase.clone().as_account_diff();
-        let commands = Command::from_precomputed_block(precomputed_block); // [A]
+        let commands = Command::from_precomputed(precomputed_block); // [A]
         let mut account_diffs_fees: Vec<AccountDiff> =
             AccountDiff::from_block_fees(coinbase.receiver, precomputed_block); // [A]
         let mut account_diffs_transactions = commands

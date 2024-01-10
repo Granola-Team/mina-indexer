@@ -1,6 +1,7 @@
 pub mod block;
 pub mod canonicity;
 pub mod client;
+pub mod command;
 pub mod event;
 pub mod ipc;
 pub mod ledger;

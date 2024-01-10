@@ -1,6 +1,5 @@
 pub mod account;
 pub mod coinbase;
-pub mod command;
 pub mod diff;
 pub mod genesis;
 pub mod post_balances;
@@ -9,13 +8,14 @@ pub mod store;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
+    command::{internal::FeeTransferUpdate, CommandType},
     ledger::{
         account::{Account, Amount, Nonce},
         diff::{
             account::{AccountDiff, UpdateType},
             LedgerDiff,
         },
-        post_balances::{CommandType, FeeTransferUpdate, PostBalance, PostBalanceUpdate},
+        post_balances::{PostBalance, PostBalanceUpdate},
         public_key::PublicKey,
     },
 };

@@ -1,20 +1,16 @@
 use crate::{
-    block::{signed_command, BlockHash},
-    ledger::{
-        command::{self, PaymentPayload, UserCommandWithStatus},
-        public_key::PublicKey,
-    },
+    block::BlockHash,
+    command::signed,
+    command::{signed::SignedCommand, PaymentPayload, UserCommandWithStatus},
+    ledger::public_key::PublicKey,
     MAINNET_GENESIS_TIMESTAMP,
 };
 use mina_serialization_types::{
     json::DeltaTransitionChainProofJson,
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
-    staged_ledger_diff::{
-        self, InternalCommandBalanceData, SignedCommandPayloadBody, StagedLedgerDiff,
-        StagedLedgerDiffJson, StakeDelegation, UserCommand,
-    },
-    v1::{DeltaTransitionChainProof, ProtocolStateProofV1, UserCommandWithStatusV1},
+    staged_ledger_diff as mina_rs,
+    v1::{DeltaTransitionChainProof, ProtocolStateProofV1},
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +26,7 @@ pub struct BlockFile {
     scheduled_time: String,
     protocol_state: ProtocolStateJson,
     protocol_state_proof: ProtocolStateProofBase64Json,
-    staged_ledger_diff: StagedLedgerDiffJson,
+    staged_ledger_diff: mina_rs::StagedLedgerDiffJson,
     delta_transition_chain_proof: DeltaTransitionChainProofJson,
 }
 
@@ -45,7 +41,7 @@ pub struct PrecomputedBlock {
     pub protocol_state: ProtocolState,
     pub blockchain_length: u32,
     pub protocol_state_proof: ProtocolStateProofV1,
-    pub staged_ledger_diff: StagedLedgerDiff,
+    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
     pub delta_transition_chain_proof: DeltaTransitionChainProof,
 }
 
@@ -76,7 +72,7 @@ impl PrecomputedBlock {
         })
     }
 
-    pub fn commands(&self) -> Vec<UserCommandWithStatusV1> {
+    pub fn commands(&self) -> Vec<UserCommandWithStatus> {
         self.staged_ledger_diff
             .diff
             .clone()
@@ -85,6 +81,10 @@ impl PrecomputedBlock {
             .inner()
             .inner()
             .commands
+            .iter()
+            .cloned()
+            .map(UserCommandWithStatus)
+            .collect()
     }
 
     pub fn block_creator(&self) -> PublicKey {
@@ -100,7 +100,7 @@ impl PrecomputedBlock {
             .into()
     }
 
-    fn internal_command_balances(&self) -> Vec<InternalCommandBalanceData> {
+    fn internal_command_balances(&self) -> Vec<mina_rs::InternalCommandBalanceData> {
         self.staged_ledger_diff
             .diff
             .clone()
@@ -116,7 +116,7 @@ impl PrecomputedBlock {
 
     pub fn coinbase_receiver_balance(&self) -> Option<u64> {
         for internal_balance in self.internal_command_balances() {
-            if let InternalCommandBalanceData::CoinBase(x) = internal_balance {
+            if let mina_rs::InternalCommandBalanceData::CoinBase(x) = internal_balance {
                 return Some(x.t.coinbase_receiver_balance.t.t.t);
             }
         }
@@ -126,7 +126,7 @@ impl PrecomputedBlock {
 
     pub fn fee_transfer_receiver1_balance(&self) -> Option<u64> {
         for internal_balance in self.internal_command_balances() {
-            if let InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
+            if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
                 return Some(x.t.receiver1_balance.t.t.t);
             }
         }
@@ -136,7 +136,7 @@ impl PrecomputedBlock {
 
     pub fn fee_transfer_receiver2_balance(&self) -> Option<u64> {
         for internal_balance in self.internal_command_balances() {
-            if let InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
+            if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
                 return x.t.receiver2_balance.map(|balance| balance.t.t.t);
             }
         }
@@ -177,23 +177,23 @@ impl PrecomputedBlock {
         let commands = self.commands();
         commands
             .iter()
-            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
+            .filter(|command| command.is_applied())
             .for_each(|command| {
-                let signed_command = match UserCommandWithStatus(command.clone()).data() {
-                    staged_ledger_diff::UserCommand::SignedCommand(signed_command) => {
-                        command::SignedCommand(signed_command)
+                let signed_command = match command.clone().data() {
+                    mina_rs::UserCommand::SignedCommand(signed_command) => {
+                        SignedCommand(signed_command)
                     }
                 };
                 public_keys.push(signed_command.signer());
                 public_keys.push(signed_command.fee_payer_pk());
                 public_keys.append(&mut match signed_command.payload_body() {
-                    SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
+                    mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
                         PaymentPayload(payment_payload.clone()).source_pk(),
                         PaymentPayload(payment_payload).receiver_pk(),
                     ],
-                    SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
+                    mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
                         match stake_delegation.inner() {
-                            StakeDelegation::SetDelegate {
+                            mina_rs::StakeDelegation::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } => vec![delegator.into(), new_delegate.into()],
@@ -236,15 +236,10 @@ impl PrecomputedBlock {
         BlockHash::from_hashv1(self.protocol_state.previous_state_hash.clone())
     }
 
-    pub fn transaction_hashes(&self) -> Vec<String> {
-        self.commands()
+    pub fn command_hashes(&self) -> Vec<String> {
+        signed::SignedCommand::from_precomputed(self)
             .iter()
-            .map(|commandv1| {
-                let UserCommand::SignedCommand(signed_commandv1) = commandv1.t.data.t.t.clone();
-                signed_command::SignedCommand(signed_commandv1)
-                    .hash_signed_command()
-                    .unwrap()
-            })
+            .map(|cmd| cmd.hash_signed_command().unwrap())
             .collect()
     }
 }

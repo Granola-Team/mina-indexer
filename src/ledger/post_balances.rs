@@ -1,21 +1,11 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, signed_command::SignedCommand},
-    ledger::{
-        command::{CommandStatusData, UserCommandWithStatus},
-        public_key::PublicKey,
+    block::precomputed::PrecomputedBlock,
+    command::{
+        internal::FeeTransferUpdate, signed::SignedCommand, CommandStatusData, CommandType,
+        CommandUpdate,
     },
+    ledger::public_key::PublicKey,
 };
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
-pub enum CommandType {
-    Payment,
-    Delegation,
-}
-
-pub struct PostBalance {
-    pub public_key: PublicKey,
-    pub balance: u64,
-}
 
 pub enum PostBalanceUpdate {
     User(CommandUpdate),
@@ -23,17 +13,9 @@ pub enum PostBalanceUpdate {
     FeeTransfer(FeeTransferUpdate),
 }
 
-pub struct CommandUpdate {
-    pub source_nonce: u32,
-    pub command_type: CommandType,
-    pub fee_payer: PostBalance,
-    pub source: PostBalance,
-    pub receiver: PostBalance,
-}
-
-pub enum FeeTransferUpdate {
-    One(PostBalance),
-    Two(PostBalance, PostBalance),
+pub struct PostBalance {
+    pub public_key: PublicKey,
+    pub balance: u64,
 }
 
 impl PostBalanceUpdate {
@@ -52,7 +34,6 @@ impl PostBalanceUpdate {
         let mut commands: Vec<Self> = precomputed_block
             .commands()
             .iter()
-            .map(|command| UserCommandWithStatus(command.clone()))
             .flat_map(|command| {
                 let signed_command = SignedCommand::from_user_command(command.clone());
                 let source_nonce = signed_command.source_nonce();

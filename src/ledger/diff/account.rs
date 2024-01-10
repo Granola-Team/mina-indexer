@@ -1,9 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    ledger::{
-        command::{Command, SignedCommand, UserCommandWithStatus},
-        Amount, PublicKey,
-    },
+    command::{signed::SignedCommand, Command},
+    ledger::{Amount, PublicKey},
 };
 use mina_serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand};
 use serde::{Deserialize, Serialize};
@@ -55,10 +53,12 @@ impl AccountDiff {
                     update_type: UpdateType::Deposit,
                 }),
             ],
-            Command::Delegation(delegation) => vec![AccountDiff::Delegation(DelegationDiff {
-                delegator: delegation.delegator,
-                delegate: delegation.delegate,
-            })],
+            Command::Delegation(delegation) => {
+                vec![AccountDiff::Delegation(DelegationDiff {
+                    delegator: delegation.delegator,
+                    delegate: delegation.delegate,
+                })]
+            }
         }
     }
 
@@ -88,9 +88,9 @@ impl AccountDiff {
         precomputed_block
             .commands()
             .iter()
-            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
+            .filter(|command| command.is_applied())
             .flat_map(
-                |command| match command.clone().inner().data.inner().inner() {
+                |command| match command.0.clone().inner().data.inner().inner() {
                     UserCommand::SignedCommand(signed_command) => {
                         let SignedCommandPayloadCommon {
                             fee,
@@ -163,10 +163,9 @@ impl std::fmt::Debug for UpdateType {
 #[cfg(test)]
 mod tests {
     use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
-    use crate::ledger::{
-        account::Amount,
+    use crate::{
         command::{Command, Delegation, Payment},
-        PublicKey,
+        ledger::{account::Amount, PublicKey},
     };
 
     // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw for all tests below

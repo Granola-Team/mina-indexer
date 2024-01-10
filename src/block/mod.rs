@@ -1,15 +1,13 @@
+pub mod genesis;
+pub mod parser;
+pub mod precomputed;
+pub mod store;
+
 use self::precomputed::{BlockFileContents, PrecomputedBlock};
 use anyhow::anyhow;
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
-
-pub mod genesis;
-pub mod parser;
-pub mod precomputed;
-pub mod signed_command;
-pub mod store;
-pub mod transaction;
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
