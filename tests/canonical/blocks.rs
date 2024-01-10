@@ -19,7 +19,7 @@ async fn test() {
         .unwrap()
         .ledger;
     let mut state = IndexerState::new(
-        BlockHash(MAINNET_GENESIS_HASH.to_string()),
+        &MAINNET_GENESIS_HASH.into(),
         genesis_ledger,
         indexer_store,
         10,

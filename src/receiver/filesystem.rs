@@ -41,7 +41,7 @@ impl FilesystemReceiver {
         event_capacity: usize,
         error_capacity: usize,
     ) -> FilesystemReceiverResult<Self> {
-        info!("initializing new filesystem receiver");
+        debug!("initializing new filesystem receiver");
         let (ev_s, worker_event_receiver) = priority::bounded(event_capacity);
         let (er_s, worker_error_receiver) = mpsc::channel(error_capacity);
         let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());

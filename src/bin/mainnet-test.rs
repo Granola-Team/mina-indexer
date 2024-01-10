@@ -1,7 +1,7 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
+    block::parser::BlockParser,
     state::{ledger::genesis, IndexerState},
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
 
     let total_time = Instant::now();
     let mut state = IndexerState::new(
-        BlockHash(GENESIS_HASH.to_string()),
+        &GENESIS_HASH.into(),
         genesis_root.ledger,
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,

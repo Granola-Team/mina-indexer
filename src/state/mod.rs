@@ -109,23 +109,23 @@ pub enum Canonicity {
 impl IndexerState {
     /// Creates a new indexer state from the genesis ledger
     pub fn new(
-        root_hash: BlockHash,
+        root_hash: &BlockHash,
         genesis_ledger: GenesisLedger,
         indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(root_hash.clone());
+        let root_branch = Branch::new_genesis(root_hash)?;
 
         indexer_store
-            .add_ledger(&root_hash, genesis_ledger.into())
+            .add_ledger(root_hash, genesis_ledger.into())
             .expect("add genesis ledger succeeds");
         indexer_store
             .set_max_canonical_blockchain_length(1)
             .expect("set genesis blockchain length succeeds");
         indexer_store
-            .add_canonical_block(1, &root_hash)
+            .add_canonical_block(1, root_hash)
             .expect("add genesis canonical block succeeds");
 
         let tip = Tip {
@@ -135,6 +135,36 @@ impl IndexerState {
 
         Ok(Self {
             phase: IndexerPhase::InitializingFromBlockDir,
+            canonical_tip: tip.clone(),
+            diffs_map: HashMap::new(),
+            best_tip: tip,
+            root_branch,
+            dangling_branches: Vec::new(),
+            indexer_store: Some(indexer_store),
+            transition_frontier_length,
+            prune_interval,
+            canonical_update_threshold,
+            blocks_processed: 0,
+            init_time: Instant::now(),
+        })
+    }
+
+    /// Creates a new indexer state without genesis events
+    pub fn new_without_genesis_events(
+        root_hash: &BlockHash,
+        indexer_store: Arc<IndexerStore>,
+        transition_frontier_length: u32,
+        prune_interval: u32,
+        canonical_update_threshold: u32,
+    ) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_genesis(root_hash)?;
+        let tip = Tip {
+            state_hash: root_branch.root_block().state_hash.clone(),
+            node_id: root_branch.root.clone(),
+        };
+
+        Ok(Self {
+            phase: IndexerPhase::SyncingFromDB,
             canonical_tip: tip.clone(),
             diffs_map: HashMap::new(),
             best_tip: tip,
@@ -524,6 +554,11 @@ impl IndexerState {
     ) -> anyhow::Result<Option<ExtensionType>> {
         if let Some((new_node_id, new_block)) = self.root_branch.simple_extension(precomputed_block)
         {
+            trace!(
+                "root extension (length {}): {}",
+                precomputed_block.blockchain_length,
+                precomputed_block.state_hash
+            );
             // check if new block connects to a dangling branch
             let mut merged_tip_id = None;
             let mut branches_to_remove = Vec::new();
@@ -851,6 +886,13 @@ impl IndexerState {
                 if state_hash != *MAINNET_GENESIS_HASH {
                     if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
                         self.root_branch = Branch::new(&block)?;
+
+                        let tip = Tip {
+                            state_hash: self.root_branch.root_block().state_hash.clone(),
+                            node_id: self.root_branch.root.clone(),
+                        };
+                        self.canonical_tip = tip.clone();
+                        self.best_tip = tip;
                         for state_hash in event_log.iter().skip(n).filter_map(|e| match e {
                             IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
                                 state_hash,

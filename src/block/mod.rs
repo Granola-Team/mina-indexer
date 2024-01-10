@@ -115,6 +115,12 @@ impl From<String> for BlockHash {
     }
 }
 
+impl From<&str> for BlockHash {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 impl std::cmp::PartialOrd for Block {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
