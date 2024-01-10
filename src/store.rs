@@ -2,10 +2,8 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonical::store::CanonicityStore,
     event::{db::*, store::EventStore, IndexerEvent},
-    state::{
-        ledger::{store::LedgerStore, Ledger},
-        Canonicity,
-    },
+    ledger::{store::LedgerStore, Ledger},
+    state::Canonicity,
 };
 use rocksdb::{ColumnFamilyDescriptor, DB};
 use std::{
@@ -87,7 +85,7 @@ impl IndexerStore {
 }
 
 impl BlockStore for IndexerStore {
-    /// Add the specified block at its state hash
+    /// Add the given block at its state hash and record a DbNewBlockevent
     fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
         trace!(
             "Adding block with height {} and hash {}",
@@ -103,7 +101,7 @@ impl BlockStore for IndexerStore {
         self.database.put_cf(&blocks_cf, key, value)?;
 
         // add new block event
-        let db_event = DbEvent::Block(DbBlockWatcherEvent::NewBlock {
+        let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
             state_hash: block.state_hash.clone(),
             blockchain_length: block.blockchain_length,
         });
@@ -126,42 +124,6 @@ impl BlockStore for IndexerStore {
         {
             None => Ok(None),
             Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-        }
-    }
-
-    /// Set the speicifed block's canonicity
-    fn set_block_canonicity(
-        &self,
-        state_hash: &BlockHash,
-        canonicity: Canonicity,
-    ) -> anyhow::Result<()> {
-        trace!("Setting canonicity of block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
-
-        match self.get_block(state_hash)? {
-            None => Ok(()),
-            Some(precomputed_block) => {
-                let with_canonicity = PrecomputedBlock {
-                    canonicity: Some(canonicity),
-                    ..precomputed_block
-                };
-                self.add_block(&with_canonicity)?;
-                Ok(())
-            }
-        }
-    }
-
-    /// Get the specified block's canonicity
-    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
-        trace!("Getting canonicity of block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
-
-        match self.get_block(state_hash)? {
-            Some(PrecomputedBlock {
-                canonicity: Some(block_canonicity),
-                ..
-            }) => Ok(Some(block_canonicity)),
-            _ => Ok(None),
         }
     }
 }
@@ -239,6 +201,30 @@ impl CanonicityStore for IndexerStore {
             .put_cf(&canonicity_cf, Self::MAX_CANONICAL_KEY, value)?;
         Ok(())
     }
+
+    /// Get the specified block's canonicity
+    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+        trace!("Getting canonicity of block with hash {}", state_hash.0);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        if let Some(PrecomputedBlock {
+            blockchain_length, ..
+        }) = self.get_block(state_hash)?
+        {
+            if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {
+                if blockchain_length > max_canonical_length {
+                    return Ok(Some(Canonicity::Pending));
+                } else if self.get_canonical_hash_at_height(blockchain_length)?
+                    == Some(state_hash.clone())
+                {
+                    return Ok(Some(Canonicity::Canonical));
+                } else {
+                    return Ok(Some(Canonicity::Orphaned));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl LedgerStore for IndexerStore {
@@ -256,7 +242,7 @@ impl LedgerStore for IndexerStore {
 
         // add new ledger event
         self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-            DbLedgerWatcherEvent::NewLedger {
+            DbLedgerEvent::NewLedger {
                 hash: state_hash.0.clone(),
             },
         )))?;

@@ -1,12 +1,9 @@
 use crate::{
     block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
     ipc::IpcActor,
+    ledger::{genesis::GenesisRoot, Ledger},
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
-    state::{
-        ledger::{genesis::GenesisRoot, Ledger},
-        summary::SummaryVerbose,
-        IndexerState, Tip,
-    },
+    state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
     MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
@@ -47,8 +44,8 @@ pub enum MinaIndexerQuery {
 
 pub enum MinaIndexerQueryResponse {
     NumBlocksProcessed(u32),
-    BestTip(Tip),
-    CanonicalTip(Tip),
+    BestTip(String),
+    CanonicalTip(String),
     Uptime(Duration),
 }
 
@@ -271,11 +268,11 @@ pub async fn run(
                     NumBlocksProcessed
                         => MinaIndexerQueryResponse::NumBlocksProcessed(state.blocks_processed),
                     BestTip => {
-                        let best_tip = state.best_tip.clone();
+                        let best_tip = state.best_tip.clone().state_hash.0;
                         MinaIndexerQueryResponse::BestTip(best_tip)
                     },
                     CanonicalTip => {
-                        let canonical_tip = state.canonical_tip.clone();
+                        let canonical_tip = state.canonical_tip.clone().state_hash.0;
                         MinaIndexerQueryResponse::CanonicalTip(canonical_tip)
                     },
                     Uptime

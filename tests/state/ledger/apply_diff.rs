@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::parser::BlockParser,
-    state::ledger::{diff::LedgerDiff, Ledger},
+    ledger::{diff::LedgerDiff, Ledger},
 };
 
 #[tokio::test]

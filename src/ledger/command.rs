@@ -1,6 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{public_key::PublicKey, Amount},
+    ledger::{public_key::PublicKey, Amount},
 };
 use mina_serialization_types::{
     staged_ledger_diff::{

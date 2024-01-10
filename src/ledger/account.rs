@@ -1,5 +1,4 @@
-use super::PublicKey;
-use crate::MAINNET_ACCOUNT_CREATION_FEE;
+use crate::{ledger::public_key::PublicKey, MAINNET_ACCOUNT_CREATION_FEE};
 use rust_decimal::Decimal;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 

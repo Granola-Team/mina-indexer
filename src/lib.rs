@@ -3,12 +3,13 @@ pub mod canonical;
 pub mod client;
 pub mod event;
 pub mod ipc;
+pub mod ledger;
 pub mod receiver;
 pub mod server;
 pub mod state;
 pub mod store;
 
-use state::ledger::account::Amount;
+use ledger::account::Amount;
 
 pub const BLOCK_REPORTING_FREQ_NUM: u32 = 5000;
 pub const BLOCK_REPORTING_FREQ_SEC: u64 = 180;

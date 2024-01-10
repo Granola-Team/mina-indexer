@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use mina_indexer::{
     block::parser::BlockParser,
-    state::ledger::{
+    ledger::{
         diff::{
             account::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,

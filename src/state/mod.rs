@@ -5,11 +5,9 @@ use crate::{
     },
     canonical::store::CanonicityStore,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
+    ledger::{diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger},
     state::{
         branch::Branch,
-        ledger::{
-            command::Command, diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger,
-        },
         summary::{
             DbStats, SummaryShort, SummaryVerbose, WitnessTreeSummaryShort,
             WitnessTreeSummaryVerbose,
@@ -32,7 +30,6 @@ use tracing::{debug, info, instrument, trace};
 use uuid::Uuid;
 
 pub mod branch;
-pub mod ledger;
 pub mod summary;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
@@ -649,40 +646,10 @@ impl IndexerState {
         self.best_tip.state_hash = block.state_hash;
     }
 
-    pub fn chain_commands(&self) -> Vec<Command> {
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return self
-                .root_branch
-                .longest_chain()
-                .iter()
-                .flat_map(|state_hash| indexer_store.get_block(state_hash))
-                .flatten()
-                .flat_map(|precomputed_block| Command::from_precomputed_block(&precomputed_block))
-                .collect();
-        }
-        vec![]
-    }
-
+    /// Get the status of a block: Canonical, Pending, or Orphaned
     pub fn get_block_status(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            if let Some(PrecomputedBlock {
-                blockchain_length, ..
-            }) = indexer_store.get_block(state_hash)?
-            {
-                if let Some(max_canonical_length) =
-                    indexer_store.get_max_canonical_blockchain_length()?
-                {
-                    if blockchain_length > max_canonical_length {
-                        return Ok(Some(Canonicity::Pending));
-                    } else if indexer_store.get_canonical_hash_at_height(blockchain_length)?
-                        == Some(state_hash.clone())
-                    {
-                        return Ok(Some(Canonicity::Canonical));
-                    } else {
-                        return Ok(Some(Canonicity::Orphaned));
-                    }
-                }
-            }
+            return indexer_store.get_block_canonicity(state_hash);
         }
 
         Ok(None)
@@ -783,7 +750,7 @@ impl IndexerState {
                     self.best_tip = tip;
 
                     for state_hash in event_log.iter().filter_map(|e| match e {
-                        IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
+                        IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
                             state_hash,
                             blockchain_length,
                         })) => {
@@ -810,9 +777,8 @@ impl IndexerState {
             } else {
                 // add all NewBlock's to the witness tree
                 for state_hash in event_log.iter().filter_map(|e| match e {
-                    IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
-                        state_hash,
-                        ..
+                    IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                        state_hash, ..
                     })) => Some(state_hash.clone()),
                     _ => None,
                 }) {
@@ -873,14 +839,14 @@ impl IndexerState {
             IndexerEvent::Db(db_event) => {
                 match db_event {
                     DbEvent::Block(db_block_event) => match db_block_event {
-                        DbBlockWatcherEvent::AlreadySeenBlock {
+                        DbBlockEvent::AlreadySeenBlock {
                             state_hash,
                             blockchain_length,
                         } => {
                             info!("Replay already seen block in db (height {blockchain_length}, hash {state_hash})");
                             Ok(())
                         }
-                        DbBlockWatcherEvent::NewBlock {
+                        DbBlockEvent::NewBlock {
                             blockchain_length,
                             state_hash,
                         } => {
@@ -900,11 +866,11 @@ impl IndexerState {
                         }
                     },
                     DbEvent::Ledger(ledger_event) => match ledger_event {
-                        DbLedgerWatcherEvent::AlreadySeenLedger(hash) => {
+                        DbLedgerEvent::AlreadySeenLedger(hash) => {
                             info!("replay already seen db ledger with hash {hash}");
                             Ok(())
                         }
-                        DbLedgerWatcherEvent::NewLedger { hash } => {
+                        DbLedgerEvent::NewLedger { hash } => {
                             info!("replay new db ledger hash {hash}");
                             Ok(())
                         }

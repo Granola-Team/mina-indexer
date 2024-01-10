@@ -1,6 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{
+    ledger::{
         command::{Command, SignedCommand, UserCommandWithStatus},
         Amount, PublicKey,
     },
@@ -163,7 +163,7 @@ impl std::fmt::Debug for UpdateType {
 #[cfg(test)]
 mod tests {
     use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
-    use crate::state::ledger::{
+    use crate::ledger::{
         account::Amount,
         command::{Command, Delegation, Payment},
         PublicKey,

@@ -1,9 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, Block},
-    state::{
-        ledger::account::Account,
-        summary::{SummaryShort, SummaryVerbose},
-    },
+    ledger::account::Account,
+    state::summary::{SummaryShort, SummaryVerbose},
     SOCKET_NAME,
 };
 use clap::Parser;

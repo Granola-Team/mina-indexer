@@ -1,6 +1,5 @@
+use mina_indexer::{block::parser::BlockParser, ledger::Ledger};
 use std::path::PathBuf;
-
-use mina_indexer::{block::parser::BlockParser, state::ledger::Ledger};
 
 #[tokio::test]
 async fn post_balances() {

@@ -9,7 +9,7 @@ pub mod store;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{
+    ledger::{
         account::{Account, Amount, Nonce},
         diff::{
             account::{AccountDiff, UpdateType},

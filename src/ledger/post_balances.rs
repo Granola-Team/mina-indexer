@@ -1,6 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, signed_command::SignedCommand},
-    state::ledger::{
+    ledger::{
         command::{CommandStatusData, UserCommandWithStatus},
         public_key::PublicKey,
     },

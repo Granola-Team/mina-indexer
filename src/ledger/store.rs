@@ -1,6 +1,4 @@
-use crate::block::BlockHash;
-
-use super::Ledger;
+use crate::{block::BlockHash, ledger::Ledger};
 
 /// Store of canonical ledgers
 pub trait LedgerStore {

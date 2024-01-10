@@ -1,6 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{diff::account::AccountDiff, PublicKey},
+    ledger::{diff::account::AccountDiff, PublicKey},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

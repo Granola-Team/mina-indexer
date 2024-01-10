@@ -1,4 +1,4 @@
-use crate::state::ledger::{command::UserCommandWithStatus, public_key::PublicKey};
+use crate::ledger::{command::UserCommandWithStatus, public_key::PublicKey};
 use blake2::digest::VariableOutput;
 use mina_serialization_types::staged_ledger_diff::{SignedCommandPayload, UserCommand};
 use std::io::Write;

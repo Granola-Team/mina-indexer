@@ -8,11 +8,9 @@ use tracing::{debug, error, info, instrument, trace};
 use crate::{
     block::{store::BlockStore, Block, BlockHash},
     canonical::store::CanonicityStore,
+    ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
-    state::{
-        ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
-        summary::{SummaryShort, SummaryVerbose},
-    },
+    state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
 };
 

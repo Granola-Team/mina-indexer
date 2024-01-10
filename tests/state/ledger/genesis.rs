@@ -1,4 +1,4 @@
-use mina_indexer::state::ledger::{
+use mina_indexer::ledger::{
     genesis::{self, GenesisRoot},
     Ledger,
 };

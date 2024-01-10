@@ -1,6 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{coinbase::Coinbase, command::Command, diff::account::AccountDiff, PublicKey},
+    ledger::{coinbase::Coinbase, command::Command, diff::account::AccountDiff, PublicKey},
 };
 use serde::{Deserialize, Serialize};
 
