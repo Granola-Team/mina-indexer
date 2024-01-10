@@ -16,7 +16,7 @@ async fn extension() {
         n += 1;
 
         while let Some(precomputed_block) = block_parser.next_block().unwrap() {
-            state.add_block(&precomputed_block).unwrap();
+            state.add_block_to_witness_tree(&precomputed_block).unwrap();
             n += 1;
         }
 

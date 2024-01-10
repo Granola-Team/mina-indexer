@@ -115,7 +115,8 @@ async fn main() -> anyhow::Result<()> {
 
     // time
     let mut floor_minutes = 0;
-    let mut adding_time = Duration::new(0, 0);
+    let mut adding_time_store = Duration::new(0, 0);
+    let mut adding_time_witness_tree = Duration::new(0, 0);
     let mut parsing_time = Duration::new(0, 0);
 
     for _ in 2..max_block_count.min(max_block_length) {
@@ -133,10 +134,17 @@ async fn main() -> anyhow::Result<()> {
             println!("Blocks:  {block_count}");
             println!("Total:   {display_elapsed:?}");
 
-            let blocks_per_sec = block_count as f64 / adding_time.as_secs_f64();
-            println!("\n~~~ Add to state ~~~");
-            println!("Avg:     {:?}", adding_time / block_count);
-            println!("Total:   {adding_time:?}");
+            let blocks_per_sec = block_count as f64 / adding_time_store.as_secs_f64();
+            println!("\n~~~ Add to block store ~~~");
+            println!("Avg:     {:?}", adding_time_store / block_count);
+            println!("Total:   {adding_time_store:?}");
+            println!("Per sec: {blocks_per_sec:?} blocks");
+            println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
+
+            let blocks_per_sec = block_count as f64 / adding_time_witness_tree.as_secs_f64();
+            println!("\n~~~ Add to witness tree ~~~");
+            println!("Avg:     {:?}", adding_time_witness_tree / block_count);
+            println!("Total:   {adding_time_witness_tree:?}");
             println!("Per sec: {blocks_per_sec:?} blocks");
             println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
 
@@ -160,9 +168,13 @@ async fn main() -> anyhow::Result<()> {
             Ok(Some(block)) => {
                 parsing_time += parse_time.elapsed();
 
-                let add = Instant::now();
-                state.add_block(&block).unwrap();
-                adding_time += add.elapsed();
+                let add_store = Instant::now();
+                state.add_block_to_store(&block).unwrap();
+                adding_time_store += add_store.elapsed();
+
+                let add_witness_tree = Instant::now();
+                state.add_block_to_witness_tree(&block).unwrap();
+                adding_time_witness_tree += add_witness_tree.elapsed();
 
                 if verbose {
                     println!(
@@ -196,7 +208,8 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let total_add = adding_time;
+    let total_add_store = adding_time_store;
+    let total_add_witness_tree = adding_time_witness_tree;
     let total_time = total_time.elapsed();
 
     println!("~~~~~~~~~~~~~~~~~~");
@@ -210,10 +223,17 @@ async fn main() -> anyhow::Result<()> {
     println!("Genesis ledger: {parse_genesis_time:?}");
     println!("Blocks:         {parsing_time:?}");
 
-    let blocks_per_sec = block_count as f64 / total_add.as_secs_f64();
-    println!("\n~~~ Add to state ~~~");
-    println!("Avg:     {:?}", total_add / block_count);
-    println!("Total:   {total_add:?}");
+    let blocks_per_sec = block_count as f64 / total_add_store.as_secs_f64();
+    println!("\n~~~ Add to block store ~~~");
+    println!("Avg:     {:?}", total_add_store / block_count);
+    println!("Total:   {total_add_store:?}");
+    println!("Per sec: {blocks_per_sec:?} blocks");
+    println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
+
+    let blocks_per_sec = block_count as f64 / total_add_witness_tree.as_secs_f64();
+    println!("\n~~~ Add to witness tree ~~~");
+    println!("Avg:     {:?}", total_add_witness_tree / block_count);
+    println!("Total:   {total_add_witness_tree:?}");
     println!("Per sec: {blocks_per_sec:?} blocks");
     println!("Per hr:  {:?} blocks", blocks_per_sec * 3600.);
 
@@ -224,6 +244,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Max dangling length: {max_dangling_len}");
     println!("Max dangling height: {max_dangling_height}\n");
 
+    let total_add = total_add_store + total_add_witness_tree;
     println!("Estimated time to ingest all mainnet blocks at this rate:");
     println!(
         "{} hrs",
