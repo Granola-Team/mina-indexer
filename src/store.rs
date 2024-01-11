@@ -107,6 +107,9 @@ impl BlockStore for IndexerStore {
         let blocks_cf = self.blocks_cf();
         self.database.put_cf(&blocks_cf, key, value)?;
 
+        // add block commands
+        self.add_commands(block)?;
+
         // add new block event
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
             state_hash: block.state_hash.clone(),
@@ -450,7 +453,7 @@ impl CommandStore for IndexerStore {
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
-        trace!("get commands for public key {}", pk.to_address());
+        trace!("Getting commands for public key {}", pk.to_address());
 
         let pk = pk.to_address();
         let key = pk.as_bytes();
