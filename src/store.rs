@@ -1,8 +1,9 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
+    command::{signed::SignedCommand, store::CommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::{store::LedgerStore, Ledger},
+    ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
 };
 use rocksdb::{ColumnFamilyDescriptor, DB};
 use std::{
@@ -24,7 +25,7 @@ impl IndexerStore {
             &database_opts,
             path,
             secondary,
-            vec!["blocks", "canonicity", "events", "ledgers"],
+            vec!["blocks", "canonicity", "commands", "events", "ledgers"],
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -37,6 +38,7 @@ impl IndexerStore {
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
+        let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
 
@@ -46,7 +48,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, events, ledgers],
+            vec![blocks, canonicity, commands, events, ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -68,6 +70,12 @@ impl IndexerStore {
         self.database
             .cf_handle("canonicity")
             .expect("canonicity column family exists")
+    }
+
+    fn commands_cf(&self) -> &rocksdb::ColumnFamily {
+        self.database
+            .cf_handle("commands")
+            .expect("commands column family exists")
     }
 
     fn ledgers_cf(&self) -> &rocksdb::ColumnFamily {
@@ -366,6 +374,91 @@ impl EventStore for IndexerStore {
             }
         }
         Ok(events)
+    }
+}
+
+impl CommandStore for IndexerStore {
+    fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        trace!("Adding commands from block {}", block.state_hash);
+
+        let commands_cf = self.commands_cf();
+        let signed_commands = SignedCommand::from_precomputed(block);
+
+        // add: command hash -> signed command
+        for signed_command in &signed_commands {
+            let hash = signed_command.hash_signed_command()?;
+            let key = hash.as_bytes();
+            let value = serde_json::to_vec(&signed_command)?;
+            self.database.put_cf(commands_cf, key, value)?;
+        }
+
+        // add: state hash -> signed commands
+        let key = block.state_hash.as_bytes();
+        let value = serde_json::to_vec(&signed_commands)?;
+        self.database.put_cf(&commands_cf, key, value)?;
+
+        // add: pk -> signed commands
+        for pk in block.block_public_keys() {
+            let pk_str = pk.to_address();
+            let key = pk_str.as_bytes();
+
+            let mut old_pk_commands: Vec<SignedCommand> = vec![];
+            let mut new_pk_commands: Vec<SignedCommand> = signed_commands
+                .iter()
+                .filter(|cmd| cmd.source_pk() == pk || cmd.receiver_pk() == pk)
+                .cloned()
+                .collect();
+
+            if let Some(commands_bytes) = self.database.get(key)? {
+                old_pk_commands = serde_json::from_slice(&commands_bytes)?;
+            }
+            old_pk_commands.append(&mut new_pk_commands);
+
+            let value = serde_json::to_vec(&old_pk_commands)?;
+            self.database.put_cf(&commands_cf, key, value)?;
+        }
+
+        Ok(())
+    }
+
+    fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>> {
+        trace!("Getting command by hash {}", command_hash);
+
+        let key = command_hash.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
+    }
+
+    fn get_commands_in_block(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+        trace!("Getting commands in block {}", state_hash.0);
+
+        let key = state_hash.0.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
+    }
+
+    fn get_commands_public_key(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+        trace!("get commands for public key {}", pk.to_address());
+
+        let pk = pk.to_address();
+        let key = pk.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
     }
 }
 
