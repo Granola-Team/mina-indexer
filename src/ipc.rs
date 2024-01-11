@@ -1,18 +1,17 @@
-use std::{path::PathBuf, process, sync::Arc};
-
-use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, instrument, trace};
-
 use crate::{
     block::{store::BlockStore, Block, BlockHash},
     canonicity::store::CanonicityStore,
+    command::{store::CommandStore, Command},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
 };
+use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
+use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
+use std::{path::PathBuf, process, sync::Arc};
+use tokio::sync::{mpsc, RwLock};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug)]
 pub struct IpcActor {
@@ -282,6 +281,54 @@ async fn handle_conn(
                 .await?;
             info!("Shutting down the indexer...");
             process::exit(0);
+        }
+        "transactions" => {
+            let pk_buffer = buffers.next().unwrap();
+            let pk = String::from_utf8(pk_buffer[..pk_buffer.len() - 1].to_vec())?;
+            let verbose_buffer = buffers.next().unwrap();
+            let verbose = String::from_utf8(verbose_buffer[..verbose_buffer.len() - 1].to_vec())?
+                .parse::<bool>()?;
+
+            info!("Received transactions command for {pk}");
+            if let Some(transactions) =
+                db.get_commands_public_key(&PublicKey::from_address(&pk)?)?
+            {
+                let transactions = {
+                    if verbose {
+                        serde_json::to_string(&transactions)?
+                    } else {
+                        let transactions_summary: Vec<Command> =
+                            transactions.iter().cloned().map(|x| x.into()).collect();
+                        serde_json::to_string(&transactions_summary)?
+                    }
+                };
+                match buffers.next() {
+                    None => {
+                        debug!("Writing transactions for {pk} to stdout");
+                        Some(transactions)
+                    }
+                    Some(path_buffer) => {
+                        let path =
+                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                                .parse::<PathBuf>()?;
+                        if !path.is_dir() {
+                            debug!("Writing transactions for {pk} to {}", path.display());
+                            tokio::fs::write(&path, transactions).await?;
+                            Some(serde_json::to_string(&format!(
+                                "Transactions for {pk} written to {}",
+                                path.display()
+                            ))?)
+                        } else {
+                            Some(serde_json::to_string(&format!(
+                                "The path provided must not be a directory: {}",
+                                path.display()
+                            ))?)
+                        }
+                    }
+                }
+            } else {
+                None
+            }
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));

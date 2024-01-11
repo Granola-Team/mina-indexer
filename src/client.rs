@@ -4,7 +4,7 @@ use crate::{
     state::summary::{SummaryShort, SummaryVerbose},
     SOCKET_NAME,
 };
-use clap::Parser;
+use clap::{Args, Parser};
 use futures::{
     io::{AsyncWriteExt, BufReader},
     AsyncReadExt,
@@ -32,9 +32,11 @@ pub enum ClientCli {
     Summary(SummaryArgs),
     /// Shutdown the server
     Shutdown,
+    /// Get transactions for an account
+    Transactions(TransactionArgs),
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct AccountArgs {
     /// Retrieve public key's account info
@@ -45,7 +47,7 @@ pub struct AccountArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ChainArgs {
     /// Number of blocks to include in this suffix
@@ -62,7 +64,7 @@ pub struct ChainArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct BestLedgerArgs {
     /// Path to write the ledger [default: stdout]
@@ -73,7 +75,7 @@ pub struct BestLedgerArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct LedgerAtHeightArgs {
     /// Path to write the ledger [default: stdout]
@@ -87,7 +89,7 @@ pub struct LedgerAtHeightArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct LedgerArgs {
     /// Path to write the ledger [default: stdout]
@@ -101,10 +103,27 @@ pub struct LedgerArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct SummaryArgs {
     /// Verbose output should be redirected to a file
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+    /// Output JSON data
+    #[arg(short, long, default_value_t = false)]
+    json: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct TransactionArgs {
+    /// Path to write the transactions [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Retrieve public key's transaction info
+    #[arg(long)]
+    public_key: String,
+    /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
     /// Output JSON data
@@ -220,6 +239,24 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
             let msg: String = serde_json::from_slice(&buffer)?;
+            println!("{msg}");
+        }
+        ClientCli::Transactions(transaction_args) => {
+            let command = match &transaction_args.path {
+                None => format!(
+                    "transactions {} {}\0",
+                    transaction_args.public_key, transaction_args.verbose
+                ),
+                Some(path) => format!(
+                    "transactions {} {} {}\0",
+                    transaction_args.public_key,
+                    transaction_args.verbose,
+                    path.display()
+                ),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+            let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
     }
