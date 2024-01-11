@@ -19,7 +19,7 @@ async fn test() {
         .ledger;
     let mut state = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.clone(),
+        genesis_ledger,
         indexer_store.clone(),
         10,
         PRUNE_INTERVAL_DEFAULT,
@@ -31,9 +31,8 @@ async fn test() {
     state.add_blocks(&mut block_parser).await.unwrap();
 
     // fresh state to replay events on top of
-    let mut new_state = IndexerState::new(
+    let mut new_state = IndexerState::new_without_genesis_events(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger,
         indexer_store,
         10,
         PRUNE_INTERVAL_DEFAULT,

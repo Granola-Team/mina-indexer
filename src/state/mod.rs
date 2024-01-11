@@ -1,7 +1,7 @@
 use crate::{
     block::{
-        parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore, Block, BlockHash,
-        BlockWithoutHeight,
+        genesis::GenesisBlock, parser::BlockParser, precomputed::PrecomputedBlock,
+        store::BlockStore, Block, BlockHash, BlockWithoutHeight,
     },
     canonical::store::CanonicityStore,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
@@ -17,8 +17,7 @@ use crate::{
     },
     store::IndexerStore,
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-    MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT,
+    MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use anyhow::anyhow;
 use id_tree::NodeId;
@@ -118,9 +117,17 @@ impl IndexerState {
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash)?;
 
+        // add genesis block and ledger to indexer store
+        let genesis_block = GenesisBlock::new()?.into();
+        indexer_store.add_block(&genesis_block)?;
+        info!("Genesis block added to indexer store");
+
         indexer_store
             .add_ledger(root_hash, genesis_ledger.into())
             .expect("add genesis ledger succeeds");
+        info!("Genesis ledger added to indexer store");
+
+        // update genesis canonicity
         indexer_store
             .set_max_canonical_blockchain_length(1)
             .expect("set genesis blockchain length succeeds");
@@ -136,7 +143,10 @@ impl IndexerState {
         Ok(Self {
             phase: IndexerPhase::InitializingFromBlockDir,
             canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
+            diffs_map: HashMap::from([(
+                genesis_block.state_hash.clone().into(),
+                LedgerDiff::from_precomputed_block(&genesis_block),
+            )]),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -205,7 +215,10 @@ impl IndexerState {
         Ok(Self {
             phase: IndexerPhase::Testing,
             canonical_tip: tip.clone(),
-            diffs_map: HashMap::new(),
+            diffs_map: HashMap::from([(
+                root_block.state_hash.clone().into(),
+                LedgerDiff::from_precomputed_block(root_block),
+            )]),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -233,7 +246,7 @@ impl IndexerState {
     /// Removes the lower portion of the root tree which is no longer needed
     fn prune_root_branch(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
         let k = self.transition_frontier_length;
-        if let Some(event) = self.update_canonical()? {
+        if let Some(witness_tree_event) = self.update_canonical()? {
             if self.root_branch.height() > self.prune_interval * k {
                 let best_tip_block = self.best_tip_block().clone();
                 debug!(
@@ -246,7 +259,7 @@ impl IndexerState {
                 self.root_branch
                     .prune_transition_frontier(k, &best_tip_block);
             }
-            return Ok(Some(event));
+            return Ok(Some(witness_tree_event));
         }
 
         Ok(None)
@@ -270,75 +283,15 @@ impl IndexerState {
     /// Updates the canonical tip if the precondition is met
     pub fn update_canonical(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
         if self.is_canonical_updatable() {
-            let mut canonical_blocks = vec![];
             let old_canonical_tip_id = self.canonical_tip.node_id.clone();
             let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
+            let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_tip_id)?;
 
-            // update canonical_tip
-            for ancestor_id in self
-                .root_branch
-                .branches
-                .ancestor_ids(&self.best_tip.node_id)
-                .unwrap()
-                .skip(MAINNET_CANONICAL_THRESHOLD.saturating_sub(1) as usize)
-            {
-                // only add blocks between the old_canonical_tip and the new one
-                if ancestor_id != &old_canonical_tip_id {
-                    let ancestor_block = self.get_block_from_id(ancestor_id);
-                    canonical_blocks.push(ancestor_block.clone());
-
-                    // update canonical tip
-                    self.canonical_tip.node_id = ancestor_id.clone();
-                    self.canonical_tip.state_hash =
-                        self.get_block_from_id(ancestor_id).state_hash.clone();
-                } else {
-                    break;
-                }
-            }
-
-            canonical_blocks.reverse();
-
-            // update ledger and canonicity stores
-            if let Some(indexer_store) = self.indexer_store.as_ref() {
-                if let Some(mut ledger) = indexer_store.get_ledger(&old_canonical_tip_hash)? {
-                    // apply the new canonical diffs and store each nth resulting ledger (n = 100)
-                    for canonical_block in &canonical_blocks {
-                        if let Some(precomputed_block) =
-                            indexer_store.get_block(&canonical_block.state_hash)?
-                        {
-                            ledger.apply_post_balances(&precomputed_block);
-                            indexer_store.add_canonical_block(
-                                precomputed_block.blockchain_length,
-                                &precomputed_block.state_hash.into(),
-                            )?;
-                            indexer_store.set_max_canonical_blockchain_length(
-                                precomputed_block.blockchain_length,
-                            )?;
-
-                            if precomputed_block.blockchain_length % 100 == 0 {
-                                indexer_store
-                                    .add_ledger(&canonical_block.state_hash, ledger.clone())?;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // remove diffs corresponding to blocks at or beneath the height of the new canonical tip
-            for node_id in self
-                .root_branch
-                .branches
-                .traverse_level_order_ids(&old_canonical_tip_id)
-                .unwrap()
-            {
-                if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
-                    self.diffs_map
-                        .remove(&self.get_block_from_id(&node_id).state_hash.clone());
-                }
-            }
+            self.update_ledger_store(&old_canonical_tip_hash, &new_canonical_blocks)?;
+            self.clean_up_diffs_map(&old_canonical_tip_id)?;
 
             return Ok(Some(WitnessTreeEvent::UpdateCanonicalChain(
-                canonical_blocks,
+                new_canonical_blocks,
             )));
         }
 
@@ -390,7 +343,7 @@ impl IndexerState {
                 }
 
                 let block = block_parser.next_block()?.unwrap();
-                let state_hash = BlockHash(block.state_hash.clone());
+                let state_hash = block.state_hash.clone().into();
 
                 // apply and add to db
                 ledger.apply_post_balances(&block);
@@ -443,33 +396,8 @@ impl IndexerState {
         }
 
         while let Some(block) = block_parser.next_block()? {
-            if should_report_from_block_count(self.blocks_processed)
-                || self.should_report_from_time(step_time.elapsed())
-            {
-                step_time = Instant::now();
-
-                let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
-                let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
-                let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
-
-                info!(
-                    "Parsed and added {} blocks to the witness tree in {:?}",
-                    self.blocks_processed,
-                    total_time.elapsed(),
-                );
-
-                debug!("Root height:       {}", self.root_branch.height());
-                debug!("Root length:       {}", self.root_branch.len());
-                debug!("Rate:              {rate} blocks/s");
-
-                info!(
-                    "Estimate rem time: {} hr",
-                    (block_parser.total_num_blocks - self.blocks_processed) as f64
-                        / (rate * 3600_f64)
-                );
-                info!("Best tip:          {best_tip:?}");
-                info!("Canonical tip:     {canonical_tip:?}");
-            }
+            self.report_progress(block_parser, step_time, total_time)?;
+            step_time = Instant::now();
 
             // *** block pipeline ***
             // - add to db
@@ -478,7 +406,7 @@ impl IndexerState {
             if let Some(db_event) = self.add_block_to_store(&block)? {
                 let new_canonical_blocks = if db_event.is_new_block_event() {
                     let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
-                        self.add_block(&block)?;
+                        self.add_block_to_witness_tree(&block)?;
                     blocks
                 } else {
                     vec![]
@@ -486,7 +414,7 @@ impl IndexerState {
 
                 new_canonical_blocks
                     .iter()
-                    .for_each(|block| self.add_canonical_block(block).unwrap());
+                    .for_each(|block| self.add_canonical_block_to_store(block).unwrap());
             }
         }
 
@@ -502,7 +430,8 @@ impl IndexerState {
     }
 
     /// Adds the block to the witness tree
-    pub fn add_block(
+    /// No store operations
+    pub fn add_block_to_witness_tree(
         &mut self,
         precomputed_block: &PrecomputedBlock,
     ) -> anyhow::Result<(ExtensionType, WitnessTreeEvent)> {
@@ -760,50 +689,18 @@ impl IndexerState {
     }
 
     /// Returns the ledger corresponding to the best tip
-    pub fn best_ledger(&mut self) -> anyhow::Result<Option<Ledger>> {
-        // get the most recent canonical ledger
+    pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            if let Some(mut ledger) =
-                indexer_store.get_ledger(&self.canonical_tip_block().state_hash)?
-            {
-                // collect diffs from canonical tip to best tip
-                let mut hashes_since_canonical_tip =
-                    if self.best_tip.state_hash != self.canonical_tip.state_hash {
-                        vec![self.best_tip.state_hash.clone()]
-                    } else {
-                        vec![]
-                    };
-
-                for ancestor in self
-                    .root_branch
-                    .branches
-                    .ancestors(&self.best_tip.node_id)
-                    .unwrap()
-                {
-                    if ancestor.data().state_hash != self.canonical_tip.state_hash {
-                        hashes_since_canonical_tip.push(ancestor.data().state_hash.clone());
-                    } else {
-                        break;
-                    }
-                }
-
-                // apply diffs from canonical tip to best tip
-                hashes_since_canonical_tip.reverse();
-                for hash in hashes_since_canonical_tip {
-                    ledger
-                        .apply_diff(self.diffs_map.get(&hash).unwrap())
-                        .unwrap();
-                }
-
-                return Ok(Some(ledger));
-            }
+            let best_tip_hash = self.best_tip_block().state_hash.clone();
+            return indexer_store.get_ledger(&best_tip_hash);
         }
 
         Ok(None)
     }
 
+    /// Get the canonical block at the given height
     pub fn canonical_block_at_height(
-        &mut self,
+        &self,
         height: u32,
     ) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
@@ -815,7 +712,8 @@ impl IndexerState {
         Ok(None)
     }
 
-    pub fn ledger_at_height(&mut self, height: u32) -> anyhow::Result<Option<Ledger>> {
+    /// Get the ledger at the specified height
+    pub fn ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_ledger_at_height(height);
         }
@@ -835,14 +733,15 @@ impl IndexerState {
         self.len() == 0
     }
 
-    fn add_block_to_store(&mut self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
+    /// Add block to the underlying block store
+    pub fn add_block_to_store(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return Ok(Some(indexer_store.add_block(block)?));
         }
         Ok(None)
     }
 
-    fn add_canonical_block(&mut self, block: &Block) -> anyhow::Result<()> {
+    fn add_canonical_block_to_store(&self, block: &Block) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_canonical_block(block.blockchain_length, &block.state_hash)?;
         }
@@ -857,74 +756,56 @@ impl IndexerState {
         let mut successive_blocks = vec![];
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let event_log = indexer_store.get_event_log()?;
-            let canonical_block_events =
-                event_log.iter().cloned().enumerate().filter_map(|(n, e)| {
-                    if e.is_canonical_block_event() {
-                        Some((n, e))
-                    } else {
-                        None
-                    }
-                });
-            if let Some((
-                n,
-                IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
-                    blockchain_length,
+            let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
+            if let Some(IndexerEvent::Db(DbEvent::Canonicity(
+                DbCanonicityEvent::NewCanonicalBlock {
+                    blockchain_length: canonical_length,
                     state_hash,
-                })),
-            )) = canonical_block_events.last()
+                },
+            ))) = canonical_block_events.last()
             {
                 // invariant
                 assert_eq!(
-                    Some(blockchain_length),
+                    Some(*canonical_length),
                     indexer_store.get_max_canonical_blockchain_length()?
                 );
 
                 // root branch root is canonical block
                 // add all successive NewBlock's to the witness tree
+                if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
+                    self.root_branch = Branch::new(&block)?;
 
-                // TODO remove once genesis block is included in the db
-                if state_hash != *MAINNET_GENESIS_HASH {
-                    if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
-                        self.root_branch = Branch::new(&block)?;
+                    let tip = Tip {
+                        state_hash: self.root_branch.root_block().state_hash.clone(),
+                        node_id: self.root_branch.root.clone(),
+                    };
+                    self.canonical_tip = tip.clone();
+                    self.best_tip = tip;
 
-                        let tip = Tip {
-                            state_hash: self.root_branch.root_block().state_hash.clone(),
-                            node_id: self.root_branch.root.clone(),
-                        };
-                        self.canonical_tip = tip.clone();
-                        self.best_tip = tip;
-                        for state_hash in event_log.iter().skip(n).filter_map(|e| match e {
-                            IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
-                                state_hash,
-                                ..
-                            })) => Some(state_hash.clone()),
-                            _ => None,
-                        }) {
-                            if let Some(block) = indexer_store.get_block(&state_hash.into())? {
-                                successive_blocks.push(block);
-                            } else {
-                                panic!(
-                                    "Fatal sync error: block missing from db {}",
-                                    block.state_hash
-                                )
-                            }
-                        }
-                    } else {
-                        panic!("Fatal sync error: block missing from db {}", state_hash)
-                    }
-                } else {
-                    // TODO remove once genesis block is included in the db
                     for state_hash in event_log.iter().filter_map(|e| match e {
                         IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
                             state_hash,
-                            ..
-                        })) => Some(state_hash.clone()),
+                            blockchain_length,
+                        })) => {
+                            if blockchain_length > canonical_length {
+                                Some(state_hash.clone())
+                            } else {
+                                None
+                            }
+                        }
                         _ => None,
                     }) {
                         if let Some(block) = indexer_store.get_block(&state_hash.into())? {
                             successive_blocks.push(block);
+                        } else {
+                            panic!(
+                                "Fatal sync error: block missing from db {}",
+                                block.state_hash
+                            )
                         }
                     }
+                } else {
+                    panic!("Fatal sync error: block missing from db {}", state_hash)
                 }
             } else {
                 // add all NewBlock's to the witness tree
@@ -950,7 +831,7 @@ impl IndexerState {
                 block.blockchain_length,
                 block.state_hash
             );
-            self.add_block(&block)?;
+            self.add_block_to_witness_tree(&block)?;
         }
 
         Ok(())
@@ -981,11 +862,11 @@ impl IndexerState {
             },
             IndexerEvent::LedgerWatcher(ledger_event) => match ledger_event {
                 LedgerWatcherEvent::NewLedger { hash, path } => {
-                    info!("replay new ledger hash {hash} at {}", path.display());
+                    info!("Replay new ledger hash {hash} at {}", path.display());
                     todo!("replay {:?}", ledger_event);
                 }
                 LedgerWatcherEvent::WatchDir(path) => {
-                    info!("replay watch ledger dir {}", path.display());
+                    info!("Replay watch ledger dir {}", path.display());
                     todo!("set fs ledger watcher {:?}", ledger_event);
                 }
             },
@@ -996,25 +877,25 @@ impl IndexerState {
                             state_hash,
                             blockchain_length,
                         } => {
-                            info!("replay already seen block in db (height {blockchain_length}, hash {state_hash})");
+                            info!("Replay already seen block in db (height {blockchain_length}, hash {state_hash})");
                             Ok(())
                         }
                         DbBlockWatcherEvent::NewBlock {
                             blockchain_length,
                             state_hash,
                         } => {
-                            info!("replay db new block (height: {blockchain_length}, hash: {state_hash})");
+                            info!("Replay db new block (height: {blockchain_length}, hash: {state_hash})");
                             if let Some(indexer_store) = self.indexer_store.as_ref() {
                                 if let Ok(Some(block)) =
                                     indexer_store.get_block(&state_hash.to_string().into())
                                 {
-                                    self.add_block(&block)?;
+                                    self.add_block_to_witness_tree(&block)?;
                                     Ok(())
                                 } else {
-                                    Err(anyhow!(""))
+                                    Err(anyhow!("Error: block missing (length {blockchain_length}): {state_hash}"))
                                 }
                             } else {
-                                Err(anyhow!("no indexer store"))
+                                Err(anyhow!("Fatal: no indexer store"))
                             }
                         }
                     },
@@ -1044,6 +925,80 @@ impl IndexerState {
                 Ok(())
             }
         }
+    }
+
+    fn get_new_canonical_blocks(
+        &mut self,
+        old_canonical_tip_id: &NodeId,
+    ) -> anyhow::Result<Vec<Block>> {
+        let mut canonical_blocks = vec![];
+
+        for ancestor_id in self
+            .root_branch
+            .branches
+            .ancestor_ids(&self.best_tip.node_id)
+            .unwrap()
+            .skip(MAINNET_CANONICAL_THRESHOLD.saturating_sub(1) as usize)
+        {
+            // only add blocks between the old_canonical_tip and the new one
+            if ancestor_id != old_canonical_tip_id {
+                let ancestor_block = self.get_block_from_id(ancestor_id).clone();
+                if canonical_blocks.is_empty() {
+                    // update canonical tip
+                    self.canonical_tip.node_id = ancestor_id.clone();
+                    self.canonical_tip.state_hash = ancestor_block.state_hash.clone();
+                }
+                canonical_blocks.push(ancestor_block);
+            } else {
+                break;
+            }
+        }
+
+        // sort lowest to highest
+        canonical_blocks.reverse();
+
+        Ok(canonical_blocks)
+    }
+
+    /// Add new canonical ledgers to the ledger store
+    fn update_ledger_store(
+        &self,
+        old_canonical_tip_hash: &BlockHash,
+        canonical_blocks: &Vec<Block>,
+    ) -> anyhow::Result<()> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            if let Some(mut ledger) = indexer_store.get_ledger(old_canonical_tip_hash)? {
+                // apply the new canonical diffs and store each nth resulting ledger (n = 100)
+                for canonical_block in canonical_blocks {
+                    let diff = self
+                        .diffs_map
+                        .get(&canonical_block.state_hash)
+                        .expect("block is in diffs_map");
+                    ledger.apply_diff(diff)?;
+
+                    if canonical_block.blockchain_length % 100 == 0 {
+                        indexer_store.add_ledger(&canonical_block.state_hash, ledger.clone())?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Remove diffs corresponding to blocks at or beneath the height of the new canonical tip
+    fn clean_up_diffs_map(&mut self, old_canonical_tip_id: &NodeId) -> anyhow::Result<()> {
+        for node_id in self
+            .root_branch
+            .branches
+            .traverse_level_order_ids(old_canonical_tip_id)
+            .unwrap()
+        {
+            if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
+                self.diffs_map
+                    .remove(&self.get_block_from_id(&node_id).state_hash.clone());
+            }
+        }
+        Ok(())
     }
 
     pub fn summary_short(&self) -> SummaryShort {
@@ -1135,6 +1090,39 @@ impl IndexerState {
 
     fn should_report_from_time(&self, duration: Duration) -> bool {
         self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
+    }
+
+    fn report_progress(
+        &self,
+        block_parser: &BlockParser,
+        step_time: Instant,
+        total_time: Instant,
+    ) -> anyhow::Result<()> {
+        if should_report_from_block_count(self.blocks_processed)
+            || self.should_report_from_time(step_time.elapsed())
+        {
+            let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
+            let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
+            let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+
+            info!(
+                "Parsed and added {} blocks to the witness tree in {:?}",
+                self.blocks_processed,
+                total_time.elapsed(),
+            );
+
+            debug!("Root height:       {}", self.root_branch.height());
+            debug!("Root length:       {}", self.root_branch.len());
+            debug!("Rate:              {rate} blocks/s");
+
+            info!(
+                "Estimate rem time: {} hr",
+                (block_parser.total_num_blocks - self.blocks_processed) as f64 / (rate * 3600_f64)
+            );
+            info!("Best tip:          {best_tip:?}");
+            info!("Canonical tip:     {canonical_tip:?}");
+        }
+        Ok(())
     }
 }
 

@@ -1,9 +1,12 @@
-use crate::state::{
-    ledger::{
-        command::{PaymentPayload, SignedCommand, UserCommandWithStatus},
-        public_key::PublicKey,
+use crate::{
+    state::{
+        ledger::{
+            command::{PaymentPayload, SignedCommand, UserCommandWithStatus},
+            public_key::PublicKey,
+        },
+        Canonicity,
     },
-    Canonicity,
+    MAINNET_GENESIS_TIMESTAMP,
 };
 use mina_serialization_types::{
     json::DeltaTransitionChainProofJson,
@@ -19,19 +22,24 @@ use serde::{Deserialize, Serialize};
 
 use super::BlockHash;
 
-pub struct BlockLogContents {
+pub struct BlockFileContents {
     pub(crate) state_hash: String,
     pub(crate) blockchain_length: Option<u32>,
     pub(crate) contents: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct BlockLog {
+pub struct BlockFile {
+    #[serde(default = "genesis_timestamp")]
     scheduled_time: String,
     protocol_state: ProtocolStateJson,
     protocol_state_proof: ProtocolStateProofBase64Json,
     staged_ledger_diff: StagedLedgerDiffJson,
     delta_transition_chain_proof: DeltaTransitionChainProofJson,
+}
+
+fn genesis_timestamp() -> String {
+    MAINNET_GENESIS_TIMESTAMP.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -47,16 +55,16 @@ pub struct PrecomputedBlock {
 }
 
 impl PrecomputedBlock {
-    pub fn from_log_contents(log_contents: BlockLogContents) -> serde_json::Result<Self> {
+    pub fn from_file_contents(log_contents: BlockFileContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
         let str = String::from_utf8_lossy(&log_contents.contents);
-        let BlockLog {
+        let BlockFile {
             scheduled_time,
             protocol_state,
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
-        } = serde_json::from_str::<BlockLog>(&str).unwrap();
+        } = serde_json::from_str::<BlockFile>(&str).unwrap();
         let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
             blockchain_length
         } else {

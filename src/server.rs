@@ -12,7 +12,6 @@ use crate::{
 };
 use anyhow::anyhow;
 use interprocess::local_socket::tokio::LocalSocketListener;
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -36,6 +35,7 @@ pub struct IndexerConfiguration {
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
+    pub initialization_mode: InitializationMode,
 }
 
 pub enum MinaIndexerQuery {
@@ -68,6 +68,7 @@ pub struct IpcChannelUpdate {
     pub store: Arc<IndexerStore>,
 }
 
+#[derive(Debug, Clone)]
 pub enum InitializationMode {
     New,
     Replay,
@@ -98,97 +99,7 @@ impl MinaIndexer {
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(
-                config,
-                store,
-                ipc_update_arc.clone(),
-                InitializationMode::New,
-            )
-            .await?;
-            run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
-        });
-
-        Ok(Self {
-            _ipc_join_handle,
-            _witness_join_handle,
-            query_sender,
-            _ipc_update_sender: ipc_update_sender,
-        })
-    }
-
-    pub async fn from_replay(
-        config: IndexerConfiguration,
-        store: Arc<IndexerStore>,
-    ) -> anyhow::Result<Self> {
-        let (query_sender, query_receiver) = mpsc::unbounded_channel();
-        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
-        let watch_dir = config.watch_dir.clone();
-        let ipc_store = store.clone();
-        let ipc_config = config.clone();
-        let listener = LocalSocketListener::bind(SOCKET_NAME)
-            .or_else(try_remove_old_socket)
-            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
-
-        debug!("Local socket listener started");
-
-        let _ipc_join_handle = tokio::spawn(async move {
-            debug!("Spawning IPC Actor");
-
-            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
-            ipc_actor.run().await
-        });
-        let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(
-                config,
-                store,
-                ipc_update_arc.clone(),
-                InitializationMode::Replay,
-            )
-            .await?;
-
-            run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
-        });
-
-        Ok(Self {
-            _ipc_join_handle,
-            _witness_join_handle,
-            query_sender,
-            _ipc_update_sender: ipc_update_sender,
-        })
-    }
-
-    pub async fn from_sync(
-        config: IndexerConfiguration,
-        store: Arc<IndexerStore>,
-    ) -> anyhow::Result<Self> {
-        let (query_sender, query_receiver) = mpsc::unbounded_channel();
-        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
-        let watch_dir = config.watch_dir.clone();
-        let ipc_store = store.clone();
-        let ipc_config = config.clone();
-        let listener = LocalSocketListener::bind(SOCKET_NAME)
-            .or_else(try_remove_old_socket)
-            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
-
-        debug!("Local socket listener started");
-
-        let _ipc_join_handle = tokio::spawn(async move {
-            debug!("Spawning IPC Actor");
-
-            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
-            ipc_actor.run().await
-        });
-        let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(
-                config,
-                store,
-                ipc_update_arc.clone(),
-                InitializationMode::Sync,
-            )
-            .await?;
-
+            let state = initialize(config, store, ipc_update_arc.clone()).await?;
             run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
         });
 
@@ -225,7 +136,6 @@ pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
-    initialization_mode: InitializationMode,
 ) -> anyhow::Result<IndexerState> {
     debug!("Setting Ctrl-C handler");
     ctrlc::set_handler(move || {
@@ -244,6 +154,7 @@ pub async fn initialize(
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
+        initialization_mode,
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
@@ -294,7 +205,8 @@ pub async fn initialize(
         let summary = Box::new(state.summary_verbose());
         info!("Getting store");
         let store = Arc::new(state.spawn_secondary_database()?);
-        info!("Updating IPC state");
+
+        debug!("Updating IPC state");
         ipc_update_sender
             .send(IpcChannelUpdate {
                 best_tip,
@@ -377,7 +289,7 @@ pub async fn run(
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
                     debug!("Receiving block {block:?}");
 
-                    state.add_block(&precomputed_block)?;
+                    state.add_block_to_witness_tree(&precomputed_block)?;
                     info!("Added {block:?}");
 
                     ipc_update_sender.send(IpcChannelUpdate {

@@ -61,7 +61,7 @@ async fn test() {
         {
             let new_canonical_blocks = if db_event.is_new_block_event() {
                 let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
-                    state1.add_block(&block).unwrap();
+                    state1.add_block_to_witness_tree(&block).unwrap();
                 blocks
             } else {
                 vec![]
@@ -74,7 +74,7 @@ async fn test() {
                         .unwrap()
                 }
             });
-            state1.add_block(&block).unwrap();
+            state1.add_block_to_witness_tree(&block).unwrap();
         }
     }
 

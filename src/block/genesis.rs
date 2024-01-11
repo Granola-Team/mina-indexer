@@ -1,0 +1,18 @@
+use crate::block::{parse_file, precomputed::PrecomputedBlock};
+use std::path::PathBuf;
+
+pub struct GenesisBlock(PrecomputedBlock);
+
+impl GenesisBlock {
+    /// Creates the mainnet genesis block as a PCB
+    pub fn new() -> anyhow::Result<Self> {
+        let genesis_block_path: PathBuf = concat!(env!("PWD"), "/tests/data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json").into();
+        Ok(Self(parse_file(&genesis_block_path)?))
+    }
+}
+
+impl From<GenesisBlock> for PrecomputedBlock {
+    fn from(value: GenesisBlock) -> Self {
+        value.0
+    }
+}
