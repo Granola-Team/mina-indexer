@@ -35,17 +35,20 @@ async fn test() {
     let mut ledger_diff = indexer_store.get_ledger_at_height(1).unwrap().unwrap();
     let mut ledger_post = indexer_store.get_ledger_at_height(1).unwrap().unwrap();
 
-    for n in 2..=3 {
+    for n in 1..=3 {
         let state_hash = indexer_store
             .get_canonical_hash_at_height(n)
             .unwrap()
             .unwrap();
         let block = indexer_store.get_block(&state_hash).unwrap().unwrap();
-        let ledger = indexer_store.get_ledger(&state_hash).unwrap().unwrap();
+        let ledger = indexer_store
+            .get_ledger_state_hash(&state_hash)
+            .unwrap()
+            .unwrap();
 
         ledger_post.apply_post_balances(&block);
         ledger_diff
-            .apply_diff(&LedgerDiff::from_precomputed_block(&block))
+            .apply_diff(&LedgerDiff::from_precomputed(&block))
             .unwrap();
 
         if ledger != ledger_post || ledger != ledger_diff {
@@ -57,6 +60,13 @@ async fn test() {
             keys_post.sort();
             keys_diff.sort();
 
+            for (m, k) in keys_diff.iter().enumerate() {
+                let key = keys.get(m).unwrap();
+                if key != k {
+                    println!("{n}: {k}");
+                    break;
+                }
+            }
             assert_eq!(
                 keys.len(),
                 keys_post.len(),
@@ -79,7 +89,6 @@ async fn test() {
                     |pk: &PublicKey| ledger_post.accounts.get(pk).map(|acct| acct.balance.0);
 
                 if pk != pk_diff {
-                    println!("*********************");
                     if ledger_balance(pk) != ledger_diff_balance(pk) {
                         println!(
                             "pk:      {pk:?} -> {:?} =/= {:?}",
@@ -99,12 +108,12 @@ async fn test() {
                 assert_eq!(
                     ledger_balance(pk),
                     ledger_diff_balance(pk),
-                    "Different balances (diff)"
+                    "Different balances (diff): {pk}"
                 );
                 assert_eq!(
                     ledger_balance(pk),
                     ledger_post_balance(pk),
-                    "Different balances (post)"
+                    "Different balances (post): {pk}"
                 );
                 assert_eq!(pk, pk_diff, "Different keys (diff)");
                 assert_eq!(pk, pk_post, "Different keys (post)");
