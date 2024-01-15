@@ -238,9 +238,28 @@ impl CanonicityStore for IndexerStore {
 }
 
 impl LedgerStore for IndexerStore {
-    /// Add the specified ledger at the key `state_hash`
-    fn add_ledger(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
-        trace!("Adding ledger at {}", state_hash.0);
+    fn add_ledger(&self, ledger_hash: &str, ledger: Ledger) -> anyhow::Result<()> {
+        trace!("Adding ledger at {}", ledger_hash);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        // add ledger to db
+        let key = ledger_hash.as_bytes();
+        let value = ledger.to_string();
+        let value = value.as_bytes();
+        let ledgers_cf = self.ledgers_cf();
+        self.database.put_cf(&ledgers_cf, key, value)?;
+
+        // add new ledger event
+        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+            DbLedgerEvent::NewLedger {
+                hash: ledger_hash.into(),
+            },
+        )))?;
+        Ok(())
+    }
+
+    fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
+        trace!("Adding ledger at state hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add ledger to db
@@ -259,9 +278,8 @@ impl LedgerStore for IndexerStore {
         Ok(())
     }
 
-    /// Get the ledger at the specified state hash
-    fn get_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting ledger at {}", state_hash.0);
+    fn get_ledger_state_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting ledger at state hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         let ledgers_cf = self.ledgers_cf();
@@ -302,14 +320,34 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
+    /// Get the ledger at the given ledger hash
+    fn get_ledger(&self, ledger_hash: &str) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting ledger at {ledger_hash}");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let ledgers_cf = self.ledgers_cf();
+        let key = ledger_hash.as_bytes();
+        if let Some(ledger) = self
+            .database
+            .get_pinned_cf(&ledgers_cf, key)?
+            .map(|bytes| bytes.to_vec())
+            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+        {
+            return Ok(Some(ledger));
+        }
+
+        Ok(None)
+    }
+
     /// Get the canonical ledger at the specified height
     fn get_ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at height {height}");
         self.database.try_catch_up_with_primary().unwrap_or(());
 
+        if height == 0 {}
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
-            Some(state_hash) => self.get_ledger(&state_hash),
+            Some(state_hash) => self.get_ledger_state_hash(&state_hash),
         }
     }
 }
@@ -345,7 +383,7 @@ impl EventStore for IndexerStore {
 
         let key = seq_num.to_be_bytes();
         let events_cf = self.events_cf();
-        let event = self.database.get_cf(&events_cf, key)?;
+        let event = self.database.get_pinned_cf(&events_cf, key)?;
         let event = event.map(|bytes| serde_json::from_slice(&bytes).unwrap());
 
         trace!("Getting event {seq_num}: {:?}", event.clone().unwrap());
@@ -358,7 +396,7 @@ impl EventStore for IndexerStore {
 
         if let Some(bytes) = self
             .database
-            .get_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
+            .get_pinned_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
         {
             serde_json::from_slice(&bytes).map_err(anyhow::Error::from)
         } else {
@@ -390,6 +428,7 @@ impl CommandStore for IndexerStore {
         // add: command hash -> signed command
         for signed_command in &signed_commands {
             let hash = signed_command.hash_signed_command()?;
+            trace!("Adding command hash {hash}");
             let key = hash.as_bytes();
             let value = serde_json::to_vec(&signed_command)?;
             self.database.put_cf(commands_cf, key, value)?;
@@ -403,6 +442,7 @@ impl CommandStore for IndexerStore {
         // add: pk -> signed commands
         for pk in block.block_public_keys() {
             let pk_str = pk.to_address();
+            trace!("Adding command pk {pk}");
             let key = pk_str.as_bytes();
 
             let mut old_pk_commands: Vec<SignedCommand> = vec![];
@@ -426,10 +466,11 @@ impl CommandStore for IndexerStore {
 
     fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>> {
         trace!("Getting command by hash {}", command_hash);
+        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = command_hash.as_bytes();
         let commands_cf = self.commands_cf();
-        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
         Ok(None)
@@ -440,25 +481,27 @@ impl CommandStore for IndexerStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
         trace!("Getting commands in block {}", state_hash.0);
+        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = state_hash.0.as_bytes();
         let commands_cf = self.commands_cf();
-        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
         Ok(None)
     }
 
-    fn get_commands_public_key(
+    fn get_commands_for_public_key(
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
-        trace!("Getting commands for public key {}", pk.to_address());
-
         let pk = pk.to_address();
+        trace!("Getting commands for public key {pk}");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
         let key = pk.as_bytes();
         let commands_cf = self.commands_cf();
-        if let Some(commands_bytes) = self.database.get_cf(commands_cf, key)? {
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
         Ok(None)
