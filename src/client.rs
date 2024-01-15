@@ -1,5 +1,6 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, Block},
+    // block::{precomputed::PrecomputedBlock, BlockWithoutHeight},
+    command::{signed::SignedCommand, Command},
     ledger::account::Account,
     state::summary::{SummaryShort, SummaryVerbose},
     SOCKET_NAME,
@@ -12,7 +13,10 @@ use futures::{
 use interprocess::local_socket::tokio::LocalSocketStream;
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process};
-use tokio::io::{stdout, AsyncWriteExt as OtherAsyncWriteExt};
+use tokio::{
+    fs::write,
+    io::{stdout, AsyncWriteExt as OtherAsyncWriteExt},
+};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -59,9 +63,6 @@ pub struct ChainArgs {
     /// Display the entire precomputed block
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -95,7 +96,7 @@ pub struct LedgerArgs {
     /// Path to write the ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
-    /// State hash corresponding to the ledger
+    /// State or ledger hash corresponding to the ledger
     #[arg(long)]
     hash: String,
     /// Output JSON data
@@ -167,19 +168,14 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             write_output(&account, account_args.json).await?;
         }
         ClientCli::BestChain(chain_args) => {
-            let command = format!("best_chain {}\0", chain_args.num);
+            let command = format!("best_chain {} {}\0", chain_args.num, chain_args.verbose);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let blocks: Vec<PrecomputedBlock> = serde_json::from_slice(&buffer)?;
-            for block in blocks.iter() {
-                if chain_args.json {
-                    stdout()
-                        .write_all(serde_json::to_string(block)?.as_bytes())
-                        .await?;
-                } else {
-                    let block = Block::from_precomputed(block, block.blockchain_length);
-                    stdout().write_all(block.summary().as_bytes()).await?;
-                }
+
+            if let Some(path) = chain_args.path.as_ref() {
+                write(path, buffer.to_vec()).await?;
+            } else {
+                stdout().write_all(&buffer).await?;
             }
         }
         ClientCli::BestLedger(best_ledger_args) => {
@@ -256,8 +252,14 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let msg = String::from_utf8(buffer)?;
-            println!("{msg}");
+
+            if transaction_args.verbose {
+                let msg: Vec<SignedCommand> = serde_json::from_slice(&buffer)?;
+                println!("{:?}", msg)
+            } else {
+                let msg: Vec<Command> = serde_json::from_slice(&buffer)?;
+                println!("{:?}", msg)
+            }
         }
     }
 

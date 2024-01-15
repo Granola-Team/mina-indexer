@@ -1,8 +1,8 @@
 use crate::{
-    block::{store::BlockStore, Block, BlockHash},
+    block::{is_valid_state_hash, store::BlockStore, Block, BlockWithoutHeight},
     canonicity::store::CanonicityStore,
     command::{store::CommandStore, Command},
-    ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
+    ledger::{self, public_key::PublicKey, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
@@ -11,7 +11,7 @@ use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, instrument, trace};
+use tracing::{debug, error, info, instrument, warn};
 
 #[derive(Debug)]
 pub struct IpcActor {
@@ -34,7 +34,7 @@ impl IpcActor {
         store: Arc<IndexerStore>,
         state_recv: IpcStateReceiver,
     ) -> Self {
-        info!("Creating new IPC actor");
+        debug!("Creating new IPC actor");
         Self {
             state_recv,
             listener,
@@ -125,34 +125,45 @@ async fn handle_conn(
     let command_string = String::from_utf8(command.to_vec()).unwrap();
     let response_json = match command_string.as_str() {
         "account" => {
-            let data_buffer = buffers.next().unwrap();
-            let public_key = PublicKey::from_address(&String::from_utf8(
-                data_buffer[..data_buffer.len() - 1].to_vec(),
+            let pk_buffer = buffers.next().unwrap();
+            let pk = PublicKey::from_address(&String::from_utf8(
+                pk_buffer[..pk_buffer.len() - 1].to_vec(),
             )?)?;
-            info!("Received account command for {public_key:?}");
-            trace!("Using ledger {ledger:?}");
-            let account = ledger.accounts.get(&public_key);
+            info!("Received account command for {pk}");
+
+            let account = ledger.accounts.get(&pk);
             if let Some(account) = account {
                 debug!("Writing account {account:?} to client");
                 Some(serde_json::to_string(account)?)
             } else {
-                None
+                warn!("Account {} does not exist", pk);
+                Some(format!("Account {} does not exist", pk))
             }
         }
         "best_chain" => {
             info!("Received best_chain command");
             let data_buffer = buffers.next().unwrap();
-            let num = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
-                .parse::<usize>()?;
+            let num = String::from_utf8(data_buffer.to_vec())?.parse::<usize>()?;
+
             let mut parent_hash = best_tip.parent_hash.clone();
             let mut best_chain = vec![db.get_block(&best_tip.state_hash)?.unwrap()];
             for _ in 1..num {
-                let parent_pcb = db.get_block(&parent_hash)?.unwrap();
-                parent_hash =
-                    BlockHash::from_hashv1(parent_pcb.protocol_state.previous_state_hash.clone());
-                best_chain.push(parent_pcb);
+                if let Some(parent_pcb) = db.get_block(&parent_hash)? {
+                    parent_hash = parent_pcb.previous_state_hash();
+                    best_chain.push(parent_pcb);
+                } else {
+                    // previous state hash of genesis block DNE
+                    break;
+                }
             }
-            Some(serde_json::to_string(&best_chain)?)
+            best_chain.reverse();
+            Some(format!(
+                "{:?}",
+                best_chain
+                    .iter()
+                    .map(BlockWithoutHeight::from)
+                    .collect::<Vec<BlockWithoutHeight>>()
+            ))
         }
         "best_ledger" => {
             info!("Received best_ledger command");
@@ -185,36 +196,70 @@ async fn handle_conn(
             let hash = String::from_utf8(hash_buffer[..hash_buffer.len() - 1].to_vec())?;
             info!("Received ledger command for {hash}");
 
-            if let Some(ledger) = db.get_ledger(&hash.clone().into())? {
-                let ledger = ledger.to_string();
-                match buffers.next() {
-                    None => {
-                        debug!("Writing ledger at {hash} to stdout");
-                        Some(ledger)
-                    }
-                    Some(path_buffer) => {
-                        let path =
-                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
-                                .parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing ledger at {hash} to {}", path.display());
-                            tokio::fs::write(path, ledger).await?;
-                            Some(serde_json::to_string(&format!(
-                                "Ledger at {hash} written to {}",
-                                path.display()
-                            ))?)
-                        } else {
-                            Some(serde_json::to_string(&format!(
-                                "The path provided must not be a directory: {}",
-                                path.display()
-                            ))?)
+            // TODO
+            // check hash if ledger or state and use appropriate function
+            if is_valid_state_hash(&hash) {
+                if let Some(ledger) = db.get_ledger_state_hash(&hash.clone().into())? {
+                    let ledger = ledger.to_string();
+                    match buffers.next() {
+                        None => {
+                            debug!("Writing ledger at {hash} to stdout");
+                            Some(ledger)
+                        }
+                        Some(path_buffer) => {
+                            let path =
+                                &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                                    .parse::<PathBuf>()?;
+                            if !path.is_dir() {
+                                debug!("Writing ledger at {hash} to {}", path.display());
+                                tokio::fs::write(path, ledger).await?;
+                                Some(serde_json::to_string(&format!(
+                                    "Ledger at {hash} written to {}",
+                                    path.display()
+                                ))?)
+                            } else {
+                                Some(serde_json::to_string(&format!(
+                                    "The path provided must not be a directory: {}",
+                                    path.display()
+                                ))?)
+                            }
                         }
                     }
+                } else {
+                    Some(format!("Ledger at state hash {hash} is not in the store"))
+                }
+            } else if ledger::is_valid_hash(&hash) {
+                if let Some(ledger) = db.get_ledger(&hash)? {
+                    let ledger = ledger.to_string();
+                    match buffers.next() {
+                        None => {
+                            debug!("Writing ledger at {hash} to stdout");
+                            Some(ledger)
+                        }
+                        Some(path_buffer) => {
+                            let path =
+                                &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                                    .parse::<PathBuf>()?;
+                            if !path.is_dir() {
+                                debug!("Writing ledger at {hash} to {}", path.display());
+                                tokio::fs::write(path, ledger).await?;
+                                Some(serde_json::to_string(&format!(
+                                    "Ledger at {hash} written to {}",
+                                    path.display()
+                                ))?)
+                            } else {
+                                Some(serde_json::to_string(&format!(
+                                    "The path provided must not be a directory: {}",
+                                    path.display()
+                                ))?)
+                            }
+                        }
+                    }
+                } else {
+                    Some(format!("Ledger at hash {hash} is not in the store"))
                 }
             } else {
-                Some(format!(
-                    "Invalid query: ledger at {hash} cannot be determined"
-                ))
+                Some(format!("Invalid: {hash} is not a state or ledger hash"))
             }
         }
         "ledger_at_height" => {
@@ -284,50 +329,46 @@ async fn handle_conn(
         }
         "transactions" => {
             let pk_buffer = buffers.next().unwrap();
-            let pk = String::from_utf8(pk_buffer[..pk_buffer.len() - 1].to_vec())?;
+            let pk = String::from_utf8(pk_buffer.to_vec())?;
             let verbose_buffer = buffers.next().unwrap();
             let verbose = String::from_utf8(verbose_buffer[..verbose_buffer.len() - 1].to_vec())?
                 .parse::<bool>()?;
 
             info!("Received transactions command for {pk}");
-            if let Some(transactions) =
-                db.get_commands_public_key(&PublicKey::from_address(&pk)?)?
-            {
-                let transactions = {
-                    if verbose {
-                        serde_json::to_string(&transactions)?
+            let transactions = db
+                .get_commands_for_public_key(&pk.clone().into())?
+                .unwrap_or(vec![]);
+            let transactions = {
+                if verbose {
+                    serde_json::to_string(&transactions)?
+                } else {
+                    let transactions_summary: Vec<Command> =
+                        transactions.into_iter().map(Command::from).collect();
+                    serde_json::to_string(&transactions_summary)?
+                }
+            };
+            match buffers.next() {
+                None => {
+                    debug!("Writing transactions for {pk} to stdout");
+                    Some(transactions)
+                }
+                Some(path_buffer) => {
+                    let path = &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
+                        .parse::<PathBuf>()?;
+                    if !path.is_dir() {
+                        debug!("Writing transactions for {pk} to {}", path.display());
+                        tokio::fs::write(&path, transactions).await?;
+                        Some(serde_json::to_string(&format!(
+                            "Transactions for {pk} written to {}",
+                            path.display()
+                        ))?)
                     } else {
-                        let transactions_summary: Vec<Command> =
-                            transactions.iter().cloned().map(|x| x.into()).collect();
-                        serde_json::to_string(&transactions_summary)?
-                    }
-                };
-                match buffers.next() {
-                    None => {
-                        debug!("Writing transactions for {pk} to stdout");
-                        Some(transactions)
-                    }
-                    Some(path_buffer) => {
-                        let path =
-                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
-                                .parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing transactions for {pk} to {}", path.display());
-                            tokio::fs::write(&path, transactions).await?;
-                            Some(serde_json::to_string(&format!(
-                                "Transactions for {pk} written to {}",
-                                path.display()
-                            ))?)
-                        } else {
-                            Some(serde_json::to_string(&format!(
-                                "The path provided must not be a directory: {}",
-                                path.display()
-                            ))?)
-                        }
+                        Some(serde_json::to_string(&format!(
+                            "The path provided must not be a directory: {}",
+                            path.display()
+                        ))?)
                     }
                 }
-            } else {
-                None
             }
         }
         bad_request => {
