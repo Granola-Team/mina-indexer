@@ -254,21 +254,37 @@ test_best_chain() {
         --log-dir ./logs &
     sleep 20
 
-    result=$(idxr best-chain | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+    result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
     result=$(idxr best-chain -v | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
+
+    # with bounds
+    bounds=$(idxr best-chain --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+        --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
+        | jq -r .[0].state_hash)
+    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $bounds
+
+    bounds=$(idxr best-chain --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+        --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
+        | jq -r .[1].state_hash)
+    assert '3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG' $bounds
+
+    bounds=$(idxr best-chain --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+        --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
+        | jq -r .[2].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $bounds
 
     # write best chain to file
     file=./best_chain/best_chain.json
     idxr best-chain -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     idxr best-chain -v -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     idxr_pid=$(pgrep -c mina-indexer)
     rm -rf best_chain
