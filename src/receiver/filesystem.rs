@@ -7,7 +7,7 @@ use tokio::sync::{
     mpsc,
     watch::{self, Sender},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, instrument};
 use watchexec::{
     error::RuntimeError,
     event::{
@@ -20,7 +20,7 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-use crate::block::{parse_file, parser::BlockParser, precomputed::PrecomputedBlock};
+use crate::block::{parser::BlockParser, precomputed::PrecomputedBlock};
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
 pub enum FilesystemReceiverError {
@@ -70,7 +70,7 @@ impl FilesystemReceiver {
         &mut self,
         directory: impl AsRef<Path>,
     ) -> Result<(), FilesystemReceiverError> {
-        info!(
+        debug!(
             "loading directory {} into FilesystemReceiver",
             directory.as_ref().display()
         );
@@ -126,7 +126,7 @@ impl super::BlockReceiver for FilesystemReceiver {
                             for tag in tags {
                                 match tag {
                                     Tag::Path { path, .. } => {
-                                        match parse_file(path.as_path()) {
+                                        match PrecomputedBlock::parse_file(path.as_path()) {
                                             Ok(block) => return Ok(Some(block)),
                                             _ => continue,
                                         }

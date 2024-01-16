@@ -1,5 +1,5 @@
 use mina_serialization_types::v1::PublicKeyV1;
-use mina_signer::{pubkey::PubKeyError, CompressedPubKey, PubKey};
+use mina_signer::{CompressedPubKey, PubKey};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -30,8 +30,22 @@ impl PublicKey {
         CompressedPubKey::from(&self.0).into_address()
     }
 
-    pub fn from_address(value: &str) -> Result<Self, PubKeyError> {
-        CompressedPubKey::from_address(value).map(|x| Self(PublicKeyV1::from(x)))
+    pub fn from_address(value: &str) -> anyhow::Result<Self> {
+        CompressedPubKey::from_address(value)
+            .map(|x| Self(PublicKeyV1::from(x)))
+            .map_err(anyhow::Error::from)
+    }
+}
+
+impl From<&str> for PublicKey {
+    fn from(value: &str) -> Self {
+        Self::from_address(value).unwrap()
+    }
+}
+
+impl From<String> for PublicKey {
+    fn from(value: String) -> Self {
+        Self::from_address(&value).unwrap()
     }
 }
 
@@ -69,6 +83,10 @@ impl From<PublicKey> for PubKey {
     fn from(value: PublicKey) -> Self {
         PubKey::from_address(&CompressedPubKey::from(&value.0).into_address()).unwrap()
     }
+}
+
+pub fn is_valid(pk: &str) -> bool {
+    pk.starts_with("B62q") && pk.len() == 55
 }
 
 #[cfg(test)]

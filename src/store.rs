@@ -344,7 +344,6 @@ impl LedgerStore for IndexerStore {
         trace!("Getting ledger at height {height}");
         self.database.try_catch_up_with_primary().unwrap_or(());
 
-        if height == 0 {}
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
             Some(state_hash) => self.get_ledger_state_hash(&state_hash),

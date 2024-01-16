@@ -4,7 +4,6 @@ use crate::{
     ledger::public_key::PublicKey,
 };
 
-///
 pub trait CommandStore {
     /// Add commands (transactions) from the given block indexed on:
     /// public keys, transaction hash, and state hashes
@@ -20,6 +19,8 @@ pub trait CommandStore {
     fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>>;
 
     /// Get commands involving the public key as a sender or receiver
-    fn get_commands_public_key(&self, pk: &PublicKey)
-        -> anyhow::Result<Option<Vec<SignedCommand>>>;
+    fn get_commands_for_public_key(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<Option<Vec<SignedCommand>>>;
 }

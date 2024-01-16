@@ -1,5 +1,5 @@
 mod block;
-mod canonical;
+mod canonicity;
 mod command;
 mod event;
 mod receiver;

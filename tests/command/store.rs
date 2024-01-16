@@ -57,7 +57,7 @@ async fn add_and_get() {
             .collect();
         let result_pk_cmds = indexer_store
             .as_ref()
-            .get_commands_public_key(&pk)
+            .get_commands_for_public_key(&pk)
             .unwrap()
             .unwrap();
         assert_eq!(result_pk_cmds, pk_cmds);

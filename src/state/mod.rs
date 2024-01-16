@@ -1,3 +1,6 @@
+pub mod branch;
+pub mod summary;
+
 use crate::{
     block::{
         genesis::GenesisBlock, parser::BlockParser, precomputed::PrecomputedBlock,
@@ -15,7 +18,8 @@ use crate::{
     },
     store::IndexerStore,
     BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-    MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH, MAINNET_TRANSITION_FRONTIER_K,
+    PRUNE_INTERVAL_DEFAULT,
 };
 use anyhow::anyhow;
 use id_tree::NodeId;
@@ -27,9 +31,6 @@ use std::{
 };
 use tracing::{debug, info, instrument, trace};
 use uuid::Uuid;
-
-pub mod branch;
-pub mod summary;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
@@ -112,7 +113,10 @@ impl IndexerState {
         info!("Genesis block added to indexer store");
 
         indexer_store
-            .add_ledger(root_hash, genesis_ledger.into())
+            .add_ledger_state_hash(
+                &MAINNET_GENESIS_PREV_STATE_HASH.into(),
+                genesis_ledger.into(),
+            )
             .expect("add genesis ledger succeeds");
         info!("Genesis ledger added to indexer store");
 
@@ -134,7 +138,7 @@ impl IndexerState {
             canonical_tip: tip.clone(),
             diffs_map: HashMap::from([(
                 genesis_block.state_hash.clone().into(),
-                LedgerDiff::from_precomputed_block(&genesis_block),
+                LedgerDiff::from_precomputed(&genesis_block),
             )]),
             best_tip: tip,
             root_branch,
@@ -143,7 +147,7 @@ impl IndexerState {
             transition_frontier_length,
             prune_interval,
             canonical_update_threshold,
-            blocks_processed: 0,
+            blocks_processed: 1,
             init_time: Instant::now(),
         })
     }
@@ -190,7 +194,7 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger {
                 store
-                    .add_ledger(&BlockHash(root_block.state_hash.clone()), ledger)
+                    .add_ledger_state_hash(&BlockHash(root_block.state_hash.clone()), ledger)
                     .expect("ledger add succeeds");
             }
             store
@@ -206,7 +210,7 @@ impl IndexerState {
             canonical_tip: tip.clone(),
             diffs_map: HashMap::from([(
                 root_block.state_hash.clone().into(),
-                LedgerDiff::from_precomputed_block(root_block),
+                LedgerDiff::from_precomputed(root_block),
             )]),
             best_tip: tip,
             root_branch,
@@ -232,66 +236,6 @@ impl IndexerState {
         Ok(block_store_readonly)
     }
 
-    /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
-        let k = self.transition_frontier_length;
-        if let Some(witness_tree_event) = self.update_canonical()? {
-            if self.root_branch.height() > self.prune_interval * k {
-                let best_tip_block = self.best_tip_block().clone();
-                debug!(
-                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
-                    k,
-                    self.best_tip_block().blockchain_length,
-                    self.canonical_tip_block().blockchain_length,
-                );
-
-                self.root_branch
-                    .prune_transition_frontier(k, &best_tip_block);
-            }
-            return Ok(Some(witness_tree_event));
-        }
-
-        Ok(None)
-    }
-
-    /// The highest known canonical block
-    pub fn canonical_tip_block(&self) -> &Block {
-        self.get_block_from_id(&self.canonical_tip.node_id)
-    }
-
-    /// The highest block known to be a descendant of the root block
-    pub fn best_tip_block(&self) -> &Block {
-        self.get_block_from_id(&self.best_tip.node_id)
-    }
-
-    /// Only works with blocks in the root branch
-    fn get_block_from_id(&self, node_id: &NodeId) -> &Block {
-        self.root_branch.branches.get(node_id).unwrap().data()
-    }
-
-    /// Updates the canonical tip if the precondition is met
-    pub fn update_canonical(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
-        if self.is_canonical_updatable() {
-            let old_canonical_tip_id = self.canonical_tip.node_id.clone();
-            let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
-            let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_tip_id)?;
-
-            self.update_ledger_store(&old_canonical_tip_hash, &new_canonical_blocks)?;
-            self.clean_up_diffs_map(&old_canonical_tip_id)?;
-
-            return Ok(Some(WitnessTreeEvent::UpdateCanonicalChain(
-                new_canonical_blocks,
-            )));
-        }
-
-        Ok(None)
-    }
-
-    fn is_canonical_updatable(&self) -> bool {
-        self.best_tip_block().height - self.canonical_tip_block().height
-            >= self.canonical_update_threshold
-    }
-
     /// Initialize indexer state from a collection of contiguous canonical blocks
     ///
     /// Short-circuits adding canonical blocks to the witness tree
@@ -301,7 +245,7 @@ impl IndexerState {
     ) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger = indexer_store
-                .get_ledger(&self.canonical_tip.state_hash)?
+                .get_ledger_state_hash(&self.canonical_tip.state_hash)?
                 .unwrap();
             let total_time = Instant::now();
 
@@ -345,7 +289,7 @@ impl IndexerState {
 
                 // store ledger at specified cadence, e.g. every 100 blocks
                 if self.blocks_processed % 100 == 0 {
-                    indexer_store.add_ledger(&state_hash, ledger.clone())?;
+                    indexer_store.add_ledger_state_hash(&state_hash, ledger.clone())?;
                 }
 
                 if self.blocks_processed == block_parser.num_canonical {
@@ -358,7 +302,12 @@ impl IndexerState {
                     self.canonical_tip = self.best_tip.clone();
                 }
             }
-            assert_eq!(self.blocks_processed, block_parser.num_canonical);
+
+            if block_parser.num_canonical == 0 {
+                assert_eq!(self.blocks_processed, 1);
+            } else {
+                assert_eq!(self.blocks_processed, block_parser.num_canonical)
+            }
         }
 
         // now add the successive non-canonical blocks
@@ -436,7 +385,7 @@ impl IndexerState {
         self.blocks_processed += 1;
         self.diffs_map.insert(
             precomputed_block.state_hash.clone().into(),
-            LedgerDiff::from_precomputed_block(precomputed_block),
+            LedgerDiff::from_precomputed(precomputed_block),
         );
 
         // forward extension on root branch
@@ -626,7 +575,7 @@ impl IndexerState {
                 && incoming_block > self.best_tip_block()
         {
             debug!(
-                "Update best tip: length = {}, state_hash = {}",
+                "Update best tip (length {}): {}",
                 incoming_block.blockchain_length, incoming_block.state_hash.0
             );
             self.best_tip.node_id = node_id.clone();
@@ -636,6 +585,66 @@ impl IndexerState {
         let (id, block) = self.root_branch.best_tip_with_id().unwrap();
         self.best_tip.node_id = id;
         self.best_tip.state_hash = block.state_hash;
+    }
+
+    /// Removes the lower portion of the root tree which is no longer needed
+    fn prune_root_branch(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
+        let k = self.transition_frontier_length;
+        if let Some(witness_tree_event) = self.update_canonical()? {
+            if self.root_branch.height() > self.prune_interval * k {
+                let best_tip_block = self.best_tip_block().clone();
+                debug!(
+                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
+                    k,
+                    self.best_tip_block().blockchain_length,
+                    self.canonical_tip_block().blockchain_length,
+                );
+
+                self.root_branch
+                    .prune_transition_frontier(k, &best_tip_block);
+            }
+            return Ok(Some(witness_tree_event));
+        }
+
+        Ok(None)
+    }
+
+    /// The highest known canonical block
+    pub fn canonical_tip_block(&self) -> &Block {
+        self.get_block_from_id(&self.canonical_tip.node_id)
+    }
+
+    /// The highest block known to be a descendant of the root block
+    pub fn best_tip_block(&self) -> &Block {
+        self.get_block_from_id(&self.best_tip.node_id)
+    }
+
+    /// Only works with blocks in the root branch
+    fn get_block_from_id(&self, node_id: &NodeId) -> &Block {
+        self.root_branch.branches.get(node_id).unwrap().data()
+    }
+
+    /// Updates the canonical tip if the precondition is met
+    pub fn update_canonical(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
+        if self.is_canonical_updatable() {
+            let old_canonical_tip_id = self.canonical_tip.node_id.clone();
+            let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
+            let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_tip_id)?;
+
+            self.update_ledger_store(&old_canonical_tip_hash, &new_canonical_blocks)?;
+            self.prune_diffs_map(&old_canonical_tip_id)?;
+
+            return Ok(Some(WitnessTreeEvent::UpdateCanonicalChain(
+                new_canonical_blocks,
+            )));
+        }
+
+        Ok(None)
+    }
+
+    fn is_canonical_updatable(&self) -> bool {
+        self.best_tip_block().height - self.canonical_tip_block().height
+            >= self.canonical_update_threshold
     }
 
     /// Get the status of a block: Canonical, Pending, or Orphaned
@@ -651,7 +660,7 @@ impl IndexerState {
     pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let best_tip_hash = self.best_tip_block().state_hash.clone();
-            return indexer_store.get_ledger(&best_tip_hash);
+            return indexer_store.get_ledger_state_hash(&best_tip_hash);
         }
 
         Ok(None)
@@ -925,7 +934,7 @@ impl IndexerState {
         canonical_blocks: &Vec<Block>,
     ) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            if let Some(mut ledger) = indexer_store.get_ledger(old_canonical_tip_hash)? {
+            if let Some(mut ledger) = indexer_store.get_ledger_state_hash(old_canonical_tip_hash)? {
                 // apply the new canonical diffs and store each nth resulting ledger (n = 100)
                 for canonical_block in canonical_blocks {
                     let diff = self
@@ -935,7 +944,8 @@ impl IndexerState {
                     ledger.apply_diff(diff)?;
 
                     if canonical_block.blockchain_length % 100 == 0 {
-                        indexer_store.add_ledger(&canonical_block.state_hash, ledger.clone())?;
+                        indexer_store
+                            .add_ledger_state_hash(&canonical_block.state_hash, ledger.clone())?;
                     }
                 }
             }
@@ -944,7 +954,7 @@ impl IndexerState {
     }
 
     /// Remove diffs corresponding to blocks at or beneath the height of the new canonical tip
-    fn clean_up_diffs_map(&mut self, old_canonical_tip_id: &NodeId) -> anyhow::Result<()> {
+    fn prune_diffs_map(&mut self, old_canonical_tip_id: &NodeId) -> anyhow::Result<()> {
         for node_id in self
             .root_branch
             .branches
