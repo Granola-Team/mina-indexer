@@ -6,8 +6,6 @@ use mina_indexer::{
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
     MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
-use serde::Deserializer;
-use serde_derive::Deserialize;
 use std::{fs, path::PathBuf, sync::Arc};
 use tracing::{error, info, instrument};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
@@ -34,11 +32,6 @@ enum IndexerCommand {
 
 #[derive(Subcommand, Debug)]
 enum ServerCommand {
-    /// Start the mina indexer with a config file
-    Config {
-        #[arg(short, long)]
-        path: PathBuf,
-    },
     /// Start the mina indexer by passing in arguments manually on the command line
     Cli(ServerArgs),
     /// Replay the events from an existing db to start the indexer
@@ -47,7 +40,7 @@ enum ServerCommand {
     Sync(ServerArgs),
 }
 
-#[derive(Parser, Debug, Clone, Deserialize)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     /// Path to the genesis ledger
@@ -76,11 +69,9 @@ pub struct ServerArgs {
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     pub log_dir: PathBuf,
     /// Max file log level
-    #[serde(deserialize_with = "level_filter_deserializer")]
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
     pub log_level: LevelFilter,
     /// Max stdout log level
-    #[serde(deserialize_with = "level_filter_deserializer")]
     #[arg(long, default_value_t = LevelFilter::INFO)]
     pub log_level_stdout: LevelFilter,
     /// Interval for pruning the root branch
@@ -103,10 +94,6 @@ pub async fn main() -> anyhow::Result<()> {
             let mut is_replay = false;
             let args = match server_command {
                 ServerCommand::Cli(args) => args,
-                ServerCommand::Config { path } => {
-                    let config_file = tokio::fs::read(path).await?;
-                    serde_yaml::from_reader(&config_file[..])?
-                }
                 ServerCommand::Sync(args) => {
                     is_sync = true;
                     args
@@ -225,39 +212,4 @@ pub fn process_indexer_configuration(
             })
         }
     }
-}
-
-pub fn level_filter_deserializer<'de, D>(deserializer: D) -> Result<LevelFilter, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct YAMLStringVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for YAMLStringVisitor {
-        type Value = LevelFilter;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a string containing yaml data")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            // unfortunately we lose some typed information
-            // from errors deserializing the json string
-            let level_filter_str: &str = serde_yaml::from_str(v).map_err(E::custom)?;
-            match level_filter_str {
-                "info" => Ok(LevelFilter::INFO),
-                "debug" => Ok(LevelFilter::DEBUG),
-                "error" => Ok(LevelFilter::ERROR),
-                "trace" => Ok(LevelFilter::TRACE),
-                "warn" => Ok(LevelFilter::TRACE),
-                "off" => Ok(LevelFilter::OFF),
-                other => Err(E::custom(format!("{} is not a valid level filter", other))),
-            }
-        }
-    }
-
-    deserializer.deserialize_any(YAMLStringVisitor)
 }

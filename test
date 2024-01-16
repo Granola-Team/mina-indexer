@@ -68,10 +68,6 @@ test_indexer_cli_reports() {
     idxr server 2>&1 |
         grep -iq "Usage: mina-indexer server"
 
-    # Indexer server config subcommand exists
-    idxr server config 2>&1 |
-        grep -iq "Usage: mina-indexer server config"
-
     # Indexer server cli subcommand works with default args
     idxr server cli --help 2>/dev/null
 
