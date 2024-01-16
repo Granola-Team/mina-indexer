@@ -49,34 +49,22 @@ Nix [here](https://nixos.org/download.html) and enable Flakes using
 the guide [here](https://nixos.wiki/wiki/Flakes). No additional
 dependencies are needed.
 
-### Setting Up the Development Environment
+### Development Setup
 
-Create your development environment using `nix develop
-'.?submodules=1'`. This prepares your system with the necessary
-dependencies, compilers, and development tools, eliminating the need
-for an independent Rust installation. For VSCode, enhance your
-experience with the `Nix Environment Selector` extension by linking it
-to `shell.nix`. Alternatively, configure your IDE environment with
-`direnv`.
+Use `nix develop` to prepare your development environment. It
+configures your current shell with all necessary dependencies and
+tools, removing the need for a separate host Rust installation.
 
 ### Building the Project
 
-To build the mina-indexer binaries, run the following command:
-
-```bash
-nix build '.?submodules=1'
-```
+Run `nix build .?submodules=1` to compile the project. This will
+compile the `mina-indexer` binary and place it in `./result/bin`.
 
 **Note:** There is an issue with versions of nix `2.19.x` where it
 doesn't correctly build the binary. Use versions `2.18.x` or
 below. Otherwise, here is a workaround command if you're unable to
-downgrade to a supported version:
-
-```bash
-nix build "git+file://$(pwd)?submodules=1"
-```
-
-This will compile the binaries and place them in `./result/bin`.
+downgrade to a supported version: `nix build
+"git+file://$(pwd)?submodules=1"`
 
 ### Running Tests
 
