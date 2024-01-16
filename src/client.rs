@@ -2,7 +2,7 @@ use crate::{
     command::{signed::SignedCommand, Command},
     ledger::account::Account,
     state::summary::{SummaryShort, SummaryVerbose},
-    SOCKET_NAME,
+    MAINNET_GENESIS_HASH, SOCKET_NAME,
 };
 use clap::{Args, Parser};
 use futures::{
@@ -54,11 +54,17 @@ pub struct AccountArgs {
 #[command(author, version, about, long_about = None)]
 pub struct ChainArgs {
     /// Number of blocks to include in this suffix
-    #[arg(short, long, default_value_t = 10)]
-    num: usize,
+    #[arg(short, long)]
+    num: Option<usize>,
     /// Path to write the best chain [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
+    /// Constrain chain query with a start state hash
+    #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
+    start_state_hash: String,
+    /// Constrain chain query with an end state hash
+    #[arg(short, long)]
+    end_state_hash: Option<String>,
     /// Display the entire precomputed block
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
@@ -181,7 +187,13 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             write_output(&account, account_args.json, None).await?;
         }
         ClientCli::BestChain(chain_args) => {
-            let command = format!("best_chain {} {}\0", chain_args.num, chain_args.verbose);
+            let command = format!(
+                "best_chain {} {} {} {}\0",
+                chain_args.num.unwrap_or(0),
+                chain_args.verbose,
+                chain_args.start_state_hash.clone(),
+                chain_args.end_state_hash.clone().unwrap_or("x".into())
+            );
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 

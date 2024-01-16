@@ -1,5 +1,5 @@
 use crate::{
-    block::{is_valid_state_hash, store::BlockStore, Block, BlockWithoutHeight},
+    block::{is_valid_state_hash, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     command::{store::CommandStore, Command},
     ledger::{self, public_key::PublicKey, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
@@ -141,24 +141,50 @@ async fn handle_conn(
         }
         "best_chain" => {
             info!("Received best_chain command");
-            let num_buffer = buffers.next().unwrap();
-            let num = String::from_utf8(num_buffer.to_vec())?.parse::<usize>()?;
-            let verbose_buffer = buffers.next().expect("verbose exists");
-            let verbose =
-                String::from_utf8(verbose_buffer[..verbose_buffer.len() - 1].to_vec())?.parse()?;
+            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
+            let start_state_hash: BlockHash =
+                String::from_utf8(buffers.next().unwrap().to_vec())?.into();
+            let end_state_hash = {
+                let x = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let x = x.trim_matches('\0');
+                if !is_valid_state_hash(x) {
+                    best_tip.state_hash.clone()
+                } else {
+                    x.into()
+                }
+            };
 
-            let mut parent_hash = best_tip.parent_hash.clone();
-            let mut best_chain = vec![db.get_block(&best_tip.state_hash)?.unwrap()];
-            for _ in 1..num {
-                if let Some(parent_pcb) = db.get_block(&parent_hash)? {
+            let block = db.get_block(&end_state_hash)?.unwrap();
+            let mut parent_hash = block.previous_state_hash();
+            let mut best_chain = vec![block];
+            if num == 0 {
+                // no num bound => use hash bounds
+                while let Some(parent_pcb) = db.get_block(&parent_hash)? {
+                    let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
                     parent_hash = parent_pcb.previous_state_hash();
                     best_chain.push(parent_pcb);
-                } else {
-                    // previous state hash of genesis block DNE
-                    break;
+
+                    if curr_hash == start_state_hash {
+                        break;
+                    }
+                }
+            } else {
+                // num bound
+                for _ in 1..num {
+                    if let Some(parent_pcb) = db.get_block(&parent_hash)? {
+                        let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
+                        parent_hash = parent_pcb.previous_state_hash();
+                        best_chain.push(parent_pcb);
+
+                        if curr_hash == start_state_hash {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
                 }
             }
-            best_chain.reverse();
 
             if verbose {
                 Some(serde_json::to_string(&best_chain)?)
