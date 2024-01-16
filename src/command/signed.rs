@@ -9,7 +9,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::io::Write;
 use versioned::Versioned;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommand(pub mina_serialization_types::staged_ledger_diff::SignedCommandV1);
 
 impl SignedCommand {
@@ -24,31 +24,19 @@ impl SignedCommand {
     }
 
     pub fn source_nonce(&self) -> u32 {
-        self.0.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32
+        self.payload_common().nonce.t.t as u32
     }
 
-    pub fn fee_payer(&self) -> PublicKey {
-        self.0
-            .t
-            .t
-            .payload
-            .t
-            .t
-            .common
-            .t
-            .t
-            .t
-            .fee_payer_pk
-            .clone()
-            .into()
+    pub fn fee_payer_pk(&self) -> PublicKey {
+        self.payload_common().fee_payer_pk.into()
     }
 
     pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
-        &self.receiver_pk() == pk || &self.source_pk() == pk
+        &self.receiver_pk() == pk || &self.source_pk() == pk || &self.fee_payer_pk() == pk
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
-        match self.0.t.t.payload.t.t.body.t.t.clone() {
+        match self.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                 payment_payload.t.t.receiver_pk.into()
             }
@@ -64,7 +52,7 @@ impl SignedCommand {
     }
 
     pub fn source_pk(&self) -> PublicKey {
-        match self.0.t.t.payload.t.t.body.t.t.clone() {
+        match self.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                 payment_payload.t.t.source_pk.into()
             }
@@ -80,41 +68,18 @@ impl SignedCommand {
     }
 
     pub fn is_delegation(&self) -> bool {
-        match self.0.t.t.payload.t.t.body.t.t.clone() {
-            mina_rs::SignedCommandPayloadBody::PaymentPayload(_payment_payload) => false,
-            mina_rs::SignedCommandPayloadBody::StakeDelegation(_delegation_payload) => true,
-        }
+        matches!(
+            self.payload_body(),
+            mina_rs::SignedCommandPayloadBody::StakeDelegation(_)
+        )
     }
 
     pub fn payload_body(&self) -> mina_rs::SignedCommandPayloadBody {
-        self.0
-            .clone()
-            .inner()
-            .inner()
-            .payload
-            .inner()
-            .inner()
-            .body
-            .inner()
-            .inner()
+        self.payload().body.clone().inner().inner()
     }
 
     pub fn payload_common(&self) -> mina_rs::SignedCommandPayloadCommon {
-        self.0
-            .clone()
-            .inner()
-            .inner()
-            .payload
-            .inner()
-            .inner()
-            .common
-            .inner()
-            .inner()
-            .inner()
-    }
-
-    pub fn fee_payer_pk(&self) -> PublicKey {
-        self.payload_common().fee_payer_pk.into()
+        self.payload().common.clone().inner().inner().inner()
     }
 
     pub fn signer(&self) -> PublicKey {
@@ -150,17 +115,7 @@ impl SignedCommand {
 }
 impl From<SignedCommand> for Command {
     fn from(value: SignedCommand) -> Command {
-        match value
-            .0
-            .inner()
-            .inner()
-            .payload
-            .inner()
-            .inner()
-            .body
-            .inner()
-            .inner()
-        {
+        match value.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
                 let mina_rs::PaymentPayload {
                     source_pk,
@@ -194,9 +149,111 @@ impl From<Versioned<Versioned<mina_rs::SignedCommand, 1>, 1>> for SignedCommand 
     }
 }
 
+impl std::fmt::Debug for SignedCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let mut json = Map::new();
+        let mina_rs::SignedCommand { payload, .. } = self.0.clone().inner().inner();
+
+        let mut common = Map::new();
+        let mina_rs::SignedCommandPayloadCommon {
+            fee,
+            fee_token,
+            fee_payer_pk,
+            nonce,
+            valid_until,
+            memo,
+        } = payload
+            .clone()
+            .inner()
+            .inner()
+            .common
+            .inner()
+            .inner()
+            .inner();
+        common.insert(
+            "fee".into(),
+            Value::Number(Number::from(fee.inner().inner())),
+        );
+        common.insert(
+            "fee_token".into(),
+            Value::Number(Number::from(fee_token.inner().inner().inner())),
+        );
+        common.insert(
+            "fee_payer_pk".into(),
+            Value::String(PublicKey::from(fee_payer_pk).to_address()),
+        );
+        common.insert(
+            "nonce".into(),
+            Value::Number(Number::from(nonce.inner().inner())),
+        );
+        common.insert(
+            "valid_until".into(),
+            Value::Number(Number::from(valid_until.inner().inner())),
+        );
+        common.insert(
+            "memo".into(),
+            Value::String(String::from_utf8_lossy(&memo.inner().0).to_string()),
+        );
+
+        let mut body = Map::new();
+        match payload.inner().inner().body.inner().inner() {
+            mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+                let mina_rs::PaymentPayload {
+                    source_pk,
+                    receiver_pk,
+                    token_id,
+                    amount,
+                } = payment_payload.inner().inner();
+
+                let mut payment = Map::new();
+                payment.insert(
+                    "source_pk".into(),
+                    Value::String(PublicKey::from(source_pk).to_address()),
+                );
+                payment.insert(
+                    "receiver_pk".into(),
+                    Value::String(PublicKey::from(receiver_pk).to_address()),
+                );
+                payment.insert(
+                    "token_id".into(),
+                    Value::Number(Number::from(token_id.inner().inner().inner())),
+                );
+                payment.insert(
+                    "amount".into(),
+                    Value::Number(Number::from(amount.inner().inner())),
+                );
+                body.insert("Payment".into(), Value::Object(payment));
+            }
+            mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
+                let mina_rs::StakeDelegation::SetDelegate {
+                    delegator,
+                    new_delegate,
+                } = stake_delegation.inner();
+
+                let mut stake_delegation = Map::new();
+                stake_delegation.insert(
+                    "delegator".into(),
+                    Value::String(PublicKey::from(delegator).to_address()),
+                );
+                stake_delegation.insert(
+                    "new_delegate".into(),
+                    Value::String(PublicKey::from(new_delegate).to_address()),
+                );
+                body.insert("StakeDelegation".into(), Value::Object(stake_delegation));
+            }
+        };
+
+        json.insert("common".into(), Value::Object(common));
+        json.insert("body".into(), Value::Object(body));
+        write!(f, "{}", to_string(&json).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::block::parse_file;
+    use crate::block::precomputed::PrecomputedBlock;
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -206,7 +263,7 @@ mod tests {
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
 
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = parse_file(&block_file).unwrap();
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file).unwrap();
         let hashes = precomputed_block.command_hashes();
         let expect = vec![
             "CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string(),
