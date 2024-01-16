@@ -8,18 +8,18 @@ pub mod store;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
-    command::{internal::FeeTransferUpdate, CommandType},
     ledger::{
         account::{Account, Amount, Nonce},
+        coinbase::Coinbase,
         diff::{
             account::{AccountDiff, UpdateType},
             LedgerDiff,
         },
-        post_balances::{PostBalance, PostBalanceUpdate},
+        post_balances::{FeeTransferUpdate, PostBalance, PostBalanceUpdate},
         public_key::PublicKey,
     },
 };
-use mina_signer::pubkey::PubKeyError;
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, result::Result};
 use tracing::{debug, trace};
@@ -86,35 +86,35 @@ impl Ledger {
                         coinbase_update.public_key,
                         coinbase_update.balance,
                     );
-                    self.apply_balance_update(coinbase_update, None)
-                }
-                PostBalanceUpdate::FeeTransfer(fee_update) => {
-                    match fee_update {
-                        FeeTransferUpdate::One(fee_update) => {
-                            trace!(
-                                "(fee tx 1) {:?} {:?}",
-                                fee_update.public_key,
-                                fee_update.balance,
-                            );
-                            self.apply_balance_update(fee_update, None);
-                        }
-                        FeeTransferUpdate::Two(fee_update1, fee_update2) => {
-                            trace!(
-                                "(fee tx 1) {:?}: {:?}",
-                                fee_update1.public_key,
-                                fee_update1.balance,
-                            );
-                            trace!(
-                                "(fee tx 2) {:?}: {:?}",
-                                fee_update2.public_key,
-                                fee_update2.balance,
-                            );
-                            self.apply_balance_update(fee_update1, None);
-                            self.apply_balance_update(fee_update2, None);
-                        }
+
+                    if Coinbase::from_precomputed(precomputed_block).is_coinbase_applied() {
+                        self.apply_balance_update(coinbase_update, None)
                     }
-                    todo!("fee transfer")
                 }
+                PostBalanceUpdate::FeeTransfer(fee_update) => match fee_update {
+                    FeeTransferUpdate::One(fee_update) => {
+                        trace!(
+                            "(fee tx 1) {:?} {:?}",
+                            fee_update.public_key,
+                            fee_update.balance,
+                        );
+                        self.apply_balance_update(fee_update, None);
+                    }
+                    FeeTransferUpdate::Two(fee_update1, fee_update2) => {
+                        trace!(
+                            "(fee tx 1) {:?}: {:?}",
+                            fee_update1.public_key,
+                            fee_update1.balance,
+                        );
+                        trace!(
+                            "(fee tx 2) {:?}: {:?}",
+                            fee_update2.public_key,
+                            fee_update2.balance,
+                        );
+                        self.apply_balance_update(fee_update1, None);
+                        self.apply_balance_update(fee_update2, None);
+                    }
+                },
                 PostBalanceUpdate::User(user_update) => {
                     trace!(
                         "(fee payer) {:?} {:?}",
@@ -132,7 +132,7 @@ impl Ledger {
                         user_update.source.balance,
                     );
 
-                    if user_update.command_type == CommandType::Delegation {
+                    if user_update.is_delegation() {
                         self.apply_delegation(
                             user_update.source.public_key.clone(),
                             user_update.receiver.public_key.clone(),
@@ -147,55 +147,21 @@ impl Ledger {
         }
     }
 
-    pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> Result<Self, PubKeyError> {
-        let mut ledger = Ledger::new();
-        for (pubkey, balance, nonce, delgation) in value {
-            match PublicKey::from_address(pubkey) {
-                Ok(pk) => {
-                    if let Some(delegate) = delgation {
-                        match PublicKey::from_address(delegate) {
-                            Ok(delegate) => {
-                                ledger.accounts.insert(
-                                    pk.clone(),
-                                    Account {
-                                        public_key: pk,
-                                        balance: balance.into(),
-                                        nonce: Nonce(nonce.unwrap_or_default()),
-                                        delegate: Some(delegate),
-                                    },
-                                );
-                            }
-                            Err(err) => return Err(err),
-                        }
-                    } else {
-                        let acct = Account {
-                            public_key: pk.clone(),
-                            balance: balance.into(),
-                            nonce: Nonce(nonce.unwrap_or_default()),
-                            delegate: None,
-                        };
-                        ledger.accounts.insert(pk, acct);
-                    }
-                }
-                Err(err) => return Err(err),
-            }
-        }
-        Ok(ledger)
-    }
-
     /// Apply a ledger diff to a mutable ledger
     pub fn apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         let ledger_diff = diff.clone();
+        let keys: Vec<PublicKey> = ledger_diff
+            .account_diffs
+            .iter()
+            .map(|diff| diff.public_key())
+            .collect();
 
-        ledger_diff
-            .public_keys_seen
-            .into_iter()
-            .for_each(|public_key| {
-                if self.accounts.get(&public_key).is_none() {
-                    self.accounts
-                        .insert(public_key.clone(), Account::empty(public_key));
-                }
-            });
+        keys.into_iter().for_each(|public_key| {
+            if self.accounts.get(&public_key).is_none() {
+                self.accounts
+                    .insert(public_key.clone(), Account::empty(public_key));
+            }
+        });
 
         for diff in ledger_diff.account_diffs {
             match self.accounts.remove(&diff.public_key()) {
@@ -235,6 +201,42 @@ impl Ledger {
         }
 
         Ok(())
+    }
+
+    pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> anyhow::Result<Self> {
+        let mut ledger = Ledger::new();
+        for (pubkey, balance, nonce, delgation) in value {
+            match PublicKey::from_address(pubkey) {
+                Ok(pk) => {
+                    if let Some(delegate) = delgation {
+                        match PublicKey::from_address(delegate) {
+                            Ok(delegate) => {
+                                ledger.accounts.insert(
+                                    pk.clone(),
+                                    Account {
+                                        public_key: pk,
+                                        balance: balance.into(),
+                                        nonce: Nonce(nonce.unwrap_or_default()),
+                                        delegate: Some(delegate),
+                                    },
+                                );
+                            }
+                            Err(e) => return Err(anyhow!("{}", e.to_string())),
+                        }
+                    } else {
+                        let acct = Account {
+                            public_key: pk.clone(),
+                            balance: balance.into(),
+                            nonce: Nonce(nonce.unwrap_or_default()),
+                            delegate: None,
+                        };
+                        ledger.accounts.insert(pk, acct);
+                    }
+                }
+                Err(e) => return Err(anyhow!("{}", e.to_string())),
+            }
+        }
+        Ok(ledger)
     }
 }
 
@@ -363,6 +365,10 @@ impl From<u64> for Amount {
     fn from(value: u64) -> Self {
         Amount(value)
     }
+}
+
+pub fn is_valid_hash(input: &str) -> bool {
+    input.starts_with("jx") && input.len() == 51
 }
 
 #[cfg(test)]
