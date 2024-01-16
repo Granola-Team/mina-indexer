@@ -67,6 +67,15 @@ To build the mina-indexer binaries, run the following command:
 nix build '.?submodules=1'
 ```
 
+**Note:** There is an issue with versions of nix `2.19.x` where it
+doesn't correctly build the binary. Use versions `2.18.x` or
+below. Otherwise, here is a workaround command if you're unable to
+downgrade to a supported version:
+
+```bash
+nix build "git+file://$(pwd)?submodules=1"
+```
+
 This will compile the binaries and place them in `./result/bin`.
 
 ### Running Tests
