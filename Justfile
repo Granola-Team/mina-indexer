@@ -11,6 +11,7 @@ build:
 
 clean:
   cargo clean
+  rm -rf result
 
 test: test-unit test-regression
 
