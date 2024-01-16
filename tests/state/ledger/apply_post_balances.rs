@@ -64,9 +64,6 @@ async fn post_balances() {
     ])
     .unwrap();
 
-    println!("=== Initial ===");
-    println!("{:?}", ledger);
-
     ledger.apply_post_balances(&block);
 
     let expected = Ledger::from(vec![
@@ -84,7 +81,7 @@ async fn post_balances() {
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
-            66859024736773,
+            66859024736773 + 1440 * 1e9 as u64, // supercharged coinbase
             Some(7297),
             None,
         ),
@@ -121,8 +118,17 @@ async fn post_balances() {
     ])
     .unwrap();
 
-    println!("=== Final ===");
-    println!("{ledger:?}");
+    // if ledgers differ, print differing values
+    if ledger != expected {
+        for pk in ledger.accounts.keys() {
+            let ledger_value = ledger.accounts.get(pk).unwrap();
+            let expected_value = expected.accounts.get(pk).unwrap();
+            if ledger_value != expected_value {
+                println!("ledger: {pk} -> {ledger_value}");
+                println!("expect: {pk} -> {expected_value}");
+            }
+        }
+    }
 
     assert_eq!(ledger, expected);
 }
