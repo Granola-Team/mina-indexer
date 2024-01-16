@@ -1,4 +1,0 @@
-initial_ledger: ./ledgers/mainnet-genesis.json
-is_genesis_ledger: true
-root_hash: 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-startup_dir: ./tests
