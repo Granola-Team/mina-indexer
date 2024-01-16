@@ -20,7 +20,7 @@ pub enum CommandType {
     Delegation,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
     Delegation(Delegation),
@@ -208,6 +208,43 @@ impl PaymentPayload {
 
     pub fn receiver_pk(&self) -> PublicKey {
         self.0.clone().inner().inner().receiver_pk.into()
+    }
+}
+
+impl std::fmt::Debug for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let mut json = Map::new();
+        match self {
+            Self::Payment(Payment {
+                source,
+                receiver,
+                amount,
+            }) => {
+                let mut payment = Map::new();
+                payment.insert("source".into(), Value::String(source.to_address()));
+                payment.insert("receiver".into(), Value::String(receiver.to_address()));
+                payment.insert("amount".into(), Value::Number(Number::from(amount.0)));
+                json.insert("Payment".into(), Value::Object(payment));
+            }
+            Self::Delegation(Delegation {
+                delegate,
+                delegator,
+            }) => {
+                let mut delegation = Map::new();
+                delegation.insert("delegate".into(), Value::String(delegate.to_address()));
+                delegation.insert("delegator".into(), Value::String(delegator.to_address()));
+                json.insert("StakeDelegation".into(), Value::Object(delegation));
+            }
+        };
+        write!(f, "{}", to_string(&json).unwrap())
+    }
+}
+
+impl CommandUpdate {
+    pub fn is_delegation(&self) -> bool {
+        matches!(self.command_type, CommandType::Delegation)
     }
 }
 
