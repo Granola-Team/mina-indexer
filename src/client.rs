@@ -107,6 +107,9 @@ pub struct LedgerArgs {
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct SummaryArgs {
+    /// Path to write the summary [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
     /// Verbose output should be redirected to a file
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
@@ -145,16 +148,27 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
-    async fn write_output<T>(input: &T, output_json: bool) -> std::io::Result<()>
+    async fn write_output<T>(
+        input: &T,
+        output_json: bool,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<()>
     where
         T: ?Sized + serde::Serialize + std::fmt::Display,
     {
+        async fn _write(path: Option<&PathBuf>, buffer: &[u8]) -> anyhow::Result<()> {
+            if let Some(path) = path {
+                write(path, buffer.to_vec()).await?;
+            } else {
+                stdout().write_all(buffer).await?;
+            }
+            Ok(())
+        }
+
         if output_json {
-            stdout()
-                .write_all(serde_json::to_string(&input)?.as_bytes())
-                .await
+            _write(path.as_ref(), serde_json::to_string(&input)?.as_bytes()).await
         } else {
-            stdout().write_all(format!("{input}").as_bytes()).await
+            _write(path.as_ref(), format!("{input}").as_bytes()).await
         }
     }
 
@@ -165,7 +179,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             reader.read_to_end(&mut buffer).await?;
 
             let account: Account = serde_json::from_slice(&buffer)?;
-            write_output(&account, account_args.json).await?;
+            write_output(&account, account_args.json, None).await?;
         }
         ClientCli::BestChain(chain_args) => {
             let command = format!("best_chain {} {}\0", chain_args.num, chain_args.verbose);
@@ -185,6 +199,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -195,6 +210,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -209,6 +225,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -220,20 +237,22 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let not_available = "No summary available yet";
             if summary_args.verbose {
                 if let Ok(summary) = serde_json::from_slice::<SummaryVerbose>(&buffer) {
-                    write_output(&summary, summary_args.json).await?;
+                    write_output(&summary, summary_args.json, summary_args.path.clone()).await?;
                 } else {
-                    write_output(not_available, summary_args.json).await?;
+                    write_output(not_available, summary_args.json, summary_args.path.clone())
+                        .await?;
                 }
             } else if let Ok(summary) = serde_json::from_slice::<SummaryShort>(&buffer) {
-                write_output(&summary, summary_args.json).await?;
+                write_output(&summary, summary_args.json, summary_args.path.clone()).await?;
             } else {
-                write_output(not_available, summary_args.json).await?;
+                write_output(not_available, summary_args.json, summary_args.path.clone()).await?;
             }
         }
         ClientCli::Shutdown => {
             let command = "shutdown \0".to_string();
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg: String = serde_json::from_slice(&buffer)?;
             println!("{msg}");
         }
