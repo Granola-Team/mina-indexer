@@ -1,14 +1,14 @@
-use self::precomputed::{BlockFileContents, PrecomputedBlock};
-use anyhow::anyhow;
-use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
-use serde::{Deserialize, Serialize};
-use std::{ffi::OsStr, path::Path};
-
+pub mod blockchain_length;
 pub mod genesis;
 pub mod parser;
 pub mod precomputed;
-pub mod signed_command;
+pub mod previous_state_hash;
 pub mod store;
+
+use self::precomputed::PrecomputedBlock;
+use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
+use serde::{Deserialize, Serialize};
+use std::{ffi::OsStr, path::Path};
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -66,13 +66,6 @@ impl Block {
             blockchain_length: precomputed_block.blockchain_length,
         }
     }
-
-    pub fn summary(&self) -> String {
-        format!(
-            "{{ len: {}, state: {} }}",
-            self.blockchain_length, self.state_hash.0
-        )
-    }
 }
 
 impl From<Block> for BlockWithoutHeight {
@@ -110,6 +103,41 @@ impl BlockWithoutHeight {
     }
 }
 
+impl From<PrecomputedBlock> for Block {
+    fn from(value: PrecomputedBlock) -> Self {
+        Self {
+            parent_hash: value.previous_state_hash(),
+            state_hash: value.state_hash.clone().into(),
+            blockchain_length: value.blockchain_length,
+            global_slot_since_genesis: value.global_slot_since_genesis(),
+            height: value.blockchain_length,
+        }
+    }
+}
+
+impl From<&PrecomputedBlock> for Block {
+    fn from(value: &PrecomputedBlock) -> Self {
+        Self {
+            parent_hash: value.previous_state_hash(),
+            state_hash: value.state_hash.clone().into(),
+            blockchain_length: value.blockchain_length,
+            global_slot_since_genesis: value.global_slot_since_genesis(),
+            height: value.blockchain_length,
+        }
+    }
+}
+
+impl From<&PrecomputedBlock> for BlockWithoutHeight {
+    fn from(value: &PrecomputedBlock) -> Self {
+        Self {
+            parent_hash: value.previous_state_hash(),
+            state_hash: value.state_hash.clone().into(),
+            blockchain_length: value.blockchain_length,
+            global_slot_since_genesis: value.global_slot_since_genesis(),
+        }
+    }
+}
+
 impl From<String> for BlockHash {
     fn from(value: String) -> Self {
         Self(value)
@@ -140,6 +168,36 @@ impl std::cmp::Ord for Block {
     }
 }
 
+impl std::fmt::Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let mut json = Map::new();
+        json.insert("height".into(), Value::Number(Number::from(self.height)));
+        json.insert(
+            "blockchain_length".into(),
+            Value::Number(Number::from(self.blockchain_length)),
+        );
+        json.insert(
+            "global_slot_since_genesis".into(),
+            Value::Number(Number::from(self.global_slot_since_genesis)),
+        );
+        json.insert(
+            "state_hash".into(),
+            Value::String(self.state_hash.0.clone()),
+        );
+        json.insert(
+            "parent_hash".into(),
+            Value::String(self.parent_hash.0.clone()),
+        );
+
+        match to_string(&Value::Object(json)) {
+            Ok(s) => write!(f, "{s}"),
+            Err(_) => Err(std::fmt::Error),
+        }
+    }
+}
+
 impl std::fmt::Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -156,14 +214,36 @@ impl std::fmt::Debug for Block {
 
 impl std::fmt::Debug for BlockWithoutHeight {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Block {{ len: {}, slot: {}, state: {}, parent: {} }}",
-            self.blockchain_length,
-            self.global_slot_since_genesis,
-            &self.state_hash.0[0..12],
-            &self.parent_hash.0[0..12]
-        )
+        write!(f, "{self}")
+    }
+}
+
+impl std::fmt::Display for BlockWithoutHeight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let mut json = Map::new();
+        json.insert(
+            "blockchain_length".into(),
+            Value::Number(Number::from(self.blockchain_length)),
+        );
+        json.insert(
+            "global_slot_since_genesis".into(),
+            Value::Number(Number::from(self.global_slot_since_genesis)),
+        );
+        json.insert(
+            "state_hash".into(),
+            Value::String(self.state_hash.0.clone()),
+        );
+        json.insert(
+            "parent_hash".into(),
+            Value::String(self.parent_hash.0.clone()),
+        );
+
+        match to_string(&Value::Object(json)) {
+            Ok(s) => write!(f, "{s}"),
+            Err(_) => Err(std::fmt::Error),
+        }
     }
 }
 
@@ -176,27 +256,6 @@ impl std::fmt::Debug for BlockHash {
 impl std::fmt::Display for BlockHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-/// Parses the precomputed block if the path is a valid block file
-pub fn parse_file(path: &Path) -> anyhow::Result<PrecomputedBlock> {
-    if is_valid_block_file(path) {
-        let file_name = path.file_name().expect("filename already checked");
-        let blockchain_length = get_blockchain_length(file_name);
-        let state_hash = get_state_hash(file_name).expect("state hash already checked");
-        let log_file_contents = std::fs::read(path)?;
-        let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
-            state_hash,
-            blockchain_length,
-            contents: log_file_contents,
-        })?;
-        Ok(precomputed_block)
-    } else {
-        Err(anyhow!(
-            "Invalid precomputed block file name: {}",
-            path.display()
-        ))
     }
 }
 
@@ -221,10 +280,11 @@ pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
         })
 }
 
+pub fn is_valid_state_hash(input: &str) -> bool {
+    input.starts_with("3N") && input.len() == 52
+}
+
 pub fn is_valid_block_file(path: &Path) -> bool {
-    fn is_valid_state_hash(input: &str) -> bool {
-        input.starts_with("3N") && input.len() == 52
-    }
     if let Some(ext) = path.extension() {
         // check json extension
         if ext.to_str() == Some("json") {

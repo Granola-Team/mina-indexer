@@ -1,6 +1,6 @@
-use crate::block::precomputed::PrecomputedBlock;
-
 pub mod filesystem;
+
+use crate::block::precomputed::PrecomputedBlock;
 
 #[async_trait::async_trait]
 pub trait BlockReceiver {

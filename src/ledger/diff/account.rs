@@ -1,9 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    state::ledger::{
-        command::{Command, SignedCommand, UserCommandWithStatus},
-        Amount, PublicKey,
-    },
+    command::{signed::SignedCommand, Command, UserCommandWithStatus},
+    ledger::{Amount, PublicKey},
 };
 use mina_serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand};
 use serde::{Deserialize, Serialize};
@@ -55,10 +53,12 @@ impl AccountDiff {
                     update_type: UpdateType::Deposit,
                 }),
             ],
-            Command::Delegation(delegation) => vec![AccountDiff::Delegation(DelegationDiff {
-                delegator: delegation.delegator,
-                delegate: delegation.delegate,
-            })],
+            Command::Delegation(delegation) => {
+                vec![AccountDiff::Delegation(DelegationDiff {
+                    delegator: delegation.delegator,
+                    delegate: delegation.delegate,
+                })]
+            }
         }
     }
 
@@ -87,34 +87,32 @@ impl AccountDiff {
     ) -> Vec<AccountDiff> {
         precomputed_block
             .commands()
-            .iter()
-            .filter(|&command| UserCommandWithStatus(command.clone()).is_applied())
-            .flat_map(
-                |command| match command.clone().inner().data.inner().inner() {
-                    UserCommand::SignedCommand(signed_command) => {
-                        let SignedCommandPayloadCommon {
-                            fee,
-                            fee_token: _fee_token,
-                            fee_payer_pk,
-                            nonce: _nonce,
-                            valid_until: _valid_until,
-                            memo: _memo,
-                        } = SignedCommand(signed_command).payload_common();
-                        vec![
-                            AccountDiff::Payment(PaymentDiff {
-                                public_key: fee_payer_pk.into(),
-                                amount: fee.clone().inner().inner().into(),
-                                update_type: UpdateType::Deduction,
-                            }),
-                            AccountDiff::Payment(PaymentDiff {
-                                public_key: coinbase_receiver.clone(),
-                                amount: fee.inner().inner().into(),
-                                update_type: UpdateType::Deposit,
-                            }),
-                        ]
-                    }
-                },
-            )
+            .into_iter()
+            .filter(UserCommandWithStatus::is_applied)
+            .flat_map(|command| match command.0.inner().data.inner().inner() {
+                UserCommand::SignedCommand(signed_command) => {
+                    let SignedCommandPayloadCommon {
+                        fee,
+                        fee_token: _fee_token,
+                        fee_payer_pk,
+                        nonce: _nonce,
+                        valid_until: _valid_until,
+                        memo: _memo,
+                    } = SignedCommand(signed_command).payload_common();
+                    vec![
+                        AccountDiff::Payment(PaymentDiff {
+                            public_key: fee_payer_pk.into(),
+                            amount: fee.clone().inner().inner().into(),
+                            update_type: UpdateType::Deduction,
+                        }),
+                        AccountDiff::Payment(PaymentDiff {
+                            public_key: coinbase_receiver.clone(),
+                            amount: fee.inner().inner().into(),
+                            update_type: UpdateType::Deposit,
+                        }),
+                    ]
+                }
+            })
             .collect()
     }
 }
@@ -137,7 +135,7 @@ impl std::fmt::Debug for DelegationDiff {
 
 impl std::fmt::Debug for CoinbaseDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} | Coinbase  | {}", self.public_key, self.amount.0)
+        write!(f, "{:?} | {}", self.public_key, self.amount.0)
     }
 }
 
@@ -163,10 +161,9 @@ impl std::fmt::Debug for UpdateType {
 #[cfg(test)]
 mod tests {
     use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
-    use crate::state::ledger::{
-        account::Amount,
+    use crate::{
         command::{Command, Delegation, Payment},
-        PublicKey,
+        ledger::{account::Amount, PublicKey},
     };
 
     // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw for all tests below

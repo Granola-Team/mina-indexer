@@ -15,18 +15,18 @@ async fn add_and_get_events() {
         path: ".".into(),
     });
     let event1 = IndexerEvent::BlockWatcher(BlockWatcherEvent::WatchDir("./block0".into()));
-    let event2 = IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::AlreadySeenBlock {
+    let event2 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::AlreadySeenBlock {
         blockchain_length: 0,
         state_hash: "state_hash".into(),
     }));
-    let event3 = IndexerEvent::Db(DbEvent::Block(DbBlockWatcherEvent::NewBlock {
+    let event3 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
         state_hash: "hash".into(),
         blockchain_length: 0,
     }));
-    let event4 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerWatcherEvent::AlreadySeenLedger(
+    let event4 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::AlreadySeenLedger(
         "hash".into(),
     )));
-    let event5 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerWatcherEvent::NewLedger {
+    let event5 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
         hash: "hash".into(),
     }));
     let event6 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {

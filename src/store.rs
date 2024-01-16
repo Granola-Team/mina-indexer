@@ -1,11 +1,9 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    canonical::store::CanonicityStore,
+    canonicity::{store::CanonicityStore, Canonicity},
+    command::{signed::SignedCommand, store::CommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
-    state::{
-        ledger::{store::LedgerStore, Ledger},
-        Canonicity,
-    },
+    ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
 };
 use rocksdb::{ColumnFamilyDescriptor, DB};
 use std::{
@@ -27,7 +25,7 @@ impl IndexerStore {
             &database_opts,
             path,
             secondary,
-            vec!["blocks", "canonicity", "events", "ledgers"],
+            vec!["blocks", "canonicity", "commands", "events", "ledgers"],
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -40,6 +38,7 @@ impl IndexerStore {
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
+        let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
 
@@ -49,7 +48,7 @@ impl IndexerStore {
         let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, events, ledgers],
+            vec![blocks, canonicity, commands, events, ledgers],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -73,6 +72,12 @@ impl IndexerStore {
             .expect("canonicity column family exists")
     }
 
+    fn commands_cf(&self) -> &rocksdb::ColumnFamily {
+        self.database
+            .cf_handle("commands")
+            .expect("commands column family exists")
+    }
+
     fn ledgers_cf(&self) -> &rocksdb::ColumnFamily {
         self.database
             .cf_handle("ledgers")
@@ -87,7 +92,7 @@ impl IndexerStore {
 }
 
 impl BlockStore for IndexerStore {
-    /// Add the specified block at its state hash
+    /// Add the given block at its state hash and record a DbNewBlockevent
     fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
         trace!(
             "Adding block with height {} and hash {}",
@@ -102,8 +107,11 @@ impl BlockStore for IndexerStore {
         let blocks_cf = self.blocks_cf();
         self.database.put_cf(&blocks_cf, key, value)?;
 
+        // add block commands
+        self.add_commands(block)?;
+
         // add new block event
-        let db_event = DbEvent::Block(DbBlockWatcherEvent::NewBlock {
+        let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
             state_hash: block.state_hash.clone(),
             blockchain_length: block.blockchain_length,
         });
@@ -126,42 +134,6 @@ impl BlockStore for IndexerStore {
         {
             None => Ok(None),
             Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-        }
-    }
-
-    /// Set the speicifed block's canonicity
-    fn set_block_canonicity(
-        &self,
-        state_hash: &BlockHash,
-        canonicity: Canonicity,
-    ) -> anyhow::Result<()> {
-        trace!("Setting canonicity of block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
-
-        match self.get_block(state_hash)? {
-            None => Ok(()),
-            Some(precomputed_block) => {
-                let with_canonicity = PrecomputedBlock {
-                    canonicity: Some(canonicity),
-                    ..precomputed_block
-                };
-                self.add_block(&with_canonicity)?;
-                Ok(())
-            }
-        }
-    }
-
-    /// Get the specified block's canonicity
-    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
-        trace!("Getting canonicity of block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
-
-        match self.get_block(state_hash)? {
-            Some(PrecomputedBlock {
-                canonicity: Some(block_canonicity),
-                ..
-            }) => Ok(Some(block_canonicity)),
-            _ => Ok(None),
         }
     }
 }
@@ -239,12 +211,55 @@ impl CanonicityStore for IndexerStore {
             .put_cf(&canonicity_cf, Self::MAX_CANONICAL_KEY, value)?;
         Ok(())
     }
+
+    /// Get the specified block's canonicity
+    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+        trace!("Getting canonicity of block with hash {}", state_hash.0);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        if let Some(PrecomputedBlock {
+            blockchain_length, ..
+        }) = self.get_block(state_hash)?
+        {
+            if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {
+                if blockchain_length > max_canonical_length {
+                    return Ok(Some(Canonicity::Pending));
+                } else if self.get_canonical_hash_at_height(blockchain_length)?
+                    == Some(state_hash.clone())
+                {
+                    return Ok(Some(Canonicity::Canonical));
+                } else {
+                    return Ok(Some(Canonicity::Orphaned));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl LedgerStore for IndexerStore {
-    /// Add the specified ledger at the key `state_hash`
-    fn add_ledger(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
-        trace!("Adding ledger at {}", state_hash.0);
+    fn add_ledger(&self, ledger_hash: &str, ledger: Ledger) -> anyhow::Result<()> {
+        trace!("Adding ledger at {}", ledger_hash);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        // add ledger to db
+        let key = ledger_hash.as_bytes();
+        let value = ledger.to_string();
+        let value = value.as_bytes();
+        let ledgers_cf = self.ledgers_cf();
+        self.database.put_cf(&ledgers_cf, key, value)?;
+
+        // add new ledger event
+        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+            DbLedgerEvent::NewLedger {
+                hash: ledger_hash.into(),
+            },
+        )))?;
+        Ok(())
+    }
+
+    fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
+        trace!("Adding ledger at state hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add ledger to db
@@ -256,16 +271,15 @@ impl LedgerStore for IndexerStore {
 
         // add new ledger event
         self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-            DbLedgerWatcherEvent::NewLedger {
+            DbLedgerEvent::NewLedger {
                 hash: state_hash.0.clone(),
             },
         )))?;
         Ok(())
     }
 
-    /// Get the ledger at the specified state hash
-    fn get_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting ledger at {}", state_hash.0);
+    fn get_ledger_state_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting ledger at state hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         let ledgers_cf = self.ledgers_cf();
@@ -306,6 +320,25 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
+    /// Get the ledger at the given ledger hash
+    fn get_ledger(&self, ledger_hash: &str) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting ledger at {ledger_hash}");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let ledgers_cf = self.ledgers_cf();
+        let key = ledger_hash.as_bytes();
+        if let Some(ledger) = self
+            .database
+            .get_pinned_cf(&ledgers_cf, key)?
+            .map(|bytes| bytes.to_vec())
+            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+        {
+            return Ok(Some(ledger));
+        }
+
+        Ok(None)
+    }
+
     /// Get the canonical ledger at the specified height
     fn get_ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at height {height}");
@@ -313,7 +346,7 @@ impl LedgerStore for IndexerStore {
 
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
-            Some(state_hash) => self.get_ledger(&state_hash),
+            Some(state_hash) => self.get_ledger_state_hash(&state_hash),
         }
     }
 }
@@ -349,7 +382,7 @@ impl EventStore for IndexerStore {
 
         let key = seq_num.to_be_bytes();
         let events_cf = self.events_cf();
-        let event = self.database.get_cf(&events_cf, key)?;
+        let event = self.database.get_pinned_cf(&events_cf, key)?;
         let event = event.map(|bytes| serde_json::from_slice(&bytes).unwrap());
 
         trace!("Getting event {seq_num}: {:?}", event.clone().unwrap());
@@ -362,7 +395,7 @@ impl EventStore for IndexerStore {
 
         if let Some(bytes) = self
             .database
-            .get_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
+            .get_pinned_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
         {
             serde_json::from_slice(&bytes).map_err(anyhow::Error::from)
         } else {
@@ -381,6 +414,96 @@ impl EventStore for IndexerStore {
             }
         }
         Ok(events)
+    }
+}
+
+impl CommandStore for IndexerStore {
+    fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        trace!("Adding commands from block {}", block.state_hash);
+
+        let commands_cf = self.commands_cf();
+        let signed_commands = SignedCommand::from_precomputed(block);
+
+        // add: command hash -> signed command
+        for signed_command in &signed_commands {
+            let hash = signed_command.hash_signed_command()?;
+            trace!("Adding command hash {hash}");
+            let key = hash.as_bytes();
+            let value = serde_json::to_vec(&signed_command)?;
+            self.database.put_cf(commands_cf, key, value)?;
+        }
+
+        // add: state hash -> signed commands
+        let key = block.state_hash.as_bytes();
+        let value = serde_json::to_vec(&signed_commands)?;
+        self.database.put_cf(&commands_cf, key, value)?;
+
+        // add: pk -> signed commands
+        for pk in block.block_public_keys() {
+            let pk_str = pk.to_address();
+            trace!("Adding command pk {pk}");
+            let key = pk_str.as_bytes();
+
+            let mut old_pk_commands: Vec<SignedCommand> = vec![];
+            let mut new_pk_commands: Vec<SignedCommand> = signed_commands
+                .iter()
+                .filter(|cmd| cmd.source_pk() == pk || cmd.receiver_pk() == pk)
+                .cloned()
+                .collect();
+
+            if let Some(commands_bytes) = self.database.get(key)? {
+                old_pk_commands = serde_json::from_slice(&commands_bytes)?;
+            }
+            old_pk_commands.append(&mut new_pk_commands);
+
+            let value = serde_json::to_vec(&old_pk_commands)?;
+            self.database.put_cf(&commands_cf, key, value)?;
+        }
+
+        Ok(())
+    }
+
+    fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>> {
+        trace!("Getting command by hash {}", command_hash);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let key = command_hash.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
+    }
+
+    fn get_commands_in_block(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+        trace!("Getting commands in block {}", state_hash.0);
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let key = state_hash.0.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
+    }
+
+    fn get_commands_for_public_key(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+        let pk = pk.to_address();
+        trace!("Getting commands for public key {pk}");
+        self.database.try_catch_up_with_primary().unwrap_or(());
+
+        let key = pk.as_bytes();
+        let commands_cf = self.commands_cf();
+        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
+            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        }
+        Ok(None)
     }
 }
 

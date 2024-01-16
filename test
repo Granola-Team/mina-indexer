@@ -50,7 +50,6 @@ setup() {
 }
 
 teardown() {
-    echo "Cleaning up and killing the background indexer with PID: ${idxr_pid}"
     kill "${idxr_pid}" 2>/dev/null || true
     rm -rf ./blocks
     rm -rf ./database
@@ -97,6 +96,9 @@ test_indexer_cli_reports() {
 
     idxr shutdown --help 2>&1 |
         grep -iq "Usage: mina-indexer shutdown"
+
+    idxr transactions --help 2>&1 |
+        grep -iq "Usage: mina-indexer transactions"
 }
 
 # Indexer server config passes cli with minimal args
@@ -110,7 +112,7 @@ test_indexer_basic_start() {
         --database-dir ./database \
         --log-dir ./logs &
     sleep 1
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -128,7 +130,7 @@ test_server_startup() {
 
     result=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -149,7 +151,7 @@ test_ipc_is_available_immediately() {
     sleep 1
 
     idxr summary
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -167,7 +169,7 @@ test_account_balance_cli() {
 
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -184,7 +186,7 @@ test_account_public_key_json() {
     sleep 5
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -215,7 +217,7 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./database"
     assert_directory_exists "./logs"
 
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -238,7 +240,42 @@ test_canonical_tip() {
     assert 5 $blockchain_length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
 
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
+    teardown
+}
+
+# Indexer server returns the correct best chain
+test_best_chain() {
+    test=test_best_chain
+    setup
+    mkdir best_chain
+
+    dl_mainnet 12 ./blocks
+    RUST_BACKTRACE=1 idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    result=$(idxr best-chain | jq -r .[0].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+
+    result=$(idxr best-chain -v | jq -r .[0].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+
+    # write best chain to file
+    file=./best_chain/best_chain.json
+    idxr best-chain -p $file
+    file_result=$(cat $file | jq -r .[0].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+
+    idxr best-chain -v -p $file
+    file_result=$(cat $file | jq -r .[0].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+
+    idxr_pid=$(pgrep -c mina-indexer)
+    rm -rf best_chain
     teardown
 }
 
@@ -246,6 +283,7 @@ test_canonical_tip() {
 test_ledgers() {
     test=test_ledgers
     setup
+    mkdir ledgers
 
     dl_mainnet 15 ./blocks
     idxr server cli \
@@ -259,20 +297,31 @@ test_ledgers() {
 
     # canonical ledgers match
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
-    hash_result=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
-    length_result=$(idxr ledger-at-height --height $canonical_length | jq -r .${pk}.balance)
-    assert $hash_result '607904750000000'
-    assert $length_result '607904750000000'
+    canonical_height=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    hash_balance=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
+    height_balance=$(idxr ledger-at-height --height $canonical_height | jq -r .${pk}.balance)
+    assert '607904750000000' $hash_balance
+    assert '607904750000000' $height_balance
 
     # best ledgers match
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_height=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+
     best_result=$(idxr best-ledger | jq -r .${pk}.balance)
     hash_result=$(idxr ledger --hash $best_hash | jq -r .${pk}.balance)
-    assert $best_result $hash_result
-    assert $best_result '607904750000000'
+    assert '607904750000000' $best_result
+    assert '607904750000000' $hash_result
 
-    idxr_pid=$(pgrep mina-indexer)
+    # write ledger to file
+    file=./ledgers/$best_hash.json
+    idxr ledger --hash $best_hash -p $file
+    
+    file_result=$(cat $file | jq -r .${pk}.balance)
+    assert '607904750000000' $file_result
+
+    idxr_pid=$(pgrep -c mina-indexer)
+    rm -rf ledgers
     teardown
 }
 
@@ -296,7 +345,7 @@ test_sync() {
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
 
     # kill running indexer and release db lock
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     kill "${idxr_pid}" 2>/dev/null || true
     rm ./database/LOCK
 
@@ -319,7 +368,7 @@ test_sync() {
     assert $best_hash $best_hash_sync
     assert $best_length $best_length_sync
 
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -341,10 +390,10 @@ test_replay() {
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    num_blocks=$(idxr summary -j | jq -r .block_processed)
+    num_blocks=$(idxr summary -j | jq -r .blocks_processed)
 
     # kill running indexer and release db lock
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
     kill "${idxr_pid}" 2>/dev/null || true
     rm ./database/LOCK
 
@@ -361,15 +410,42 @@ test_replay() {
     canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    num_blocks_sync=$(idxr summary -j | jq -r .block_processed)
+    num_blocks_sync=$(idxr summary -j | jq -r .blocks_processed)
 
     assert $canonical_hash $canonical_hash_sync
     assert $canonical_length $canonical_length_sync
     assert $best_hash $best_hash_sync
     assert $best_length $best_length_sync
+    assert $num_blocks 15
     assert $num_blocks $num_blocks_sync
 
-    idxr_pid=$(pgrep mina-indexer)
+    idxr_pid=$(pgrep -c mina-indexer)
+    teardown
+}
+
+# Indexer server returns correct transactions
+test_transactions() {
+    test=test_transactions
+    setup
+
+    dl_mainnet 3 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 10
+
+    transactions=$(idxr transactions --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
+    assert $transactions '[]'
+
+    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+    assert $amount '1000'
+
+    transactions=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
+    assert $transactions '1000'
+
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -384,9 +460,11 @@ if [ "$#" -eq 0 ]; then
     test_account_public_key_json
     test_startup_dirs_get_created
     test_canonical_tip
+    test_best_chain
     test_ledgers
     test_sync
     test_replay
+    test_transactions
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -399,9 +477,11 @@ else
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
             "test_canonical_tip") test_canonical_tip ;;
+            "test_best_chain") test_best_chain ;;
             "test_ledgers") test_ledgers ;;
             "test_sync") test_sync ;;
             "test_replay") test_replay ;;
+            "test_transactions") test_transactions ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done

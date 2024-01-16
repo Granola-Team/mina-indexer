@@ -1,6 +1,6 @@
 use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
-    state::ledger::genesis::parse_file,
+    ledger::genesis::parse_file,
     state::IndexerState,
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,

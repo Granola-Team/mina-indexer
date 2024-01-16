@@ -1,9 +1,7 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::parser::BlockParser,
-    state::{ledger::genesis, IndexerState},
-    store::IndexerStore,
+    block::parser::BlockParser, ledger::genesis, state::IndexerState, store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
     PRUNE_INTERVAL_DEFAULT,
 };

@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use id_tree::NodeId;
 use mina_indexer::{
     block::{parser::BlockParser, Block},
     state::branch::Branch,
 };
+use std::path::PathBuf;
 
 // extend a branch with a new leaf
 #[tokio::test]
@@ -111,9 +110,5 @@ async fn extension() {
     );
 
     // after root isn't a leaf
-    assert!(tree2
-        .leaves()
-        .iter()
-        .cloned()
-        .all(|x| x != after_root.clone()));
+    assert!(tree2.leaves().into_iter().all(|x| x != after_root.clone()));
 }

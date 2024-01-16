@@ -95,7 +95,7 @@ pub fn discovery(
                 < canonical_threshold
         {
             info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
-            return Ok((vec![], paths.iter().cloned().cloned().collect()));
+            return Ok((vec![], paths.into_iter().cloned().collect()));
         }
 
         // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
@@ -166,7 +166,7 @@ pub fn discovery(
                     "Unable to locate parent block: mainnet-{}-{parent_hash}.json",
                     length_from_path_or_max(curr_path) - 1,
                 );
-                return Ok((vec![], paths.iter().cloned().cloned().collect()));
+                return Ok((vec![], paths.into_iter().cloned().collect()));
             }
         }
 

@@ -1,9 +1,10 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
-    canonical::store::CanonicityStore,
+    canonicity::store::CanonicityStore,
     event::{store::EventStore, witness_tree::WitnessTreeEvent},
-    state::{ledger::genesis::GenesisRoot, IndexerState},
+    ledger::genesis::GenesisRoot,
+    state::IndexerState,
     store::IndexerStore,
     MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
 };

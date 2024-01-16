@@ -1,6 +1,6 @@
 use crate::{
-    block::{length_from_path, parse_file, precomputed::PrecomputedBlock},
-    canonical::chain_discovery::discovery,
+    block::{length_from_path, precomputed::PrecomputedBlock},
+    canonicity::canonical_chain_discovery::discovery,
 };
 use anyhow::anyhow;
 use glob::glob;
@@ -86,11 +86,11 @@ impl BlockParser {
     /// Traverses `self`'s internal paths. First canonical, then successive.
     pub fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return parse_file(&next_path).map(Some);
+            return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
 
         if let Some(next_path) = self.successive_paths.next() {
-            return parse_file(&next_path).map(Some);
+            return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
 
         Ok(None)

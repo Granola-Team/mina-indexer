@@ -1,12 +1,11 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, Block},
-    state::{
-        ledger::account::Account,
-        summary::{SummaryShort, SummaryVerbose},
-    },
+    // block::{precomputed::PrecomputedBlock, BlockWithoutHeight},
+    command::{signed::SignedCommand, Command},
+    ledger::account::Account,
+    state::summary::{SummaryShort, SummaryVerbose},
     SOCKET_NAME,
 };
-use clap::Parser;
+use clap::{Args, Parser};
 use futures::{
     io::{AsyncWriteExt, BufReader},
     AsyncReadExt,
@@ -14,7 +13,10 @@ use futures::{
 use interprocess::local_socket::tokio::LocalSocketStream;
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process};
-use tokio::io::{stdout, AsyncWriteExt as OtherAsyncWriteExt};
+use tokio::{
+    fs::write,
+    io::{stdout, AsyncWriteExt as OtherAsyncWriteExt},
+};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -34,9 +36,11 @@ pub enum ClientCli {
     Summary(SummaryArgs),
     /// Shutdown the server
     Shutdown,
+    /// Get transactions for an account
+    Transactions(TransactionArgs),
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct AccountArgs {
     /// Retrieve public key's account info
@@ -47,7 +51,7 @@ pub struct AccountArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct ChainArgs {
     /// Number of blocks to include in this suffix
@@ -59,12 +63,9 @@ pub struct ChainArgs {
     /// Display the entire precomputed block
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct BestLedgerArgs {
     /// Path to write the ledger [default: stdout]
@@ -75,7 +76,7 @@ pub struct BestLedgerArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct LedgerAtHeightArgs {
     /// Path to write the ledger [default: stdout]
@@ -89,13 +90,13 @@ pub struct LedgerAtHeightArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct LedgerArgs {
     /// Path to write the ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
-    /// State hash corresponding to the ledger
+    /// State or ledger hash corresponding to the ledger
     #[arg(long)]
     hash: String,
     /// Output JSON data
@@ -103,10 +104,30 @@ pub struct LedgerArgs {
     json: bool,
 }
 
-#[derive(clap::Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct SummaryArgs {
+    /// Path to write the summary [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
     /// Verbose output should be redirected to a file
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+    /// Output JSON data
+    #[arg(short, long, default_value_t = false)]
+    json: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct TransactionArgs {
+    /// Path to write the transactions [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Retrieve public key's transaction info
+    #[arg(long)]
+    public_key: String,
+    /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
     /// Output JSON data
@@ -127,16 +148,27 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
-    async fn write_output<T>(input: &T, output_json: bool) -> std::io::Result<()>
+    async fn write_output<T>(
+        input: &T,
+        output_json: bool,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<()>
     where
         T: ?Sized + serde::Serialize + std::fmt::Display,
     {
+        async fn _write(path: Option<&PathBuf>, buffer: &[u8]) -> anyhow::Result<()> {
+            if let Some(path) = path {
+                write(path, buffer.to_vec()).await?;
+            } else {
+                stdout().write_all(buffer).await?;
+            }
+            Ok(())
+        }
+
         if output_json {
-            stdout()
-                .write_all(serde_json::to_string(&input)?.as_bytes())
-                .await
+            _write(path.as_ref(), serde_json::to_string(&input)?.as_bytes()).await
         } else {
-            stdout().write_all(format!("{input}").as_bytes()).await
+            _write(path.as_ref(), format!("{input}").as_bytes()).await
         }
     }
 
@@ -147,22 +179,17 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             reader.read_to_end(&mut buffer).await?;
 
             let account: Account = serde_json::from_slice(&buffer)?;
-            write_output(&account, account_args.json).await?;
+            write_output(&account, account_args.json, None).await?;
         }
         ClientCli::BestChain(chain_args) => {
-            let command = format!("best_chain {}\0", chain_args.num);
+            let command = format!("best_chain {} {}\0", chain_args.num, chain_args.verbose);
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
-            let blocks: Vec<PrecomputedBlock> = serde_json::from_slice(&buffer)?;
-            for block in blocks.iter() {
-                if chain_args.json {
-                    stdout()
-                        .write_all(serde_json::to_string(block)?.as_bytes())
-                        .await?;
-                } else {
-                    let block = Block::from_precomputed(block, block.blockchain_length);
-                    stdout().write_all(block.summary().as_bytes()).await?;
-                }
+
+            if let Some(path) = chain_args.path.as_ref() {
+                write(path, buffer.to_vec()).await?;
+            } else {
+                stdout().write_all(&buffer).await?;
             }
         }
         ClientCli::BestLedger(best_ledger_args) => {
@@ -172,6 +199,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -182,6 +210,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -196,6 +225,7 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg = String::from_utf8(buffer)?;
             println!("{msg}");
         }
@@ -207,22 +237,48 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let not_available = "No summary available yet";
             if summary_args.verbose {
                 if let Ok(summary) = serde_json::from_slice::<SummaryVerbose>(&buffer) {
-                    write_output(&summary, summary_args.json).await?;
+                    write_output(&summary, summary_args.json, summary_args.path.clone()).await?;
                 } else {
-                    write_output(not_available, summary_args.json).await?;
+                    write_output(not_available, summary_args.json, summary_args.path.clone())
+                        .await?;
                 }
             } else if let Ok(summary) = serde_json::from_slice::<SummaryShort>(&buffer) {
-                write_output(&summary, summary_args.json).await?;
+                write_output(&summary, summary_args.json, summary_args.path.clone()).await?;
             } else {
-                write_output(not_available, summary_args.json).await?;
+                write_output(not_available, summary_args.json, summary_args.path.clone()).await?;
             }
         }
         ClientCli::Shutdown => {
             let command = "shutdown \0".to_string();
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
+
             let msg: String = serde_json::from_slice(&buffer)?;
             println!("{msg}");
+        }
+        ClientCli::Transactions(transaction_args) => {
+            let command = match &transaction_args.path {
+                None => format!(
+                    "transactions {} {}\0",
+                    transaction_args.public_key, transaction_args.verbose
+                ),
+                Some(path) => format!(
+                    "transactions {} {} {}\0",
+                    transaction_args.public_key,
+                    transaction_args.verbose,
+                    path.display()
+                ),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            if transaction_args.verbose {
+                let msg: Vec<SignedCommand> = serde_json::from_slice(&buffer)?;
+                println!("{:?}", msg)
+            } else {
+                let msg: Vec<Command> = serde_json::from_slice(&buffer)?;
+                println!("{:?}", msg)
+            }
         }
     }
 

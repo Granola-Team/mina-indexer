@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
-    client,
+    client, ledger,
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
-    state::ledger,
     store::IndexerStore,
     CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
     MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,

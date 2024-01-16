@@ -152,12 +152,9 @@ async fn merge() {
         .data();
     let leaf0 = Block::from_precomputed(&leaf0_block, 2);
     let leaf1 = Block::from_precomputed(&leaf1_block, 2);
-    let leaves0: HashSet<Block> = root_branch.leaves().iter().cloned().collect();
+    let leaves0: HashSet<Block> = root_branch.leaves().into_iter().collect();
 
-    assert_eq!(
-        leaves0.iter().cloned().collect::<HashSet<Block>>(),
-        HashSet::from([leaf0, leaf1])
-    );
+    assert_eq!(HashSet::from([leaf0, leaf1]), leaves0.into_iter().collect());
 
     // branch root should match the tree's root
     assert_eq!(root0, branch_root0);

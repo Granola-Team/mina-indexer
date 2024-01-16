@@ -1,5 +1,4 @@
-use super::PublicKey;
-use crate::MAINNET_ACCOUNT_CREATION_FEE;
+use crate::{ledger::public_key::PublicKey, MAINNET_ACCOUNT_CREATION_FEE};
 use rust_decimal::Decimal;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -139,18 +138,7 @@ impl std::fmt::Display for Account {
 
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let pk = self.public_key.to_address();
-        let delegate = self
-            .delegate
-            .as_ref()
-            .map(|pk| pk.to_address())
-            .unwrap_or(pk.clone());
-        writeln!(f, "{{")?;
-        writeln!(f, "  pk:       {pk}")?;
-        writeln!(f, "  balance:  {}", nanomina_to_mina(self.balance.0))?;
-        writeln!(f, "  nonce:    {}", self.nonce.0)?;
-        writeln!(f, "  delegate: {delegate}")?;
-        writeln!(f, "}}")
+        write!(f, "{self}")
     }
 }
 
@@ -200,5 +188,5 @@ where
         }
     }
 
-    deserializer.deserialize_string(StringVisitor)
+    deserializer.deserialize_str(StringVisitor)
 }

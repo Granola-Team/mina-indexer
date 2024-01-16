@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mina_indexer::{
     block::parser::BlockParser,
-    state::ledger::{diff::LedgerDiff, Ledger},
+    ledger::{diff::LedgerDiff, Ledger},
 };
 
 #[tokio::test]
@@ -15,7 +15,7 @@ async fn account_diffs() {
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await
         .unwrap();
-    let diff = LedgerDiff::from_precomputed_block(&block);
+    let diff = LedgerDiff::from_precomputed(&block);
 
     let mut ledger = Ledger::from(vec![
         (
