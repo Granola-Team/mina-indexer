@@ -222,7 +222,7 @@ impl PrecomputedBlock {
     }
 
     /// Vec of public keys which send or receive funds in applied commands and coinbase
-    pub fn active_all_public_keys(&self) -> Vec<PublicKey> {
+    pub fn active_public_keys(&self) -> Vec<PublicKey> {
         // block creator and block stake winner
         let mut public_keys: HashSet<PublicKey> =
             HashSet::from([self.block_creator(), self.block_stake_winner()]);

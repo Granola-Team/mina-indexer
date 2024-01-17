@@ -26,26 +26,8 @@ pub struct SignedCommandWithData {
 }
 
 impl SignedCommand {
-    pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
-        &self.0.t.t.payload.t.t
-    }
-
-    pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
-        match uc.0.inner().data.inner().inner() {
-            mina_rs::UserCommand::SignedCommand(signed_command) => signed_command.into(),
-        }
-    }
-
-    pub fn source_nonce(&self) -> u32 {
-        self.payload_common().nonce.t.t as u32
-    }
-
     pub fn fee_payer_pk(&self) -> PublicKey {
         self.payload_common().fee_payer_pk.into()
-    }
-
-    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
-        &self.receiver_pk() == pk || &self.source_pk() == pk || &self.fee_payer_pk() == pk
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
@@ -80,11 +62,42 @@ impl SignedCommand {
         }
     }
 
+    pub fn signer(&self) -> PublicKey {
+        self.0.clone().inner().inner().signer.0.inner().into()
+    }
+
+    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+        vec![
+            self.receiver_pk(),
+            self.source_pk(),
+            self.fee_payer_pk(),
+            self.signer(),
+        ]
+    }
+
+    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
+        self.all_public_keys().contains(pk)
+    }
+
     pub fn is_delegation(&self) -> bool {
         matches!(
             self.payload_body(),
             mina_rs::SignedCommandPayloadBody::StakeDelegation(_)
         )
+    }
+
+    pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
+        &self.0.t.t.payload.t.t
+    }
+
+    pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
+        match uc.0.inner().data.inner().inner() {
+            mina_rs::UserCommand::SignedCommand(signed_command) => signed_command.into(),
+        }
+    }
+
+    pub fn source_nonce(&self) -> u32 {
+        self.payload_common().nonce.t.t as u32
     }
 
     pub fn payload_body(&self) -> mina_rs::SignedCommandPayloadBody {
@@ -93,10 +106,6 @@ impl SignedCommand {
 
     pub fn payload_common(&self) -> mina_rs::SignedCommandPayloadCommon {
         self.payload().common.clone().inner().inner().inner()
-    }
-
-    pub fn signer(&self) -> PublicKey {
-        self.0.clone().inner().inner().signer.0.inner().into()
     }
 
     pub fn hash_signed_command(&self) -> anyhow::Result<String> {

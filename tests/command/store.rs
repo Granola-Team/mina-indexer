@@ -32,7 +32,7 @@ async fn add_and_get() {
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
     let block = bp.get_precomputed_block(state_hash).await.unwrap();
     let block_cmds = SignedCommand::from_precomputed(&block);
-    let pks = block.block_public_keys();
+    let pks = block.all_public_keys();
 
     // add the block to the block store
     indexer.add_block_to_store(&block).unwrap();
