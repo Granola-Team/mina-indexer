@@ -1,6 +1,6 @@
 use crate::{
     block::{is_valid_state_hash, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
-    command::{store::CommandStore, Command},
+    command::{signed::SignedCommand, store::CommandStore, Command},
     ledger::{self, public_key::PublicKey, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
     state::summary::{SummaryShort, SummaryVerbose},
@@ -125,9 +125,9 @@ async fn handle_conn(
     let response_json = match command_string.as_str() {
         "account" => {
             let pk_buffer = buffers.next().unwrap();
-            let pk = PublicKey::from_address(&String::from_utf8(
-                pk_buffer[..pk_buffer.len() - 1].to_vec(),
-            )?)?;
+            let pk: PublicKey = String::from_utf8(pk_buffer.to_vec())?
+                .trim_end_matches('\0')
+                .into();
             info!("Received account command for {pk}");
 
             let account = ledger.accounts.get(&pk);
@@ -146,12 +146,12 @@ async fn handle_conn(
             let start_state_hash: BlockHash =
                 String::from_utf8(buffers.next().unwrap().to_vec())?.into();
             let end_state_hash = {
-                let x = String::from_utf8(buffers.next().unwrap().to_vec())?;
-                let x = x.trim_matches('\0');
-                if !is_valid_state_hash(x) {
+                let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let hash = hash.trim_end_matches('\0');
+                if !is_valid_state_hash(hash) {
                     best_tip.state_hash.clone()
                 } else {
-                    x.into()
+                    hash.into()
                 }
             };
 
@@ -199,7 +199,8 @@ async fn handle_conn(
             let ledger = ledger.to_string();
             match buffers.next() {
                 Some(data_buffer) => {
-                    let data = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?;
+                    let data = String::from_utf8(data_buffer.to_vec())?;
+                    let data = data.trim_end_matches('\0');
                     if data.is_empty() {
                         debug!("Writing best ledger to stdout");
                         Some(ledger)
@@ -222,8 +223,8 @@ async fn handle_conn(
             }
         }
         "ledger" => {
-            let hash_buffer = buffers.next().unwrap();
-            let hash = String::from_utf8(hash_buffer.to_vec())?;
+            let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let hash = hash.trim_end_matches('\0');
             info!("Received ledger command for {hash}");
 
             // check if ledger or state hash and use appropriate getter
@@ -239,9 +240,9 @@ async fn handle_conn(
                             Some(ledger)
                         }
                         Some(path_buffer) => {
-                            let path =
-                                &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
-                                    .parse::<PathBuf>()?;
+                            let path = &String::from_utf8(path_buffer.to_vec())?
+                                .trim_end_matches('\0')
+                                .parse::<PathBuf>()?;
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
@@ -273,8 +274,9 @@ async fn handle_conn(
                             Some(ledger)
                         }
                         Some(path_buffer) => {
-                            let path =
-                                &String::from_utf8(path_buffer.to_vec())?.parse::<PathBuf>()?;
+                            let path = &String::from_utf8(path_buffer.to_vec())?
+                                .trim_end_matches('\0')
+                                .parse::<PathBuf>()?;
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
@@ -297,8 +299,8 @@ async fn handle_conn(
             }
         }
         "ledger_at_height" => {
-            let height_buffer = buffers.next().unwrap();
-            let height = String::from_utf8(height_buffer[..height_buffer.len() - 1].to_vec())?
+            let height = String::from_utf8(buffers.next().unwrap().to_vec())?
+                .trim_end_matches('\0')
                 .parse::<u32>()?;
             info!("Received ledger_at_height {height} command");
 
@@ -312,9 +314,9 @@ async fn handle_conn(
                         Some(ledger)
                     }
                     Some(path_buffer) => {
-                        let path =
-                            &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
-                                .parse::<PathBuf>()?;
+                        let path = &String::from_utf8(path_buffer.to_vec())?
+                            .trim_end_matches('\0')
+                            .parse::<PathBuf>()?;
                         if !path.is_dir() {
                             debug!("Writing ledger at height {height} to {}", path.display());
 
@@ -337,8 +339,8 @@ async fn handle_conn(
         }
         "summary" => {
             info!("Received summary command");
-            let data_buffer = buffers.next().unwrap();
-            let verbose = String::from_utf8(data_buffer[..data_buffer.len() - 1].to_vec())?
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?
+                .trim_end_matches('\0')
                 .parse::<bool>()?;
             if let Some(summary) = summary {
                 if verbose {
@@ -361,46 +363,65 @@ async fn handle_conn(
             process::exit(0);
         }
         "transactions" => {
-            let pk_buffer = buffers.next().unwrap();
-            let pk = String::from_utf8(pk_buffer.to_vec())?;
-            let verbose_buffer = buffers.next().unwrap();
-            let verbose = String::from_utf8(verbose_buffer[..verbose_buffer.len() - 1].to_vec())?
-                .parse::<bool>()?;
+            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
+            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
+            let start_state_hash: BlockHash =
+                String::from_utf8(buffers.next().unwrap().to_vec())?.into();
+            let end_state_hash: BlockHash = {
+                let raw = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                if &raw == "x" {
+                    // dummy value
+                    best_tip.state_hash.clone()
+                } else {
+                    raw.into()
+                }
+            };
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
 
             info!("Received transactions command for {pk}");
             let transactions = db
-                .get_commands_for_public_key(&pk.clone().into())?
+                .get_commands_with_bounds(&pk.clone().into(), &start_state_hash, &end_state_hash)?
                 .unwrap_or(vec![]);
-            let transactions = {
-                if verbose {
-                    serde_json::to_string(&transactions)?
+            let transaction_str = {
+                let txs = if num != 0 {
+                    transactions.into_iter().take(num).collect()
                 } else {
-                    let transactions_summary: Vec<Command> =
-                        transactions.into_iter().map(Command::from).collect();
-                    serde_json::to_string(&transactions_summary)?
+                    transactions
+                };
+
+                if verbose {
+                    let txs: Vec<SignedCommand> =
+                        txs.into_iter().map(SignedCommand::from).collect();
+                    format!("{txs:?}")
+                } else {
+                    let txs: Vec<Command> = txs.into_iter().map(Command::from).collect();
+                    format!("{txs:?}")
                 }
             };
-            match buffers.next() {
-                None => {
-                    debug!("Writing transactions for {pk} to stdout");
-                    Some(transactions)
-                }
-                Some(path_buffer) => {
-                    let path = &String::from_utf8(path_buffer[..path_buffer.len() - 1].to_vec())?
-                        .parse::<PathBuf>()?;
-                    if !path.is_dir() {
-                        debug!("Writing transactions for {pk} to {}", path.display());
-                        tokio::fs::write(&path, transactions).await?;
-                        Some(serde_json::to_string(&format!(
-                            "Transactions for {pk} written to {}",
-                            path.display()
-                        ))?)
-                    } else {
-                        Some(serde_json::to_string(&format!(
-                            "The path provided must not be a directory: {}",
-                            path.display()
-                        ))?)
-                    }
+            if path.is_empty() {
+                // stdout
+                debug!("Writing transactions for {pk} to stdout");
+                Some(transaction_str)
+            } else {
+                // write to path
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    debug!("Writing transactions for {pk} to {}", path.display());
+
+                    tokio::fs::write(&path, transaction_str).await?;
+                    // let s = tokio::fs::read_to_string(path.clone()).await?;
+                    // debug!("File contents: {s}");
+                    Some(format!(
+                        "Transactions for {pk} written to {}",
+                        path.display()
+                    ))
+                } else {
+                    Some(format!(
+                        "The path provided must not be a directory: {}",
+                        path.display()
+                    ))
                 }
             }
         }
