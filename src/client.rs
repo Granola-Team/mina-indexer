@@ -1,5 +1,4 @@
 use crate::{
-    command::{signed::SignedCommand, Command},
     ledger::account::Account,
     state::summary::{SummaryShort, SummaryVerbose},
     MAINNET_GENESIS_HASH, SOCKET_NAME,
@@ -43,7 +42,7 @@ pub enum ClientCli {
 #[command(author, version, about, long_about = None)]
 pub struct AccountArgs {
     /// Retrieve public key's account info
-    #[arg(short, long)]
+    #[arg(short = 'k', long)]
     public_key: String,
     /// Output JSON data
     #[arg(short, long, default_value_t = false)]
@@ -130,8 +129,17 @@ pub struct TransactionArgs {
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Retrieve public key's transaction info
-    #[arg(long)]
+    #[arg(short = 'k', long)]
     public_key: String,
+    /// Bound the fetched transactions by a number
+    #[arg(short, long)]
+    num: Option<usize>,
+    /// Bound the fetched transactions by a start state hash
+    #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
+    start_state_hash: String,
+    /// Bound the fetched transactions by an end state hash
+    #[arg(short, long)]
+    end_state_hash: Option<String>,
     /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
@@ -268,28 +276,23 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             println!("{msg}");
         }
         ClientCli::Transactions(transaction_args) => {
-            let command = match &transaction_args.path {
-                None => format!(
-                    "transactions {} {}\0",
-                    transaction_args.public_key, transaction_args.verbose
-                ),
-                Some(path) => format!(
-                    "transactions {} {} {}\0",
-                    transaction_args.public_key,
-                    transaction_args.verbose,
-                    path.display()
-                ),
-            };
+            let command = format!(
+                "transactions {} {} {} {} {} {}\0",
+                transaction_args.public_key,
+                transaction_args.verbose,
+                transaction_args.num.unwrap_or(0),
+                transaction_args.start_state_hash,
+                transaction_args
+                    .end_state_hash
+                    .clone()
+                    .unwrap_or("x".into()),
+                transaction_args.path.clone().unwrap_or("".into()).display(),
+            );
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
-            if transaction_args.verbose {
-                let msg: Vec<SignedCommand> = serde_json::from_slice(&buffer)?;
-                println!("{:?}", msg)
-            } else {
-                let msg: Vec<Command> = serde_json::from_slice(&buffer)?;
-                println!("{:?}", msg)
-            }
+            let msg = String::from_utf8(buffer.to_vec())?;
+            println!("{msg}");
         }
     }
 
