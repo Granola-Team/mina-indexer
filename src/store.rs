@@ -1,7 +1,10 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
-    command::{signed::SignedCommand, store::CommandStore},
+    command::{
+        signed::{SignedCommand, SignedCommandWithStateHash},
+        store::CommandStore,
+    },
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
 };
@@ -10,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use tracing::trace;
+use tracing::{trace, warn};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -419,17 +422,29 @@ impl EventStore for IndexerStore {
 
 impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        trace!("Adding commands from block {}", block.state_hash);
+        trace!(
+            "Adding commands from block (length {}) {}",
+            block.blockchain_length,
+            block.state_hash
+        );
 
         let commands_cf = self.commands_cf();
         let signed_commands = SignedCommand::from_precomputed(block);
 
-        // add: command hash -> signed command
+        // add: command hash -> signed command with state hash
         for signed_command in &signed_commands {
             let hash = signed_command.hash_signed_command()?;
-            trace!("Adding command hash {hash}");
+            trace!(
+                "Adding command hash {hash} (length {}, state hash {})",
+                block.blockchain_length,
+                block.state_hash.clone(),
+            );
+
             let key = hash.as_bytes();
-            let value = serde_json::to_vec(&signed_command)?;
+            let value = serde_json::to_vec(&SignedCommandWithStateHash::from(
+                signed_command,
+                &block.state_hash,
+            ))?;
             self.database.put_cf(commands_cf, key, value)?;
         }
 
@@ -438,32 +453,37 @@ impl CommandStore for IndexerStore {
         let value = serde_json::to_vec(&signed_commands)?;
         self.database.put_cf(&commands_cf, key, value)?;
 
-        // add: pk -> signed commands
+        // add: pk -> signed commands with state hash
         for pk in block.block_public_keys() {
             let pk_str = pk.to_address();
             trace!("Adding command pk {pk}");
             let key = pk_str.as_bytes();
 
-            let mut old_pk_commands: Vec<SignedCommand> = vec![];
-            let mut new_pk_commands: Vec<SignedCommand> = signed_commands
+            let mut block_pk_commands: Vec<SignedCommandWithStateHash> = signed_commands
                 .iter()
-                .filter(|cmd| cmd.source_pk() == pk || cmd.receiver_pk() == pk)
-                .cloned()
+                .filter(|cmd| cmd.contains_public_key(&pk))
+                .map(|c| SignedCommandWithStateHash::from(c, &block.state_hash))
                 .collect();
 
-            if let Some(commands_bytes) = self.database.get(key)? {
-                old_pk_commands = serde_json::from_slice(&commands_bytes)?;
-            }
-            old_pk_commands.append(&mut new_pk_commands);
+            block_pk_commands.append(
+                &mut self
+                    .database
+                    .get_pinned_cf(&commands_cf, key)?
+                    .map(|bytes| serde_json::from_slice(&bytes).unwrap())
+                    .unwrap_or(vec![]),
+            );
 
-            let value = serde_json::to_vec(&old_pk_commands)?;
+            let value = serde_json::to_vec(&block_pk_commands)?;
             self.database.put_cf(&commands_cf, key, value)?;
         }
 
         Ok(())
     }
 
-    fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>> {
+    fn get_command_by_hash(
+        &self,
+        command_hash: &str,
+    ) -> anyhow::Result<Option<SignedCommandWithStateHash>> {
         trace!("Getting command by hash {}", command_hash);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
@@ -493,7 +513,7 @@ impl CommandStore for IndexerStore {
     fn get_commands_for_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>> {
         let pk = pk.to_address();
         trace!("Getting commands for public key {pk}");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -503,6 +523,50 @@ impl CommandStore for IndexerStore {
         if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
+        Ok(None)
+    }
+
+    fn get_commands_with_bounds(
+        &self,
+        pk: &PublicKey,
+        start_state_hash: &BlockHash,
+        end_state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>> {
+        let start_block_opt = self.get_block(start_state_hash)?;
+        let end_block_opt = self.get_block(end_state_hash)?;
+
+        if let (Some(start_block), Some(end_block)) = (start_block_opt, end_block_opt) {
+            let start_height = start_block.blockchain_length;
+            let end_height = end_block.blockchain_length;
+
+            if end_height < start_height {
+                warn!("Block (length {end_height}) {end_state_hash} is lower than block (length {start_height}) {start_state_hash}");
+                return Ok(None);
+            }
+
+            let mut num = end_height - start_height;
+            let mut prev_hash = end_block.previous_state_hash();
+            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash.into()];
+            while let Some(block) = self.get_block(&prev_hash)? {
+                if num == 0 {
+                    break;
+                }
+
+                num -= 1;
+                state_hashes.push(prev_hash);
+                prev_hash = block.previous_state_hash();
+            }
+
+            if let Some(commands) = self.get_commands_for_public_key(pk)? {
+                return Ok(Some(
+                    commands
+                        .into_iter()
+                        .filter(|c| state_hashes.contains(&c.state_hash))
+                        .collect(),
+                ));
+            }
+        }
+
         Ok(None)
     }
 }
