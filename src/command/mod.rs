@@ -3,13 +3,13 @@ pub mod signed;
 pub mod store;
 
 use crate::{
-    block::precomputed::PrecomputedBlock,
+    block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::SignedCommand,
     ledger::{account::Amount, post_balances::PostBalance, public_key::PublicKey},
 };
 use mina_serialization_types::{
     staged_ledger_diff as mina_rs,
-    v1::{PaymentPayloadV1, UserCommandWithStatusV1},
+    v1::{PaymentPayloadV1, StakeDelegationV1, UserCommandWithStatusV1},
 };
 use serde::{Deserialize, Serialize};
 use tracing::trace;
@@ -23,7 +23,14 @@ pub enum CommandType {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
+    #[serde(alias = "StakeDelegation")]
     Delegation(Delegation),
+}
+
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct CommandWithStateHash {
+    pub command: Command,
+    pub state_hash: BlockHash,
 }
 
 pub struct CommandUpdate {
@@ -92,7 +99,7 @@ impl UserCommandWithStatus {
                 _,
                 balance_data,
             ) => CommandStatusData::Applied {
-                balance_data: balance_data.t,
+                balance_data: balance_data.inner(),
             },
             mina_serialization_types::staged_ledger_diff::TransactionStatus::Failed(_, _) => {
                 CommandStatusData::Failed
@@ -146,6 +153,9 @@ impl UserCommandWithStatus {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct PaymentPayload(pub PaymentPayloadV1);
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct StakeDelegation(pub StakeDelegationV1);
 
 impl Command {
     /// Get the list of commands from the precomputed block
@@ -208,6 +218,52 @@ impl PaymentPayload {
 
     pub fn receiver_pk(&self) -> PublicKey {
         self.0.clone().inner().inner().receiver_pk.into()
+    }
+}
+
+impl StakeDelegation {
+    pub fn delegator(&self) -> PublicKey {
+        let mina_rs::StakeDelegation::SetDelegate { delegator, .. } = self.0.clone().inner();
+        delegator.into()
+    }
+
+    pub fn new_delegate(&self) -> PublicKey {
+        let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } = self.0.clone().inner();
+        new_delegate.into()
+    }
+}
+
+impl From<mina_rs::UserCommandWithStatus> for UserCommandWithStatus {
+    fn from(value: mina_rs::UserCommandWithStatus) -> Self {
+        Self(versioned::Versioned {
+            version: 1,
+            t: value,
+        })
+    }
+}
+
+impl From<UserCommandWithStatus> for mina_rs::UserCommandWithStatus {
+    fn from(value: UserCommandWithStatus) -> Self {
+        value.0.inner()
+    }
+}
+
+impl From<UserCommandWithStatus> for Command {
+    fn from(value: UserCommandWithStatus) -> Self {
+        value.data().into()
+    }
+}
+
+impl From<mina_rs::UserCommand> for Command {
+    fn from(value: mina_rs::UserCommand) -> Self {
+        let value: SignedCommand = value.into();
+        value.into()
+    }
+}
+
+impl From<UserCommandWithStatus> for CommandStatusData {
+    fn from(value: UserCommandWithStatus) -> Self {
+        value.status_data()
     }
 }
 
