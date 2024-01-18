@@ -1,7 +1,6 @@
 use crate::{
     block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash},
-    command::signed,
-    command::{signed::SignedCommand, PaymentPayload, UserCommandWithStatus},
+    command::{signed::SignedCommand, UserCommandWithStatus},
     ledger::{coinbase::Coinbase, public_key::PublicKey},
     MAINNET_GENESIS_TIMESTAMP,
 };
@@ -14,7 +13,7 @@ use mina_serialization_types::{
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1},
 };
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 pub struct BlockFileContents {
     pub(crate) state_hash: String,
@@ -50,14 +49,14 @@ pub struct PrecomputedBlock {
 impl PrecomputedBlock {
     pub fn from_file_contents(log_contents: BlockFileContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
-        let str = String::from_utf8_lossy(&log_contents.contents);
+        let contents = String::from_utf8_lossy(&log_contents.contents);
         let BlockFile {
             scheduled_time,
             protocol_state,
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
-        } = serde_json::from_str::<BlockFile>(&str).unwrap();
+        } = serde_json::from_str(&contents)?;
         let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
             blockchain_length
         } else {
@@ -122,6 +121,10 @@ impl PrecomputedBlock {
 
     pub fn block_creator(&self) -> PublicKey {
         self.consensus_state().block_creator.into()
+    }
+
+    pub fn block_stake_winner(&self) -> PublicKey {
+        self.consensus_state().block_stake_winner.into()
     }
 
     pub fn internal_command_balances(&self) -> Vec<mina_rs::InternalCommandBalanceData> {
@@ -191,16 +194,18 @@ impl PrecomputedBlock {
         self.consensus_state().coinbase_receiver.into()
     }
 
-    pub fn block_public_keys(&self) -> Vec<PublicKey> {
-        let mut public_keys: Vec<PublicKey> = vec![];
-        let consenesus_state = self.consensus_state();
+    fn consensus_public_keys(&self) -> HashSet<PublicKey> {
+        HashSet::from([
+            self.block_creator(),
+            self.coinbase_receiver(),
+            self.block_stake_winner(),
+        ])
+    }
 
-        public_keys.append(&mut vec![
-            consenesus_state.block_creator.into(),
-            consenesus_state.coinbase_receiver.into(),
-            consenesus_state.block_stake_winner.into(),
-        ]);
+    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
 
+        // add keys from all commands
         let commands = self.commands();
         commands.iter().for_each(|command| {
             let signed_command = match command.clone().data() {
@@ -208,42 +213,27 @@ impl PrecomputedBlock {
                     SignedCommand(signed_command)
                 }
             };
-            public_keys.push(signed_command.signer());
-            public_keys.push(signed_command.fee_payer_pk());
-            public_keys.append(&mut match signed_command.payload_body() {
-                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
-                    PaymentPayload(payment_payload.clone()).source_pk(),
-                    PaymentPayload(payment_payload).receiver_pk(),
-                ],
-                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
-                    match stake_delegation.inner() {
-                        mina_rs::StakeDelegation::SetDelegate {
-                            delegator,
-                            new_delegate,
-                        } => vec![delegator.into(), new_delegate.into()],
-                    }
-                }
-            })
+            add_keys(&mut pk_set, signed_command.all_public_keys());
         });
 
-        public_keys
+        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
+        pks.sort();
+        pks
     }
 
-    pub fn active_block_public_keys(&self) -> Vec<PublicKey> {
-        let mut public_keys: Vec<PublicKey> = vec![];
-        let consenesus_state = self.consensus_state();
+    /// Vec of public keys which send or receive funds in applied commands and coinbase
+    pub fn active_public_keys(&self) -> Vec<PublicKey> {
+        // block creator and block stake winner
+        let mut public_keys: HashSet<PublicKey> =
+            HashSet::from([self.block_creator(), self.block_stake_winner()]);
 
-        public_keys.append(&mut vec![
-            consenesus_state.block_creator.into(),
-            consenesus_state.block_stake_winner.into(),
-        ]);
-
+        // coinbase receiver
         if Coinbase::from_precomputed(self).is_coinbase_applied() {
-            public_keys.push(consenesus_state.coinbase_receiver.into());
+            public_keys.insert(self.coinbase_receiver());
         }
 
-        let commands = self.commands();
-        commands
+        // applied commands
+        self.commands()
             .iter()
             .filter(|cmd| cmd.is_applied())
             .for_each(|command| {
@@ -252,25 +242,12 @@ impl PrecomputedBlock {
                         SignedCommand(signed_command)
                     }
                 };
-                public_keys.push(signed_command.signer());
-                public_keys.push(signed_command.fee_payer_pk());
-                public_keys.append(&mut match signed_command.payload_body() {
-                    mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => vec![
-                        PaymentPayload(payment_payload.clone()).source_pk(),
-                        PaymentPayload(payment_payload).receiver_pk(),
-                    ],
-                    mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
-                        match stake_delegation.inner() {
-                            mina_rs::StakeDelegation::SetDelegate {
-                                delegator,
-                                new_delegate,
-                            } => vec![delegator.into(), new_delegate.into()],
-                        }
-                    }
-                })
+                add_keys(&mut public_keys, signed_command.all_public_keys());
             });
 
-        public_keys
+        let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();
+        pks.sort();
+        pks
     }
 
     pub fn global_slot_since_genesis(&self) -> u32 {
@@ -305,9 +282,15 @@ impl PrecomputedBlock {
     }
 
     pub fn command_hashes(&self) -> Vec<String> {
-        signed::SignedCommand::from_precomputed(self)
+        SignedCommand::from_precomputed(self)
             .iter()
             .map(|cmd| cmd.hash_signed_command().unwrap())
             .collect()
+    }
+}
+
+fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
+    for pk in new_pks {
+        pks.insert(pk);
     }
 }

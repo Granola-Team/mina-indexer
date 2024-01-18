@@ -1,6 +1,6 @@
 use crate::{
-    block::precomputed::PrecomputedBlock,
-    command::{Command, Delegation, Payment, UserCommandWithStatus},
+    block::{precomputed::PrecomputedBlock, BlockHash},
+    command::*,
     ledger::public_key::PublicKey,
 };
 use blake2::digest::VariableOutput;
@@ -12,27 +12,22 @@ use versioned::Versioned;
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommand(pub mina_serialization_types::staged_ledger_diff::SignedCommandV1);
 
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SignedCommandWithStateHash {
+    pub command: SignedCommand,
+    pub state_hash: BlockHash,
+}
+
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SignedCommandWithData {
+    pub command: SignedCommand,
+    pub state_hash: BlockHash,
+    pub status: CommandStatusData,
+}
+
 impl SignedCommand {
-    pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
-        &self.0.t.t.payload.t.t
-    }
-
-    pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
-        match uc.0.t.data.t.t {
-            mina_rs::UserCommand::SignedCommand(signed_command) => signed_command.into(),
-        }
-    }
-
-    pub fn source_nonce(&self) -> u32 {
-        self.payload_common().nonce.t.t as u32
-    }
-
     pub fn fee_payer_pk(&self) -> PublicKey {
         self.payload_common().fee_payer_pk.into()
-    }
-
-    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
-        &self.receiver_pk() == pk || &self.source_pk() == pk || &self.fee_payer_pk() == pk
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
@@ -67,11 +62,42 @@ impl SignedCommand {
         }
     }
 
+    pub fn signer(&self) -> PublicKey {
+        self.0.clone().inner().inner().signer.0.inner().into()
+    }
+
+    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+        vec![
+            self.receiver_pk(),
+            self.source_pk(),
+            self.fee_payer_pk(),
+            self.signer(),
+        ]
+    }
+
+    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
+        self.all_public_keys().contains(pk)
+    }
+
     pub fn is_delegation(&self) -> bool {
         matches!(
             self.payload_body(),
             mina_rs::SignedCommandPayloadBody::StakeDelegation(_)
         )
+    }
+
+    pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
+        &self.0.t.t.payload.t.t
+    }
+
+    pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
+        match uc.0.inner().data.inner().inner() {
+            mina_rs::UserCommand::SignedCommand(signed_command) => signed_command.into(),
+        }
+    }
+
+    pub fn source_nonce(&self) -> u32 {
+        self.payload_common().nonce.t.t as u32
     }
 
     pub fn payload_body(&self) -> mina_rs::SignedCommandPayloadBody {
@@ -80,10 +106,6 @@ impl SignedCommand {
 
     pub fn payload_common(&self) -> mina_rs::SignedCommandPayloadCommon {
         self.payload().common.clone().inner().inner().inner()
-    }
-
-    pub fn signer(&self) -> PublicKey {
-        self.0.clone().inner().inner().signer.0.inner().into()
     }
 
     pub fn hash_signed_command(&self) -> anyhow::Result<String> {
@@ -105,14 +127,39 @@ impl SignedCommand {
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        block
-            .commands()
-            .iter()
-            .map(|cmd| cmd.0.clone().inner().data.inner().inner())
-            .map(|mina_rs::UserCommand::SignedCommand(signed_cmd)| SignedCommand(signed_cmd))
-            .collect()
+        block.commands().into_iter().map(Self::from).collect()
     }
 }
+
+impl SignedCommandWithStateHash {
+    pub fn from(signed_cmd: &SignedCommand, state_hash: &str) -> Self {
+        Self {
+            command: signed_cmd.clone(),
+            state_hash: state_hash.into(),
+        }
+    }
+}
+
+impl From<mina_rs::UserCommand> for SignedCommand {
+    fn from(value: mina_rs::UserCommand) -> Self {
+        let mina_rs::UserCommand::SignedCommand(v1) = value;
+        Self(v1)
+    }
+}
+
+impl From<mina_rs::UserCommandWithStatus> for SignedCommand {
+    fn from(value: mina_rs::UserCommandWithStatus) -> Self {
+        Self::from_user_command(value.into())
+    }
+}
+
+impl From<UserCommandWithStatus> for SignedCommand {
+    fn from(value: UserCommandWithStatus) -> Self {
+        let value: mina_rs::UserCommandWithStatus = value.into();
+        value.into()
+    }
+}
+
 impl From<SignedCommand> for Command {
     fn from(value: SignedCommand) -> Command {
         match value.payload_body() {
@@ -139,6 +186,27 @@ impl From<SignedCommand> for Command {
                     delegator: delegator.into(),
                 })
             }
+        }
+    }
+}
+
+impl From<SignedCommandWithStateHash> for SignedCommand {
+    fn from(value: SignedCommandWithStateHash) -> Self {
+        value.command
+    }
+}
+
+impl From<SignedCommandWithStateHash> for Command {
+    fn from(value: SignedCommandWithStateHash) -> Self {
+        value.command.into()
+    }
+}
+
+impl From<SignedCommandWithStateHash> for CommandWithStateHash {
+    fn from(value: SignedCommandWithStateHash) -> Self {
+        Self {
+            command: value.command.into(),
+            state_hash: value.state_hash,
         }
     }
 }

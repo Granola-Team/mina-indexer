@@ -1,6 +1,6 @@
-use std::path::Path;
-
+use crate::block::BlockHash;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PreviousStateHashBlock {
@@ -25,9 +25,28 @@ impl PreviousStateHash {
     }
 }
 
+impl From<PreviousStateHashBlock> for PreviousStateHash {
+    fn from(value: PreviousStateHashBlock) -> Self {
+        Self(value.protocol_state.previous_state_hash)
+    }
+}
+
+impl From<PreviousStateHashBlock> for BlockHash {
+    fn from(value: PreviousStateHashBlock) -> Self {
+        let p: PreviousStateHash = value.into();
+        p.into()
+    }
+}
+
 impl From<PreviousStateHash> for String {
     fn from(value: PreviousStateHash) -> Self {
         value.0
+    }
+}
+
+impl From<PreviousStateHash> for BlockHash {
+    fn from(value: PreviousStateHash) -> Self {
+        value.0.into()
     }
 }
 

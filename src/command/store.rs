@@ -1,6 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::signed::SignedCommand,
+    command::signed::{SignedCommand, SignedCommandWithStateHash},
     ledger::public_key::PublicKey,
 };
 
@@ -16,11 +16,22 @@ pub trait CommandStore {
     ) -> anyhow::Result<Option<Vec<SignedCommand>>>;
 
     /// Get a command by its hash
-    fn get_command_by_hash(&self, command_hash: &str) -> anyhow::Result<Option<SignedCommand>>;
+    fn get_command_by_hash(
+        &self,
+        command_hash: &str,
+    ) -> anyhow::Result<Option<SignedCommandWithStateHash>>;
 
     /// Get commands involving the public key as a sender or receiver
     fn get_commands_for_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SignedCommand>>>;
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>>;
+
+    /// Get commands for the public key with number and/or state hash bounds
+    fn get_commands_with_bounds(
+        &self,
+        pk: &PublicKey,
+        start_state_hash: &BlockHash,
+        end_state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>>;
 }

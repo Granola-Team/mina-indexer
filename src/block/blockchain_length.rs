@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BlockchainLengthBlock {
@@ -42,6 +41,27 @@ impl BlockchainLength {
 impl From<BlockchainLength> for u32 {
     fn from(value: BlockchainLength) -> Self {
         value.0
+    }
+}
+
+impl From<BlockchainLengthBlock> for BlockchainLength {
+    fn from(value: BlockchainLengthBlock) -> Self {
+        Self(
+            value
+                .protocol_state
+                .body
+                .consensus_state
+                .blockchain_length
+                .parse()
+                .unwrap(),
+        )
+    }
+}
+
+impl From<BlockchainLengthBlock> for u32 {
+    fn from(value: BlockchainLengthBlock) -> Self {
+        let b: BlockchainLength = value.into();
+        b.into()
     }
 }
 

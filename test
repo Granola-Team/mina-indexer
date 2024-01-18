@@ -254,21 +254,39 @@ test_best_chain() {
         --log-dir ./logs &
     sleep 20
 
-    result=$(idxr best-chain | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+    result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
     result=$(idxr best-chain -v | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
+
+    # with bounds
+    bounds=$(idxr best-chain \
+        --start-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
+        --end-state-hash 3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY \
+        | jq -r .[0].state_hash)
+    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $bounds
+
+    bounds=$(idxr best-chain \
+        --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+        --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
+        | jq -r .[1].state_hash)
+    assert '3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG' $bounds
+
+    bounds=$(idxr best-chain --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+        --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
+        | jq -r .[2].state_hash)
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $bounds
 
     # write best chain to file
     file=./best_chain/best_chain.json
     idxr best-chain -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     idxr best-chain -v -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     idxr_pid=$(pgrep -c mina-indexer)
     rm -rf best_chain
@@ -412,7 +430,7 @@ test_replay() {
     assert $canonical_length $canonical_length_sync
     assert $best_hash $best_hash_sync
     assert $best_length $best_length_sync
-    assert $num_blocks 15
+    assert '15' $num_blocks
     assert $num_blocks $num_blocks_sync
 
     idxr_pid=$(pgrep -c mina-indexer)
@@ -423,25 +441,48 @@ test_replay() {
 test_transactions() {
     test=test_transactions
     setup
+    mkdir transactions
 
-    dl_mainnet 3 ./blocks
+    dl_mainnet 13 ./blocks
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs &
-    sleep 10
+    sleep 15
 
+    # basic transaction queries
     transactions=$(idxr transactions --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
-    assert $transactions '[]'
+    assert '[]' $transactions
 
     amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
-    assert $amount '1000'
+    assert '1000' $amount
 
-    transactions=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
-    assert $transactions '1000'
+    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
+    assert '1000' $amount
+
+    # bounded transaction queries
+    amount=$(idxr transactions -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+        --start-state-hash 3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG \
+        --end-state-hash 3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5 \
+        | jq -r .[0].Payment.amount)
+    assert '1000' $amount
+
+    amount=$(idxr transactions -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+        --start-state-hash 3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH \
+        --end-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
+        | jq -r .[0].Payment.amount)
+    assert '1000' $amount
+
+    # write transactions to file
+    file=./transactions/transactions.json
+    idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
+    
+    file_result=$(cat $file | jq -r .[0].Payment.amount)
+    assert '1000' $file_result
 
     idxr_pid=$(pgrep -c mina-indexer)
+    rm -rf ./transactions
     teardown
 }
 

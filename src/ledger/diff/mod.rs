@@ -38,7 +38,7 @@ impl LedgerDiff {
         }
 
         LedgerDiff {
-            public_keys_seen: precomputed_block.active_block_public_keys(),
+            public_keys_seen: precomputed_block.active_public_keys(),
             account_diffs,
         }
     }
