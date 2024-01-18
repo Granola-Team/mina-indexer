@@ -331,7 +331,7 @@ test_best_chain() {
     result=$(idxr best-chain -v | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
-    # with bounds
+    # best chain with bounds
     bounds=$(idxr best-chain \
         --start-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
         --end-state-hash 3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY \
@@ -399,12 +399,27 @@ test_ledgers() {
     assert '607904750000000' $best_result
     assert '607904750000000' $hash_result
 
-    # write ledger to file
-    file=./ledgers/$best_hash.json
+    # write ledgers to file
+    file=./ledgers/best-$best_height-$best_hash.json
+    idxr best-ledger -p $file
+    
+    file_result=$(cat $file | jq -r .${pk}.balance)
+    assert '607904750000000' $file_result
+    rm -f $file
+
+    file=./ledgers/ledger-$best_height-$best_hash.json
     idxr ledger --hash $best_hash -p $file
     
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
+    rm -f $file
+
+    file=./ledgers/height-$canonical_height-$best_hash.json
+    idxr ledger-at-height --height $canonical_height -p $file
+    
+    file_result=$(cat $file | jq -r .${pk}.balance)
+    assert '607904750000000' $file_result
+    rm -f $file
 
     idxr_pid=$(pgrep -c mina-indexer)
     rm -rf ledgers
