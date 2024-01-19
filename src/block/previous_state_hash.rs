@@ -12,6 +12,7 @@ pub struct ProtocolState {
     pub previous_state_hash: String,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct PreviousStateHash(pub String);
 
 impl PreviousStateHash {

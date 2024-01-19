@@ -10,15 +10,19 @@ use std::{
 };
 use tracing::debug;
 
-/// Splits block paths into two collections: canonical and successive
+/// Splits block paths into three collections:
+/// - canonical
+/// - successive
+/// - orphaned
 ///
-/// Traverses canoncial paths first, then successive
+/// Traverses canoncial paths, then successive, then orphaned
 pub struct BlockParser {
     pub num_canonical: u32,
     pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
     canonical_paths: IntoIter<PathBuf>,
     successive_paths: IntoIter<PathBuf>,
+    orphaned_paths: IntoIter<PathBuf>,
 }
 
 impl BlockParser {
@@ -65,7 +69,7 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .filter(|path| length_from_path(path).is_some())
                 .collect();
-            if let Ok((canonical_paths, successive_paths)) =
+            if let Ok((canonical_paths, successive_paths, orphaned_paths)) =
                 discovery(length_filter, canonical_threshold, paths.iter().collect())
             {
                 Ok(Self {
@@ -74,6 +78,7 @@ impl BlockParser {
                     blocks_dir,
                     canonical_paths: canonical_paths.into_iter(),
                     successive_paths: successive_paths.into_iter(),
+                    orphaned_paths: orphaned_paths.into_iter(),
                 })
             } else {
                 Ok(Self::empty(&blocks_dir, &paths))
@@ -93,11 +98,33 @@ impl BlockParser {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
 
+        // TODO remove
+        if let Some(next_path) = self.orphaned_paths.next() {
+            return PrecomputedBlock::parse_file(&next_path).map(Some);
+        }
+
+        Ok(None)
+    }
+
+    /// Traverses `self`'s internal paths, returning raw json bytes
+    pub fn next_raw_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+        if let Some(next_path) = self.canonical_paths.next() {
+            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
+        }
+
+        if let Some(next_path) = self.successive_paths.next() {
+            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
+        }
+
+        if let Some(next_path) = self.orphaned_paths.next() {
+            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
+        }
+
         Ok(None)
     }
 
     /// Gets the precomputed block with supplied `state_hash`, it must exist ahead
-    /// of `self`'s current file in the order imposed by glob/filesystem.
+    /// of `self`'s current file
     pub async fn get_precomputed_block(
         &mut self,
         state_hash: &str,
@@ -122,13 +149,17 @@ impl BlockParser {
             blocks_dir: blocks_dir.to_path_buf(),
             canonical_paths: vec![].into_iter(),
             successive_paths: paths.clone().into_iter(),
+            orphaned_paths: vec![].into_iter(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{get_blockchain_length, is_valid_block_file, length_from_path, BlockHash};
+    use crate::block::{
+        blockchain_length::BlockchainLength, get_blockchain_length, is_valid_block_file,
+        length_from_path, BlockHash,
+    };
     use quickcheck::{Arbitrary, Gen};
     use quickcheck_macros::quickcheck;
     use std::{
@@ -212,6 +243,36 @@ mod tests {
             .collect();
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn blockchain_length_from_path() -> anyhow::Result<()> {
+        let expected: Vec<u32> = vec![
+            113512, 113518, 175222, 179591, 179594, 195769, 195770, 196577, 2, 206418, 216651,
+            220897, 5929, 26272, 32202, 31640, 31775, 40702, 750, 84160, 84161, 9638, 9644,
+        ];
+        let paths: Vec<PathBuf> = glob::glob("./tests/data/non_sequential_blocks/*")?
+            .flatten()
+            .collect();
+        let actual: Vec<u32> = paths
+            .iter()
+            .flat_map(|x| {
+                BlockchainLength::from_path(&PathBuf::from(x))
+                    .map(<BlockchainLength as Into<u32>>::into)
+                    .ok()
+            })
+            .collect();
+
+        assert_eq!(expected, actual);
+
+        let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
+        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
+            .iter()
+            .map(|x| length_from_path(Path::new(x)))
+            .collect();
+
+        assert_eq!(expected, actual);
+        Ok(())
     }
 
     #[test]

@@ -7,7 +7,7 @@ use blake2::digest::VariableOutput;
 use mina_serialization_types::staged_ledger_diff as mina_rs;
 use serde_derive::{Deserialize, Serialize};
 use std::io::Write;
-use versioned::Versioned;
+use versioned::Versioned2;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommand(pub mina_serialization_types::staged_ledger_diff::SignedCommandV1);
@@ -211,8 +211,8 @@ impl From<SignedCommandWithStateHash> for CommandWithStateHash {
     }
 }
 
-impl From<Versioned<Versioned<mina_rs::SignedCommand, 1>, 1>> for SignedCommand {
-    fn from(value: Versioned<Versioned<mina_rs::SignedCommand, 1>, 1>) -> Self {
+impl From<Versioned2<mina_rs::SignedCommand, 1, 1>> for SignedCommand {
+    fn from(value: Versioned2<mina_rs::SignedCommand, 1, 1>) -> Self {
         SignedCommand(value)
     }
 }
