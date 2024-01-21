@@ -7,6 +7,11 @@ use crate::{
         store::BlockStore, Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
+    constants::{
+        BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
+        MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH,
+        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    },
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger},
     state::{
@@ -17,9 +22,6 @@ use crate::{
         },
     },
     store::IndexerStore,
-    BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-    MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT,
 };
 use anyhow::anyhow;
 use id_tree::NodeId;

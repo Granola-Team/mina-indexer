@@ -1,8 +1,8 @@
 use crate::{
     block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash},
     command::{signed::SignedCommand, UserCommandWithStatus},
+    constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey},
-    MAINNET_GENESIS_TIMESTAMP,
 };
 use anyhow::anyhow;
 use mina_serialization_types::{

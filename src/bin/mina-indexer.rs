@@ -1,10 +1,13 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
-    client, ledger,
+    client,
+    constants::{
+        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
+        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+    },
+    ledger,
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
-    MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
 };
 use std::{fs, path::PathBuf, sync::Arc};
 use tracing::{error, info, instrument};
