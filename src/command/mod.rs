@@ -307,7 +307,7 @@ impl CommandUpdate {
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
-    use crate::{block::parser::BlockParser, MAINNET_CANONICAL_THRESHOLD};
+    use crate::{block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD};
     use std::path::PathBuf;
 
     #[tokio::test]

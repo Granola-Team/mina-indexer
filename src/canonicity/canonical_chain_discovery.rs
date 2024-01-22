@@ -1,6 +1,6 @@
 use crate::{
     block::{get_blockchain_length, get_state_hash, is_valid_block_file},
-    BLOCK_REPORTING_FREQ_NUM,
+    constants::BLOCK_REPORTING_FREQ_NUM,
 };
 use std::{
     fs::File,

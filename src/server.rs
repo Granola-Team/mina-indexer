@@ -1,11 +1,11 @@
 use crate::{
     block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
+    constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
     ledger::{genesis::GenesisRoot, Ledger},
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
-    MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME,
 };
 use anyhow::anyhow;
 use interprocess::local_socket::tokio::LocalSocketListener;

@@ -1,7 +1,10 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::parser::BlockParser, ledger::genesis::GenesisRoot, state::IndexerState,
-    store::IndexerStore, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
+    block::parser::BlockParser,
+    constants::{MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT},
+    ledger::genesis::GenesisRoot,
+    state::IndexerState,
+    store::IndexerStore,
 };
 use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
 

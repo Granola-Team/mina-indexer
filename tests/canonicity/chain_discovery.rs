@@ -1,4 +1,4 @@
-use mina_indexer::{block::parser::BlockParser, MAINNET_CANONICAL_THRESHOLD};
+use mina_indexer::{block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD};
 use std::path::PathBuf;
 
 #[tokio::test]

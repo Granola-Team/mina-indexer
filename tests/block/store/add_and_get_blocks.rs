@@ -1,11 +1,11 @@
-use std::{fs::remove_dir_all, collections::HashMap, path::PathBuf};
+use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
+    constants::MAINNET_CANONICAL_THRESHOLD,
     store::IndexerStore,
-    MAINNET_CANONICAL_THRESHOLD,
 };
+use std::{collections::HashMap, fs::remove_dir_all, path::PathBuf};
 use tokio::time::Instant;
-use crate::helpers::setup_new_db_dir;
 
 #[tokio::test]
 async fn rocksdb() {

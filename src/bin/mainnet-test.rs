@@ -1,9 +1,14 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::parser::BlockParser, ledger::genesis, state::IndexerState, store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT,
+    block::parser::BlockParser,
+    constants::{
+        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
+        PRUNE_INTERVAL_DEFAULT,
+    },
+    ledger::genesis,
+    state::IndexerState,
+    store::IndexerStore,
 };
 use std::{fs, path::PathBuf, sync::Arc, thread};
 use tokio::{

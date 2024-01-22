@@ -1,6 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, Block, BlockHash},
-    MAINNET_CANONICAL_THRESHOLD,
+    constants::MAINNET_CANONICAL_THRESHOLD,
 };
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
