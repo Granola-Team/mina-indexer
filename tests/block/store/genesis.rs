@@ -1,10 +1,12 @@
 use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
+    constants::{
+        CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
+        PRUNE_INTERVAL_DEFAULT,
+    },
     ledger::genesis::parse_file,
     state::IndexerState,
     store::IndexerStore,
-    CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-    PRUNE_INTERVAL_DEFAULT,
 };
 use std::{path::PathBuf, sync::Arc};
 
