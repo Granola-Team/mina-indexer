@@ -8,6 +8,7 @@ use crate::{
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
 };
+use anyhow::anyhow;
 use rocksdb::{ColumnFamilyDescriptor, DB};
 use std::{
     path::{Path, PathBuf},
@@ -57,6 +58,14 @@ impl IndexerStore {
             db_path: PathBuf::from(path),
             database,
         })
+    }
+
+    pub fn create_checkpoint(&self, path: &Path) -> anyhow::Result<()> {
+        use rocksdb::checkpoint::Checkpoint;
+
+        let checkpoint = Checkpoint::new(&self.database)?;
+        Checkpoint::create_checkpoint(&checkpoint, path)
+            .map_err(|e| anyhow!("Error creating db checkpoint: {}", e.to_string()))
     }
 
     pub fn db_path(&self) -> &Path {
