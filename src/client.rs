@@ -26,6 +26,8 @@ pub enum ClientCli {
     BestChain(ChainArgs),
     /// Dump the best ledger to a file
     BestLedger(BestLedgerArgs),
+    /// Create a checkpoint of the indexer store RocksDB
+    Checkpoint(CheckpointArgs),
     /// Dump the ledger at a specified state hash
     Ledger(LedgerArgs),
     /// Dump the ledger at a specified height (blockchain length)
@@ -78,6 +80,14 @@ pub struct BestLedgerArgs {
     /// Output JSON data
     #[arg(short, long, default_value_t = false)]
     json: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct CheckpointArgs {
+    /// Path to write the checkpoint
+    #[arg(short, long)]
+    path: PathBuf,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -216,6 +226,14 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
                 None => "best_ledger \0".to_string(),
                 Some(path) => format!("best_ledger {}\0", path.display()),
             };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            let msg = String::from_utf8(buffer)?;
+            println!("{msg}");
+        }
+        ClientCli::Checkpoint(checkpoint_args) => {
+            let command = format!("checkpoint {}\0", checkpoint_args.path.display());
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
