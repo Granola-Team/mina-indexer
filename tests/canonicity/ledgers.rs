@@ -48,7 +48,7 @@ async fn test() {
 
         ledger_post.apply_post_balances(&block);
         ledger_diff
-            .apply_diff(&LedgerDiff::from_precomputed(&block))
+            ._apply_diff(&LedgerDiff::from_precomputed(&block))
             .unwrap();
 
         if ledger != ledger_post || ledger != ledger_diff {

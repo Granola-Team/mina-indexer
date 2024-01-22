@@ -6,7 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
     pub account_diffs: Vec<AccountDiff>,

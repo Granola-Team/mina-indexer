@@ -176,6 +176,7 @@ pub async fn initialize(
                 info!("Replaying indexer events from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
+                    ledger.ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
@@ -186,6 +187,7 @@ pub async fn initialize(
                 info!("Syncing indexer state from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
+                    ledger.ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,

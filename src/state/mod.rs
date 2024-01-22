@@ -45,6 +45,8 @@ pub struct IndexerState {
     pub best_tip: Tip,
     /// Highest known canonical block
     pub canonical_tip: Tip,
+    /// Ledger corresponding to the canonical tip
+    pub ledger: Ledger,
     /// Map of ledger diffs following the canonical tip
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -117,7 +119,7 @@ impl IndexerState {
         indexer_store
             .add_ledger_state_hash(
                 &MAINNET_GENESIS_PREV_STATE_HASH.into(),
-                genesis_ledger.into(),
+                genesis_ledger.clone().into(),
             )
             .expect("add genesis ledger succeeds");
         info!("Genesis ledger added to indexer store");
@@ -138,6 +140,9 @@ impl IndexerState {
         Ok(Self {
             phase: IndexerPhase::InitializingFromBlockDir,
             canonical_tip: tip.clone(),
+            // apply genesis block to genesis ledger
+            ledger: <GenesisLedger as Into<Ledger>>::into(genesis_ledger)
+                .apply_diff_from_precomputed(&genesis_block)?,
             diffs_map: HashMap::from([(
                 genesis_block.state_hash.clone().into(),
                 LedgerDiff::from_precomputed(&genesis_block),
@@ -157,6 +162,7 @@ impl IndexerState {
     /// Creates a new indexer state without genesis events
     pub fn new_without_genesis_events(
         root_hash: &BlockHash,
+        genesis_ledger: GenesisLedger,
         indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
         prune_interval: u32,
@@ -171,6 +177,7 @@ impl IndexerState {
         Ok(Self {
             phase: IndexerPhase::SyncingFromDB,
             canonical_tip: tip.clone(),
+            ledger: genesis_ledger.into(),
             diffs_map: HashMap::new(),
             best_tip: tip,
             root_branch,
@@ -194,7 +201,7 @@ impl IndexerState {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = rocksdb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
-            if let Some(ledger) = root_ledger {
+            if let Some(ledger) = root_ledger.clone() {
                 store
                     .add_ledger_state_hash(&BlockHash(root_block.state_hash.clone()), ledger)
                     .expect("ledger add succeeds");
@@ -210,6 +217,10 @@ impl IndexerState {
         Ok(Self {
             phase: IndexerPhase::Testing,
             canonical_tip: tip.clone(),
+            // apply root block to root ledger
+            ledger: root_ledger
+                .and_then(|x| x.apply_diff_from_precomputed(root_block).ok())
+                .unwrap_or_default(),
             diffs_map: HashMap::from([(
                 root_block.state_hash.clone().into(),
                 LedgerDiff::from_precomputed(root_block),
@@ -246,10 +257,8 @@ impl IndexerState {
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let mut ledger = indexer_store
-                .get_ledger_state_hash(&self.canonical_tip.state_hash)?
-                .unwrap();
             let total_time = Instant::now();
+            let mut ledger_diff = LedgerDiff::default();
 
             if block_parser.num_canonical > BLOCK_REPORTING_FREQ_NUM {
                 info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
@@ -277,31 +286,39 @@ impl IndexerState {
                     debug!("Rate: {rate} blocks/s");
                 }
 
-                let block = block_parser.next_block()?.unwrap();
-                let state_hash = block.state_hash.clone().into();
+                if let Some(block) = block_parser.next_block()? {
+                    let state_hash = block.state_hash.clone().into();
 
-                // apply and add to db
-                ledger.apply_post_balances(&block);
-                indexer_store.add_block(&block)?;
-                indexer_store.add_canonical_block(
-                    block.blockchain_length,
-                    &block.state_hash.clone().into(),
-                )?;
-                indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
+                    // aggregate diffs, apply, and add to db
+                    let diff = LedgerDiff::from_precomputed(&block);
+                    ledger_diff.append(diff);
 
-                // store ledger at specified cadence, e.g. every 100 blocks
-                if self.blocks_processed % 100 == 0 {
-                    indexer_store.add_ledger_state_hash(&state_hash, ledger.clone())?;
-                }
+                    indexer_store.add_block(&block)?;
+                    indexer_store.add_canonical_block(
+                        block.blockchain_length,
+                        &block.state_hash.clone().into(),
+                    )?;
+                    indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
 
-                if self.blocks_processed == block_parser.num_canonical {
-                    // update root branch
-                    self.root_branch = Branch::new(&block)?;
-                    self.best_tip = Tip {
-                        state_hash: self.root_branch.root_block().state_hash.clone(),
-                        node_id: self.root_branch.root.clone(),
-                    };
-                    self.canonical_tip = self.best_tip.clone();
+                    // compute and store ledger at specified cadence, e.g. every 100 blocks
+                    if self.blocks_processed % 100 == 0 {
+                        self.ledger._apply_diff(&ledger_diff)?;
+                        ledger_diff = LedgerDiff::default();
+                        indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
+                    }
+
+                    if self.blocks_processed == block_parser.num_canonical {
+                        // update root branch
+                        self.root_branch = Branch::new(&block)?;
+                        self.ledger._apply_diff(&ledger_diff)?;
+                        self.best_tip = Tip {
+                            state_hash: self.root_branch.root_block().state_hash.clone(),
+                            node_id: self.root_branch.root.clone(),
+                        };
+                        self.canonical_tip = self.best_tip.clone();
+                    }
+                } else {
+                    return Err(anyhow!("Block unexpectedly missing"));
                 }
             }
 
@@ -630,10 +647,10 @@ impl IndexerState {
     pub fn update_canonical(&mut self) -> anyhow::Result<Option<WitnessTreeEvent>> {
         if self.is_canonical_updatable() {
             let old_canonical_tip_id = self.canonical_tip.node_id.clone();
-            let old_canonical_tip_hash = self.canonical_tip_block().state_hash.clone();
             let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_tip_id)?;
 
-            self.update_ledger_store(&old_canonical_tip_hash, &new_canonical_blocks)?;
+            self.update_ledger(&new_canonical_blocks)?;
+            self.update_ledger_store(&new_canonical_blocks)?;
             self.prune_diffs_map(&old_canonical_tip_id)?;
 
             return Ok(Some(WitnessTreeEvent::UpdateCanonicalChain(
@@ -660,12 +677,7 @@ impl IndexerState {
 
     /// Returns the ledger corresponding to the best tip
     pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let best_tip_hash = self.best_tip_block().state_hash.clone();
-            return indexer_store.get_ledger_state_hash(&best_tip_hash);
-        }
-
-        Ok(None)
+        Ok(Some(self.ledger.clone()))
     }
 
     /// Get the canonical block at the given height
@@ -929,26 +941,28 @@ impl IndexerState {
         Ok(canonical_blocks)
     }
 
-    /// Add new canonical ledgers to the ledger store
-    fn update_ledger_store(
-        &self,
-        old_canonical_tip_hash: &BlockHash,
-        canonical_blocks: &Vec<Block>,
-    ) -> anyhow::Result<()> {
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            if let Some(mut ledger) = indexer_store.get_ledger_state_hash(old_canonical_tip_hash)? {
-                // apply the new canonical diffs and store each nth resulting ledger (n = 100)
-                for canonical_block in canonical_blocks {
-                    let diff = self
-                        .diffs_map
-                        .get(&canonical_block.state_hash)
-                        .expect("block is in diffs_map");
-                    ledger.apply_diff(diff)?;
+    /// Add new canonical canonical diffs to the ledger
+    fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
+        // apply the new canonical diffs and store each nth resulting ledger (n = 100)
+        let mut ledger_diff = LedgerDiff::default();
+        for canonical_block in canonical_blocks {
+            let diff = self
+                .diffs_map
+                .get(&canonical_block.state_hash)
+                .expect("block is in diffs_map");
+            ledger_diff.append(diff.clone());
+        }
 
-                    if canonical_block.blockchain_length % 100 == 0 {
-                        indexer_store
-                            .add_ledger_state_hash(&canonical_block.state_hash, ledger.clone())?;
-                    }
+        self.ledger._apply_diff(&ledger_diff)
+    }
+
+    /// Add new canonical ledgers to the ledger store
+    fn update_ledger_store(&self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            for canonical_block in canonical_blocks {
+                if canonical_block.blockchain_length % 100 == 0 {
+                    indexer_store
+                        .add_ledger_state_hash(&canonical_block.state_hash, self.ledger.clone())?;
                 }
             }
         }

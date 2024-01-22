@@ -147,8 +147,26 @@ impl Ledger {
         }
     }
 
+    pub fn apply_diff_from_precomputed(self, block: &PrecomputedBlock) -> anyhow::Result<Self> {
+        let diff = LedgerDiff::from_precomputed(block);
+        self.apply_diff(&diff)
+    }
+
+    /// Apply a ledger diff
+    pub fn apply_diff(self, diff: &LedgerDiff) -> anyhow::Result<Self> {
+        let mut ledger = self;
+        ledger._apply_diff(diff)?;
+        Ok(ledger)
+    }
+
+    pub fn _apply_diff_from_precomputed(&mut self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        let diff = LedgerDiff::from_precomputed(block);
+        self._apply_diff(&diff)?;
+        Ok(())
+    }
+
     /// Apply a ledger diff to a mutable ledger
-    pub fn apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
+    pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         let ledger_diff = diff.clone();
         let keys: Vec<PublicKey> = ledger_diff
             .account_diffs
@@ -312,7 +330,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
         let mut ledger = self;
         ledger
-            .apply_diff(&ledger_diff)
+            ._apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -320,7 +338,7 @@ impl ExtendWithLedgerDiff for Ledger {
     fn from_diff(ledger_diff: LedgerDiff) -> Self {
         let mut ledger = Ledger::new();
         ledger
-            .apply_diff(&ledger_diff)
+            ._apply_diff(&ledger_diff)
             .expect("diff applied successfully");
         ledger
     }
@@ -395,7 +413,6 @@ mod tests {
 
         accounts.insert(public_key.clone(), account);
 
-        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
@@ -404,8 +421,7 @@ mod tests {
                 update_type: UpdateType::Deposit,
             })],
         };
-
-        ledger
+        let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
@@ -423,8 +439,8 @@ mod tests {
                 .expect("delegate public key creation");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
+
         accounts.insert(public_key.clone(), account);
-        let mut ledger = Ledger { accounts };
 
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
@@ -433,8 +449,7 @@ mod tests {
                 delegate: delegate_key.clone(),
             })],
         };
-
-        ledger
+        let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
@@ -457,7 +472,6 @@ mod tests {
 
         accounts.insert(public_key.clone(), account);
 
-        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
@@ -466,8 +480,7 @@ mod tests {
                 update_type: UpdateType::Deposit,
             })],
         };
-
-        ledger
+        let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 
@@ -493,7 +506,6 @@ mod tests {
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account.clone());
 
-        let mut ledger = Ledger { accounts };
         let ledger_diff = LedgerDiff {
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
@@ -501,8 +513,7 @@ mod tests {
                 delegate: delegate_key.clone(),
             })],
         };
-
-        ledger
+        let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
 

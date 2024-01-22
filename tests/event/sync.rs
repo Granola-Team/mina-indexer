@@ -34,6 +34,7 @@ async fn test() {
     // fresh state to sync events with no genesis events
     let mut state_sync = IndexerState::new_without_genesis_events(
         &MAINNET_GENESIS_HASH.into(),
+        genesis_ledger,
         indexer_store,
         10,
         PRUNE_INTERVAL_DEFAULT,

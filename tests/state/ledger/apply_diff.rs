@@ -17,7 +17,7 @@ async fn account_diffs() {
         .unwrap();
     let diff = LedgerDiff::from_precomputed(&block);
 
-    let mut ledger = Ledger::from(vec![
+    let ledger = Ledger::from(vec![
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             1000000000000,
@@ -72,7 +72,7 @@ async fn account_diffs() {
     println!("=== Initial ===");
     println!("{:?}", ledger);
 
-    ledger.apply_diff(&diff).unwrap();
+    let ledger = ledger.apply_diff(&diff).unwrap();
 
     let expected = Ledger::from(vec![
         (
