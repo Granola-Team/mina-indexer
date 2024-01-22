@@ -423,18 +423,19 @@ test_replay() {
     sleep 20
 
     # post-replay reults
-    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
-    best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    num_blocks_sync=$(idxr summary -j | jq -r .blocks_processed)
+    canonical_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    num_blocks_replay=$(idxr summary -j | jq -r .blocks_processed)
 
-    assert $canonical_hash $canonical_hash_sync
-    assert $canonical_length $canonical_length_sync
-    assert $best_hash $best_hash_sync
-    assert $best_length $best_length_sync
+    assert $canonical_hash $canonical_hash_replay
+    assert $canonical_length $canonical_length_replay
+    assert $best_hash $best_hash_replay
+    assert '15' $best_length
+    assert $best_length $best_length_replay
     assert '15' $num_blocks
-    assert $num_blocks $num_blocks_sync
+    assert '15' $num_blocks_replay
 
     idxr_pid=$(pgrep -c mina-indexer)
     teardown

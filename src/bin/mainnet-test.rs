@@ -24,10 +24,10 @@ use tracing_subscriber::prelude::*;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Startup blocks directory path
-    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/startup-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
     blocks_dir: PathBuf,
     /// Watch blocks directory path
-    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/watch-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
     /// Max blockchain_length of blocks to parse
     #[arg(short = 'l', long, default_value_t = 10_000)]

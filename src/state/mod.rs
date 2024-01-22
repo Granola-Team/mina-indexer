@@ -890,11 +890,11 @@ impl IndexerState {
                     },
                     DbEvent::Ledger(ledger_event) => match ledger_event {
                         DbLedgerEvent::AlreadySeenLedger(hash) => {
-                            info!("replay already seen db ledger with hash {hash}");
+                            info!("Replay already seen db ledger with hash {hash}");
                             Ok(())
                         }
                         DbLedgerEvent::NewLedger { hash } => {
-                            info!("replay new db ledger hash {hash}");
+                            info!("Replay new db ledger hash {hash}");
                             Ok(())
                         }
                     },
@@ -903,14 +903,14 @@ impl IndexerState {
                             blockchain_length,
                             state_hash,
                         } => {
-                            info!("replay new canonical block (height: {blockchain_length}, hash: {state_hash})");
+                            info!("Replay new canonical block (height: {blockchain_length}, hash: {state_hash})");
                             Ok(())
                         }
                     },
                 }
             }
             IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain(blocks)) => {
-                info!("replay update canonical chain {:?}", blocks);
+                info!("Replay update canonical chain {:?}", blocks);
                 Ok(())
             }
         }

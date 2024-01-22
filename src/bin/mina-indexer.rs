@@ -103,7 +103,7 @@ pub async fn main() -> anyhow::Result<()> {
             };
             let database_dir = args.database_dir.clone();
             if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
-                if dir.count() != 0 {
+                if matches!(mode, InitializationMode::New) && dir.count() != 0 {
                     // sync from existing db
                     mode = InitializationMode::Sync;
                 }
