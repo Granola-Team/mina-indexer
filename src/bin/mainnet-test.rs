@@ -3,8 +3,8 @@ use clap::Parser;
 use mina_indexer::{
     block::parser::BlockParser,
     constants::{
-        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
+        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     ledger::genesis,
     state::IndexerState,
@@ -99,6 +99,7 @@ async fn main() -> anyhow::Result<()> {
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 

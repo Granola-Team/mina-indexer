@@ -2,7 +2,9 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    constants::{MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT},
+    constants::{
+        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
+    },
     event::{store::EventStore, witness_tree::WitnessTreeEvent},
     ledger::genesis::GenesisRoot,
     state::IndexerState,
@@ -35,6 +37,7 @@ async fn test() {
         10,
         PRUNE_INTERVAL_DEFAULT,
         MAINNET_CANONICAL_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
     let mut state1 = IndexerState::new(
@@ -44,6 +47,7 @@ async fn test() {
         10,
         PRUNE_INTERVAL_DEFAULT,
         MAINNET_CANONICAL_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 

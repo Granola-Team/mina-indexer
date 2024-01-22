@@ -1,8 +1,8 @@
 use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
     constants::{
-        CANONICAL_UPDATE_THRESHOLD, MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_GENESIS_HASH,
+        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     ledger::genesis::parse_file,
     state::IndexerState,
@@ -26,6 +26,7 @@ async fn block_added() {
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 

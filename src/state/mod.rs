@@ -9,7 +9,7 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     constants::{
         BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-        MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH,
+        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH,
         MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
@@ -47,6 +47,8 @@ pub struct IndexerState {
     pub canonical_tip: Tip,
     /// Ledger corresponding to the canonical tip
     pub ledger: Ledger,
+    /// Cadence for computing and storing new ledgers
+    pub ledger_cadence: u32,
     /// Map of ledger diffs following the canonical tip
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
@@ -108,6 +110,7 @@ impl IndexerState {
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
+        ledger_cadence: u32,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash)?;
 
@@ -156,6 +159,7 @@ impl IndexerState {
             canonical_update_threshold,
             blocks_processed: 1,
             init_time: Instant::now(),
+            ledger_cadence,
         })
     }
 
@@ -167,6 +171,7 @@ impl IndexerState {
         transition_frontier_length: u32,
         prune_interval: u32,
         canonical_update_threshold: u32,
+        ledger_cadence: u32,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_genesis(root_hash)?;
         let tip = Tip {
@@ -188,6 +193,7 @@ impl IndexerState {
             canonical_update_threshold,
             blocks_processed: 0,
             init_time: Instant::now(),
+            ledger_cadence,
         })
     }
 
@@ -197,6 +203,7 @@ impl IndexerState {
         root_ledger: Option<Ledger>,
         rocksdb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
+        ledger_cadence: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = rocksdb_path.map(|path| {
@@ -235,6 +242,7 @@ impl IndexerState {
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 0,
             init_time: Instant::now(),
+            ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
         })
     }
 

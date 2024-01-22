@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
     constants::{
-        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
-        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
+        MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     ledger,
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
@@ -77,6 +77,9 @@ pub struct ServerArgs {
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     pub log_level_stdout: LevelFilter,
+    /// Cadence for computing and storing ledgers
+    #[arg(long, default_value_t = LEDGER_CADENCE)]
+    ledger_cadence: u32,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
@@ -93,24 +96,16 @@ pub async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         IndexerCommand::Client(args) => client::run(&args).await,
         IndexerCommand::Server { server_command } => {
-            let mut is_sync = false;
-            let mut is_replay = false;
-            let args = match server_command {
-                ServerCommand::Cli(args) => args,
-                ServerCommand::Sync(args) => {
-                    is_sync = true;
-                    args
-                }
-                ServerCommand::Replay(args) => {
-                    is_replay = true;
-                    args
-                }
+            let (args, mut mode) = match server_command {
+                ServerCommand::Cli(args) => (args, InitializationMode::New),
+                ServerCommand::Sync(args) => (args, InitializationMode::Sync),
+                ServerCommand::Replay(args) => (args, InitializationMode::Replay),
             };
             let database_dir = args.database_dir.clone();
             if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
                 if dir.count() != 0 {
                     // sync from existing db
-                    is_sync = true;
+                    mode = InitializationMode::Sync;
                 }
             }
 
@@ -120,13 +115,6 @@ pub async fn main() -> anyhow::Result<()> {
 
             init_tracing_logger(log_dir, log_level, log_level_stdout).await?;
 
-            let mode = if !is_replay && !is_sync {
-                InitializationMode::New
-            } else if is_replay {
-                InitializationMode::Replay
-            } else {
-                InitializationMode::Sync
-            };
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone()).await?;
@@ -180,6 +168,7 @@ pub fn process_indexer_configuration(
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
+    let ledger_cadence = args.ledger_cadence;
 
     assert!(
         ledger.is_file(),
@@ -212,6 +201,7 @@ pub fn process_indexer_configuration(
                 canonical_threshold,
                 canonical_update_threshold,
                 initialization_mode: mode,
+                ledger_cadence,
             })
         }
     }
