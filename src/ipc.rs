@@ -222,6 +222,26 @@ async fn handle_conn(
                 _ => None,
             }
         }
+        "checkpoint" => {
+            info!("Received checkpoint command");
+            let path: PathBuf = String::from_utf8(buffers.next().unwrap().to_vec())?
+                .trim_end_matches('\0')
+                .parse()?;
+            if path.exists() {
+                error!("Checkpoint directory already exists at {}", path.display());
+                Some(format!(
+                    "Checkpoint directory already exists at {}",
+                    path.display()
+                ))
+            } else {
+                debug!("Creating checkpoint at {}", path.display());
+                db.create_checkpoint(&path)?;
+                Some(format!(
+                    "Checkpoint created and saved to {}",
+                    path.display()
+                ))
+            }
+        }
         "ledger" => {
             let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let hash = hash.trim_end_matches('\0');

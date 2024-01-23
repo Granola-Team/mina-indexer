@@ -81,6 +81,9 @@ test_indexer_cli_reports() {
     idxr best-ledger --help 2>&1 |
         grep -iq "Usage: mina-indexer best-ledger"
 
+    idxr checkpoint --help 2>&1 |
+        grep -iq "Usage: mina-indexer checkpoint"
+
     idxr ledger --help 2>&1 |
         grep -iq "Usage: mina-indexer ledger"
 
@@ -486,6 +489,60 @@ test_transactions() {
     teardown
 }
 
+# Indexer server correctly creates a db checkpoint
+test_checkpoint() {
+    test=test_checkpoint
+    setup
+
+    dl_mainnet 13 ./blocks
+    idxr server cli \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs &
+    sleep 20
+
+    # pre-checkpoint results
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+
+    # create checkpoint in ./checkpoint
+    idxr checkpoint -p ./checkpoint
+
+    # kill running indexer and remove directories
+    idxr_pid=$(pgrep -c mina-indexer)
+    teardown
+
+    # sync a new indexer from checkpointed db
+    setup
+    idxr server sync \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./checkpoint \
+        --log-dir ./logs &
+    sleep 20
+
+    # post-checkpoint reults
+    canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    amount_checkpoint=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+
+    assert $canonical_hash $canonical_hash_checkpoint
+    assert $canonical_length $canonical_length_checkpoint
+    assert $best_hash $best_hash_checkpoint
+    assert $best_length $best_length_checkpoint
+    assert $amount $amount_checkpoint
+
+    idxr_pid=$(pgrep -c mina-indexer)
+    rm -rf ./checkpoint
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -502,6 +559,7 @@ if [ "$#" -eq 0 ]; then
     test_sync
     test_replay
     test_transactions
+    test_checkpoint
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -519,6 +577,7 @@ else
             "test_sync") test_sync ;;
             "test_replay") test_replay ;;
             "test_transactions") test_transactions ;;
+            "test_checkpoint") test_checkpoint ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
