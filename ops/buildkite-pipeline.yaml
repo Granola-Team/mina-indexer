@@ -6,7 +6,10 @@ steps:
     echo PATH=$PATH
     nix-shell --run just
   key: prereqs
-
+- label: "This is a test for cargo audit"
+  command: |
+    ls -lah /home/anon/.cargo/bin/
+  depends_on: prereqs
 - label: "Lint, Audit, Build, and Test"
   command: |
     nix-shell --run "just lint && just test"
