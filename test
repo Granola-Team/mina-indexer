@@ -637,11 +637,11 @@ test_many_blocks() {
     test=test_many_blocks
 
     setup
-    # dl_mainnet 1000 ./blocks
+    dl_mainnet 1000 ./blocks
 
     idxr server cli \
-        --startup-dir $HOME/Documents/granola/indexer/mainnet_blocks \
-        --watch-dir $HOME/Documents/granola/indexer/mainnet_blocks \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
