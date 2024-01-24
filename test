@@ -580,15 +580,16 @@ test_transactions() {
 # Indexer server correctly creates a db checkpoint
 test_checkpoint() {
     test=test_checkpoint
-    setup
 
+    setup
     dl_mainnet 13 ./blocks
+
     idxr server cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs &
-    sleep 20
+    sleep 5
 
     # pre-checkpoint results
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
@@ -611,7 +612,7 @@ test_checkpoint() {
         --watch-dir ./blocks \
         --database-dir ./checkpoint \
         --log-dir ./logs &
-    sleep 20
+    sleep 5
 
     # post-checkpoint reults
     canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
@@ -628,6 +629,48 @@ test_checkpoint() {
 
     idxr_pid=$(pgrep -c mina-indexer)
     rm -rf ./checkpoint
+    teardown
+}
+
+# Indexer server starts with many blocks
+test_many_blocks() {
+    test=test_many_blocks
+
+    setup
+    # dl_mainnet 1000 ./blocks
+
+    idxr server cli \
+        --startup-dir $HOME/Documents/granola/indexer/mainnet_blocks \
+        --watch-dir $HOME/Documents/granola/indexer/mainnet_blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --ledger-cadence 100 \
+        --log-level-stdout debug &
+    sleep 300
+
+    # results
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    assert '1000' $best_length
+    assert '990' $canonical_length
+    assert '3NK9aySQJBEgAUKcWGrpbZhA4M8wL2N3cjipq3mEb4HPTuUkowEF' $canonical_hash
+    assert '3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66' $best_hash
+
+    pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
+
+    # check ledgers are present
+    # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
+    balance=$(idxr ledger --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
+
+    # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
+    balance=$(idxr ledger --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
+
+    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -648,6 +691,7 @@ if [ "$#" -eq 0 ]; then
     test_replay
     test_transactions
     test_checkpoint
+    test_many_blocks
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -666,6 +710,7 @@ else
             "test_replay") test_replay ;;
             "test_transactions") test_transactions ;;
             "test_checkpoint") test_checkpoint ;;
+            "test_many_blocks") test_many_blocks ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
