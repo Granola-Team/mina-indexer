@@ -133,10 +133,7 @@ pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
 
 impl UserCommandWithStatus {
     pub fn is_applied(&self) -> bool {
-        if let CommandStatusData::Applied { .. } = self.status_data() {
-            return true;
-        }
-        false
+        self.status_data().is_applied()
     }
 
     pub fn status_data(&self) -> CommandStatusData {

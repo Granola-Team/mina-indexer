@@ -321,41 +321,6 @@ impl std::fmt::Debug for Ledger {
     }
 }
 
-pub trait ExtendWithLedgerDiff {
-    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self;
-    fn from_diff(ledger_diff: LedgerDiff) -> Self;
-}
-
-impl ExtendWithLedgerDiff for Ledger {
-    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
-        let mut ledger = self;
-        ledger
-            ._apply_diff(&ledger_diff)
-            .expect("diff applied successfully");
-        ledger
-    }
-
-    fn from_diff(ledger_diff: LedgerDiff) -> Self {
-        let mut ledger = Ledger::new();
-        ledger
-            ._apply_diff(&ledger_diff)
-            .expect("diff applied successfully");
-        ledger
-    }
-}
-
-impl ExtendWithLedgerDiff for LedgerDiff {
-    fn extend_with_diff(self, ledger_diff: LedgerDiff) -> Self {
-        let mut to_extend = self;
-        to_extend.append(ledger_diff);
-        to_extend
-    }
-
-    fn from_diff(ledger_diff: LedgerDiff) -> Self {
-        ledger_diff
-    }
-}
-
 impl std::fmt::Display for LedgerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

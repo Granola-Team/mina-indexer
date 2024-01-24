@@ -71,7 +71,11 @@ impl Coinbase {
         !matches!(self.kind, CoinbaseKind::Zero)
     }
 
-    pub fn as_account_diff(self) -> AccountDiff {
-        AccountDiff::from_coinbase(self.receiver, self.supercharge)
+    // only apply if "coinbase" =/= [ "Zero" ]
+    pub fn as_account_diff(self) -> Option<AccountDiff> {
+        if self.is_coinbase_applied() {
+            return Some(AccountDiff::from_coinbase(self.receiver, self.supercharge));
+        }
+        None
     }
 }

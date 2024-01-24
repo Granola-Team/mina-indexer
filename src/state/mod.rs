@@ -264,8 +264,8 @@ impl IndexerState {
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
+        let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let total_time = Instant::now();
             let mut ledger_diff = LedgerDiff::default();
 
             if block_parser.num_canonical > BLOCK_REPORTING_FREQ_NUM {
@@ -308,8 +308,8 @@ impl IndexerState {
                     )?;
                     indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
 
-                    // compute and store ledger at specified cadence, e.g. every 100 blocks
-                    if self.blocks_processed % 100 == 0 {
+                    // compute and store ledger at specified cadence
+                    if self.blocks_processed % self.ledger_cadence == 0 {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
                         indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
@@ -338,7 +338,8 @@ impl IndexerState {
         }
 
         // now add the successive non-canonical blocks
-        self.add_blocks(block_parser).await
+        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
+            .await
     }
 
     /// Initialize indexer state without short-circuiting canonical blocks
@@ -351,7 +352,16 @@ impl IndexerState {
 
     /// Adds blocks to the state according to `block_parser` then changes phase to Watching
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
+        self.add_blocks_with_time(block_parser, None).await
+    }
+
+    async fn add_blocks_with_time(
+        &mut self,
+        block_parser: &mut BlockParser,
+        elapsed: Option<Duration>,
+    ) -> anyhow::Result<()> {
         let total_time = Instant::now();
+        let offset = elapsed.unwrap_or(Duration::new(0, 0));
         let mut step_time = total_time;
 
         if self.blocks_processed == 0 && block_parser.total_num_blocks > 500 {
@@ -386,7 +396,7 @@ impl IndexerState {
         info!(
             "Ingested {} blocks in {:?}",
             self.blocks_processed,
-            total_time.elapsed(),
+            total_time.elapsed() + offset,
         );
 
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
@@ -968,7 +978,7 @@ impl IndexerState {
     fn update_ledger_store(&self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             for canonical_block in canonical_blocks {
-                if canonical_block.blockchain_length % 100 == 0 {
+                if canonical_block.blockchain_length % self.ledger_cadence == 0 {
                     indexer_store
                         .add_ledger_state_hash(&canonical_block.state_hash, self.ledger.clone())?;
                 }

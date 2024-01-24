@@ -31,9 +31,7 @@ impl LedgerDiff {
         account_diffs.append(&mut account_diff_transactions);
 
         // apply coinbase last
-        // only apply if "coinbase" =/= [ "Zero" ]
-        let coinbase_update = coinbase.clone().as_account_diff();
-        if coinbase.is_coinbase_applied() {
+        if let Some(coinbase_update) = coinbase.as_account_diff() {
             account_diffs.push(coinbase_update);
         }
 
@@ -45,7 +43,9 @@ impl LedgerDiff {
 
     pub fn append(&mut self, other: Self) {
         other.public_keys_seen.into_iter().for_each(|account| {
-            self.public_keys_seen.push(account);
+            if !self.public_keys_seen.contains(&account) {
+                self.public_keys_seen.push(account);
+            }
         });
 
         other.account_diffs.into_iter().for_each(|update| {
