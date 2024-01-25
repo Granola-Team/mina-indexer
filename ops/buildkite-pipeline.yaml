@@ -1,19 +1,12 @@
 steps:
 
-- label: "Prereqs"
+- label: "Build"
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
-    nix-shell --run just
-    nix-shell --run "just prereqs"
+    nix-shell --pure --run just
+    nix-shell --pure --run "just prereqs"
+    nix-shell --pure --run "just test-ci"
   key: prereqs
   agents:
-    os: macos
-
-- label: "Lint, Audit, Build, and Test"
-  command: |
-    nix-shell --run "just test-ci"
-  key: build
-  depends_on: prereqs
-  agents:
-    os: macos
+    os: Linux
