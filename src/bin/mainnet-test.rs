@@ -3,8 +3,8 @@ use clap::Parser;
 use mina_indexer::{
     block::parser::BlockParser,
     constants::{
-        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
+        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     ledger::genesis,
     state::IndexerState,
@@ -24,10 +24,10 @@ use tracing_subscriber::prelude::*;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Startup blocks directory path
-    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/startup-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
     blocks_dir: PathBuf,
     /// Watch blocks directory path
-    #[arg(short, long, default_value = concat!(env!("HOME"), ".mina-indexer/watch-blocks"))]
+    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
     /// Max blockchain_length of blocks to parse
     #[arg(short = 'l', long, default_value_t = 10_000)]
@@ -99,6 +99,7 @@ async fn main() -> anyhow::Result<()> {
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 

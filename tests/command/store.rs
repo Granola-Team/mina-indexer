@@ -3,8 +3,8 @@ use mina_indexer::{
     block::parser::BlockParser,
     command::{signed::SignedCommand, store::CommandStore},
     constants::{
-        CANONICAL_UPDATE_THRESHOLD, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH,
-        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
+        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
+        MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
     ledger::genesis::parse_file,
     state::IndexerState,
@@ -27,6 +27,7 @@ async fn add_and_get() {
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 

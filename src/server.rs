@@ -33,6 +33,7 @@ pub struct IndexerConfiguration {
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
     pub initialization_mode: InitializationMode,
+    pub ledger_cadence: u32,
 }
 
 pub enum MinaIndexerQuery {
@@ -152,6 +153,7 @@ pub async fn initialize(
         canonical_threshold,
         canonical_update_threshold,
         initialization_mode,
+        ledger_cadence,
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
@@ -170,26 +172,31 @@ pub async fn initialize(
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
                     canonical_update_threshold,
+                    ledger_cadence,
                 )?
             }
             InitializationMode::Replay => {
                 info!("Replaying indexer events from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
+                    ledger.ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
                     canonical_update_threshold,
+                    ledger_cadence,
                 )?
             }
             InitializationMode::Sync => {
                 info!("Syncing indexer state from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
+                    ledger.ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
                     canonical_update_threshold,
+                    ledger_cadence,
                 )?
             }
         };

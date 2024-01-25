@@ -57,28 +57,74 @@ pub struct Delegation {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CommandStatusData {
     Applied {
-        balance_data: mina_rs::TransactionStatusBalanceData,
+        auxiliary_data: Box<mina_rs::TransactionStatusAuxiliaryData>,
+        balance_data: Box<mina_rs::TransactionStatusBalanceData>,
     },
     Failed,
 }
 
 impl CommandStatusData {
-    pub fn fee_payer_balance(data: &mina_rs::TransactionStatusBalanceData) -> Option<u64> {
-        data.fee_payer_balance.as_ref().map(|balance| balance.t.t.t)
+    pub fn is_applied(&self) -> bool {
+        matches!(self, Self::Applied { .. })
     }
 
-    pub fn receiver_balance(balance_data: &mina_rs::TransactionStatusBalanceData) -> Option<u64> {
-        balance_data
-            .receiver_balance
-            .as_ref()
-            .map(|balance| balance.t.t.t)
+    fn balance_data(&self) -> Option<&mina_rs::TransactionStatusBalanceData> {
+        if let Self::Applied { balance_data, .. } = self {
+            return Some(balance_data);
+        }
+        None
     }
 
-    pub fn source_balance(balance_data: &mina_rs::TransactionStatusBalanceData) -> Option<u64> {
-        balance_data
-            .source_balance
-            .as_ref()
-            .map(|balance| balance.t.t.t)
+    fn auxiliary_data(&self) -> Option<&mina_rs::TransactionStatusAuxiliaryData> {
+        if let Self::Applied { auxiliary_data, .. } = self {
+            return Some(auxiliary_data);
+        }
+        None
+    }
+
+    pub fn fee_payer_balance(&self) -> Option<u64> {
+        self.balance_data()
+            .and_then(|b| b.fee_payer_balance.as_ref().map(|b| b.t.t.t))
+    }
+
+    pub fn receiver_balance(&self) -> Option<u64> {
+        self.balance_data()
+            .and_then(|b| b.receiver_balance.as_ref().map(|b| b.t.t.t))
+    }
+
+    pub fn source_balance(&self) -> Option<u64> {
+        self.balance_data()
+            .and_then(|b| b.source_balance.as_ref().map(|b| b.t.t.t))
+    }
+
+    pub fn fee_payer_account_creation_fee_paid(&self) -> Option<u64> {
+        self.auxiliary_data().and_then(|b| {
+            b.fee_payer_account_creation_fee_paid
+                .as_ref()
+                .map(|b| b.t.t)
+        })
+    }
+
+    pub fn receiver_account_creation_fee_paid(&self) -> Option<u64> {
+        self.auxiliary_data()
+            .and_then(|b| b.receiver_account_creation_fee_paid.as_ref().map(|b| b.t.t))
+    }
+
+    pub fn created_token(&self) -> Option<u64> {
+        self.auxiliary_data()
+            .and_then(|b| b.created_token.as_ref().map(|b| b.t.t.t))
+    }
+
+    pub fn from_transaction_status(data: &mina_rs::TransactionStatus) -> Self {
+        use mina_rs::TransactionStatus as TS;
+
+        match data {
+            TS::Applied(auxiliary_data, balance_data) => Self::Applied {
+                auxiliary_data: Box::new(auxiliary_data.clone().inner()),
+                balance_data: Box::new(balance_data.clone().inner()),
+            },
+            _ => Self::Failed,
+        }
     }
 }
 
@@ -87,19 +133,17 @@ pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
 
 impl UserCommandWithStatus {
     pub fn is_applied(&self) -> bool {
-        if let CommandStatusData::Applied { .. } = self.status_data() {
-            return true;
-        }
-        false
+        self.status_data().is_applied()
     }
 
     pub fn status_data(&self) -> CommandStatusData {
         match self.0.t.status.t.clone() {
             mina_serialization_types::staged_ledger_diff::TransactionStatus::Applied(
-                _,
+                auxiliary_data,
                 balance_data,
             ) => CommandStatusData::Applied {
-                balance_data: balance_data.inner(),
+                auxiliary_data: Box::new(auxiliary_data.inner()),
+                balance_data: Box::new(balance_data.inner()),
             },
             mina_serialization_types::staged_ledger_diff::TransactionStatus::Failed(_, _) => {
                 CommandStatusData::Failed
@@ -230,6 +274,12 @@ impl StakeDelegation {
     pub fn new_delegate(&self) -> PublicKey {
         let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } = self.0.clone().inner();
         new_delegate.into()
+    }
+}
+
+impl From<mina_rs::TransactionStatus> for CommandStatusData {
+    fn from(value: mina_rs::TransactionStatus) -> Self {
+        Self::from_transaction_status(&value)
     }
 }
 

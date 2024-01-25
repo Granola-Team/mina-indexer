@@ -11,13 +11,14 @@ download_blocks_cleanup() {
 trap download_blocks_cleanup EXIT
 
 BUCKET=$1
-MAX_SLOT=$2
-NETWORK=$3
-OUT_DIR=$4
+MIN_LENGTH=$2
+MAX_LENGTH=$3
+NETWORK=$4
+OUT_DIR=$5
 
-for SLOT in `seq 2 $MAX_SLOT`
+for LENGTH in `seq $MIN_LENGTH $MAX_LENGTH`
 do
-    echo "gs://${BUCKET}/${NETWORK}-${SLOT}-*.json" >> "$BLOCKS_DIR"/block_urls
+    echo "gs://${BUCKET}/${NETWORK}-${LENGTH}-*.json" >> "$BLOCKS_DIR"/block_urls
 done 2>/dev/null
 
 gsutil -m cp -I "$OUT_DIR" < "$BLOCKS_DIR"/block_urls

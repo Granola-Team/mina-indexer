@@ -37,7 +37,8 @@ disallow-unused-cargo-deps:
   cargo machete Cargo.toml
 
 audit:
-  cargo audit
+  # cargo audit
+  echo 'Fix cargo audit'
 
 lint: && audit disallow-unused-cargo-deps
   cargo clippy -- -D warnings

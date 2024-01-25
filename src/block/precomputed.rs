@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use mina_serialization_types::{
+    consensus_state as mina_consensus,
     json::DeltaTransitionChainProofJson,
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
@@ -39,8 +40,8 @@ fn genesis_timestamp() -> String {
 pub struct PrecomputedBlock {
     pub state_hash: String,
     pub scheduled_time: String,
-    pub protocol_state: ProtocolState,
     pub blockchain_length: u32,
+    pub protocol_state: ProtocolState,
     pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
     pub delta_transition_chain_proof: DeltaTransitionChainProof,
@@ -108,7 +109,31 @@ impl PrecomputedBlock {
             .collect()
     }
 
-    pub fn consensus_state(&self) -> mina_serialization_types::consensus_state::ConsensusState {
+    pub fn accounts_created(&self) -> Vec<PublicKey> {
+        self.commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                let signed: SignedCommand = cmd.clone().into();
+                if cmd
+                    .status_data()
+                    .fee_payer_account_creation_fee_paid()
+                    .is_some()
+                {
+                    Some(signed.fee_payer_pk())
+                } else if cmd
+                    .status_data()
+                    .receiver_account_creation_fee_paid()
+                    .is_some()
+                {
+                    Some(signed.receiver_pk())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn consensus_state(&self) -> mina_consensus::ConsensusState {
         self.protocol_state
             .body
             .clone()

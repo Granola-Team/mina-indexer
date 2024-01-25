@@ -2,7 +2,9 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    constants::{MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT},
+    constants::{
+        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
+    },
     ledger::{diff::LedgerDiff, genesis::GenesisRoot, public_key::PublicKey, store::LedgerStore},
     state::IndexerState,
     store::IndexerStore,
@@ -26,6 +28,7 @@ async fn test() {
         10,
         PRUNE_INTERVAL_DEFAULT,
         MAINNET_CANONICAL_THRESHOLD,
+        LEDGER_CADENCE,
     )
     .unwrap();
 
@@ -48,7 +51,7 @@ async fn test() {
 
         ledger_post.apply_post_balances(&block);
         ledger_diff
-            .apply_diff(&LedgerDiff::from_precomputed(&block))
+            ._apply_diff(&LedgerDiff::from_precomputed(&block))
             .unwrap();
 
         if ledger != ledger_post || ledger != ledger_diff {
