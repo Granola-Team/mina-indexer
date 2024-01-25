@@ -16,7 +16,7 @@ prereqs:
   command -v pgrep
 
 build:
-  cargo build
+  cargo build --profile release
 
 clean:
   cargo clean
@@ -42,7 +42,7 @@ audit:
 lint: && audit disallow-unused-cargo-deps
   cargo clippy -- -D warnings
   cargo clippy --all-targets --all-features -- -D warnings
-  cargo check
+  cargo check --profile release
 
 images:
   docker build .
