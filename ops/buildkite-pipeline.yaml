@@ -8,7 +8,7 @@ steps:
     nix-shell --run "just prereqs"
   key: prereqs
   agents:
-    macos: true
+    os: macos
 
 - label: "Lint, Audit, Build, and Test"
   command: |
@@ -16,4 +16,4 @@ steps:
   key: build
   depends_on: prereqs
   agents:
-    macos: true
+    os: macos
