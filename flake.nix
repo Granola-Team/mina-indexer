@@ -64,6 +64,8 @@
             bacon
             google-cloud-sdk
             just
+            jq
+            procps   # For pgrep
           ]
           ++ buildDependencies;
 

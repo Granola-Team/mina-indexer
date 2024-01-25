@@ -6,6 +6,15 @@
 default:
   @just --list --justfile {{justfile()}}
 
+prereqs:
+  cargo --version
+  cargo nextest --version
+  cargo audit --version
+  cargo clippy --version
+  cargo machete --help 2>&1 >/dev/null
+  jq --version
+  pgrep --version
+
 build:
   cargo build
 

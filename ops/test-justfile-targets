@@ -3,6 +3,7 @@
 set -ex
 
 just
+just prereqs
 just clean
 just audit
 just lint
