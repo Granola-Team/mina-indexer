@@ -64,6 +64,7 @@
             bacon
             google-cloud-sdk
             just
+            jq
           ]
           ++ buildDependencies;
 
