@@ -9,4 +9,4 @@ steps:
     nix-shell --pure --run "just test-ci"
   key: prereqs
   agents:
-    os: Linux
+    os: linux
