@@ -5,10 +5,11 @@ steps:
     echo HOME=$HOME
     echo PATH=$PATH
     nix-shell --run just
+    nix-shell --run "just prereqs"
   key: prereqs
 
 - label: "Lint, Audit, Build, and Test"
   command: |
-    nix-shell --run "just lint && just test"
+    nix-shell --run "just test-ci"
   key: build
   depends_on: prereqs
