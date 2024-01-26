@@ -16,12 +16,10 @@ test = true
 
 [dependencies]
 anyhow = { version = "1.0.69" }
-async-trait = "0.1.64"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 serde_json = { version = "1.0.92", features = ["raw_value"] }
 clap = { version = "4.1.4", features = ["derive"] }
-thiserror = "1.0.38"
 glob = "0.3.1"
 bin-prot = { path = "./mina-rs/protocol/bin-prot", version = "0.1.0" }
 mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", version = "0.1.0" }
@@ -29,8 +27,6 @@ versioned = { path = "./mina-rs/protocol/versioned", version = "0.1.0" }
 mina-signer = { path = "./mina-rs/proof-systems/signer", version = "0.1.0" }
 speedb = "0.0.4"
 id_tree = { version = "1.8.0", features = ["serde_support"] }
-watchexec = "2.3.0"
-async-priority-channel = "0.1.0"
 uuid = { version = "1.3.1", features = ["v4"] }
 time = { version = "0.3.20", features = ["serde", "serde-human-readable"] }
 tracing = "0.1.37"

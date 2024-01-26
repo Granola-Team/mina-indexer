@@ -6,7 +6,6 @@ pub mod constants;
 pub mod event;
 pub mod ledger;
 pub mod mina_blocks;
-pub mod receiver;
 pub mod server;
 pub mod servers;
 pub mod state;
