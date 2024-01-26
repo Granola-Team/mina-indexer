@@ -18,7 +18,6 @@ test = true
 anyhow = { version = "1.0.69" }
 async-trait = "0.1.64"
 futures = "0.3.26"
-futures-util = "0.3.26"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 serde_json = { version = "1.0.92", features = ["raw_value"] }
@@ -44,15 +43,11 @@ rust_decimal_macros = "1.33.1"
 bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
 ctrlc = "3.4.0"
-oneshot = "0.1.5"
+tokio = { version = "1.25.0", features = ["full"] }
 
 [dev-dependencies]
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.0"
-
-[dependencies.tokio]
-version = "1.25.0"
-features = ["full"]
 
 [profile.release]
 lto = "fat"

@@ -9,7 +9,7 @@ use mina_indexer::{
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf};
 use tracing::{error, info, instrument};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
@@ -113,19 +113,17 @@ pub async fn main() -> anyhow::Result<()> {
             let log_level = args.log_level;
             let log_level_stdout = args.log_level_stdout;
 
-            init_tracing_logger(log_dir, log_level, log_level_stdout).await?;
+            init_tracing_logger(log_dir, log_level, log_level_stdout)?;
 
             let config = process_indexer_configuration(args, mode)?;
-            let db = Arc::new(IndexerStore::new(&database_dir)?);
-            let indexer = MinaIndexer::new(config, db.clone()).await?;
+            let indexer = MinaIndexer::new(config);
 
-            indexer.await_loop().await;
             Ok(())
         }
     }
 }
 
-async fn init_tracing_logger(
+fn init_tracing_logger(
     log_dir: PathBuf,
     log_level: LevelFilter,
     log_level_stdout: LevelFilter,
@@ -134,7 +132,7 @@ async fn init_tracing_logger(
     let mut log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
     fs::create_dir_all(log_dir.clone()).expect("log_dir should be created");
 
-    while tokio::fs::metadata(&log_file).await.is_ok() {
+    while std::fs::metadata(&log_file).is_ok() {
         log_number += 1;
         log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
     }
@@ -157,7 +155,7 @@ async fn init_tracing_logger(
 }
 
 #[instrument(skip_all)]
-pub fn process_indexer_configuration(
+fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
 ) -> anyhow::Result<IndexerConfiguration> {
@@ -169,6 +167,7 @@ pub fn process_indexer_configuration(
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
+    let database_dir = args.database_dir;
 
     assert!(
         ledger.is_file(),
@@ -182,7 +181,7 @@ pub fn process_indexer_configuration(
     );
     fs::create_dir_all(watch_dir.clone()).expect("watch_dir should be created");
 
-    info!("Parsing ledger file at {}", ledger.display());
+    info!("Parsing ledger file at {}...", ledger.display());
 
     match ledger::genesis::parse_file(&ledger) {
         Err(err) => {
@@ -190,7 +189,7 @@ pub fn process_indexer_configuration(
             std::process::exit(100)
         }
         Ok(ledger) => {
-            info!("Ledger parsed successfully!");
+            info!("Ledger parsed successfully");
 
             Ok(IndexerConfiguration {
                 ledger,
@@ -202,6 +201,7 @@ pub fn process_indexer_configuration(
                 canonical_update_threshold,
                 initialization_mode: mode,
                 ledger_cadence,
+                database_dir,
             })
         }
     }

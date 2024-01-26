@@ -4,7 +4,6 @@ pub mod client;
 pub mod command;
 pub mod constants;
 pub mod event;
-pub mod ipc;
 pub mod ledger;
 pub mod mina_blocks;
 pub mod receiver;
