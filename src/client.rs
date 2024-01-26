@@ -26,7 +26,7 @@ pub enum ClientCli {
     BestChain(ChainArgs),
     /// Dump the best ledger to a file
     BestLedger(BestLedgerArgs),
-    /// Create a checkpoint of the indexer store RocksDB
+    /// Create a checkpoint of the indexer store Speedb
     Checkpoint(CheckpointArgs),
     /// Dump the ledger at a specified state hash
     Ledger(LedgerArgs),

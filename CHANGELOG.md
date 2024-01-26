@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Replaced rocksdb with speedb
+
 ### Added
 
 - [#70](https://github.com/Granola-Team/mina-indexer/pull/70): More complex extension tests

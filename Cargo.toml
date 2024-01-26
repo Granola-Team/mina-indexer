@@ -29,7 +29,7 @@ bin-prot = { path = "./mina-rs/protocol/bin-prot", version = "0.1.0" }
 mina-serialization-types = { path = "./mina-rs/protocol/serialization-types", version = "0.1.0" }
 versioned = { path = "./mina-rs/protocol/versioned", version = "0.1.0" }
 mina-signer = { path = "./mina-rs/proof-systems/signer", version = "0.1.0" }
-rocksdb = { default-features = false, version = "0.21.0" }
+speedb = "0.0.4"
 id_tree = { version = "1.8.0", features = ["serde_support"] }
 watchexec = "2.3.0"
 async-priority-channel = "0.1.0"
