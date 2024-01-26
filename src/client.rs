@@ -4,16 +4,14 @@ use crate::{
     state::summary::{SummaryShort, SummaryVerbose},
 };
 use clap::{Args, Parser};
-use futures::{
-    io::{AsyncWriteExt, BufReader},
-    AsyncReadExt,
-};
-use interprocess::local_socket::tokio::LocalSocketStream;
+
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process};
+
 use tokio::{
     fs::write,
-    io::{stdout, AsyncWriteExt as OtherAsyncWriteExt},
+    io::{stdout, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::UnixStream,
 };
 use tracing::instrument;
 
@@ -209,7 +207,7 @@ pub struct TransactionPublicKeyArgs {
 
 #[instrument]
 pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
-    let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
+    let conn = match UnixStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
             eprintln!("Unable to connect to the domain socket server: {e}");

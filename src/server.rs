@@ -7,7 +7,10 @@ use crate::{
 };
 
 use std::{
-    fs, path::{Path, PathBuf}, process, sync::Arc
+    fs,
+    path::{Path, PathBuf},
+    process,
+    sync::Arc,
 };
 
 use tracing::{debug, info};
@@ -51,11 +54,9 @@ pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     //TODO: This doesn't need to be an Arc but it's easier to make it so for now
     let store = Arc::new(IndexerStore::new(&database_dir)?);
     let state = initialize(config, store).await?;
-        
-    let _ = tokio::spawn(async move {
-        run(watch_dir, state).await
-    });
-    
+
+    let _ = tokio::spawn(async move { run(watch_dir, state).await });
+
     Ok(())
 }
 
