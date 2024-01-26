@@ -36,6 +36,7 @@ pub enum ClientCli {
     Summary(SummaryArgs),
     /// Shutdown the server
     Shutdown,
+    #[clap(flatten)]
     /// Get transactions for an account
     Transactions(TransactionArgs),
 }
@@ -132,9 +133,51 @@ pub struct SummaryArgs {
     json: bool,
 }
 
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum TransactionArgs {
+    /// Query transactions by state hash
+    TxStateHash(TransactionStateHashArgs),
+    /// Query transactions by their hash
+    TxHash(TransactionHashArgs),
+    /// Query transactions by public key
+    TxPublicKey(TransactionPublicKeyArgs),
+}
+
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct TransactionArgs {
+pub struct TransactionStateHashArgs {
+    /// Path to write the transactions [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// State hash of the contining block
+    #[arg(short, long)]
+    state_hash: String,
+    /// Verbose transaction output
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+    /// Output JSON data
+    #[arg(short, long, default_value_t = false)]
+    json: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct TransactionHashArgs {
+    /// Hash of the transaction
+    #[arg(short, long)]
+    tx_hash: String,
+    /// Verbose transaction output
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+    /// Output JSON data
+    #[arg(short, long, default_value_t = false)]
+    json: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct TransactionPublicKeyArgs {
     /// Path to write the transactions [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
@@ -294,18 +337,29 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             println!("{msg}");
         }
         ClientCli::Transactions(transaction_args) => {
-            let command = format!(
-                "transactions {} {} {} {} {} {}\0",
-                transaction_args.public_key,
-                transaction_args.verbose,
-                transaction_args.num.unwrap_or(0),
-                transaction_args.start_state_hash,
-                transaction_args
-                    .end_state_hash
-                    .clone()
-                    .unwrap_or("x".into()),
-                transaction_args.path.clone().unwrap_or("".into()).display(),
-            );
+            let command = match transaction_args {
+                TransactionArgs::TxHash(args) => {
+                    format!(
+                        "transactions-hash {} {} {} \0",
+                        args.tx_hash, args.verbose, args.json
+                    )
+                }
+                TransactionArgs::TxPublicKey(pk_args) => format!(
+                    "transactions-pk {} {} {} {} {} {}\0",
+                    pk_args.public_key,
+                    pk_args.verbose,
+                    pk_args.num.unwrap_or(0),
+                    pk_args.start_state_hash,
+                    pk_args.end_state_hash.clone().unwrap_or("x".into()),
+                    pk_args.path.clone().unwrap_or("".into()).display(),
+                ),
+                TransactionArgs::TxStateHash(args) => {
+                    format!(
+                        "transactions-state-hash {} {} {} \0",
+                        args.state_hash, args.verbose, args.json
+                    )
+                }
+            };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
