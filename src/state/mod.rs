@@ -201,12 +201,12 @@ impl IndexerState {
     pub fn new_testing(
         root_block: &PrecomputedBlock,
         root_ledger: Option<Ledger>,
-        rocksdb_path: Option<&std::path::Path>,
+        speedb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
         ledger_cadence: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block);
-        let indexer_store = rocksdb_path.map(|path| {
+        let indexer_store = speedb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
@@ -252,7 +252,7 @@ impl IndexerState {
         let mut secondary_path = primary_path.clone();
         secondary_path.push(Uuid::new_v4().to_string());
 
-        debug!("Spawning secondary readonly RocksDB instance");
+        debug!("Spawning secondary readonly Speedb instance");
         let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
         Ok(block_store_readonly)
     }

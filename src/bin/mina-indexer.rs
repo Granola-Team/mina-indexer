@@ -65,7 +65,7 @@ pub struct ServerArgs {
     /// Path to directory to watch for new blocks
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
     watch_dir: PathBuf,
-    /// Path to directory for rocksdb
+    /// Path to directory for speedb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     pub database_dir: PathBuf,
     /// Path to directory for logs

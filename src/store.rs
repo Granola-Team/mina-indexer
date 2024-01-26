@@ -9,7 +9,7 @@ use crate::{
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
 };
 use anyhow::anyhow;
-use rocksdb::{ColumnFamilyDescriptor, DB};
+use speedb::{ColumnFamilyDescriptor, DB};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -24,8 +24,8 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     pub fn new_read_only(path: &Path, secondary: &Path) -> anyhow::Result<Self> {
-        let database_opts = rocksdb::Options::default();
-        let database = rocksdb::DBWithThreadMode::open_cf_as_secondary(
+        let database_opts = speedb::Options::default();
+        let database = speedb::DBWithThreadMode::open_cf_as_secondary(
             &database_opts,
             path,
             secondary,
@@ -38,7 +38,7 @@ impl IndexerStore {
     }
 
     pub fn new(path: &Path) -> anyhow::Result<Self> {
-        let mut cf_opts = rocksdb::Options::default();
+        let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
@@ -46,10 +46,10 @@ impl IndexerStore {
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
         let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
 
-        let mut database_opts = rocksdb::Options::default();
+        let mut database_opts = speedb::Options::default();
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
-        let database = rocksdb::DBWithThreadMode::open_cf_descriptors(
+        let database = speedb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
             vec![blocks, canonicity, commands, events, ledgers],
@@ -61,7 +61,7 @@ impl IndexerStore {
     }
 
     pub fn create_checkpoint(&self, path: &Path) -> anyhow::Result<()> {
-        use rocksdb::checkpoint::Checkpoint;
+        use speedb::checkpoint::Checkpoint;
 
         let checkpoint = Checkpoint::new(&self.database)?;
         Checkpoint::create_checkpoint(&checkpoint, path)
@@ -72,31 +72,31 @@ impl IndexerStore {
         &self.db_path
     }
 
-    fn blocks_cf(&self) -> &rocksdb::ColumnFamily {
+    fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks")
             .expect("blocks column family exists")
     }
 
-    fn canonicity_cf(&self) -> &rocksdb::ColumnFamily {
+    fn canonicity_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("canonicity")
             .expect("canonicity column family exists")
     }
 
-    fn commands_cf(&self) -> &rocksdb::ColumnFamily {
+    fn commands_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("commands")
             .expect("commands column family exists")
     }
 
-    fn ledgers_cf(&self) -> &rocksdb::ColumnFamily {
+    fn ledgers_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("ledgers")
             .expect("ledgers column family exists")
     }
 
-    fn events_cf(&self) -> &rocksdb::ColumnFamily {
+    fn events_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("events")
             .expect("events column family exists")
@@ -586,35 +586,35 @@ impl IndexerStore {
 
     pub fn db_stats(&self) -> String {
         self.database
-            .property_value(rocksdb::properties::DBSTATS)
+            .property_value(speedb::properties::DBSTATS)
             .unwrap()
             .unwrap()
     }
 
     pub fn memtables_size(&self) -> String {
         self.database
-            .property_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
+            .property_value(speedb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
     }
 
     pub fn estimate_live_data_size(&self) -> u64 {
         self.database
-            .property_int_value(rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE)
+            .property_int_value(speedb::properties::ESTIMATE_LIVE_DATA_SIZE)
             .unwrap()
             .unwrap()
     }
 
     pub fn estimate_num_keys(&self) -> u64 {
         self.database
-            .property_int_value(rocksdb::properties::ESTIMATE_NUM_KEYS)
+            .property_int_value(speedb::properties::ESTIMATE_NUM_KEYS)
             .unwrap()
             .unwrap()
     }
 
     pub fn cur_size_all_mem_tables(&self) -> u64 {
         self.database
-            .property_int_value(rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES)
+            .property_int_value(speedb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
     }

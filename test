@@ -426,7 +426,7 @@ test_ledgers() {
     teardown
 }
 
-# Indexer server syncs with existing rocksdb
+# Indexer server syncs with existing Speedb
 test_sync() {
     test=test_sync
 

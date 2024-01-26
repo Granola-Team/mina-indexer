@@ -8,7 +8,7 @@ use std::{collections::HashMap, fs::remove_dir_all, path::PathBuf};
 use tokio::time::Instant;
 
 #[tokio::test]
-async fn rocksdb() {
+async fn speedb() {
     let store_dir = setup_new_db_dir("./block-store-test");
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 

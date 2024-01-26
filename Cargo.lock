@@ -1545,10 +1545,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "librocksdb-sys"
-version = "0.11.0+8.1.1"
+name = "libspeedb-sys"
+version = "0.0.4+2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3386f101bcb4bd252d8e9d2fb41ec3b0862a15a62b478c355b2982efa469e3e"
+checksum = "14468e1c90e57078dcc625b045d9ad38ed53550d21282d886c48d521163ed05b"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -1556,6 +1556,8 @@ dependencies = [
  "glob",
  "libc",
  "libz-sys",
+ "lz4-sys",
+ "zstd-sys",
 ]
 
 [[package]]
@@ -1603,6 +1605,16 @@ dependencies = [
  "scoped-tls",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "lz4-sys"
+version = "1.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
@@ -1704,12 +1716,12 @@ dependencies = [
  "oneshot",
  "quickcheck",
  "quickcheck_macros",
- "rocksdb",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
  "serde_derive",
  "serde_json",
+ "speedb",
  "thiserror",
  "time",
  "tokio",
@@ -2469,16 +2481,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rocksdb"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb6f170a4041d50a0ce04b0d2e14916d6ca863ea2e422689a5b694395d299ffe"
-dependencies = [
- "libc",
- "librocksdb-sys",
-]
-
-[[package]]
 name = "rust_decimal"
 version = "1.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2773,6 +2775,16 @@ checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "speedb"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78a8bab270d7d5a088d3dd9f1eb6ce0f0c5ee6261acff6b04b3e230bfafe8a1c"
+dependencies = [
+ "libc",
+ "libspeedb-sys",
 ]
 
 [[package]]
@@ -3493,4 +3505,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.9+zstd.1.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e16efa8a874a0481a574084d34cc26fdb3b99627480f785888deb6386506656"
+dependencies = [
+ "cc",
+ "pkg-config",
 ]
