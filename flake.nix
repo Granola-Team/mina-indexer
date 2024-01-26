@@ -1,6 +1,4 @@
 {
-  description = "development environment and build system for mina-indexer";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
@@ -18,8 +16,8 @@
     flake-utils,
     flake-compat,
     ...
-  }:
-    flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "x86_64-windows"] (
+    }:
+    flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"] (
       system: let
         overlays = [(import rust-overlay)];
         pkgs = import nixpkgs {
@@ -45,12 +43,12 @@
             clang
             pkg-config
           ]
+          ++ runtimeDependencies
           ++ lib.optionals stdenv.isDarwin
           [
             frameworks.Security
             frameworks.CoreServices
-          ]
-          ++ runtimeDependencies;
+          ];
 
         developmentDependencies = with pkgs;
           [
@@ -64,8 +62,9 @@
             bacon
             google-cloud-sdk
             just
-            jq
-            procps   # For pgrep
+            jq       # Used in testing.
+            procps   # For pgrep.
+            git      # Needed but not declared by Nix's 'stdenv' build.
           ]
           ++ buildDependencies;
 
