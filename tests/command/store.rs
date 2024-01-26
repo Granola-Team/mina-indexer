@@ -34,7 +34,7 @@ async fn add_and_get() {
     let mut bp = BlockParser::new(blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
     let block = bp.get_precomputed_block(state_hash).await.unwrap();
-    let block_cmds = SignedCommand::from_precomputed(&block);
+    let block_cmds = block.commands();
     let pks = block.all_public_keys();
 
     // add the block to the block store
@@ -53,6 +53,7 @@ async fn add_and_get() {
         let pk_cmds: Vec<SignedCommand> = block_cmds
             .iter()
             .cloned()
+            .map(SignedCommand::from)
             .filter(|x| x.contains_public_key(&pk))
             .collect();
         let result_pk_cmds: Vec<SignedCommand> = indexer_store
@@ -67,7 +68,7 @@ async fn add_and_get() {
     }
 
     // check transaction hash key
-    for cmd in block_cmds {
+    for cmd in SignedCommand::from_precomputed(&block) {
         let result_cmd: SignedCommand = indexer_store
             .get_command_by_hash(&cmd.hash_signed_command().unwrap())
             .unwrap()

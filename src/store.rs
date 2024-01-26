@@ -4,6 +4,7 @@ use crate::{
     command::{
         signed::{SignedCommand, SignedCommandWithStateHash},
         store::CommandStore,
+        UserCommandWithStatus,
     },
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
@@ -457,9 +458,9 @@ impl CommandStore for IndexerStore {
             self.database.put_cf(commands_cf, key, value)?;
         }
 
-        // add: state hash -> signed commands
+        // add: state hash -> user commands with status
         let key = block.state_hash.as_bytes();
-        let value = serde_json::to_vec(&signed_commands)?;
+        let value = serde_json::to_vec(&block.commands())?;
         self.database.put_cf(&commands_cf, key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
@@ -510,7 +511,7 @@ impl CommandStore for IndexerStore {
     fn get_commands_in_block(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<SignedCommand>>> {
+    ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>> {
         trace!("Getting commands in block {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
