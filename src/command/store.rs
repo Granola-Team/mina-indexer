@@ -1,6 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{signed::SignedCommandWithStateHash, UserCommandWithStatus},
+    command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
 };
 
@@ -19,13 +19,13 @@ pub trait CommandStore {
     fn get_command_by_hash(
         &self,
         command_hash: &str,
-    ) -> anyhow::Result<Option<SignedCommandWithStateHash>>;
+    ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
     /// Get commands involving the public key as a sender or receiver
     fn get_commands_for_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>>;
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithData>>>;
 
     /// Get commands for the public key with number and/or state hash bounds
     fn get_commands_with_bounds(
@@ -33,7 +33,7 @@ pub trait CommandStore {
         pk: &PublicKey,
         start_state_hash: &BlockHash,
         end_state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<SignedCommandWithStateHash>>>;
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithData>>>;
 
     /// Get number of commands for public key `pk`
     fn get_pk_num_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
