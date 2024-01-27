@@ -1,5 +1,5 @@
 use crate::{
-    block::{is_valid_block_file, parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
+    block::{is_valid_block_file, parser::BlockParser, precomputed::{self, PrecomputedBlock}, Block, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ledger::{genesis::GenesisRoot, Ledger},
     state::IndexerState,
@@ -7,16 +7,13 @@ use crate::{
 };
 
 use std::{
-    fs,
-    path::{Path, PathBuf},
-    process,
-    sync::Arc,
+    fs, path::{Path, PathBuf}, process, sync::{Arc, Mutex}, thread
 };
 
 use crossbeam_channel::bounded;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -48,8 +45,9 @@ impl MinaIndexer {
         Self { config }
     }
 }
-
+#[instrument(skip_all)]
 pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
+    info!("Starting Mina Indexer...");
     let config = indexer.config.clone();
     let watch_dir = config.watch_dir.clone();
     let database_dir = config.database_dir.clone();
@@ -57,18 +55,33 @@ pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     //TODO: This doesn't need to be an Arc but it's easier to make it so for now
     let store = Arc::new(IndexerStore::new(&database_dir)?);
     let state = initialize(config, store).await?;
-
-    let _ = tokio::spawn(async move { run(watch_dir, state).await });
-
+    run(watch_dir, Arc::new(Mutex::new(state)));
     Ok(())
 }
 
-async fn run(block_watch_dir: impl AsRef<Path>, state: IndexerState) {
-    todo!()
+fn run(block_watch_dir: PathBuf, state: Arc<Mutex<IndexerState>>) {
+    let (ingestion_tx, ingestion_rx) = bounded(16384);
+
+    // Launch watch block directory thread
+    let _ = thread::spawn(move || {
+        let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
+    });
+
+    let foobar = state.clone();
+    // Launch precomputed block deserializer and persistence thread
+    let _ = thread::spawn(move || {
+        info!("Starting block persisting thread..");
+        for path_buf in ingestion_rx {
+            let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
+            let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
+            debug!("Deserialized precomputed block {block:?}");
+            foobar.lock().unwrap().add_block_to_witness_tree(&precomputed_block).unwrap();
+        }
+    });
 }
 
 /// Watches a directory listening for when valid precomputed blocks are created and signals downstream
-pub fn watch_directory_for_blocks<P: AsRef<Path>>(
+fn watch_directory_for_blocks<P: AsRef<Path>>(
     watch_dir: P,
     sender: crossbeam_channel::Sender<PathBuf>,
 ) -> notify::Result<()> {
@@ -76,13 +89,13 @@ pub fn watch_directory_for_blocks<P: AsRef<Path>>(
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
 
     watcher.watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!("Listening for precomputed blocks: {:?}", watch_dir.as_ref());
+    info!("Starting block watcher thread..");
+    info!("Listening for precomputed blocks in directory: {:?}", watch_dir.as_ref());
     for res in rx {
         match res {
             Ok(event) => {
                 if let EventKind::Create(notify::event::CreateKind::File) = event.kind {
                     for path in event.paths {
-                        trace!("File Created Signal");
                         if is_valid_block_file(&path) {
                             debug!("Valid precomputed block file");
                             if let Err(e) = sender.send(path) {

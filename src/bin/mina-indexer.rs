@@ -7,7 +7,6 @@ use mina_indexer::{
     },
     ledger,
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
-    store::IndexerStore,
 };
 use std::{fs, path::PathBuf};
 use tracing::{error, info, instrument};
@@ -116,8 +115,12 @@ pub async fn main() -> anyhow::Result<()> {
             init_tracing_logger(log_dir, log_level, log_level_stdout)?;
 
             let config = process_indexer_configuration(args, mode)?;
-            let indexer = MinaIndexer::new(config);
 
+            let indexer = MinaIndexer::new(config);
+            let _ = mina_indexer::server::start(indexer).await;
+            loop {
+
+            }
             Ok(())
         }
     }
