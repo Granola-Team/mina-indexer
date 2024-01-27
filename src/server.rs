@@ -1,5 +1,10 @@
 use crate::{
-    block::{is_valid_block_file, parser::BlockParser, precomputed::{self, PrecomputedBlock}, Block, BlockHash, BlockWithoutHeight},
+    block::{
+        is_valid_block_file,
+        parser::BlockParser,
+        precomputed::{self, PrecomputedBlock},
+        Block, BlockHash, BlockWithoutHeight,
+    },
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ledger::{genesis::GenesisRoot, Ledger},
     state::IndexerState,
@@ -7,7 +12,11 @@ use crate::{
 };
 
 use std::{
-    fs, path::{Path, PathBuf}, process, sync::{Arc, Mutex}, thread
+    fs,
+    path::{Path, PathBuf},
+    process,
+    sync::{Arc, Mutex},
+    thread,
 };
 
 use crossbeam_channel::bounded;
@@ -75,7 +84,11 @@ fn run(block_watch_dir: PathBuf, state: Arc<Mutex<IndexerState>>) {
             let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
             let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
             debug!("Deserialized precomputed block {block:?}");
-            foobar.lock().unwrap().add_block_to_witness_tree(&precomputed_block).unwrap();
+            foobar
+                .lock()
+                .unwrap()
+                .add_block_to_witness_tree(&precomputed_block)
+                .unwrap();
         }
     });
 }
@@ -90,7 +103,10 @@ fn watch_directory_for_blocks<P: AsRef<Path>>(
 
     watcher.watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
     info!("Starting block watcher thread..");
-    info!("Listening for precomputed blocks in directory: {:?}", watch_dir.as_ref());
+    info!(
+        "Listening for precomputed blocks in directory: {:?}",
+        watch_dir.as_ref()
+    );
     for res in rx {
         match res {
             Ok(event) => {
@@ -188,8 +204,7 @@ async fn initialize(
             InitializationMode::New => {
                 info!("Parsing blocks");
                 let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
-                state
-                    .initialize_with_canonical_chain_discovery(&mut block_parser)?;
+                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
             }
             InitializationMode::Replay => {
                 state.replay_events()?;
@@ -203,16 +218,3 @@ async fn initialize(
 
     Ok(state)
 }
-
-// block_fut = filesystem_receiver.recv_block() => {
-//     if let Some(precomputed_block) = block_fut? {
-//         let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-//         debug!("Receiving block {block:?}");
-
-//         state.add_block_to_witness_tree(&precomputed_block)?;
-//         info!("Added {block:?}");
-//     } else {
-//         info!("Block receiver shutdown, system exit");
-//         return Ok(())
-//     }
-// }

@@ -118,9 +118,7 @@ pub async fn main() -> anyhow::Result<()> {
 
             let indexer = MinaIndexer::new(config);
             let _ = mina_indexer::server::start(indexer).await;
-            loop {
-
-            }
+            loop {}
             Ok(())
         }
     }
