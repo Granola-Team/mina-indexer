@@ -31,8 +31,8 @@ idxr_server() {
     echo $! > idxr_pid
 }
 
-idxr_server_cli() {
-    idxr_server cli "$@"
+idxr_server_start() {
+    idxr_server start "$@"
 }
 
 dl_mainnet() {
@@ -125,8 +125,14 @@ test_indexer_cli_reports() {
     idxr shutdown --help 2>&1 |
         grep -iq "Usage: mina-indexer shutdown"
 
-    idxr transactions --help 2>&1 |
-        grep -iq "Usage: mina-indexer transactions"
+    idxr tx-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer tx-hash"
+
+    idxr tx-public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer tx-public-key"
+
+    idxr tx-state-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer tx-state-hash"
 }
 
 # Indexer server starts up without any precomputed blocks
@@ -134,7 +140,7 @@ test_server_startup() {
     test=test_server_startup
     
     setup
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -154,7 +160,7 @@ test_ipc_is_available_immediately() {
     setup
     dl_mainnet 100 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -172,7 +178,7 @@ test_startup_dirs_get_created() {
     test=test_startup_dirs_get_created
 
     setup
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./startup-blocks \
         --watch-dir ./watch-blocks \
         --database-dir ./database \
@@ -192,7 +198,7 @@ test_account_balance_cli() {
     test=test_account_balance_cli
 
     setup
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -210,7 +216,7 @@ test_account_public_key_json() {
     test=test_account_public_key_json
 
     setup
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -230,7 +236,7 @@ test_canonical_tip() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -255,7 +261,7 @@ test_missing_blocks() {
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -321,7 +327,7 @@ test_best_chain() {
     mkdir best_chain
     dl_mainnet 12 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -374,7 +380,7 @@ test_ledgers() {
     mkdir ledgers
     dl_mainnet 15 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -434,7 +440,7 @@ test_sync() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -481,7 +487,7 @@ test_replay() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -534,39 +540,80 @@ test_transactions() {
     mkdir transactions
     dl_mainnet 13 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
 
-    # basic transaction queries
-    transactions=$(idxr transactions --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
+    # basic pk transaction queries
+    transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
+    amount_v=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.body.Payment.amount)
+    state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].state_hash)
+    tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].tx_hash)
+
     assert '[]' $transactions
-
-    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
     assert '1000' $amount
+    assert '1000' $amount_v
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
+    assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
 
-    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
-    assert '1000' $amount
-
-    # bounded transaction queries
-    amount=$(idxr transactions -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+    # bounded pk transaction queries
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
         --start-state-hash 3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG \
         --end-state-hash 3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5 \
         | jq -r .[0].Payment.amount)
     assert '1000' $amount
 
-    amount=$(idxr transactions -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
         --start-state-hash 3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH \
         --end-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
         | jq -r .[0].Payment.amount)
     assert '1000' $amount
 
+    # tx hash query
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j | jq -r .Payment.amount)
+    assert '1000' $amount
+
+    # tx hash query - verbose
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.body.Payment.amount)
+    status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status | jq -r .[0])
+    tx_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .tx_hash)
+    state_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .state_hash)
+
+    assert '1000' $amount
+    assert 'Failed' $status
+    assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
+
+    # state hash query
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.amount)
+    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.source)
+    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.receiver)
+
+    assert '1000' $amount
+    assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $source
+    assert 'B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM' $receiver
+
+    # state hash query - verbose
+    kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[0])
+    assert 'Signed_command' $kind
+
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.amount)
+    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.source_pk)
+    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.receiver_pk)
+    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.token_id)
+
+    assert '1' $token
+    assert '1000' $amount
+    assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $source
+    assert 'B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM' $receiver
+
     # write transactions to file
     file=./transactions/transactions.json
-    idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
+    idxr tx-public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
     
     file_result=$(cat $file | jq -r .[0].Payment.amount)
     assert '1000' $file_result
@@ -582,7 +629,7 @@ test_checkpoint() {
     setup
     dl_mainnet 13 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -594,7 +641,7 @@ test_checkpoint() {
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
 
     # create checkpoint in ./checkpoint
     idxr checkpoint -p ./checkpoint
@@ -616,7 +663,7 @@ test_checkpoint() {
     canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr transactions --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
     assert $canonical_length $canonical_length_checkpoint
@@ -635,14 +682,14 @@ test_many_blocks() {
     setup
     dl_mainnet 1000 ./blocks
 
-    idxr_server_cli \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
-        --log-level-stdout debug
-    sleep 300
+        --log-level-stdout debug &
+    sleep 60
 
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
