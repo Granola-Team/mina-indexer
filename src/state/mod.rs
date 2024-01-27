@@ -260,7 +260,7 @@ impl IndexerState {
     /// Initialize indexer state from a collection of contiguous canonical blocks
     ///
     /// Short-circuits adding canonical blocks to the witness tree
-    pub async fn initialize_with_canonical_chain_discovery(
+    pub fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
@@ -339,23 +339,22 @@ impl IndexerState {
 
         // now add the successive non-canonical blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
-            .await
     }
 
     /// Initialize indexer state without short-circuiting canonical blocks
-    pub async fn initialize_without_canonical_chain_discovery(
+    pub fn initialize_without_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
-        self.add_blocks(block_parser).await
+        self.add_blocks(block_parser)
     }
 
     /// Adds blocks to the state according to `block_parser` then changes phase to Watching
-    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        self.add_blocks_with_time(block_parser, None).await
+    pub fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
+        self.add_blocks_with_time(block_parser, None)
     }
 
-    async fn add_blocks_with_time(
+    fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
         elapsed: Option<Duration>,

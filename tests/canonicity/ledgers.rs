@@ -32,7 +32,7 @@ async fn test() {
     )
     .unwrap();
 
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
     let mut ledger_diff = indexer_store.get_ledger_at_height(1).unwrap().unwrap();

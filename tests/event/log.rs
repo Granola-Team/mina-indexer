@@ -52,7 +52,7 @@ async fn test() {
     .unwrap();
 
     // add parser0 blocks to state0
-    state0.add_blocks(&mut block_parser0).await.unwrap();
+    state0.add_blocks(&mut block_parser0).unwrap();
 
     // add parser1 blocks to state1
     // - add block to db

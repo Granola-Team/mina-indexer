@@ -38,6 +38,8 @@ bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
 ctrlc = "3.4.0"
 tokio = { version = "1.25.0", features = ["full"] }
+crossbeam-channel = "0.5.11"
+notify = "6.1.1"
 
 [dev-dependencies]
 quickcheck = "1.0.3"

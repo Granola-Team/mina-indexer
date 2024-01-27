@@ -1,5 +1,5 @@
 use crate::{
-    block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
+    block::{is_valid_block_file, parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ledger::{genesis::GenesisRoot, Ledger},
     state::IndexerState,
@@ -13,7 +13,10 @@ use std::{
     sync::Arc,
 };
 
-use tracing::{debug, info};
+use crossbeam_channel::bounded;
+use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -62,6 +65,39 @@ pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
 
 async fn run(block_watch_dir: impl AsRef<Path>, state: IndexerState) {
     todo!()
+}
+
+/// Watches a directory listening for when valid precomputed blocks are created and signals downstream
+pub fn watch_directory_for_blocks<P: AsRef<Path>>(
+    watch_dir: P,
+    sender: crossbeam_channel::Sender<PathBuf>,
+) -> notify::Result<()> {
+    let (tx, rx) = bounded(4096);
+    let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
+
+    watcher.watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+    info!("Listening for precomputed blocks: {:?}", watch_dir.as_ref());
+    for res in rx {
+        match res {
+            Ok(event) => {
+                if let EventKind::Create(notify::event::CreateKind::File) = event.kind {
+                    for path in event.paths {
+                        trace!("File Created Signal");
+                        if is_valid_block_file(&path) {
+                            debug!("Valid precomputed block file");
+                            if let Err(e) = sender.send(path) {
+                                error!("Unable to send path downstream. {}", e);
+                            }
+                        } else {
+                            warn!("Invalid precomputed block file: {}", path.display());
+                        }
+                    }
+                }
+            }
+            Err(error) => error!("Error: {error:?}"),
+        }
+    }
+    Ok(())
 }
 
 async fn initialize(
@@ -140,8 +176,7 @@ async fn initialize(
                 info!("Parsing blocks");
                 let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
                 state
-                    .initialize_with_canonical_chain_discovery(&mut block_parser)
-                    .await?;
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)?;
             }
             InitializationMode::Replay => {
                 state.replay_events()?;

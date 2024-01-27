@@ -32,7 +32,7 @@ async fn test() {
     )
     .unwrap();
 
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     println!("CANONICAL TIP: {:?}", state.canonical_tip_block());
     println!("BEST TIP:      {:?}", state.best_tip_block());

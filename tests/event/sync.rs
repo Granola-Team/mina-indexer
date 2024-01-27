@@ -32,7 +32,7 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     // fresh state to sync events with no genesis events
     let mut state_sync = IndexerState::new_without_genesis_events(
