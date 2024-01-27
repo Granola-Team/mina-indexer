@@ -27,8 +27,7 @@ test: test-unit test-regression
 test-ci: lint test-unit test-regression
 
 test-unit: build
-  # TODO: remove '--test-threads', which work around a bug in the test code.
-  cargo nextest run --test-threads=1
+  cargo nextest run
 
 test-regression: build
   ./test
