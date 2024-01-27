@@ -23,6 +23,7 @@ pub struct SignedCommandWithData {
     pub command: SignedCommand,
     pub state_hash: BlockHash,
     pub status: CommandStatusData,
+    pub tx_hash: String,
 }
 
 impl SignedCommand {
@@ -140,6 +141,20 @@ impl SignedCommandWithStateHash {
     }
 }
 
+impl SignedCommandWithData {
+    pub fn from(user_cmd: &UserCommandWithStatus, state_hash: &str) -> Self {
+        let command = SignedCommand::from(user_cmd.clone());
+        Self {
+            state_hash: state_hash.into(),
+            status: user_cmd.status_data(),
+            tx_hash: command
+                .hash_signed_command()
+                .expect("valid transaction hash"),
+            command,
+        }
+    }
+}
+
 impl From<mina_rs::UserCommand> for SignedCommand {
     fn from(value: mina_rs::UserCommand) -> Self {
         let mina_rs::UserCommand::SignedCommand(v1) = value;
@@ -217,12 +232,12 @@ impl From<Versioned2<mina_rs::SignedCommand, 1, 1>> for SignedCommand {
     }
 }
 
-impl std::fmt::Debug for SignedCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl From<SignedCommand> for serde_json::Value {
+    fn from(value: SignedCommand) -> Self {
         use serde_json::*;
 
         let mut json = Map::new();
-        let mina_rs::SignedCommand { payload, .. } = self.0.clone().inner().inner();
+        let mina_rs::SignedCommand { payload, .. } = value.0.inner().inner();
 
         let mut common = Map::new();
         let mina_rs::SignedCommandPayloadCommon {
@@ -258,7 +273,7 @@ impl std::fmt::Debug for SignedCommand {
         );
         common.insert(
             "valid_until".into(),
-            Value::Number(Number::from(valid_until.inner().inner())),
+            Value::Number(Number::from(valid_until.inner().inner() as u64)),
         );
         common.insert(
             "memo".into(),
@@ -309,12 +324,84 @@ impl std::fmt::Debug for SignedCommand {
                     "new_delegate".into(),
                     Value::String(PublicKey::from(new_delegate).to_address()),
                 );
-                body.insert("StakeDelegation".into(), Value::Object(stake_delegation));
+                body.insert("Stake_delegation".into(), Value::Object(stake_delegation));
             }
         };
 
         json.insert("common".into(), Value::Object(common));
         json.insert("body".into(), Value::Object(body));
+        Value::Object(json)
+    }
+}
+
+pub struct SignedCommandWithKind(SignedCommand);
+
+impl From<UserCommandWithStatus> for SignedCommandWithKind {
+    fn from(value: UserCommandWithStatus) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<SignedCommandWithKind> for serde_json::Value {
+    fn from(value: SignedCommandWithKind) -> Self {
+        use serde_json::*;
+
+        Value::Array(vec![Value::String("Signed_command".into()), value.0.into()])
+    }
+}
+
+impl From<SignedCommandWithData> for serde_json::Value {
+    fn from(value: SignedCommandWithData) -> Self {
+        use serde_json::*;
+
+        let mut obj = Map::new();
+        let tx_hash = Value::String(value.tx_hash);
+        let state_hash = Value::String(value.state_hash.0);
+        let command = value.command.into();
+        let status = value.status.into();
+
+        obj.insert("tx_hash".into(), tx_hash);
+        obj.insert("command".into(), command);
+        obj.insert("status".into(), status);
+        obj.insert("state_hash".into(), state_hash);
+        Value::Object(obj)
+    }
+}
+
+impl From<SignedCommandWithData> for SignedCommand {
+    fn from(value: SignedCommandWithData) -> Self {
+        value.command
+    }
+}
+
+impl std::fmt::Debug for SignedCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
+        write!(f, "{}", to_string(&json).unwrap())
+    }
+}
+
+impl std::fmt::Debug for SignedCommandWithData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
+        write!(f, "{}", to_string(&json).unwrap())
+    }
+}
+
+impl std::fmt::Debug for SignedCommandWithStateHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let mut json = Map::new();
+        json.insert("command".to_string(), self.command.clone().into());
+        json.insert(
+            "state_hash".to_string(),
+            Value::String(self.state_hash.0.clone()),
+        );
         write!(f, "{}", to_string(&json).unwrap())
     }
 }
