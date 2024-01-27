@@ -1,16 +1,13 @@
+use crate::constants::MAINNET_TRANSITION_FRONTIER_K;
 use crate::{
     block::{
-        is_valid_block_file,
-        parser::BlockParser,
-        precomputed::{self, PrecomputedBlock},
-        Block, BlockHash, BlockWithoutHeight,
+        is_valid_block_file, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash,
+        BlockWithoutHeight,
     },
-    constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
-    ledger::{genesis::GenesisRoot, Ledger},
+    ledger::genesis::GenesisRoot,
     state::IndexerState,
     store::IndexerStore,
 };
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -19,10 +16,10 @@ use std::{
     thread,
 };
 
-use crossbeam_channel::bounded;
+use crossbeam_channel::{bounded, Receiver};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -70,7 +67,6 @@ pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
 
 fn run(block_watch_dir: PathBuf, state: Arc<Mutex<IndexerState>>) {
     let (ingestion_tx, ingestion_rx) = bounded(16384);
-
     // Launch watch block directory thread
     let _ = thread::spawn(move || {
         let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
@@ -79,20 +75,23 @@ fn run(block_watch_dir: PathBuf, state: Arc<Mutex<IndexerState>>) {
     let foobar = state.clone();
     // Launch precomputed block deserializer and persistence thread
     let _ = thread::spawn(move || {
-        info!("Starting block persisting thread..");
-        for path_buf in ingestion_rx {
-            let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
-            let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-            debug!("Deserialized precomputed block {block:?}");
-            foobar
-                .lock()
-                .unwrap()
-                .add_block_to_witness_tree(&precomputed_block)
-                .unwrap();
-        }
+        let _ = foobar_thread(foobar, ingestion_rx);
     });
 }
 
+fn foobar_thread(foobar: Arc<Mutex<IndexerState>>, ingestion_rx: Receiver<PathBuf>) {
+    info!("Starting block persisting thread..");
+    for path_buf in ingestion_rx {
+        let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
+        let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
+        debug!("Deserialized precomputed block {block:?}");
+        foobar
+            .lock()
+            .unwrap()
+            .add_block_to_witness_tree(&precomputed_block)
+            .unwrap();
+    }
+}
 /// Watches a directory listening for when valid precomputed blocks are created and signals downstream
 fn watch_directory_for_blocks<P: AsRef<Path>>(
     watch_dir: P,
