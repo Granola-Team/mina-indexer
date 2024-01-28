@@ -23,11 +23,11 @@ test_cleanup() {
 trap test_cleanup EXIT
 
 idxr() {
-    "$IDXR" "$@"
+    RUST_BACKTRACE=full "$IDXR" "$@"
 }
 
 idxr_server() {
-    "$IDXR" server "$@" &
+    RUST_BACKTRACE=full "$IDXR" server "$@" &
     echo $! > idxr_pid
 }
 
