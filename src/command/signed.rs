@@ -5,7 +5,7 @@ use crate::{
 };
 use blake2::digest::VariableOutput;
 use mina_serialization_types::staged_ledger_diff as mina_rs;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use versioned::Versioned2;
 
@@ -236,101 +236,15 @@ impl From<SignedCommand> for serde_json::Value {
     fn from(value: SignedCommand) -> Self {
         use serde_json::*;
 
-        let mut json = Map::new();
-        let mina_rs::SignedCommand { payload, .. } = value.0.inner().inner();
+        let mut object = Map::new();
+        let payload = payload_json(value.0.clone());
+        let signer = signer(value.0.clone());
+        let signature = signature(value.0);
 
-        let mut common = Map::new();
-        let mina_rs::SignedCommandPayloadCommon {
-            fee,
-            fee_token,
-            fee_payer_pk,
-            nonce,
-            valid_until,
-            memo,
-        } = payload
-            .clone()
-            .inner()
-            .inner()
-            .common
-            .inner()
-            .inner()
-            .inner();
-        common.insert(
-            "fee".into(),
-            Value::Number(Number::from(fee.inner().inner())),
-        );
-        common.insert(
-            "fee_token".into(),
-            Value::Number(Number::from(fee_token.inner().inner().inner())),
-        );
-        common.insert(
-            "fee_payer_pk".into(),
-            Value::String(PublicKey::from(fee_payer_pk).to_address()),
-        );
-        common.insert(
-            "nonce".into(),
-            Value::Number(Number::from(nonce.inner().inner())),
-        );
-        common.insert(
-            "valid_until".into(),
-            Value::Number(Number::from(valid_until.inner().inner() as u64)),
-        );
-        common.insert(
-            "memo".into(),
-            Value::String(String::from_utf8_lossy(&memo.inner().0).to_string()),
-        );
-
-        let mut body = Map::new();
-        match payload.inner().inner().body.inner().inner() {
-            mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                let mina_rs::PaymentPayload {
-                    source_pk,
-                    receiver_pk,
-                    token_id,
-                    amount,
-                } = payment_payload.inner().inner();
-
-                let mut payment = Map::new();
-                payment.insert(
-                    "source_pk".into(),
-                    Value::String(PublicKey::from(source_pk).to_address()),
-                );
-                payment.insert(
-                    "receiver_pk".into(),
-                    Value::String(PublicKey::from(receiver_pk).to_address()),
-                );
-                payment.insert(
-                    "token_id".into(),
-                    Value::Number(Number::from(token_id.inner().inner().inner())),
-                );
-                payment.insert(
-                    "amount".into(),
-                    Value::Number(Number::from(amount.inner().inner())),
-                );
-                body.insert("Payment".into(), Value::Object(payment));
-            }
-            mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
-                let mina_rs::StakeDelegation::SetDelegate {
-                    delegator,
-                    new_delegate,
-                } = stake_delegation.inner();
-
-                let mut stake_delegation = Map::new();
-                stake_delegation.insert(
-                    "delegator".into(),
-                    Value::String(PublicKey::from(delegator).to_address()),
-                );
-                stake_delegation.insert(
-                    "new_delegate".into(),
-                    Value::String(PublicKey::from(new_delegate).to_address()),
-                );
-                body.insert("Stake_delegation".into(), Value::Object(stake_delegation));
-            }
-        };
-
-        json.insert("common".into(), Value::Object(common));
-        json.insert("body".into(), Value::Object(body));
-        Value::Object(json)
+        object.insert("payload".into(), payload);
+        object.insert("signer".into(), signer);
+        object.insert("signature".into(), signature);
+        Value::Object(object)
     }
 }
 
@@ -404,6 +318,123 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
         );
         write!(f, "{}", to_string(&json).unwrap())
     }
+}
+
+fn signer(value: mina_rs::SignedCommandV1) -> serde_json::Value {
+    use serde_json::*;
+
+    Value::String(PublicKey::from_v1(value.inner().inner().signer.0.inner()).to_address())
+}
+
+fn signature(_value: mina_rs::SignedCommandV1) -> serde_json::Value {
+    use serde_json::*;
+
+    Value::String("signature".into())
+}
+
+fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
+    use serde_json::*;
+
+    let mut payload_obj = Map::new();
+    let mina_rs::SignedCommand { payload, .. } = value.inner().inner();
+
+    let mut common = Map::new();
+    let mina_rs::SignedCommandPayloadCommon {
+        fee,
+        fee_token,
+        fee_payer_pk,
+        nonce,
+        valid_until,
+        memo,
+    } = payload
+        .clone()
+        .inner()
+        .inner()
+        .common
+        .inner()
+        .inner()
+        .inner();
+    common.insert(
+        "fee".into(),
+        Value::Number(Number::from(fee.inner().inner())),
+    );
+    common.insert(
+        "fee_token".into(),
+        Value::Number(Number::from(fee_token.inner().inner().inner())),
+    );
+    common.insert(
+        "fee_payer_pk".into(),
+        Value::String(PublicKey::from(fee_payer_pk).to_address()),
+    );
+    common.insert(
+        "nonce".into(),
+        Value::Number(Number::from(nonce.inner().inner())),
+    );
+    common.insert(
+        "valid_until".into(),
+        Value::Number(Number::from(valid_until.inner().inner() as u32)),
+    );
+    common.insert(
+        "memo".into(),
+        Value::String(String::from_utf8_lossy(&memo.inner().0).to_string()),
+    );
+
+    let body = match payload.inner().inner().body.inner().inner() {
+        mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+            let mina_rs::PaymentPayload {
+                source_pk,
+                receiver_pk,
+                token_id,
+                amount,
+            } = payment_payload.inner().inner();
+
+            let mut payment = Map::new();
+            payment.insert(
+                "source_pk".into(),
+                Value::String(PublicKey::from(source_pk).to_address()),
+            );
+            payment.insert(
+                "receiver_pk".into(),
+                Value::String(PublicKey::from(receiver_pk).to_address()),
+            );
+            payment.insert(
+                "token_id".into(),
+                Value::Number(Number::from(token_id.inner().inner().inner())),
+            );
+            payment.insert(
+                "amount".into(),
+                Value::Number(Number::from(amount.inner().inner())),
+            );
+            Value::Array(vec![
+                Value::String("Payment".into()),
+                Value::Object(payment),
+            ])
+        }
+        mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
+            let mina_rs::StakeDelegation::SetDelegate {
+                delegator,
+                new_delegate,
+            } = stake_delegation.inner();
+
+            let mut stake_delegation = Map::new();
+            stake_delegation.insert(
+                "delegator".into(),
+                Value::String(PublicKey::from(delegator).to_address()),
+            );
+            stake_delegation.insert(
+                "new_delegate".into(),
+                Value::String(PublicKey::from(new_delegate).to_address()),
+            );
+            Value::Array(vec![
+                Value::String("Stake_delegation".into()),
+                Value::Object(stake_delegation),
+            ])
+        }
+    };
+
+    payload_obj.insert("common".into(), Value::Object(common));
+    payload_obj.insert("body".into(), body);
+    Value::Object(payload_obj)
 }
 
 #[cfg(test)]

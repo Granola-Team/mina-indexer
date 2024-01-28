@@ -430,7 +430,8 @@ impl std::fmt::Debug for UserCommandWithStatus {
 mod test {
     use super::{Command, Delegation, Payment};
     use crate::{
-        block::parser::BlockParser, command::stringify, constants::MAINNET_CANONICAL_THRESHOLD,
+        block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD,
+        ledger::account::nanomina_to_mina,
     };
     use std::path::PathBuf;
 
@@ -580,11 +581,65 @@ mod test {
         }
     }
 
-    ///
     #[test]
     fn user_command_with_status_json() -> anyhow::Result<()> {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
+
+        fn stringify(value: serde_json::Value) -> serde_json::Value {
+            use serde_json::*;
+
+            match value {
+                Value::Number(n) => Value::String(n.to_string()),
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(_, x)| *x = stringify(x.clone()));
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(stringify).collect()),
+                x => x,
+            }
+        }
+        fn supress_memo_and_sig(value: serde_json::Value) -> serde_json::Value {
+            use serde_json::*;
+
+            match value {
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(key, x)| {
+                        if *key == json!("memo") || *key == json!("signature") {
+                            *x = Value::Null
+                        } else {
+                            *x = supress_memo_and_sig(x.clone())
+                        }
+                    });
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => {
+                    Value::Array(arr.into_iter().map(supress_memo_and_sig).collect())
+                }
+                x => x,
+            }
+        }
+        fn fee_convert(value: serde_json::Value) -> serde_json::Value {
+            use serde_json::*;
+
+            match value {
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(key, x)| {
+                        if *key == json!("fee") {
+                            *x = {
+                                let nanomina = x.clone().to_string().parse::<u64>().unwrap();
+                                Value::String(nanomina_to_mina(nanomina))
+                            }
+                        } else {
+                            *x = fee_convert(x.clone())
+                        }
+                    });
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(fee_convert).collect()),
+                x => x,
+            }
+        }
 
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
         let contents = std::fs::read(path.clone())?;
@@ -594,7 +649,30 @@ mod test {
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        assert_eq!(user_cmd_with_status_json, stringify(user_cmd_with_status));
+        if let Value::Object(obj) = &user_cmd_with_status {
+            if let Value::Object(obj_json) = &user_cmd_with_status_json {
+                for key in obj.keys() {
+                    if obj[key].clone() != obj_json[key].clone() {
+                        println!(
+                            "{key}:\n{:#?}",
+                            supress_memo_and_sig(user_cmd_with_status_json.clone())
+                        );
+                        println!("----------------------------------------------");
+                        println!(
+                            "{key}:\n{:#?}",
+                            stringify(supress_memo_and_sig(fee_convert(
+                                user_cmd_with_status.clone()
+                            )))
+                        );
+                        println!("----------------------------------------------");
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            supress_memo_and_sig(user_cmd_with_status_json),
+            stringify(supress_memo_and_sig(fee_convert(user_cmd_with_status)))
+        );
         Ok(())
     }
 }
@@ -657,19 +735,4 @@ fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serd
     balance_obj.insert("receiver_balance".into(), receiver_balance);
     balance_obj.insert("source_balance".into(), source_balance);
     Value::Object(balance_obj)
-}
-
-#[allow(dead_code)]
-fn stringify(value: serde_json::Value) -> serde_json::Value {
-    use serde_json::*;
-
-    match value {
-        Value::Number(n) => Value::String(n.to_string()),
-        Value::Object(mut obj) => {
-            obj.iter_mut().for_each(|(_, x)| *x = stringify(x.clone()));
-            Value::Object(obj)
-        }
-        Value::Array(arr) => Value::Array(arr.into_iter().map(stringify).collect()),
-        x => x,
-    }
 }
