@@ -117,7 +117,8 @@ pub async fn main() -> anyhow::Result<()> {
             let config = process_indexer_configuration(args, mode)?;
 
             let indexer = MinaIndexer::new(config);
-            let _ = mina_indexer::server::start(indexer).await;
+            let _ = mina_indexer::server::start(indexer);
+            // replace loop with JoinHandle
             loop {}
             Ok(())
         }

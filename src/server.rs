@@ -12,7 +12,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process,
-    sync::{Arc, Mutex},
+    sync::Arc,
     thread,
 };
 
@@ -51,46 +51,69 @@ impl MinaIndexer {
         Self { config }
     }
 }
+
 #[instrument(skip_all)]
-pub async fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
+pub fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     info!("Starting Mina Indexer...");
     let config = indexer.config.clone();
-    let watch_dir = config.watch_dir.clone();
-    let database_dir = config.database_dir.clone();
 
-    //TODO: This doesn't need to be an Arc but it's easier to make it so for now
-    let store = Arc::new(IndexerStore::new(&database_dir)?);
-    let state = initialize(config, store).await?;
-    run(watch_dir, Arc::new(Mutex::new(state)));
+    run(config);
     Ok(())
 }
 
-fn run(block_watch_dir: PathBuf, state: Arc<Mutex<IndexerState>>) {
+fn run(config: IndexerConfiguration) {
+    let block_watch_dir = config.watch_dir.clone();
     let (ingestion_tx, ingestion_rx) = bounded(16384);
+
     // Launch watch block directory thread
     let _ = thread::spawn(move || {
         let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
     });
-
-    let foobar = state.clone();
     // Launch precomputed block deserializer and persistence thread
     let _ = thread::spawn(move || {
-        let _ = foobar_thread(foobar, ingestion_rx);
+        let _ = block_persistence(config, ingestion_rx);
+    });
+
+    // Wait for signal
+    let _ = tokio::spawn(async move {
+        let _ = wait_for_signal().await;
     });
 }
 
-fn foobar_thread(foobar: Arc<Mutex<IndexerState>>, ingestion_rx: Receiver<PathBuf>) {
+///
+async fn wait_for_signal() {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut term = signal(SignalKind::terminate()).expect("failed to register signal handler");
+    let mut int = signal(SignalKind::interrupt()).expect("failed to register signal handler");
+    tokio::select! {
+        _ = term.recv() => {
+            info!("Received SIGTERM");
+            process::exit(100);
+        },
+        _ = int.recv() => {
+            info!("Received SIGINT");
+            process::exit(101);
+        },
+    }
+}
+
+/// Write Precomputed Block to disk
+fn block_persistence(
+    config: IndexerConfiguration,
+    ingestion_rx: Receiver<PathBuf>,
+) -> notify::Result<()> {
     info!("Starting block persisting thread..");
+    let database_dir = config.database_dir.clone();
+    let store = Arc::new(IndexerStore::new(&database_dir).unwrap());
+    let mut state = initialize(config, store).unwrap();
+
     for path_buf in ingestion_rx {
         let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
         let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
         debug!("Deserialized precomputed block {block:?}");
-        foobar
-            .lock()
-            .unwrap()
-            .add_block_to_witness_tree(&precomputed_block)
-            .unwrap();
+        state.add_block_to_witness_tree(&precomputed_block).unwrap();
     }
+    Ok(())
 }
 /// Watches a directory listening for when valid precomputed blocks are created and signals downstream
 fn watch_directory_for_blocks<P: AsRef<Path>>(
@@ -128,17 +151,10 @@ fn watch_directory_for_blocks<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn initialize(
+fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
-    debug!("Setting Ctrl-C handler");
-    ctrlc::set_handler(move || {
-        info!("SIGINT received. Exiting.");
-        process::exit(0);
-    })
-    .expect("Error setting Ctrl-C handler");
-
     info!("Starting mina-indexer server");
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
@@ -199,9 +215,9 @@ async fn initialize(
             }
         };
 
+        debug!("Initialization mode: {:?}", initialization_mode);
         match initialization_mode {
             InitializationMode::New => {
-                info!("Parsing blocks");
                 let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
                 state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
             }
