@@ -26,6 +26,10 @@ impl Ord for PublicKey {
 }
 
 impl PublicKey {
+    pub fn from_v1(v1: PublicKeyV1) -> Self {
+        Self(v1)
+    }
+
     pub fn to_address(&self) -> String {
         CompressedPubKey::from(&self.0).into_address()
     }

@@ -93,7 +93,7 @@ impl Ord for Account {
 
 const MINA_SCALE: u32 = 9;
 
-fn nanomina_to_mina(num: u64) -> String {
+pub fn nanomina_to_mina(num: u64) -> String {
     let mut dec = Decimal::from(num);
     dec.set_scale(MINA_SCALE).unwrap();
     let mut dec_str = dec.to_string();
