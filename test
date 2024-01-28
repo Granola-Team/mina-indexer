@@ -265,7 +265,8 @@ test_missing_blocks() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs
+        --log-dir ./logs \
+        --log-level-stdout debug &
     sleep 5
 
     # start out missing block 11 & 21
@@ -550,7 +551,7 @@ test_transactions() {
     # basic pk transaction queries
     transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
     amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
-    amount_v=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.body.Payment.amount)
+    amount_v=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.Payment.amount)
     state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].state_hash)
     tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].tx_hash)
 
@@ -578,7 +579,7 @@ test_transactions() {
     assert '1000' $amount
 
     # tx hash query - verbose
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.body.Payment.amount)
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.Payment.amount)
     status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status | jq -r .[0])
     tx_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .tx_hash)
     state_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .state_hash)
@@ -601,10 +602,10 @@ test_transactions() {
     kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[0])
     assert 'Signed_command' $kind
 
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.amount)
-    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.source_pk)
-    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.receiver_pk)
-    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].body.Payment.token_id)
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.amount)
+    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.source_pk)
+    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.receiver_pk)
+    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.token_id)
 
     assert '1' $token
     assert '1000' $amount
