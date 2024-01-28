@@ -23,14 +23,14 @@ pub struct UnixDomainSocketServer {
     /// True if the Unix domain socket server is running
     is_running: AtomicBool,
     /// Unix domain socket file path
-    path: String,
+    path: PathBuf,
     /// The underlying data store
     state_ro: Arc<IndexerState>,
 }
 
 impl UnixDomainSocketServer {
     /// Create a new UnixDomainSocketServer
-    pub fn new(path: String, state_ro: IndexerState) -> Self {
+    pub fn new(path: PathBuf, state_ro: IndexerState) -> Self {
         Self {
             is_running: AtomicBool::new(false),
             state_ro: Arc::new(state_ro),
@@ -41,10 +41,11 @@ impl UnixDomainSocketServer {
 
 /// Start the Unix domain server
 pub async fn start(server: UnixDomainSocketServer) -> anyhow::Result<()> {
+    info!("****************************");
     let result = server
         .is_running
         .compare_and_swap(false, true, Ordering::AcqRel);
-    if !result {
+    if result {
         warn!("Unix domain server already running");
         return Ok(());
     }
@@ -472,22 +473,3 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
 
     Ok(())
 }
-
-// async fn _handle_connection(mut socket: UnixStream, _state: Arc<IndexerState>) {
-//     let mut buf = [0; 1024];
-//     loop {
-//         match socket.read(&mut buf).await {
-//             Ok(n) if n == 0 => break,
-//             Ok(n) => {
-//                 if let Err(e) = socket.write_all(&buf[..n]).await {
-//                     error!("Failed to write to socket; err = {:?}", e);
-//                     break;
-//                 }
-//             }
-//             Err(e) => {
-//                 error!("Failed to read from socket; err = {:?}", e);
-//                 break;
-//             }
-//         }
-//     }
-// }

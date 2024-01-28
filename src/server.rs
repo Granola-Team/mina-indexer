@@ -1,4 +1,5 @@
-use crate::constants::MAINNET_TRANSITION_FRONTIER_K;
+use crate::constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME};
+use crate::servers::unix_domain_socket_server::UnixDomainSocketServer;
 use crate::{
     block::{
         is_valid_block_file, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash,
@@ -20,6 +21,7 @@ use crossbeam_channel::{bounded, Receiver};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use tracing::{debug, error, info, instrument, warn};
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -65,21 +67,65 @@ fn run(config: IndexerConfiguration) {
     let block_watch_dir = config.watch_dir.clone();
     let (ingestion_tx, ingestion_rx) = bounded(16384);
 
+    let foo =  config.clone();
     // Launch watch block directory thread
     let _ = thread::spawn(move || {
         let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
     });
     // Launch precomputed block deserializer and persistence thread
     let _ = thread::spawn(move || {
-        let _ = block_persistence(config, ingestion_rx);
+        let _ = block_persistence(config.clone(), ingestion_rx);
     });
 
     // Wait for signal
     let _ = tokio::spawn(async move {
         let _ = wait_for_signal().await;
     });
+
+
+    // Launch Unix Domain Server
+    let _ = tokio::spawn(async move {
+        start_unix_domain_server(foo).await;
+    });
 }
 
+#[instrument(skip_all)]
+async fn start_unix_domain_server(config: IndexerConfiguration) {
+    info!("Starting unix domain server...");
+    let IndexerConfiguration {
+        ledger,
+        root_hash,
+        prune_interval,
+        canonical_update_threshold,
+        ledger_cadence,
+        database_dir,
+        ..
+    } = config;
+
+    let primary_path = database_dir.clone();
+    let mut secondary_path = primary_path.clone();
+    secondary_path.push(Uuid::new_v4().to_string());
+
+    let store = Arc::new(IndexerStore::new_read_only(&primary_path, &secondary_path).unwrap());
+    // create read only indexer state
+    let foobar = IndexerState::new_without_genesis_events(
+        &root_hash,
+        ledger.ledger.clone(),
+        store,
+        MAINNET_TRANSITION_FRONTIER_K,
+        prune_interval,
+        canonical_update_threshold,
+        ledger_cadence,
+    );
+
+    let state = match foobar {
+        Ok(state) => state,
+        Err(e) => panic!("OH SHIT: {:?}", e),
+    };
+    let socket_name = PathBuf::from(SOCKET_NAME);
+    let server = UnixDomainSocketServer::new(socket_name, state);
+    let _ = crate::servers::unix_domain_socket_server::start(server).await;
+}
 ///
 async fn wait_for_signal() {
     use tokio::signal::unix::{signal, SignalKind};
@@ -167,7 +213,7 @@ fn initialize(
         canonical_update_threshold,
         initialization_mode,
         ledger_cadence,
-        database_dir,
+        database_dir: _,
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
