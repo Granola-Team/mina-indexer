@@ -596,32 +596,20 @@ mod test {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
-        fn stringify(value: serde_json::Value) -> serde_json::Value {
+        fn convert(value: serde_json::Value) -> serde_json::Value {
             match value {
                 Value::Number(n) => Value::String(n.to_string()),
-                Value::Object(mut obj) => {
-                    obj.iter_mut().for_each(|(_, x)| *x = stringify(x.clone()));
-                    Value::Object(obj)
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(stringify).collect()),
-                x => x,
-            }
-        }
-        fn supress_memo_and_sig(value: serde_json::Value) -> serde_json::Value {
-            match value {
                 Value::Object(mut obj) => {
                     obj.iter_mut().for_each(|(key, x)| {
                         if *key == json!("memo") || *key == json!("signature") {
                             *x = Value::Null
                         } else {
-                            *x = supress_memo_and_sig(x.clone())
+                            *x = convert(x.clone())
                         }
                     });
                     Value::Object(obj)
                 }
-                Value::Array(arr) => {
-                    Value::Array(arr.into_iter().map(supress_memo_and_sig).collect())
-                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(convert).collect()),
                 x => x,
             }
         }
@@ -683,7 +671,7 @@ mod test {
             }
         }
         fn to_mina_json(json: serde_json::Value) -> serde_json::Value {
-            to_mina_format(stringify(supress_memo_and_sig(fee_convert(json))))
+            to_mina_format(convert(fee_convert(json)))
         }
 
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
@@ -694,14 +682,11 @@ mod test {
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        println!("{:#?}", supress_memo_and_sig(mina_json.clone()));
+        println!("{:#?}", convert(mina_json.clone()));
         println!("{:#?}", to_mina_json(user_cmd_with_status.clone()));
 
-        assert_eq!(
-            supress_memo_and_sig(mina_json),
-            to_mina_json(user_cmd_with_status)
-        );
-        Ok(())
+        assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
+        panic!()
     }
 }
 
