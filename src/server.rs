@@ -58,34 +58,35 @@ impl MinaIndexer {
 pub fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     info!("Starting Mina Indexer...");
     let config = indexer.config.clone();
-
     run(config);
     Ok(())
 }
 
 fn run(config: IndexerConfiguration) {
+    let uds_config = config.clone();
+    let database_dir = config.database_dir.clone();
     let block_watch_dir = config.watch_dir.clone();
     let (ingestion_tx, ingestion_rx) = bounded(16384);
 
-    let foo =  config.clone();
+    // RocksDB instances need to be created first before a secondary instance can be created
+    let store = Arc::new(IndexerStore::new(&database_dir).unwrap());
+    let state = initialize(config, store).unwrap();
+
     // Launch watch block directory thread
     let _ = thread::spawn(move || {
         let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
     });
     // Launch precomputed block deserializer and persistence thread
     let _ = thread::spawn(move || {
-        let _ = block_persistence(config.clone(), ingestion_rx);
+        let _ = block_persistence(state, ingestion_rx);
     });
-
     // Wait for signal
     let _ = tokio::spawn(async move {
         let _ = wait_for_signal().await;
     });
-
-
     // Launch Unix Domain Server
     let _ = tokio::spawn(async move {
-        start_unix_domain_server(foo).await;
+        start_unix_domain_server(uds_config).await;
     });
 }
 
@@ -106,6 +107,7 @@ async fn start_unix_domain_server(config: IndexerConfiguration) {
     let mut secondary_path = primary_path.clone();
     secondary_path.push(Uuid::new_v4().to_string());
 
+    // TODO: Ensure the IndexerStore exists before attempting to create a read only instance
     let store = Arc::new(IndexerStore::new_read_only(&primary_path, &secondary_path).unwrap());
     // create read only indexer state
     let foobar = IndexerState::new_without_genesis_events(
@@ -145,13 +147,10 @@ async fn wait_for_signal() {
 
 /// Write Precomputed Block to disk
 fn block_persistence(
-    config: IndexerConfiguration,
+    mut state: IndexerState,
     ingestion_rx: Receiver<PathBuf>,
 ) -> notify::Result<()> {
     info!("Starting block persisting thread..");
-    let database_dir = config.database_dir.clone();
-    let store = Arc::new(IndexerStore::new(&database_dir).unwrap());
-    let mut state = initialize(config, store).unwrap();
 
     for path_buf in ingestion_rx {
         let precomputed_block = PrecomputedBlock::parse_file(&path_buf.as_path()).unwrap();
@@ -166,13 +165,13 @@ fn watch_directory_for_blocks<P: AsRef<Path>>(
     watch_dir: P,
     sender: crossbeam_channel::Sender<PathBuf>,
 ) -> notify::Result<()> {
+    info!("Starting block watcher thread..");
     let (tx, rx) = bounded(4096);
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
 
     watcher.watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!("Starting block watcher thread..");
     info!(
-        "Listening for precomputed blocks in directory: {:?}",
+        "Listening for blocks in directory: {:?}",
         watch_dir.as_ref()
     );
     for res in rx {
@@ -207,13 +206,12 @@ fn initialize(
         ledger,
         root_hash,
         startup_dir,
-        watch_dir: _,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
         initialization_mode,
         ledger_cadence,
-        database_dir: _,
+        ..
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
