@@ -266,7 +266,10 @@ impl From<SignedCommandWithKind> for serde_json::Value {
     fn from(value: SignedCommandWithKind) -> Self {
         use serde_json::*;
 
-        Value::Array(vec![Value::String("Signed_command".into()), value.0.into()])
+        let mut obj = Map::new();
+        obj.insert("kind".into(), Value::String("Signed_command".into()));
+        obj.insert("contents".into(), value.0.into());
+        Value::Object(obj)
     }
 }
 
@@ -389,14 +392,15 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
 
     let body = match payload.inner().inner().body.inner().inner() {
         mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
+            let mut body_obj = Map::new();
             let mina_rs::PaymentPayload {
                 source_pk,
                 receiver_pk,
                 token_id,
                 amount,
             } = payment_payload.inner().inner();
-
             let mut payment = Map::new();
+
             payment.insert(
                 "source_pk".into(),
                 Value::String(PublicKey::from(source_pk).to_address()),
@@ -413,18 +417,18 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
                 "amount".into(),
                 Value::Number(Number::from(amount.inner().inner())),
             );
-            Value::Array(vec![
-                Value::String("Payment".into()),
-                Value::Object(payment),
-            ])
+            body_obj.insert("kind".into(), Value::String("Payment".into()));
+            body_obj.insert("contents".into(), Value::Object(payment));
+            Value::Object(body_obj)
         }
         mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
+            let mut body_obj = Map::new();
             let mina_rs::StakeDelegation::SetDelegate {
                 delegator,
                 new_delegate,
             } = stake_delegation.inner();
-
             let mut stake_delegation = Map::new();
+
             stake_delegation.insert(
                 "delegator".into(),
                 Value::String(PublicKey::from(delegator).to_address()),
@@ -433,10 +437,9 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
                 "new_delegate".into(),
                 Value::String(PublicKey::from(new_delegate).to_address()),
             );
-            Value::Array(vec![
-                Value::String("Stake_delegation".into()),
-                Value::Object(stake_delegation),
-            ])
+            body_obj.insert("kind".into(), Value::String("Stake-delegation".into()));
+            body_obj.insert("contents".into(), Value::Object(stake_delegation));
+            Value::Object(body_obj)
         }
     };
 

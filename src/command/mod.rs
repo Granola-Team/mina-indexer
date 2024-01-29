@@ -340,12 +340,18 @@ impl From<CommandStatusData> for serde_json::Value {
                 auxiliary_data,
                 balance_data,
             } => {
+                let mut applied_obj = Map::new();
                 let status = Value::String("Applied".into());
                 let aux_json = to_auxiliary_json(&auxiliary_data);
                 let balance_json = to_balance_json(&balance_data);
-                Value::Array(vec![status, aux_json, balance_json])
+
+                applied_obj.insert("kind".into(), status);
+                applied_obj.insert("auxiliary_data".into(), aux_json);
+                applied_obj.insert("balance_data".into(), balance_json);
+                Value::Object(applied_obj)
             }
             CommandStatusData::Failed(reason, balance_data) => {
+                let mut failed_obj = Map::new();
                 let status = Value::String("Failed".into());
                 let reason_json = Value::Array(
                     reason
@@ -356,7 +362,11 @@ impl From<CommandStatusData> for serde_json::Value {
                         .collect(),
                 );
                 let balance_json = to_balance_json(&balance_data);
-                Value::Array(vec![status, reason_json, balance_json])
+
+                failed_obj.insert("kind".into(), status);
+                failed_obj.insert("reason".into(), reason_json);
+                failed_obj.insert("balance_data".into(), balance_json);
+                Value::Object(failed_obj)
             }
         }
     }
@@ -587,8 +597,6 @@ mod test {
         use serde_json::*;
 
         fn stringify(value: serde_json::Value) -> serde_json::Value {
-            use serde_json::*;
-
             match value {
                 Value::Number(n) => Value::String(n.to_string()),
                 Value::Object(mut obj) => {
@@ -600,8 +608,6 @@ mod test {
             }
         }
         fn supress_memo_and_sig(value: serde_json::Value) -> serde_json::Value {
-            use serde_json::*;
-
             match value {
                 Value::Object(mut obj) => {
                     obj.iter_mut().for_each(|(key, x)| {
@@ -620,8 +626,6 @@ mod test {
             }
         }
         fn fee_convert(value: serde_json::Value) -> serde_json::Value {
-            use serde_json::*;
-
             match value {
                 Value::Object(mut obj) => {
                     obj.iter_mut().for_each(|(key, x)| {
@@ -640,38 +644,62 @@ mod test {
                 x => x,
             }
         }
+        fn to_mina_format(json: serde_json::Value) -> serde_json::Value {
+            match json {
+                Value::Object(mut obj) => {
+                    let keys: Vec<String> = obj.keys().cloned().collect();
+                    if keys.contains(&"kind".into()) && keys.contains(&"contents".into()) {
+                        Value::Array(vec![
+                            obj["kind"].clone(),
+                            to_mina_format(obj["contents"].clone()),
+                        ])
+                    } else if keys.contains(&"kind".into())
+                        && keys.contains(&"auxiliary_data".into())
+                        && keys.contains(&"balance_data".into())
+                    {
+                        // applied command
+                        Value::Array(vec![
+                            obj["kind"].clone(),
+                            obj["auxiliary_data"].clone(),
+                            obj["balance_data"].clone(),
+                        ])
+                    } else if keys.contains(&"kind".into())
+                        && keys.contains(&"reason".into())
+                        && keys.contains(&"balance_data".into())
+                    {
+                        // failed command
+                        Value::Array(vec![
+                            obj["kind"].clone(),
+                            obj["reason"].clone(),
+                            obj["balance_data"].clone(),
+                        ])
+                    } else {
+                        obj.iter_mut()
+                            .for_each(|(_, val)| *val = to_mina_format(val.clone()));
+                        Value::Object(obj)
+                    }
+                }
+                x => x,
+            }
+        }
+        fn to_mina_json(json: serde_json::Value) -> serde_json::Value {
+            to_mina_format(stringify(supress_memo_and_sig(fee_convert(json))))
+        }
 
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
         let contents = std::fs::read(path.clone())?;
-        let user_cmd_with_status_json: Value =
+        let mina_json: Value =
             from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
         let block = PrecomputedBlock::parse_file(&path)?;
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        if let Value::Object(obj) = &user_cmd_with_status {
-            if let Value::Object(obj_json) = &user_cmd_with_status_json {
-                for key in obj.keys() {
-                    if obj[key].clone() != obj_json[key].clone() {
-                        println!(
-                            "{key}:\n{:#?}",
-                            supress_memo_and_sig(user_cmd_with_status_json.clone())
-                        );
-                        println!("----------------------------------------------");
-                        println!(
-                            "{key}:\n{:#?}",
-                            stringify(supress_memo_and_sig(fee_convert(
-                                user_cmd_with_status.clone()
-                            )))
-                        );
-                        println!("----------------------------------------------");
-                    }
-                }
-            }
-        }
+        println!("{:#?}", supress_memo_and_sig(mina_json.clone()));
+        println!("{:#?}", to_mina_json(user_cmd_with_status.clone()));
+
         assert_eq!(
-            supress_memo_and_sig(user_cmd_with_status_json),
-            stringify(supress_memo_and_sig(fee_convert(user_cmd_with_status)))
+            supress_memo_and_sig(mina_json),
+            to_mina_json(user_cmd_with_status)
         );
         Ok(())
     }
