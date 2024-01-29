@@ -551,13 +551,20 @@ test_transactions() {
     # basic pk transaction queries
     transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
     amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
-    amount_v=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.Payment.amount)
+
+    assert '1000' $amount
+    assert '[]' $transactions
+
+    # basic pk transaction queries - verbose
+    kind=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.kind)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.contents.amount)
     state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].state_hash)
     tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].tx_hash)
+    length=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].blockchain_length)
 
-    assert '[]' $transactions
+    assert 3 $length
     assert '1000' $amount
-    assert '1000' $amount_v
+    assert 'Payment' $kind
     assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
     assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
 
@@ -579,11 +586,15 @@ test_transactions() {
     assert '1000' $amount
 
     # tx hash query - verbose
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.Payment.amount)
-    status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status | jq -r .[0])
+    kind=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.kind)
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.contents.amount)
+    status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status.kind)
     tx_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .tx_hash)
     state_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .state_hash)
+    length=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .blockchain_length)
 
+    assert 3 $length
+    assert 'Payment' $kind
     assert '1000' $amount
     assert 'Failed' $status
     assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
@@ -599,13 +610,13 @@ test_transactions() {
     assert 'B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM' $receiver
 
     # state hash query - verbose
-    kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[0])
+    kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.kind)
     assert 'Signed_command' $kind
 
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.amount)
-    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.source_pk)
-    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.receiver_pk)
-    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data | jq -r .[1].payload.body.Payment.token_id)
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.amount)
+    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.source_pk)
+    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.receiver_pk)
+    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.token_id)
 
     assert '1' $token
     assert '1000' $amount
@@ -642,7 +653,7 @@ test_checkpoint() {
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.contents.body.contents.amount)
 
     # create checkpoint in ./checkpoint
     idxr checkpoint -p ./checkpoint
@@ -664,7 +675,7 @@ test_checkpoint() {
     canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].body.Payment.amount)
+    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.contents.body.contents.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
     assert $canonical_length $canonical_length_checkpoint
