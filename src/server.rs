@@ -177,15 +177,18 @@ fn watch_directory_for_blocks<P: AsRef<Path>>(
     for res in rx {
         match res {
             Ok(event) => {
-                if let EventKind::Create(notify::event::CreateKind::File) = event.kind {
+                info!("&&&& {:?}: {:?}", event.kind, event.paths);
+                if let EventKind::Create(notify::event::CreateKind::File)
+                | EventKind::Modify(notify::event::ModifyKind::Data(_)) = event.kind
+                {
                     for path in event.paths {
                         if is_valid_block_file(&path) {
-                            debug!("Valid precomputed block file");
+                            info!("Valid precomputed block file: {}", path.display());
                             if let Err(e) = sender.send(path) {
                                 error!("Unable to send path downstream. {}", e);
                             }
                         } else {
-                            warn!("Invalid precomputed block file: {}", path.display());
+                            //warn!("Invalid precomputed block file: {}", path.display());
                         }
                     }
                 }

@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::block::store::BlockStore;
 use crate::block::{is_valid_state_hash, BlockHash, BlockWithoutHeight};
@@ -41,7 +41,6 @@ impl UnixDomainSocketServer {
 
 /// Start the Unix domain server
 pub async fn start(server: UnixDomainSocketServer) -> anyhow::Result<()> {
-    info!("****************************");
     let result = server
         .is_running
         .compare_and_swap(false, true, Ordering::AcqRel);
@@ -79,6 +78,7 @@ async fn run(mut server: UnixDomainSocketServer, listener: UnixListener) -> anyh
                 match client {
                     Ok((socket, _)) => {
                         let state = server.state_ro.clone();
+                        //state.sync_from_db();
                         tokio::spawn(async move {
                             let _ = handle_connection(socket, state).await;
                         });
@@ -115,12 +115,18 @@ async fn run(mut server: UnixDomainSocketServer, listener: UnixListener) -> anyh
 ///
 /// <request_line> ::= <command> <arg_list>
 ///
+#[instrument(skip_all)]
 async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyhow::Result<()> {
     // Protocol rigmarole
     let (reader, mut writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
     let read_size = reader.read_buf(&mut buffer).await?;
+
+    let store = state.indexer_store.clone().unwrap();
+    let database = &store.database;
+    database.try_catch_up_with_primary()?;
+    
 
     if read_size == 0 {
         return Err(anyhow!("Unexpected EOF"));
