@@ -452,8 +452,11 @@ impl CommandStore for IndexerStore {
             );
 
             let key = hash.as_bytes();
-            let value =
-                serde_json::to_vec(&SignedCommandWithData::from(command, &block.state_hash))?;
+            let value = serde_json::to_vec(&SignedCommandWithData::from(
+                command,
+                &block.state_hash,
+                block.blockchain_length,
+            ))?;
             self.database.put_cf(commands_cf, key, value)?;
         }
 
@@ -472,7 +475,7 @@ impl CommandStore for IndexerStore {
             let block_pk_commands: Vec<SignedCommandWithData> = user_commands
                 .iter()
                 .filter(|cmd| cmd.contains_public_key(&pk))
-                .map(|c| SignedCommandWithData::from(c, &block.state_hash))
+                .map(|c| SignedCommandWithData::from(c, &block.state_hash, block.blockchain_length))
                 .collect();
 
             if !block_pk_commands.is_empty() {

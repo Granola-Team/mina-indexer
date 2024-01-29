@@ -24,6 +24,7 @@ pub struct SignedCommandWithData {
     pub state_hash: BlockHash,
     pub status: CommandStatusData,
     pub tx_hash: String,
+    pub blockchain_length: u32,
 }
 
 impl SignedCommand {
@@ -142,7 +143,11 @@ impl SignedCommandWithStateHash {
 }
 
 impl SignedCommandWithData {
-    pub fn from(user_cmd: &UserCommandWithStatus, state_hash: &str) -> Self {
+    pub fn from(
+        user_cmd: &UserCommandWithStatus,
+        state_hash: &str,
+        blockchain_length: u32,
+    ) -> Self {
         let command = SignedCommand::from(user_cmd.clone());
         Self {
             state_hash: state_hash.into(),
@@ -151,6 +156,7 @@ impl SignedCommandWithData {
                 .hash_signed_command()
                 .expect("valid transaction hash"),
             command,
+            blockchain_length,
         }
     }
 }
@@ -273,11 +279,13 @@ impl From<SignedCommandWithData> for serde_json::Value {
         let state_hash = Value::String(value.state_hash.0);
         let command = value.command.into();
         let status = value.status.into();
+        let blockchain_length = value.blockchain_length.into();
 
         obj.insert("tx_hash".into(), tx_hash);
         obj.insert("command".into(), command);
         obj.insert("status".into(), status);
         obj.insert("state_hash".into(), state_hash);
+        obj.insert("blockchain_length".into(), blockchain_length);
         Value::Object(obj)
     }
 }
