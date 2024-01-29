@@ -36,7 +36,7 @@ idxr_server_cli() {
 }
 
 dl_mainnet() {
-    "$BLOCKS_FETCHER" mina_network_block_data 2 "$1" mainnet "$2"
+    "$BLOCKS_FETCHER" mina_network_block_data 2 "$1" mainnet "$2" 
 }
 
 dl_mainnet_single() {
