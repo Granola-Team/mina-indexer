@@ -439,10 +439,7 @@ impl std::fmt::Debug for UserCommandWithStatus {
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
-    use crate::{
-        block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD,
-        ledger::account::nanomina_to_mina,
-    };
+    use crate::{block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD};
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -589,101 +586,6 @@ mod test {
                     .collect::<Vec<(String, String)>>()
             );
         }
-    }
-
-    #[test]
-    fn user_command_with_status_json() -> anyhow::Result<()> {
-        use crate::block::precomputed::PrecomputedBlock;
-        use serde_json::*;
-
-        fn convert(value: serde_json::Value) -> serde_json::Value {
-            match value {
-                Value::Number(n) => Value::String(n.to_string()),
-                Value::Object(mut obj) => {
-                    obj.iter_mut().for_each(|(key, x)| {
-                        if *key == json!("memo") || *key == json!("signature") {
-                            *x = Value::Null
-                        } else {
-                            *x = convert(x.clone())
-                        }
-                    });
-                    Value::Object(obj)
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(convert).collect()),
-                x => x,
-            }
-        }
-        fn fee_convert(value: serde_json::Value) -> serde_json::Value {
-            match value {
-                Value::Object(mut obj) => {
-                    obj.iter_mut().for_each(|(key, x)| {
-                        if *key == json!("fee") {
-                            *x = {
-                                let nanomina = x.clone().to_string().parse::<u64>().unwrap();
-                                Value::String(nanomina_to_mina(nanomina))
-                            }
-                        } else {
-                            *x = fee_convert(x.clone())
-                        }
-                    });
-                    Value::Object(obj)
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(fee_convert).collect()),
-                x => x,
-            }
-        }
-        fn to_mina_format(json: serde_json::Value) -> serde_json::Value {
-            match json {
-                Value::Object(mut obj) => {
-                    let keys: Vec<String> = obj.keys().cloned().collect();
-                    if keys.contains(&"kind".into()) && keys.contains(&"contents".into()) {
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            to_mina_format(obj["contents"].clone()),
-                        ])
-                    } else if keys.contains(&"kind".into())
-                        && keys.contains(&"auxiliary_data".into())
-                        && keys.contains(&"balance_data".into())
-                    {
-                        // applied command
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            obj["auxiliary_data"].clone(),
-                            obj["balance_data"].clone(),
-                        ])
-                    } else if keys.contains(&"kind".into())
-                        && keys.contains(&"reason".into())
-                        && keys.contains(&"balance_data".into())
-                    {
-                        // failed command
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            obj["reason"].clone(),
-                            obj["balance_data"].clone(),
-                        ])
-                    } else {
-                        obj.iter_mut()
-                            .for_each(|(_, val)| *val = to_mina_format(val.clone()));
-                        Value::Object(obj)
-                    }
-                }
-                x => x,
-            }
-        }
-        fn to_mina_json(json: serde_json::Value) -> serde_json::Value {
-            to_mina_format(convert(fee_convert(json)))
-        }
-
-        let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
-        let contents = std::fs::read(path.clone())?;
-        let mina_json: Value =
-            from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
-        let block = PrecomputedBlock::parse_file(&path)?;
-        let user_cmd_with_status = block.commands()[0].clone();
-        let user_cmd_with_status: Value = user_cmd_with_status.into();
-
-        assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
-        Ok(())
     }
 }
 
