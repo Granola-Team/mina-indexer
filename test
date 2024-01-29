@@ -26,6 +26,15 @@ idxr() {
     "$IDXR" "$@"
 }
 
+idxr_server {
+    "$IDXR" server "$@"
+    echo $! > idxr_pid
+}
+
+idxr_server_cli {
+    idxr_server cli "$@"
+}
+
 dl_mainnet() {
     "$BLOCKS_FETCHER" mina_network_block_data 2 "$1" mainnet "$2"
 }
@@ -69,7 +78,7 @@ setup() {
 }
 
 teardown() {
-    kill "${idxr_pid}" 2>/dev/null || true
+    kill "$(cat idxr_pid)" 2>/dev/null || true
     rm -rf ./blocks
     rm -rf ./database
     rm -rf ./logs
@@ -84,11 +93,11 @@ test_indexer_cli_reports() {
         grep -iq "Usage:"
 
     # Indexer reports usage for server subcommand
-    idxr server 2>&1 |
+    idxr_server 2>&1 |
         grep -iq "Usage: mina-indexer server"
 
     # Indexer server cli subcommand works with default args
-    idxr server cli --help 2>/dev/null
+    idxr_server --help 2>/dev/null
 
     # Indexer reports usage for client subcommands
     idxr account --help 2>&1 |
@@ -124,7 +133,7 @@ test_server_startup() {
     test=test_server_startup
     
     setup
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -134,7 +143,6 @@ test_server_startup() {
     result=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -145,7 +153,7 @@ test_ipc_is_available_immediately() {
     setup
     dl_mainnet 100 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -155,7 +163,6 @@ test_ipc_is_available_immediately() {
     sleep 1
 
     idxr summary
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -164,7 +171,7 @@ test_startup_dirs_get_created() {
     test=test_startup_dirs_get_created
 
     setup
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./startup-blocks \
         --watch-dir ./watch-blocks \
         --database-dir ./database \
@@ -176,7 +183,6 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./database"
     assert_directory_exists "./logs"
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -185,7 +191,7 @@ test_account_balance_cli() {
     test=test_account_balance_cli
 
     setup
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -195,7 +201,6 @@ test_account_balance_cli() {
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -204,7 +209,7 @@ test_account_public_key_json() {
     test=test_account_public_key_json
 
     setup
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -214,7 +219,6 @@ test_account_public_key_json() {
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -225,7 +229,7 @@ test_canonical_tip() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -238,7 +242,6 @@ test_canonical_tip() {
     assert 5 $blockchain_length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -251,7 +254,7 @@ test_missing_blocks() {
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -306,7 +309,6 @@ test_missing_blocks() {
     assert '3NLsuVoPLnRzdzjrdFKWmkqNzqNEQxrfa7iQMwu1WxcstZjmorUs' $best_hash
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $canonical_hash
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -318,7 +320,7 @@ test_best_chain() {
     mkdir best_chain
     dl_mainnet 12 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -359,7 +361,6 @@ test_best_chain() {
     file_result=$(cat $file | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
-    idxr_pid=$(pgrep -c mina-indexer)
     rm -rf best_chain
     teardown
 }
@@ -372,7 +373,7 @@ test_ledgers() {
     mkdir ledgers
     dl_mainnet 15 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -421,7 +422,6 @@ test_ledgers() {
     assert '607904750000000' $file_result
     rm -f $file
 
-    idxr_pid=$(pgrep -c mina-indexer)
     rm -rf ledgers
     teardown
 }
@@ -433,7 +433,7 @@ test_sync() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -447,12 +447,11 @@ test_sync() {
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
 
     # kill running indexer and release db lock
-    idxr_pid=$(pgrep -c mina-indexer)
-    kill "${idxr_pid}" 2>/dev/null || true
+    kill "$(cat idxr_pid)" 2>/dev/null || true
     rm ./database/LOCK
 
     # sync from previous indexer db
-    idxr server sync \
+    idxr_server sync \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -470,7 +469,6 @@ test_sync() {
     assert $best_hash $best_hash_sync
     assert $best_length $best_length_sync
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -481,7 +479,7 @@ test_replay() {
     setup
     dl_mainnet 15 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -496,12 +494,11 @@ test_replay() {
     num_blocks=$(idxr summary -j | jq -r .blocks_processed)
 
     # kill running indexer and release db lock
-    idxr_pid=$(pgrep -c mina-indexer)
-    kill "${idxr_pid}" 2>/dev/null || true
+    kill "$(cat idxr_pid)" 2>/dev/null || true
     rm ./database/LOCK
 
     # replay events from previous indexer instance
-    idxr server replay \
+    idxr_server replay \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -523,7 +520,6 @@ test_replay() {
     assert '15' $num_blocks
     assert $num_blocks $num_blocks_replay
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 
@@ -535,7 +531,7 @@ test_transactions() {
     mkdir transactions
     dl_mainnet 13 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -572,7 +568,6 @@ test_transactions() {
     file_result=$(cat $file | jq -r .[0].Payment.amount)
     assert '1000' $file_result
 
-    idxr_pid=$(pgrep -c mina-indexer)
     rm -rf ./transactions
     teardown
 }
@@ -584,7 +579,7 @@ test_checkpoint() {
     setup
     dl_mainnet 13 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -602,12 +597,11 @@ test_checkpoint() {
     idxr checkpoint -p ./checkpoint
 
     # kill running indexer and remove directories
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 
     # sync a new indexer from checkpointed db
     setup
-    idxr server sync \
+    idxr_server sync \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./checkpoint \
@@ -627,7 +621,6 @@ test_checkpoint() {
     assert $best_length $best_length_checkpoint
     assert $amount $amount_checkpoint
 
-    idxr_pid=$(pgrep -c mina-indexer)
     rm -rf ./checkpoint
     teardown
 }
@@ -639,7 +632,7 @@ test_many_blocks() {
     setup
     dl_mainnet 1000 ./blocks
 
-    idxr server cli \
+    idxr_server_cli \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
@@ -670,7 +663,6 @@ test_many_blocks() {
     balance=$(idxr ledger --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
-    idxr_pid=$(pgrep -c mina-indexer)
     teardown
 }
 

@@ -13,7 +13,6 @@ prereqs:
   cargo clippy --version
   cargo machete --help 2>&1 >/dev/null
   jq --version
-  command -v pgrep
 
 build:
   cargo build --profile release
