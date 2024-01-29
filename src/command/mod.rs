@@ -682,11 +682,8 @@ mod test {
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        println!("{:#?}", convert(mina_json.clone()));
-        println!("{:#?}", to_mina_json(user_cmd_with_status.clone()));
-
         assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
-        panic!()
+        Ok(())
     }
 }
 

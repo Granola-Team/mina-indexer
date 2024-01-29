@@ -31,6 +31,9 @@ test-unit: build
 test-regression: build
   ./test
 
+test-release: build
+  ./test test_release
+
 disallow-unused-cargo-deps:
   cargo machete Cargo.toml
 

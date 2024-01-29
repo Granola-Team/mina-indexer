@@ -2,7 +2,8 @@
 set -ex
 
 # Collect the binaries under test and the test ledger.
-IDXR="$(pwd)"/target/debug/mina-indexer
+IDXR_DEBUG="$(pwd)"/target/debug/mina-indexer
+IDXR_RELEASE="$(pwd)"/target/release/mina-indexer
 LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
@@ -23,16 +24,25 @@ test_cleanup() {
 trap test_cleanup EXIT
 
 idxr() {
-    RUST_BACKTRACE=full "$IDXR" "$@"
+    RUST_BACKTRACE=full "$IDXR_DEBUG" "$@"
 }
 
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR" server "$@" &
+    RUST_BACKTRACE=full "$IDXR_DEBUG" server "$@" &
+    echo $! > idxr_pid
+}
+
+idxr_server_release() {
+    RUST_BACKTRACE=full "$IDXR_RELEASE" server "$@" &
     echo $! > idxr_pid
 }
 
 idxr_server_start() {
     idxr_server start "$@"
+}
+
+idxr_server_release_start() {
+    idxr_server_release start "$@"
 }
 
 dl_mainnet() {
@@ -728,6 +738,46 @@ test_many_blocks() {
     teardown
 }
 
+# Release version is fast
+test_release() {
+    test=test_release
+
+    setup
+    dl_mainnet 5000 ./blocks
+
+    idxr_server_release_start \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs
+        --log-level-stdout debug &
+    sleep 30
+
+    # results
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    assert '5000' $best_length
+    assert '4990' $canonical_length
+    assert '3NKiyxhxfohCGpHkQg7TC1cNxHzAHbcHCUAdSM1aNt2u6dGtVrvC' $canonical_hash
+    assert '3NLn1bsWFjycHNJGGLy3KSxXSW6ixmFrunn1iym5GWjTXxkt6oFi' $best_hash
+
+    pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
+
+    # check ledgers are present
+    # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
+    balance=$(idxr ledger --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
+
+    # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
+    balance=$(idxr ledger --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -765,6 +815,7 @@ else
             "test_transactions") test_transactions ;;
             "test_checkpoint") test_checkpoint ;;
             "test_many_blocks") test_many_blocks ;;
+            "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
