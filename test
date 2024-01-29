@@ -26,12 +26,12 @@ idxr() {
     "$IDXR" "$@"
 }
 
-idxr_server {
+idxr_server() {
     "$IDXR" server "$@"
     echo $! > idxr_pid
 }
 
-idxr_server_cli {
+idxr_server_cli() {
     idxr_server cli "$@"
 }
 
