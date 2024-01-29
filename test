@@ -27,7 +27,7 @@ idxr() {
 }
 
 idxr_server() {
-    "$IDXR" server "$@"
+    "$IDXR" server "$@" &
     echo $! > idxr_pid
 }
 
@@ -79,6 +79,7 @@ setup() {
 
 teardown() {
     kill "$(cat idxr_pid)" 2>/dev/null || true
+    rm -f ./idxr_pid
     rm -rf ./blocks
     rm -rf ./database
     rm -rf ./logs
@@ -137,7 +138,7 @@ test_server_startup() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     result=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
@@ -159,7 +160,7 @@ test_ipc_is_available_immediately() {
         --database-dir ./database \
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ &
+        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
     sleep 1
 
     idxr summary
@@ -175,7 +176,7 @@ test_startup_dirs_get_created() {
         --startup-dir ./startup-blocks \
         --watch-dir ./watch-blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 1
 
     assert_directory_exists "./startup-blocks"
@@ -195,7 +196,7 @@ test_account_balance_cli() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
@@ -213,7 +214,7 @@ test_account_public_key_json() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
@@ -233,7 +234,7 @@ test_canonical_tip() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
     
     state_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
@@ -258,7 +259,7 @@ test_missing_blocks() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # start out missing block 11 & 21
@@ -324,7 +325,7 @@ test_best_chain() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
@@ -377,7 +378,7 @@ test_ledgers() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
@@ -437,7 +438,7 @@ test_sync() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # pre-sync results
@@ -448,6 +449,7 @@ test_sync() {
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
+    rm -f idxr_pid
     rm ./database/LOCK
 
     # sync from previous indexer db
@@ -455,7 +457,7 @@ test_sync() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # post-sync reults
@@ -483,7 +485,7 @@ test_replay() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # pre-replay results
@@ -495,6 +497,7 @@ test_replay() {
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
+    rm -f idxr_pid
     rm ./database/LOCK
 
     # replay events from previous indexer instance
@@ -502,7 +505,7 @@ test_replay() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # post-replay reults
@@ -535,7 +538,7 @@ test_transactions() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # basic transaction queries
@@ -583,7 +586,7 @@ test_checkpoint() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # pre-checkpoint results
@@ -605,7 +608,7 @@ test_checkpoint() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./checkpoint \
-        --log-dir ./logs &
+        --log-dir ./logs
     sleep 5
 
     # post-checkpoint reults
@@ -638,7 +641,7 @@ test_many_blocks() {
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
-        --log-level-stdout debug &
+        --log-level-stdout debug
     sleep 300
 
     # results
