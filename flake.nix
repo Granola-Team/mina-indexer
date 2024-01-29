@@ -63,7 +63,6 @@
             google-cloud-sdk
             just
             jq       # Used in testing.
-            procps   # For pgrep.
             git      # Needed but not declared by Nix's 'stdenv' build.
           ]
           ++ buildDependencies;
