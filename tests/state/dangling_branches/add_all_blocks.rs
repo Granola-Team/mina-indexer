@@ -23,19 +23,16 @@ async fn extension() {
 
         println!("{state}");
 
-        // All 24 blocks are parsed successfully
-        println!("Blocks added: {n}");
-        assert_eq!(n, 24);
+        // all blocks parsed successfully
+        println!("Blocks parsed and added: {n}");
+        assert_eq!(n, 36);
 
-        // Root branch
-        // - height = 10
-        // - ??? leaves
-        assert_eq!(state.dangling_branches.clone().len(), 2);
+        // root branch
+        assert_eq!(state.root_branch.len(), 34);
+        assert_eq!(state.root_branch.height(), 13);
+        assert_eq!(state.root_branch.leaves().len(), 21);
 
-        // 2 dangling branches
-        // - 1: height = 1
-        // - 2: height = 1
-        // - 1 leaf
+        // dangling branches
         assert_eq!(state.dangling_branches.clone().len(), 2);
 
         state
@@ -106,6 +103,6 @@ async fn extension() {
         println!("{display_chain:?}");
 
         // ten blocks in the longest chain
-        assert_eq!(longest_chain.len(), 10);
+        assert_eq!(longest_chain.len(), 13);
     }
 }

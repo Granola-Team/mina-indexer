@@ -4,6 +4,7 @@ use crate::{
 };
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
+    LevelOrderTraversalIds,
     MoveBehavior::ToRoot,
     Node, NodeId,
     RemoveBehavior::{DropChildren, OrphanChildren},
@@ -56,6 +57,13 @@ impl Branch {
         self.branches.height() == 0
     }
 
+    fn traverse_level_order_ids(&self) -> LevelOrderTraversalIds<Block> {
+        let root = self.branches.root_node_id().expect("root node id");
+        self.branches
+            .traverse_level_order_ids(root)
+            .expect("traverse level order ids")
+    }
+
     /// Returns the node id of the best tip
     pub fn best_tip_id(&self) -> NodeId {
         let mut best_tip_id = self
@@ -63,11 +71,8 @@ impl Branch {
             .root_node_id()
             .expect("branch always has root node")
             .clone();
-        for node_id in self
-            .branches
-            .traverse_post_order_ids(&best_tip_id)
-            .expect("branch always has root node")
-        {
+
+        for node_id in self.traverse_level_order_ids() {
             let best_tip = self
                 .branches
                 .get(&best_tip_id)
@@ -108,15 +113,7 @@ impl Branch {
 
     /// Returns the new node's id in the branch and its data
     pub fn simple_extension(&mut self, block: &PrecomputedBlock) -> Option<(NodeId, Block)> {
-        let root_node_id = self
-            .branches
-            .root_node_id()
-            .expect("root_node_id guaranteed by constructor");
-        for node_id in self
-            .branches
-            .traverse_post_order_ids(root_node_id)
-            .expect("root_node_id is valid")
-        {
+        for node_id in self.traverse_level_order_ids() {
             let node = self
                 .branches
                 .get(&node_id)
@@ -205,12 +202,9 @@ impl Branch {
 
     /// block is guaranteed to exist in leaves
     fn leaf_node_id(&self, block: &Block) -> Option<NodeId> {
-        self.branches
-            .traverse_post_order_ids(self.branches.root_node_id()?)
-            .unwrap()
-            .find(|node_id| {
-                block.state_hash == self.branches.get(node_id).unwrap().data().state_hash
-            })
+        self.traverse_level_order_ids().find(|node_id| {
+            block.state_hash == self.branches.get(node_id).unwrap().data().state_hash
+        })
     }
 
     /// Merges two trees:
@@ -325,11 +319,7 @@ impl Branch {
     pub fn top_leaves_with_id(&self) -> Vec<(NodeId, Block)> {
         let mut top_leaves = vec![];
 
-        for node_id in self
-            .branches
-            .traverse_post_order_ids(self.branches.root_node_id().unwrap())
-            .unwrap()
-        {
+        for node_id in self.traverse_level_order_ids() {
             let node = self.branches.get(&node_id).unwrap();
             if node.data().height + 1 == self.height() {
                 top_leaves.push((node_id.clone(), node.data().clone()));
@@ -348,19 +338,17 @@ impl Branch {
     }
 
     pub fn leaves(&self) -> Vec<Block> {
-        let mut leaves = vec![];
-
-        for node in self
-            .branches
-            .traverse_level_order(self.branches.root_node_id().unwrap())
-            .unwrap()
-        {
-            if node.data().height + 1 == self.height() {
-                leaves.push(node.data().clone());
-            }
-        }
-
-        leaves
+        self.branches
+            .traverse_level_order(self.branches.root_node_id().expect("root node id"))
+            .expect("traverse level order")
+            .filter_map(|x| {
+                if x.children().is_empty() {
+                    Some(x.data().clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     // Always returns some for a non-empty tree
@@ -400,13 +388,7 @@ impl Branch {
     }
 
     pub fn len(&self) -> u32 {
-        let mut size = 0;
-        if let Some(root) = self.branches.root_node_id() {
-            for _ in self.branches.traverse_level_order_ids(root).unwrap() {
-                size += 1;
-            }
-        }
-        size
+        self.traverse_level_order_ids().count() as u32
     }
 
     pub fn height(&self) -> u32 {
