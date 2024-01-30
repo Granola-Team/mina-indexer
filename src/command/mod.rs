@@ -4,13 +4,10 @@ pub mod store;
 
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::signed::SignedCommand,
+    command::signed::{SignedCommand, SignedCommandWithKind},
     ledger::{account::Amount, post_balances::PostBalance, public_key::PublicKey},
 };
-use mina_serialization_types::{
-    staged_ledger_diff as mina_rs,
-    v1::{PaymentPayloadV1, StakeDelegationV1, UserCommandWithStatusV1},
-};
+use mina_serialization_types::{staged_ledger_diff as mina_rs, v1 as mina_v1};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
@@ -57,10 +54,13 @@ pub struct Delegation {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CommandStatusData {
     Applied {
-        auxiliary_data: Box<mina_rs::TransactionStatusAuxiliaryData>,
-        balance_data: Box<mina_rs::TransactionStatusBalanceData>,
+        auxiliary_data: mina_rs::TransactionStatusAuxiliaryData,
+        balance_data: mina_rs::TransactionStatusBalanceData,
     },
-    Failed,
+    Failed(
+        Vec<mina_rs::TransactionStatusFailedType>,
+        mina_rs::TransactionStatusBalanceData,
+    ),
 }
 
 impl CommandStatusData {
@@ -120,16 +120,19 @@ impl CommandStatusData {
 
         match data {
             TS::Applied(auxiliary_data, balance_data) => Self::Applied {
-                auxiliary_data: Box::new(auxiliary_data.clone().inner()),
-                balance_data: Box::new(balance_data.clone().inner()),
+                auxiliary_data: auxiliary_data.clone().inner(),
+                balance_data: balance_data.clone().inner(),
             },
-            _ => Self::Failed,
+            TS::Failed(fails, balance_data) => Self::Failed(
+                fails.iter().map(|reason| reason.clone().inner()).collect(),
+                balance_data.clone().inner(),
+            ),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct UserCommandWithStatus(pub UserCommandWithStatusV1);
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct UserCommandWithStatus(pub mina_v1::UserCommandWithStatusV1);
 
 impl UserCommandWithStatus {
     pub fn is_applied(&self) -> bool {
@@ -138,17 +141,22 @@ impl UserCommandWithStatus {
 
     pub fn status_data(&self) -> CommandStatusData {
         match self.0.t.status.t.clone() {
-            mina_serialization_types::staged_ledger_diff::TransactionStatus::Applied(
-                auxiliary_data,
-                balance_data,
-            ) => CommandStatusData::Applied {
-                auxiliary_data: Box::new(auxiliary_data.inner()),
-                balance_data: Box::new(balance_data.inner()),
-            },
-            mina_serialization_types::staged_ledger_diff::TransactionStatus::Failed(_, _) => {
-                CommandStatusData::Failed
+            mina_rs::TransactionStatus::Applied(auxiliary_data, balance_data) => {
+                CommandStatusData::Applied {
+                    auxiliary_data: auxiliary_data.inner(),
+                    balance_data: balance_data.inner(),
+                }
             }
+            mina_rs::TransactionStatus::Failed(reason, balance_data) => CommandStatusData::Failed(
+                reason.iter().map(|r| r.clone().inner()).collect(),
+                balance_data.inner(),
+            ),
         }
+    }
+
+    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
+        let signed = SignedCommand::from(self.clone());
+        signed.all_public_keys().contains(pk)
     }
 
     pub fn data(&self) -> mina_rs::UserCommand {
@@ -196,10 +204,10 @@ impl UserCommandWithStatus {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct PaymentPayload(pub PaymentPayloadV1);
+pub struct PaymentPayload(pub mina_v1::PaymentPayloadV1);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct StakeDelegation(pub StakeDelegationV1);
+pub struct StakeDelegation(pub mina_v1::StakeDelegationV1);
 
 impl Command {
     /// Get the list of commands from the precomputed block
@@ -277,6 +285,12 @@ impl StakeDelegation {
     }
 }
 
+impl CommandUpdate {
+    pub fn is_delegation(&self) -> bool {
+        matches!(self.command_type, CommandType::Delegation)
+    }
+}
+
 impl From<mina_rs::TransactionStatus> for CommandStatusData {
     fn from(value: mina_rs::TransactionStatus) -> Self {
         Self::from_transaction_status(&value)
@@ -317,13 +331,54 @@ impl From<UserCommandWithStatus> for CommandStatusData {
     }
 }
 
-impl std::fmt::Debug for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl From<CommandStatusData> for serde_json::Value {
+    fn from(value: CommandStatusData) -> Self {
+        use serde_json::*;
+
+        match value {
+            CommandStatusData::Applied {
+                auxiliary_data,
+                balance_data,
+            } => {
+                let mut applied_obj = Map::new();
+                let status = Value::String("Applied".into());
+                let aux_json = to_auxiliary_json(&auxiliary_data);
+                let balance_json = to_balance_json(&balance_data);
+
+                applied_obj.insert("kind".into(), status);
+                applied_obj.insert("auxiliary_data".into(), aux_json);
+                applied_obj.insert("balance_data".into(), balance_json);
+                Value::Object(applied_obj)
+            }
+            CommandStatusData::Failed(reason, balance_data) => {
+                let mut failed_obj = Map::new();
+                let status = Value::String("Failed".into());
+                let reason_json = Value::Array(
+                    reason
+                        .iter()
+                        .map(|r| {
+                            Value::String(serde_json::to_string(&r).expect("serialize reason"))
+                        })
+                        .collect(),
+                );
+                let balance_json = to_balance_json(&balance_data);
+
+                failed_obj.insert("kind".into(), status);
+                failed_obj.insert("reason".into(), reason_json);
+                failed_obj.insert("balance_data".into(), balance_json);
+                Value::Object(failed_obj)
+            }
+        }
+    }
+}
+
+impl From<Command> for serde_json::Value {
+    fn from(value: Command) -> Self {
         use serde_json::*;
 
         let mut json = Map::new();
-        match self {
-            Self::Payment(Payment {
+        match value {
+            Command::Payment(Payment {
                 source,
                 receiver,
                 amount,
@@ -334,30 +389,60 @@ impl std::fmt::Debug for Command {
                 payment.insert("amount".into(), Value::Number(Number::from(amount.0)));
                 json.insert("Payment".into(), Value::Object(payment));
             }
-            Self::Delegation(Delegation {
+            Command::Delegation(Delegation {
                 delegate,
                 delegator,
             }) => {
                 let mut delegation = Map::new();
                 delegation.insert("delegate".into(), Value::String(delegate.to_address()));
                 delegation.insert("delegator".into(), Value::String(delegator.to_address()));
-                json.insert("StakeDelegation".into(), Value::Object(delegation));
+                json.insert("Stake_delegation".into(), Value::Object(delegation));
             }
         };
+        Value::Object(json)
+    }
+}
+
+impl std::fmt::Debug for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
         write!(f, "{}", to_string(&json).unwrap())
     }
 }
 
-impl CommandUpdate {
-    pub fn is_delegation(&self) -> bool {
-        matches!(self.command_type, CommandType::Delegation)
+impl From<UserCommandWithStatus> for serde_json::Value {
+    fn from(value: UserCommandWithStatus) -> Self {
+        use serde_json::*;
+
+        let mut object = Map::new();
+        let user_cmd: UserCommandWithStatus = value.0.inner().into();
+        let status: CommandStatusData = user_cmd.clone().into();
+        let data: SignedCommandWithKind = user_cmd.into();
+
+        object.insert("data".into(), data.into());
+        object.insert("status".into(), status.into());
+        Value::Object(object)
+    }
+}
+
+impl std::fmt::Debug for UserCommandWithStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
+        write!(f, "{}", to_string(&json).unwrap())
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
-    use crate::{block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD};
+    use crate::{
+        block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD,
+        ledger::account::nanomina_to_mina,
+    };
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -505,4 +590,184 @@ mod test {
             );
         }
     }
+
+    #[test]
+    fn user_command_with_status_json() -> anyhow::Result<()> {
+        use crate::block::precomputed::PrecomputedBlock;
+        use serde_json::*;
+
+        fn convert(value: serde_json::Value) -> serde_json::Value {
+            match value {
+                Value::Number(n) => Value::String(n.to_string()),
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(key, x)| {
+                        if *key == json!("memo") || *key == json!("signature") {
+                            *x = Value::Null
+                        } else {
+                            *x = convert(x.clone())
+                        }
+                    });
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(convert).collect()),
+                x => x,
+            }
+        }
+        fn fee_convert(value: serde_json::Value) -> serde_json::Value {
+            match value {
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(key, x)| {
+                        if *key == json!("fee") {
+                            *x = {
+                                let nanomina = x.clone().to_string().parse::<u64>().unwrap();
+                                Value::String(nanomina_to_mina(nanomina))
+                            }
+                        } else {
+                            *x = fee_convert(x.clone())
+                        }
+                    });
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(fee_convert).collect()),
+                x => x,
+            }
+        }
+        /// Convert to Mina precomputed block json format
+        fn to_mina_format(json: serde_json::Value) -> serde_json::Value {
+            match json {
+                Value::Object(mut obj) => {
+                    let keys: Vec<String> = obj.keys().cloned().collect();
+                    if keys.contains(&"data".into()) {
+                        // signed command
+                        if let Value::Object(mut data) = obj["data"].clone() {
+                            let kind = obj["data"]["kind"].clone();
+                            if kind == Value::String("Signed_command".into()) {
+                                data.remove("kind");
+                                obj["data"] = Value::Array(vec![kind, Value::Object(data)]);
+                            }
+                        }
+
+                        obj.iter_mut()
+                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                        Value::Object(obj)
+                    } else if keys.contains(&"body".into()) {
+                        // payment/delegation
+                        if let Value::Object(mut body) = obj["body"].clone() {
+                            let kind = obj["body"]["kind"].clone();
+                            if kind == Value::String("Payment".into())
+                                || kind == Value::String("Stake_delegation".into())
+                            {
+                                body.remove("kind");
+                                obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                            }
+                        }
+
+                        obj.iter_mut()
+                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                        Value::Object(obj)
+                    } else if keys.contains(&"kind".into())
+                        && keys.contains(&"auxiliary_data".into())
+                        && keys.contains(&"balance_data".into())
+                    {
+                        // applied status
+                        Value::Array(vec![
+                            obj["kind"].clone(),
+                            obj["auxiliary_data"].clone(),
+                            obj["balance_data"].clone(),
+                        ])
+                    } else if keys.contains(&"kind".into())
+                        && keys.contains(&"reason".into())
+                        && keys.contains(&"balance_data".into())
+                    {
+                        // failed status
+                        Value::Array(vec![
+                            obj["kind"].clone(),
+                            obj["reason"].clone(),
+                            obj["balance_data"].clone(),
+                        ])
+                    } else {
+                        obj.iter_mut()
+                            .for_each(|(_, val)| *val = to_mina_format(val.clone()));
+                        Value::Object(obj)
+                    }
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(to_mina_format).collect()),
+                x => x,
+            }
+        }
+        fn to_mina_json(json: serde_json::Value) -> serde_json::Value {
+            to_mina_format(convert(fee_convert(json)))
+        }
+
+        let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
+        let contents = std::fs::read(path.clone())?;
+        let mina_json: Value =
+            from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
+        let block = PrecomputedBlock::parse_file(&path)?;
+        let user_cmd_with_status = block.commands()[0].clone();
+        let user_cmd_with_status: Value = user_cmd_with_status.into();
+
+        assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
+        Ok(())
+    }
+}
+
+fn to_auxiliary_json(
+    auxiliary_data: &mina_rs::TransactionStatusAuxiliaryData,
+) -> serde_json::Value {
+    use serde_json::*;
+
+    let mut auxiliary_obj = Map::new();
+    let fee_payer_account_creation_fee_paid = auxiliary_data
+        .fee_payer_account_creation_fee_paid
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .unwrap_or(Value::Null);
+    let receiver_account_creation_fee_paid = auxiliary_data
+        .receiver_account_creation_fee_paid
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .unwrap_or(Value::Null);
+    let created_token = auxiliary_data
+        .created_token
+        .clone()
+        .map(|id| Value::Number(Number::from(id.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+
+    auxiliary_obj.insert(
+        "fee_payer_account_creation_fee_paid".into(),
+        fee_payer_account_creation_fee_paid,
+    );
+    auxiliary_obj.insert(
+        "receiver_account_creation_fee_paid".into(),
+        receiver_account_creation_fee_paid,
+    );
+    auxiliary_obj.insert("created_token".into(), created_token);
+    Value::Object(auxiliary_obj)
+}
+
+fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serde_json::Value {
+    use serde_json::*;
+
+    let mut balance_obj = Map::new();
+    let fee_payer_balance = balance_data
+        .fee_payer_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+    let receiver_balance = balance_data
+        .receiver_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+    let source_balance = balance_data
+        .source_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+
+    balance_obj.insert("fee_payer_balance".into(), fee_payer_balance);
+    balance_obj.insert("receiver_balance".into(), receiver_balance);
+    balance_obj.insert("source_balance".into(), source_balance);
+    Value::Object(balance_obj)
 }

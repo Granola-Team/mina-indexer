@@ -15,6 +15,9 @@ prereqs:
   jq --version
 
 build:
+  cargo build
+
+build-release:
   cargo build --profile release
 
 clean:
@@ -28,8 +31,11 @@ test-ci: lint test-unit test-regression
 test-unit: build
   cargo nextest run
 
-test-regression: build
+test-regression: build-release
   ./test
+
+test-release: build-release
+  ./test test_release
 
 disallow-unused-cargo-deps:
   cargo machete Cargo.toml

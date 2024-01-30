@@ -35,11 +35,11 @@ enum IndexerCommand {
 
 #[derive(Subcommand, Debug)]
 enum ServerCommand {
-    /// Start the mina indexer by passing in arguments manually on the command line
-    Cli(ServerArgs),
-    /// Replay the events from an existing db to start the indexer
+    /// Start a new mina indexer by passing arguments on the command line
+    Start(ServerArgs),
+    /// Start a mina indexer by replaying events from an existing indexer store
     Replay(ServerArgs),
-    /// Sync from events in an existing db to start the indexer
+    /// Start a mina indexer by syncing from events in an existing indexer store
     Sync(ServerArgs),
 }
 
@@ -97,7 +97,7 @@ pub async fn main() -> anyhow::Result<()> {
         IndexerCommand::Client(args) => client::run(&args).await,
         IndexerCommand::Server { server_command } => {
             let (args, mut mode) = match server_command {
-                ServerCommand::Cli(args) => (args, InitializationMode::New),
+                ServerCommand::Start(args) => (args, InitializationMode::New),
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
             };

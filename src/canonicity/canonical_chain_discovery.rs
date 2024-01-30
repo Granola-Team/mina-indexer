@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-use tracing::{debug, info};
+use tracing::info;
 
 pub fn discovery(
     length_filter: Option<u32>,
@@ -111,7 +111,6 @@ pub fn discovery(
         if let Some(successive_start_idx) =
             next_length_start_index(paths.as_slice(), curr_length_idx)
         {
-            debug!("Handle successive blocks");
             if successive_start_idx < length_start_indices_and_diffs.len() {
                 for path in paths[successive_start_idx..]
                     .iter()

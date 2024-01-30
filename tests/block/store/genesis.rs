@@ -1,3 +1,4 @@
+use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
     constants::{
@@ -10,14 +11,12 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, sync::Arc};
 
-#[tokio::test]
-async fn block_added() {
-    let mut store_dir = std::env::temp_dir();
-    store_dir.push("./genesis-block-test");
-
-    let indexer_store = Arc::new(IndexerStore::new(&store_dir).unwrap());
+#[test]
+fn block_added() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("genesis-block-test");
+    let indexer_store = Arc::new(IndexerStore::new(&store_dir)?);
     let genesis_ledger_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
-    let genesis_root = parse_file(genesis_ledger_path).unwrap();
+    let genesis_root = parse_file(genesis_ledger_path)?;
 
     let indexer = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
@@ -27,8 +26,7 @@ async fn block_added() {
         PRUNE_INTERVAL_DEFAULT,
         CANONICAL_UPDATE_THRESHOLD,
         LEDGER_CADENCE,
-    )
-    .unwrap();
+    )?;
 
     assert_eq!(
         indexer
@@ -37,5 +35,6 @@ async fn block_added() {
             .get_block(&MAINNET_GENESIS_HASH.into())
             .unwrap(),
         Some(GenesisBlock::new().unwrap().into())
-    )
+    );
+    Ok(())
 }
