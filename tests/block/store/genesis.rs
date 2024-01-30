@@ -10,8 +10,8 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, sync::Arc};
 
-#[tokio::test]
-async fn block_added() {
+#[test]
+fn block_added() {
     let mut store_dir = std::env::temp_dir();
     store_dir.push("./genesis-block-test");
 

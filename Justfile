@@ -26,7 +26,7 @@ test: test-unit test-regression
 test-ci: lint test-unit test-regression
 
 test-unit: build
-  cargo nextest run --no-fail-fast
+  cargo nextest run --no-capture
 
 test-regression: build
   ./test

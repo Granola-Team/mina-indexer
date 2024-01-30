@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -613,6 +613,7 @@ impl CommandStore for IndexerStore {
             .get_pinned_cf(self.commands_cf(), key)?
             .map(|bytes| {
                 let s = String::from_utf8(bytes.to_vec()).expect("valid utf8");
+                info!("********* {}", s);
                 s.parse().expect("n is u32")
             }))
     }
