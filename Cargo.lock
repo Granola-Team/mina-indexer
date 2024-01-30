@@ -1722,6 +1722,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "speedb",
+ "tempfile",
  "thiserror",
  "time",
  "tokio",

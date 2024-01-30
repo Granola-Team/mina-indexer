@@ -6,14 +6,12 @@ mod receiver;
 mod state;
 
 pub mod helpers {
-    /// Removes the dir if it exists, creates a fesh dir
-    pub fn setup_new_db_dir(db_path: &str) -> std::path::PathBuf {
-        let mut store_dir = std::env::temp_dir();
-        store_dir.push(db_path);
-
-        if store_dir.exists() {
-            std::fs::remove_dir_all(store_dir.clone()).unwrap();
+    /// Sets up a new temp dir, deleted when it goes out of scope
+    pub fn setup_new_db_dir(prefix: &str) -> anyhow::Result<tempfile::TempDir> {
+        let store_dir = tempfile::TempDir::with_prefix(prefix)?;
+        if store_dir.path().exists() {
+            std::fs::remove_dir_all(store_dir.path())?;
         }
-        store_dir
+        Ok(store_dir)
     }
 }
