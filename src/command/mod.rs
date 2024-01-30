@@ -23,7 +23,7 @@ pub enum CommandType {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
-    #[serde(alias = "StakeDelegation")]
+    #[serde(rename = "Stake_delegation")]
     Delegation(Delegation),
 }
 

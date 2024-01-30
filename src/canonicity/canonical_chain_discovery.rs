@@ -1,10 +1,8 @@
 use crate::{
-    block::{get_blockchain_length, get_state_hash, is_valid_block_file},
+    block::{blockchain_length::*, get_state_hash, is_valid_block_file, previous_state_hash::*},
     constants::BLOCK_REPORTING_FREQ_NUM,
 };
 use std::{
-    fs::File,
-    io::{prelude::*, SeekFrom},
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -14,7 +12,7 @@ pub fn discovery(
     length_filter: Option<u32>,
     canonical_threshold: u32,
     mut paths: Vec<&PathBuf>,
-) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
     // separate all blocks into the canonical chain
     // and the blocks that follow the canonical tip
     let mut canonical_paths = vec![];
@@ -95,7 +93,7 @@ pub fn discovery(
                 < canonical_threshold
         {
             info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
-            return Ok((vec![], paths.into_iter().cloned().collect()));
+            return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
         }
 
         // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
@@ -146,7 +144,8 @@ pub fn discovery(
             // search for parent in previous segment's blocks
             let mut parent_found = false;
             let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
-            let parent_hash = extract_parent_hash_from_path(curr_path)?;
+            let parent_hash = PreviousStateHash::from_path(curr_path)?;
+            let parent_hash: String = parent_hash.into();
 
             for path in paths[prev_length_idx..curr_length_idx].iter() {
                 if parent_hash == hash_from_path(path) {
@@ -166,13 +165,14 @@ pub fn discovery(
                     "Unable to locate parent block: mainnet-{}-{parent_hash}.json",
                     length_from_path_or_max(curr_path) - 1,
                 );
-                return Ok((vec![], paths.into_iter().cloned().collect()));
+                return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
             }
         }
 
         // push the lowest canonical block
         for path in paths[..curr_length_idx].iter() {
-            if extract_parent_hash_from_path(curr_path)? == hash_from_path(path) {
+            let prev_hash: String = PreviousStateHash::from_path(curr_path)?.into();
+            if prev_hash == hash_from_path(path) {
                 canonical_paths.push(path.to_path_buf());
                 break;
             }
@@ -188,37 +188,40 @@ pub fn discovery(
         );
     }
 
-    Ok((canonical_paths.to_vec(), successive_paths.to_vec()))
-}
+    let max_canonical_length = canonical_paths
+        .last()
+        .and_then(|p| {
+            BlockchainLength::from_path(p)
+                .ok()
+                .map(<BlockchainLength as Into<u32>>::into)
+        })
+        .unwrap_or(1);
+    let orphaned: Vec<PathBuf> = paths
+        .into_iter()
+        .filter(|p| {
+            if let Ok(length) = BlockchainLength::from_path(p) {
+                let length: u32 = length.into();
+                return length <= max_canonical_length && !canonical_paths.contains(p);
+            }
+            false
+        })
+        .cloned()
+        .collect();
 
-/// Gets the parent hash from the contents of the block's JSON file.
-/// This function depends on the current JSON layout for precomputed blocks
-/// and should be modified to use a custom `prev_state_hash` field deserializer.
-fn extract_parent_hash_from_path(path: &Path) -> anyhow::Result<String> {
-    let mut parent_hash_offset = 75;
-    let mut parent_hash = read_parent_hash(path, parent_hash_offset)?;
-
-    while !parent_hash.starts_with("3N") {
-        parent_hash_offset += 1;
-        parent_hash = read_parent_hash(path, parent_hash_offset)?;
-    }
-    Ok(parent_hash)
-}
-
-fn read_parent_hash(path: &Path, parent_hash_offset: u64) -> anyhow::Result<String> {
-    let parent_hash_length = 52;
-    let mut f = File::open(path)?;
-    let mut buf = vec![0; parent_hash_length];
-
-    f.seek(SeekFrom::Start(parent_hash_offset))?;
-    f.read_exact(&mut buf)?;
-    drop(f);
-    String::from_utf8(buf).map_err(anyhow::Error::from)
+    Ok((
+        canonical_paths.to_vec(),
+        successive_paths.to_vec(),
+        orphaned,
+    ))
 }
 
 /// Checks if the block at `curr_path` is the _parent_ of the block at `path`.
 fn is_parent(path: &Path, curr_path: &Path) -> bool {
-    extract_parent_hash_from_path(curr_path).unwrap() == hash_from_path(path)
+    if let Ok(prev_hash) = PreviousStateHash::from_path(curr_path) {
+        let prev_hash: String = prev_hash.into();
+        return prev_hash == hash_from_path(path);
+    }
+    false
 }
 
 /// Returns the start index of the paths with next higher length.
@@ -325,7 +328,9 @@ fn max_num_canonical_blocks(
 // path helpers
 fn length_from_path(path: &Path) -> Option<u32> {
     if is_valid_block_file(path) {
-        get_blockchain_length(path.file_name()?)
+        BlockchainLength::from_path(path)
+            .ok()
+            .map(<BlockchainLength as Into<u32>>::into)
     } else {
         None
     }
