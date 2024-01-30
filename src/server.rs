@@ -177,13 +177,16 @@ fn watch_directory_for_blocks<P: AsRef<Path>>(
     for res in rx {
         match res {
             Ok(event) => {
-                info!("&&&& {:?}: {:?}", event.kind, event.paths);
                 if let EventKind::Create(notify::event::CreateKind::File)
-                | EventKind::Modify(notify::event::ModifyKind::Data(_)) = event.kind
+                // Because of the way gsutil does resumable downloads,
+                // it first creates a file with a suffix .gstmp then
+                // when it's finished downloading, it will rename the
+                // file to the proper extension.
+                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
                 {
                     for path in event.paths {
                         if is_valid_block_file(&path) {
-                            info!("Valid precomputed block file: {}", path.display());
+                            debug!("Valid precomputed block file: {}", path.display());
                             if let Err(e) = sender.send(path) {
                                 error!("Unable to send path downstream. {}", e);
                             }
