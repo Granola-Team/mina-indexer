@@ -3,12 +3,11 @@ use mina_indexer::{
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
     store::IndexerStore,
 };
-use std::fs::remove_dir_all;
 
-#[tokio::test]
-async fn add_and_get_events() {
-    let store_dir = setup_new_db_dir("./event-store-test");
-    let db = IndexerStore::new(&store_dir).unwrap();
+#[test]
+fn add_and_get_events() {
+    let store_dir = setup_new_db_dir("event-store").unwrap();
+    let db = IndexerStore::new(store_dir.path()).unwrap();
 
     let event0 = IndexerEvent::BlockWatcher(BlockWatcherEvent::SawBlock {
         state_hash: "block0".into(),
@@ -61,6 +60,4 @@ async fn add_and_get_events() {
         event_log,
         vec![event0, event1, event2, event3, event4, event5, event6, event7, event8]
     );
-
-    remove_dir_all(store_dir).unwrap();
 }

@@ -43,6 +43,7 @@ notify = "6.1.1"
 [dev-dependencies]
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.0"
+tempfile = "3.9.0"
 
 [profile.release]
 lto = "fat"
