@@ -9,14 +9,14 @@ use mina_indexer::{
     state::IndexerState,
     store::IndexerStore,
 };
-use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn test() {
-    let db_path = setup_new_db_dir("./test_canonical_ledgers_store");
+    let store_dir = setup_new_db_dir("./test_canonical_ledgers_store").unwrap();
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
-    let indexer_store = Arc::new(IndexerStore::new(&db_path).unwrap());
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
         .unwrap()
@@ -126,6 +126,4 @@ async fn test() {
         assert!(ledger == ledger_diff, "Different ledgers (diff)");
         assert!(ledger == ledger_post, "Different ledgers (post)");
     }
-
-    remove_dir_all(db_path).unwrap();
 }

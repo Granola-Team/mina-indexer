@@ -4,15 +4,14 @@ use mina_indexer::{
     constants::MAINNET_CANONICAL_THRESHOLD,
     store::IndexerStore,
 };
-use std::{collections::HashMap, fs::remove_dir_all, path::PathBuf};
-use tokio::time::Instant;
+use std::{collections::HashMap, path::PathBuf, time::Instant};
 
-#[tokio::test]
-async fn speedb() {
-    let store_dir = setup_new_db_dir("./block-store-test");
+#[test]
+fn speedb() {
+    let store_dir = setup_new_db_dir("block-store-db").unwrap();
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
-    let db = IndexerStore::new(&store_dir).unwrap();
+    let db = IndexerStore::new(store_dir.path()).unwrap();
     let mut bp = BlockParser::new(log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
     let mut blocks = HashMap::new();
@@ -39,6 +38,4 @@ async fn speedb() {
     println!("Number of blocks: {n}");
     println!("To insert all:    {add_time:?}");
     println!("To fetch all:     {:?}\n", fetching.elapsed());
-
-    remove_dir_all(store_dir).unwrap();
 }

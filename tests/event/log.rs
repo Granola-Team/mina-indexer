@@ -10,20 +10,20 @@ use mina_indexer::{
     state::IndexerState,
     store::IndexerStore,
 };
-use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn test() {
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
 
-    let db_path0 = setup_new_db_dir("./test-event-log-store0");
+    let store_dir0 = setup_new_db_dir("event-log-store0").unwrap();
     let mut block_parser0 = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
-    let db_path1 = setup_new_db_dir("./test-event-log-store1");
+    let store_dir1 = setup_new_db_dir("event-log-store1").unwrap();
     let mut block_parser1 = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
 
-    let indexer_store0 = Arc::new(IndexerStore::new(&db_path0).unwrap());
-    let indexer_store1 = Arc::new(IndexerStore::new(&db_path1).unwrap());
+    let indexer_store0 = Arc::new(IndexerStore::new(store_dir0.path()).unwrap());
+    let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path()).unwrap());
 
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
@@ -101,7 +101,4 @@ async fn test() {
     println!("{:?}", event_log1);
 
     assert_eq!(event_log0, event_log1);
-
-    remove_dir_all(db_path0).unwrap();
-    remove_dir_all(db_path1).unwrap();
 }

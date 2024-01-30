@@ -10,14 +10,14 @@ use mina_indexer::{
     state::IndexerState,
     store::IndexerStore,
 };
-use std::{fs::remove_dir_all, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn add_and_get() {
-    let store_dir = setup_new_db_dir("./command-store-test");
+    let store_dir = setup_new_db_dir("command-store").unwrap();
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
 
-    let indexer_store = Arc::new(IndexerStore::new(&store_dir).unwrap());
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
     let genesis_ledger_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path).unwrap();
     let indexer = IndexerState::new(
@@ -76,6 +76,4 @@ async fn add_and_get() {
             .into();
         assert_eq!(result_cmd, cmd);
     }
-
-    remove_dir_all(store_dir).unwrap();
 }
