@@ -613,9 +613,10 @@ impl CommandStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.commands_cf(), key)?
-            .map(|bytes| {
-                let s = String::from_utf8(bytes.to_vec()).expect("valid utf8");
-                s.parse().expect("n is u32")
+            .and_then(|bytes| {
+                String::from_utf8(bytes.to_vec())
+                    .ok()
+                    .and_then(|s| s.parse().ok())
             }))
     }
 }
