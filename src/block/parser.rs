@@ -25,7 +25,22 @@ pub struct BlockParser {
     orphaned_paths: IntoIter<PathBuf>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockParserPaths {
+    pub canonical_paths: Vec<PathBuf>,
+    pub successive_paths: Vec<PathBuf>,
+    pub orphaned_paths: Vec<PathBuf>,
+}
+
 impl BlockParser {
+    pub fn paths(&self) -> BlockParserPaths {
+        BlockParserPaths {
+            canonical_paths: self.canonical_paths.clone().collect(),
+            successive_paths: self.successive_paths.clone().collect(),
+            orphaned_paths: self.orphaned_paths.clone().collect(),
+        }
+    }
+
     pub fn new(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
         Self::new_internal(blocks_dir, None, canonical_threshold)
     }
