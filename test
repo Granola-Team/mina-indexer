@@ -567,7 +567,7 @@ test_transactions() {
 
     # basic pk transaction queries - verbose
     kind=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.kind)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.contents.amount)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
     state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].state_hash)
     tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].tx_hash)
     length=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].blockchain_length)
@@ -597,7 +597,7 @@ test_transactions() {
 
     # tx hash query - verbose
     kind=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.kind)
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.contents.amount)
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.amount)
     status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status.kind)
     tx_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .tx_hash)
     state_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .state_hash)
@@ -623,10 +623,10 @@ test_transactions() {
     kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.kind)
     assert 'Signed_command' $kind
 
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.amount)
-    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.source_pk)
-    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.receiver_pk)
-    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.contents.payload.body.contents.token_id)
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.amount)
+    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.source_pk)
+    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.receiver_pk)
+    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.token_id)
 
     assert '1' $token
     assert '1000' $amount
@@ -663,7 +663,7 @@ test_checkpoint() {
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.contents.body.contents.amount)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
 
     # create checkpoint in ./checkpoint
     idxr checkpoint -p ./checkpoint
@@ -685,7 +685,7 @@ test_checkpoint() {
     canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.contents.body.contents.amount)
+    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
     assert $canonical_length $canonical_length_checkpoint

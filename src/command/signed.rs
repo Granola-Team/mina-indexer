@@ -266,10 +266,12 @@ impl From<SignedCommandWithKind> for serde_json::Value {
     fn from(value: SignedCommandWithKind) -> Self {
         use serde_json::*;
 
-        let mut obj = Map::new();
-        obj.insert("kind".into(), Value::String("Signed_command".into()));
-        obj.insert("contents".into(), value.0.into());
-        Value::Object(obj)
+        if let Value::Object(mut obj) = value.0.into() {
+            obj.insert("kind".into(), Value::String("Signed_command".into()));
+            Value::Object(obj)
+        } else {
+            Value::Null
+        }
     }
 }
 
@@ -399,26 +401,24 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
                 token_id,
                 amount,
             } = payment_payload.inner().inner();
-            let mut payment = Map::new();
 
-            payment.insert(
+            body_obj.insert(
                 "source_pk".into(),
                 Value::String(PublicKey::from(source_pk).to_address()),
             );
-            payment.insert(
+            body_obj.insert(
                 "receiver_pk".into(),
                 Value::String(PublicKey::from(receiver_pk).to_address()),
             );
-            payment.insert(
+            body_obj.insert(
                 "token_id".into(),
                 Value::Number(Number::from(token_id.inner().inner().inner())),
             );
-            payment.insert(
+            body_obj.insert(
                 "amount".into(),
                 Value::Number(Number::from(amount.inner().inner())),
             );
             body_obj.insert("kind".into(), Value::String("Payment".into()));
-            body_obj.insert("contents".into(), Value::Object(payment));
             Value::Object(body_obj)
         }
         mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation) => {
@@ -427,18 +427,16 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
                 delegator,
                 new_delegate,
             } = stake_delegation.inner();
-            let mut stake_delegation = Map::new();
 
-            stake_delegation.insert(
+            body_obj.insert(
                 "delegator".into(),
                 Value::String(PublicKey::from(delegator).to_address()),
             );
-            stake_delegation.insert(
+            body_obj.insert(
                 "new_delegate".into(),
                 Value::String(PublicKey::from(new_delegate).to_address()),
             );
-            body_obj.insert("kind".into(), Value::String("Stake-delegation".into()));
-            body_obj.insert("contents".into(), Value::Object(stake_delegation));
+            body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));
             Value::Object(body_obj)
         }
     };

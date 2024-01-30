@@ -632,20 +632,44 @@ mod test {
                 x => x,
             }
         }
+        /// Convert to Mina precomputed block json format
         fn to_mina_format(json: serde_json::Value) -> serde_json::Value {
             match json {
                 Value::Object(mut obj) => {
                     let keys: Vec<String> = obj.keys().cloned().collect();
-                    if keys.contains(&"kind".into()) && keys.contains(&"contents".into()) {
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            to_mina_format(obj["contents"].clone()),
-                        ])
+                    if keys.contains(&"data".into()) {
+                        // signed command
+                        if let Value::Object(mut data) = obj["data"].clone() {
+                            let kind = obj["data"]["kind"].clone();
+                            if kind == Value::String("Signed_command".into()) {
+                                data.remove("kind");
+                                obj["data"] = Value::Array(vec![kind, Value::Object(data)]);
+                            }
+                        }
+
+                        obj.iter_mut()
+                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                        Value::Object(obj)
+                    } else if keys.contains(&"body".into()) {
+                        // payment/delegation
+                        if let Value::Object(mut body) = obj["body"].clone() {
+                            let kind = obj["body"]["kind"].clone();
+                            if kind == Value::String("Payment".into())
+                                || kind == Value::String("Stake_delegation".into())
+                            {
+                                body.remove("kind");
+                                obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                            }
+                        }
+
+                        obj.iter_mut()
+                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                        Value::Object(obj)
                     } else if keys.contains(&"kind".into())
                         && keys.contains(&"auxiliary_data".into())
                         && keys.contains(&"balance_data".into())
                     {
-                        // applied command
+                        // applied status
                         Value::Array(vec![
                             obj["kind"].clone(),
                             obj["auxiliary_data"].clone(),
@@ -655,7 +679,7 @@ mod test {
                         && keys.contains(&"reason".into())
                         && keys.contains(&"balance_data".into())
                     {
-                        // failed command
+                        // failed status
                         Value::Array(vec![
                             obj["kind"].clone(),
                             obj["reason"].clone(),
@@ -667,6 +691,7 @@ mod test {
                         Value::Object(obj)
                     }
                 }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(to_mina_format).collect()),
                 x => x,
             }
         }
