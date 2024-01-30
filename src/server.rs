@@ -57,7 +57,7 @@ impl MinaIndexer {
 #[instrument(skip_all)]
 pub fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     info!("Starting Mina Indexer...");
-    let config = indexer.config.clone();
+    let config = indexer.config;
     run(config);
     Ok(())
 }

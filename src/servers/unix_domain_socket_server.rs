@@ -9,12 +9,10 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::block::store::BlockStore;
 use crate::block::{is_valid_state_hash, BlockHash, BlockWithoutHeight};
-use crate::command::signed::SignedCommand;
 use crate::command::store::CommandStore;
 use crate::command::Command;
-use crate::ledger;
-use crate::ledger::public_key::PublicKey;
 use crate::ledger::store::LedgerStore;
+use crate::ledger::{self, public_key};
 use crate::state::summary::{SummaryShort, SummaryVerbose};
 use crate::state::IndexerState;
 
@@ -126,7 +124,6 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
     let store = state.indexer_store.clone().unwrap();
     let database = &store.database;
     database.try_catch_up_with_primary()?;
-    
 
     if read_size == 0 {
         return Err(anyhow!("Unexpected EOF"));
@@ -138,13 +135,19 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
     let response_json = match command_string.as_str() {
         "account" => {
             let pk_buffer = buffers.next().unwrap();
-            let pk: PublicKey = String::from_utf8(pk_buffer.to_vec())?
-                .trim_end_matches('\0')
-                .into();
+
+            let pk = String::from_utf8(pk_buffer.to_vec())?;
+            let pk = pk.trim_end_matches('\0');
+            if public_key::is_valid(pk) {
+                Some(pk.into())
+            } else {
+                Some(format!("Invalid pk: {pk}"))
+            };
+
             info!("Received account command for {pk}");
 
             let ledger = state.ledger.clone();
-            let account = ledger.accounts.get(&pk);
+            let account = ledger.accounts.get(&pk.into());
             if let Some(account) = account {
                 debug!("Writing account {account:?} to client");
                 Some(serde_json::to_string(account)?)
@@ -395,10 +398,9 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-            info!("Shutting down the indexer...");
             process::exit(0);
         }
-        "transactions" => {
+        "tx-pk" => {
             let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
             let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
             let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
@@ -417,7 +419,7 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
 
-            info!("Received transactions command for {pk}");
+            info!("Received transactions command for public key {pk}");
             // TODO: Find a better way to unwrap
             let db = state.indexer_store.clone().unwrap();
             let transactions = db
@@ -431,27 +433,22 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
                 };
 
                 if verbose {
-                    let txs: Vec<SignedCommand> =
-                        txs.into_iter().map(SignedCommand::from).collect();
                     format!("{txs:?}")
                 } else {
-                    let txs: Vec<Command> = txs.into_iter().map(Command::from).collect();
+                    let txs: Vec<Command> =
+                        txs.into_iter().map(|c| Command::from(c.command)).collect();
                     format!("{txs:?}")
                 }
             };
             if path.is_empty() {
-                // stdout
                 debug!("Writing transactions for {pk} to stdout");
                 Some(transaction_str)
             } else {
-                // write to path
                 let path: PathBuf = path.into();
                 if !path.is_dir() {
                     debug!("Writing transactions for {pk} to {}", path.display());
 
                     tokio::fs::write(&path, transaction_str).await?;
-                    // let s = tokio::fs::read_to_string(path.clone()).await?;
-                    // debug!("File contents: {s}");
                     Some(format!(
                         "Transactions for {pk} written to {}",
                         path.display()
@@ -463,6 +460,40 @@ async fn handle_connection(socket: UnixStream, state: Arc<IndexerState>) -> anyh
                     ))
                 }
             }
+        }
+        "tx-hash" => {
+            let tx_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?
+                .trim_end_matches('\0')
+                .parse()?;
+
+            info!("Received transactions command for tx hash {tx_hash}");
+            let db = state.indexer_store.clone().unwrap();
+            db.get_command_by_hash(&tx_hash)?.map(|cmd| {
+                if verbose {
+                    format!("{cmd:?}")
+                } else {
+                    let cmd: Command = cmd.command.into();
+                    format!("{cmd:?}")
+                }
+            })
+        }
+        "tx-state-hash" => {
+            let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?
+                .trim_end_matches('\0')
+                .parse()?;
+
+            info!("Received transactions command for state hash {state_hash}");
+            let db = state.indexer_store.clone().unwrap();
+            db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
+                if verbose {
+                    format!("{cmds:?}")
+                } else {
+                    let cmd: Vec<Command> = cmds.into_iter().map(Command::from).collect();
+                    format!("{cmd:?}")
+                }
+            })
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
