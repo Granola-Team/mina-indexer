@@ -2,7 +2,7 @@ use crate::{
     block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
-    ledger::{genesis::GenesisRoot, Ledger},
+    ledger::{genesis::GenesisLedger, Ledger},
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
@@ -25,7 +25,7 @@ use tracing::{debug, info, instrument};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
-    pub ledger: GenesisRoot,
+    pub ledger: GenesisLedger,
     pub root_hash: BlockHash,
     pub startup_dir: PathBuf,
     pub watch_dir: PathBuf,
@@ -145,7 +145,7 @@ pub async fn initialize(
     info!("Starting mina-indexer server");
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
-        ledger,
+        ledger: genesis_ledger,
         root_hash,
         startup_dir,
         watch_dir: _,
@@ -167,7 +167,7 @@ pub async fn initialize(
                 );
                 IndexerState::new(
                     &root_hash,
-                    ledger.ledger.clone(),
+                    genesis_ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
@@ -179,7 +179,7 @@ pub async fn initialize(
                 info!("Replaying indexer events from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
-                    ledger.ledger.clone(),
+                    genesis_ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
@@ -191,7 +191,7 @@ pub async fn initialize(
                 info!("Syncing indexer state from db at {}", db_path.display());
                 IndexerState::new_without_genesis_events(
                     &root_hash,
-                    ledger.ledger.clone(),
+                    genesis_ledger.clone(),
                     store,
                     MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
@@ -204,7 +204,7 @@ pub async fn initialize(
         info!("Getting best tip");
         let best_tip = state.best_tip_block().clone();
         info!("Getting best ledger");
-        let ledger = ledger.ledger.into();
+        let ledger = genesis_ledger.into();
         info!("Getting summary");
         let summary = Box::new(state.summary_verbose());
         info!("Getting store");

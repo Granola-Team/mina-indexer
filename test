@@ -21,6 +21,7 @@ test_cleanup() {
     fi
     rm -rf "${TEST_DIR}"
 }
+
 trap test_cleanup EXIT
 
 idxr() {
