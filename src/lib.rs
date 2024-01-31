@@ -9,5 +9,6 @@ pub mod ledger;
 pub mod mina_blocks;
 pub mod receiver;
 pub mod server;
+pub mod snark_work;
 pub mod state;
 pub mod store;
