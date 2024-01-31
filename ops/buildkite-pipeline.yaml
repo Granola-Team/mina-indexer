@@ -6,7 +6,8 @@ steps:
     echo PATH=$PATH
     nix-shell --pure --run just
     nix-shell --pure --run "just prereqs"
-    nix-shell --pure --run "just test-ci"
+    nix-shell --pure --run "just test-ci | tee build.log"
   key: prereqs
+  artifact_paths: "build.log"
   agents:
     os: linux
