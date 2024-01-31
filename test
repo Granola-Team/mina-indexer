@@ -178,7 +178,7 @@ test_ipc_is_available_immediately() {
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-    sleep 1
+    sleep 2
 
     idxr summary
     teardown
@@ -194,7 +194,7 @@ test_startup_dirs_get_created() {
         --watch-dir ./watch-blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    sleep 2
 
     assert_directory_exists "./startup-blocks"
     assert_directory_exists "./watch-blocks"

@@ -222,7 +222,6 @@ pub async fn initialize(
 
         match initialization_mode {
             InitializationMode::New => {
-                info!("Parsing blocks");
                 let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
                 state
                     .initialize_with_canonical_chain_discovery(&mut block_parser)
