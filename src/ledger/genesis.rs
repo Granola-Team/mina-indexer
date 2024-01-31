@@ -21,7 +21,7 @@ pub struct GenesisTimestamp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisRoot {
     pub genesis: GenesisTimestamp,
-    pub ledger: GenesisLedger,
+    pub ledger: GenesisAccounts,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,9 +42,14 @@ pub struct GenesisAccountTiming {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenesisLedger {
+pub struct GenesisAccounts {
     pub name: String,
     pub accounts: Vec<GenesisAccount>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisLedger {
+    ledger: Ledger,
 }
 
 pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Error>> {
@@ -53,16 +58,23 @@ pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Err
     Ok(pk.into())
 }
 
-impl From<GenesisRoot> for Ledger {
+impl From<GenesisRoot> for GenesisLedger {
     fn from(value: GenesisRoot) -> Self {
-        value.ledger.into()
+        Self::new(value.ledger)
     }
 }
 
 impl From<GenesisLedger> for Ledger {
-    fn from(genesis_ledger: GenesisLedger) -> Ledger {
+    fn from(value: GenesisLedger) -> Self {
+        value.ledger
+    }
+}
+
+impl GenesisLedger {
+    /// This is the only way to construct a
+    pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
         let mut accounts = HashMap::new();
-        for genesis_account in genesis_ledger.accounts {
+        for genesis_account in genesis.accounts {
             let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
                 Ok(amt) => (amt * dec!(1_000_000_000))
                     .to_u64()
@@ -95,7 +107,9 @@ impl From<GenesisLedger> for Ledger {
                 panic!("Unparsable public key");
             }
         }
-        Ledger { accounts }
+        GenesisLedger {
+            ledger: Ledger { accounts },
+        }
     }
 }
 

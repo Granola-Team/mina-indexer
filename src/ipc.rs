@@ -10,7 +10,7 @@ use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
 pub struct IpcActor {
@@ -44,7 +44,7 @@ impl IpcActor {
                 blockchain_length: 1,
                 global_slot_since_genesis: 0,
             }),
-            ledger: RwLock::new(config.ledger.ledger.into()),
+            ledger: RwLock::new(config.ledger.into()),
             summary: RwLock::new(None),
             store: RwLock::new(store),
         }
@@ -254,7 +254,7 @@ async fn handle_conn(
             // check if ledger or state hash and use appropriate getter
             if is_valid_state_hash(&hash[..52]) {
                 let hash = &hash[..52];
-                debug!("{hash} is a state hash");
+                trace!("{hash} is a state hash");
 
                 if let Some(ledger) = db.get_ledger_state_hash(&hash.into())? {
                     let ledger = ledger.to_string();
@@ -288,7 +288,7 @@ async fn handle_conn(
                 }
             } else if ledger::is_valid_hash(&hash[..51]) {
                 let hash = &hash[..51];
-                debug!("{hash} is a ledger hash");
+                trace!("{hash} is a ledger hash");
 
                 if let Some(ledger) = db.get_ledger(hash)? {
                     let ledger = ledger.to_string();

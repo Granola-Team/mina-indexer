@@ -20,7 +20,7 @@ fn block_added() -> anyhow::Result<()> {
 
     let indexer = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_root.ledger,
+        genesis_root.into(),
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
