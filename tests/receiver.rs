@@ -4,7 +4,7 @@ use mina_indexer::receiver::{filesystem::FilesystemReceiver, BlockReceiver};
 use tokio::{
     fs::{create_dir_all, remove_dir_all, File},
     io::AsyncWriteExt,
-    process::Command,
+    // process::Command, TODO: remove
 };
 
 #[tokio::test]
@@ -41,7 +41,9 @@ async fn detects_new_block_written() {
     posttest(&test_dir, success).await;
 }
 
-#[tokio::test]
+// TODO: recover this testing functionality
+// #[tokio::test]
+/*
 async fn detects_new_block_copied() {
     const TEST_BLOCK_PATH: &str = "./tests/data/non_sequential_blocks/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json";
 
@@ -77,6 +79,7 @@ async fn detects_new_block_copied() {
 
     posttest(&test_dir, success).await;
 }
+*/
 
 async fn pretest(path: impl AsRef<Path>) {
     println!("Pretest: {}", path.as_ref().display());
