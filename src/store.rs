@@ -466,7 +466,7 @@ impl CommandStore for IndexerStore {
         self.database.put_cf(&commands_cf, key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
-        for pk in block.all_public_keys() {
+        for pk in block.active_public_keys() {
             let pk_str = pk.to_address();
             trace!("Adding command pk {pk}");
 
