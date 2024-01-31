@@ -8,6 +8,7 @@ use crate::{
     },
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
+    snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
 use speedb::{ColumnFamilyDescriptor, DB};
@@ -30,7 +31,14 @@ impl IndexerStore {
             &database_opts,
             path,
             secondary,
-            vec!["blocks", "canonicity", "commands", "events", "ledgers"],
+            vec![
+                "blocks",
+                "canonicity",
+                "commands",
+                "events",
+                "ledgers",
+                "snarks",
+            ],
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -45,7 +53,8 @@ impl IndexerStore {
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
         let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
-        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
+        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
+        let snarks = ColumnFamilyDescriptor::new("snarks", cf_opts);
 
         let mut database_opts = speedb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -53,7 +62,7 @@ impl IndexerStore {
         let database = speedb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, commands, events, ledgers],
+            vec![blocks, canonicity, commands, events, ledgers, snarks],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -122,6 +131,9 @@ impl BlockStore for IndexerStore {
 
         // add block commands
         self.add_commands(block)?;
+
+        // add block SNARK work
+        self.add_snark_work(block)?;
 
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
@@ -466,7 +478,7 @@ impl CommandStore for IndexerStore {
         self.database.put_cf(&commands_cf, key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
-        for pk in block.active_public_keys() {
+        for pk in block.all_command_public_keys() {
             let pk_str = pk.to_address();
             trace!("Adding command pk {pk}");
 
@@ -618,6 +630,30 @@ impl CommandStore for IndexerStore {
                     .ok()
                     .and_then(|s| s.parse().ok())
             }))
+    }
+}
+
+impl SnarkStore for IndexerStore {
+    fn add_snark_work(&self, _block: &PrecomputedBlock) -> anyhow::Result<()> {
+        todo!("add snark work")
+    }
+
+    fn get_pk_num_prover_blocks(&self, _pk: &str) -> anyhow::Result<Option<u32>> {
+        todo!("get pk num prover blocks")
+    }
+
+    fn get_snark_work_by_public_key(
+        &self,
+        _pk: &PublicKey,
+    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>> {
+        todo!("get snark work by pk")
+    }
+
+    fn get_snark_work_in_block(
+        &self,
+        _state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
+        todo!("get snark work in block")
     }
 }
 
