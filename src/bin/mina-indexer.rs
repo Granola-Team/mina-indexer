@@ -5,7 +5,7 @@ use mina_indexer::{
         CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
         MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
     },
-    ledger,
+    ledger::{self, genesis::GenesisLedger},
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
@@ -189,8 +189,9 @@ pub fn process_indexer_configuration(
             error!("Unable to parse genesis ledger: {err}");
             std::process::exit(100)
         }
-        Ok(ledger) => {
-            info!("Ledger parsed successfully!");
+        Ok(genesis_root) => {
+            let ledger: GenesisLedger = genesis_root.into();
+            info!("Genesis ledger parsed successfully");
 
             Ok(IndexerConfiguration {
                 ledger,

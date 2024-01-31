@@ -115,41 +115,35 @@ impl IndexerState {
         let root_branch = Branch::new_genesis(root_hash)?;
 
         // add genesis block and ledger to indexer store
+        indexer_store.add_ledger_state_hash(
+            &MAINNET_GENESIS_PREV_STATE_HASH.into(),
+            genesis_ledger.clone().into(),
+        )?;
+        info!("Genesis ledger added to indexer store");
+
         let genesis_block = GenesisBlock::new()?.into();
         indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
 
-        indexer_store
-            .add_ledger_state_hash(
-                &MAINNET_GENESIS_PREV_STATE_HASH.into(),
-                genesis_ledger.clone().into(),
-            )
-            .expect("add genesis ledger succeeds");
-        info!("Genesis ledger added to indexer store");
-
         // update genesis canonicity
-        indexer_store
-            .set_max_canonical_blockchain_length(1)
-            .expect("set genesis blockchain length succeeds");
-        indexer_store
-            .add_canonical_block(1, root_hash)
-            .expect("add genesis canonical block succeeds");
+        indexer_store.set_max_canonical_blockchain_length(1)?;
+        indexer_store.add_canonical_block(1, root_hash)?;
 
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
         };
 
+        // apply genesis block to genesis ledger and keep its ledger diff
         Ok(Self {
-            phase: IndexerPhase::InitializingFromBlockDir,
-            canonical_tip: tip.clone(),
-            // apply genesis block to genesis ledger
             ledger: <GenesisLedger as Into<Ledger>>::into(genesis_ledger)
                 .apply_diff_from_precomputed(&genesis_block)?,
             diffs_map: HashMap::from([(
                 genesis_block.state_hash.clone().into(),
                 LedgerDiff::from_precomputed(&genesis_block),
             )]),
+            phase: IndexerPhase::InitializingFromBlockDir,
+            canonical_tip: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -157,7 +151,7 @@ impl IndexerState {
             transition_frontier_length,
             prune_interval,
             canonical_update_threshold,
-            blocks_processed: 1,
+            blocks_processed: 1, // genesis block
             init_time: Instant::now(),
             ledger_cadence,
         })
@@ -180,10 +174,10 @@ impl IndexerState {
         };
 
         Ok(Self {
-            phase: IndexerPhase::SyncingFromDB,
-            canonical_tip: tip.clone(),
             ledger: genesis_ledger.into(),
             diffs_map: HashMap::new(),
+            phase: IndexerPhase::SyncingFromDB,
+            canonical_tip: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -221,10 +215,8 @@ impl IndexerState {
             node_id: root_branch.root.clone(),
         };
 
+        // apply root block to root ledger and keep its ledger diff
         Ok(Self {
-            phase: IndexerPhase::Testing,
-            canonical_tip: tip.clone(),
-            // apply root block to root ledger
             ledger: root_ledger
                 .and_then(|x| x.apply_diff_from_precomputed(root_block).ok())
                 .unwrap_or_default(),
@@ -232,6 +224,8 @@ impl IndexerState {
                 root_block.state_hash.clone().into(),
                 LedgerDiff::from_precomputed(root_block),
             )]),
+            phase: IndexerPhase::Testing,
+            canonical_tip: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -240,7 +234,7 @@ impl IndexerState {
                 .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
-            blocks_processed: 0,
+            blocks_processed: 1, // root block
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
         })

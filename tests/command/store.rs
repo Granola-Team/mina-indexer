@@ -22,7 +22,7 @@ async fn add_and_get() {
     let genesis_root = parse_file(genesis_ledger_path).unwrap();
     let indexer = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_root.ledger,
+        genesis_root.into(),
         indexer_store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,
