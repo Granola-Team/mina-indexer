@@ -4,6 +4,7 @@ steps:
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
+    echo TEMP=$TMPDIR
     nix-shell --pure --run just
     nix-shell --pure --run "just prereqs"
     nix-shell --pure --run "just test-ci"
