@@ -15,10 +15,7 @@ prereqs:
   jq --version
 
 build:
-  cargo build
-
-build-release:
-  cargo build --profile release
+  cargo build --release
 
 clean:
   cargo clean
@@ -29,12 +26,12 @@ test: test-unit test-regression
 test-ci: lint test-unit test-regression
 
 test-unit: build
-  cargo nextest run
+  cargo nextest run --release
 
-test-regression: build-release
+test-regression: build
   ./test
 
-test-release: build-release
+test-release: build
   ./test test_release
 
 disallow-unused-cargo-deps:
@@ -46,7 +43,6 @@ audit:
 lint: && audit disallow-unused-cargo-deps
   cargo clippy -- -D warnings
   cargo clippy --all-targets --all-features -- -D warnings
-  cargo check --profile release
 
 images:
   docker build .

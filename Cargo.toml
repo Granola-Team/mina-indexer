@@ -58,6 +58,3 @@ features = ["full"]
 [profile.release]
 lto = "fat"
 incremental = true
-
-[profile.dev]
-lto = "off"
