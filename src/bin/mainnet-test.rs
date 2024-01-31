@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     let total_time = Instant::now();
     let mut state = IndexerState::new(
         &GENESIS_HASH.into(),
-        genesis_root.ledger,
+        genesis_root.into(),
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
         PRUNE_INTERVAL_DEFAULT,

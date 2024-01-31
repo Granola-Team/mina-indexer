@@ -18,12 +18,10 @@ async fn test() {
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
-        .unwrap()
-        .ledger;
+    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
     let mut state = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger,
+        genesis_ledger.into(),
         indexer_store,
         10,
         PRUNE_INTERVAL_DEFAULT,

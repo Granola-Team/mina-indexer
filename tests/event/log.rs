@@ -26,13 +26,11 @@ async fn test() {
     let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path()).unwrap());
 
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)
-        .unwrap()
-        .ledger;
+    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
 
     let mut state0 = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.clone(),
+        genesis_ledger.clone().into(),
         indexer_store0,
         10,
         PRUNE_INTERVAL_DEFAULT,
@@ -42,7 +40,7 @@ async fn test() {
     .unwrap();
     let mut state1 = IndexerState::new(
         &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger,
+        genesis_ledger.into(),
         indexer_store1,
         10,
         PRUNE_INTERVAL_DEFAULT,

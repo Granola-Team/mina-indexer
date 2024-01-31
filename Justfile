@@ -21,9 +21,11 @@ clean:
   cargo clean
   rm -rf result
 
-test: test-unit test-regression
+test: test-unit
+  ./test
 
-test-ci: lint test-unit test-regression
+test-ci: lint test-unit
+  ./test
 
 test-unit: build
   cargo nextest run --release
