@@ -7,7 +7,7 @@ use crate::{
 use mina_serialization_types::snark_work as mina_rs;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkSummary {
     pub fee: u64,
     pub prover: PublicKey,
@@ -20,7 +20,7 @@ pub struct SnarkWork {
     pub prover: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkSummaryWithStateHash {
     pub fee: u64,
     pub prover: PublicKey,
@@ -117,6 +117,20 @@ impl From<SnarkWorkSummaryWithStateHash> for serde_json::Value {
     }
 }
 
+impl std::fmt::Debug for SnarkWorkSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json: serde_json::Value = self.clone().into();
+        write!(f, "{}", serde_json::to_string(&json).unwrap())
+    }
+}
+
+impl std::fmt::Debug for SnarkWorkSummaryWithStateHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json: serde_json::Value = self.clone().into();
+        write!(f, "{}", serde_json::to_string(&json).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -127,10 +141,6 @@ mod test {
 
     #[test]
     fn from_precomputed() -> anyhow::Result<()> {
-        let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
-        let contents = std::fs::read(path.clone())?;
-        let block = PrecomputedBlock::parse_file(&path)?;
-
         fn convert_snark_work(value: Value) -> Value {
             match value {
                 Value::String(s) => {
@@ -165,6 +175,11 @@ mod test {
             }
         }
 
+        // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
+        let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
+        let contents = std::fs::read(path.clone())?;
+        let block = PrecomputedBlock::parse_file(&path)?;
+
         if let Value::Array(arr) = from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]
             ["completed_works"]
             .clone()
@@ -195,10 +210,49 @@ mod test {
                 SnarkWorkSummaryWithStateHash::from_precomputed(&block);
             let completed_works_state_hash: Value = completed_works_state_hash.into();
             assert_eq!(completed_works_state_hash_json, completed_works_state_hash);
-
-            Ok(())
         } else {
             panic!("Expected SNARK work object")
         }
+
+        // mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK
+        let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK.json".into();
+        let contents = std::fs::read(path.clone())?;
+        let block = PrecomputedBlock::parse_file(&path)?;
+
+        if let Value::Array(arr) = from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][1]
+            ["completed_works"]
+            .clone()
+        {
+            // no proofs
+            let completed_works_no_proofs_json = Value::Array(
+                arr.clone()
+                    .into_iter()
+                    .map(|x| drop_proofs(convert_snark_work(x)))
+                    .collect(),
+            );
+            let completed_works_no_proofs = SnarkWorkSummary::from_precomputed(&block);
+            let completed_works_no_proofs: Value = completed_works_no_proofs.into();
+            assert_eq!(completed_works_no_proofs_json, completed_works_no_proofs);
+
+            // state hash
+            let completed_works_state_hash_json = Value::Array(
+                arr.into_iter()
+                    .map(|x| {
+                        drop_proofs(add_state_hash(
+                            convert_snark_work(x),
+                            &block.state_hash.clone().into(),
+                        ))
+                    })
+                    .collect(),
+            );
+            let completed_works_state_hash =
+                SnarkWorkSummaryWithStateHash::from_precomputed(&block);
+            let completed_works_state_hash: Value = completed_works_state_hash.into();
+            assert_eq!(completed_works_state_hash_json, completed_works_state_hash);
+        } else {
+            panic!("Expected SNARK work object")
+        }
+
+        Ok(())
     }
 }

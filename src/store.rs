@@ -671,7 +671,7 @@ impl SnarkStore for IndexerStore {
                 .collect();
 
             if !block_pk_snarks.is_empty() {
-                // write these commands to the next key for pk
+                // write these SNARKs to the next key for pk
                 let key = format!("{pk_str}{n}").as_bytes().to_vec();
                 let value = serde_json::to_vec(&block_pk_snarks)?;
                 self.database.put_cf(snarks_cf, key, value)?;
@@ -687,7 +687,6 @@ impl SnarkStore for IndexerStore {
         Ok(())
     }
 
-    /// Number of blocks containing `pk` commands
     fn get_pk_num_prover_blocks(&self, pk: &str) -> anyhow::Result<Option<u32>> {
         let key = pk.as_bytes();
         Ok(self
