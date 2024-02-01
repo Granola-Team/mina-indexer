@@ -2,8 +2,7 @@
 set -ex
 
 # Collect the binaries under test and the test ledger.
-IDXR_DEBUG="$(pwd)"/target/debug/mina-indexer
-IDXR_RELEASE="$(pwd)"/target/release/mina-indexer
+IDXR="$(pwd)"/target/release/mina-indexer
 LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
@@ -25,25 +24,16 @@ test_cleanup() {
 trap test_cleanup EXIT
 
 idxr() {
-    RUST_BACKTRACE=full "$IDXR_DEBUG" "$@"
+    RUST_BACKTRACE=full "$IDXR" "$@"
 }
 
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR_DEBUG" server "$@" &
-    echo $! > idxr_pid
-}
-
-idxr_server_release() {
-    RUST_BACKTRACE=full "$IDXR_RELEASE" server "$@" &
+    RUST_BACKTRACE=full "$IDXR" server "$@" &
     echo $! > idxr_pid
 }
 
 idxr_server_start() {
     idxr_server start "$@"
-}
-
-idxr_server_release_start() {
-    idxr_server_release start "$@"
 }
 
 dl_mainnet() {
@@ -746,7 +736,7 @@ test_release() {
     setup
     dl_mainnet 5000 ./blocks
 
-    idxr_server_release_start \
+    idxr_server_start \
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
