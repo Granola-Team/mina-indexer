@@ -158,7 +158,7 @@ mod test {
                 x => x,
             }
         }
-        fn drop_proofs(value: Value) -> Value {
+        fn remove_proofs(value: Value) -> Value {
             if let Value::Object(mut obj) = value {
                 obj.remove("proofs");
                 Value::Object(obj)
@@ -188,7 +188,7 @@ mod test {
             let completed_works_no_proofs_json = Value::Array(
                 arr.clone()
                     .into_iter()
-                    .map(|x| drop_proofs(convert_snark_work(x)))
+                    .map(|x| remove_proofs(convert_snark_work(x)))
                     .collect(),
             );
             let completed_works_no_proofs = SnarkWorkSummary::from_precomputed(&block);
@@ -199,7 +199,7 @@ mod test {
             let completed_works_state_hash_json = Value::Array(
                 arr.into_iter()
                     .map(|x| {
-                        drop_proofs(add_state_hash(
+                        remove_proofs(add_state_hash(
                             convert_snark_work(x),
                             &block.state_hash.clone().into(),
                         ))
@@ -217,9 +217,10 @@ mod test {
         // mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK.json".into();
         let contents = std::fs::read(path.clone())?;
+        let contents = String::from_utf8_lossy(&contents);
         let block = PrecomputedBlock::parse_file(&path)?;
 
-        if let Value::Array(arr) = from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][1]
+        if let Value::Array(arr) = from_str::<Value>(&contents)?["staged_ledger_diff"]["diff"][1]
             ["completed_works"]
             .clone()
         {
@@ -227,7 +228,7 @@ mod test {
             let completed_works_no_proofs_json = Value::Array(
                 arr.clone()
                     .into_iter()
-                    .map(|x| drop_proofs(convert_snark_work(x)))
+                    .map(|x| remove_proofs(convert_snark_work(x)))
                     .collect(),
             );
             let completed_works_no_proofs = SnarkWorkSummary::from_precomputed(&block);
@@ -238,7 +239,7 @@ mod test {
             let completed_works_state_hash_json = Value::Array(
                 arr.into_iter()
                     .map(|x| {
-                        drop_proofs(add_state_hash(
+                        remove_proofs(add_state_hash(
                             convert_snark_work(x),
                             &block.state_hash.clone().into(),
                         ))
