@@ -168,7 +168,7 @@ test_ipc_is_available_immediately() {
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
         --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-    sleep 2
+    sleep 1
 
     idxr summary
     teardown
@@ -184,7 +184,7 @@ test_startup_dirs_get_created() {
         --watch-dir ./watch-blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 2
+    sleep 1
 
     assert_directory_exists "./startup-blocks"
     assert_directory_exists "./watch-blocks"
@@ -758,8 +758,8 @@ test_many_blocks() {
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
-        --log-level-stdout debug &
-    sleep 60
+        --log-level-stdout debug
+    sleep 10
 
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -797,8 +797,8 @@ test_release() {
         --startup-dir ./blocks \
         --watch-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs
-        --log-level-stdout debug &
+        --log-dir ./logs \
+        --log-level-stdout debug
     sleep 30
 
     # results
