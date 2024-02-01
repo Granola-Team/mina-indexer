@@ -1,5 +1,6 @@
 pub mod blockchain_length;
 pub mod genesis;
+pub mod ingestion;
 pub mod parser;
 pub mod precomputed;
 pub mod previous_state_hash;

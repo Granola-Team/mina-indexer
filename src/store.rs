@@ -32,6 +32,9 @@ impl IndexerStore {
             secondary,
             vec!["blocks", "canonicity", "commands", "events", "ledgers"],
         )?;
+        let _ = database
+            .try_catch_up_with_primary()
+            .expect("Database should catch up to primary");
         Ok(Self {
             db_path: PathBuf::from(secondary),
             database,

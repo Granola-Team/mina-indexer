@@ -1,26 +1,16 @@
+use crate::block::ingestion;
 use crate::constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME};
 use crate::servers::unix_domain_socket_server::UnixDomainSocketServer;
 use crate::{
-    block::{
-        is_valid_block_file, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash,
-        BlockWithoutHeight,
-    },
+    block::{parser::BlockParser, precomputed::PrecomputedBlock, BlockHash, BlockWithoutHeight},
     ledger::genesis::GenesisRoot,
     state::IndexerState,
     store::IndexerStore,
 };
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process,
-    sync::Arc,
-    thread,
-};
+use std::{fs, path::PathBuf, process, sync::Arc, thread};
 
 use crossbeam_channel::{bounded, Receiver};
-use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -57,8 +47,7 @@ impl MinaIndexer {
 #[instrument(skip_all)]
 pub fn start(indexer: MinaIndexer) -> anyhow::Result<()> {
     info!("Starting Mina Indexer...");
-    let config = indexer.config;
-    run(config);
+    run(indexer.config);
     Ok(())
 }
 
@@ -74,7 +63,7 @@ fn run(config: IndexerConfiguration) {
 
     // Launch watch block directory thread
     let _ = thread::spawn(move || {
-        let _ = watch_directory_for_blocks(block_watch_dir, ingestion_tx);
+        let _ = ingestion::watch_directory_for_blocks(block_watch_dir, ingestion_tx);
     });
     // Launch precomputed block deserializer and persistence thread
     let _ = thread::spawn(move || {
@@ -110,7 +99,7 @@ async fn start_unix_domain_server(config: IndexerConfiguration) {
     // TODO: Ensure the IndexerStore exists before attempting to create a read only instance
     let store = Arc::new(IndexerStore::new_read_only(&primary_path, &secondary_path).unwrap());
     // create read only indexer state
-    let foobar = IndexerState::new_without_genesis_events(
+    let indexer_state = IndexerState::new_without_genesis_events(
         &root_hash,
         ledger.ledger.clone(),
         store,
@@ -120,10 +109,13 @@ async fn start_unix_domain_server(config: IndexerConfiguration) {
         ledger_cadence,
     );
 
-    let state = match foobar {
+    let mut state = match indexer_state {
         Ok(state) => state,
-        Err(e) => panic!("OH SHIT: {:?}", e),
+        Err(e) => panic!("Unable to create indexer state: {:?}", e),
     };
+    if let Err(err) = state.sync_from_db() {
+        info!("Unable to sync from db: {}", err);
+    }
     let socket_name = PathBuf::from(SOCKET_NAME);
     let server = UnixDomainSocketServer::new(socket_name, state);
     let _ = crate::servers::unix_domain_socket_server::start(server).await;
@@ -157,47 +149,6 @@ fn block_persistence(
         let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
         debug!("Deserialized precomputed block {block:?}");
         state.add_block_to_witness_tree(&precomputed_block).unwrap();
-    }
-    Ok(())
-}
-/// Watches a directory listening for when valid precomputed blocks are created and signals downstream
-fn watch_directory_for_blocks<P: AsRef<Path>>(
-    watch_dir: P,
-    sender: crossbeam_channel::Sender<PathBuf>,
-) -> notify::Result<()> {
-    info!("Starting block watcher thread..");
-    let (tx, rx) = bounded(4096);
-    let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
-
-    watcher.watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!(
-        "Listening for blocks in directory: {:?}",
-        watch_dir.as_ref()
-    );
-    for res in rx {
-        match res {
-            Ok(event) => {
-                if let EventKind::Create(notify::event::CreateKind::File)
-                // Because of the way gsutil does resumable downloads,
-                // it first creates a file with a suffix .gstmp then
-                // when it's finished downloading, it will rename the
-                // file to the proper extension.
-                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
-                {
-                    for path in event.paths {
-                        if is_valid_block_file(&path) {
-                            debug!("Valid precomputed block file: {}", path.display());
-                            if let Err(e) = sender.send(path) {
-                                error!("Unable to send path downstream. {}", e);
-                            }
-                        } else {
-                            //warn!("Invalid precomputed block file: {}", path.display());
-                        }
-                    }
-                }
-            }
-            Err(error) => error!("Error: {error:?}"),
-        }
     }
     Ok(())
 }
