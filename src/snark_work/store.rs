@@ -5,7 +5,7 @@ use crate::{
 };
 
 pub trait SnarkStore {
-    /// Add snark work
+    /// Add snark work in a precomputed block
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
     /// Get snark work in a given block

@@ -111,6 +111,12 @@ impl IndexerStore {
             .cf_handle("events")
             .expect("events column family exists")
     }
+
+    fn snarks_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snarks")
+            .expect("snarks column family exists")
+    }
 }
 
 impl BlockStore for IndexerStore {
@@ -634,26 +640,112 @@ impl CommandStore for IndexerStore {
 }
 
 impl SnarkStore for IndexerStore {
-    fn add_snark_work(&self, _block: &PrecomputedBlock) -> anyhow::Result<()> {
-        todo!("add snark work")
+    fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        trace!(
+            "Adding SNARK work from block (length {}) {}",
+            block.blockchain_length,
+            block.state_hash
+        );
+
+        let snarks_cf = self.snarks_cf();
+        let completed_works = SnarkWorkSummary::from_precomputed(block);
+        let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
+
+        // add: state hash -> snark work
+        let key = block.state_hash.as_bytes();
+        let value = serde_json::to_vec(&completed_works)?;
+        self.database.put_cf(snarks_cf, key, value)?;
+
+        // add: "pk -> linked list of SNARK work summaries with state hash"
+        for pk in block.prover_keys() {
+            let pk_str = pk.to_address();
+            trace!("Adding SNARK work for pk {pk}");
+
+            // get pk's next index
+            let n = self.get_pk_num_prover_blocks(&pk_str)?.unwrap_or(0);
+
+            let block_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = completed_works_state_hash
+                .clone()
+                .into_iter()
+                .filter(|snark| snark.contains_pk(&pk))
+                .collect();
+
+            if !block_pk_snarks.is_empty() {
+                // write these commands to the next key for pk
+                let key = format!("{pk_str}{n}").as_bytes().to_vec();
+                let value = serde_json::to_vec(&block_pk_snarks)?;
+                self.database.put_cf(snarks_cf, key, value)?;
+
+                // update pk's next index
+                let key = pk_str.as_bytes();
+                let next_n = (n + 1).to_string();
+                let value = next_n.as_bytes();
+                self.database.put_cf(&snarks_cf, key, value)?;
+            }
+        }
+
+        Ok(())
     }
 
-    fn get_pk_num_prover_blocks(&self, _pk: &str) -> anyhow::Result<Option<u32>> {
-        todo!("get pk num prover blocks")
+    /// Number of blocks containing `pk` commands
+    fn get_pk_num_prover_blocks(&self, pk: &str) -> anyhow::Result<Option<u32>> {
+        let key = pk.as_bytes();
+        Ok(self
+            .database
+            .get_pinned_cf(self.snarks_cf(), key)?
+            .and_then(|bytes| {
+                String::from_utf8(bytes.to_vec())
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+            }))
     }
 
     fn get_snark_work_by_public_key(
         &self,
-        _pk: &PublicKey,
+        pk: &PublicKey,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>> {
-        todo!("get snark work by pk")
+        let pk = pk.to_address();
+        trace!("Getting SNARK work for public key {pk}");
+
+        let snarks_cf = self.snarks_cf();
+        let mut all_snarks = None;
+        fn key_n(pk: String, n: u32) -> Vec<u8> {
+            format!("{pk}{n}").as_bytes().to_vec()
+        }
+
+        if let Some(n) = self.get_pk_num_prover_blocks(&pk)? {
+            for m in 0..n {
+                if let Some(mut block_m_snarks) = self
+                    .database
+                    .get_pinned_cf(snarks_cf, key_n(pk.clone(), m))?
+                    .map(|bytes| {
+                        serde_json::from_slice::<Vec<SnarkWorkSummaryWithStateHash>>(&bytes)
+                            .expect("snark work with state hash")
+                    })
+                {
+                    let mut snarks = all_snarks.unwrap_or(vec![]);
+                    snarks.append(&mut block_m_snarks);
+                    all_snarks = Some(snarks);
+                } else {
+                    all_snarks = None;
+                    break;
+                }
+            }
+        }
+        Ok(all_snarks)
     }
 
     fn get_snark_work_in_block(
         &self,
-        _state_hash: &BlockHash,
+        state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
-        todo!("get snark work in block")
+        trace!("Getting SNARK work in block {}", state_hash.0);
+
+        let key = state_hash.0.as_bytes();
+        if let Some(snarks_bytes) = self.database.get_pinned_cf(self.snarks_cf(), key)? {
+            return Ok(Some(serde_json::from_slice(&snarks_bytes)?));
+        }
+        Ok(None)
     }
 }
 
