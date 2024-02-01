@@ -634,6 +634,63 @@ test_transactions() {
     rm -rf ./transactions
     teardown
 }
+# Indexer server returns correct SNARK work
+test_snark_work() {
+    test=test_snark_work
+
+    setup
+    mkdir snark_work
+    dl_mainnet 120 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs
+    sleep 5
+
+    # pk SNARK work queries
+    # prover has SNARK work in block 111
+    fee=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].fee)
+    prover=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].prover)
+    state_hash=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].state_hash)
+
+    assert '0' $fee
+    assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
+    assert '3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK' $state_hash
+
+    # state hash SNARK work queries
+    fee=$(idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].fee)
+    prover=$(idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].prover)
+
+    assert '0' $fee
+    assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
+
+    # write SNARK work from public key to file
+    file=./snark_work/snark_work.json
+    idxr snark-public-key -k B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h -p $file
+    
+    fee=$(cat $file | jq -r .[0].fee)
+    prover=$(cat $file | jq -r .[0].prover)
+    state_hash=$(cat $file | jq -r .[0].state_hash)
+
+    assert '0' $fee
+    assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
+    assert '3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK' $state_hash
+
+    # write SNARK work from block to file
+    file=./snark_work/snark_work.json
+    idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK -p $file
+    
+    fee=$(cat $file | jq -r .[0].fee)
+    prover=$(cat $file | jq -r .[0].prover)
+
+    assert '0' $fee
+    assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
+
+    rm -rf ./snark_work
+    teardown
+}
 
 # Indexer server correctly creates a db checkpoint
 test_checkpoint() {
@@ -785,6 +842,7 @@ if [ "$#" -eq 0 ]; then
     test_sync
     test_replay
     test_transactions
+    test_snark_work
     test_checkpoint
     test_many_blocks
 else
@@ -804,6 +862,7 @@ else
             "test_sync") test_sync ;;
             "test_replay") test_replay ;;
             "test_transactions") test_transactions ;;
+            "test_snark_work") test_snark_work ;;
             "test_checkpoint") test_checkpoint ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
