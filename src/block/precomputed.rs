@@ -227,7 +227,8 @@ impl PrecomputedBlock {
         ])
     }
 
-    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+    /// All applied & failed command public keys
+    pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
         let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
 
         // add keys from all commands
@@ -238,7 +239,22 @@ impl PrecomputedBlock {
                     SignedCommand(signed_command)
                 }
             };
-            add_keys(&mut pk_set, signed_command.all_public_keys());
+            add_keys(&mut pk_set, signed_command.all_command_public_keys());
+        });
+
+        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
+        pks.sort();
+        pks
+    }
+
+    /// Prover public keys for completed SNARK work
+    pub fn prover_keys(&self) -> Vec<PublicKey> {
+        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
+
+        // add prover keys from completed SNARK work
+        let completed_works = self.completed_works();
+        completed_works.iter().for_each(|work| {
+            pk_set.insert(work.prover.clone().into());
         });
 
         let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
@@ -252,7 +268,7 @@ impl PrecomputedBlock {
         let mut public_keys: HashSet<PublicKey> =
             HashSet::from([self.block_creator(), self.block_stake_winner()]);
 
-        // coinbase receiver
+        // coinbase receiver if cooinbase is applied
         if Coinbase::from_precomputed(self).is_coinbase_applied() {
             public_keys.insert(self.coinbase_receiver());
         }
@@ -267,7 +283,7 @@ impl PrecomputedBlock {
                         SignedCommand(signed_command)
                     }
                 };
-                add_keys(&mut public_keys, signed_command.all_public_keys());
+                add_keys(&mut public_keys, signed_command.all_command_public_keys());
             });
 
         let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();

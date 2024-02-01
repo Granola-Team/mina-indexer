@@ -59,6 +59,12 @@ impl std::hash::Hash for PublicKey {
     }
 }
 
+impl From<PublicKey> for String {
+    fn from(value: PublicKey) -> Self {
+        value.to_address()
+    }
+}
+
 impl std::fmt::Display for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_address())
