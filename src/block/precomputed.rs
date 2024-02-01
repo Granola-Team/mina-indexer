@@ -10,7 +10,7 @@ use mina_serialization_types::{
     json::DeltaTransitionChainProofJson,
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
-    staged_ledger_diff as mina_rs,
+    snark_work as mina_snark, staged_ledger_diff as mina_rs,
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1},
 };
 use serde::{Deserialize, Serialize};
@@ -172,14 +172,19 @@ impl PrecomputedBlock {
         self.staged_ledger_diff_tuple().1.map(|x| x.inner().inner())
     }
 
-    pub fn completed_works(
-        &self,
-    ) -> Vec<mina_serialization_types::snark_work::TransactionSnarkWork> {
-        self.staged_ledger_pre_diff()
+    pub fn completed_works(&self) -> Vec<mina_snark::TransactionSnarkWork> {
+        let mut completed_works: Vec<mina_snark::TransactionSnarkWork> = self
+            .staged_ledger_pre_diff()
             .completed_works
             .iter()
             .map(|x| x.t.clone())
-            .collect()
+            .collect();
+        let mut other = self
+            .staged_ledger_post_diff()
+            .map(|diff| diff.completed_works.iter().map(|x| x.t.clone()).collect())
+            .unwrap_or(vec![]);
+        completed_works.append(&mut other);
+        completed_works
     }
 
     pub fn coinbase_receiver_balance(&self) -> Option<u64> {
