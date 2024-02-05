@@ -28,6 +28,8 @@ pub enum ClientCli {
     Checkpoint(CheckpointArgs),
     #[clap(flatten)]
     Ledger(LedgerArgs),
+    #[clap(flatten)]
+    Snark(SnarkArgs),
     /// Show summary of the state
     Summary(SummaryArgs),
     /// Shutdown the server
@@ -123,6 +125,37 @@ pub struct LedgerStateHashArgs {
     /// Output JSON data
     #[arg(short, long, default_value_t = false)]
     json: bool,
+}
+
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum SnarkArgs {
+    /// Query a block for SNARK work
+    Snark(SnarkStateHashArgs),
+    /// Query a public key for all SNARK work
+    SnarkPublicKey(SnarkPublickKeyArgs),
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct SnarkStateHashArgs {
+    /// Path to write the snark work [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// State hash of block to query
+    #[arg(long)]
+    state_hash: String,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct SnarkPublickKeyArgs {
+    /// Path to write the snark work [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// State hash of block to query
+    #[arg(short = 'k', long)]
+    public_key: String,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -307,6 +340,25 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
                     "ledger_at_height {} {}\0",
                     ledger_at_height_args.height,
                     path.display()
+                ),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            let msg = String::from_utf8(buffer)?;
+            println!("{msg}");
+        }
+        ClientCli::Snark(snark_args) => {
+            let command = match snark_args {
+                SnarkArgs::Snark(snark_args) => format!(
+                    "snark-state-hash {} {}\0",
+                    snark_args.state_hash,
+                    snark_args.path.clone().unwrap_or("".into()).display()
+                ),
+                SnarkArgs::SnarkPublicKey(pk_args) => format!(
+                    "snark-pk {} {}\0",
+                    pk_args.public_key,
+                    pk_args.path.clone().unwrap_or("".into()).display()
                 ),
             };
             writer.write_all(command.as_bytes()).await?;

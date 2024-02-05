@@ -68,7 +68,7 @@ impl SignedCommand {
         self.0.clone().inner().inner().signer.0.inner().into()
     }
 
-    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+    pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
         vec![
             self.receiver_pk(),
             self.source_pk(),
@@ -78,7 +78,7 @@ impl SignedCommand {
     }
 
     pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
-        self.all_public_keys().contains(pk)
+        self.all_command_public_keys().contains(pk)
     }
 
     pub fn is_delegation(&self) -> bool {

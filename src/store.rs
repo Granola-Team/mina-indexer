@@ -8,6 +8,7 @@ use crate::{
     },
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
+    snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
 use speedb::{ColumnFamilyDescriptor, DB};
@@ -30,7 +31,14 @@ impl IndexerStore {
             &database_opts,
             path,
             secondary,
-            vec!["blocks", "canonicity", "commands", "events", "ledgers"],
+            vec![
+                "blocks",
+                "canonicity",
+                "commands",
+                "events",
+                "ledgers",
+                "snarks",
+            ],
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -45,7 +53,8 @@ impl IndexerStore {
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
         let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
-        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts);
+        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
+        let snarks = ColumnFamilyDescriptor::new("snarks", cf_opts);
 
         let mut database_opts = speedb::Options::default();
         database_opts.create_missing_column_families(true);
@@ -53,7 +62,7 @@ impl IndexerStore {
         let database = speedb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, commands, events, ledgers],
+            vec![blocks, canonicity, commands, events, ledgers, snarks],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -102,6 +111,12 @@ impl IndexerStore {
             .cf_handle("events")
             .expect("events column family exists")
     }
+
+    fn snarks_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snarks")
+            .expect("snarks column family exists")
+    }
 }
 
 impl BlockStore for IndexerStore {
@@ -122,6 +137,9 @@ impl BlockStore for IndexerStore {
 
         // add block commands
         self.add_commands(block)?;
+
+        // add block SNARK work
+        self.add_snark_work(block)?;
 
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
@@ -466,7 +484,7 @@ impl CommandStore for IndexerStore {
         self.database.put_cf(&commands_cf, key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
-        for pk in block.all_public_keys() {
+        for pk in block.all_command_public_keys() {
             let pk_str = pk.to_address();
             trace!("Adding command pk {pk}");
 
@@ -618,6 +636,115 @@ impl CommandStore for IndexerStore {
                     .ok()
                     .and_then(|s| s.parse().ok())
             }))
+    }
+}
+
+impl SnarkStore for IndexerStore {
+    fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        trace!(
+            "Adding SNARK work from block (length {}) {}",
+            block.blockchain_length,
+            block.state_hash
+        );
+
+        let snarks_cf = self.snarks_cf();
+        let completed_works = SnarkWorkSummary::from_precomputed(block);
+        let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
+
+        // add: state hash -> snark work
+        let key = block.state_hash.as_bytes();
+        let value = serde_json::to_vec(&completed_works)?;
+        self.database.put_cf(snarks_cf, key, value)?;
+
+        // add: "pk -> linked list of SNARK work summaries with state hash"
+        for pk in block.prover_keys() {
+            let pk_str = pk.to_address();
+            trace!("Adding SNARK work for pk {pk}");
+
+            // get pk's next index
+            let n = self.get_pk_num_prover_blocks(&pk_str)?.unwrap_or(0);
+
+            let block_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = completed_works_state_hash
+                .clone()
+                .into_iter()
+                .filter(|snark| snark.contains_pk(&pk))
+                .collect();
+
+            if !block_pk_snarks.is_empty() {
+                // write these SNARKs to the next key for pk
+                let key = format!("{pk_str}{n}").as_bytes().to_vec();
+                let value = serde_json::to_vec(&block_pk_snarks)?;
+                self.database.put_cf(snarks_cf, key, value)?;
+
+                // update pk's next index
+                let key = pk_str.as_bytes();
+                let next_n = (n + 1).to_string();
+                let value = next_n.as_bytes();
+                self.database.put_cf(&snarks_cf, key, value)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_pk_num_prover_blocks(&self, pk: &str) -> anyhow::Result<Option<u32>> {
+        let key = pk.as_bytes();
+        Ok(self
+            .database
+            .get_pinned_cf(self.snarks_cf(), key)?
+            .and_then(|bytes| {
+                String::from_utf8(bytes.to_vec())
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+            }))
+    }
+
+    fn get_snark_work_by_public_key(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>> {
+        let pk = pk.to_address();
+        trace!("Getting SNARK work for public key {pk}");
+
+        let snarks_cf = self.snarks_cf();
+        let mut all_snarks = None;
+        fn key_n(pk: String, n: u32) -> Vec<u8> {
+            format!("{pk}{n}").as_bytes().to_vec()
+        }
+
+        if let Some(n) = self.get_pk_num_prover_blocks(&pk)? {
+            for m in 0..n {
+                if let Some(mut block_m_snarks) = self
+                    .database
+                    .get_pinned_cf(snarks_cf, key_n(pk.clone(), m))?
+                    .map(|bytes| {
+                        serde_json::from_slice::<Vec<SnarkWorkSummaryWithStateHash>>(&bytes)
+                            .expect("snark work with state hash")
+                    })
+                {
+                    let mut snarks = all_snarks.unwrap_or(vec![]);
+                    snarks.append(&mut block_m_snarks);
+                    all_snarks = Some(snarks);
+                } else {
+                    all_snarks = None;
+                    break;
+                }
+            }
+        }
+        Ok(all_snarks)
+    }
+
+    fn get_snark_work_in_block(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
+        trace!("Getting SNARK work in block {}", state_hash.0);
+
+        let key = state_hash.0.as_bytes();
+        if let Some(snarks_bytes) = self.database.get_pinned_cf(self.snarks_cf(), key)? {
+            return Ok(Some(serde_json::from_slice(&snarks_bytes)?));
+        }
+        Ok(None)
     }
 }
 

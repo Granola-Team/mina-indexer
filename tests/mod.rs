@@ -2,7 +2,7 @@ mod block;
 mod canonicity;
 mod command;
 mod event;
-mod receiver;
+mod snark_work;
 mod state;
 
 pub mod helpers {

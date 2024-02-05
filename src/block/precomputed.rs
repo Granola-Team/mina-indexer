@@ -10,7 +10,7 @@ use mina_serialization_types::{
     json::DeltaTransitionChainProofJson,
     protocol_state::{ProtocolState, ProtocolStateJson},
     protocol_state_proof::ProtocolStateProofBase64Json,
-    staged_ledger_diff as mina_rs,
+    snark_work as mina_snark, staged_ledger_diff as mina_rs,
     v1::{DeltaTransitionChainProof, ProtocolStateProofV1},
 };
 use serde::{Deserialize, Serialize};
@@ -172,14 +172,19 @@ impl PrecomputedBlock {
         self.staged_ledger_diff_tuple().1.map(|x| x.inner().inner())
     }
 
-    pub fn completed_works(
-        &self,
-    ) -> Vec<mina_serialization_types::snark_work::TransactionSnarkWork> {
-        self.staged_ledger_pre_diff()
+    pub fn completed_works(&self) -> Vec<mina_snark::TransactionSnarkWork> {
+        let mut completed_works: Vec<mina_snark::TransactionSnarkWork> = self
+            .staged_ledger_pre_diff()
             .completed_works
             .iter()
             .map(|x| x.t.clone())
-            .collect()
+            .collect();
+        let mut other = self
+            .staged_ledger_post_diff()
+            .map(|diff| diff.completed_works.iter().map(|x| x.t.clone()).collect())
+            .unwrap_or(vec![]);
+        completed_works.append(&mut other);
+        completed_works
     }
 
     pub fn coinbase_receiver_balance(&self) -> Option<u64> {
@@ -227,7 +232,8 @@ impl PrecomputedBlock {
         ])
     }
 
-    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+    /// All applied & failed command public keys
+    pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
         let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
 
         // add keys from all commands
@@ -238,7 +244,22 @@ impl PrecomputedBlock {
                     SignedCommand(signed_command)
                 }
             };
-            add_keys(&mut pk_set, signed_command.all_public_keys());
+            add_keys(&mut pk_set, signed_command.all_command_public_keys());
+        });
+
+        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
+        pks.sort();
+        pks
+    }
+
+    /// Prover public keys for completed SNARK work
+    pub fn prover_keys(&self) -> Vec<PublicKey> {
+        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
+
+        // add prover keys from completed SNARK work
+        let completed_works = self.completed_works();
+        completed_works.iter().for_each(|work| {
+            pk_set.insert(work.prover.clone().into());
         });
 
         let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
@@ -252,7 +273,7 @@ impl PrecomputedBlock {
         let mut public_keys: HashSet<PublicKey> =
             HashSet::from([self.block_creator(), self.block_stake_winner()]);
 
-        // coinbase receiver
+        // coinbase receiver if cooinbase is applied
         if Coinbase::from_precomputed(self).is_coinbase_applied() {
             public_keys.insert(self.coinbase_receiver());
         }
@@ -267,7 +288,7 @@ impl PrecomputedBlock {
                         SignedCommand(signed_command)
                     }
                 };
-                add_keys(&mut public_keys, signed_command.all_public_keys());
+                add_keys(&mut public_keys, signed_command.all_command_public_keys());
             });
 
         let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();

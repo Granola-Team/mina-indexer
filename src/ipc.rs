@@ -3,6 +3,7 @@ use crate::{
     command::{store::CommandStore, Command},
     ledger::{self, public_key, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
+    snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
 };
@@ -21,7 +22,9 @@ pub struct IpcActor {
     summary: RwLock<Option<SummaryVerbose>>,
     store: RwLock<Arc<IndexerStore>>,
 }
+
 type IpcStateReceiver = mpsc::Receiver<IpcChannelUpdate>;
+
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum IpcActorError {}
 
@@ -209,17 +212,14 @@ async fn handle_conn(
                         debug!("Writing best ledger to stdout");
                         Some(ledger)
                     } else {
-                        let path = &data.parse::<PathBuf>()?;
+                        let path = data.parse::<PathBuf>()?;
                         if !path.is_dir() {
                             debug!("Writing best ledger to {}", path.display());
 
-                            tokio::fs::write(path, ledger).await?;
+                            tokio::fs::write(path.clone(), ledger).await?;
                             Some(format!("Best ledger written to {}", path.display()))
                         } else {
-                            Some(format!(
-                                "The path provided must not be a directory: {}",
-                                path.display()
-                            ))
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 }
@@ -264,22 +264,19 @@ async fn handle_conn(
                             Some(ledger)
                         }
                         Some(path_buffer) => {
-                            let path = &String::from_utf8(path_buffer.to_vec())?
+                            let path = String::from_utf8(path_buffer.to_vec())?
                                 .trim_end_matches('\0')
                                 .parse::<PathBuf>()?;
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path, ledger).await?;
+                                tokio::fs::write(path.clone(), ledger).await?;
                                 Some(format!(
                                     "Ledger at state hash {hash} written to {}",
                                     path.display()
                                 ))
                             } else {
-                                Some(format!(
-                                    "The path provided must not be a directory: {}",
-                                    path.display()
-                                ))
+                                file_must_not_be_a_directory(&path)
                             }
                         }
                     }
@@ -298,19 +295,16 @@ async fn handle_conn(
                             Some(ledger)
                         }
                         Some(path_buffer) => {
-                            let path = &String::from_utf8(path_buffer.to_vec())?
+                            let path = String::from_utf8(path_buffer.to_vec())?
                                 .trim_end_matches('\0')
                                 .parse::<PathBuf>()?;
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path, ledger).await?;
+                                tokio::fs::write(path.clone(), ledger).await?;
                                 Some(format!("Ledger at {hash} written to {}", path.display()))
                             } else {
-                                Some(format!(
-                                    "The path provided must not be a directory: {}",
-                                    path.display()
-                                ))
+                                file_must_not_be_a_directory(&path)
                             }
                         }
                     }
@@ -338,7 +332,7 @@ async fn handle_conn(
                         Some(ledger)
                     }
                     Some(path_buffer) => {
-                        let path = &String::from_utf8(path_buffer.to_vec())?
+                        let path = String::from_utf8(path_buffer.to_vec())?
                             .trim_end_matches('\0')
                             .parse::<PathBuf>()?;
                         if !path.is_dir() {
@@ -350,16 +344,70 @@ async fn handle_conn(
                                 path.display()
                             ))
                         } else {
-                            Some(format!(
-                                "The path provided must not be a directory: {}",
-                                path.display()
-                            ))
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 }
             } else {
                 None
             }
+        }
+        "snark-pk" => {
+            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!("Received SNARK work command for public key {pk}");
+
+            let snarks = db
+                .get_snark_work_by_public_key(&pk.clone().into())?
+                .unwrap_or(vec![]);
+            let snarks_str = format!("{snarks:?}");
+
+            if path.is_empty() {
+                debug!("Writing SNARK work for {pk} to stdout");
+                Some(snarks_str)
+            } else {
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    debug!("Writing SNARK work for {pk} to {}", path.display());
+
+                    tokio::fs::write(&path, snarks_str).await?;
+                    Some(format!("SNARK work for {pk} written to {}", path.display()))
+                } else {
+                    file_must_not_be_a_directory(&path)
+                }
+            }
+        }
+        "snark-state-hash" => {
+            let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!("Received SNARK work command for state hash {state_hash}");
+
+            db.get_snark_work_in_block(&state_hash.clone().into())?
+                .and_then(|snarks| {
+                    let snarks_str = format!("{snarks:?}");
+                    if path.is_empty() {
+                        debug!("Writing SNARK work for {state_hash} to stdout");
+                        Some(snarks_str)
+                    } else {
+                        let path: PathBuf = path.into();
+                        if !path.is_dir() {
+                            debug!(
+                                "Writing SNARK work for block {state_hash} to {}",
+                                path.display()
+                            );
+
+                            std::fs::write(&path, snarks_str).unwrap();
+                            Some(format!(
+                                "SNARK work for block {state_hash} written to {}",
+                                path.display()
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
+                        }
+                    }
+                })
         }
         "summary" => {
             info!("Received summary command");
@@ -436,10 +484,7 @@ async fn handle_conn(
                         path.display()
                     ))
                 } else {
-                    Some(format!(
-                        "The path provided must not be a directory: {}",
-                        path.display()
-                    ))
+                    file_must_not_be_a_directory(&path)
                 }
             }
         }
@@ -489,4 +534,11 @@ async fn handle_conn(
     }
 
     Ok(())
+}
+
+fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
+    Some(format!(
+        "The path provided must not be a directory: {}",
+        path.display()
+    ))
 }

@@ -156,7 +156,7 @@ impl UserCommandWithStatus {
 
     pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
         let signed = SignedCommand::from(self.clone());
-        signed.all_public_keys().contains(pk)
+        signed.all_command_public_keys().contains(pk)
     }
 
     pub fn data(&self) -> mina_rs::UserCommand {
