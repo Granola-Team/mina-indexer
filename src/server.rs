@@ -7,14 +7,12 @@ use crate::{
     state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
 };
-use anyhow::anyhow;
 use interprocess::local_socket::tokio::LocalSocketListener;
 use std::{
     fs,
     path::{Path, PathBuf},
     process,
     sync::Arc,
-    time::Duration,
 };
 use tokio::{
     io,
@@ -36,25 +34,9 @@ pub struct IndexerConfiguration {
     pub ledger_cadence: u32,
 }
 
-pub enum MinaIndexerQuery {
-    NumBlocksProcessed,
-    BestTip,
-    CanonicalTip,
-    Uptime,
-}
-
-pub enum MinaIndexerQueryResponse {
-    NumBlocksProcessed(u32),
-    BestTip(String),
-    CanonicalTip(String),
-    Uptime(Duration),
-}
-
 pub struct MinaIndexer {
     _ipc_join_handle: JoinHandle<()>,
     _witness_join_handle: JoinHandle<anyhow::Result<()>>,
-    query_sender:
-        mpsc::UnboundedSender<(MinaIndexerQuery, oneshot::Sender<MinaIndexerQueryResponse>)>,
     _ipc_update_sender: Sender<IpcChannelUpdate>,
 }
 
@@ -78,7 +60,6 @@ impl MinaIndexer {
         config: IndexerConfiguration,
         store: Arc<IndexerStore>,
     ) -> anyhow::Result<Self> {
-        let (query_sender, query_receiver) = mpsc::unbounded_channel();
         let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
         let ipc_update_arc = Arc::new(ipc_update_sender.clone());
         let watch_dir = config.watch_dir.clone();
@@ -98,13 +79,12 @@ impl MinaIndexer {
         });
         let _witness_join_handle = tokio::spawn(async move {
             let state = initialize(config, store, ipc_update_arc.clone()).await?;
-            run(watch_dir, state, query_receiver, ipc_update_arc.clone()).await
+            run(watch_dir, state, ipc_update_arc.clone()).await
         });
 
         Ok(Self {
             _ipc_join_handle,
             _witness_join_handle,
-            query_sender,
             _ipc_update_sender: ipc_update_sender,
         })
     }
@@ -112,21 +92,6 @@ impl MinaIndexer {
     pub async fn await_loop(self) {
         let _ = self._witness_join_handle.await;
         let _ = self._ipc_join_handle.await;
-    }
-
-    fn send_query(&self, command: MinaIndexerQuery) -> anyhow::Result<MinaIndexerQueryResponse> {
-        let (response_sender, response_receiver) = oneshot::channel();
-        self.query_sender
-            .send((command, response_sender))
-            .map_err(|_| anyhow!("could not send command to running Mina Indexer"))?;
-        response_receiver.recv().map_err(|recv_err| recv_err.into())
-    }
-
-    pub fn blocks_processed(&self) -> anyhow::Result<u32> {
-        match self.send_query(MinaIndexerQuery::NumBlocksProcessed)? {
-            MinaIndexerQueryResponse::NumBlocksProcessed(blocks_processed) => Ok(blocks_processed),
-            _ => Err(anyhow!("unexpected response!")),
-        }
     }
 }
 
@@ -253,10 +218,6 @@ pub async fn initialize(
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
-    mut query_receiver: mpsc::UnboundedReceiver<(
-        MinaIndexerQuery,
-        oneshot::Sender<MinaIndexerQueryResponse>,
-    )>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> Result<(), anyhow::Error> {
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
@@ -268,25 +229,6 @@ pub async fn run(
 
     loop {
         tokio::select! {
-            Some((command, response_sender)) = query_receiver.recv() => {
-                use MinaIndexerQuery::*;
-                let response = match command {
-                    NumBlocksProcessed
-                        => MinaIndexerQueryResponse::NumBlocksProcessed(state.blocks_processed),
-                    BestTip => {
-                        let best_tip = state.best_tip.clone().state_hash.0;
-                        MinaIndexerQueryResponse::BestTip(best_tip)
-                    },
-                    CanonicalTip => {
-                        let canonical_tip = state.canonical_tip.clone().state_hash.0;
-                        MinaIndexerQueryResponse::CanonicalTip(canonical_tip)
-                    },
-                    Uptime
-                        => MinaIndexerQueryResponse::Uptime(state.init_time.elapsed())
-                };
-                response_sender.send(response)?;
-            }
-
             block_fut = filesystem_receiver.recv_block() => {
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
