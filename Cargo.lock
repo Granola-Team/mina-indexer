@@ -610,7 +610,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72f3f22f1a586604e62efd23f78218f3ccdecf7a33c4500db2d37d85a24fe994"
 dependencies = [
- "nix 0.26.4",
+ "nix",
  "terminfo",
  "thiserror",
  "which",
@@ -630,7 +630,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5080df6b0f0ecb76cab30808f00d937ba725cebe266a3da8cd89dff92f2a9916"
 dependencies = [
  "async-trait",
- "nix 0.26.4",
+ "nix",
  "tokio",
  "winapi",
 ]
@@ -701,16 +701,6 @@ checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array",
  "typenum",
-]
-
-[[package]]
-name = "ctrlc"
-version = "3.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b467862cc8610ca6fc9a1532d7777cee0804e678ab45410897b9396495994a0b"
-dependencies = [
- "nix 0.27.1",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1669,7 +1659,6 @@ dependencies = [
  "bs58 0.5.0",
  "bytesize",
  "clap",
- "ctrlc",
  "futures",
  "futures-util",
  "glob",
@@ -1805,17 +1794,6 @@ dependencies = [
  "libc",
  "memoffset",
  "pin-utils",
-]
-
-[[package]]
-name = "nix"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
-dependencies = [
- "bitflags 2.4.2",
- "cfg-if",
- "libc",
 ]
 
 [[package]]
@@ -3109,7 +3087,7 @@ dependencies = [
  "futures",
  "ignore-files",
  "miette",
- "nix 0.26.4",
+ "nix",
  "normalize-path",
  "notify",
  "once_cell",
@@ -3127,7 +3105,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01603bbe02fd75918f010dadad456d47eda14fb8fdcab276b0b4b8362f142ae3"
 dependencies = [
- "nix 0.26.4",
+ "nix",
  "notify",
  "watchexec-signals",
 ]
@@ -3139,7 +3117,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc2a5df96c388901c94ca04055fcd51d4196ca3e971c5e805bd4a4b61dd6a7e5"
 dependencies = [
  "miette",
- "nix 0.26.4",
+ "nix",
  "thiserror",
 ]
 

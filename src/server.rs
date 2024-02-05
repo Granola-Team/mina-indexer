@@ -95,18 +95,31 @@ impl MinaIndexer {
     }
 }
 
+async fn wait_for_signal() {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut term = signal(SignalKind::terminate()).expect("failed to register signal handler");
+    let mut int = signal(SignalKind::interrupt()).expect("failed to register signal handler");
+    tokio::select! {
+        _ = term.recv() => {
+            info!("Received SIGTERM");
+            process::exit(100);
+        },
+        _ = int.recv() => {
+            info!("Received SIGINT");
+            process::exit(101);
+        },
+    }
+}
+
 pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<IndexerState> {
-    debug!("Setting Ctrl-C handler");
-    ctrlc::set_handler(move || {
-        info!("SIGINT received. Exiting.");
-        process::exit(0);
-    })
-    .expect("Error setting Ctrl-C handler");
-
+    // Setup signal handler
+    tokio::spawn(async move {
+        let _ = wait_for_signal().await;
+    });
     info!("Starting mina-indexer server");
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
