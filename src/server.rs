@@ -117,7 +117,7 @@ pub async fn initialize(
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<IndexerState> {
     // Setup signal handler
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = wait_for_signal().await;
     });
     info!("Starting mina-indexer server");
