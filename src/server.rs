@@ -60,7 +60,7 @@ impl MinaIndexer {
         store: Arc<IndexerStore>,
     ) -> anyhow::Result<Self> {
         let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-        let ipc_update_arc = Arc::new(ipc_update_sender.clone());
+        let ipc_update_arc = Arc::new(ipc_update_sender);
         let watch_dir = config.watch_dir.clone();
         let ipc_store = store.clone();
         let ipc_config = config.clone();
