@@ -179,13 +179,9 @@ pub async fn initialize(
             }
         };
 
-        info!("Getting best tip");
         let best_tip = state.best_tip_block().clone();
-        info!("Getting best ledger");
         let ledger = genesis_ledger.into();
-        info!("Getting summary");
         let summary = Box::new(state.summary_verbose());
-        info!("Getting store");
         let store = Arc::new(state.spawn_secondary_database()?);
 
         debug!("Updating IPC state");
