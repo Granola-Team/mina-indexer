@@ -16,7 +16,7 @@ use std::{
 };
 use tokio::{
     io,
-    sync::mpsc::{self, Sender},
+    sync::mpsc,
     task::JoinHandle,
 };
 use tracing::{debug, info, instrument};
@@ -37,7 +37,6 @@ pub struct IndexerConfiguration {
 pub struct MinaIndexer {
     _ipc_join_handle: JoinHandle<()>,
     _witness_join_handle: JoinHandle<anyhow::Result<()>>,
-    _ipc_update_sender: Sender<IpcChannelUpdate>,
 }
 
 #[derive(Debug)]
@@ -65,6 +64,7 @@ impl MinaIndexer {
         let watch_dir = config.watch_dir.clone();
         let ipc_store = store.clone();
         let ipc_config = config.clone();
+
         let listener = LocalSocketListener::bind(SOCKET_NAME)
             .or_else(try_remove_old_socket)
             .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
@@ -85,7 +85,6 @@ impl MinaIndexer {
         Ok(Self {
             _ipc_join_handle,
             _witness_join_handle,
-            _ipc_update_sender: ipc_update_sender,
         })
     }
 
@@ -126,12 +125,12 @@ pub async fn initialize(
         ledger: genesis_ledger,
         root_hash,
         startup_dir,
-        watch_dir: _,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
         initialization_mode,
         ledger_cadence,
+        ..
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");

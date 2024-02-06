@@ -25,9 +25,6 @@ pub struct IpcActor {
 
 type IpcStateReceiver = mpsc::Receiver<IpcChannelUpdate>;
 
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub enum IpcActorError {}
-
 impl IpcActor {
     #[instrument(skip_all)]
     pub fn new(
