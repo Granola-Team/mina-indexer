@@ -301,6 +301,12 @@ impl From<SignedCommandWithData> for SignedCommand {
     }
 }
 
+impl From<SignedCommandWithData> for Command {
+    fn from(value: SignedCommandWithData) -> Self {
+        value.command.into()
+    }
+}
+
 impl std::fmt::Debug for SignedCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use serde_json::*;
@@ -444,6 +450,10 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     payload_obj.insert("common".into(), Value::Object(common));
     payload_obj.insert("body".into(), body);
     Value::Object(payload_obj)
+}
+
+pub fn is_valid_tx_hash(input: &str) -> bool {
+    input.starts_with("Ckp") && input.len() == 53
 }
 
 #[cfg(test)]
