@@ -256,6 +256,15 @@ impl Ledger {
         }
         Ok(ledger)
     }
+
+    pub fn to_string_pretty(&self) -> String {
+        let mut accounts = HashMap::new();
+        for (pk, acct) in &self.accounts {
+            accounts.insert(pk.to_address(), acct.clone());
+        }
+
+        serde_json::to_string_pretty(&accounts).unwrap()
+    }
 }
 
 impl ToString for Ledger {
