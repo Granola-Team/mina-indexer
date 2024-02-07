@@ -280,45 +280,41 @@ async fn handle_conn(
         }
         "ledger" => {
             let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let hash = hash.trim_end_matches('\0');
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
             info!("Received ledger command for {hash}");
 
             // check if ledger or state hash and use appropriate getter
-            if block::is_valid_state_hash(hash) {
+            if block::is_valid_state_hash(&hash) {
                 trace!("{hash} is a state hash");
 
-                if let Some(ledger) = db.get_ledger_state_hash(&hash.into())? {
+                if let Some(ledger) = db.get_ledger_state_hash(&hash.clone().into())? {
                     let ledger = ledger.to_string_pretty();
-                    match buffers.next() {
-                        None => {
-                            debug!("Writing ledger at state hash {hash} to stdout");
-                            Some(ledger)
-                        }
-                        Some(path_buffer) => {
-                            let path = String::from_utf8(path_buffer.to_vec())?
-                                .trim_end_matches('\0')
-                                .parse::<PathBuf>()?;
-                            if !path.is_dir() {
-                                debug!("Writing ledger at {hash} to {}", path.display());
+                    if path.is_empty() {
+                        debug!("Writing ledger at state hash {hash} to stdout");
+                        Some(ledger)
+                    } else {
+                        let path: PathBuf = path.into();
+                        if !path.is_dir() {
+                            debug!("Writing ledger at {hash} to {}", path.display());
 
-                                std::fs::write(path.clone(), ledger)?;
-                                Some(format!(
-                                    "Ledger at state hash {hash} written to {}",
-                                    path.display()
-                                ))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            std::fs::write(path.clone(), ledger)?;
+                            Some(format!(
+                                "Ledger at state hash {hash} written to {}",
+                                path.display()
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 } else {
                     error!("Ledger at state hash {hash} is not in the store");
                     Some(format!("Ledger at state hash {hash} is not in the store"))
                 }
-            } else if ledger::is_valid_hash(hash) {
+            } else if ledger::is_valid_hash(&hash) {
                 trace!("{hash} is a ledger hash");
 
-                if let Some(ledger) = db.get_ledger(hash)? {
+                if let Some(ledger) = db.get_ledger(&hash)? {
                     let ledger = ledger.to_string_pretty();
                     match buffers.next() {
                         None => {
@@ -349,9 +345,9 @@ async fn handle_conn(
             }
         }
         "ledger-at-height" => {
-            let height = String::from_utf8(buffers.next().unwrap().to_vec())?
-                .trim_end_matches('\0')
-                .parse::<u32>()?;
+            let height = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
             info!("Received ledger-at-height {height} command");
 
             if height > best_tip.blockchain_length {
@@ -359,26 +355,21 @@ async fn handle_conn(
                 Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {}", best_tip.blockchain_length))
             } else if let Some(ledger) = db.get_ledger_at_height(height)? {
                 let ledger = ledger.to_string_pretty();
-                match buffers.next() {
-                    None => {
-                        debug!("Writing ledger at height {height} to stdout");
-                        Some(ledger)
-                    }
-                    Some(path_buffer) => {
-                        let path = String::from_utf8(path_buffer.to_vec())?
-                            .trim_end_matches('\0')
-                            .parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing ledger at height {height} to {}", path.display());
+                if path.is_empty() {
+                    debug!("Writing ledger at height {height} to stdout");
+                    Some(ledger)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing ledger at height {height} to {}", path.display());
 
-                            std::fs::write(&path, ledger)?;
-                            Some(format!(
-                                "Ledger at height {height} written to {}",
-                                path.display()
-                            ))
-                        } else {
-                            file_must_not_be_a_directory(&path)
-                        }
+                        std::fs::write(&path, ledger)?;
+                        Some(format!(
+                            "Ledger at height {height} written to {}",
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
                     }
                 }
             } else {
