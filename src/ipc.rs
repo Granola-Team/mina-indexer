@@ -1,6 +1,6 @@
 use crate::{
-    block::{is_valid_state_hash, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
-    command::{store::CommandStore, Command},
+    block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    command::{signed, store::CommandStore, Command},
     ledger::{self, public_key, store::LedgerStore, Ledger},
     server::{IndexerConfiguration, IpcChannelUpdate},
     snark_work::store::SnarkStore,
@@ -152,7 +152,7 @@ async fn handle_conn(
             let end_state_hash = {
                 let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
                 let hash = hash.trim_end_matches('\0');
-                if !is_valid_state_hash(hash) {
+                if !block::is_valid_state_hash(hash) {
                     best_tip.state_hash.clone()
                 } else {
                     hash.into()
@@ -249,7 +249,7 @@ async fn handle_conn(
             info!("Received ledger command for {hash}");
 
             // check if ledger or state hash and use appropriate getter
-            if is_valid_state_hash(&hash[..52]) {
+            if block::is_valid_state_hash(&hash[..52]) {
                 let hash = &hash[..52];
                 trace!("{hash} is a state hash");
 
@@ -431,9 +431,8 @@ async fn handle_conn(
             process::exit(0);
         }
         "tx-pk" => {
-            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
-            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
             let start_state_hash: BlockHash =
                 String::from_utf8(buffers.next().unwrap().to_vec())?.into();
             let end_state_hash: BlockHash = {
@@ -445,43 +444,43 @@ async fn handle_conn(
                     raw.into()
                 }
             };
-            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let path = path.trim_end_matches('\0');
+            info!("Received tx-public-key command for {pk}");
 
-            info!("Received transactions command for public key {pk}");
-            let transactions = db
-                .get_commands_with_bounds(&pk.clone().into(), &start_state_hash, &end_state_hash)?
-                .unwrap_or(vec![]);
-            let transaction_str = {
-                let txs = if num != 0 {
-                    transactions.into_iter().take(num).collect()
+            if !public_key::is_valid(&pk) {
+                invalid_public_key(&pk)
+            } else if !block::is_valid_state_hash(&start_state_hash.0) {
+                invalid_state_hash(&start_state_hash.0)
+            } else if !block::is_valid_state_hash(&end_state_hash.0) {
+                invalid_state_hash(&end_state_hash.0)
+            } else {
+                let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let path = path.trim_end_matches('\0');
+                let transactions = db
+                    .get_commands_for_public_key(&pk.clone().into())?
+                    .unwrap_or(vec![]);
+                let transaction_str = if verbose {
+                    format!("{transactions:#?}")
                 } else {
-                    transactions
+                    let txs: Vec<Command> = transactions.into_iter().map(Command::from).collect();
+                    format!("{txs:#?}")
                 };
 
-                if verbose {
-                    format!("{txs:?}")
+                if path.is_empty() {
+                    debug!("Writing transactions for {pk} to stdout");
+                    Some(transaction_str)
                 } else {
-                    let txs: Vec<Command> =
-                        txs.into_iter().map(|c| Command::from(c.command)).collect();
-                    format!("{txs:?}")
-                }
-            };
-            if path.is_empty() {
-                debug!("Writing transactions for {pk} to stdout");
-                Some(transaction_str)
-            } else {
-                let path: PathBuf = path.into();
-                if !path.is_dir() {
-                    debug!("Writing transactions for {pk} to {}", path.display());
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing transactions for {pk} to {}", path.display());
 
-                    tokio::fs::write(&path, transaction_str).await?;
-                    Some(format!(
-                        "Transactions for {pk} written to {}",
-                        path.display()
-                    ))
-                } else {
-                    file_must_not_be_a_directory(&path)
+                        std::fs::write(&path, transaction_str)?;
+                        Some(format!(
+                            "Transactions for {pk} written to {}",
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
                 }
             }
         }
@@ -491,15 +490,19 @@ async fn handle_conn(
                 .trim_end_matches('\0')
                 .parse()?;
 
-            info!("Received transactions command for tx hash {tx_hash}");
-            db.get_command_by_hash(&tx_hash)?.map(|cmd| {
-                if verbose {
-                    format!("{cmd:?}")
-                } else {
-                    let cmd: Command = cmd.command.into();
-                    format!("{cmd:?}")
-                }
-            })
+            info!("Received tx-hash command for {tx_hash}");
+            if !signed::is_valid_tx_hash(&tx_hash) {
+                invalid_tx_hash(&tx_hash)
+            } else {
+                db.get_command_by_hash(&tx_hash)?.map(|cmd| {
+                    if verbose {
+                        format!("{cmd:#?}")
+                    } else {
+                        let cmd: Command = cmd.command.into();
+                        format!("{cmd:#?}")
+                    }
+                })
+            }
         }
         "tx-state-hash" => {
             let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
@@ -507,15 +510,19 @@ async fn handle_conn(
                 .trim_end_matches('\0')
                 .parse()?;
 
-            info!("Received transactions command for state hash {state_hash}");
-            db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
-                if verbose {
-                    format!("{cmds:?}")
-                } else {
-                    let cmd: Vec<Command> = cmds.into_iter().map(Command::from).collect();
-                    format!("{cmd:?}")
-                }
-            })
+            info!("Received tx-state-hash command for {state_hash}");
+            if !block::is_valid_state_hash(&state_hash) {
+                invalid_state_hash(&state_hash)
+            } else {
+                db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
+                    if verbose {
+                        format!("{cmds:#?}")
+                    } else {
+                        let cmd: Vec<Command> = cmds.into_iter().map(Command::from).collect();
+                        format!("{cmd:#?}")
+                    }
+                })
+            }
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
@@ -538,4 +545,19 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
         "The path provided must not be a directory: {}",
         path.display()
     ))
+}
+
+fn invalid_public_key(input: &str) -> Option<String> {
+    warn!("Invalid public key: {input}");
+    Some(format!("Invalid public key: {input}"))
+}
+
+fn invalid_tx_hash(input: &str) -> Option<String> {
+    warn!("Invalid transaction hash: {input}");
+    Some(format!("Invalid transaction hash: {input}"))
+}
+
+fn invalid_state_hash(input: &str) -> Option<String> {
+    warn!("Invalid state hash: {input}");
+    Some(format!("Invalid state hash: {input}"))
 }

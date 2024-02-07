@@ -14,11 +14,7 @@ use std::{
     process,
     sync::Arc,
 };
-use tokio::{
-    io,
-    sync::mpsc,
-    task::JoinHandle,
-};
+use tokio::{io, sync::mpsc, task::JoinHandle};
 use tracing::{debug, info, instrument};
 
 #[derive(Clone, Debug)]
