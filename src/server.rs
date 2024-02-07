@@ -262,9 +262,15 @@ fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
             "Domain socket: {} already in use. Removing old vestige",
             &SOCKET_NAME
         );
-        std::fs::remove_file(SOCKET_NAME).expect("Should be able to remove socket file");
+        remove_domain_socket()?;
         LocalSocketListener::bind(SOCKET_NAME)
     } else {
         Err(e)
     }
+}
+
+pub fn remove_domain_socket() -> io::Result<()> {
+    std::fs::remove_file(SOCKET_NAME)?;
+    info!("Domain socket removed: {SOCKET_NAME}");
+    Ok(())
 }

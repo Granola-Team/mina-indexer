@@ -2,7 +2,7 @@ use crate::{
     block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     command::{signed, store::CommandStore, Command},
     ledger::{self, public_key, store::LedgerStore, Ledger},
-    server::{IndexerConfiguration, IpcChannelUpdate},
+    server::{remove_domain_socket, IndexerConfiguration, IpcChannelUpdate},
     snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
@@ -419,29 +419,55 @@ async fn handle_conn(
                     }
                 })
         }
-        "summary" => {
-            info!("Received summary command");
-            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?
-                .trim_end_matches('\0')
-                .parse::<bool>()?;
-            if let Some(summary) = summary {
-                if verbose {
-                    Some(serde_json::to_string::<SummaryVerbose>(summary)?)
-                } else {
-                    Some(serde_json::to_string::<SummaryShort>(
-                        &summary.clone().into(),
-                    )?)
-                }
-            } else {
-                Some("No summary available yet".into())
-            }
-        }
         "shutdown" => {
             info!("Received shutdown command");
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
+
+            remove_domain_socket().unwrap_or(());
             process::exit(0);
+        }
+        "summary" => {
+            info!("Received summary command");
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
+            let json = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+
+            if let Some(summary) = summary {
+                let summary_str = if verbose {
+                    if json {
+                        serde_json::to_string(&summary)?
+                    } else {
+                        format!("{summary}")
+                    }
+                } else {
+                    let summary: SummaryShort = summary.clone().into();
+                    if json {
+                        serde_json::to_string(&summary)?
+                    } else {
+                        format!("{summary}")
+                    }
+                };
+
+                if path.is_empty() {
+                    info!("Writing summary to stdout");
+                    Some(summary_str)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        info!("Writing summary to {}", path.display());
+
+                        std::fs::write(&path, summary_str).unwrap();
+                        Some(format!("Summary written to {}", path.display()))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
+            } else {
+                Some("Summary not available".into())
+            }
         }
         "tx-pk" => {
             let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
