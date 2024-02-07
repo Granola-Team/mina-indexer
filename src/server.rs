@@ -15,7 +15,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{io, sync::mpsc, task::JoinHandle};
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -95,7 +95,7 @@ async fn wait_for_signal() {
     let mut int = signal(SignalKind::interrupt()).expect("failed to register signal handler");
     tokio::select! {
         _ = term.recv() => {
-            info!("Received SIGTERM");
+            trace!("Received SIGTERM");
             process::exit(100);
         },
         _ = int.recv() => {
@@ -105,16 +105,20 @@ async fn wait_for_signal() {
     }
 }
 
+async fn setup_signal_handler() {
+    tokio::spawn(async move {
+        let _ = wait_for_signal().await;
+    });
+}
+
 pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<IndexerState> {
-    // Setup signal handler
-    tokio::spawn(async move {
-        let _ = wait_for_signal().await;
-    });
     info!("Starting mina-indexer server");
+    setup_signal_handler().await;
+
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
         ledger: genesis_ledger,
