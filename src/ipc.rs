@@ -127,20 +127,33 @@ async fn handle_conn(
             let pk_buffer = buffers.next().unwrap();
             let pk = String::from_utf8(pk_buffer.to_vec())?;
             let pk = pk.trim_end_matches('\0');
-            if public_key::is_valid(pk) {
-                Some(pk.into())
-            } else {
-                Some(format!("Invalid pk: {pk}"))
-            };
             info!("Received account command for {pk}");
 
-            let account = ledger.accounts.get(&pk.into());
-            if let Some(account) = account {
-                debug!("Writing account {account:?} to client");
-                Some(serde_json::to_string(account)?)
+            if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash)? {
+                if !public_key::is_valid(pk) {
+                    invalid_public_key(pk)
+                } else if let Ok(pk) = pk.try_into() {
+                    let account = ledger.accounts.get(&pk);
+                    if let Some(account) = account {
+                        info!("Writing account {pk} to client");
+                        Some(format!("{account}"))
+                    } else {
+                        warn!("Account {pk} does not exist");
+                        Some(format!("Account {pk} does not exist"))
+                    }
+                } else {
+                    warn!("Invalid public key {pk}");
+                    Some(format!("Invalid public key {pk}"))
+                }
             } else {
-                warn!("Account {} does not exist", pk);
-                Some(format!("Account {} does not exist", pk))
+                error!(
+                    "Best ledger not in database (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                );
+                Some(format!(
+                    "Best ledger not in database (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                ))
             }
         }
         "best_chain" => {
