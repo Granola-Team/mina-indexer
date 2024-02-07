@@ -271,68 +271,67 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let msg = msg.trim_end();
             println!("{msg}");
         }
-        ClientCli::Ledger(LedgerArgs::BestLedger(best_ledger_args)) => {
-            let command = match &best_ledger_args.path {
-                None => "best_ledger \0".to_string(),
-                Some(path) => format!("best_ledger {}\0", path.display()),
-            };
-            writer.write_all(command.as_bytes()).await?;
-            reader.read_to_end(&mut buffer).await?;
-
-            let msg = String::from_utf8(buffer)?;
-            println!("{msg}");
-        }
         ClientCli::Checkpoint(checkpoint_args) => {
             let command = format!("checkpoint {}\0", checkpoint_args.path.display());
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
             let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
             println!("{msg}");
         }
-        ClientCli::Ledger(LedgerArgs::Ledger(ledger_args)) => {
-            let command = match &ledger_args.path {
-                None => format!("ledger {}\0", ledger_args.hash),
-                Some(path) => format!("ledger {} {}\0", ledger_args.hash, path.display()),
+        ClientCli::Ledger(ledger_args) => {
+            let command = match ledger_args {
+                LedgerArgs::BestLedger(args) => {
+                    format!(
+                        "best-ledger {}\0",
+                        args.path.clone().unwrap_or("".into()).display()
+                    )
+                }
+                LedgerArgs::Ledger(args) => {
+                    format!(
+                        "ledger {} {}\0",
+                        args.hash,
+                        args.path.clone().unwrap_or("".into()).display()
+                    )
+                }
+                LedgerArgs::LedgerAtHeight(args) => {
+                    format!(
+                        "ledger-at-height {} {}\0",
+                        args.height,
+                        args.path.clone().unwrap_or("".into()).display(),
+                    )
+                }
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
             let msg = String::from_utf8(buffer)?;
-            println!("{msg}");
-        }
-        ClientCli::Ledger(LedgerArgs::LedgerAtHeight(ledger_at_height_args)) => {
-            let command = match &ledger_at_height_args.path {
-                None => format!("ledger_at_height {}\0", ledger_at_height_args.height),
-                Some(path) => format!(
-                    "ledger_at_height {} {}\0",
-                    ledger_at_height_args.height,
-                    path.display()
-                ),
-            };
-            writer.write_all(command.as_bytes()).await?;
-            reader.read_to_end(&mut buffer).await?;
-
-            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
             println!("{msg}");
         }
         ClientCli::Snark(snark_args) => {
             let command = match snark_args {
-                SnarkArgs::Snark(snark_args) => format!(
-                    "snark-state-hash {} {}\0",
-                    snark_args.state_hash,
-                    snark_args.path.clone().unwrap_or("".into()).display()
-                ),
-                SnarkArgs::SnarkPublicKey(pk_args) => format!(
-                    "snark-pk {} {}\0",
-                    pk_args.public_key,
-                    pk_args.path.clone().unwrap_or("".into()).display()
-                ),
+                SnarkArgs::Snark(snark_args) => {
+                    format!(
+                        "snark-state-hash {} {}\0",
+                        snark_args.state_hash,
+                        snark_args.path.clone().unwrap_or("".into()).display()
+                    )
+                }
+                SnarkArgs::SnarkPublicKey(pk_args) => {
+                    format!(
+                        "snark-pk {} {}\0",
+                        pk_args.public_key,
+                        pk_args.path.clone().unwrap_or("".into()).display()
+                    )
+                }
             };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
             let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
             println!("{msg}");
         }
         ClientCli::Shutdown => {
@@ -359,15 +358,16 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
                 TransactionArgs::TxHash(args) => {
                     format!("tx-hash {} {} {}\0", args.tx_hash, args.verbose, args.json)
                 }
-                TransactionArgs::TxPublicKey(pk_args) => format!(
-                    "tx-pk {} {} {} {} {} {}\0",
-                    pk_args.public_key,
-                    pk_args.verbose,
-                    pk_args.num.unwrap_or(0),
-                    pk_args.start_state_hash,
-                    pk_args.end_state_hash.clone().unwrap_or("x".into()),
-                    pk_args.path.clone().unwrap_or("".into()).display(),
-                ),
+                TransactionArgs::TxPublicKey(pk_args) => {
+                    format!(
+                        "tx-pk {} {} {} {} {}\0",
+                        pk_args.public_key,
+                        pk_args.verbose,
+                        pk_args.start_state_hash,
+                        pk_args.end_state_hash.clone().unwrap_or("x".into()),
+                        pk_args.path.clone().unwrap_or("".into()).display(),
+                    )
+                }
                 TransactionArgs::TxStateHash(args) => {
                     format!(
                         "tx-state-hash {} {} {}\0",
@@ -378,7 +378,8 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
-            let msg = String::from_utf8(buffer.to_vec())?;
+            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
             println!("{msg}");
         }
     }
