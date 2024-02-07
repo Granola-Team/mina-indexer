@@ -7,10 +7,6 @@ use futures::{
 use interprocess::local_socket::tokio::LocalSocketStream;
 use serde_derive::{Deserialize, Serialize};
 use std::{path::PathBuf, process};
-use tokio::{
-    fs::write,
-    io::{stdout, AsyncWriteExt as OtherAsyncWriteExt},
-};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -259,22 +255,21 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let msg = msg.trim_end();
             println!("{msg}");
         }
-        ClientCli::BestChain(chain_args) => {
+        ClientCli::BestChain(args) => {
             let command = format!(
-                "best_chain {} {} {} {}\0",
-                chain_args.num.unwrap_or(0),
-                chain_args.verbose,
-                chain_args.start_state_hash.clone(),
-                chain_args.end_state_hash.clone().unwrap_or("x".into())
+                "best-chain {} {} {} {} {}\0",
+                args.num.unwrap_or(0),
+                args.verbose,
+                args.start_state_hash,
+                args.end_state_hash.clone().unwrap_or("x".into()),
+                args.path.clone().unwrap_or("".into()).display()
             );
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
-            if let Some(path) = chain_args.path.as_ref() {
-                write(path, buffer.to_vec()).await?;
-            } else {
-                stdout().write_all(&buffer).await?;
-            }
+            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
+            println!("{msg}");
         }
         ClientCli::Ledger(LedgerArgs::BestLedger(best_ledger_args)) => {
             let command = match &best_ledger_args.path {

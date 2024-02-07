@@ -150,9 +150,9 @@ async fn handle_conn(
                 ))
             }
         }
-        "best_chain" => {
-            info!("Received best_chain command");
-            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
+        "best-chain" => {
+            info!("Received best-chain command");
+            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
             let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
             let start_state_hash: BlockHash =
                 String::from_utf8(buffers.next().unwrap().to_vec())?.into();
@@ -165,24 +165,27 @@ async fn handle_conn(
                     hash.into()
                 }
             };
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
 
-            let block = db.get_block(&end_state_hash)?.unwrap();
-            let mut parent_hash = block.previous_state_hash();
-            let mut best_chain = vec![block];
-            if num == 0 {
-                // no num bound => use hash bounds
-                while let Some(parent_pcb) = db.get_block(&parent_hash)? {
-                    let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
-                    parent_hash = parent_pcb.previous_state_hash();
-                    best_chain.push(parent_pcb);
+            if !block::is_valid_state_hash(&start_state_hash.0) {
+                invalid_state_hash(&start_state_hash.0)
+            } else if let (Some(end_block), Some(start_block)) = (
+                db.get_block(&end_state_hash)?,
+                db.get_block(&start_state_hash)?,
+            ) {
+                let start_height = start_block.blockchain_length;
+                let end_height = end_block.blockchain_length;
+                let mut parent_hash = end_block.previous_state_hash();
+                let mut best_chain = vec![end_block];
 
-                    if curr_hash == start_state_hash {
-                        break;
-                    }
-                }
-            } else {
-                // num bound
-                for _ in 1..num {
+                // constrain by num and state hash bound
+                let max = if num == 0 {
+                    end_height.saturating_sub(start_height)
+                } else {
+                    num.min(end_height.saturating_sub(start_height))
+                };
+                for _ in 0..max {
                     if let Some(parent_pcb) = db.get_block(&parent_hash)? {
                         let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
                         parent_hash = parent_pcb.previous_state_hash();
@@ -195,14 +198,31 @@ async fn handle_conn(
                         break;
                     }
                 }
-            }
 
-            if verbose {
-                Some(serde_json::to_string(&best_chain)?)
+                let best_chain_str = if verbose {
+                    serde_json::to_string_pretty(&best_chain)?
+                } else {
+                    let best_chain: Vec<BlockWithoutHeight> =
+                        best_chain.iter().map(BlockWithoutHeight::from).collect();
+                    format!("{best_chain:?}")
+                };
+
+                if path.is_empty() {
+                    info!("Writing best chain to stdout");
+                    Some(best_chain_str)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        info!("Writing best chain to {}", path.display());
+
+                        std::fs::write(path.clone(), best_chain_str)?;
+                        Some(format!("Best chain written to {}", path.display()))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
             } else {
-                let best_chain: Vec<BlockWithoutHeight> =
-                    best_chain.iter().map(BlockWithoutHeight::from).collect();
-                Some(format!("{best_chain:?}"))
+                None
             }
         }
         "checkpoint" => {
