@@ -1,7 +1,7 @@
 use crate::{
     block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     command::{signed, store::CommandStore, Command},
-    ledger::{self, public_key, store::LedgerStore, Ledger},
+    ledger::{self, public_key, store::LedgerStore},
     server::{remove_domain_socket, IndexerConfiguration, IpcChannelUpdate},
     snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
@@ -18,7 +18,6 @@ pub struct IpcActor {
     state_recv: IpcStateReceiver,
     listener: LocalSocketListener,
     best_tip: RwLock<Block>,
-    ledger: RwLock<Ledger>,
     summary: RwLock<Option<SummaryVerbose>>,
     store: RwLock<Arc<IndexerStore>>,
 }
@@ -44,7 +43,6 @@ impl IpcActor {
                 blockchain_length: 1,
                 global_slot_since_genesis: 0,
             }),
-            ledger: RwLock::new(config.ledger.into()),
             summary: RwLock::new(None),
             store: RwLock::new(store),
         }
@@ -61,7 +59,6 @@ impl IpcActor {
                         Some(state) => {
                             debug!("Setting IPC state");
                             *self.best_tip.write().await = state.best_tip;
-                            *self.ledger.write().await = state.ledger;
                             *self.summary.write().await = Some(*state.summary);
                             *self.store.write().await = state.store;
                         },
@@ -71,7 +68,6 @@ impl IpcActor {
                 client = self.listener.accept() => {
                     let store = self.store.read().await.clone();
                     let best_tip = self.best_tip.read().await.clone();
-                    let ledger = self.ledger.read().await.clone();
                     let summary = self.summary.read().await.clone();
                     match client {
                         Err(e) => error!("Error accepting connection: {}", e.to_string()),
@@ -82,7 +78,6 @@ impl IpcActor {
                                 match handle_conn(stream,
                                     &store,
                                     &best_tip,
-                                    &ledger,
                                     summary.as_ref()
                                 ).await {
                                     Err(e) => {
@@ -106,7 +101,6 @@ async fn handle_conn(
     conn: LocalSocketStream,
     db: &IndexerStore,
     best_tip: &Block,
-    ledger: &Ledger,
     summary: Option<&SummaryVerbose>,
 ) -> Result<(), anyhow::Error> {
     use anyhow::anyhow;
@@ -211,31 +205,6 @@ async fn handle_conn(
                 Some(format!("{best_chain:?}"))
             }
         }
-        "best_ledger" => {
-            info!("Received best_ledger command");
-            let ledger = ledger.to_string();
-            match buffers.next() {
-                Some(data_buffer) => {
-                    let data = String::from_utf8(data_buffer.to_vec())?;
-                    let data = data.trim_end_matches('\0');
-                    if data.is_empty() {
-                        debug!("Writing best ledger to stdout");
-                        Some(ledger)
-                    } else {
-                        let path = data.parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing best ledger to {}", path.display());
-
-                            tokio::fs::write(path.clone(), ledger).await?;
-                            Some(format!("Best ledger written to {}", path.display()))
-                        } else {
-                            file_must_not_be_a_directory(&path)
-                        }
-                    }
-                }
-                _ => None,
-            }
-        }
         "checkpoint" => {
             info!("Received checkpoint command");
             let path: PathBuf = String::from_utf8(buffers.next().unwrap().to_vec())?
@@ -256,18 +225,50 @@ async fn handle_conn(
                 ))
             }
         }
+        "best-ledger" => {
+            info!("Received best-ledger command");
+
+            if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash)? {
+                let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let path = path.trim_end_matches('\0');
+                let ledger = ledger.to_string_pretty();
+
+                if path.is_empty() {
+                    debug!("Writing best ledger to stdout");
+                    Some(ledger)
+                } else {
+                    let path = path.parse::<PathBuf>()?;
+                    if path.is_dir() {
+                        file_must_not_be_a_directory(&path)
+                    } else {
+                        debug!("Writing best ledger to {}", path.display());
+
+                        std::fs::write(path.clone(), ledger)?;
+                        Some(format!("Best ledger written to {}", path.display()))
+                    }
+                }
+            } else {
+                error!(
+                    "Best ledger cannot be calculated (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                );
+                Some(format!(
+                    "Best ledger cannot be calculated (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                ))
+            }
+        }
         "ledger" => {
             let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let hash = hash.trim_end_matches('\0');
             info!("Received ledger command for {hash}");
 
             // check if ledger or state hash and use appropriate getter
-            if block::is_valid_state_hash(&hash[..52]) {
-                let hash = &hash[..52];
+            if block::is_valid_state_hash(hash) {
                 trace!("{hash} is a state hash");
 
                 if let Some(ledger) = db.get_ledger_state_hash(&hash.into())? {
-                    let ledger = ledger.to_string();
+                    let ledger = ledger.to_string_pretty();
                     match buffers.next() {
                         None => {
                             debug!("Writing ledger at state hash {hash} to stdout");
@@ -280,7 +281,7 @@ async fn handle_conn(
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path.clone(), ledger).await?;
+                                std::fs::write(path.clone(), ledger)?;
                                 Some(format!(
                                     "Ledger at state hash {hash} written to {}",
                                     path.display()
@@ -291,14 +292,14 @@ async fn handle_conn(
                         }
                     }
                 } else {
+                    error!("Ledger at state hash {hash} is not in the store");
                     Some(format!("Ledger at state hash {hash} is not in the store"))
                 }
-            } else if ledger::is_valid_hash(&hash[..51]) {
-                let hash = &hash[..51];
+            } else if ledger::is_valid_hash(hash) {
                 trace!("{hash} is a ledger hash");
 
                 if let Some(ledger) = db.get_ledger(hash)? {
-                    let ledger = ledger.to_string();
+                    let ledger = ledger.to_string_pretty();
                     match buffers.next() {
                         None => {
                             debug!("Writing ledger at {hash} to stdout");
@@ -311,7 +312,7 @@ async fn handle_conn(
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path.clone(), ledger).await?;
+                                std::fs::write(path.clone(), ledger)?;
                                 Some(format!("Ledger at {hash} written to {}", path.display()))
                             } else {
                                 file_must_not_be_a_directory(&path)
@@ -319,23 +320,25 @@ async fn handle_conn(
                         }
                     }
                 } else {
+                    error!("Ledger at {hash} is not in the store");
                     Some(format!("Ledger at {hash} is not in the store"))
                 }
             } else {
-                debug!("Length 52: {}", hash.len());
-                Some(format!("Invalid: {hash} is not a state or ledger hash"))
+                error!("Invalid ledger or state hash: {hash}");
+                Some(format!("Invalid ledger or state hash: {hash}"))
             }
         }
-        "ledger_at_height" => {
+        "ledger-at-height" => {
             let height = String::from_utf8(buffers.next().unwrap().to_vec())?
                 .trim_end_matches('\0')
                 .parse::<u32>()?;
-            info!("Received ledger_at_height {height} command");
+            info!("Received ledger-at-height {height} command");
 
             if height > best_tip.blockchain_length {
-                Some(format!("Invalid query: ledger at height {height} cannot be determined from a best chain of length {}", best_tip.blockchain_length))
+                // ahead of witness tree - cannot compute
+                Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {}", best_tip.blockchain_length))
             } else if let Some(ledger) = db.get_ledger_at_height(height)? {
-                let ledger = ledger.to_string();
+                let ledger = ledger.to_string_pretty();
                 match buffers.next() {
                     None => {
                         debug!("Writing ledger at height {height} to stdout");
@@ -348,7 +351,7 @@ async fn handle_conn(
                         if !path.is_dir() {
                             debug!("Writing ledger at height {height} to {}", path.display());
 
-                            tokio::fs::write(&path, ledger).await?;
+                            std::fs::write(&path, ledger)?;
                             Some(format!(
                                 "Ledger at height {height} written to {}",
                                 path.display()
@@ -359,7 +362,10 @@ async fn handle_conn(
                     }
                 }
             } else {
-                None
+                error!("Invalid ledger query. Ledger at height {height} not available");
+                Some(format!(
+                    "Invalid ledger query. Ledger at height {height} not available"
+                ))
             }
         }
         "snark-pk" => {
