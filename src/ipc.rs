@@ -363,28 +363,32 @@ async fn handle_conn(
             }
         }
         "snark-pk" => {
-            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
             info!("Received SNARK work command for public key {pk}");
 
-            let snarks = db
-                .get_snark_work_by_public_key(&pk.clone().into())?
-                .unwrap_or(vec![]);
-            let snarks_str = format!("{snarks:?}");
-
-            if path.is_empty() {
-                debug!("Writing SNARK work for {pk} to stdout");
-                Some(snarks_str)
+            if !public_key::is_valid(&pk) {
+                invalid_public_key(&pk)
             } else {
-                let path: PathBuf = path.into();
-                if !path.is_dir() {
-                    debug!("Writing SNARK work for {pk} to {}", path.display());
+                let snarks = db
+                    .get_snark_work_by_public_key(&pk.clone().into())?
+                    .unwrap_or(vec![]);
+                let snarks_str = format!("{snarks:#?}");
 
-                    tokio::fs::write(&path, snarks_str).await?;
-                    Some(format!("SNARK work for {pk} written to {}", path.display()))
+                if path.is_empty() {
+                    debug!("Writing SNARK work for {pk} to stdout");
+                    Some(snarks_str)
                 } else {
-                    file_must_not_be_a_directory(&path)
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing SNARK work for {pk} to {}", path.display());
+
+                        std::fs::write(&path, snarks_str)?;
+                        Some(format!("SNARK work for {pk} written to {}", path.display()))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
                 }
             }
         }
@@ -394,30 +398,34 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
             info!("Received SNARK work command for state hash {state_hash}");
 
-            db.get_snark_work_in_block(&state_hash.clone().into())?
-                .and_then(|snarks| {
-                    let snarks_str = format!("{snarks:?}");
-                    if path.is_empty() {
-                        debug!("Writing SNARK work for {state_hash} to stdout");
-                        Some(snarks_str)
-                    } else {
-                        let path: PathBuf = path.into();
-                        if !path.is_dir() {
-                            debug!(
-                                "Writing SNARK work for block {state_hash} to {}",
-                                path.display()
-                            );
-
-                            std::fs::write(&path, snarks_str).unwrap();
-                            Some(format!(
-                                "SNARK work for block {state_hash} written to {}",
-                                path.display()
-                            ))
+            if !block::is_valid_state_hash(&state_hash) {
+                invalid_state_hash(&state_hash)
+            } else {
+                db.get_snark_work_in_block(&state_hash.clone().into())?
+                    .and_then(|snarks| {
+                        let snarks_str = format!("{snarks:#?}");
+                        if path.is_empty() {
+                            debug!("Writing SNARK work for {state_hash} to stdout");
+                            Some(snarks_str)
                         } else {
-                            file_must_not_be_a_directory(&path)
+                            let path: PathBuf = path.into();
+                            if !path.is_dir() {
+                                debug!(
+                                    "Writing SNARK work for block {state_hash} to {}",
+                                    path.display()
+                                );
+
+                                std::fs::write(&path, snarks_str).unwrap();
+                                Some(format!(
+                                    "SNARK work for block {state_hash} written to {}",
+                                    path.display()
+                                ))
+                            } else {
+                                file_must_not_be_a_directory(&path)
+                            }
                         }
-                    }
-                })
+                    })
+            }
         }
         "shutdown" => {
             info!("Received shutdown command");
