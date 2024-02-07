@@ -2,7 +2,7 @@ use crate::{
     block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
-    ledger::{genesis::GenesisLedger, Ledger},
+    ledger::genesis::GenesisLedger,
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
@@ -38,7 +38,6 @@ pub struct MinaIndexer {
 #[derive(Debug)]
 pub struct IpcChannelUpdate {
     pub best_tip: Block,
-    pub ledger: Ledger,
     pub summary: Box<SummaryVerbose>,
     pub store: Arc<IndexerStore>,
 }
@@ -175,7 +174,6 @@ pub async fn initialize(
         };
 
         let best_tip = state.best_tip_block().clone();
-        let ledger = genesis_ledger.into();
         let summary = Box::new(state.summary_verbose());
         let store = Arc::new(state.spawn_secondary_database()?);
 
@@ -183,7 +181,6 @@ pub async fn initialize(
         ipc_update_sender
             .send(IpcChannelUpdate {
                 best_tip,
-                ledger,
                 summary,
                 store,
             })
@@ -207,7 +204,6 @@ pub async fn initialize(
         ipc_update_sender
             .send(IpcChannelUpdate {
                 best_tip: state.best_tip_block().clone(),
-                ledger: state.best_ledger()?.unwrap(),
                 summary: Box::new(state.summary_verbose()),
                 store: Arc::new(state.spawn_secondary_database()?),
             })
@@ -243,7 +239,6 @@ pub async fn run(
 
                     ipc_update_sender.send(IpcChannelUpdate {
                         best_tip: state.best_tip_block().clone(),
-                        ledger: state.best_ledger()?.unwrap(),
                         summary: Box::new(state.summary_verbose()),
                         store: Arc::new(state.spawn_secondary_database()?),
                     }).await?;
