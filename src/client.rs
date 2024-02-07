@@ -1,4 +1,4 @@
-use crate::constants::*;
+use crate::constants::{MAINNET_GENESIS_HASH, SOCKET_NAME};
 use clap::{Args, Parser};
 use futures::{
     io::{AsyncWriteExt, BufReader},
@@ -12,20 +12,22 @@ use tracing::instrument;
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
-    /// Display account info for the given public key
+    /// Query account by public key
     Account(AccountArgs),
-    /// Display the best chain
-    BestChain(ChainArgs),
-    /// Create a checkpoint of the indexer store Speedb
+    #[clap(flatten)]
+    Block(BlockArgs),
+    #[clap(flatten)]
+    Chain(ChainArgs),
+    /// Create a checkpoint of the indexer store
     Checkpoint(CheckpointArgs),
     #[clap(flatten)]
     Ledger(LedgerArgs),
-    #[clap(flatten)]
-    Snark(SnarkArgs),
-    /// Show summary of the state
-    Summary(SummaryArgs),
     /// Shutdown the server
     Shutdown,
+    #[clap(flatten)]
+    Snark(SnarkArgs),
+    /// Show a summary of the state
+    Summary(SummaryArgs),
     #[clap(flatten)]
     Transactions(TransactionArgs),
 }
@@ -41,9 +43,66 @@ pub struct AccountArgs {
     json: bool,
 }
 
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum BlockArgs {
+    /// Query block by state hash
+    Block(BlockStateHashArgs),
+    /// Query the best tip
+    BestTip(BestTipArgs),
+    /// Query block as a ledger diff
+    LedgerDiff(LedgerDiffArgs),
+}
+
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct ChainArgs {
+pub struct BestTipArgs {
+    /// Path to write the best tip [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display the entire precomputed block
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct BlockStateHashArgs {
+    /// Retrieve the block with the given state hash
+    #[arg(short, long)]
+    state_hash: String,
+    /// Path to write the block [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display the entire precomputed block
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct LedgerDiffArgs {
+    /// Retrieve ledger diff for block with given state hash
+    #[arg(short, long)]
+    state_hash: u32,
+    /// Path to write the ledger diff [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display verbose ledger diffs
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum ChainArgs {
+    /// Query the best chain
+    BestChain(BestChainArgs),
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct BestChainArgs {
     /// Number of blocks to include in this suffix
     #[arg(short, long)]
     num: Option<usize>,
@@ -87,7 +146,7 @@ pub struct LedgerAtHeightArgs {
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Block height of the ledger
-    #[arg(long)]
+    #[arg(short, long)]
     height: u32,
     /// Output JSON data
     #[arg(short, long, default_value_t = false)]
@@ -101,7 +160,7 @@ pub enum LedgerArgs {
     BestLedger(BestLedgerArgs),
     /// Query ledger by state hash
     Ledger(LedgerStateHashArgs),
-    /// Query ledger at height
+    /// Query ledger by height
     LedgerAtHeight(LedgerAtHeightArgs),
 }
 
@@ -112,7 +171,7 @@ pub struct LedgerStateHashArgs {
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// State or ledger hash corresponding to the ledger
-    #[arg(long)]
+    #[arg(short, long)]
     hash: String,
     /// Output JSON data
     #[arg(short, long, default_value_t = false)]
@@ -122,9 +181,9 @@ pub struct LedgerStateHashArgs {
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum SnarkArgs {
-    /// Query a block for SNARK work
+    /// Query SNARK work by state hash
     Snark(SnarkStateHashArgs),
-    /// Query a public key for all SNARK work
+    /// Query SNARK work by prover public key
     SnarkPublicKey(SnarkPublickKeyArgs),
 }
 
@@ -135,7 +194,7 @@ pub struct SnarkStateHashArgs {
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// State hash of block to query
-    #[arg(long)]
+    #[arg(short, long)]
     state_hash: String,
 }
 
@@ -181,7 +240,7 @@ pub struct TransactionStateHashArgs {
     /// Path to write the transactions [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
-    /// State hash of the contining block
+    /// State hash of the containing block
     #[arg(short, long)]
     state_hash: String,
     /// Verbose transaction output
@@ -215,9 +274,6 @@ pub struct TransactionPublicKeyArgs {
     /// Retrieve public key's transaction info
     #[arg(short = 'k', long)]
     public_key: String,
-    /// Bound the fetched transactions by a number
-    #[arg(short, long)]
-    num: Option<usize>,
     /// Bound the fetched transactions by a start state hash
     #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
     start_state_hash: String,
@@ -233,7 +289,7 @@ pub struct TransactionPublicKeyArgs {
 }
 
 #[instrument]
-pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
+pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
     let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
@@ -255,15 +311,44 @@ pub async fn run(command: &ClientCli) -> Result<(), anyhow::Error> {
             let msg = msg.trim_end();
             println!("{msg}");
         }
-        ClientCli::BestChain(args) => {
-            let command = format!(
-                "best-chain {} {} {} {} {}\0",
-                args.num.unwrap_or(0),
-                args.verbose,
-                args.start_state_hash,
-                args.end_state_hash.clone().unwrap_or("x".into()),
-                args.path.clone().unwrap_or("".into()).display()
-            );
+        ClientCli::Chain(chain_args) => {
+            let command = match chain_args {
+                ChainArgs::BestChain(args) => format!(
+                    "best-chain {} {} {} {} {}\0",
+                    args.num.unwrap_or(0),
+                    args.verbose,
+                    args.start_state_hash,
+                    args.end_state_hash.clone().unwrap_or("x".into()),
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
+            println!("{msg}");
+        }
+        ClientCli::Block(block_args) => {
+            let command = match block_args {
+                BlockArgs::BestTip(args) => format!(
+                    "block-best-tip {} {}\0",
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+                BlockArgs::Block(args) => format!(
+                    "block-state-hash {} {} {}\0",
+                    args.state_hash,
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+                BlockArgs::LedgerDiff(args) => format!(
+                    "block-ledger-diff {} {} {}\0",
+                    args.state_hash,
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+            };
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
 
