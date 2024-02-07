@@ -1,6 +1,9 @@
+pub mod ser_de;
+
+use self::ser_de::*;
 use crate::{constants::MAINNET_ACCOUNT_CREATION_FEE, ledger::public_key::PublicKey};
 use rust_decimal::Decimal;
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
@@ -15,9 +18,11 @@ pub struct Account {
     #[serde(serialize_with = "serialize_public_key")]
     #[serde(deserialize_with = "deserialize_public_key")]
     pub public_key: PublicKey,
+    #[serde(serialize_with = "serialize_public_key_opt")]
+    #[serde(deserialize_with = "deserialize_public_key_opt")]
+    pub delegate: Option<PublicKey>,
     pub balance: Amount,
     pub nonce: Nonce,
-    pub delegate: Option<PublicKey>,
 }
 
 impl Account {
@@ -110,27 +115,8 @@ pub fn nanomina_to_mina(num: u64) -> String {
 
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use serde_json::*;
-
-        let pk = self.public_key.to_address();
-        let delegate = self
-            .delegate
-            .as_ref()
-            .map(|pk| pk.to_address())
-            .unwrap_or(pk.clone());
-
-        let mut map = Map::new();
-        map.insert("pk".to_string(), Value::String(pk));
-        map.insert(
-            "balance".to_string(),
-            json!(nanomina_to_mina(self.balance.0)),
-        );
-        map.insert("nonce".to_string(), json!(self.nonce.0));
-        map.insert("delegate".to_string(), Value::String(delegate));
-
-        let value = Value::Object(map);
-        match to_string_pretty(&value) {
-            Ok(s) => writeln!(f, "{}", s),
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),
         }
     }
@@ -151,42 +137,4 @@ fn test_nanomina_to_mina_conversion() {
     let actual = 1_000_000_000;
     let val = nanomina_to_mina(actual);
     assert_eq!("1", val);
-}
-
-fn serialize_public_key<S>(
-    public_key: &PublicKey,
-    s: S,
-) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-where
-    S: Serializer,
-{
-    let pub_key_address = public_key.to_address();
-    s.serialize_str(&pub_key_address)
-}
-
-fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PublicKey, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    pub struct StringVisitor;
-
-    impl<'de> Visitor<'de> for StringVisitor {
-        type Value = PublicKey;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a valid Mina public key address")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            match PublicKey::from_address(v) {
-                Err(e) => Err(E::custom(e.to_string())),
-                Ok(public_key) => Ok(public_key),
-            }
-        }
-    }
-
-    deserializer.deserialize_str(StringVisitor)
 }
