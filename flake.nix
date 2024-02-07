@@ -53,7 +53,6 @@
         developmentDependencies = with pkgs;
           [
             rust
-            rust-analyzer
             rnix-lsp
             alejandra
             cargo-nextest
