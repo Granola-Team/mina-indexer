@@ -71,7 +71,7 @@ impl From<GenesisLedger> for Ledger {
 }
 
 impl GenesisLedger {
-    /// This is the only way to construct a
+    /// This is the only way to construct a genesis ledger
     pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
         let mut accounts = HashMap::new();
         for genesis_account in genesis.accounts {
