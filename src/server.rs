@@ -236,10 +236,11 @@ pub async fn run(
             block_fut = filesystem_receiver.recv_block() => {
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-                    debug!("Receiving block {block:?}");
+                    debug!("Receiving block (length {}): {}", block.blockchain_length, block.state_hash);
 
-                    state.add_block_to_witness_tree(&precomputed_block)?;
-                    info!("Added {block:?}");
+                    if state.block_pipeline(&precomputed_block)? {
+                        info!("Added block (length {}): {}", block.blockchain_length, block.state_hash);
+                    }
 
                     ipc_update_sender.send(IpcChannelUpdate {
                         best_tip: state.best_tip_block().clone(),
