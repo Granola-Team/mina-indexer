@@ -368,23 +368,7 @@ impl IndexerState {
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
-            // *** block pipeline ***
-            // - add to db
-            // - add to witness tree
-            // - db processes canonical blocks
-            if let Some(db_event) = self.add_block_to_store(&block)? {
-                let new_canonical_blocks = if db_event.is_new_block_event() {
-                    let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
-                        self.add_block_to_witness_tree(&block)?;
-                    blocks
-                } else {
-                    vec![]
-                };
-
-                new_canonical_blocks
-                    .iter()
-                    .for_each(|block| self.add_canonical_block_to_store(block).unwrap());
-            }
+            self.block_pipeline(&block)?;
         }
 
         info!(
@@ -396,6 +380,29 @@ impl IndexerState {
         debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
         self.phase = IndexerPhase::Watching;
         Ok(())
+    }
+
+    pub fn block_pipeline(&mut self, block: &PrecomputedBlock) -> anyhow::Result<bool> {
+        // *** block pipeline ***
+        // - add to db
+        // - add to witness tree
+        // - db processes canonical blocks
+        if let Some(db_event) = self.add_block_to_store(block)? {
+            let new_canonical_blocks = if db_event.is_new_block_event() {
+                let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
+                    self.add_block_to_witness_tree(block)?;
+                blocks
+            } else {
+                debug!("Block not added: {:?}", db_event);
+                return Ok(false);
+            };
+
+            new_canonical_blocks
+                .iter()
+                .for_each(|block| self.add_canonical_block_to_store(block).unwrap());
+        }
+
+        Ok(true)
     }
 
     /// Adds the block to the witness tree

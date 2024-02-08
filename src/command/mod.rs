@@ -408,7 +408,7 @@ impl std::fmt::Debug for Command {
         use serde_json::*;
 
         let json: Value = self.clone().into();
-        write!(f, "{}", to_string(&json).unwrap())
+        write!(f, "{}", to_string_pretty(&json).unwrap())
     }
 }
 
@@ -432,7 +432,7 @@ impl std::fmt::Debug for UserCommandWithStatus {
         use serde_json::*;
 
         let json: Value = self.clone().into();
-        write!(f, "{}", to_string(&json).unwrap())
+        write!(f, "{}", to_string_pretty(&json).unwrap())
     }
 }
 

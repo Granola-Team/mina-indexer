@@ -206,7 +206,7 @@ test_account_balance_cli() {
         --log-dir ./logs
     sleep 5
 
-    result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
+    result=$(idxr account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
 
     teardown
@@ -224,13 +224,13 @@ test_account_public_key_json() {
         --log-dir ./logs
     sleep 5
 
-    result=$(idxr account -j --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
+    result=$(idxr account -k B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
 
     teardown
 }
 
-# Indexer server returns the correct canonical tip
+# Indexer summary returns the correct canonical tip
 test_canonical_tip() {
     test=test_canonical_tip
 
@@ -249,6 +249,31 @@ test_canonical_tip() {
     
     assert 5 $blockchain_length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
+
+    teardown
+}
+
+# Indexer server returns the correct best tip
+test_best_tip() {
+    test=test_best_tip
+
+    setup
+    dl_mainnet 15 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs
+    sleep 5
+    
+    hash=$(idxr best-tip | jq -r .state_hash)
+    length=$(idxr best-tip | jq -r .blockchain_length)
+    wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    
+    assert $wt_length $length
+    assert $wt_hash $hash
 
     teardown
 }
@@ -550,18 +575,18 @@ test_transactions() {
     sleep 5
 
     # basic pk transaction queries
-    transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR -j | jq -r .)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j | jq -r .[0].Payment.amount)
+    transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR | jq -r .)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .[0].Payment.amount)
 
     assert '1000' $amount
     assert '[]' $transactions
 
     # basic pk transaction queries - verbose
-    kind=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.kind)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
-    state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].state_hash)
-    tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].tx_hash)
-    length=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].blockchain_length)
+    kind=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.kind)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
+    state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].state_hash)
+    tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].tx_hash)
+    length=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].blockchain_length)
 
     assert 3 $length
     assert '1000' $amount
@@ -583,16 +608,16 @@ test_transactions() {
     assert '1000' $amount
 
     # tx hash query
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j | jq -r .Payment.amount)
+    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa | jq -r .Payment.amount)
     assert '1000' $amount
 
     # tx hash query - verbose
-    kind=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.kind)
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .command.payload.body.amount)
-    status=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .status.kind)
-    tx_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .tx_hash)
-    state_hash=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .state_hash)
-    length=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -j -v | jq -r .blockchain_length)
+    kind=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.kind)
+    amount=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.amount)
+    status=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .status.kind)
+    tx_hash=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .tx_hash)
+    state_hash=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .state_hash)
+    length=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .blockchain_length)
 
     assert 3 $length
     assert 'Payment' $kind
@@ -602,22 +627,22 @@ test_transactions() {
     assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
 
     # state hash query
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.amount)
-    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.source)
-    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j | jq -r .[0].Payment.receiver)
+    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.amount)
+    source=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.source)
+    receiver=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.receiver)
 
     assert '1000' $amount
     assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $source
     assert 'B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM' $receiver
 
     # state hash query - verbose
-    kind=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.kind)
+    kind=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.kind)
     assert 'Signed_command' $kind
 
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.amount)
-    source=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.source_pk)
-    receiver=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.receiver_pk)
-    token=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -j -v | jq -r .[0].data.payload.body.token_id)
+    amount=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.amount)
+    source=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.source_pk)
+    receiver=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.receiver_pk)
+    token=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.token_id)
 
     assert '1' $token
     assert '1000' $amount
@@ -626,7 +651,7 @@ test_transactions() {
 
     # write transactions to file
     file=./transactions/transactions.json
-    idxr tx-public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
+    idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
     
     file_result=$(cat $file | jq -r .[0].Payment.amount)
     assert '1000' $file_result
@@ -711,7 +736,7 @@ test_checkpoint() {
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
+    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     # create checkpoint in ./checkpoint
     idxr checkpoint -p ./checkpoint
@@ -733,7 +758,7 @@ test_checkpoint() {
     canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -j -v | jq -r .[0].command.payload.body.amount)
+    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
     assert $canonical_length $canonical_length_checkpoint
@@ -836,6 +861,7 @@ if [ "$#" -eq 0 ]; then
     test_account_balance_cli
     test_account_public_key_json
     test_canonical_tip
+    test_best_tip
     test_missing_blocks
     test_best_chain
     test_ledgers
@@ -856,6 +882,7 @@ else
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_canonical_tip") test_canonical_tip ;;
+            "test_best_tip") test_best_tip ;;
             "test_missing_blocks") test_missing_blocks ;;
             "test_best_chain") test_best_chain ;;
             "test_ledgers") test_ledgers ;;

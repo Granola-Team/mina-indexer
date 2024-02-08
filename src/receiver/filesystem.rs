@@ -1,13 +1,17 @@
+use crate::block::{self, parser::BlockParser, precomputed::PrecomputedBlock};
 use async_priority_channel as priority;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use tokio::sync::{
     mpsc,
     watch::{self, Sender},
 };
-use tracing::{debug, instrument};
+use tracing::{debug, error, instrument};
 use watchexec::{
     error::RuntimeError,
     event::{
@@ -20,16 +24,17 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-use crate::block::{parser::BlockParser, precomputed::PrecomputedBlock};
-
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
 pub enum FilesystemReceiverError {
     WatchTargetIsNotADirectory(PathBuf),
     WorkerRuntimeError(String),
 }
+
 pub type FilesystemReceiverResult<T> = std::result::Result<T, FilesystemReceiverError>;
+
 pub struct FilesystemReceiver {
     parsers: Vec<BlockParser>,
+    paths_added: HashSet<PathBuf>,
     worker_command_sender: Sender<WorkingData>,
     worker_event_receiver: priority::Receiver<Event, Priority>,
     worker_error_receiver: mpsc::Receiver<RuntimeError>,
@@ -53,6 +58,7 @@ impl FilesystemReceiver {
 
         Ok(Self {
             parsers: vec![],
+            paths_added: HashSet::with_capacity(1000),
             worker_command_sender,
             worker_event_receiver,
             worker_error_receiver,
@@ -118,20 +124,30 @@ impl super::BlockReceiver for FilesystemReceiver {
                         .tags
                         .iter();
                         if tags.any(|signal|
-                                matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
+                                matches!(signal, Tag::Path { .. })
                                 ||
                                 matches!(signal, Tag::FileEventKind(Modify(_)))
+                                ||
+                                matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
                             )
                         {
                             for tag in tags {
-                                match tag {
-                                    Tag::Path { path, .. } => {
+                                if let Tag::Path { path, .. } = tag {
+                                    if self.paths_added.len() == 1000 {
+                                        self.paths_added.clear()
+                                    }
+                                    if block::is_valid_block_file(path) && !self.paths_added.contains(path) {
+                                        self.paths_added.insert(path.clone());
                                         match PrecomputedBlock::parse_file(path.as_path()) {
                                             Ok(block) => return Ok(Some(block)),
-                                            _ => continue,
+                                            _ => {
+                                                error!("Cannot parse block at {}", path.display());
+                                                continue;
+                                            },
                                         }
                                     }
-                                    _ => continue,
+                                } else {
+                                    continue;
                                 }
                             }
                         }

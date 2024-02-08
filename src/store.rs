@@ -120,19 +120,30 @@ impl IndexerStore {
 }
 
 impl BlockStore for IndexerStore {
-    /// Add the given block at its state hash and record a DbNewBlockevent
+    /// Add the given block at its state hash and record a db event
     fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
         trace!(
-            "Adding block with height {} and hash {}",
+            "Adding block (length {}): {}",
             block.blockchain_length,
             block.state_hash
         );
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add block to db
         let key = block.state_hash.as_bytes();
         let value = serde_json::to_vec(&block)?;
         let blocks_cf = self.blocks_cf();
+
+        if matches!(self.database.get_cf(&blocks_cf, key), Ok(Some(_))) {
+            trace!(
+                "Block already present (length {}): {}",
+                block.blockchain_length,
+                block.state_hash
+            );
+            return Ok(DbEvent::Block(DbBlockEvent::AlreadySeenBlock {
+                state_hash: block.state_hash.clone(),
+                blockchain_length: block.blockchain_length,
+            }));
+        }
         self.database.put_cf(&blocks_cf, key, value)?;
 
         // add block commands
@@ -172,10 +183,7 @@ impl BlockStore for IndexerStore {
 impl CanonicityStore for IndexerStore {
     /// Add a canonical state hash at the specified blockchain_length
     fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
-        trace!(
-            "Adding canonical block at height {height} with hash {}",
-            state_hash.0
-        );
+        trace!("Adding canonical block (length {height}): {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
         // height -> state hash

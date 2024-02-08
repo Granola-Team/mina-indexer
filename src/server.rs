@@ -2,7 +2,7 @@ use crate::{
     block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
-    ledger::{genesis::GenesisLedger, Ledger},
+    ledger::genesis::GenesisLedger,
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
     state::{summary::SummaryVerbose, IndexerState},
     store::IndexerStore,
@@ -14,12 +14,8 @@ use std::{
     process,
     sync::Arc,
 };
-use tokio::{
-    io,
-    sync::mpsc,
-    task::JoinHandle,
-};
-use tracing::{debug, info, instrument};
+use tokio::{io, sync::mpsc, task::JoinHandle};
+use tracing::{debug, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -42,7 +38,6 @@ pub struct MinaIndexer {
 #[derive(Debug)]
 pub struct IpcChannelUpdate {
     pub best_tip: Block,
-    pub ledger: Ledger,
     pub summary: Box<SummaryVerbose>,
     pub store: Arc<IndexerStore>,
 }
@@ -100,7 +95,7 @@ async fn wait_for_signal() {
     let mut int = signal(SignalKind::interrupt()).expect("failed to register signal handler");
     tokio::select! {
         _ = term.recv() => {
-            info!("Received SIGTERM");
+            trace!("Received SIGTERM");
             process::exit(100);
         },
         _ = int.recv() => {
@@ -110,16 +105,20 @@ async fn wait_for_signal() {
     }
 }
 
+async fn setup_signal_handler() {
+    tokio::spawn(async move {
+        let _ = wait_for_signal().await;
+    });
+}
+
 pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<IndexerState> {
-    // Setup signal handler
-    tokio::spawn(async move {
-        let _ = wait_for_signal().await;
-    });
     info!("Starting mina-indexer server");
+    setup_signal_handler().await;
+
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
         ledger: genesis_ledger,
@@ -179,7 +178,6 @@ pub async fn initialize(
         };
 
         let best_tip = state.best_tip_block().clone();
-        let ledger = genesis_ledger.into();
         let summary = Box::new(state.summary_verbose());
         let store = Arc::new(state.spawn_secondary_database()?);
 
@@ -187,7 +185,6 @@ pub async fn initialize(
         ipc_update_sender
             .send(IpcChannelUpdate {
                 best_tip,
-                ledger,
                 summary,
                 store,
             })
@@ -211,7 +208,6 @@ pub async fn initialize(
         ipc_update_sender
             .send(IpcChannelUpdate {
                 best_tip: state.best_tip_block().clone(),
-                ledger: state.best_ledger()?.unwrap(),
                 summary: Box::new(state.summary_verbose()),
                 store: Arc::new(state.spawn_secondary_database()?),
             })
@@ -240,14 +236,14 @@ pub async fn run(
             block_fut = filesystem_receiver.recv_block() => {
                 if let Some(precomputed_block) = block_fut? {
                     let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-                    debug!("Receiving block {block:?}");
+                    debug!("Receiving block (length {}): {}", block.blockchain_length, block.state_hash);
 
-                    state.add_block_to_witness_tree(&precomputed_block)?;
-                    info!("Added {block:?}");
+                    if state.block_pipeline(&precomputed_block)? {
+                        info!("Added block (length {}): {}", block.blockchain_length, block.state_hash);
+                    }
 
                     ipc_update_sender.send(IpcChannelUpdate {
                         best_tip: state.best_tip_block().clone(),
-                        ledger: state.best_ledger()?.unwrap(),
                         summary: Box::new(state.summary_verbose()),
                         store: Arc::new(state.spawn_secondary_database()?),
                     }).await?;
@@ -266,9 +262,15 @@ fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
             "Domain socket: {} already in use. Removing old vestige",
             &SOCKET_NAME
         );
-        std::fs::remove_file(SOCKET_NAME).expect("Should be able to remove socket file");
+        remove_domain_socket()?;
         LocalSocketListener::bind(SOCKET_NAME)
     } else {
         Err(e)
     }
+}
+
+pub fn remove_domain_socket() -> io::Result<()> {
+    std::fs::remove_file(SOCKET_NAME)?;
+    info!("Domain socket removed: {SOCKET_NAME}");
+    Ok(())
 }

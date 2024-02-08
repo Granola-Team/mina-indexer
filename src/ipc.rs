@@ -1,8 +1,8 @@
 use crate::{
-    block::{is_valid_state_hash, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
-    command::{store::CommandStore, Command},
-    ledger::{self, public_key, store::LedgerStore, Ledger},
-    server::{IndexerConfiguration, IpcChannelUpdate},
+    block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    command::{signed, store::CommandStore, Command},
+    ledger::{self, public_key, store::LedgerStore},
+    server::{remove_domain_socket, IndexerConfiguration, IpcChannelUpdate},
     snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
@@ -18,7 +18,6 @@ pub struct IpcActor {
     state_recv: IpcStateReceiver,
     listener: LocalSocketListener,
     best_tip: RwLock<Block>,
-    ledger: RwLock<Ledger>,
     summary: RwLock<Option<SummaryVerbose>>,
     store: RwLock<Arc<IndexerStore>>,
 }
@@ -44,7 +43,6 @@ impl IpcActor {
                 blockchain_length: 1,
                 global_slot_since_genesis: 0,
             }),
-            ledger: RwLock::new(config.ledger.into()),
             summary: RwLock::new(None),
             store: RwLock::new(store),
         }
@@ -61,7 +59,6 @@ impl IpcActor {
                         Some(state) => {
                             debug!("Setting IPC state");
                             *self.best_tip.write().await = state.best_tip;
-                            *self.ledger.write().await = state.ledger;
                             *self.summary.write().await = Some(*state.summary);
                             *self.store.write().await = state.store;
                         },
@@ -71,7 +68,6 @@ impl IpcActor {
                 client = self.listener.accept() => {
                     let store = self.store.read().await.clone();
                     let best_tip = self.best_tip.read().await.clone();
-                    let ledger = self.ledger.read().await.clone();
                     let summary = self.summary.read().await.clone();
                     match client {
                         Err(e) => error!("Error accepting connection: {}", e.to_string()),
@@ -82,7 +78,6 @@ impl IpcActor {
                                 match handle_conn(stream,
                                     &store,
                                     &best_tip,
-                                    &ledger,
                                     summary.as_ref()
                                 ).await {
                                     Err(e) => {
@@ -106,10 +101,11 @@ async fn handle_conn(
     conn: LocalSocketStream,
     db: &IndexerStore,
     best_tip: &Block,
-    ledger: &Ledger,
     summary: Option<&SummaryVerbose>,
 ) -> Result<(), anyhow::Error> {
     use anyhow::anyhow;
+    use helpers::*;
+
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -127,55 +123,128 @@ async fn handle_conn(
             let pk_buffer = buffers.next().unwrap();
             let pk = String::from_utf8(pk_buffer.to_vec())?;
             let pk = pk.trim_end_matches('\0');
-            if public_key::is_valid(pk) {
-                Some(pk.into())
-            } else {
-                Some(format!("Invalid pk: {pk}"))
-            };
             info!("Received account command for {pk}");
 
-            let account = ledger.accounts.get(&pk.into());
-            if let Some(account) = account {
-                debug!("Writing account {account:?} to client");
-                Some(serde_json::to_string(account)?)
+            if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash)? {
+                if !public_key::is_valid(pk) {
+                    invalid_public_key(pk)
+                } else {
+                    let pk = pk.into();
+                    let account = ledger.accounts.get(&pk);
+                    if let Some(account) = account {
+                        info!("Writing account {pk} to client");
+                        Some(format!("{account}"))
+                    } else {
+                        warn!("Account {pk} does not exist");
+                        Some(format!("Account {pk} does not exist"))
+                    }
+                }
             } else {
-                warn!("Account {} does not exist", pk);
-                Some(format!("Account {} does not exist", pk))
+                error!(
+                    "Best ledger not in database (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                );
+                Some(format!(
+                    "Best ledger not in database (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                ))
             }
         }
-        "best_chain" => {
-            info!("Received best_chain command");
-            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
+        "block-best-tip" => {
+            info!("Received best-tip command");
+            let verbose: bool = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+
+            if let Ok(Some(ref block)) = db.get_block(&best_tip.state_hash) {
+                let block_str = if verbose {
+                    serde_json::to_string_pretty(block)?
+                } else {
+                    let block: BlockWithoutHeight = block.into();
+                    serde_json::to_string_pretty(&block)?
+                };
+                if !path.is_empty() {
+                    info!("Writing best tip block to {path}");
+                    std::fs::write(path, block_str)?;
+                    Some(format!("Best block written to {path}"))
+                } else {
+                    info!("Writing best tip block to stdout");
+                    Some(block_str)
+                }
+            } else {
+                error!(
+                    "Best tip block is not in the store (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                );
+                Some(format!(
+                    "Best tip block is not in the store (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                ))
+            }
+        }
+        "block-state-hash" => {
+            info!("Received block-state-hash command");
+            let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let verbose: bool = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+
+            if !block::is_valid_state_hash(&state_hash) {
+                invalid_state_hash(&state_hash)
+            } else if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
+                let block_str = if verbose {
+                    serde_json::to_string_pretty(block)?
+                } else {
+                    let block: BlockWithoutHeight = block.into();
+                    serde_json::to_string_pretty(&block)?
+                };
+                if !path.is_empty() {
+                    info!("Writing block {state_hash} to {path}");
+                    std::fs::write(path, block_str)?;
+                    Some(format!("Best block written to {path}"))
+                } else {
+                    info!("Writing best tip block to stdout");
+                    Some(block_str)
+                }
+            } else {
+                error!("Block at state hash not present in store: {}", state_hash);
+                Some(format!(
+                    "Block at state hash not present in store: {}",
+                    state_hash
+                ))
+            }
+        }
+        "best-chain" => {
+            info!("Received best-chain command");
+            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
             let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
             let start_state_hash: BlockHash =
                 String::from_utf8(buffers.next().unwrap().to_vec())?.into();
             let end_state_hash = {
                 let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
                 let hash = hash.trim_end_matches('\0');
-                if !is_valid_state_hash(hash) {
+                if !block::is_valid_state_hash(hash) {
                     best_tip.state_hash.clone()
                 } else {
                     hash.into()
                 }
             };
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
 
-            let block = db.get_block(&end_state_hash)?.unwrap();
-            let mut parent_hash = block.previous_state_hash();
-            let mut best_chain = vec![block];
-            if num == 0 {
-                // no num bound => use hash bounds
-                while let Some(parent_pcb) = db.get_block(&parent_hash)? {
-                    let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
-                    parent_hash = parent_pcb.previous_state_hash();
-                    best_chain.push(parent_pcb);
+            if !block::is_valid_state_hash(&start_state_hash.0) {
+                invalid_state_hash(&start_state_hash.0)
+            } else if let (Some(end_block), Some(start_block)) = (
+                db.get_block(&end_state_hash)?,
+                db.get_block(&start_state_hash)?,
+            ) {
+                let start_height = start_block.blockchain_length;
+                let end_height = end_block.blockchain_length;
+                let mut parent_hash = end_block.previous_state_hash();
+                let mut best_chain = vec![end_block];
 
-                    if curr_hash == start_state_hash {
-                        break;
-                    }
-                }
-            } else {
-                // num bound
-                for _ in 1..num {
+                // constrain by num and state hash bound
+                for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
                     if let Some(parent_pcb) = db.get_block(&parent_hash)? {
                         let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
                         parent_hash = parent_pcb.previous_state_hash();
@@ -188,39 +257,31 @@ async fn handle_conn(
                         break;
                     }
                 }
-            }
 
-            if verbose {
-                Some(serde_json::to_string(&best_chain)?)
-            } else {
-                let best_chain: Vec<BlockWithoutHeight> =
-                    best_chain.iter().map(BlockWithoutHeight::from).collect();
-                Some(format!("{best_chain:?}"))
-            }
-        }
-        "best_ledger" => {
-            info!("Received best_ledger command");
-            let ledger = ledger.to_string();
-            match buffers.next() {
-                Some(data_buffer) => {
-                    let data = String::from_utf8(data_buffer.to_vec())?;
-                    let data = data.trim_end_matches('\0');
-                    if data.is_empty() {
-                        debug!("Writing best ledger to stdout");
-                        Some(ledger)
+                let best_chain_str = if verbose {
+                    serde_json::to_string(&best_chain)?
+                } else {
+                    let best_chain: Vec<BlockWithoutHeight> =
+                        best_chain.iter().map(BlockWithoutHeight::from).collect();
+                    format_vec_jq_compatible(&best_chain)
+                };
+
+                if path.is_empty() {
+                    info!("Writing best chain to stdout");
+                    Some(best_chain_str)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        info!("Writing best chain to {}", path.display());
+
+                        std::fs::write(path.clone(), best_chain_str)?;
+                        Some(format!("Best chain written to {}", path.display()))
                     } else {
-                        let path = data.parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing best ledger to {}", path.display());
-
-                            tokio::fs::write(path.clone(), ledger).await?;
-                            Some(format!("Best ledger written to {}", path.display()))
-                        } else {
-                            file_must_not_be_a_directory(&path)
-                        }
+                        file_must_not_be_a_directory(&path)
                     }
                 }
-                _ => None,
+            } else {
+                None
             }
         }
         "checkpoint" => {
@@ -243,49 +304,77 @@ async fn handle_conn(
                 ))
             }
         }
+        "best-ledger" => {
+            info!("Received best-ledger command");
+
+            if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash)? {
+                let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let path = path.trim_end_matches('\0');
+                let ledger = ledger.to_string_pretty();
+
+                if path.is_empty() {
+                    debug!("Writing best ledger to stdout");
+                    Some(ledger)
+                } else {
+                    let path = path.parse::<PathBuf>()?;
+                    if path.is_dir() {
+                        file_must_not_be_a_directory(&path)
+                    } else {
+                        debug!("Writing best ledger to {}", path.display());
+
+                        std::fs::write(path.clone(), ledger)?;
+                        Some(format!("Best ledger written to {}", path.display()))
+                    }
+                }
+            } else {
+                error!(
+                    "Best ledger cannot be calculated (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                );
+                Some(format!(
+                    "Best ledger cannot be calculated (length {}): {}",
+                    best_tip.blockchain_length, best_tip.state_hash.0
+                ))
+            }
+        }
         "ledger" => {
             let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let hash = hash.trim_end_matches('\0');
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
             info!("Received ledger command for {hash}");
 
             // check if ledger or state hash and use appropriate getter
-            if is_valid_state_hash(&hash[..52]) {
-                let hash = &hash[..52];
+            if block::is_valid_state_hash(&hash) {
                 trace!("{hash} is a state hash");
 
-                if let Some(ledger) = db.get_ledger_state_hash(&hash.into())? {
-                    let ledger = ledger.to_string();
-                    match buffers.next() {
-                        None => {
-                            debug!("Writing ledger at state hash {hash} to stdout");
-                            Some(ledger)
-                        }
-                        Some(path_buffer) => {
-                            let path = String::from_utf8(path_buffer.to_vec())?
-                                .trim_end_matches('\0')
-                                .parse::<PathBuf>()?;
-                            if !path.is_dir() {
-                                debug!("Writing ledger at {hash} to {}", path.display());
+                if let Some(ledger) = db.get_ledger_state_hash(&hash.clone().into())? {
+                    let ledger = ledger.to_string_pretty();
+                    if path.is_empty() {
+                        debug!("Writing ledger at state hash {hash} to stdout");
+                        Some(ledger)
+                    } else {
+                        let path: PathBuf = path.into();
+                        if !path.is_dir() {
+                            debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path.clone(), ledger).await?;
-                                Some(format!(
-                                    "Ledger at state hash {hash} written to {}",
-                                    path.display()
-                                ))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            std::fs::write(path.clone(), ledger)?;
+                            Some(format!(
+                                "Ledger at state hash {hash} written to {}",
+                                path.display()
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 } else {
+                    error!("Ledger at state hash {hash} is not in the store");
                     Some(format!("Ledger at state hash {hash} is not in the store"))
                 }
-            } else if ledger::is_valid_hash(&hash[..51]) {
-                let hash = &hash[..51];
+            } else if ledger::is_valid_hash(&hash) {
                 trace!("{hash} is a ledger hash");
 
-                if let Some(ledger) = db.get_ledger(hash)? {
-                    let ledger = ledger.to_string();
+                if let Some(ledger) = db.get_ledger(&hash)? {
+                    let ledger = ledger.to_string_pretty();
                     match buffers.next() {
                         None => {
                             debug!("Writing ledger at {hash} to stdout");
@@ -298,7 +387,7 @@ async fn handle_conn(
                             if !path.is_dir() {
                                 debug!("Writing ledger at {hash} to {}", path.display());
 
-                                tokio::fs::write(path.clone(), ledger).await?;
+                                std::fs::write(path.clone(), ledger)?;
                                 Some(format!("Ledger at {hash} written to {}", path.display()))
                             } else {
                                 file_must_not_be_a_directory(&path)
@@ -306,72 +395,76 @@ async fn handle_conn(
                         }
                     }
                 } else {
+                    error!("Ledger at {hash} is not in the store");
                     Some(format!("Ledger at {hash} is not in the store"))
                 }
             } else {
-                debug!("Length 52: {}", hash.len());
-                Some(format!("Invalid: {hash} is not a state or ledger hash"))
+                error!("Invalid ledger or state hash: {hash}");
+                Some(format!("Invalid ledger or state hash: {hash}"))
             }
         }
-        "ledger_at_height" => {
-            let height = String::from_utf8(buffers.next().unwrap().to_vec())?
-                .trim_end_matches('\0')
-                .parse::<u32>()?;
-            info!("Received ledger_at_height {height} command");
+        "ledger-at-height" => {
+            let height = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!("Received ledger-at-height {height} command");
 
             if height > best_tip.blockchain_length {
-                Some(format!("Invalid query: ledger at height {height} cannot be determined from a best chain of length {}", best_tip.blockchain_length))
+                // ahead of witness tree - cannot compute
+                Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {}", best_tip.blockchain_length))
             } else if let Some(ledger) = db.get_ledger_at_height(height)? {
-                let ledger = ledger.to_string();
-                match buffers.next() {
-                    None => {
-                        debug!("Writing ledger at height {height} to stdout");
-                        Some(ledger)
-                    }
-                    Some(path_buffer) => {
-                        let path = String::from_utf8(path_buffer.to_vec())?
-                            .trim_end_matches('\0')
-                            .parse::<PathBuf>()?;
-                        if !path.is_dir() {
-                            debug!("Writing ledger at height {height} to {}", path.display());
+                let ledger = ledger.to_string_pretty();
+                if path.is_empty() {
+                    debug!("Writing ledger at height {height} to stdout");
+                    Some(ledger)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing ledger at height {height} to {}", path.display());
 
-                            tokio::fs::write(&path, ledger).await?;
-                            Some(format!(
-                                "Ledger at height {height} written to {}",
-                                path.display()
-                            ))
-                        } else {
-                            file_must_not_be_a_directory(&path)
-                        }
+                        std::fs::write(&path, ledger)?;
+                        Some(format!(
+                            "Ledger at height {height} written to {}",
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
                     }
                 }
             } else {
-                None
+                error!("Invalid ledger query. Ledger at height {height} not available");
+                Some(format!(
+                    "Invalid ledger query. Ledger at height {height} not available"
+                ))
             }
         }
         "snark-pk" => {
-            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
             info!("Received SNARK work command for public key {pk}");
 
-            let snarks = db
-                .get_snark_work_by_public_key(&pk.clone().into())?
-                .unwrap_or(vec![]);
-            let snarks_str = format!("{snarks:?}");
-
-            if path.is_empty() {
-                debug!("Writing SNARK work for {pk} to stdout");
-                Some(snarks_str)
+            if !public_key::is_valid(&pk) {
+                invalid_public_key(&pk)
             } else {
-                let path: PathBuf = path.into();
-                if !path.is_dir() {
-                    debug!("Writing SNARK work for {pk} to {}", path.display());
+                let snarks = db
+                    .get_snark_work_by_public_key(&pk.clone().into())?
+                    .unwrap_or(vec![]);
+                let snarks_str = format_vec_jq_compatible(&snarks);
 
-                    tokio::fs::write(&path, snarks_str).await?;
-                    Some(format!("SNARK work for {pk} written to {}", path.display()))
+                if path.is_empty() {
+                    debug!("Writing SNARK work for {pk} to stdout");
+                    Some(snarks_str)
                 } else {
-                    file_must_not_be_a_directory(&path)
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing SNARK work for {pk} to {}", path.display());
+
+                        std::fs::write(&path, snarks_str)?;
+                        Some(format!("SNARK work for {pk} written to {}", path.display()))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
                 }
             }
         }
@@ -381,46 +474,33 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
             info!("Received SNARK work command for state hash {state_hash}");
 
-            db.get_snark_work_in_block(&state_hash.clone().into())?
-                .and_then(|snarks| {
-                    let snarks_str = format!("{snarks:?}");
-                    if path.is_empty() {
-                        debug!("Writing SNARK work for {state_hash} to stdout");
-                        Some(snarks_str)
-                    } else {
-                        let path: PathBuf = path.into();
-                        if !path.is_dir() {
-                            debug!(
-                                "Writing SNARK work for block {state_hash} to {}",
-                                path.display()
-                            );
-
-                            std::fs::write(&path, snarks_str).unwrap();
-                            Some(format!(
-                                "SNARK work for block {state_hash} written to {}",
-                                path.display()
-                            ))
-                        } else {
-                            file_must_not_be_a_directory(&path)
-                        }
-                    }
-                })
-        }
-        "summary" => {
-            info!("Received summary command");
-            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?
-                .trim_end_matches('\0')
-                .parse::<bool>()?;
-            if let Some(summary) = summary {
-                if verbose {
-                    Some(serde_json::to_string::<SummaryVerbose>(summary)?)
-                } else {
-                    Some(serde_json::to_string::<SummaryShort>(
-                        &summary.clone().into(),
-                    )?)
-                }
+            if !block::is_valid_state_hash(&state_hash) {
+                invalid_state_hash(&state_hash)
             } else {
-                Some("No summary available yet".into())
+                db.get_snark_work_in_block(&state_hash.clone().into())?
+                    .and_then(|snarks| {
+                        let snarks_str = format_vec_jq_compatible(&snarks);
+                        if path.is_empty() {
+                            debug!("Writing SNARK work for {state_hash} to stdout");
+                            Some(snarks_str)
+                        } else {
+                            let path: PathBuf = path.into();
+                            if !path.is_dir() {
+                                debug!(
+                                    "Writing SNARK work for block {state_hash} to {}",
+                                    path.display()
+                                );
+
+                                std::fs::write(&path, snarks_str).unwrap();
+                                Some(format!(
+                                    "SNARK work for block {state_hash} written to {}",
+                                    path.display()
+                                ))
+                            } else {
+                                file_must_not_be_a_directory(&path)
+                            }
+                        }
+                    })
             }
         }
         "shutdown" => {
@@ -428,12 +508,46 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
+
+            remove_domain_socket().unwrap_or(());
             process::exit(0);
         }
-        "tx-pk" => {
-            let pk = &String::from_utf8(buffers.next().unwrap().to_vec())?;
+        "summary" => {
+            info!("Received summary command");
             let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
-            let num = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<usize>()?;
+            let json = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+
+            if let Some(summary) = summary {
+                let summary_str = if verbose {
+                    format_json(&summary, json)
+                } else {
+                    let summary: SummaryShort = summary.clone().into();
+                    format_json(&summary, json)
+                };
+
+                if path.is_empty() {
+                    info!("Writing summary to stdout");
+                    Some(summary_str)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        info!("Writing summary to {}", path.display());
+
+                        std::fs::write(&path, summary_str).unwrap();
+                        Some(format!("Summary written to {}", path.display()))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
+            } else {
+                Some("Summary not available".into())
+            }
+        }
+        "tx-pk" => {
+            let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let verbose = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<bool>()?;
             let start_state_hash: BlockHash =
                 String::from_utf8(buffers.next().unwrap().to_vec())?.into();
             let end_state_hash: BlockHash = {
@@ -445,43 +559,43 @@ async fn handle_conn(
                     raw.into()
                 }
             };
-            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let path = path.trim_end_matches('\0');
+            info!("Received tx-public-key command for {pk}");
 
-            info!("Received transactions command for public key {pk}");
-            let transactions = db
-                .get_commands_with_bounds(&pk.clone().into(), &start_state_hash, &end_state_hash)?
-                .unwrap_or(vec![]);
-            let transaction_str = {
-                let txs = if num != 0 {
-                    transactions.into_iter().take(num).collect()
+            if !public_key::is_valid(&pk) {
+                invalid_public_key(&pk)
+            } else if !block::is_valid_state_hash(&start_state_hash.0) {
+                invalid_state_hash(&start_state_hash.0)
+            } else if !block::is_valid_state_hash(&end_state_hash.0) {
+                invalid_state_hash(&end_state_hash.0)
+            } else {
+                let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+                let path = path.trim_end_matches('\0');
+                let transactions = db
+                    .get_commands_for_public_key(&pk.clone().into())?
+                    .unwrap_or(vec![]);
+                let transaction_str = if verbose {
+                    format_vec_jq_compatible(&transactions)
                 } else {
-                    transactions
+                    let txs: Vec<Command> = transactions.into_iter().map(Command::from).collect();
+                    format_vec_jq_compatible(&txs)
                 };
 
-                if verbose {
-                    format!("{txs:?}")
+                if path.is_empty() {
+                    debug!("Writing transactions for {pk} to stdout");
+                    Some(transaction_str)
                 } else {
-                    let txs: Vec<Command> =
-                        txs.into_iter().map(|c| Command::from(c.command)).collect();
-                    format!("{txs:?}")
-                }
-            };
-            if path.is_empty() {
-                debug!("Writing transactions for {pk} to stdout");
-                Some(transaction_str)
-            } else {
-                let path: PathBuf = path.into();
-                if !path.is_dir() {
-                    debug!("Writing transactions for {pk} to {}", path.display());
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing transactions for {pk} to {}", path.display());
 
-                    tokio::fs::write(&path, transaction_str).await?;
-                    Some(format!(
-                        "Transactions for {pk} written to {}",
-                        path.display()
-                    ))
-                } else {
-                    file_must_not_be_a_directory(&path)
+                        std::fs::write(&path, transaction_str)?;
+                        Some(format!(
+                            "Transactions for {pk} written to {}",
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
                 }
             }
         }
@@ -491,15 +605,19 @@ async fn handle_conn(
                 .trim_end_matches('\0')
                 .parse()?;
 
-            info!("Received transactions command for tx hash {tx_hash}");
-            db.get_command_by_hash(&tx_hash)?.map(|cmd| {
-                if verbose {
-                    format!("{cmd:?}")
-                } else {
-                    let cmd: Command = cmd.command.into();
-                    format!("{cmd:?}")
-                }
-            })
+            info!("Received tx-hash command for {tx_hash}");
+            if !signed::is_valid_tx_hash(&tx_hash) {
+                invalid_tx_hash(&tx_hash)
+            } else {
+                db.get_command_by_hash(&tx_hash)?.map(|cmd| {
+                    if verbose {
+                        format!("{cmd:?}")
+                    } else {
+                        let cmd: Command = cmd.command.into();
+                        format!("{cmd:?}")
+                    }
+                })
+            }
         }
         "tx-state-hash" => {
             let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
@@ -507,15 +625,19 @@ async fn handle_conn(
                 .trim_end_matches('\0')
                 .parse()?;
 
-            info!("Received transactions command for state hash {state_hash}");
-            db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
-                if verbose {
-                    format!("{cmds:?}")
-                } else {
-                    let cmd: Vec<Command> = cmds.into_iter().map(Command::from).collect();
-                    format!("{cmd:?}")
-                }
-            })
+            info!("Received tx-state-hash command for {state_hash}");
+            if !block::is_valid_state_hash(&state_hash) {
+                invalid_state_hash(&state_hash)
+            } else {
+                db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
+                    if verbose {
+                        format_vec_jq_compatible(&cmds)
+                    } else {
+                        let cmds: Vec<Command> = cmds.into_iter().map(Command::from).collect();
+                        format_vec_jq_compatible(&cmds)
+                    }
+                })
+            }
         }
         bad_request => {
             return Err(anyhow!("Malformed request: {bad_request}"));
@@ -538,4 +660,42 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
         "The path provided must not be a directory: {}",
         path.display()
     ))
+}
+
+mod helpers {
+    use super::*;
+
+    pub fn invalid_public_key(input: &str) -> Option<String> {
+        warn!("Invalid public key: {input}");
+        Some(format!("Invalid public key: {input}"))
+    }
+
+    pub fn invalid_tx_hash(input: &str) -> Option<String> {
+        warn!("Invalid transaction hash: {input}");
+        Some(format!("Invalid transaction hash: {input}"))
+    }
+
+    pub fn invalid_state_hash(input: &str) -> Option<String> {
+        warn!("Invalid state hash: {input}");
+        Some(format!("Invalid state hash: {input}"))
+    }
+
+    pub fn format_vec_jq_compatible<T>(vec: &Vec<T>) -> String
+    where
+        T: std::fmt::Debug,
+    {
+        let pp = format!("{vec:#?}");
+        pp.replace(",\n]", "\n]")
+    }
+
+    pub fn format_json<T>(input: &T, json: bool) -> String
+    where
+        T: ?Sized + serde::Serialize + std::fmt::Display,
+    {
+        if json {
+            serde_json::to_string(input).unwrap()
+        } else {
+            format!("{input}")
+        }
+    }
 }
