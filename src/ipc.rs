@@ -104,6 +104,8 @@ async fn handle_conn(
     summary: Option<&SummaryVerbose>,
 ) -> Result<(), anyhow::Error> {
     use anyhow::anyhow;
+    use helpers::*;
+
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -126,7 +128,8 @@ async fn handle_conn(
             if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash)? {
                 if !public_key::is_valid(pk) {
                     invalid_public_key(pk)
-                } else if let Ok(pk) = pk.try_into() {
+                } else {
+                    let pk = pk.into();
                     let account = ledger.accounts.get(&pk);
                     if let Some(account) = account {
                         info!("Writing account {pk} to client");
@@ -135,9 +138,6 @@ async fn handle_conn(
                         warn!("Account {pk} does not exist");
                         Some(format!("Account {pk} does not exist"))
                     }
-                } else {
-                    warn!("Invalid public key {pk}");
-                    Some(format!("Invalid public key {pk}"))
                 }
             } else {
                 error!(
@@ -273,12 +273,7 @@ async fn handle_conn(
                 let mut best_chain = vec![end_block];
 
                 // constrain by num and state hash bound
-                let max = if num == 0 {
-                    end_height.saturating_sub(start_height)
-                } else {
-                    num.min(end_height.saturating_sub(start_height))
-                };
-                for _ in 0..max {
+                for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
                     if let Some(parent_pcb) = db.get_block(&parent_hash)? {
                         let curr_hash: BlockHash = parent_pcb.state_hash.clone().into();
                         parent_hash = parent_pcb.previous_state_hash();
@@ -293,11 +288,11 @@ async fn handle_conn(
                 }
 
                 let best_chain_str = if verbose {
-                    serde_json::to_string_pretty(&best_chain)?
+                    serde_json::to_string(&best_chain)?
                 } else {
                     let best_chain: Vec<BlockWithoutHeight> =
                         best_chain.iter().map(BlockWithoutHeight::from).collect();
-                    format!("{best_chain:?}")
+                    format_vec_jq_compatible(&best_chain)
                 };
 
                 if path.is_empty() {
@@ -484,7 +479,7 @@ async fn handle_conn(
                 let snarks = db
                     .get_snark_work_by_public_key(&pk.clone().into())?
                     .unwrap_or(vec![]);
-                let snarks_str = format!("{snarks:#?}");
+                let snarks_str = format_vec_jq_compatible(&snarks);
 
                 if path.is_empty() {
                     debug!("Writing SNARK work for {pk} to stdout");
@@ -513,7 +508,7 @@ async fn handle_conn(
             } else {
                 db.get_snark_work_in_block(&state_hash.clone().into())?
                     .and_then(|snarks| {
-                        let snarks_str = format!("{snarks:#?}");
+                        let snarks_str = format_vec_jq_compatible(&snarks);
                         if path.is_empty() {
                             debug!("Writing SNARK work for {state_hash} to stdout");
                             Some(snarks_str)
@@ -555,18 +550,10 @@ async fn handle_conn(
 
             if let Some(summary) = summary {
                 let summary_str = if verbose {
-                    if json {
-                        serde_json::to_string(&summary)?
-                    } else {
-                        format!("{summary}")
-                    }
+                    format_json(&summary, json)
                 } else {
                     let summary: SummaryShort = summary.clone().into();
-                    if json {
-                        serde_json::to_string(&summary)?
-                    } else {
-                        format!("{summary}")
-                    }
+                    format_json(&summary, json)
                 };
 
                 if path.is_empty() {
@@ -616,10 +603,10 @@ async fn handle_conn(
                     .get_commands_for_public_key(&pk.clone().into())?
                     .unwrap_or(vec![]);
                 let transaction_str = if verbose {
-                    format!("{transactions:#?}")
+                    format_vec_jq_compatible(&transactions)
                 } else {
                     let txs: Vec<Command> = transactions.into_iter().map(Command::from).collect();
-                    format!("{txs:#?}")
+                    format_vec_jq_compatible(&txs)
                 };
 
                 if path.is_empty() {
@@ -653,10 +640,10 @@ async fn handle_conn(
             } else {
                 db.get_command_by_hash(&tx_hash)?.map(|cmd| {
                     if verbose {
-                        format!("{cmd:#?}")
+                        format!("{cmd:?}")
                     } else {
                         let cmd: Command = cmd.command.into();
-                        format!("{cmd:#?}")
+                        format!("{cmd:?}")
                     }
                 })
             }
@@ -673,10 +660,10 @@ async fn handle_conn(
             } else {
                 db.get_commands_in_block(&state_hash.into())?.map(|cmds| {
                     if verbose {
-                        format!("{cmds:#?}")
+                        format_vec_jq_compatible(&cmds)
                     } else {
-                        let cmd: Vec<Command> = cmds.into_iter().map(Command::from).collect();
-                        format!("{cmd:#?}")
+                        let cmds: Vec<Command> = cmds.into_iter().map(Command::from).collect();
+                        format_vec_jq_compatible(&cmds)
                     }
                 })
             }
@@ -704,17 +691,40 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
     ))
 }
 
-fn invalid_public_key(input: &str) -> Option<String> {
-    warn!("Invalid public key: {input}");
-    Some(format!("Invalid public key: {input}"))
-}
+mod helpers {
+    use super::*;
 
-fn invalid_tx_hash(input: &str) -> Option<String> {
-    warn!("Invalid transaction hash: {input}");
-    Some(format!("Invalid transaction hash: {input}"))
-}
+    pub fn invalid_public_key(input: &str) -> Option<String> {
+        warn!("Invalid public key: {input}");
+        Some(format!("Invalid public key: {input}"))
+    }
 
-fn invalid_state_hash(input: &str) -> Option<String> {
-    warn!("Invalid state hash: {input}");
-    Some(format!("Invalid state hash: {input}"))
+    pub fn invalid_tx_hash(input: &str) -> Option<String> {
+        warn!("Invalid transaction hash: {input}");
+        Some(format!("Invalid transaction hash: {input}"))
+    }
+
+    pub fn invalid_state_hash(input: &str) -> Option<String> {
+        warn!("Invalid state hash: {input}");
+        Some(format!("Invalid state hash: {input}"))
+    }
+
+    pub fn format_vec_jq_compatible<T>(vec: &Vec<T>) -> String
+    where
+        T: std::fmt::Debug,
+    {
+        let pp = format!("{vec:#?}");
+        pp.replace(",\n]", "\n]")
+    }
+
+    pub fn format_json<T>(input: &T, json: bool) -> String
+    where
+        T: ?Sized + serde::Serialize + std::fmt::Display,
+    {
+        if json {
+            serde_json::to_string(input).unwrap()
+        } else {
+            format!("{input}")
+        }
+    }
 }
