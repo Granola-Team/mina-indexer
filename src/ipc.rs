@@ -1,7 +1,7 @@
 use crate::{
     block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
     command::{signed, store::CommandStore, Command},
-    ledger::{self, diff::LedgerDiff, public_key, store::LedgerStore},
+    ledger::{self, public_key, store::LedgerStore},
     server::{remove_domain_socket, IndexerConfiguration, IpcChannelUpdate},
     snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
@@ -212,35 +212,6 @@ async fn handle_conn(
                     "Block at state hash not present in store: {}",
                     state_hash
                 ))
-            }
-        }
-        "block-ledger-diff" => {
-            info!("Received block-ledger-diff command");
-            let state_hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let _verbose: bool = String::from_utf8(buffers.next().unwrap().to_vec())?.parse()?;
-            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
-            let path = path.trim_end_matches('\0');
-
-            if !block::is_valid_state_hash(&state_hash) {
-                invalid_state_hash(&state_hash)
-            } else if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
-                let diff_str = serde_json::to_string_pretty(&LedgerDiff::from_precomputed(block))?;
-                if !path.is_empty() {
-                    let path: PathBuf = path.into();
-                    info!(
-                        "Writing ledger diff for block {state_hash} to {}",
-                        path.display()
-                    );
-
-                    std::fs::write(path.clone(), diff_str)?;
-                    Some(format!("Ledger diff written to {}", path.display()))
-                } else {
-                    info!("Writing ledger for block {state_hash} to stdout");
-                    Some(diff_str)
-                }
-            } else {
-                error!("Block not present in store: {state_hash}");
-                Some(format!("Block not present in store: {state_hash}"))
             }
         }
         "best-chain" => {
