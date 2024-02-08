@@ -278,6 +278,52 @@ test_best_tip() {
     teardown
 }
 
+# Indexer handles copied blocks correctly
+test_block_copy() {
+    test=test_block_copy
+
+    setup
+    mkdir ./blocks_to_copy
+    dl_mainnet 10 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level-stdout debug
+    sleep 5
+
+    # start without block 11
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    assert 10 $best_length
+    assert 1 $canonical_length
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+
+    # add block 11
+    dl_mainnet_single 11 ./blocks_to_copy
+    cp ./blocks_to_copy/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json ./blocks
+    sleep 1
+
+    # check
+    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    assert 11 $best_length
+    assert 1 $canonical_length
+    assert '3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA' $best_hash
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+
+    teardown
+}
+
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
     test=test_missing_blocks
@@ -292,7 +338,7 @@ test_missing_blocks() {
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --log-level-stdout debug &
+        --log-level-stdout debug
     sleep 5
 
     # start out missing block 11 & 21
@@ -862,6 +908,7 @@ if [ "$#" -eq 0 ]; then
     test_account_public_key_json
     test_canonical_tip
     test_best_tip
+    test_block_copy
     test_missing_blocks
     test_best_chain
     test_ledgers
@@ -883,6 +930,7 @@ else
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_canonical_tip") test_canonical_tip ;;
             "test_best_tip") test_best_tip ;;
+            "test_block_copy") test_block_copy ;;
             "test_missing_blocks") test_missing_blocks ;;
             "test_best_chain") test_best_chain ;;
             "test_ledgers") test_ledgers ;;
