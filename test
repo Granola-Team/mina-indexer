@@ -253,6 +253,31 @@ test_canonical_tip() {
     teardown
 }
 
+# Indexer server returns the correct best tip
+test_best_tip() {
+    test=test_best_tip
+
+    setup
+    dl_mainnet 15 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --watch-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs
+    sleep 5
+    
+    hash=$(idxr best-tip | jq -r .state_hash)
+    length=$(idxr best-tip | jq -r .blockchain_length)
+    wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    
+    assert $wt_length $length
+    assert $wt_hash $hash
+
+    teardown
+}
+
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
     test=test_missing_blocks
