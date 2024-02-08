@@ -120,14 +120,14 @@ impl From<SnarkWorkSummaryWithStateHash> for serde_json::Value {
 impl std::fmt::Debug for SnarkWorkSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let json: serde_json::Value = self.clone().into();
-        write!(f, "{}", serde_json::to_string(&json).unwrap())
+        write!(f, "{}", serde_json::to_string_pretty(&json).unwrap())
     }
 }
 
 impl std::fmt::Debug for SnarkWorkSummaryWithStateHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let json: serde_json::Value = self.clone().into();
-        write!(f, "{}", serde_json::to_string(&json).unwrap())
+        write!(f, "{}", serde_json::to_string_pretty(&json).unwrap())
     }
 }
 

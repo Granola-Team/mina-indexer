@@ -170,28 +170,7 @@ impl std::cmp::Ord for Block {
 
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use serde_json::*;
-
-        let mut json = Map::new();
-        json.insert("height".into(), Value::Number(Number::from(self.height)));
-        json.insert(
-            "blockchain_length".into(),
-            Value::Number(Number::from(self.blockchain_length)),
-        );
-        json.insert(
-            "global_slot_since_genesis".into(),
-            Value::Number(Number::from(self.global_slot_since_genesis)),
-        );
-        json.insert(
-            "state_hash".into(),
-            Value::String(self.state_hash.0.clone()),
-        );
-        json.insert(
-            "parent_hash".into(),
-            Value::String(self.parent_hash.0.clone()),
-        );
-
-        match to_string(&Value::Object(json)) {
+        match serde_json::to_string_pretty(self) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),
         }
@@ -220,27 +199,7 @@ impl std::fmt::Debug for BlockWithoutHeight {
 
 impl std::fmt::Display for BlockWithoutHeight {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use serde_json::*;
-
-        let mut json = Map::new();
-        json.insert(
-            "blockchain_length".into(),
-            Value::Number(Number::from(self.blockchain_length)),
-        );
-        json.insert(
-            "global_slot_since_genesis".into(),
-            Value::Number(Number::from(self.global_slot_since_genesis)),
-        );
-        json.insert(
-            "state_hash".into(),
-            Value::String(self.state_hash.0.clone()),
-        );
-        json.insert(
-            "parent_hash".into(),
-            Value::String(self.parent_hash.0.clone()),
-        );
-
-        match to_string(&Value::Object(json)) {
+        match serde_json::to_string_pretty(self) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),
         }

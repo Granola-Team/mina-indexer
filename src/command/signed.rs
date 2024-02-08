@@ -312,7 +312,7 @@ impl std::fmt::Debug for SignedCommand {
         use serde_json::*;
 
         let json: Value = self.clone().into();
-        write!(f, "{}", to_string(&json).unwrap())
+        write!(f, "{}", to_string_pretty(&json).unwrap())
     }
 }
 
@@ -321,7 +321,7 @@ impl std::fmt::Debug for SignedCommandWithData {
         use serde_json::*;
 
         let json: Value = self.clone().into();
-        write!(f, "{}", to_string(&json).unwrap())
+        write!(f, "{}", to_string_pretty(&json).unwrap())
     }
 }
 
@@ -330,12 +330,12 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
         use serde_json::*;
 
         let mut json = Map::new();
-        json.insert("command".to_string(), self.command.clone().into());
+        json.insert("command".into(), self.command.clone().into());
         json.insert(
-            "state_hash".to_string(),
+            "state_hash".into(),
             Value::String(self.state_hash.0.clone()),
         );
-        write!(f, "{}", to_string(&json).unwrap())
+        write!(f, "{}", to_string_pretty(&json).unwrap())
     }
 }
 
