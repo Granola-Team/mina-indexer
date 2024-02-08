@@ -38,9 +38,6 @@ pub struct AccountArgs {
     /// Retrieve public key's account info
     #[arg(short = 'k', long)]
     public_key: String,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -48,10 +45,8 @@ pub struct AccountArgs {
 pub enum BlockArgs {
     /// Query block by state hash
     Block(BlockStateHashArgs),
-    /// Query the best tip
+    /// Query the best tip block
     BestTip(BestTipArgs),
-    /// Query block as a ledger diff
-    LedgerDiff(LedgerDiffArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -68,27 +63,13 @@ pub struct BestTipArgs {
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct BlockStateHashArgs {
-    /// Retrieve the block with the given state hash
+    /// Retrieve the block with given state hash
     #[arg(short, long)]
     state_hash: String,
     /// Path to write the block [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct LedgerDiffArgs {
-    /// Retrieve ledger diff for block with given state hash
-    #[arg(short, long)]
-    state_hash: u32,
-    /// Path to write the ledger diff [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display verbose ledger diffs
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
@@ -104,8 +85,8 @@ pub enum ChainArgs {
 #[command(author, version, about, long_about = None)]
 pub struct BestChainArgs {
     /// Number of blocks to include in this suffix
-    #[arg(short, long)]
-    num: Option<usize>,
+    #[arg(short, long, default_value_t = 10)]
+    num: usize,
     /// Path to write the best chain [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
@@ -126,9 +107,6 @@ pub struct BestLedgerArgs {
     /// Path to write the ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -148,9 +126,6 @@ pub struct LedgerAtHeightArgs {
     /// Block height of the ledger
     #[arg(short, long)]
     height: u32,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -159,23 +134,20 @@ pub enum LedgerArgs {
     /// Query the best ledger
     BestLedger(BestLedgerArgs),
     /// Query ledger by state hash
-    Ledger(LedgerStateHashArgs),
+    Ledger(LedgerHashArgs),
     /// Query ledger by height
     LedgerAtHeight(LedgerAtHeightArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct LedgerStateHashArgs {
+pub struct LedgerHashArgs {
     /// Path to write the ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// State or ledger hash corresponding to the ledger
     #[arg(short, long)]
     hash: String,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -246,9 +218,6 @@ pub struct TransactionStateHashArgs {
     /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -260,9 +229,6 @@ pub struct TransactionHashArgs {
     /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -283,9 +249,6 @@ pub struct TransactionPublicKeyArgs {
     /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
 }
 
 #[instrument]
@@ -315,7 +278,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
             let command = match chain_args {
                 ChainArgs::BestChain(args) => format!(
                     "best-chain {} {} {} {} {}\0",
-                    args.num.unwrap_or(0),
+                    args.num,
                     args.verbose,
                     args.start_state_hash,
                     args.end_state_hash.clone().unwrap_or("x".into()),
@@ -338,12 +301,6 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 ),
                 BlockArgs::Block(args) => format!(
                     "block-state-hash {} {} {}\0",
-                    args.state_hash,
-                    args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
-                ),
-                BlockArgs::LedgerDiff(args) => format!(
-                    "block-ledger-diff {} {} {}\0",
                     args.state_hash,
                     args.verbose,
                     args.path.clone().unwrap_or("".into()).display()
@@ -441,7 +398,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
         ClientCli::Transactions(transaction_args) => {
             let command = match transaction_args {
                 TransactionArgs::TxHash(args) => {
-                    format!("tx-hash {} {} {}\0", args.tx_hash, args.verbose, args.json)
+                    format!("tx-hash {} {}\0", args.tx_hash, args.verbose)
                 }
                 TransactionArgs::TxPublicKey(pk_args) => {
                     format!(
@@ -454,10 +411,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                     )
                 }
                 TransactionArgs::TxStateHash(args) => {
-                    format!(
-                        "tx-state-hash {} {} {}\0",
-                        args.state_hash, args.verbose, args.json
-                    )
+                    format!("tx-state-hash {} {}\0", args.state_hash, args.verbose)
                 }
             };
             writer.write_all(command.as_bytes()).await?;
