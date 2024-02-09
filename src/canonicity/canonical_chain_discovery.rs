@@ -1,20 +1,23 @@
-use crate::{
-    block::{blockchain_length::*, get_state_hash, is_valid_block_file, previous_state_hash::*},
-    constants::BLOCK_REPORTING_FREQ_NUM,
+use crate::block::{
+    blockchain_length::*, get_state_hash, is_valid_block_file, previous_state_hash::*,
 };
 use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-use tracing::info;
+use tracing::{debug, info};
 
+/// Separate blocks into 3 length-sorted lists:
+/// - canonical chain
+/// - blocks following the canonical tip
+/// - orphaned blocks
 pub fn discovery(
-    length_filter: Option<u32>,
+    min_len_filter: Option<u32>,
+    max_len_filter: Option<u32>,
     canonical_threshold: u32,
+    reporting_freq: u32,
     mut paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
-    // separate all blocks into the canonical chain
-    // and the blocks that follow the canonical tip
     let mut canonical_paths = vec![];
     let mut successive_paths = vec![];
 
@@ -26,20 +29,31 @@ pub fn discovery(
 
         info!(
             "{} blocks sorted by length in {:?}",
-            if paths.iter().map(|path| length_from_path_or_max(path)).min() == Some(2) {
-                paths.len() + 1
-            } else {
-                paths.len()
-            },
+            paths.len() + 1, // +1 genesis
             time.elapsed(),
         );
 
-        if let Some(blockchain_length) = length_filter {
-            info!("Applying block filter: blockchain_length < {blockchain_length}");
+        if let Some(blockchain_length) = max_len_filter {
+            debug!("Applying max length block filter: blockchain_length < {blockchain_length}");
             let filtered_paths: Vec<&PathBuf> = paths
                 .iter()
                 .map_while(|&path| {
-                    if length_from_path_or_max(path) < blockchain_length {
+                    if length_from_path_or_max(path) <= blockchain_length {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            paths = filtered_paths;
+        }
+
+        if let Some(blockchain_length) = min_len_filter {
+            debug!("Applying min length block filter: blockchain_length > {blockchain_length}");
+            let filtered_paths: Vec<&PathBuf> = paths
+                .iter()
+                .map_while(|&path| {
+                    if length_from_path_or_max(path) >= blockchain_length {
                         Some(path)
                     } else {
                         None
@@ -53,6 +67,7 @@ pub fn discovery(
         // - diffs between blocks of successive lengths (to find gaps)
         // - starting index for each collection of blocks of a fixed length
         // - length of the current path under investigation
+
         let mut length_start_indices_and_diffs = vec![];
         let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
 
@@ -124,10 +139,10 @@ pub fn discovery(
         // collect the canonical blocks
         canonical_paths.push(curr_path.clone());
 
-        if canonical_paths.len() < BLOCK_REPORTING_FREQ_NUM as usize {
-            info!("Walking the canonical chain back to the beginning");
+        if canonical_paths.len() < reporting_freq as usize {
+            info!("Walking the canonical chain back to genesis");
         } else {
-            info!("Walking the canonical chain back to the beginning, reporting every {BLOCK_REPORTING_FREQ_NUM} blocks");
+            info!("Walking the canonical chain back to genesis, reporting every {reporting_freq} blocks");
         }
 
         let time = Instant::now();
@@ -136,7 +151,7 @@ pub fn discovery(
         // descend from the canonical tip to the lowest block in the dir,
         // segment by segment, searching for ancestors
         while curr_start_idx > 0 {
-            if count % BLOCK_REPORTING_FREQ_NUM == 0 {
+            if count % reporting_freq == 0 {
                 info!("Found {count} canonical blocks in {:?}", time.elapsed());
             }
 
