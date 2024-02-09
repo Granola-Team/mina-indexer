@@ -55,10 +55,10 @@ async fn extension() {
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await
         .unwrap();
-    assert_eq!(
+    assert!(matches!(
         state.add_block_to_witness_tree(&child1).unwrap().0,
-        ExtensionType::RootSimple
-    );
+        ExtensionType::RootSimple(_)
+    ));
     assert_eq!(
         child1.state_hash,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
@@ -91,7 +91,7 @@ async fn extension() {
         .unwrap();
     let (extension_type, _) = state.add_block_to_witness_tree(&child2).unwrap();
 
-    assert_eq!(extension_type, ExtensionType::RootSimple);
+    assert!(matches!(extension_type, ExtensionType::RootSimple(_)));
     assert_eq!(
         child2.state_hash,
         "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()

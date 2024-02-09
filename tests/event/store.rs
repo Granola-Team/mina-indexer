@@ -1,5 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
+    block::Block,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
     store::IndexerStore,
 };
@@ -37,7 +38,18 @@ fn add_and_get_events() {
         path: "./path".into(),
     });
     let event8 = IndexerEvent::LedgerWatcher(LedgerWatcherEvent::WatchDir("./path".into()));
-    let event9 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain(vec![]));
+    let block = Block {
+        parent_hash: "parent_hash".into(),
+        state_hash: "state_hash".into(),
+        height: 0,
+        blockchain_length: 1,
+        global_slot_since_genesis: 0,
+    };
+    let event9 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip(block.clone()));
+    let event10 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain {
+        best_tip: block,
+        canonical_blocks: CanonicalBlocksEvent::CanonicalBlocks(vec![]),
+    });
 
     // block, db, and ledger events are recorded
     assert_eq!(db.add_event(&event0).unwrap(), 1);
@@ -51,6 +63,7 @@ fn add_and_get_events() {
     assert_eq!(db.add_event(&event8).unwrap(), 9);
     // witness tree events aren't recorded
     assert_eq!(db.add_event(&event9).unwrap(), 9);
+    assert_eq!(db.add_event(&event10).unwrap(), 9);
 
     let next_seq_num = db.get_next_seq_num().unwrap();
     assert_eq!(next_seq_num, 9);

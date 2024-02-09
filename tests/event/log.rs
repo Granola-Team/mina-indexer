@@ -3,7 +3,7 @@ use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
     constants::*,
-    event::{store::EventStore, witness_tree::WitnessTreeEvent},
+    event::{store::EventStore, witness_tree::*},
     ledger::genesis::GenesisRoot,
     state::IndexerState,
     store::IndexerStore,
@@ -55,6 +55,7 @@ async fn test() {
     // add parser1 blocks to state1
     // - add block to db
     // - add block to witness tree
+    // - update best tip
     // - update canonicities
     while let Some(block) = block_parser1.next_block().unwrap() {
         if let Some(db_event) = state1
@@ -62,22 +63,31 @@ async fn test() {
             .as_ref()
             .map(|store| store.add_block(&block).unwrap())
         {
-            let new_canonical_blocks = if db_event.is_new_block_event() {
-                let (_, WitnessTreeEvent::UpdateCanonicalChain(blocks)) =
-                    state1.add_block_to_witness_tree(&block).unwrap();
-                blocks
-            } else {
-                vec![]
-            };
+            if db_event.is_new_block_event() {
+                if let Some(wt_event) = state1.add_block_to_witness_tree(&block).unwrap().1 {
+                    let (best_tip, new_canonical_blocks) = match wt_event {
+                        WitnessTreeEvent::UpdateBestTip(best_tip) => (best_tip, vec![]),
+                        WitnessTreeEvent::UpdateCanonicalChain {
+                            best_tip,
+                            canonical_blocks: CanonicalBlocksEvent::CanonicalBlocks(blocks),
+                        } => (best_tip, blocks),
+                    };
 
-            new_canonical_blocks.iter().for_each(|block| {
-                if let Some(store) = state1.indexer_store.as_ref() {
-                    store
-                        .add_canonical_block(block.blockchain_length, &block.state_hash)
-                        .unwrap()
+                    state1
+                        .update_best_block_in_store(&best_tip.state_hash)
+                        .unwrap();
+                    new_canonical_blocks.iter().for_each(|block| {
+                        if let Some(store) = state1.indexer_store.as_ref() {
+                            store
+                                .add_canonical_block(block.blockchain_length, &block.state_hash)
+                                .unwrap()
+                        }
+                    });
+                    state1.add_block_to_witness_tree(&block).unwrap();
                 }
-            });
-            state1.add_block_to_witness_tree(&block).unwrap();
+            } else {
+                continue;
+            };
         }
     }
 

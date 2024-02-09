@@ -128,7 +128,7 @@ async fn extension() {
 
     // dangling branch rebases on top of root_branch
     let (extension_type, _) = state.add_block_to_witness_tree(&middle_block).unwrap();
-    assert_eq!(extension_type, ExtensionType::RootComplex);
+    assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     // no more dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
