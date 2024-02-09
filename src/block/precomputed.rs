@@ -1,5 +1,6 @@
 use crate::{
     block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash},
+    canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey},
@@ -38,6 +39,18 @@ fn genesis_timestamp() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlock {
+    pub state_hash: String,
+    pub scheduled_time: String,
+    pub blockchain_length: u32,
+    pub protocol_state: ProtocolState,
+    pub protocol_state_proof: ProtocolStateProofV1,
+    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
+    pub delta_transition_chain_proof: DeltaTransitionChainProof,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrecomputedBlockWithCanonicity {
+    pub canonicity: Option<Canonicity>,
     pub state_hash: String,
     pub scheduled_time: String,
     pub blockchain_length: u32,
@@ -332,6 +345,19 @@ impl PrecomputedBlock {
             .iter()
             .map(|cmd| cmd.hash_signed_command().unwrap())
             .collect()
+    }
+
+    pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
+        PrecomputedBlockWithCanonicity {
+            canonicity: Some(canonicity),
+            state_hash: self.state_hash.clone(),
+            scheduled_time: self.scheduled_time.clone(),
+            blockchain_length: self.blockchain_length,
+            protocol_state: self.protocol_state.clone(),
+            protocol_state_proof: self.protocol_state_proof.clone(),
+            staged_ledger_diff: self.staged_ledger_diff.clone(),
+            delta_transition_chain_proof: self.delta_transition_chain_proof.clone(),
+        }
     }
 }
 
