@@ -1,13 +1,7 @@
 use bytesize::ByteSize;
 use clap::Parser;
 use mina_indexer::{
-    block::parser::BlockParser,
-    constants::{
-        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
-    },
-    ledger::genesis,
-    state::IndexerState,
+    block::parser::BlockParser, constants::*, ledger::genesis, state::IndexerState,
     store::IndexerStore,
 };
 use std::{fs, path::PathBuf, sync::Arc, thread};
@@ -53,7 +47,6 @@ struct Args {
 }
 
 const DB_PATH: &str = "./mainnet-test-block-store";
-const GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -75,9 +68,13 @@ async fn main() -> anyhow::Result<()> {
         .with(stdout_layer.with_filter(log_level))
         .init();
 
-    let mut bp =
-        BlockParser::new_filtered(&blocks_dir, max_block_length, MAINNET_CANONICAL_THRESHOLD)
-            .unwrap();
+    let mut bp = BlockParser::new_with_canonical_chain_discovery_filtered(
+        &blocks_dir,
+        max_block_length,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
     let store_dir = &PathBuf::from(DB_PATH);
     if store_dir.exists() {
         fs::remove_dir_all(store_dir)?;
@@ -93,15 +90,10 @@ async fn main() -> anyhow::Result<()> {
 
     let total_time = Instant::now();
     let mut state = IndexerState::new(
-        &GENESIS_HASH.into(),
         genesis_root.into(),
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
-        CANONICAL_UPDATE_THRESHOLD,
-        LEDGER_CADENCE,
-    )
-    .unwrap();
+    )?;
 
     let sorting_time = total_time.elapsed();
     println!("Sorting time: {sorting_time:?}\n");

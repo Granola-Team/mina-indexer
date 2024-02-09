@@ -1,10 +1,15 @@
-use mina_indexer::{block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD};
+use mina_indexer::{block::parser::BlockParser, constants::*};
 use std::path::PathBuf;
 
 #[test]
 fn gaps() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/gaps");
-    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
@@ -21,7 +26,12 @@ fn gaps() {
 #[test]
 fn contiguous() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
@@ -38,7 +48,12 @@ fn contiguous() {
 #[test]
 fn missing_parent() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/missing_parent");
-    let mut block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(
@@ -60,7 +75,12 @@ fn missing_parent() {
 #[test]
 fn one_block() {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/one_block");
-    let block_parser = BlockParser::new(&blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     assert_eq!(block_parser.num_canonical, 0);
     assert_eq!(block_parser.total_num_blocks, 1);
@@ -70,7 +90,12 @@ fn one_block() {
 fn canonical_threshold() {
     let canonical_threshold = 2;
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new(&blocks_dir, canonical_threshold).unwrap();
+    let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        canonical_threshold,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     while let Some(precomputed_block) = block_parser.next_block().unwrap() {
         println!(

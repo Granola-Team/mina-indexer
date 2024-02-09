@@ -51,7 +51,7 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new_testing(&root0_block, None, None, None, None).unwrap();
+    let mut state = IndexerState::new_testing(&root0_block, None, None, None, None, None).unwrap();
 
     // Root branch
     // - len = 1

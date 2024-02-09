@@ -439,17 +439,19 @@ impl std::fmt::Debug for UserCommandWithStatus {
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
-    use crate::{
-        block::parser::BlockParser, constants::MAINNET_CANONICAL_THRESHOLD,
-        ledger::account::nanomina_to_mina,
-    };
+    use crate::{block::parser::BlockParser, constants::*, ledger::account::nanomina_to_mina};
     use std::path::PathBuf;
 
     #[tokio::test]
     async fn from_precomputed() {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
         let log_dir = PathBuf::from("./tests/data/non_sequential_blocks");
-        let mut bp = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+        let mut bp = BlockParser::new_with_canonical_chain_discovery(
+            &log_dir,
+            MAINNET_CANONICAL_THRESHOLD,
+            BLOCK_REPORTING_FREQ_NUM,
+        )
+        .unwrap();
         let block = bp
             .get_precomputed_block("3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw")
             .await

@@ -76,7 +76,7 @@ async fn merge() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new_testing(&root_block, None, None, None, None).unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
 
     // ---------
     // add leaf0

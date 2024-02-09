@@ -2,9 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    constants::{
-        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     event::{store::EventStore, witness_tree::WitnessTreeEvent},
     ledger::genesis::GenesisRoot,
     state::IndexerState,
@@ -14,38 +12,40 @@ use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn test() {
-    let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+    let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
 
     let store_dir0 = setup_new_db_dir("event-log-store0").unwrap();
-    let mut block_parser0 = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut block_parser0 = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     let store_dir1 = setup_new_db_dir("event-log-store1").unwrap();
-    let mut block_parser1 = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut block_parser1 = BlockParser::new_with_canonical_chain_discovery(
+        &blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     let indexer_store0 = Arc::new(IndexerStore::new(store_dir0.path()).unwrap());
     let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path()).unwrap());
 
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
+    let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
 
     let mut state0 = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.clone().into(),
-        indexer_store0,
-        10,
-        PRUNE_INTERVAL_DEFAULT,
-        MAINNET_CANONICAL_THRESHOLD,
-        LEDGER_CADENCE,
+        genesis_root.clone().into(),
+        indexer_store0.clone(),
+        MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
     let mut state1 = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.into(),
-        indexer_store1,
-        10,
-        PRUNE_INTERVAL_DEFAULT,
-        MAINNET_CANONICAL_THRESHOLD,
-        LEDGER_CADENCE,
+        genesis_root.into(),
+        indexer_store1.clone(),
+        MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
 

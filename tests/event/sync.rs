@@ -1,11 +1,8 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockWithoutHeight},
-    constants::{
-        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
-    },
     ledger::genesis::GenesisRoot,
-    state::IndexerState,
+    state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
 };
 use std::{path::PathBuf, sync::Arc};
@@ -17,32 +14,16 @@ async fn test() {
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
-    let mut state = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.clone().into(),
-        indexer_store.clone(),
-        10,
-        PRUNE_INTERVAL_DEFAULT,
-        MAINNET_CANONICAL_THRESHOLD,
-        LEDGER_CADENCE,
-    )
-    .unwrap();
+    let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
+    let mut state =
+        IndexerState::new(genesis_root.clone().into(), indexer_store.clone(), 10).unwrap();
 
     // add all blocks to the state
     state.add_blocks(&mut block_parser).await.unwrap();
 
     // fresh state to sync events with no genesis events
-    let mut state_sync = IndexerState::new_without_genesis_events(
-        &MAINNET_GENESIS_HASH.into(),
-        genesis_ledger.into(),
-        indexer_store,
-        10,
-        PRUNE_INTERVAL_DEFAULT,
-        MAINNET_CANONICAL_THRESHOLD,
-        LEDGER_CADENCE,
-    )
-    .unwrap();
+    let config = IndexerStateConfig::new(genesis_root.into(), indexer_store, 10);
+    let mut state_sync = IndexerState::new_without_genesis_events(config).unwrap();
 
     // sync from state's event store
     state_sync.sync_from_db().unwrap();

@@ -2,10 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::parser::BlockParser,
     command::{signed::SignedCommand, store::CommandStore},
-    constants::{
-        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     ledger::genesis::parse_file,
     state::IndexerState,
     store::IndexerStore,
@@ -21,17 +18,18 @@ async fn add_and_get() {
     let genesis_ledger_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path).unwrap();
     let indexer = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
         genesis_root.into(),
         indexer_store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
-        CANONICAL_UPDATE_THRESHOLD,
-        LEDGER_CADENCE,
     )
     .unwrap();
 
-    let mut bp = BlockParser::new(blocks_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut bp = BlockParser::new_with_canonical_chain_discovery(
+        blocks_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
     let block = bp.get_precomputed_block(state_hash).await.unwrap();
     let block_cmds = block.commands();

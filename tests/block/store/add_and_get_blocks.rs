@@ -1,7 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
-    constants::MAINNET_CANONICAL_THRESHOLD,
+    constants::*,
     store::IndexerStore,
 };
 use std::{collections::HashMap, path::PathBuf, time::Instant};
@@ -12,7 +12,12 @@ fn speedb() {
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
     let db = IndexerStore::new(store_dir.path()).unwrap();
-    let mut bp = BlockParser::new(log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let mut bp = BlockParser::new_with_canonical_chain_discovery(
+        log_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .unwrap();
 
     let mut blocks = HashMap::new();
 
