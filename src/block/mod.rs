@@ -5,7 +5,7 @@ pub mod precomputed;
 pub mod previous_state_hash;
 pub mod store;
 
-use self::precomputed::PrecomputedBlock;
+use crate::{block::precomputed::PrecomputedBlock, canonicity::Canonicity};
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
@@ -21,6 +21,7 @@ pub struct Block {
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BlockWithoutHeight {
+    pub canonicity: Option<Canonicity>,
     pub parent_hash: BlockHash,
     pub state_hash: BlockHash,
     pub blockchain_length: u32,
@@ -71,6 +72,7 @@ impl Block {
 impl From<Block> for BlockWithoutHeight {
     fn from(value: Block) -> Self {
         Self {
+            canonicity: None,
             parent_hash: value.parent_hash.clone(),
             state_hash: value.state_hash.clone(),
             global_slot_since_genesis: value.global_slot_since_genesis,
@@ -87,6 +89,7 @@ impl BlockWithoutHeight {
         Self {
             parent_hash,
             state_hash,
+            canonicity: None,
             global_slot_since_genesis: precomputed_block
                 .protocol_state
                 .body
@@ -99,6 +102,17 @@ impl BlockWithoutHeight {
                 .t
                 .t,
             blockchain_length: precomputed_block.blockchain_length,
+        }
+    }
+
+    pub fn with_canonicity(block: &PrecomputedBlock, canonicity: Canonicity) -> Self {
+        let block: Block = block.into();
+        Self {
+            canonicity: Some(canonicity),
+            state_hash: block.state_hash,
+            parent_hash: block.parent_hash,
+            blockchain_length: block.blockchain_length,
+            global_slot_since_genesis: block.global_slot_since_genesis,
         }
     }
 }
@@ -130,6 +144,7 @@ impl From<&PrecomputedBlock> for Block {
 impl From<&PrecomputedBlock> for BlockWithoutHeight {
     fn from(value: &PrecomputedBlock) -> Self {
         Self {
+            canonicity: None,
             parent_hash: value.previous_state_hash(),
             state_hash: value.state_hash.clone().into(),
             blockchain_length: value.blockchain_length,
