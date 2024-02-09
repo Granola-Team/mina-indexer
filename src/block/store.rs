@@ -9,4 +9,10 @@ pub trait BlockStore {
 
     /// Get block from the store
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>>;
+
+    /// Set best block state hash
+    fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()>;
+
+    /// Get best block from the store
+    fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
 }
