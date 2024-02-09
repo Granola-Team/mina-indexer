@@ -37,9 +37,13 @@
 
         frameworks = pkgs.darwin.apple_sdk.frameworks;
 
+        llvm = pkgs.llvmPackages_14;
+        clang = llvm.clang;
+        libclang = llvm.libclang;
+
         buildDependencies = with pkgs;
           [
-            llvmPackages.libclang
+            libclang
             clang
             pkg-config
           ]
@@ -66,11 +70,11 @@
           ]
           ++ buildDependencies;
 
-        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        LIBCLANG_PATH = "${libclang.lib}/lib";
         BINDGEN_EXTRA_CLANG_ARGS =
           if pkgs.stdenv.isDarwin
           then "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
-          else "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang}/include";
+          else "-isystem ${libclang.lib}/lib/clang/${pkgs.lib.getVersion clang}/include";
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
