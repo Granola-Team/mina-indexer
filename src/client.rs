@@ -198,12 +198,12 @@ pub struct SummaryArgs {
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum TransactionArgs {
-    /// Query transactions by state hash
-    TxStateHash(TransactionStateHashArgs),
     /// Query transactions by their hash
     TxHash(TransactionHashArgs),
     /// Query transactions by public key
     TxPublicKey(TransactionPublicKeyArgs),
+    /// Query transactions by state hash
+    TxStateHash(TransactionStateHashArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
