@@ -17,6 +17,7 @@ pub enum DbBlockEvent {
         state_hash: String,
         blockchain_length: u32,
     },
+    NewBestTip(String),
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -64,6 +65,9 @@ impl std::fmt::Debug for DbBlockEvent {
                 blockchain_length,
                 ..
             } => write!(f, "db: new block ({blockchain_length}, {state_hash})"),
+            Self::NewBestTip(state_hash) => {
+                write!(f, "db: new best tip ({state_hash})")
+            }
         }
     }
 }
