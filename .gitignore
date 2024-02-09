@@ -6,3 +6,4 @@
 # Editor Droppings
 .idea*
 .*.swp
+build.log
