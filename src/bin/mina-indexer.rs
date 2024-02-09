@@ -1,10 +1,7 @@
 use clap::{Parser, Subcommand};
 use mina_indexer::{
     client,
-    constants::{
-        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_GENESIS_HASH, MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     ledger::{self, genesis::GenesisLedger},
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
@@ -58,28 +55,31 @@ pub struct ServerArgs {
         long,
         default_value = MAINNET_GENESIS_HASH
     )]
-    root_hash: String,
+    genesis_hash: String,
     /// Path to startup blocks directory
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
     startup_dir: PathBuf,
-    /// Path to directory to watch for new blocks
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/watch-blocks"))]
-    watch_dir: PathBuf,
+    /// Path to directory to watch for new blocks [default: startup_dir]
+    #[arg(short, long)]
+    watch_dir: Option<PathBuf>,
     /// Path to directory for speedb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     pub database_dir: PathBuf,
     /// Path to directory for logs
     #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
     pub log_dir: PathBuf,
-    /// Max file log level
-    #[arg(long, default_value_t = LevelFilter::DEBUG)]
-    pub log_level: LevelFilter,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
-    pub log_level_stdout: LevelFilter,
+    pub log_level: LevelFilter,
+    /// Max file log level
+    #[arg(long, default_value_t = LevelFilter::DEBUG)]
+    pub log_level_file: LevelFilter,
     /// Cadence for computing and storing ledgers
     #[arg(long, default_value_t = LEDGER_CADENCE)]
     ledger_cadence: u32,
+    /// Cadence for reporting progress
+    #[arg(long, default_value_t = BLOCK_REPORTING_FREQ_NUM)]
+    reporting_freq: u32,
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
@@ -110,10 +110,10 @@ pub async fn main() -> anyhow::Result<()> {
             }
 
             let log_dir = args.log_dir.clone();
+            let log_level_file = args.log_level_file;
             let log_level = args.log_level;
-            let log_level_stdout = args.log_level_stdout;
 
-            init_tracing_logger(log_dir, log_level, log_level_stdout).await?;
+            init_tracing_logger(log_dir, log_level_file, log_level).await?;
 
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
@@ -162,13 +162,14 @@ pub fn process_indexer_configuration(
     mode: InitializationMode,
 ) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.genesis_ledger;
-    let root_hash = args.root_hash.into();
+    let genesis_hash = args.genesis_hash.into();
     let startup_dir = args.startup_dir;
-    let watch_dir = args.watch_dir;
+    let watch_dir = args.watch_dir.unwrap_or(startup_dir.clone());
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
+    let reporting_freq = args.reporting_freq;
 
     assert!(
         ledger.is_file(),
@@ -190,12 +191,12 @@ pub fn process_indexer_configuration(
             std::process::exit(100)
         }
         Ok(genesis_root) => {
-            let ledger: GenesisLedger = genesis_root.into();
+            let genesis_ledger: GenesisLedger = genesis_root.into();
             info!("Genesis ledger parsed successfully");
 
             Ok(IndexerConfiguration {
-                ledger,
-                root_hash,
+                genesis_ledger,
+                genesis_hash,
                 startup_dir,
                 watch_dir,
                 prune_interval,
@@ -203,6 +204,7 @@ pub fn process_indexer_configuration(
                 canonical_update_threshold,
                 initialization_mode: mode,
                 ledger_cadence,
+                reporting_freq,
             })
         }
     }
