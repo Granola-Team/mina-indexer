@@ -10,6 +10,7 @@ use std::{
 };
 use tracing::debug;
 
+// TODO change names
 /// Splits block paths into three collections:
 /// - canonical
 /// - successive
@@ -41,16 +42,78 @@ impl BlockParser {
         }
     }
 
-    pub fn new(blocks_dir: &Path, canonical_threshold: u32) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, None, canonical_threshold)
+    /// Returns a new block parser which employs canonical chain discovery
+    pub fn new_with_canonical_chain_discovery(
+        blocks_dir: &Path,
+        canonical_threshold: u32,
+        reporting_freq: u32,
+    ) -> anyhow::Result<Self> {
+        Self::with_canonical_chain_discovery(
+            blocks_dir,
+            None,
+            None,
+            canonical_threshold,
+            reporting_freq,
+        )
     }
 
-    pub fn new_filtered(
+    /// Returns a new ccd block parser with paths filtered by max length
+    pub fn new_with_canonical_chain_discovery_filtered(
         blocks_dir: &Path,
-        blocklength: u32,
+        block_length: u32,
         canonical_threshold: u32,
+        reporting_freq: u32,
     ) -> anyhow::Result<Self> {
-        Self::new_internal(blocks_dir, Some(blocklength), canonical_threshold)
+        Self::with_canonical_chain_discovery(
+            blocks_dir,
+            None,
+            Some(block_length),
+            canonical_threshold,
+            reporting_freq,
+        )
+    }
+
+    /// Returns a new glob-based block parser with paths filtered by a min length
+    pub fn new_glob_min_length_filtered(
+        blocks_dir: &Path,
+        min_length_filter: Option<u32>,
+    ) -> anyhow::Result<Self> {
+        Self::new_glob_length_filtered(blocks_dir, min_length_filter, None)
+    }
+
+    /// Returns a new glob-based block parser with paths filtered by min or max length
+    pub fn new_glob_length_filtered(
+        blocks_dir: &Path,
+        min_length: Option<u32>,
+        max_length: Option<u32>,
+    ) -> anyhow::Result<Self> {
+        if blocks_dir.exists() {
+            let pattern = format!("{}/*.json", blocks_dir.display());
+            let blocks_dir = blocks_dir.to_owned();
+            let mut paths: Vec<PathBuf> = glob(&pattern)?
+                .filter_map(|x| x.ok())
+                .filter(|path| length_from_path(path).is_some())
+                .collect();
+
+            if min_length.is_some() {
+                paths.retain(|p| length_from_path(p) > min_length)
+            }
+
+            if max_length.is_some() {
+                paths.retain(|p| length_from_path(p) < max_length)
+            }
+
+            Ok(Self {
+                blocks_dir,
+                num_canonical: 0,
+                total_num_blocks: paths.len() as u32,
+                successive_paths: paths.into_iter(),
+                canonical_paths: vec![].into_iter(),
+                orphaned_paths: vec![].into_iter(),
+            })
+        } else {
+            Ok(Self::empty(blocks_dir, &vec![]))
+        }
     }
 
     /// Simplified `BlockParser` for testing without canonical chain discovery.
@@ -71,10 +134,12 @@ impl BlockParser {
     /// separating the block paths into two categories:
     /// - blocks known to be _canonical_
     /// - blocks that are higher than the canonical tip
-    fn new_internal(
+    fn with_canonical_chain_discovery(
         blocks_dir: &Path,
-        length_filter: Option<u32>,
+        min_len_filter: Option<u32>,
+        max_len_filter: Option<u32>,
         canonical_threshold: u32,
+        reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         debug!("Building parser");
         if blocks_dir.exists() {
@@ -84,9 +149,13 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .filter(|path| length_from_path(path).is_some())
                 .collect();
-            if let Ok((canonical_paths, successive_paths, orphaned_paths)) =
-                discovery(length_filter, canonical_threshold, paths.iter().collect())
-            {
+            if let Ok((canonical_paths, successive_paths, orphaned_paths)) = discovery(
+                min_len_filter,
+                max_len_filter,
+                canonical_threshold,
+                reporting_freq,
+                paths.iter().collect(),
+            ) {
                 Ok(Self {
                     num_canonical: canonical_paths.len() as u32,
                     total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,

@@ -1,5 +1,6 @@
 use crate::{
     block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
     ledger::{self, public_key, store::LedgerStore},
     server::{remove_domain_socket, IndexerConfiguration, IpcChannelUpdate},
@@ -37,8 +38,8 @@ impl IpcActor {
             state_recv,
             listener,
             best_tip: RwLock::new(Block {
-                parent_hash: config.root_hash.clone(),
-                state_hash: config.root_hash,
+                parent_hash: config.genesis_hash.clone(),
+                state_hash: config.genesis_hash,
                 height: 1,
                 blockchain_length: 1,
                 global_slot_since_genesis: 0,
@@ -201,9 +202,12 @@ async fn handle_conn(
                 if !path.is_empty() {
                     info!("Writing block {state_hash} to {path}");
                     std::fs::write(path, block_str)?;
-                    Some(format!("Best block written to {path}"))
+                    Some(format!("Block {} written to {path}", block.state_hash))
                 } else {
-                    info!("Writing best tip block to stdout");
+                    info!(
+                        "Writing block to stdout (length {}): {}",
+                        block.blockchain_length, block.state_hash
+                    );
                     Some(block_str)
                 }
             } else {
@@ -412,17 +416,44 @@ async fn handle_conn(
             if height > best_tip.blockchain_length {
                 // ahead of witness tree - cannot compute
                 Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {}", best_tip.blockchain_length))
-            } else if let Some(ledger) = db.get_ledger_at_height(height)? {
-                let ledger = ledger.to_string_pretty();
+            } else {
+                let ledger_str = if Some(height) > db.get_max_canonical_blockchain_length()? {
+                    // follow best chain back from tip to given height block and get the ledger
+                    if let Some(mut curr_block) = db.get_block(&best_tip.state_hash)? {
+                        while curr_block.blockchain_length > height {
+                            if let Some(parent) = db.get_block(&curr_block.previous_state_hash())? {
+                                curr_block = parent;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        let state_hash = curr_block.state_hash.clone().into();
+                        if let Some(ledger) = db.get_ledger_state_hash(&state_hash)? {
+                            ledger.to_string_pretty()
+                        } else {
+                            block_missing_from_db(&curr_block.state_hash)
+                        }
+                    } else {
+                        error!("Best tip block missing from store");
+                        "Best tip block missing from store".to_string()
+                    }
+                } else if let Some(ledger) = db.get_ledger_at_height(height)? {
+                    ledger.to_string_pretty()
+                } else {
+                    error!("Invalid ledger query. Ledger at height {height} not available");
+                    format!("Invalid ledger query. Ledger at height {height} not available")
+                };
+
                 if path.is_empty() {
                     debug!("Writing ledger at height {height} to stdout");
-                    Some(ledger)
+                    Some(ledger_str)
                 } else {
                     let path: PathBuf = path.into();
                     if !path.is_dir() {
                         debug!("Writing ledger at height {height} to {}", path.display());
 
-                        std::fs::write(&path, ledger)?;
+                        std::fs::write(&path, ledger_str)?;
                         Some(format!(
                             "Ledger at height {height} written to {}",
                             path.display()
@@ -431,11 +462,6 @@ async fn handle_conn(
                         file_must_not_be_a_directory(&path)
                     }
                 }
-            } else {
-                error!("Invalid ledger query. Ledger at height {height} not available");
-                Some(format!(
-                    "Invalid ledger query. Ledger at height {height} not available"
-                ))
             }
         }
         "snark-pk" => {
@@ -453,15 +479,21 @@ async fn handle_conn(
                 let snarks_str = format_vec_jq_compatible(&snarks);
 
                 if path.is_empty() {
-                    debug!("Writing SNARK work for {pk} to stdout");
+                    debug!("Writing SNARK work for public key {pk} to stdout");
                     Some(snarks_str)
                 } else {
                     let path: PathBuf = path.into();
                     if !path.is_dir() {
-                        debug!("Writing SNARK work for {pk} to {}", path.display());
+                        debug!(
+                            "Writing SNARK work for public key {pk} to {}",
+                            path.display()
+                        );
 
                         std::fs::write(&path, snarks_str)?;
-                        Some(format!("SNARK work for {pk} written to {}", path.display()))
+                        Some(format!(
+                            "SNARK work for public key {pk} written to {}",
+                            path.display()
+                        ))
                     } else {
                         file_must_not_be_a_directory(&path)
                     }
@@ -481,7 +513,7 @@ async fn handle_conn(
                     .and_then(|snarks| {
                         let snarks_str = format_vec_jq_compatible(&snarks);
                         if path.is_empty() {
-                            debug!("Writing SNARK work for {state_hash} to stdout");
+                            debug!("Writing SNARK work for block {state_hash} to stdout");
                             Some(snarks_str)
                         } else {
                             let path: PathBuf = path.into();
@@ -678,6 +710,11 @@ mod helpers {
     pub fn invalid_state_hash(input: &str) -> Option<String> {
         warn!("Invalid state hash: {input}");
         Some(format!("Invalid state hash: {input}"))
+    }
+
+    pub fn block_missing_from_db(state_hash: &str) -> String {
+        error!("Block missing from store: {state_hash}");
+        format!("Block missing from store: {state_hash}")
     }
 
     pub fn format_vec_jq_compatible<T>(vec: &Vec<T>) -> String

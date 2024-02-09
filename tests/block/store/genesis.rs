@@ -1,10 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
-    constants::{
-        CANONICAL_UPDATE_THRESHOLD, LEDGER_CADENCE, MAINNET_GENESIS_HASH,
-        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     ledger::genesis::parse_file,
     state::IndexerState,
     store::IndexerStore,
@@ -19,13 +16,9 @@ fn block_added() -> anyhow::Result<()> {
     let genesis_root = parse_file(genesis_ledger_path)?;
 
     let indexer = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
         genesis_root.into(),
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
-        PRUNE_INTERVAL_DEFAULT,
-        CANONICAL_UPDATE_THRESHOLD,
-        LEDGER_CADENCE,
     )?;
 
     assert_eq!(
@@ -34,7 +27,7 @@ fn block_added() -> anyhow::Result<()> {
             .unwrap()
             .get_block(&MAINNET_GENESIS_HASH.into())
             .unwrap(),
-        Some(GenesisBlock::new().unwrap().into())
+        Some(GenesisBlock::new().unwrap().to_precomputed())
     );
     Ok(())
 }

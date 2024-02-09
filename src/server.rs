@@ -4,7 +4,7 @@ use crate::{
     ipc::IpcActor,
     ledger::genesis::GenesisLedger,
     receiver::{filesystem::FilesystemReceiver, BlockReceiver},
-    state::{summary::SummaryVerbose, IndexerState},
+    state::{summary::SummaryVerbose, IndexerState, IndexerStateConfig},
     store::IndexerStore,
 };
 use interprocess::local_socket::tokio::LocalSocketListener;
@@ -19,8 +19,8 @@ use tracing::{debug, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
-    pub ledger: GenesisLedger,
-    pub root_hash: BlockHash,
+    pub genesis_ledger: GenesisLedger,
+    pub genesis_hash: BlockHash,
     pub startup_dir: PathBuf,
     pub watch_dir: PathBuf,
     pub prune_interval: u32,
@@ -28,6 +28,7 @@ pub struct IndexerConfiguration {
     pub canonical_update_threshold: u32,
     pub initialization_mode: InitializationMode,
     pub ledger_cadence: u32,
+    pub reporting_freq: u32,
 }
 
 pub struct MinaIndexer {
@@ -121,19 +122,30 @@ pub async fn initialize(
 
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
-        ledger: genesis_ledger,
-        root_hash,
+        genesis_ledger,
+        genesis_hash,
         startup_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
         initialization_mode,
         ledger_cadence,
+        reporting_freq,
         ..
     } = config;
 
     fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
 
+    let state_config = IndexerStateConfig {
+        genesis_hash,
+        genesis_ledger: genesis_ledger.clone(),
+        indexer_store: store,
+        transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
+        prune_interval,
+        canonical_update_threshold,
+        ledger_cadence,
+        reporting_freq,
+    };
     let state = {
         let mut state = match initialization_mode {
             InitializationMode::New => {
@@ -141,39 +153,15 @@ pub async fn initialize(
                     "Initializing indexer state from blocks in {}",
                     startup_dir.display()
                 );
-                IndexerState::new(
-                    &root_hash,
-                    genesis_ledger.clone(),
-                    store,
-                    MAINNET_TRANSITION_FRONTIER_K,
-                    prune_interval,
-                    canonical_update_threshold,
-                    ledger_cadence,
-                )?
+                IndexerState::new_from_config(state_config)?
             }
             InitializationMode::Replay => {
                 info!("Replaying indexer events from db at {}", db_path.display());
-                IndexerState::new_without_genesis_events(
-                    &root_hash,
-                    genesis_ledger.clone(),
-                    store,
-                    MAINNET_TRANSITION_FRONTIER_K,
-                    prune_interval,
-                    canonical_update_threshold,
-                    ledger_cadence,
-                )?
+                IndexerState::new_without_genesis_events(state_config)?
             }
             InitializationMode::Sync => {
                 info!("Syncing indexer state from db at {}", db_path.display());
-                IndexerState::new_without_genesis_events(
-                    &root_hash,
-                    genesis_ledger.clone(),
-                    store,
-                    MAINNET_TRANSITION_FRONTIER_K,
-                    prune_interval,
-                    canonical_update_threshold,
-                    ledger_cadence,
-                )?
+                IndexerState::new_without_genesis_events(state_config)?
             }
         };
 
@@ -192,16 +180,26 @@ pub async fn initialize(
 
         match initialization_mode {
             InitializationMode::New => {
-                let mut block_parser = BlockParser::new(&startup_dir, canonical_threshold)?;
+                let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+                    &startup_dir,
+                    canonical_threshold,
+                    reporting_freq,
+                )?;
                 state
                     .initialize_with_canonical_chain_discovery(&mut block_parser)
                     .await?;
             }
             InitializationMode::Replay => {
-                state.replay_events()?;
+                let min_length_filter = state.replay_events()?;
+                let mut block_parser =
+                    BlockParser::new_glob_min_length_filtered(&startup_dir, min_length_filter)?;
+                state.add_blocks(&mut block_parser).await?;
             }
             InitializationMode::Sync => {
-                state.sync_from_db()?;
+                let min_length_filter = state.sync_from_db()?;
+                let mut block_parser =
+                    BlockParser::new_glob_min_length_filtered(&startup_dir, min_length_filter)?;
+                state.add_blocks(&mut block_parser).await?;
             }
         }
 
@@ -271,6 +269,6 @@ fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
 
 pub fn remove_domain_socket() -> io::Result<()> {
     std::fs::remove_file(SOCKET_NAME)?;
-    info!("Domain socket removed: {SOCKET_NAME}");
+    debug!("Domain socket removed: {SOCKET_NAME}");
     Ok(())
 }

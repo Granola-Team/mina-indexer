@@ -7,11 +7,7 @@ use crate::{
         store::BlockStore, Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    constants::{
-        BLOCK_REPORTING_FREQ_NUM, BLOCK_REPORTING_FREQ_SEC, CANONICAL_UPDATE_THRESHOLD,
-        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_PREV_STATE_HASH,
-        MAINNET_TRANSITION_FRONTIER_K, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger},
     state::{
@@ -31,7 +27,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
@@ -62,6 +58,8 @@ pub struct IndexerState {
     pub transition_frontier_length: u32,
     /// Interval to the prune the root branch
     pub prune_interval: u32,
+    /// Frequency to report
+    pub reporting_freq: u32,
     /// Threshold for updating the canonical tip and db ledger
     pub canonical_update_threshold: u32,
     /// Number of blocks added to the state
@@ -101,33 +99,71 @@ pub enum ExtensionDirection {
     Reverse,
 }
 
-impl IndexerState {
-    /// Creates a new indexer state from the genesis ledger
+pub struct IndexerStateConfig {
+    pub genesis_hash: BlockHash,
+    pub genesis_ledger: GenesisLedger,
+    pub indexer_store: Arc<IndexerStore>,
+    pub transition_frontier_length: u32,
+    pub prune_interval: u32,
+    pub canonical_update_threshold: u32,
+    pub ledger_cadence: u32,
+    pub reporting_freq: u32,
+}
+
+impl IndexerStateConfig {
     pub fn new(
-        root_hash: &BlockHash,
         genesis_ledger: GenesisLedger,
         indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
-        prune_interval: u32,
-        canonical_update_threshold: u32,
-        ledger_cadence: u32,
+    ) -> Self {
+        IndexerStateConfig {
+            genesis_ledger,
+            indexer_store,
+            transition_frontier_length,
+            genesis_hash: MAINNET_GENESIS_HASH.into(),
+            prune_interval: PRUNE_INTERVAL_DEFAULT,
+            canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
+            ledger_cadence: LEDGER_CADENCE,
+            reporting_freq: BLOCK_REPORTING_FREQ_NUM,
+        }
+    }
+}
+
+impl IndexerState {
+    pub fn new(
+        genesis_ledger: GenesisLedger,
+        indexer_store: Arc<IndexerStore>,
+        transition_frontier_length: u32,
     ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(root_hash)?;
+        Self::new_from_config(IndexerStateConfig::new(
+            genesis_ledger,
+            indexer_store,
+            transition_frontier_length,
+        ))
+    }
+
+    /// Creates a new indexer state from the genesis ledger
+    pub fn new_from_config(config: IndexerStateConfig) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
 
         // add genesis block and ledger to indexer store
-        indexer_store.add_ledger_state_hash(
+        config.indexer_store.add_ledger_state_hash(
             &MAINNET_GENESIS_PREV_STATE_HASH.into(),
-            genesis_ledger.clone().into(),
+            config.genesis_ledger.clone().into(),
         )?;
         info!("Genesis ledger added to indexer store");
 
-        let genesis_block = GenesisBlock::new()?.into();
-        indexer_store.add_block(&genesis_block)?;
+        let genesis_block = GenesisBlock::new()?.to_precomputed();
+        config.indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
 
         // update genesis canonicity
-        indexer_store.set_max_canonical_blockchain_length(1)?;
-        indexer_store.add_canonical_block(1, root_hash)?;
+        config
+            .indexer_store
+            .set_max_canonical_blockchain_length(1)?;
+        config
+            .indexer_store
+            .add_canonical_block(1, &config.genesis_hash)?;
 
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
@@ -136,7 +172,7 @@ impl IndexerState {
 
         // apply genesis block to genesis ledger and keep its ledger diff
         Ok(Self {
-            ledger: <GenesisLedger as Into<Ledger>>::into(genesis_ledger)
+            ledger: <GenesisLedger as Into<Ledger>>::into(config.genesis_ledger)
                 .apply_diff_from_precomputed(&genesis_block)?,
             diffs_map: HashMap::from([(
                 genesis_block.state_hash.clone().into(),
@@ -147,47 +183,41 @@ impl IndexerState {
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
-            indexer_store: Some(indexer_store),
-            transition_frontier_length,
-            prune_interval,
-            canonical_update_threshold,
+            indexer_store: Some(config.indexer_store),
+            transition_frontier_length: config.transition_frontier_length,
+            prune_interval: config.prune_interval,
+            canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 1, // genesis block
             init_time: Instant::now(),
-            ledger_cadence,
+            ledger_cadence: config.ledger_cadence,
+            reporting_freq: config.reporting_freq,
         })
     }
 
     /// Creates a new indexer state without genesis events
-    pub fn new_without_genesis_events(
-        root_hash: &BlockHash,
-        genesis_ledger: GenesisLedger,
-        indexer_store: Arc<IndexerStore>,
-        transition_frontier_length: u32,
-        prune_interval: u32,
-        canonical_update_threshold: u32,
-        ledger_cadence: u32,
-    ) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(root_hash)?;
+    pub fn new_without_genesis_events(config: IndexerStateConfig) -> anyhow::Result<Self> {
+        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
         };
 
         Ok(Self {
-            ledger: genesis_ledger.into(),
+            ledger: config.genesis_ledger.into(),
             diffs_map: HashMap::new(),
             phase: IndexerPhase::SyncingFromDB,
             canonical_tip: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
-            indexer_store: Some(indexer_store),
-            transition_frontier_length,
-            prune_interval,
-            canonical_update_threshold,
-            blocks_processed: 0,
+            indexer_store: Some(config.indexer_store),
+            transition_frontier_length: config.transition_frontier_length,
+            prune_interval: config.prune_interval,
+            canonical_update_threshold: config.canonical_update_threshold,
+            blocks_processed: 0, // no genesis block included
             init_time: Instant::now(),
-            ledger_cadence,
+            ledger_cadence: config.ledger_cadence,
+            reporting_freq: config.reporting_freq,
         })
     }
 
@@ -198,6 +228,7 @@ impl IndexerState {
         speedb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
         ledger_cadence: Option<u32>,
+        reporting_freq: Option<u32>,
     ) -> anyhow::Result<Self> {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = speedb_path.map(|path| {
@@ -237,6 +268,7 @@ impl IndexerState {
             blocks_processed: 1, // root block
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
+            reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
         })
     }
 
@@ -272,7 +304,7 @@ impl IndexerState {
             while self.blocks_processed < block_parser.num_canonical {
                 self.blocks_processed += 1;
 
-                if should_report_from_block_count(self.blocks_processed) {
+                if self.should_report_from_block_count() {
                     let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
                     info!(
@@ -751,10 +783,13 @@ impl IndexerState {
 
     /// Sync from an existing db
     ///
-    /// Short-circuits adding blocks to the witness tree by starting at
-    /// the most recent canonical block and only adding the succeeding blocks
-    pub fn sync_from_db(&mut self) -> anyhow::Result<()> {
+    /// Short-circuits adding blocks to the witness tree by rooting the
+    /// witness tree at the most recent "canonical" block and only adding
+    /// the succeeding blocks
+    pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
+        let mut min_length_filter = None;
         let mut successive_blocks = vec![];
+
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let event_log = indexer_store.get_event_log()?;
             let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
@@ -771,7 +806,7 @@ impl IndexerState {
                     indexer_store.get_max_canonical_blockchain_length()?
                 );
 
-                // root branch root is canonical block
+                // root branch root is canonical tip
                 // add all successive NewBlock's to the witness tree
                 if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
                     self.root_branch = Branch::new(&block)?;
@@ -780,6 +815,8 @@ impl IndexerState {
                         state_hash: self.root_branch.root_block().state_hash.clone(),
                         node_id: self.root_branch.root.clone(),
                     };
+                    self.diffs_map
+                        .insert(tip.state_hash.clone(), LedgerDiff::from_precomputed(&block));
                     self.canonical_tip = tip.clone();
                     self.best_tip = tip;
 
@@ -808,6 +845,9 @@ impl IndexerState {
                 } else {
                     panic!("Fatal sync error: block missing from db {}", state_hash)
                 }
+
+                // return after adding succesive blocks
+                min_length_filter = Some(*canonical_length);
             } else {
                 // add all NewBlock's to the witness tree
                 for state_hash in event_log.iter().filter_map(|e| match e {
@@ -834,18 +874,32 @@ impl IndexerState {
             self.add_block_to_witness_tree(&block)?;
         }
 
-        Ok(())
+        Ok(min_length_filter)
     }
 
     /// Replay events on a mutable state
-    pub fn replay_events(&mut self) -> anyhow::Result<()> {
+    pub fn replay_events(&mut self) -> anyhow::Result<Option<u32>> {
+        let mut min_length_filter = None;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let events = indexer_store.get_event_log()?;
-            events
-                .iter()
-                .for_each(|event| self.replay_event(event).unwrap());
+            events.iter().for_each(|event| {
+                if let IndexerEvent::Db(DbEvent::Canonicity(
+                    DbCanonicityEvent::NewCanonicalBlock {
+                        blockchain_length, ..
+                    },
+                )) = event
+                {
+                    // filter out blocks at or below the "canonical" tip
+                    if Some(*blockchain_length) > min_length_filter {
+                        min_length_filter = Some(*blockchain_length)
+                    }
+                }
+                self.replay_event(event)
+                    .unwrap_or_else(|e| error!("{}", e.to_string()));
+            });
         }
-        Ok(())
+
+        Ok(min_length_filter)
     }
 
     fn replay_event(&mut self, event: &IndexerEvent) -> anyhow::Result<()> {
@@ -1095,13 +1149,17 @@ impl IndexerState {
         self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
     }
 
+    fn should_report_from_block_count(&self) -> bool {
+        self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
+    }
+
     fn report_progress(
         &self,
         block_parser: &BlockParser,
         step_time: Instant,
         total_time: Instant,
     ) -> anyhow::Result<()> {
-        if should_report_from_block_count(self.blocks_processed)
+        if self.should_report_from_block_count()
             || self.should_report_from_time(step_time.elapsed())
         {
             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
@@ -1132,10 +1190,6 @@ impl IndexerState {
 /// Checks if the block is the parent of the branch's root
 fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
     precomputed_block.state_hash == branch.root_block().parent_hash.0
-}
-
-fn should_report_from_block_count(block_count: u32) -> bool {
-    block_count > 0 && block_count % BLOCK_REPORTING_FREQ_NUM == 0
 }
 
 impl std::fmt::Display for IndexerState {

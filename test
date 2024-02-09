@@ -167,7 +167,7 @@ test_ipc_is_available_immediately() {
         --database-dir ./database \
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
-        --root-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
+        --genesis-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
     sleep 1
 
     idxr summary
@@ -291,7 +291,7 @@ test_block_copy() {
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --log-level-stdout debug
+        --log-level debug
     sleep 5
 
     # start without block 11
@@ -338,7 +338,7 @@ test_missing_blocks() {
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --log-level-stdout debug
+        --log-level debug
     sleep 5
 
     # start out missing block 11 & 21
@@ -477,8 +477,11 @@ test_ledgers() {
 
     best_result=$(idxr best-ledger | jq -r .${pk}.balance)
     hash_result=$(idxr ledger --hash $best_hash | jq -r .${pk}.balance)
+    height_balance=$(idxr ledger-at-height --height $best_height | jq -r .${pk}.balance)
+
     assert '607904750000000' $best_result
     assert '607904750000000' $hash_result
+    assert '607904750000000' $height_balance
 
     # write ledgers to file
     file=./ledgers/best-$best_height-$best_hash.json
@@ -495,8 +498,8 @@ test_ledgers() {
     assert '607904750000000' $file_result
     rm -f $file
 
-    file=./ledgers/height-$canonical_height-$best_hash.json
-    idxr ledger-at-height --height $canonical_height -p $file
+    file=./ledgers/height-$best_height-$best_hash.json
+    idxr ledger-at-height --height $best_height -p $file
     
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
@@ -520,16 +523,13 @@ test_sync() {
         --log-dir ./logs
     sleep 5
 
-    # pre-sync results
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
     rm -f idxr_pid
     rm ./database/LOCK
+
+    # add more blocks to the watch dir while not indexing
+    dl_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
     idxr_server sync \
@@ -539,16 +539,17 @@ test_sync() {
         --log-dir ./logs
     sleep 5
 
-    # post-sync reults
+    # post-sync results
     canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
     canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
 
-    assert $canonical_hash $canonical_hash_sync
-    assert $canonical_length $canonical_length_sync
-    assert $best_hash $best_hash_sync
-    assert $best_length $best_length_sync
+    # includes blocks added to watch dir while down
+    assert 20 $best_length_sync
+    assert 10 $canonical_length_sync
+    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_sync
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $canonical_hash_sync
 
     teardown
 }
@@ -567,17 +568,13 @@ test_replay() {
         --log-dir ./logs
     sleep 5
 
-    # pre-replay results
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    num_blocks=$(idxr summary -j | jq -r .blocks_processed)
-
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
     rm -f idxr_pid
     rm ./database/LOCK
+
+    # add more blocks to the watch dir while not indexing
+    dl_mainnet_range 16 20 ./blocks
 
     # replay events from previous indexer instance
     idxr_server replay \
@@ -587,20 +584,19 @@ test_replay() {
         --log-dir ./logs
     sleep 5
 
-    # post-replay reults
+    # post-replay results
     canonical_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
     canonical_length_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     best_hash_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     num_blocks_replay=$(idxr summary -j | jq -r .blocks_processed)
 
-    assert $canonical_hash $canonical_hash_replay
-    assert $canonical_length $canonical_length_replay
-    assert $best_hash $best_hash_replay
-    assert '15' $best_length
-    assert $best_length $best_length_replay
-    assert '15' $num_blocks
-    assert $num_blocks $num_blocks_replay
+    # includes blocks added to watch dir while down
+    assert 20 $num_blocks_replay
+    assert 20 $best_length_replay
+    assert 10 $canonical_length_replay
+    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $canonical_hash_replay
 
     teardown
 }
@@ -829,7 +825,7 @@ test_many_blocks() {
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
-        --log-level-stdout debug
+        --log-level debug
     sleep 10
 
     # results
@@ -869,7 +865,7 @@ test_release() {
         --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --log-level-stdout debug
+        --log-level debug
     sleep 30
 
     # results

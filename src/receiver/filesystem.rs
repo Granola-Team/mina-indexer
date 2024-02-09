@@ -58,7 +58,7 @@ impl FilesystemReceiver {
 
         Ok(Self {
             parsers: vec![],
-            paths_added: HashSet::with_capacity(1000),
+            paths_added: HashSet::new(),
             worker_command_sender,
             worker_event_receiver,
             worker_error_receiver,
@@ -107,7 +107,7 @@ impl FilesystemReceiver {
 
 #[async_trait]
 impl super::BlockReceiver for FilesystemReceiver {
-    async fn recv_block(&mut self) -> Result<Option<PrecomputedBlock>, anyhow::Error> {
+    async fn recv_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         loop {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
@@ -133,7 +133,7 @@ impl super::BlockReceiver for FilesystemReceiver {
                         {
                             for tag in tags {
                                 if let Tag::Path { path, .. } = tag {
-                                    if self.paths_added.len() == 1000 {
+                                    if self.paths_added.len() == 100 {
                                         self.paths_added.clear()
                                     }
                                     if block::is_valid_block_file(path) && !self.paths_added.contains(path) {

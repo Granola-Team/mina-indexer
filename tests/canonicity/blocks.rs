@@ -2,9 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
-    constants::{
-        LEDGER_CADENCE, MAINNET_CANONICAL_THRESHOLD, MAINNET_GENESIS_HASH, PRUNE_INTERVAL_DEFAULT,
-    },
+    constants::*,
     ledger::genesis::GenesisRoot,
     state::IndexerState,
     store::IndexerStore,
@@ -20,13 +18,9 @@ async fn test() {
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
     let mut state = IndexerState::new(
-        &MAINNET_GENESIS_HASH.into(),
         genesis_ledger.into(),
-        indexer_store,
-        10,
-        PRUNE_INTERVAL_DEFAULT,
-        MAINNET_CANONICAL_THRESHOLD,
-        LEDGER_CADENCE,
+        indexer_store.clone(),
+        MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
 

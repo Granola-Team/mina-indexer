@@ -60,10 +60,15 @@ async fn get_global_slot_since_genesis() {
 
 #[tokio::test]
 async fn orphaned_blocks() {
-    use mina_indexer::{block::parser::BlockParserPaths, constants::MAINNET_CANONICAL_THRESHOLD};
+    use mina_indexer::{block::parser::BlockParserPaths, constants::*};
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let block_parser = BlockParser::new(&log_dir, MAINNET_CANONICAL_THRESHOLD).unwrap();
+    let block_parser = BlockParser::new_with_canonical_chain_discovery(
+        &log_dir,
+        MAINNET_CANONICAL_THRESHOLD,
+        MAINNET_TRANSITION_FRONTIER_K,
+    )
+    .unwrap();
 
     assert_eq!(
         block_parser.paths(),
