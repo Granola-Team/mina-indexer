@@ -11,8 +11,8 @@ impl GenesisBlock {
     }
 }
 
-impl From<GenesisBlock> for PrecomputedBlock {
-    fn from(value: GenesisBlock) -> Self {
-        value.0
+impl GenesisBlock {
+    pub fn to_precomputed(self) -> PrecomputedBlock {
+        self.0
     }
 }
