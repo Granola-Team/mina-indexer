@@ -102,7 +102,7 @@ async fn extensions() {
 
     println!(
         "=== Before Branch 0 ===\n{:?}",
-        state.dangling_branches.get(0).unwrap()
+        state.dangling_branches.first().unwrap()
     );
     println!(
         "=== Before Branch 1 ===\n{:?}",
@@ -174,10 +174,10 @@ async fn extensions() {
     let leaves1: Vec<Block> = state.dangling_branches.get(1).unwrap().leaves().to_vec();
 
     // root1 is not a leaf
-    assert_ne!(root1, leaves1.get(0).unwrap());
+    assert_ne!(root1, leaves1.first().unwrap());
     println!(
         "\n=== After Branch 0 ===\n{:?}",
-        &state.dangling_branches.get(0).unwrap()
+        &state.dangling_branches.first().unwrap()
     );
     println!(
         "\n=== After Branch 1 ===\n{:?}",
