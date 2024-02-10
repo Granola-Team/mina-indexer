@@ -133,7 +133,7 @@ impl BlockStore for IndexerStore {
         let value = serde_json::to_vec(&block)?;
         let blocks_cf = self.blocks_cf();
 
-        if matches!(self.database.get_cf(&blocks_cf, key), Ok(Some(_))) {
+        if matches!(self.database.get_pinned_cf(&blocks_cf, key), Ok(Some(_))) {
             trace!(
                 "Block already present (length {}): {}",
                 block.blockchain_length,
@@ -176,6 +176,39 @@ impl BlockStore for IndexerStore {
             None => Ok(None),
             Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         }
+    }
+
+    fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>> {
+        trace!("Getting best block");
+        match self
+            .database
+            .get_pinned_cf(self.blocks_cf(), Self::BEST_TIP_BLOCK_KEY)?
+            .map(|bytes| bytes.to_vec())
+        {
+            None => Ok(None),
+            Some(bytes) => {
+                let state_hash: BlockHash = String::from_utf8(bytes)?.into();
+                self.get_block(&state_hash)
+            }
+        }
+    }
+
+    fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
+        trace!("Setting best block");
+
+        // set new best tip
+        self.database.put_cf(
+            self.blocks_cf(),
+            Self::BEST_TIP_BLOCK_KEY,
+            state_hash.to_string().as_bytes(),
+        )?;
+
+        // record new best tip event
+        self.add_event(&IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBestTip(
+            state_hash.clone().0,
+        ))))?;
+
+        Ok(())
     }
 }
 
@@ -781,6 +814,7 @@ impl SnarkStore for IndexerStore {
 }
 
 impl IndexerStore {
+    const BEST_TIP_BLOCK_KEY: &[u8] = "best_tip_block".as_bytes();
     const NEXT_EVENT_SEQ_NUM_KEY: &[u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &[u8] = "max_canonical_blockchain_length".as_bytes();
 

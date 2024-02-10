@@ -100,7 +100,7 @@ async fn extension() {
 
     // merges branch 2 into 0
     let (extension_type, _) = state.add_block_to_witness_tree(&middle_block).unwrap();
-    assert_eq!(extension_type, ExtensionType::RootComplex);
+    assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     for (idx, branch) in state.dangling_branches.iter().enumerate() {
         println!("=== After Branch {idx} ===");

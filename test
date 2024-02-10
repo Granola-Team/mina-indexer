@@ -143,7 +143,6 @@ test_server_startup() {
     setup
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -163,7 +162,6 @@ test_ipc_is_available_immediately() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
@@ -201,7 +199,6 @@ test_account_balance_cli() {
     setup
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -219,7 +216,6 @@ test_account_public_key_json() {
     setup
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -239,16 +235,41 @@ test_canonical_tip() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
     
-    state_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    blockchain_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
     
-    assert 5 $blockchain_length
-    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $state_hash
+    assert 5 $length
+    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $hash
+
+    teardown
+}
+
+# Indexer server handles canonical threshold correctly
+test_canonical_threshold() {
+    test=test_canonical_threshold
+
+    num_seq_blocks=15
+    canonical_threshold=2
+
+    setup
+    dl_mainnet $num_seq_blocks ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --canonical-threshold $canonical_threshold
+    sleep 5
+
+    hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+
+    assert $(expr $num_seq_blocks - $canonical_threshold) $length
+    assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $hash
 
     teardown
 }
@@ -262,15 +283,17 @@ test_best_tip() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
-    
+
+    # best tip query
     hash=$(idxr best-tip | jq -r .state_hash)
     canonicity=$(idxr best-tip | jq -r .canonicity)
     length=$(idxr best-tip | jq -r .blockchain_length)
     canonicity_v=$(idxr best-tip -v | jq -r .canonicity)
+
+    # witness tree summary
     wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     
@@ -292,7 +315,6 @@ test_block_copy() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -339,7 +361,6 @@ test_missing_blocks() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -406,7 +427,6 @@ test_best_chain() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -459,7 +479,6 @@ test_ledgers() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -522,7 +541,6 @@ test_sync() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -538,7 +556,6 @@ test_sync() {
     # sync from previous indexer db
     idxr_server sync \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -567,7 +584,6 @@ test_replay() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -583,7 +599,6 @@ test_replay() {
     # replay events from previous indexer instance
     idxr_server replay \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -615,7 +630,6 @@ test_transactions() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -715,7 +729,6 @@ test_snark_work() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -772,7 +785,6 @@ test_checkpoint() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -794,7 +806,6 @@ test_checkpoint() {
     setup
     idxr_server sync \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./checkpoint \
         --log-dir ./logs
     sleep 5
@@ -825,7 +836,6 @@ test_many_blocks() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
@@ -866,7 +876,6 @@ test_release() {
 
     idxr_server_start \
         --startup-dir ./blocks \
-        --watch-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -907,6 +916,7 @@ if [ "$#" -eq 0 ]; then
     test_account_balance_cli
     test_account_public_key_json
     test_canonical_tip
+    test_canonical_threshold
     test_best_tip
     test_block_copy
     test_missing_blocks
@@ -929,6 +939,7 @@ else
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_canonical_tip") test_canonical_tip ;;
+            "test_canonical_threshold") test_canonical_threshold ;;
             "test_best_tip") test_best_tip ;;
             "test_block_copy") test_block_copy ;;
             "test_missing_blocks") test_missing_blocks ;;

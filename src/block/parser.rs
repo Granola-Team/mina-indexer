@@ -116,13 +116,19 @@ impl BlockParser {
         }
     }
 
-    /// Simplified `BlockParser` for testing without canonical chain discovery.
+    /// Glob-based parse for testing without canonical chain discovery
     pub fn new_testing(blocks_dir: &Path) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
             let paths: Vec<PathBuf> = glob(&format!("{}/*.json", blocks_dir.display()))?
                 .filter_map(|x| x.ok())
                 .collect();
+
+            println!("===== Testing block parser paths =====");
+            for path in &paths {
+                println!("{}", path.file_name().unwrap().to_str().unwrap());
+            }
+            println!("======================================");
 
             Ok(Self::empty(&blocks_dir, &paths))
         } else {
@@ -172,7 +178,10 @@ impl BlockParser {
         }
     }
 
-    /// Traverses `self`'s internal paths. First canonical, then successive.
+    /// Traverses `self`'s internal paths
+    /// - canonical
+    /// - successive
+    /// - orphaned
     pub fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
@@ -182,7 +191,6 @@ impl BlockParser {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
 
-        // TODO remove
         if let Some(next_path) = self.orphaned_paths.next() {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
