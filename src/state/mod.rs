@@ -720,7 +720,7 @@ impl IndexerState {
     /// Get the status of a block: Canonical, Pending, or Orphaned
     pub fn get_block_status(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return indexer_store.get_block_canonicity(state_hash);
+            return indexer_store.get_block_canonicity(state_hash, &self.best_tip.state_hash);
         }
 
         Ok(None)

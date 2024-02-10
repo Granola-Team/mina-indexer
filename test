@@ -268,12 +268,16 @@ test_best_tip() {
     sleep 5
     
     hash=$(idxr best-tip | jq -r .state_hash)
+    canonicity=$(idxr best-tip | jq -r .canonicity)
     length=$(idxr best-tip | jq -r .blockchain_length)
+    canonicity_v=$(idxr best-tip -v | jq -r .canonicity)
     wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     
-    assert $wt_length $length
     assert $wt_hash $hash
+    assert $wt_length $length
+    assert 'Canonical' $canonicity
+    assert 'Canonical' $canonicity_v
 
     teardown
 }

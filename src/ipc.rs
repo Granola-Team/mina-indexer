@@ -1,5 +1,8 @@
 use crate::{
-    block::{self, store::BlockStore, Block, BlockHash, BlockWithoutHeight},
+    block::{
+        self, precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, Block, BlockHash,
+        BlockWithoutHeight,
+    },
     canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
     ledger::{self, public_key, store::LedgerStore},
@@ -158,11 +161,17 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
 
             if let Ok(Some(ref block)) = db.get_block(&best_tip.state_hash) {
-                let block_str = if verbose {
-                    serde_json::to_string_pretty(block)?
+                let block_str = if let Some(canonicity) =
+                    db.get_block_canonicity(&block.state_hash.clone().into(), &best_tip.state_hash)?
+                {
+                    if verbose {
+                        serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
+                    } else {
+                        let block = BlockWithoutHeight::with_canonicity(block, canonicity);
+                        serde_json::to_string_pretty(&block)?
+                    }
                 } else {
-                    let block: BlockWithoutHeight = block.into();
-                    serde_json::to_string_pretty(&block)?
+                    block_missing_from_db(&block.state_hash)
                 };
                 if !path.is_empty() {
                     info!("Writing best tip block to {path}");
@@ -193,11 +202,17 @@ async fn handle_conn(
             if !block::is_valid_state_hash(&state_hash) {
                 invalid_state_hash(&state_hash)
             } else if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
-                let block_str = if verbose {
-                    serde_json::to_string_pretty(block)?
+                let block_str = if let Some(canonicity) =
+                    db.get_block_canonicity(&block.state_hash.clone().into(), &best_tip.state_hash)?
+                {
+                    if verbose {
+                        serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
+                    } else {
+                        let block = BlockWithoutHeight::with_canonicity(block, canonicity);
+                        serde_json::to_string_pretty(&block)?
+                    }
                 } else {
-                    let block: BlockWithoutHeight = block.into();
-                    serde_json::to_string_pretty(&block)?
+                    block_missing_from_db(&block.state_hash)
                 };
                 if !path.is_empty() {
                     info!("Writing block {state_hash} to {path}");
@@ -263,10 +278,34 @@ async fn handle_conn(
                 }
 
                 let best_chain_str = if verbose {
+                    let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
+                        .iter()
+                        .flat_map(|block| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
+                                &block.state_hash.clone().into(),
+                                &best_tip.state_hash,
+                            ) {
+                                Some(block.with_canonicity(canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     serde_json::to_string(&best_chain)?
                 } else {
-                    let best_chain: Vec<BlockWithoutHeight> =
-                        best_chain.iter().map(BlockWithoutHeight::from).collect();
+                    let best_chain: Vec<BlockWithoutHeight> = best_chain
+                        .iter()
+                        .flat_map(|block| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
+                                &block.state_hash.clone().into(),
+                                &best_tip.state_hash,
+                            ) {
+                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     format_vec_jq_compatible(&best_chain)
                 };
 
@@ -435,8 +474,7 @@ async fn handle_conn(
                             block_missing_from_db(&curr_block.state_hash)
                         }
                     } else {
-                        error!("Best tip block missing from store");
-                        "Best tip block missing from store".to_string()
+                        best_tip_missing_from_db()
                     }
                 } else if let Some(ledger) = db.get_ledger_at_height(height)? {
                     ledger.to_string_pretty()
@@ -715,6 +753,11 @@ mod helpers {
     pub fn block_missing_from_db(state_hash: &str) -> String {
         error!("Block missing from store: {state_hash}");
         format!("Block missing from store: {state_hash}")
+    }
+
+    pub fn best_tip_missing_from_db() -> String {
+        error!("Best tip block missing from store");
+        "Best tip block missing from store".to_string()
     }
 
     pub fn format_vec_jq_compatible<T>(vec: &Vec<T>) -> String

@@ -162,7 +162,6 @@ impl BlockStore for IndexerStore {
         Ok(db_event)
     }
 
-    /// Get the block with the specified hash
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
         trace!("Getting block with hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -181,7 +180,6 @@ impl BlockStore for IndexerStore {
 }
 
 impl CanonicityStore for IndexerStore {
-    /// Add a canonical state hash at the specified blockchain_length
     fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Adding canonical block (length {height}): {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -206,7 +204,6 @@ impl CanonicityStore for IndexerStore {
         Ok(())
     }
 
-    /// Get the state hash of the canonical block with the specified blockchain_length
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>> {
         trace!("Getting canonical hash at height {height}");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -223,7 +220,6 @@ impl CanonicityStore for IndexerStore {
         }
     }
 
-    /// Get the length of the canonical chain
     fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>> {
         trace!("Getting max canonical blockchain length");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -239,7 +235,6 @@ impl CanonicityStore for IndexerStore {
         }
     }
 
-    /// Set the length of the canonical chain
     fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()> {
         trace!("Setting max canonical blockchain length to {height}");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -251,24 +246,53 @@ impl CanonicityStore for IndexerStore {
         Ok(())
     }
 
-    /// Get the specified block's canonicity
-    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+    fn get_block_canonicity(
+        &self,
+        state_hash: &BlockHash,
+        best_tip: &BlockHash,
+    ) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
-        if let Some(PrecomputedBlock {
-            blockchain_length, ..
-        }) = self.get_block(state_hash)?
-        {
-            if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {
-                if blockchain_length > max_canonical_length {
+        if let Ok(Some(best_tip)) = self.get_block(best_tip) {
+            if let Some(PrecomputedBlock {
+                blockchain_length, ..
+            }) = self.get_block(state_hash)?
+            {
+                if blockchain_length > best_tip.blockchain_length {
                     return Ok(Some(Canonicity::Pending));
-                } else if self.get_canonical_hash_at_height(blockchain_length)?
-                    == Some(state_hash.clone())
+                } else if let Some(max_canonical_length) =
+                    self.get_max_canonical_blockchain_length()?
                 {
-                    return Ok(Some(Canonicity::Canonical));
-                } else {
-                    return Ok(Some(Canonicity::Orphaned));
+                    if blockchain_length > max_canonical_length {
+                        // follow best chain back from tip to given block
+                        let mut curr_block = best_tip;
+                        while curr_block.state_hash != state_hash.to_string()
+                            && curr_block.blockchain_length > max_canonical_length
+                        {
+                            if let Some(parent) =
+                                self.get_block(&curr_block.previous_state_hash())?
+                            {
+                                curr_block = parent;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if curr_block.state_hash == state_hash.to_string()
+                            && curr_block.blockchain_length > max_canonical_length
+                        {
+                            return Ok(Some(Canonicity::Canonical));
+                        } else {
+                            return Ok(Some(Canonicity::Orphaned));
+                        }
+                    } else if self.get_canonical_hash_at_height(blockchain_length)?
+                        == Some(state_hash.clone())
+                    {
+                        return Ok(Some(Canonicity::Canonical));
+                    } else {
+                        return Ok(Some(Canonicity::Orphaned));
+                    }
                 }
             }
         }
