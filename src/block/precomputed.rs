@@ -6,6 +6,7 @@ use crate::{
     ledger::{coinbase::Coinbase, public_key::PublicKey},
 };
 use anyhow::anyhow;
+use base64::{self, Engine};
 use mina_serialization_types::{
     consensus_state as mina_consensus,
     json::DeltaTransitionChainProofJson,
@@ -347,6 +348,27 @@ impl PrecomputedBlock {
             .collect()
     }
 
+    pub fn last_vrf_output(&self) -> String {
+        let b64 = base64::engine::GeneralPurpose::new(
+            &base64::alphabet::URL_SAFE,
+            base64::engine::GeneralPurposeConfig::new(),
+        );
+        b64.encode(
+            self.protocol_state
+                .clone()
+                .body
+                .inner()
+                .inner()
+                .consensus_state
+                .inner()
+                .inner()
+                .last_vrf_output
+                .inner()
+                .0
+                .as_slice(),
+        )
+    }
+
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
         PrecomputedBlockWithCanonicity {
             canonicity: Some(canonicity),
@@ -364,5 +386,22 @@ impl PrecomputedBlock {
 fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
     for pk in new_pks {
         pks.insert(pk);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PrecomputedBlock;
+    use std::path::PathBuf;
+
+    #[test]
+    fn last_vrf_output() -> anyhow::Result<()> {
+        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let block = PrecomputedBlock::parse_file(&path)?;
+        assert_eq!(
+            block.last_vrf_output(),
+            "bgHnww8tqHDhk3rBpW9tse_L_WPup7yKDKigNvoeBwA=".to_string()
+        );
+        Ok(())
     }
 }

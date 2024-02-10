@@ -2043,6 +2043,7 @@ dependencies = [
  "anyhow",
  "async-priority-channel",
  "async-trait",
+ "base64 0.21.7",
  "bin-prot",
  "blake2",
  "bs58 0.5.0",

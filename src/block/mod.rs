@@ -17,6 +17,7 @@ pub struct Block {
     pub height: u32,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
+    pub last_vrf_output: String,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -28,7 +29,7 @@ pub struct BlockWithoutHeight {
     pub global_slot_since_genesis: u32,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct BlockHash(pub String);
 
 impl BlockHash {
@@ -48,23 +49,14 @@ impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = BlockHash(precomputed_block.state_hash.clone());
+        let state_hash = precomputed_block.state_hash.clone().into();
         Self {
-            parent_hash,
-            state_hash,
             height,
-            global_slot_since_genesis: precomputed_block
-                .protocol_state
-                .body
-                .t
-                .t
-                .consensus_state
-                .t
-                .t
-                .global_slot_since_genesis
-                .t
-                .t,
+            state_hash,
+            parent_hash,
+            last_vrf_output: precomputed_block.last_vrf_output(),
             blockchain_length: precomputed_block.blockchain_length,
+            global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
         }
     }
 }
@@ -85,7 +77,7 @@ impl BlockWithoutHeight {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = BlockHash(precomputed_block.state_hash.clone());
+        let state_hash = precomputed_block.state_hash.clone().into();
         Self {
             parent_hash,
             state_hash,
@@ -125,6 +117,7 @@ impl From<PrecomputedBlock> for Block {
             blockchain_length: value.blockchain_length,
             global_slot_since_genesis: value.global_slot_since_genesis(),
             height: value.blockchain_length,
+            last_vrf_output: value.last_vrf_output(),
         }
     }
 }
@@ -137,6 +130,7 @@ impl From<&PrecomputedBlock> for Block {
             blockchain_length: value.blockchain_length,
             global_slot_since_genesis: value.global_slot_since_genesis(),
             height: value.blockchain_length,
+            last_vrf_output: value.last_vrf_output(),
         }
     }
 }
@@ -172,13 +166,20 @@ impl std::cmp::PartialOrd for Block {
 }
 
 impl std::cmp::Ord for Block {
+    /// Follows `selectLongerChain`
+    /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.state_hash == other.state_hash {
-            std::cmp::Ordering::Equal
-        } else if self.height > other.height {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Less
+        use std::cmp::Ordering;
+
+        let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
+        let vrf_cmp = self.last_vrf_output.cmp(&other.last_vrf_output);
+        let hash_cmp = self.state_hash.cmp(&other.state_hash);
+
+        match (length_cmp, vrf_cmp, hash_cmp) {
+            (Ordering::Greater, _, _)
+            | (Ordering::Equal, Ordering::Greater, _)
+            | (Ordering::Equal, Ordering::Equal, Ordering::Greater) => Ordering::Greater,
+            _ => Ordering::Less,
         }
     }
 }
