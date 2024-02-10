@@ -59,7 +59,6 @@ impl MinaIndexer {
         let ipc_update_arc = Arc::new(ipc_update_sender);
         let watch_dir = config.watch_dir.clone();
         let ipc_store = store.clone();
-        let ipc_config = config.clone();
 
         let listener = LocalSocketListener::bind(SOCKET_NAME)
             .or_else(try_remove_old_socket)
@@ -70,7 +69,7 @@ impl MinaIndexer {
         let _ipc_join_handle = tokio::spawn(async move {
             debug!("Spawning IPC Actor");
 
-            let mut ipc_actor = IpcActor::new(ipc_config, listener, ipc_store, ipc_update_receiver);
+            let mut ipc_actor = IpcActor::new(listener, ipc_store, ipc_update_receiver);
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
