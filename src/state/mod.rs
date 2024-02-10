@@ -302,31 +302,19 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diff = LedgerDiff::default();
 
-            if block_parser.num_canonical > BLOCK_REPORTING_FREQ_NUM {
-                info!("Adding blocks to the state, reporting every {BLOCK_REPORTING_FREQ_NUM}...");
+            if block_parser.num_canonical > self.reporting_freq {
+                info!(
+                    "Adding blocks to the state, reporting every {}...",
+                    self.reporting_freq
+                );
             } else {
                 info!("Adding blocks to the state...");
             }
 
             // process canonical blocks first
-            while self.blocks_processed < block_parser.num_canonical {
+            while self.blocks_processed <= block_parser.num_canonical {
                 self.blocks_processed += 1;
-
-                if self.should_report_from_block_count() {
-                    let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
-
-                    info!(
-                        "{} blocks parsed and applied in {:?}",
-                        self.blocks_processed,
-                        total_time.elapsed(),
-                    );
-                    info!(
-                        "Estimated time: {} min",
-                        (block_parser.total_num_blocks - self.blocks_processed) as f64
-                            / (rate * 60_f64)
-                    );
-                    debug!("Rate: {rate} blocks/s");
-                }
+                self.report_from_block_count(block_parser, total_time);
 
                 if let Some(block) = block_parser.next_block()? {
                     let state_hash = block.state_hash.clone().into();
@@ -336,6 +324,7 @@ impl IndexerState {
                     ledger_diff.append(diff);
 
                     indexer_store.add_block(&block)?;
+                    indexer_store.set_best_block(&block.state_hash.clone().into())?;
                     indexer_store.add_canonical_block(
                         block.blockchain_length,
                         &block.state_hash.clone().into(),
@@ -343,13 +332,16 @@ impl IndexerState {
                     indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
 
                     // compute and store ledger at specified cadence
-                    if self.blocks_processed % self.ledger_cadence == 0 {
+                    if self.blocks_processed > 0 && self.blocks_processed % self.ledger_cadence == 0
+                    {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
                         indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
-                    if self.blocks_processed == block_parser.num_canonical {
+                    if self.blocks_processed > 0
+                        && self.blocks_processed == block_parser.num_canonical + 1
+                    {
                         // update root branch
                         self.root_branch = Branch::new(&block)?;
                         self.ledger._apply_diff(&ledger_diff)?;
@@ -364,11 +356,7 @@ impl IndexerState {
                 }
             }
 
-            if block_parser.num_canonical == 0 {
-                assert_eq!(self.blocks_processed, 1);
-            } else {
-                assert_eq!(self.blocks_processed, block_parser.num_canonical)
-            }
+            assert_eq!(self.blocks_processed, block_parser.num_canonical + 1); // +1 genesis
         }
 
         // now add the successive non-canonical blocks
@@ -400,7 +388,8 @@ impl IndexerState {
 
         if self.blocks_processed == 0 && block_parser.total_num_blocks > 500 {
             info!(
-                "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {BLOCK_REPORTING_FREQ_NUM} blocks"
+                "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
+                self.reporting_freq
             );
         }
 
@@ -1204,6 +1193,23 @@ impl IndexerState {
 
     fn should_report_from_block_count(&self) -> bool {
         self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
+    }
+
+    fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
+        if self.should_report_from_block_count() {
+            let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+
+            info!(
+                "{} blocks parsed and applied in {:?}",
+                self.blocks_processed,
+                total_time.elapsed(),
+            );
+            info!(
+                "Estimated time: {} min",
+                (block_parser.total_num_blocks - self.blocks_processed) as f64 / (rate * 60_f64)
+            );
+            debug!("Rate: {rate} blocks/s");
+        }
     }
 
     fn report_progress(

@@ -178,7 +178,10 @@ impl BlockParser {
         }
     }
 
-    /// Traverses `self`'s internal paths. First canonical, then successive.
+    /// Traverses `self`'s internal paths
+    /// - canonical
+    /// - successive
+    /// - orphaned
     pub fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
@@ -188,7 +191,6 @@ impl BlockParser {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
 
-        // TODO remove
         if let Some(next_path) = self.orphaned_paths.next() {
             return PrecomputedBlock::parse_file(&next_path).map(Some);
         }
