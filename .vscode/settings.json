@@ -1,5 +1,5 @@
 {
-    "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
+    "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
         "./mina-rs/consensus/Cargo.toml",
