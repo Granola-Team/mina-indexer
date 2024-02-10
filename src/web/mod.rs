@@ -16,6 +16,7 @@ pub async fn start_web_server(state: Arc<IndexerStore>) -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(state.clone()))
+            .service(blocks::get_blocks)
             .service(blocks::get_block)
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
