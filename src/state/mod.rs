@@ -157,6 +157,11 @@ impl IndexerState {
         config.indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
 
+        // update genesis best block
+        config
+            .indexer_store
+            .set_best_block(&MAINNET_GENESIS_HASH.into())?;
+
         // update genesis canonicity
         config
             .indexer_store
@@ -235,8 +240,11 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
-                    .add_ledger_state_hash(&BlockHash(root_block.state_hash.clone()), ledger)
+                    .add_ledger_state_hash(&root_block.state_hash.clone().into(), ledger)
                     .expect("ledger add succeeds");
+                store
+                    .set_best_block(&root_block.state_hash.clone().into())
+                    .expect("set best block to root block");
             }
             store
         });
