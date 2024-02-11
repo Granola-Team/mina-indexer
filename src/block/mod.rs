@@ -297,3 +297,21 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{precomputed::PrecomputedBlock, Block};
+    use std::path::PathBuf;
+
+    #[test]
+    fn comapare_blocks() -> anyhow::Result<()> {
+        let path0: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json".into();
+        let path1: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+
+        let block0: Block = PrecomputedBlock::parse_file(&path0)?.into();
+        let block1: Block = PrecomputedBlock::parse_file(&path1)?.into();
+        assert!(block0 > block1);
+
+        Ok(())
+    }
+}
