@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::Block,
+    block::{vrf_output::VrfOutput, Block},
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
     store::IndexerStore,
 };
@@ -44,7 +44,7 @@ fn add_and_get_events() {
         height: 0,
         blockchain_length: 1,
         global_slot_since_genesis: 0,
-        last_vrf_output: "last_vrf_output".into(),
+        hash_last_vrf_output: VrfOutput::new("last_vrf_output".as_bytes().to_vec()),
     };
     let event9 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip(block.clone()));
     let event10 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain {

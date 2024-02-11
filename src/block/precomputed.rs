@@ -1,12 +1,11 @@
 use crate::{
-    block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash},
+    block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash, VrfOutput},
     canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey},
 };
 use anyhow::anyhow;
-use base64::{self, Engine};
 use mina_serialization_types::{
     consensus_state as mina_consensus,
     json::DeltaTransitionChainProofJson,
@@ -348,12 +347,9 @@ impl PrecomputedBlock {
             .collect()
     }
 
+    /// Base64 encoded string
     pub fn last_vrf_output(&self) -> String {
-        let b64 = base64::engine::GeneralPurpose::new(
-            &base64::alphabet::URL_SAFE,
-            base64::engine::GeneralPurposeConfig::new(),
-        );
-        b64.encode(
+        let last_vrf_output = VrfOutput::new(
             self.protocol_state
                 .clone()
                 .body
@@ -364,9 +360,27 @@ impl PrecomputedBlock {
                 .inner()
                 .last_vrf_output
                 .inner()
-                .0
-                .as_slice(),
-        )
+                .0,
+        );
+        last_vrf_output.base64_encode()
+    }
+
+    /// Blake2b hex digest of last_vrf_output
+    pub fn hash_last_vrf_output(&self) -> VrfOutput {
+        let last_vrf_output = VrfOutput::new(
+            self.protocol_state
+                .clone()
+                .body
+                .inner()
+                .inner()
+                .consensus_state
+                .inner()
+                .inner()
+                .last_vrf_output
+                .inner()
+                .0,
+        );
+        VrfOutput::new(last_vrf_output.hex_digest())
     }
 
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
@@ -391,16 +405,23 @@ fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
 
 #[cfg(test)]
 mod tests {
-    use super::PrecomputedBlock;
+    use super::{PrecomputedBlock, VrfOutput};
+    use hex_literal::hex;
     use std::path::PathBuf;
 
     #[test]
-    fn last_vrf_output() -> anyhow::Result<()> {
+    fn vrf_output() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
         let block = PrecomputedBlock::parse_file(&path)?;
         assert_eq!(
             block.last_vrf_output(),
             "bgHnww8tqHDhk3rBpW9tse_L_WPup7yKDKigNvoeBwA=".to_string()
+        );
+        assert_eq!(
+            block.hash_last_vrf_output(),
+            VrfOutput::new(
+                hex!("7b0bc721df63c1eabf5b85c0e05e952c6b06c1aa101db1ed3acea4faaf8420c4").to_vec()
+            )
         );
         Ok(())
     }

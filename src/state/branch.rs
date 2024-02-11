@@ -1,5 +1,5 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, Block, BlockHash},
+    block::{precomputed::PrecomputedBlock, vrf_output::VrfOutput, Block, BlockHash},
     constants::*,
 };
 use id_tree::{
@@ -37,7 +37,9 @@ impl Branch {
             height: 0,
             blockchain_length: 1,
             global_slot_since_genesis: 0,
-            last_vrf_output: MAINNET_GENESIS_LAST_VRF_OUTPUT.into(),
+            hash_last_vrf_output: VrfOutput::new(
+                VrfOutput::base64_decode(MAINNET_GENESIS_LAST_VRF_OUTPUT)?.hex_digest(),
+            ),
         };
         let mut branches = Tree::new();
         let root = branches.insert(Node::new(genesis_block), AsRoot)?;
