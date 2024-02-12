@@ -1,4 +1,4 @@
-FROM rust:1.70 as builder
+FROM rust:1.75 as builder
 WORKDIR /usr/src/mina-indexer
 COPY . .
 RUN apt-get update && apt-get install -y libclang-dev && rm -rf /var/lib/apt/lists/*

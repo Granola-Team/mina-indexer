@@ -88,7 +88,7 @@ async fn extension() {
     let mut tree = String::new();
     state
         .dangling_branches
-        .get(0)
+        .first()
         .unwrap()
         .branches
         .write_formatted(&mut tree)
@@ -151,7 +151,7 @@ async fn extension() {
         .data();
     let leaves: Vec<Block> = root_branch.leaves().to_vec();
 
-    assert_eq!(leaves.get(0).unwrap().state_hash.0, leaf_block.state_hash);
+    assert_eq!(leaves.first().unwrap().state_hash.0, leaf_block.state_hash);
 
     // branch root should match the tree's root
     assert_eq!(root, branch_root);

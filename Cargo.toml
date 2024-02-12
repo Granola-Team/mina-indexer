@@ -44,6 +44,8 @@ rust_decimal_macros = "1.33.1"
 bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
 tempfile = "3.9.0"
+actix-web = "4.5.1"
+actix-cors = "0.7.0"
 
 [dev-dependencies]
 quickcheck = "1.0.3"

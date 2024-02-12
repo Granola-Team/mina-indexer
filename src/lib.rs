@@ -12,3 +12,4 @@ pub mod server;
 pub mod snark_work;
 pub mod state;
 pub mod store;
+pub mod web;

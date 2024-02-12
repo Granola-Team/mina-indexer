@@ -65,20 +65,25 @@ async fn extension() {
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // before extension quantities
-    let before_root = state.dangling_branches.get(0).unwrap().root_block().clone();
-    let before_leaves = state.dangling_branches.get(0).unwrap().leaves();
+    let before_root = state
+        .dangling_branches
+        .first()
+        .unwrap()
+        .root_block()
+        .clone();
+    let before_leaves = state.dangling_branches.first().unwrap().leaves();
     let before_root_leaf = state
         .dangling_branches
-        .get(0)
+        .first()
         .unwrap()
         .leaves()
-        .get(0)
+        .first()
         .unwrap()
         .clone();
 
     assert_eq!(before_leaves.len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().len(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().height(), 1);
     assert_eq!(before_root, before_root_leaf);
 
     println!("=== Before state ===");
@@ -95,7 +100,7 @@ async fn extension() {
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // after extension quantities
-    let after_branch = state.dangling_branches.get(0).unwrap();
+    let after_branch = state.dangling_branches.first().unwrap();
     let after_root = after_branch.root_block().clone();
     let branches1 = &after_branch.branches;
     let leaves1 = &after_branch.leaves();
@@ -119,7 +124,7 @@ async fn extension() {
         &after_child_block,
         after_branch
             .leaves()
-            .get(0)
+            .first()
             .expect("There should be a leaf block")
     );
 
@@ -129,7 +134,7 @@ async fn extension() {
 
     // leaf checks
     let leaves: Vec<Block> = leaves1.to_vec();
-    let leaf = leaves.get(0).unwrap();
+    let leaf = leaves.first().unwrap();
 
     // height differs, hashes agree
     assert_eq!(leaf.height, 1 + before_root.height);

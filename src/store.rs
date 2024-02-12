@@ -814,9 +814,9 @@ impl SnarkStore for IndexerStore {
 }
 
 impl IndexerStore {
-    const BEST_TIP_BLOCK_KEY: &[u8] = "best_tip_block".as_bytes();
-    const NEXT_EVENT_SEQ_NUM_KEY: &[u8] = "next_event_seq_num".as_bytes();
-    const MAX_CANONICAL_KEY: &[u8] = "max_canonical_blockchain_length".as_bytes();
+    const BEST_TIP_BLOCK_KEY: &'static [u8] = "best_tip_block".as_bytes();
+    const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
+    const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();
 
     pub fn db_stats(&self) -> String {
         self.database

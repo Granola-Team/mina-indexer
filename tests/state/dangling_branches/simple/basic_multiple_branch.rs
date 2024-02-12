@@ -68,7 +68,7 @@ async fn extensions() {
     let root0 = state.root_branch.root_block();
 
     let leaves = state.root_branch.leaves();
-    let root_leaf0 = leaves.get(0).unwrap();
+    let root_leaf0 = leaves.first().unwrap();
 
     println!("=== Before Branch 0 ===");
     println!("{:?}", state.root_branch.branches);
@@ -97,9 +97,9 @@ async fn extensions() {
     // - height = 1
     // - leaves = 1
     assert_eq!(state.dangling_branches.len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().leaves().len(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().len(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().height(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().leaves().len(), 1);
 
     // after extension quantities
     let root1 = state.root_branch.root_block();
@@ -109,7 +109,7 @@ async fn extensions() {
         .unwrap()
         .data();
     let leaves1 = state.root_branch.leaves();
-    let root_leaf1 = leaves1.get(0).unwrap();
+    let root_leaf1 = leaves1.first().unwrap();
 
     // root == leaf
     assert_eq!(root1, root_leaf1);
@@ -117,7 +117,7 @@ async fn extensions() {
     println!("\n=== After Root Branch ===");
     println!("{:?}", state.root_branch);
     println!("\n=== After Dangling Branch 0 ===");
-    println!("{:?}", state.dangling_branches.get(0).unwrap());
+    println!("{:?}", state.dangling_branches.first().unwrap());
 
     // branch root should match the tree's root
     assert_eq!(root1, branch_root1);

@@ -195,7 +195,7 @@ impl PrecomputedBlock {
         let mut other = self
             .staged_ledger_post_diff()
             .map(|diff| diff.completed_works.iter().map(|x| x.t.clone()).collect())
-            .unwrap_or(vec![]);
+            .unwrap_or_default();
         completed_works.append(&mut other);
         completed_works
     }

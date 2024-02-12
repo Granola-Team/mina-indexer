@@ -436,6 +436,66 @@ impl std::fmt::Debug for UserCommandWithStatus {
     }
 }
 
+fn to_auxiliary_json(
+    auxiliary_data: &mina_rs::TransactionStatusAuxiliaryData,
+) -> serde_json::Value {
+    use serde_json::*;
+
+    let mut auxiliary_obj = Map::new();
+    let fee_payer_account_creation_fee_paid = auxiliary_data
+        .fee_payer_account_creation_fee_paid
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .unwrap_or(Value::Null);
+    let receiver_account_creation_fee_paid = auxiliary_data
+        .receiver_account_creation_fee_paid
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .unwrap_or(Value::Null);
+    let created_token = auxiliary_data
+        .created_token
+        .clone()
+        .map(|id| Value::Number(Number::from(id.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+
+    auxiliary_obj.insert(
+        "fee_payer_account_creation_fee_paid".into(),
+        fee_payer_account_creation_fee_paid,
+    );
+    auxiliary_obj.insert(
+        "receiver_account_creation_fee_paid".into(),
+        receiver_account_creation_fee_paid,
+    );
+    auxiliary_obj.insert("created_token".into(), created_token);
+    Value::Object(auxiliary_obj)
+}
+
+fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serde_json::Value {
+    use serde_json::*;
+
+    let mut balance_obj = Map::new();
+    let fee_payer_balance = balance_data
+        .fee_payer_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+    let receiver_balance = balance_data
+        .receiver_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+    let source_balance = balance_data
+        .source_balance
+        .clone()
+        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .unwrap_or(Value::Null);
+
+    balance_obj.insert("fee_payer_balance".into(), fee_payer_balance);
+    balance_obj.insert("receiver_balance".into(), receiver_balance);
+    balance_obj.insert("source_balance".into(), source_balance);
+    Value::Object(balance_obj)
+}
+
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
@@ -712,64 +772,4 @@ mod test {
         assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
         Ok(())
     }
-}
-
-fn to_auxiliary_json(
-    auxiliary_data: &mina_rs::TransactionStatusAuxiliaryData,
-) -> serde_json::Value {
-    use serde_json::*;
-
-    let mut auxiliary_obj = Map::new();
-    let fee_payer_account_creation_fee_paid = auxiliary_data
-        .fee_payer_account_creation_fee_paid
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
-        .unwrap_or(Value::Null);
-    let receiver_account_creation_fee_paid = auxiliary_data
-        .receiver_account_creation_fee_paid
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
-        .unwrap_or(Value::Null);
-    let created_token = auxiliary_data
-        .created_token
-        .clone()
-        .map(|id| Value::Number(Number::from(id.inner().inner().inner())))
-        .unwrap_or(Value::Null);
-
-    auxiliary_obj.insert(
-        "fee_payer_account_creation_fee_paid".into(),
-        fee_payer_account_creation_fee_paid,
-    );
-    auxiliary_obj.insert(
-        "receiver_account_creation_fee_paid".into(),
-        receiver_account_creation_fee_paid,
-    );
-    auxiliary_obj.insert("created_token".into(), created_token);
-    Value::Object(auxiliary_obj)
-}
-
-fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serde_json::Value {
-    use serde_json::*;
-
-    let mut balance_obj = Map::new();
-    let fee_payer_balance = balance_data
-        .fee_payer_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
-        .unwrap_or(Value::Null);
-    let receiver_balance = balance_data
-        .receiver_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
-        .unwrap_or(Value::Null);
-    let source_balance = balance_data
-        .source_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
-        .unwrap_or(Value::Null);
-
-    balance_obj.insert("fee_payer_balance".into(), fee_payer_balance);
-    balance_obj.insert("receiver_balance".into(), receiver_balance);
-    balance_obj.insert("source_balance".into(), source_balance);
-    Value::Object(balance_obj)
 }

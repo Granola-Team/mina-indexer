@@ -50,12 +50,17 @@ async fn extension() {
     // danlging_root_block is added as the root of the 0th dangling branch
     assert_eq!(state.root_branch.clone().height(), 1);
     assert_eq!(state.dangling_branches.len(), 1);
-    assert_eq!(state.dangling_branches.get(0).unwrap().height(), 1);
+    assert_eq!(state.dangling_branches.first().unwrap().height(), 1);
 
     // before extension quantities
-    let before_root = state.dangling_branches.get(0).unwrap().root_block().clone();
-    let before_leaves = state.dangling_branches.get(0).unwrap().leaves().clone();
-    let before_leaf = before_leaves.get(0).unwrap().clone();
+    let before_root = state
+        .dangling_branches
+        .first()
+        .unwrap()
+        .root_block()
+        .clone();
+    let before_leaves = state.dangling_branches.first().unwrap().leaves().clone();
+    let before_leaf = before_leaves.first().unwrap().clone();
 
     // before_root is the only leaf
     assert_eq!(before_leaves.len(), 1);
@@ -78,13 +83,13 @@ async fn extension() {
     // before root has no children
     assert!(state
         .dangling_branches
-        .get(0)
+        .first()
         .unwrap()
         .branches
         .children_ids(
             state
                 .dangling_branches
-                .get(0)
+                .first()
                 .unwrap()
                 .branches
                 .root_node_id()
@@ -104,8 +109,13 @@ async fn extension() {
         .unwrap();
 
     // after extension quantities
-    let after_root = state.dangling_branches.get(0).unwrap().root_block().clone();
-    let branches1 = state.dangling_branches.get(0).unwrap();
+    let after_root = state
+        .dangling_branches
+        .first()
+        .unwrap()
+        .root_block()
+        .clone();
+    let branches1 = state.dangling_branches.first().unwrap();
     let leaves1 = branches1.leaves();
     let after_root_id = branches1.branches.root_node_id().unwrap();
     let after_root_leaf = {
@@ -117,7 +127,7 @@ async fn extension() {
         assert_eq!(child_ids.len(), 1);
         branches1
             .branches
-            .get(child_ids.get(0).unwrap())
+            .get(child_ids.first().unwrap())
             .unwrap()
             .data()
     };
@@ -127,13 +137,13 @@ async fn extension() {
         &after_root,
         state
             .dangling_branches
-            .get(0)
+            .first()
             .unwrap()
             .branches
             .get(
                 state
                     .dangling_branches
-                    .get(0)
+                    .first()
                     .unwrap()
                     .branches
                     .root_node_id()
@@ -156,9 +166,9 @@ async fn extension() {
     assert_eq!(before_root, after_root);
 
     // after tree has 2 blocks
-    assert_eq!(state.dangling_branches.get(0).unwrap().height(), 2);
+    assert_eq!(state.dangling_branches.first().unwrap().height(), 2);
 
     // after root isn't a leaf
     assert_eq!(leaves1.len(), 1);
-    assert_ne!(&after_root, leaves1.get(0).unwrap());
+    assert_ne!(&after_root, leaves1.first().unwrap());
 }
