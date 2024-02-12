@@ -1656,6 +1656,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
+
+[[package]]
 name = "home"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2043,6 +2049,7 @@ dependencies = [
  "anyhow",
  "async-priority-channel",
  "async-trait",
+ "base64 0.21.7",
  "bin-prot",
  "blake2",
  "bs58 0.5.0",
@@ -2051,6 +2058,7 @@ dependencies = [
  "futures",
  "futures-util",
  "glob",
+ "hex-literal",
  "id_tree",
  "interprocess",
  "mina-serialization-types",

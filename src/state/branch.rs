@@ -1,6 +1,6 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, Block, BlockHash},
-    constants::MAINNET_CANONICAL_THRESHOLD,
+    block::{precomputed::PrecomputedBlock, vrf_output::VrfOutput, Block, BlockHash},
+    constants::*,
 };
 use id_tree::{
     InsertBehavior::{AsRoot, UnderNode},
@@ -37,6 +37,9 @@ impl Branch {
             height: 0,
             blockchain_length: 1,
             global_slot_since_genesis: 0,
+            hash_last_vrf_output: VrfOutput::new(
+                VrfOutput::base64_decode(MAINNET_GENESIS_LAST_VRF_OUTPUT)?.hex_digest(),
+            ),
         };
         let mut branches = Tree::new();
         let root = branches.insert(Node::new(genesis_block), AsRoot)?;

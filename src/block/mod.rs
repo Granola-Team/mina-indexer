@@ -4,7 +4,9 @@ pub mod parser;
 pub mod precomputed;
 pub mod previous_state_hash;
 pub mod store;
+pub mod vrf_output;
 
+use self::vrf_output::VrfOutput;
 use crate::{block::precomputed::PrecomputedBlock, canonicity::Canonicity};
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,7 @@ pub struct Block {
     pub height: u32,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
+    pub hash_last_vrf_output: VrfOutput,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -28,7 +31,7 @@ pub struct BlockWithoutHeight {
     pub global_slot_since_genesis: u32,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct BlockHash(pub String);
 
 impl BlockHash {
@@ -48,23 +51,14 @@ impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = BlockHash(precomputed_block.state_hash.clone());
+        let state_hash = precomputed_block.state_hash.clone().into();
         Self {
-            parent_hash,
-            state_hash,
             height,
-            global_slot_since_genesis: precomputed_block
-                .protocol_state
-                .body
-                .t
-                .t
-                .consensus_state
-                .t
-                .t
-                .global_slot_since_genesis
-                .t
-                .t,
+            state_hash,
+            parent_hash,
             blockchain_length: precomputed_block.blockchain_length,
+            hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
+            global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
         }
     }
 }
@@ -85,7 +79,7 @@ impl BlockWithoutHeight {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
         let parent_hash =
             BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = BlockHash(precomputed_block.state_hash.clone());
+        let state_hash = precomputed_block.state_hash.clone().into();
         Self {
             parent_hash,
             state_hash,
@@ -120,11 +114,12 @@ impl BlockWithoutHeight {
 impl From<PrecomputedBlock> for Block {
     fn from(value: PrecomputedBlock) -> Self {
         Self {
-            parent_hash: value.previous_state_hash(),
-            state_hash: value.state_hash.clone().into(),
-            blockchain_length: value.blockchain_length,
-            global_slot_since_genesis: value.global_slot_since_genesis(),
             height: value.blockchain_length,
+            parent_hash: value.previous_state_hash(),
+            blockchain_length: value.blockchain_length,
+            state_hash: value.state_hash.clone().into(),
+            hash_last_vrf_output: value.hash_last_vrf_output(),
+            global_slot_since_genesis: value.global_slot_since_genesis(),
         }
     }
 }
@@ -132,11 +127,12 @@ impl From<PrecomputedBlock> for Block {
 impl From<&PrecomputedBlock> for Block {
     fn from(value: &PrecomputedBlock) -> Self {
         Self {
-            parent_hash: value.previous_state_hash(),
-            state_hash: value.state_hash.clone().into(),
-            blockchain_length: value.blockchain_length,
-            global_slot_since_genesis: value.global_slot_since_genesis(),
             height: value.blockchain_length,
+            parent_hash: value.previous_state_hash(),
+            blockchain_length: value.blockchain_length,
+            state_hash: value.state_hash.clone().into(),
+            hash_last_vrf_output: value.hash_last_vrf_output(),
+            global_slot_since_genesis: value.global_slot_since_genesis(),
         }
     }
 }
@@ -172,13 +168,20 @@ impl std::cmp::PartialOrd for Block {
 }
 
 impl std::cmp::Ord for Block {
+    /// Follows `selectLongerChain`
+    /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.state_hash == other.state_hash {
-            std::cmp::Ordering::Equal
-        } else if self.height > other.height {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Less
+        use std::cmp::Ordering;
+
+        let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
+        let vrf_cmp = self.hash_last_vrf_output.cmp(&other.hash_last_vrf_output);
+        let hash_cmp = self.state_hash.cmp(&other.state_hash);
+
+        match (length_cmp, vrf_cmp, hash_cmp) {
+            (Ordering::Greater, _, _)
+            | (Ordering::Equal, Ordering::Greater, _)
+            | (Ordering::Equal, Ordering::Equal, Ordering::Greater) => Ordering::Greater,
+            _ => Ordering::Less,
         }
     }
 }
@@ -294,5 +297,27 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
         get_blockchain_length(path.file_name()?)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{precomputed::PrecomputedBlock, Block};
+    use std::path::PathBuf;
+
+    #[test]
+    fn comapare_blocks() -> anyhow::Result<()> {
+        let path0: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json".into();
+        let path1: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let path2: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLUfaHDcyt9KsYxi1xsSdYE369GAduLxVgRUDE7RuFgSXQBphDK.json".into();
+
+        let block0: Block = PrecomputedBlock::parse_file(&path0)?.into();
+        let block1: Block = PrecomputedBlock::parse_file(&path1)?.into();
+        let block2: Block = PrecomputedBlock::parse_file(&path2)?.into();
+
+        assert!(block0 > block1);
+        assert!(block0 > block2);
+        assert!(block1 > block2);
+        Ok(())
     }
 }
