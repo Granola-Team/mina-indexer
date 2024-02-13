@@ -33,6 +33,8 @@ impl IndexerStore {
             secondary,
             vec![
                 "blocks",
+                "lengths",
+                "slots",
                 "canonicity",
                 "commands",
                 "events",
@@ -50,6 +52,8 @@ impl IndexerStore {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
+        let lengths = ColumnFamilyDescriptor::new("lengths", cf_opts.clone());
+        let slots = ColumnFamilyDescriptor::new("slots", cf_opts.clone());
         let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
         let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
         let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
@@ -62,7 +66,9 @@ impl IndexerStore {
         let database = speedb::DBWithThreadMode::open_cf_descriptors(
             &database_opts,
             path,
-            vec![blocks, canonicity, commands, events, ledgers, snarks],
+            vec![
+                blocks, lengths, slots, canonicity, commands, events, ledgers, snarks,
+            ],
         )?;
         Ok(Self {
             db_path: PathBuf::from(path),
@@ -86,6 +92,18 @@ impl IndexerStore {
         self.database
             .cf_handle("blocks")
             .expect("blocks column family exists")
+    }
+
+    fn lengths_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("lengths")
+            .expect("lengths column family exists")
+    }
+
+    fn slots_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("slots")
+            .expect("slots column family exists")
     }
 
     fn canonicity_cf(&self) -> &speedb::ColumnFamily {
@@ -145,6 +163,15 @@ impl BlockStore for IndexerStore {
             }));
         }
         self.database.put_cf(&blocks_cf, key, value)?;
+
+        // add block to height list
+        self.add_block_at_height(&block.state_hash.clone().into(), block.blockchain_length)?;
+
+        // add block to slots list
+        self.add_block_at_slot(
+            &block.state_hash.clone().into(),
+            block.global_slot_since_genesis(),
+        )?;
 
         // add block commands
         self.add_commands(block)?;
@@ -209,6 +236,129 @@ impl BlockStore for IndexerStore {
         ))))?;
 
         Ok(())
+    }
+
+    fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32> {
+        trace!("Getting number of blocks at height {blockchain_length}");
+        Ok(
+            match self
+                .database
+                .get_pinned_cf(self.lengths_cf(), blockchain_length.to_string().as_bytes())?
+            {
+                None => 0,
+                Some(bytes) => String::from_utf8(bytes.to_vec())?.parse()?,
+            },
+        )
+    }
+
+    fn add_block_at_height(
+        &self,
+        state_hash: &BlockHash,
+        blockchain_length: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Adding block {state_hash} at height {blockchain_length}");
+
+        // increment num blocks at height
+        let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
+        self.database.put_cf(
+            self.lengths_cf(),
+            blockchain_length.to_string().as_bytes(),
+            (num_blocks_at_height + 1).to_string().as_bytes(),
+        )?;
+
+        // add the new key-value pair
+        let key = format!("{blockchain_length}-{num_blocks_at_height}");
+        Ok(self.database.put_cf(
+            self.lengths_cf(),
+            key.as_bytes(),
+            state_hash.to_string().as_bytes(),
+        )?)
+    }
+
+    fn get_blocks_at_height(
+        &self,
+        blockchain_length: u32,
+    ) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
+        let mut blocks = vec![];
+
+        for n in 0..num_blocks_at_height {
+            let key = format!("{blockchain_length}-{n}");
+            match self
+                .database
+                .get_pinned_cf(self.lengths_cf(), key.as_bytes())?
+                .map(|bytes| bytes.to_vec())
+            {
+                None => break,
+                Some(bytes) => {
+                    let state_hash: BlockHash = String::from_utf8(bytes)?.into();
+                    if let Some(block) = self.get_block(&state_hash)? {
+                        blocks.push(block);
+                    }
+                }
+            }
+        }
+
+        Ok(blocks)
+    }
+
+    fn get_num_blocks_at_slot(&self, slot: u32) -> anyhow::Result<u32> {
+        trace!("Getting number of blocks at slot {slot}");
+        Ok(
+            match self
+                .database
+                .get_pinned_cf(self.slots_cf(), slot.to_string().as_bytes())?
+            {
+                None => 0,
+                Some(bytes) => String::from_utf8(bytes.to_vec())?.parse()?,
+            },
+        )
+    }
+
+    fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()> {
+        trace!("Adding block {state_hash} at slot {slot}");
+
+        // increment num blocks at slot
+        let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
+        self.database.put_cf(
+            self.slots_cf(),
+            slot.to_string().as_bytes(),
+            (num_blocks_at_slot + 1).to_string().as_bytes(),
+        )?;
+
+        // add the new key-value pair
+        let key = format!("{slot}-{num_blocks_at_slot}");
+        Ok(self.database.put_cf(
+            self.slots_cf(),
+            key.as_bytes(),
+            state_hash.to_string().as_bytes(),
+        )?)
+    }
+
+    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        trace!("Getting blocks at slot {slot}");
+
+        let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
+        let mut blocks = vec![];
+
+        for n in 0..num_blocks_at_slot {
+            let key = format!("{slot}-{n}");
+            match self
+                .database
+                .get_pinned_cf(self.slots_cf(), key.as_bytes())?
+                .map(|bytes| bytes.to_vec())
+            {
+                None => break,
+                Some(bytes) => {
+                    let state_hash: BlockHash = String::from_utf8(bytes)?.into();
+                    if let Some(block) = self.get_block(&state_hash)? {
+                        blocks.push(block);
+                    }
+                }
+            }
+        }
+
+        Ok(blocks)
     }
 }
 
