@@ -7,7 +7,7 @@ use mina_indexer::{
 use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 #[test]
-fn speedb() {
+fn add_and_get() {
     let store_dir = setup_new_db_dir("block-store-db").unwrap();
     let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
