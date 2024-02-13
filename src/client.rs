@@ -47,6 +47,10 @@ pub enum BlockArgs {
     Block(BlockStateHashArgs),
     /// Query the best tip block
     BestTip(BestTipArgs),
+    /// Query blocks by global slot number
+    BlocksAtSlot(BlocksAtSlotArgs),
+    /// Query blocks by blockchain length
+    BlocksAtHeight(BlocksAtHeightArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -66,6 +70,34 @@ pub struct BlockStateHashArgs {
     /// Retrieve the block with given state hash
     #[arg(short, long)]
     state_hash: String,
+    /// Path to write the block [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display the entire precomputed block
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct BlocksAtHeightArgs {
+    /// Retrieve the blocks with given blockchain length
+    #[arg(short, long)]
+    height: String,
+    /// Path to write the block [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display the entire precomputed block
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct BlocksAtSlotArgs {
+    /// Retrieve the blocks in given global slot
+    #[arg(short, long)]
+    slot: String,
     /// Path to write the block [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
@@ -302,6 +334,18 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 BlockArgs::Block(args) => format!(
                     "block-state-hash {} {} {}\0",
                     args.state_hash,
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+                BlockArgs::BlocksAtHeight(args) => format!(
+                    "blocks-at-height {} {} {}\0",
+                    args.height,
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+                BlockArgs::BlocksAtSlot(args) => format!(
+                    "blocks-at-slot {} {} {}\0",
+                    args.slot,
                     args.verbose,
                     args.path.clone().unwrap_or("".into()).display()
                 ),
