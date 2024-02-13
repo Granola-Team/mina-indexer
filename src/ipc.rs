@@ -244,7 +244,9 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
 
             if let Some(best_tip) = db.get_best_block()? {
-                let blocks_at_height = db.get_blocks_at_height(height)?;
+                let mut blocks_at_height = db.get_blocks_at_height(height)?;
+                blocks_at_height.sort();
+
                 let blocks_str = if verbose {
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
                         .iter()
@@ -306,7 +308,9 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
 
             if let Some(best_tip) = db.get_best_block()? {
-                let blocks_at_slot = db.get_blocks_at_slot(slot)?;
+                let mut blocks_at_slot = db.get_blocks_at_slot(slot)?;
+                blocks_at_slot.sort();
+
                 let blocks_str = if verbose {
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
                         .iter()
