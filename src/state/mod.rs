@@ -665,7 +665,7 @@ impl IndexerState {
 
         if incoming_block.blockchain_length == best_tip_length + 1
             || incoming_block.blockchain_length == best_tip_length
-                && incoming_block > self.best_tip_block()
+                && incoming_block < self.best_tip_block()
         {
             debug!(
                 "Update best tip (length {}): {}",
