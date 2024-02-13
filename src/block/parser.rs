@@ -198,23 +198,6 @@ impl BlockParser {
         Ok(None)
     }
 
-    /// Traverses `self`'s internal paths, returning raw json bytes
-    pub fn next_raw_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
-        if let Some(next_path) = self.canonical_paths.next() {
-            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
-        }
-
-        if let Some(next_path) = self.successive_paths.next() {
-            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
-        }
-
-        if let Some(next_path) = self.orphaned_paths.next() {
-            return Ok(Some(PrecomputedBlock::parse_file(&next_path)?));
-        }
-
-        Ok(None)
-    }
-
     /// Gets the precomputed block with supplied `state_hash`, it must exist ahead
     /// of `self`'s current file
     pub async fn get_precomputed_block(
