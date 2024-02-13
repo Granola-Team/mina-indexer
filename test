@@ -16,6 +16,7 @@ test_cleanup() {
     err=$?
     if [ $err != 0 ]; then
         echo "\e[0;31mTest failed ($test): $err\e[0;37m"
+        teardown
         exit 1
     fi
     rm -rf "${TEST_DIR}"
