@@ -199,6 +199,14 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./database"
     assert_directory_exists "./logs"
 
+    # check for server args
+    if [ ! -f "./config.json" ]; then
+        echo "Test Failed: Expected ./config.json to exist, but it does not."
+        exit 1
+    else
+        echo "Test Passed: ./config.json exists."
+    fi
+
     teardown
 }
 

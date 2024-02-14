@@ -113,7 +113,12 @@ pub async fn main() -> anyhow::Result<()> {
             let log_level_file = args.log_level_file;
             let log_level = args.log_level;
 
-            init_tracing_logger(log_dir, log_level_file, log_level).await?;
+            init_tracing_logger(log_dir.clone(), log_level_file, log_level).await?;
+
+            // write server args to config.json
+            let path = log_dir.with_file_name("config.json");
+            let args_json: ServerArgsJson = args.clone().into();
+            std::fs::write(path, serde_json::to_string_pretty(&args_json)?)?;
 
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
@@ -207,6 +212,47 @@ pub fn process_indexer_configuration(
                 ledger_cadence,
                 reporting_freq,
             })
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ServerArgsJson {
+    genesis_ledger: String,
+    genesis_hash: String,
+    startup_dir: String,
+    watch_dir: String,
+    database_dir: String,
+    log_dir: String,
+    log_level: String,
+    log_level_file: String,
+    ledger_cadence: u32,
+    reporting_freq: u32,
+    prune_interval: u32,
+    canonical_threshold: u32,
+    canonical_update_threshold: u32,
+}
+
+impl From<ServerArgs> for ServerArgsJson {
+    fn from(value: ServerArgs) -> Self {
+        Self {
+            genesis_ledger: value.genesis_ledger.display().to_string(),
+            genesis_hash: value.genesis_hash,
+            startup_dir: value.startup_dir.display().to_string(),
+            watch_dir: value
+                .watch_dir
+                .unwrap_or(value.startup_dir)
+                .display()
+                .to_string(),
+            database_dir: value.database_dir.display().to_string(),
+            log_dir: value.log_dir.display().to_string(),
+            log_level: value.log_level.to_string(),
+            log_level_file: value.log_level_file.to_string(),
+            ledger_cadence: value.ledger_cadence,
+            reporting_freq: value.reporting_freq,
+            prune_interval: value.prune_interval,
+            canonical_threshold: value.canonical_threshold,
+            canonical_update_threshold: value.canonical_update_threshold,
         }
     }
 }
