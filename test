@@ -16,6 +16,7 @@ test_cleanup() {
     err=$?
     if [ $err != 0 ]; then
         echo "\e[0;31mTest failed ($test): $err\e[0;37m"
+        teardown
         exit 1
     fi
     rm -rf "${TEST_DIR}"
@@ -105,14 +106,23 @@ test_indexer_cli_reports() {
     idxr account --help 2>&1 |
         grep -iq "Usage: mina-indexer account"
 
-    idxr best-chain --help 2>&1 |
-        grep -iq "Usage: mina-indexer best-chain"
+    idxr block --help 2>&1 |
+        grep -iq "Usage: mina-indexer block"
 
-    idxr best-ledger --help 2>&1 |
-        grep -iq "Usage: mina-indexer best-ledger"
+    idxr best-tip --help 2>&1 |
+        grep -iq "Usage: mina-indexer best-tip"
+
+    idxr blocks-at-height --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks-at-height"
+
+    idxr blocks-at-slot --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks-at-slot"
 
     idxr checkpoint --help 2>&1 |
         grep -iq "Usage: mina-indexer checkpoint"
+
+    idxr best-ledger --help 2>&1 |
+        grep -iq "Usage: mina-indexer best-ledger"
 
     idxr ledger --help 2>&1 |
         grep -iq "Usage: mina-indexer ledger"
@@ -120,11 +130,11 @@ test_indexer_cli_reports() {
     idxr ledger-at-height --help 2>&1 |
         grep -iq "Usage: mina-indexer ledger-at-height"
 
-    idxr summary --help 2>&1 |
-        grep -iq "Usage: mina-indexer summary"
-
     idxr shutdown --help 2>&1 |
         grep -iq "Usage: mina-indexer shutdown"
+
+    idxr summary --help 2>&1 |
+        grep -iq "Usage: mina-indexer summary"
 
     idxr tx-hash --help 2>&1 |
         grep -iq "Usage: mina-indexer tx-hash"
@@ -301,6 +311,89 @@ test_best_tip() {
     assert $wt_length $length
     assert 'Canonical' $canonicity
     assert 'Canonical' $canonicity_v
+
+    teardown
+}
+
+# Indexer server returns the correct blocks for height and slot queries
+test_blocks() {
+    test=test_blocks
+
+    setup
+    dl_mainnet 10 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs
+    sleep 5
+
+    # basic height query
+    hash=$(idxr blocks-at-height -h 10 | jq -r .[0].state_hash)
+    slot=$(idxr blocks-at-height -h 10 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks-at-height -h 10 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks-at-height -h 10 | jq -r .[0].canonicity)
+
+    # verbose height query
+    hash_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].canonicity)
+
+    # witness tree summary
+    wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    
+    assert 9 $slot
+    assert $wt_hash $hash
+    assert $wt_hash $hash_v
+    assert $wt_length $length
+    assert $wt_length $length_v
+    assert 'Canonical' $canonicity
+    assert 'Canonical' $canonicity_v
+
+    # basic slot query
+    hash=$(idxr blocks-at-slot -s 9 | jq -r .[0].state_hash)
+    slot=$(idxr blocks-at-slot -s 9 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks-at-slot -s 9 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks-at-slot -s 9 | jq -r .[0].canonicity)
+
+    # verbose slot query
+    hash_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].canonicity)
+    
+    assert 9 $slot
+    assert $wt_hash $hash
+    assert $wt_hash $hash_v
+    assert $wt_length $length
+    assert $wt_length $length_v
+    assert 'Canonical' $canonicity
+    assert 'Canonical' $canonicity_v
+
+    # height 10 = slot 9
+    slot=$(idxr blocks-at-slot -s 9 | jq -r .)
+    height=$(idxr blocks-at-height -h 10 | jq -r .)
+    assert "$slot" "$height"
+
+    # write at height to file
+    file=./blocks_at_height.json
+    idxr blocks-at-height -h 10 -p $file
+    
+    height=$(cat $file | jq -r .[0].blockchain_length)
+    slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
+    
+    assert 9 $slot
+    assert 10 $height
+
+    # write at slot to file
+    file=./blocks_at_slot.json
+    idxr blocks-at-slot -s 9 -p $file
+
+    height=$(cat $file | jq -r .[0].blockchain_length)
+    slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
+    
+    assert 9 $slot
+    assert 10 $height
 
     teardown
 }
@@ -918,6 +1011,7 @@ if [ "$#" -eq 0 ]; then
     test_canonical_tip
     test_canonical_threshold
     test_best_tip
+    test_blocks
     test_block_copy
     test_missing_blocks
     test_best_chain
@@ -941,6 +1035,7 @@ else
             "test_canonical_tip") test_canonical_tip ;;
             "test_canonical_threshold") test_canonical_threshold ;;
             "test_best_tip") test_best_tip ;;
+            "test_blocks") test_blocks ;;
             "test_block_copy") test_block_copy ;;
             "test_missing_blocks") test_missing_blocks ;;
             "test_best_chain") test_best_chain ;;

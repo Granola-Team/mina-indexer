@@ -180,8 +180,8 @@ impl std::cmp::Ord for Block {
         match (length_cmp, vrf_cmp, hash_cmp) {
             (Ordering::Greater, _, _)
             | (Ordering::Equal, Ordering::Greater, _)
-            | (Ordering::Equal, Ordering::Equal, Ordering::Greater) => Ordering::Greater,
-            _ => Ordering::Less,
+            | (Ordering::Equal, Ordering::Equal, Ordering::Greater) => Ordering::Less,
+            _ => Ordering::Greater,
         }
     }
 }
@@ -315,9 +315,9 @@ mod tests {
         let block1: Block = PrecomputedBlock::parse_file(&path1)?.into();
         let block2: Block = PrecomputedBlock::parse_file(&path2)?.into();
 
-        assert!(block0 > block1);
-        assert!(block0 > block2);
-        assert!(block1 > block2);
+        assert!(block0 < block1);
+        assert!(block0 < block2);
+        assert!(block1 < block2);
         Ok(())
     }
 }

@@ -1,5 +1,7 @@
 use crate::{
-    block::{get_blockchain_length, get_state_hash, is_valid_block_file, BlockHash, VrfOutput},
+    block::{
+        get_blockchain_length, get_state_hash, is_valid_block_file, Block, BlockHash, VrfOutput,
+    },
     canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
@@ -396,6 +398,22 @@ impl PrecomputedBlock {
         }
     }
 }
+
+impl std::cmp::PartialOrd for PrecomputedBlock {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for PrecomputedBlock {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let self_block: Block = self.into();
+        let other_block: Block = other.into();
+        self_block.cmp(&other_block)
+    }
+}
+
+impl std::cmp::Eq for PrecomputedBlock {}
 
 fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
     for pk in new_pks {
