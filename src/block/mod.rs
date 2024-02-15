@@ -12,7 +12,7 @@ use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1,
 use serde::{Deserialize, Serialize};
 use std::{
     ffi::OsStr,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -303,8 +303,8 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
     }
 }
 
-pub fn extract_block_height(pathbuf: &PathBuf) -> u32 {
-    let filename = pathbuf.to_str().unwrap();
+pub fn extract_block_height(path: &Path) -> u32 {
+    let filename = path.to_str().unwrap();
     let first_dash = filename.find('-');
     let second_dash =
         first_dash.and_then(|index| filename[index + 1..].find('-').map(|i| i + index + 1));
@@ -320,14 +320,14 @@ mod tests {
     use crate::block::extract_block_height;
 
     use super::{precomputed::PrecomputedBlock, Block};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn extract_block_height_test() {
         let filename1 =
-            &PathBuf::from("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
+            &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
         let filename2 =
-            &PathBuf::from("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+            &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
 
         assert_eq!(u32::MAX, extract_block_height(filename1));
         assert_eq!(2, extract_block_height(filename2));
