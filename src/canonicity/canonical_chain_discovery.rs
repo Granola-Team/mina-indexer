@@ -1,5 +1,6 @@
 use crate::block::{
-    blockchain_length::*, get_state_hash, is_valid_block_file, previous_state_hash::*,
+    blockchain_length::*, extract_block_height, get_state_hash, is_valid_block_file,
+    previous_state_hash::*,
 };
 use std::{
     path::{Path, PathBuf},
@@ -25,7 +26,7 @@ pub fn discovery(
         info!("Sorting startup blocks by length");
 
         let time = Instant::now();
-        paths.sort_by_key(|x| length_from_path_or_max(x));
+        paths.sort_by_cached_key(|x| extract_block_height(x));
 
         info!(
             "{} blocks sorted by length in {:?}",
