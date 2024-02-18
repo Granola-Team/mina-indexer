@@ -10,10 +10,7 @@ use self::vrf_output::VrfOutput;
 use crate::{block::precomputed::PrecomputedBlock, canonicity::Canonicity};
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsStr,
-    path::Path,
-};
+use std::{ffi::OsStr, path::Path};
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -334,12 +331,22 @@ mod tests {
             &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
         let filename2 =
             &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
-            let filename3 =
-            &Path::new("/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json");
+        let filename3 = &Path::new(
+            "/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
+        );
 
-        assert_eq!("3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8".to_owned(), extract_state_hash(filename1));
-        assert_eq!("3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_owned(), extract_state_hash(filename2));
-        assert_eq!("3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R".to_owned(), extract_state_hash(filename3));
+        assert_eq!(
+            "3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8".to_owned(),
+            extract_state_hash(filename1)
+        );
+        assert_eq!(
+            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_owned(),
+            extract_state_hash(filename2)
+        );
+        assert_eq!(
+            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R".to_owned(),
+            extract_state_hash(filename3)
+        );
     }
 
     #[test]
