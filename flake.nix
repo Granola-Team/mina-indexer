@@ -77,8 +77,8 @@
               nativeBuildInputs = buildDependencies;
               buildInputs = runtimeDependencies;
 
-              env = { LIBCLANG_PATH = "${libclang.lib}/lib"; }
-              // (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
+              env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
+                    (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
 
               doCheck = false;
             };
@@ -87,11 +87,12 @@
           };
 
           devShells.default = mkShell {
-            NIX_LDFLAGS="-l${stdenv.cc.libcxx.cxxabi.libName}";
+            env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
+                  (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
+
             buildInputs = developmentDependencies;
             shellHook = ''
               git submodule update --init --recursive
-              export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
               export TMPDIR=/var/tmp
             '';
           };
