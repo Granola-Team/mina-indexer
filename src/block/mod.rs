@@ -301,7 +301,7 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
 }
 
 pub fn extract_block_height(path: &Path) -> u32 {
-    let filename = path.to_str().unwrap();
+    let filename = path.file_name().and_then(|x| x.to_str()).unwrap();
     let first_dash = filename.find('-');
     let second_dash =
         first_dash.and_then(|index| filename[index + 1..].find('-').map(|i| i + index + 1));
@@ -355,9 +355,13 @@ mod tests {
             &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
         let filename2 =
             &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+            let filename3 =
+            &Path::new("/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json");
 
         assert_eq!(u32::MAX, extract_block_height(filename1));
         assert_eq!(2, extract_block_height(filename2));
+        assert_eq!(3, extract_block_height(filename3));
+
     }
     #[test]
     fn comapare_blocks() -> anyhow::Result<()> {
