@@ -1,5 +1,5 @@
 use crate::block::{
-    blockchain_length::*, extract_block_height, get_state_hash, is_valid_block_file,
+    blockchain_length::*, extract_block_height, extract_state_hash, is_valid_block_file,
     previous_state_hash::*,
 };
 use std::{
@@ -356,5 +356,5 @@ fn length_from_path_or_max(path: &Path) -> u32 {
 }
 
 fn hash_from_path(path: &Path) -> String {
-    get_state_hash(path.file_name().unwrap()).unwrap()
+    extract_state_hash(path)
 }

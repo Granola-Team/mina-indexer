@@ -10,10 +10,7 @@ use self::vrf_output::VrfOutput;
 use crate::{block::precomputed::PrecomputedBlock, canonicity::Canonicity};
 use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsStr,
-    path::Path,
-};
+use std::{ffi::OsStr, path::Path};
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -315,12 +312,42 @@ pub fn extract_block_height(path: &Path) -> u32 {
     u32::MAX
 }
 
+pub fn extract_state_hash(path: &Path) -> String {
+    let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
+    let dash_pos = name.rfind('-').unwrap();
+    let state_hash = &name[dash_pos + 1..];
+    state_hash.to_owned()
+}
 #[cfg(test)]
 mod tests {
-    use crate::block::extract_block_height;
+    use crate::block::{extract_block_height, extract_state_hash};
 
     use super::{precomputed::PrecomputedBlock, Block};
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn extract_state_hash_test() {
+        let filename1 =
+            &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
+        let filename2 =
+            &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+        let filename3 = &Path::new(
+            "/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
+        );
+
+        assert_eq!(
+            "3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8".to_owned(),
+            extract_state_hash(filename1)
+        );
+        assert_eq!(
+            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_owned(),
+            extract_state_hash(filename2)
+        );
+        assert_eq!(
+            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R".to_owned(),
+            extract_state_hash(filename3)
+        );
+    }
 
     #[test]
     fn extract_block_height_test() {
