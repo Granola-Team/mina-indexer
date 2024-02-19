@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     vec::IntoIter,
 };
-use tracing::debug;
+use tracing::info;
 
 // TODO change names
 /// Splits block paths into three collections:
@@ -147,7 +147,7 @@ impl BlockParser {
         canonical_threshold: u32,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
-        debug!("Building parser");
+        info!("Block parser with canonical chain discovery");
         if blocks_dir.exists() {
             let pattern = format!("{}/*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
@@ -162,6 +162,7 @@ impl BlockParser {
                 reporting_freq,
                 paths.iter().collect(),
             ) {
+                info!("Canonical chain discovery successful...");
                 Ok(Self {
                     num_canonical: canonical_paths.len() as u32,
                     total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,

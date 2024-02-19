@@ -17,11 +17,12 @@ pub struct PreviousStateHash(pub String);
 
 impl PreviousStateHash {
     pub fn from_path(path: &Path) -> anyhow::Result<Self> {
+        let bytes = &std::fs::read(path)?;
         let PreviousStateHashBlock {
             protocol_state: ProtocolState {
                 previous_state_hash,
             },
-        } = serde_json::from_slice(&std::fs::read(path)?)?;
+        } = serde_json::from_slice(bytes)?;
         Ok(Self(previous_state_hash))
     }
 }
@@ -55,6 +56,7 @@ impl From<PreviousStateHash> for BlockHash {
 mod test {
     use super::*;
     use crate::block::precomputed::PrecomputedBlock;
+
     use std::path::PathBuf;
 
     #[test]
