@@ -1,8 +1,8 @@
 use crate::block::{
-    blockchain_length::*, extract_block_height, extract_state_hash, is_valid_block_file,
-    previous_state_hash::*,
+    extract_block_height, extract_block_height_or_max, extract_state_hash, previous_state_hash::*,
 };
 use std::{
+    collections::HashSet,
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -19,6 +19,7 @@ pub fn discovery(
     reporting_freq: u32,
     mut paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
+    let mut canonical_state_hashes = HashSet::new();
     let mut canonical_paths = vec![];
     let mut successive_paths = vec![];
 
@@ -26,7 +27,7 @@ pub fn discovery(
         info!("Sorting startup blocks by length");
 
         let time = Instant::now();
-        paths.sort_by_cached_key(|x| extract_block_height(x));
+        paths.sort_by_cached_key(|x| extract_block_height_or_max(x));
 
         info!(
             "{} blocks sorted by length in {:?}",
@@ -36,32 +37,12 @@ pub fn discovery(
 
         if let Some(blockchain_length) = max_len_filter {
             debug!("Applying max length block filter: blockchain_length < {blockchain_length}");
-            let filtered_paths: Vec<&PathBuf> = paths
-                .iter()
-                .map_while(|&path| {
-                    if length_from_path_or_max(path) <= blockchain_length {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            paths = filtered_paths;
+            paths.retain(|p| extract_block_height_or_max(p) <= blockchain_length);
         }
 
         if let Some(blockchain_length) = min_len_filter {
             debug!("Applying min length block filter: blockchain_length > {blockchain_length}");
-            let filtered_paths: Vec<&PathBuf> = paths
-                .iter()
-                .map_while(|&path| {
-                    if length_from_path_or_max(path) >= blockchain_length {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            paths = filtered_paths;
+            paths.retain(|p| extract_block_height_or_max(p) >= blockchain_length);
         }
 
         // keep track of:
@@ -70,12 +51,13 @@ pub fn discovery(
         // - length of the current path under investigation
 
         let mut length_start_indices_and_diffs = vec![];
-        let mut curr_length = length_from_path(paths.first().unwrap()).unwrap();
+        // paths will always have at least 1 item
+        let mut curr_length = extract_block_height_or_max(paths.first().unwrap());
 
         info!("Searching for canonical chain in startup blocks");
 
         for (idx, path) in paths.iter().enumerate() {
-            let length = length_from_path_or_max(path);
+            let length = extract_block_height_or_max(path);
             if length > curr_length || idx == 0 {
                 length_start_indices_and_diffs.push((idx, length - curr_length));
                 curr_length = length;
@@ -119,8 +101,8 @@ pub fn discovery(
 
         info!(
             "Found canonical tip (length {}): {}",
-            length_from_path(curr_path).unwrap_or(0),
-            hash_from_path(curr_path),
+            extract_block_height(curr_path).unwrap_or(0),
+            extract_state_hash(curr_path),
         );
 
         // handle all blocks that are higher than the canonical tip
@@ -130,7 +112,7 @@ pub fn discovery(
             if successive_start_idx < length_start_indices_and_diffs.len() {
                 for path in paths[successive_start_idx..]
                     .iter()
-                    .filter(|p| length_from_path(p).is_some())
+                    .filter(|p| extract_block_height(p).is_some())
                 {
                     successive_paths.push(path.to_path_buf());
                 }
@@ -139,6 +121,7 @@ pub fn discovery(
 
         // collect the canonical blocks
         canonical_paths.push(curr_path.clone());
+        canonical_state_hashes.insert(extract_state_hash(curr_path));
 
         if canonical_paths.len() < reporting_freq as usize {
             info!("Walking the canonical chain back to genesis");
@@ -159,18 +142,19 @@ pub fn discovery(
             // search for parent in previous segment's blocks
             let mut parent_found = false;
             let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
-            let parent_hash = PreviousStateHash::from_path(curr_path)?;
-            let parent_hash: String = parent_hash.into();
+
+            let parent_hash = PreviousStateHash::from_path(curr_path)?.0;
 
             for path in paths[prev_length_idx..curr_length_idx].iter() {
-                if parent_hash == hash_from_path(path) {
+                if parent_hash == extract_state_hash(path) {
                     canonical_paths.push(path.to_path_buf());
+                    canonical_state_hashes.insert(extract_state_hash(path));
                     curr_path = path;
                     curr_length_idx = prev_length_idx;
                     count += 1;
                     curr_start_idx -= 1;
                     parent_found = true;
-                    continue;
+                    break;
                 }
             }
 
@@ -178,7 +162,7 @@ pub fn discovery(
             if !parent_found {
                 info!(
                     "Unable to locate parent block: mainnet-{}-{parent_hash}.json",
-                    length_from_path_or_max(curr_path) - 1,
+                    extract_block_height_or_max(curr_path) - 1,
                 );
                 return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
             }
@@ -186,9 +170,11 @@ pub fn discovery(
 
         // push the lowest canonical block
         for path in paths[..curr_length_idx].iter() {
-            let prev_hash: String = PreviousStateHash::from_path(curr_path)?.into();
-            if prev_hash == hash_from_path(path) {
+            let prev_hash = PreviousStateHash::from_path(curr_path)?.0;
+            if prev_hash == extract_state_hash(path) {
+                debug!("Lowest block canonical found");
                 canonical_paths.push(path.to_path_buf());
+                canonical_state_hashes.insert(extract_state_hash(path));
                 break;
             }
         }
@@ -205,24 +191,20 @@ pub fn discovery(
 
     let max_canonical_length = canonical_paths
         .last()
-        .and_then(|p| {
-            BlockchainLength::from_path(p)
-                .ok()
-                .map(<BlockchainLength as Into<u32>>::into)
-        })
+        .and_then(|p| extract_block_height(p))
         .unwrap_or(1);
+
     let orphaned: Vec<PathBuf> = paths
         .into_iter()
         .filter(|p| {
-            if let Ok(length) = BlockchainLength::from_path(p) {
-                let length: u32 = length.into();
-                return length <= max_canonical_length && !canonical_paths.contains(p);
+            if let Some(length) = extract_block_height(p) {
+                return length <= max_canonical_length
+                    && !canonical_state_hashes.contains(&extract_state_hash(p));
             }
             false
         })
         .cloned()
         .collect();
-
     Ok((
         canonical_paths.to_vec(),
         successive_paths.to_vec(),
@@ -234,16 +216,16 @@ pub fn discovery(
 fn is_parent(path: &Path, curr_path: &Path) -> bool {
     if let Ok(prev_hash) = PreviousStateHash::from_path(curr_path) {
         let prev_hash: String = prev_hash.into();
-        return prev_hash == hash_from_path(path);
+        return prev_hash == extract_state_hash(path);
     }
     false
 }
 
 /// Returns the start index of the paths with next higher length.
 fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize> {
-    let length = length_from_path_or_max(paths[path_idx]);
+    let length = extract_block_height_or_max(paths[path_idx]);
     for (n, path) in paths[path_idx..].iter().enumerate() {
-        if length_from_path_or_max(path) > length {
+        if extract_block_height_or_max(path) > length {
             return Some(path_idx + n);
         }
     }
@@ -338,23 +320,4 @@ fn max_num_canonical_blocks(
         .position(|x| x.0 == last_contiguous_start_idx)
         .unwrap_or(0) as u32
         + 1
-}
-
-// path helpers
-fn length_from_path(path: &Path) -> Option<u32> {
-    if is_valid_block_file(path) {
-        BlockchainLength::from_path(path)
-            .ok()
-            .map(<BlockchainLength as Into<u32>>::into)
-    } else {
-        None
-    }
-}
-
-fn length_from_path_or_max(path: &Path) -> u32 {
-    length_from_path(path).unwrap_or(u32::MAX)
-}
-
-fn hash_from_path(path: &Path) -> String {
-    extract_state_hash(path)
 }

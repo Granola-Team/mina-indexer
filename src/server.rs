@@ -179,11 +179,17 @@ pub async fn initialize(
 
         match initialization_mode {
             InitializationMode::New => {
-                let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+                let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
                     &startup_dir,
                     canonical_threshold,
                     reporting_freq,
-                )?;
+                ) {
+                    Ok(block_parser) => block_parser,
+                    Err(e) => {
+                        panic!("Obtaining block parser failed: {}", e);
+                    }
+                };
+                info!("Initializing indexer state");
                 state
                     .initialize_with_canonical_chain_discovery(&mut block_parser)
                     .await?;
