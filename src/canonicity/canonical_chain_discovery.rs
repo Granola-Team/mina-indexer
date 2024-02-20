@@ -1,5 +1,6 @@
 use crate::block::{
-    extract_block_height, extract_block_height_or_max, extract_state_hash, previous_state_hash::*,
+    blockchain_length::BlockchainLength, extract_block_height, extract_block_height_or_max,
+    extract_state_hash, previous_state_hash::*,
 };
 use std::{
     collections::HashSet,
@@ -196,12 +197,18 @@ pub fn discovery(
 
     let orphaned: Vec<PathBuf> = paths
         .into_iter()
-        .filter(|p| {
-            if let Some(length) = extract_block_height(p) {
+        .filter(|p| match extract_block_height(p) {
+            Some(length) => {
                 return length <= max_canonical_length
                     && !canonical_state_hashes.contains(&extract_state_hash(p));
             }
-            false
+            None => {
+                // Read the precomputed block for height
+                if let Ok(length) = BlockchainLength::from_path(p) {
+                    return length.0 <= max_canonical_length && !canonical_paths.contains(p);
+                }
+                false
+            }
         })
         .cloned()
         .collect();
