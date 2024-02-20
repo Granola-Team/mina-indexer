@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     flake-compat = {
@@ -37,19 +37,13 @@
 
         frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-        llvm = pkgs.llvmPackages_14;
-        clang = llvm.clang;
-        libclang = llvm.libclang;
-
-        buildDependencies = with pkgs;
-          [
-            libclang
+        buildDependencies = with pkgs; [
+            libclang.lib
             clang
             pkg-config
-          ]
+            rustPlatform.bindgenHook]
           ++ runtimeDependencies
-          ++ lib.optionals stdenv.isDarwin
-          [
+          ++ lib.optionals stdenv.isDarwin [
             frameworks.Security
             frameworks.CoreServices
           ];
@@ -57,24 +51,15 @@
         developmentDependencies = with pkgs;
           [
             rust
-            rnix-lsp
-            alejandra
             cargo-nextest
             cargo-audit
             cargo-machete
-            bacon
             google-cloud-sdk
             just
             jq       # Used in testing.
             git      # Needed but not declared by Nix's 'stdenv' build.
           ]
           ++ buildDependencies;
-
-        LIBCLANG_PATH = "${libclang.lib}/lib";
-        BINDGEN_EXTRA_CLANG_ARGS =
-          if pkgs.stdenv.isDarwin
-          then "-isystem ${pkgs.stdenv.cc.cc}/lib/clang/${pkgs.lib.getVersion pkgs.stdenv.cc.cc}/include"
-          else "-isystem ${libclang.lib}/lib/clang/${pkgs.lib.getVersion clang}/include";
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
@@ -92,11 +77,9 @@
               nativeBuildInputs = buildDependencies;
               buildInputs = runtimeDependencies;
 
-              preBuild = ''
-                export LIBCLANG_PATH="${LIBCLANG_PATH}"
-                export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
+              env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
+                    (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
 
-              '';
               doCheck = false;
             };
 
@@ -104,11 +87,12 @@
           };
 
           devShells.default = mkShell {
+            env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
+                  (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
+
             buildInputs = developmentDependencies;
             shellHook = ''
               git submodule update --init --recursive
-              export LIBCLANG_PATH="${LIBCLANG_PATH}"
-              export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS}"
               export TMPDIR=/var/tmp
             '';
           };
