@@ -57,18 +57,20 @@ mod test {
     use super::*;
     use crate::block::precomputed::PrecomputedBlock;
 
+    use glob::glob;
     use std::path::PathBuf;
 
     #[test]
-    fn check() -> anyhow::Result<()> {
-        let path: PathBuf = "./tests/data/canonical_chain_discovery/contiguous/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json".into();
-        let PreviousStateHashBlock {
-            protocol_state: ProtocolState {
-                previous_state_hash,
-            },
-        } = serde_json::from_slice(&std::fs::read(&path)?)?;
-        let pcb = PrecomputedBlock::parse_file(&path)?;
-        assert_eq!(previous_state_hash, pcb.previous_state_hash().0);
+    fn previous_state_hash_deserializer_test() -> anyhow::Result<()> {
+        let paths: Vec<PathBuf> = glob("./tests/data/canonical_chain_discovery/contiguous/*.json")?
+            .filter_map(|x| x.ok())
+            .collect();
+
+        for path in paths {
+            let previous_state_hash = PreviousStateHash::from_path(&path)?.0;
+            let block = PrecomputedBlock::parse_file(&path)?;
+            assert_eq!(previous_state_hash, block.previous_state_hash().0);
+        }
         Ok(())
     }
 }
