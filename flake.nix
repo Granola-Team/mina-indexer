@@ -58,6 +58,7 @@
             just
             jq       # Used in testing.
             git      # Needed but not declared by Nix's 'stdenv' build.
+            curl
           ]
           ++ buildDependencies;
 
