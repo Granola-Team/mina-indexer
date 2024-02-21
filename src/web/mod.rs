@@ -10,6 +10,7 @@ use actix_web::HttpServer;
 
 use crate::store::IndexerStore;
 
+use self::rest::accounts;
 use self::rest::blocks;
 
 pub async fn start_web_server(state: Arc<IndexerStore>) -> std::io::Result<()> {
@@ -18,6 +19,7 @@ pub async fn start_web_server(state: Arc<IndexerStore>) -> std::io::Result<()> {
             .app_data(Data::new(state.clone()))
             .service(blocks::get_blocks)
             .service(blocks::get_block)
+            .service(accounts::get_account)
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
