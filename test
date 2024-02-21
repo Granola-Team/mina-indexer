@@ -978,7 +978,9 @@ test_rest_account() {
         --startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
-        --log-level debug
+        --log-level debug \
+        --web-hostname "0.0.0.0" \
+        --web-port 1337
     sleep 10
 
     # results
