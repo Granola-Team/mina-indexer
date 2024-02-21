@@ -984,7 +984,7 @@ test_rest_account() {
     sleep 10
 
     # results
-    balance=$(curl -s http://localhost:8080/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
+    balance=$(curl -s http://localhost:1337/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert '1440030000000' $balance
 
     teardown
