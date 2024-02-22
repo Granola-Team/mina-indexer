@@ -311,6 +311,16 @@ impl PrecomputedBlock {
         pks
     }
 
+    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+        let mut public_keys: HashSet<PublicKey> =
+            self.all_command_public_keys().into_iter().collect();
+        add_keys(&mut public_keys, self.prover_keys());
+
+        let mut public_keys: Vec<PublicKey> = public_keys.into_iter().collect();
+        public_keys.sort();
+        public_keys
+    }
+
     pub fn global_slot_since_genesis(&self) -> u32 {
         self.protocol_state
             .body
