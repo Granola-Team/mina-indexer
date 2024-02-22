@@ -89,6 +89,12 @@ pub struct ServerArgs {
     /// Threshold for updating the canonical tip/ledger
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
+    /// Web server hostname for REST and GraphQL
+    #[arg(long, default_value = "localhost")]
+    web_hostname: String,
+    /// Web server port for REST and GraphQL
+    #[arg(long, default_value_t = 8080)]
+    web_port: u16,
 }
 
 #[tokio::main]
@@ -102,6 +108,9 @@ pub async fn main() -> anyhow::Result<()> {
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
             };
             let database_dir = args.database_dir.clone();
+            let web_hostname = args.web_hostname.clone();
+            let web_port = args.web_port;
+
             if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
                 if matches!(mode, InitializationMode::New) && dir.count() != 0 {
                     // sync from existing db
@@ -124,7 +133,9 @@ pub async fn main() -> anyhow::Result<()> {
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone()).await?;
 
-            mina_indexer::web::start_web_server(db).await.unwrap();
+            mina_indexer::web::start_web_server(db, (web_hostname, web_port))
+                .await
+                .unwrap();
             indexer.await_loop().await;
             Ok(())
         }

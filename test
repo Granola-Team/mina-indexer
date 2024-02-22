@@ -968,6 +968,28 @@ test_many_blocks() {
     teardown
 }
 
+test_rest_account() {
+    test=test_rest_account
+
+    setup
+    dl_mainnet 100 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug \
+        --web-hostname "0.0.0.0" \
+        --web-port 1337
+    sleep 10
+
+    # results
+    balance=$(curl -s http://localhost:1337/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
+    assert '1440030000000' $balance
+
+    teardown
+}
+
 # Release version is fast
 test_release() {
     test=test_release
@@ -1030,6 +1052,7 @@ if [ "$#" -eq 0 ]; then
     test_snark_work
     test_checkpoint
     test_many_blocks
+    test_rest_account
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1054,6 +1077,7 @@ else
             "test_snark_work") test_snark_work ;;
             "test_checkpoint") test_checkpoint ;;
             "test_many_blocks") test_many_blocks ;;
+            "test_rest_account") test_rest_account ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac
