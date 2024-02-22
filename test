@@ -118,6 +118,9 @@ test_indexer_cli_reports() {
     idxr blocks-at-slot --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks-at-slot"
 
+    idxr blocks-at-public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks-at-public-key"
+
     idxr checkpoint --help 2>&1 |
         grep -iq "Usage: mina-indexer checkpoint"
 
@@ -378,6 +381,25 @@ test_blocks() {
     assert 'Canonical' $canonicity
     assert 'Canonical' $canonicity_v
 
+    # basic public key query
+    hash=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].state_hash)
+    slot=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].canonicity)
+
+    # verbose public key query
+    hash_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].canonicity)
+    
+    assert 9 $slot
+    assert $wt_hash $hash
+    assert $wt_hash $hash_v
+    assert $wt_length $length
+    assert $wt_length $length_v
+    assert 'Canonical' $canonicity
+    assert 'Canonical' $canonicity_v
+
     # height 10 = slot 9
     slot=$(idxr blocks-at-slot -s 9 | jq -r .)
     height=$(idxr blocks-at-height -h 10 | jq -r .)
@@ -396,6 +418,16 @@ test_blocks() {
     # write at slot to file
     file=./blocks_at_slot.json
     idxr blocks-at-slot -s 9 -p $file
+
+    height=$(cat $file | jq -r .[0].blockchain_length)
+    slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
+    
+    assert 9 $slot
+    assert 10 $height
+
+    # write at public key to file
+    file=./blocks_at_pk.json
+    idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -p $file
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
