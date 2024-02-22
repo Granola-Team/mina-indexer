@@ -12,6 +12,7 @@ use std::net;
 use crate::store::IndexerStore;
 
 use self::rest::accounts;
+use self::rest::blockchain;
 use self::rest::blocks;
 
 pub async fn start_web_server<A: net::ToSocketAddrs>(
@@ -24,6 +25,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs>(
             .service(blocks::get_blocks)
             .service(blocks::get_block)
             .service(accounts::get_account)
+            .service(blockchain::get_blockchain_summary)
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
