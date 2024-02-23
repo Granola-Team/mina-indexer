@@ -11,6 +11,7 @@ struct Record {
     locked: u64,
 }
 
+#[derive(Default)]
 pub struct LockedBalances {
     locked: HashMap<u32, Amount>,
 }

@@ -95,6 +95,9 @@ pub struct ServerArgs {
     /// Web server port for REST and GraphQL
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
+    /// Path to the genesis ledger
+    #[arg(long, default_value = concat!(env!("PWD"), "/data/locked.csv"))]
+    locked_supply_csv: PathBuf,
 }
 
 #[tokio::main]
@@ -107,6 +110,7 @@ pub async fn main() -> anyhow::Result<()> {
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
             };
+            let locked_supply_csv = args.locked_supply_csv.clone();
             let database_dir = args.database_dir.clone();
             let web_hostname = args.web_hostname.clone();
             let web_port = args.web_port;
@@ -133,7 +137,7 @@ pub async fn main() -> anyhow::Result<()> {
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone()).await?;
 
-            mina_indexer::web::start_web_server(db, (web_hostname, web_port))
+            mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
                 .await
                 .unwrap();
             indexer.await_loop().await;
