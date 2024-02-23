@@ -1000,8 +1000,8 @@ test_many_blocks() {
     teardown
 }
 
-test_rest_account() {
-    test=test_rest_account
+test_rest_endpoints() {
+    test=test_rest_endpoints
 
     setup
     dl_mainnet 100 ./blocks
@@ -1019,6 +1019,15 @@ test_rest_account() {
     balance=$(curl -s http://localhost:1337/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert '1440030000000' $balance
 
+    # Testing blockchain summary endpoint
+    locked_supply=$(curl -s http://localhost:1337/summary | jq -r .lockedSupply)
+    assert '716354155' $locked_supply
+
+    block_height=$(curl -s http://localhost:1337/summary | jq -r .blockchainLength)
+    assert '100' $block_height
+
+    state_hash=$(curl -s http://localhost:1337/summary | jq -r .stateHash)
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $state_hash
     teardown
 }
 
@@ -1084,7 +1093,7 @@ if [ "$#" -eq 0 ]; then
     test_snark_work
     test_checkpoint
     test_many_blocks
-    test_rest_account
+    test_rest_endpoints
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1109,7 +1118,7 @@ else
             "test_snark_work") test_snark_work ;;
             "test_checkpoint") test_checkpoint ;;
             "test_many_blocks") test_many_blocks ;;
-            "test_rest_account") test_rest_account ;;
+            "test_rest_endpoints") test_rest_endpoints ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac
