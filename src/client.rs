@@ -51,6 +51,8 @@ pub enum BlockArgs {
     BlocksAtSlot(BlocksAtSlotArgs),
     /// Query blocks by blockchain length
     BlocksAtHeight(BlocksAtHeightArgs),
+    /// Query blocks by public key
+    BlocksAtPublicKey(BlocksAtPublicKeyArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -98,6 +100,20 @@ pub struct BlocksAtSlotArgs {
     /// Retrieve the blocks in given global slot
     #[arg(short, long)]
     slot: String,
+    /// Path to write the block [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Display the entire precomputed block
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct BlocksAtPublicKeyArgs {
+    /// Retrieve the blocks associated with given public key
+    #[arg(short = 'k', long)]
+    public_key: String,
     /// Path to write the block [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
@@ -346,6 +362,12 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 BlockArgs::BlocksAtSlot(args) => format!(
                     "blocks-at-slot {} {} {}\0",
                     args.slot,
+                    args.verbose,
+                    args.path.clone().unwrap_or("".into()).display()
+                ),
+                BlockArgs::BlocksAtPublicKey(args) => format!(
+                    "blocks-at-public-key {} {} {}\0",
+                    args.public_key,
                     args.verbose,
                     args.path.clone().unwrap_or("".into()).display()
                 ),

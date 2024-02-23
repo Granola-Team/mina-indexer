@@ -164,6 +164,11 @@ impl BlockStore for IndexerStore {
         }
         self.database.put_cf(&blocks_cf, key, value)?;
 
+        // add block for each public key
+        for pk in block.all_public_keys() {
+            self.add_block_at_public_key(&pk, &block.state_hash.clone().into())?;
+        }
+
         // add block to height list
         self.add_block_at_height(&block.state_hash.clone().into(), block.blockchain_length)?;
 
@@ -346,6 +351,69 @@ impl BlockStore for IndexerStore {
             match self
                 .database
                 .get_pinned_cf(self.slots_cf(), key.as_bytes())?
+                .map(|bytes| bytes.to_vec())
+            {
+                None => break,
+                Some(bytes) => {
+                    let state_hash: BlockHash = String::from_utf8(bytes)?.into();
+                    if let Some(block) = self.get_block(&state_hash)? {
+                        blocks.push(block);
+                    }
+                }
+            }
+        }
+
+        Ok(blocks)
+    }
+
+    fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+        trace!("Getting number of blocks at public key {pk}");
+        Ok(
+            match self
+                .database
+                .get_pinned_cf(self.blocks_cf(), pk.to_string().as_bytes())?
+            {
+                None => 0,
+                Some(bytes) => String::from_utf8(bytes.to_vec())?.parse()?,
+            },
+        )
+    }
+
+    fn add_block_at_public_key(
+        &self,
+        pk: &PublicKey,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        trace!("Adding block {state_hash} at public key {pk}");
+
+        // increment num blocks at public key
+        let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
+        self.database.put_cf(
+            self.blocks_cf(),
+            pk.to_string().as_bytes(),
+            (num_blocks_at_pk + 1).to_string().as_bytes(),
+        )?;
+
+        // add the new key-value pair
+        let key = format!("{pk}-{num_blocks_at_pk}");
+        Ok(self.database.put_cf(
+            self.blocks_cf(),
+            key.as_bytes(),
+            state_hash.to_string().as_bytes(),
+        )?)
+    }
+
+    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        trace!("Getting blocks at public key {pk}");
+
+        let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
+        let mut blocks = vec![];
+
+        for n in 0..num_blocks_at_pk {
+            let key = format!("{pk}-{n}");
+            match self
+                .database
+                .get_pinned_cf(self.blocks_cf(), key.as_bytes())?
                 .map(|bytes| bytes.to_vec())
             {
                 None => break,
