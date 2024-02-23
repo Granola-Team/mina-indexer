@@ -95,7 +95,7 @@ pub struct ServerArgs {
     /// Web server port for REST and GraphQL
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
-    /// Path to the genesis ledger
+    /// Path to the locked supply CSV
     #[arg(long, default_value = concat!(env!("PWD"), "/data/locked.csv"))]
     locked_supply_csv: PathBuf,
 }
