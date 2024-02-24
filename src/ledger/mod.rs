@@ -19,7 +19,6 @@ use crate::{
         public_key::PublicKey,
     },
 };
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, result::Result};
 use tracing::{debug, trace};
@@ -224,35 +223,18 @@ impl Ledger {
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> anyhow::Result<Self> {
         let mut ledger = Ledger::new();
         for (pubkey, balance, nonce, delgation) in value {
-            match PublicKey::from_address(pubkey) {
-                Ok(pk) => {
-                    if let Some(delegate) = delgation {
-                        match PublicKey::from_address(delegate) {
-                            Ok(delegate) => {
-                                ledger.accounts.insert(
-                                    pk.clone(),
-                                    Account {
-                                        public_key: pk,
-                                        balance: balance.into(),
-                                        nonce: Nonce(nonce.unwrap_or_default()),
-                                        delegate: Some(delegate),
-                                    },
-                                );
-                            }
-                            Err(e) => return Err(anyhow!("{}", e.to_string())),
-                        }
-                    } else {
-                        let acct = Account {
-                            public_key: pk.clone(),
-                            balance: balance.into(),
-                            nonce: Nonce(nonce.unwrap_or_default()),
-                            delegate: None,
-                        };
-                        ledger.accounts.insert(pk, acct);
-                    }
-                }
-                Err(e) => return Err(anyhow!("{}", e.to_string())),
-            }
+            let pk = PublicKey::new(pubkey);
+            let delegate = delgation.map(PublicKey::new);
+
+            ledger.accounts.insert(
+                pk.clone(),
+                Account {
+                    public_key: pk,
+                    balance: balance.into(),
+                    nonce: Nonce(nonce.unwrap_or_default()),
+                    delegate,
+                },
+            );
         }
         Ok(ledger)
     }
@@ -285,7 +267,7 @@ impl std::str::FromStr for Ledger {
         let deser: HashMap<String, Account> = serde_json::from_str(s)?;
         let mut accounts = HashMap::new();
         for (pk, acct) in deser {
-            accounts.insert(PublicKey::from_address(&pk)?, acct);
+            accounts.insert(PublicKey(pk), acct);
         }
 
         Ok(Ledger { accounts })
@@ -379,9 +361,7 @@ mod tests {
     #[test]
     fn apply_diff_payment() {
         let diff_amount = 1.into();
-        let public_key =
-            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
-                .expect("public key creation");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
 
@@ -405,12 +385,9 @@ mod tests {
 
     #[test]
     fn apply_diff_delegation() {
-        let public_key =
-            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
-                .expect("public key creation");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
-            PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")
-                .expect("delegate public key creation");
+            PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
 
@@ -434,9 +411,7 @@ mod tests {
     #[test]
     fn apply_diff_payment_with_post_balance() {
         let diff_amount = 1.into();
-        let public_key =
-            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
-                .expect("public key creation");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let mut account = Account::empty(public_key.clone());
 
         account.balance = Amount(10); // Set the balance explicitly
@@ -467,12 +442,10 @@ mod tests {
 
     #[test]
     fn apply_diff_delegation_with_post_balance() {
-        let public_key =
-            PublicKey::from_address("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")
-                .expect("public key creation");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
-            PublicKey::from_address("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")
-                .expect("delegate public key creation");
+            PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
+
         let mut account = Account::empty(public_key.clone());
 
         account.balance = Amount(20);

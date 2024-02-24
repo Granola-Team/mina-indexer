@@ -6,13 +6,12 @@ use serde::{Deserialize, Serialize};
 pub struct PublicKey(pub String);
 
 impl PublicKey {
-    pub fn to_address(&self) -> String {
-        self.0.to_owned()
+    pub fn new<S: Into<String>>(key: S) -> Self {
+        Self(key.into())
     }
 
-    // TODO: Remove result as it's not necessary
-    pub fn from_address(value: &str) -> anyhow::Result<Self> {
-        Ok(value.into())
+    pub fn to_address(&self) -> String {
+        self.0.to_owned()
     }
 }
 
@@ -87,7 +86,7 @@ mod test {
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
         ];
         for pk in pks {
-            assert_eq!(PublicKey::from_address(pk).unwrap().to_address(), pk);
+            assert_eq!(PublicKey(pk.to_owned()).to_address(), pk);
         }
     }
 }
