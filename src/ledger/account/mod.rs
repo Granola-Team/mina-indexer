@@ -1,6 +1,3 @@
-pub mod ser_de;
-
-use self::ser_de::*;
 use crate::{constants::MAINNET_ACCOUNT_CREATION_FEE, ledger::public_key::PublicKey};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -15,11 +12,7 @@ pub struct Nonce(pub u32);
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Account {
-    #[serde(serialize_with = "serialize_public_key")]
-    #[serde(deserialize_with = "deserialize_public_key")]
     pub public_key: PublicKey,
-    #[serde(serialize_with = "serialize_public_key_opt")]
-    #[serde(deserialize_with = "deserialize_public_key_opt")]
     pub delegate: Option<PublicKey>,
     pub balance: Amount,
     pub nonce: Nonce,
@@ -128,13 +121,18 @@ impl std::fmt::Debug for Account {
     }
 }
 
-#[test]
-fn test_nanomina_to_mina_conversion() {
-    let actual = 1_000_000_001;
-    let val = nanomina_to_mina(actual);
-    assert_eq!("1.000000001", val);
+#[cfg(test)]
+mod test {
+    use crate::ledger::account::nanomina_to_mina;
 
-    let actual = 1_000_000_000;
-    let val = nanomina_to_mina(actual);
-    assert_eq!("1", val);
+    #[test]
+    fn test_nanomina_to_mina_conversion() {
+        let actual = 1_000_000_001;
+        let val = nanomina_to_mina(actual);
+        assert_eq!("1.000000001", val);
+
+        let actual = 1_000_000_000;
+        let val = nanomina_to_mina(actual);
+        assert_eq!("1", val);
+    }
 }
