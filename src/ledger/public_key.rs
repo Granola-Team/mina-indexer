@@ -17,19 +17,19 @@ impl PublicKey {
 
     // TODO: Remove result as it's not necessary
     pub fn from_address(value: &str) -> anyhow::Result<Self> {
-        Ok(Self(value.to_string()))
+        Ok(value.into())
     }
 }
 
 impl From<&str> for PublicKey {
     fn from(value: &str) -> Self {
-        Self::from_address(value).unwrap()
+        Self(value.to_owned())
     }
 }
 
 impl From<String> for PublicKey {
     fn from(value: String) -> Self {
-        Self::from_address(&value).unwrap()
+        Self(value.to_owned())
     }
 }
 
