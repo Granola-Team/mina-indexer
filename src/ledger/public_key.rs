@@ -3,14 +3,9 @@ use mina_signer::{CompressedPubKey, PubKey};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PublicKey(String);
+pub struct PublicKey(pub String);
 
 impl PublicKey {
-    pub fn from_v1(v1: PublicKeyV1) -> Self {
-        let pk = CompressedPubKey::from(&v1.0.inner().inner());
-        Self(pk.into_address())
-    }
-
     pub fn to_address(&self) -> String {
         self.0.to_owned()
     }
