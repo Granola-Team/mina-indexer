@@ -6,6 +6,9 @@ IDXR="$(pwd)"/target/release/mina-indexer
 LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
+# JSON Schemas
+SUMMARY_SCHEMA="$(pwd)"/tests/json-schemas/summary.json
+
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
@@ -1020,14 +1023,58 @@ test_rest_endpoints() {
     assert '1440030000000' $balance
 
     # Testing blockchain summary endpoint
-    locked_supply=$(curl -s http://localhost:1337/summary | jq -r .lockedSupply)
+    curl -s http://localhost:1337/summary > output.json
+
+    blockchain_length=$(cat output.json | jq -r .blockchainLength)
+    assert '100' $blockchain_length
+
+    chain_id=$(cat output.json | jq -r .chainId)
+    assert '5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1' $chain_id
+
+    circulating_supply=$(cat output.json | jq -r .circulatingSupply)
+    assert '89031537.840039233' $circulating_supply
+
+    # date_time=$(cat output.json | jq -r .dateTime)
+    # assert 'Wed, 17 Mar 2021 07:15:00 GMT' $date_time
+
+    epoch=$(cat output.json | jq -r .epoch)
+    assert '0' $epoch
+
+    global_slot=$(cat output.json | jq -r .globalSlot)
+    assert '145' $global_slot
+
+    locked_supply=$(cat output.json | jq -r .lockedSupply)
     assert '716354155' $locked_supply
 
-    block_height=$(curl -s http://localhost:1337/summary | jq -r .blockchainLength)
-    assert '100' $block_height
+    min_window_density=$(cat output.json | jq -r .minWindowDensity)
+    assert '77' $min_window_density
 
-    state_hash=$(curl -s http://localhost:1337/summary | jq -r .stateHash)
+    next_epoch_ledger_hash=$(cat output.json | jq -r .nextEpochLedgerHash)
+    assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $next_epoch_ledger_hash
+
+    previous_state_hash=$(cat output.json | jq -r .previousStateHash)
+    assert '3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh' $previous_state_hash
+
+    slot=$(cat output.json | jq -r .slot)
+    assert '145' $slot
+
+    snarked_ledger_hash=$(cat output.json | jq -r .snarkedLedgerHash)
+    assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $snarked_ledger_hash
+
+    staged_ledger_hash=$(cat output.json | jq -r .stagedLedgerHash)
+    assert 'jwWHNKQPdgLxHCsBki57a6zBfNPUFkAQmsrCNq3E7Q8oiNCNdkm' $staged_ledger_hash
+
+    staking_epoch_ledger_hash=$(cat output.json | jq -r .stakingEpochLedgerHash)
+    assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $staking_epoch_ledger_hash
+
+    state_hash=$(cat output.json | jq -r .stateHash)
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $state_hash
+
+    total_currency=$(cat output.json | jq -r .totalCurrency)
+    assert '805385692.840039233' $total_currency
+
+    check-jsonschema --schemafile "$SUMMARY_SCHEMA" output.json
+
     teardown
 }
 
