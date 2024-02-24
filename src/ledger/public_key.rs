@@ -2,8 +2,8 @@ use mina_serialization_types::v1::PublicKeyV1;
 use mina_signer::{CompressedPubKey, PubKey};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PublicKey(PublicKeyV1);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublicKey(String);
 
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
@@ -15,29 +15,29 @@ impl Eq for PublicKey {}
 
 impl PartialOrd for PublicKey {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.to_address().cmp(&other.to_address()))
+        Some(self.0.cmp(&other.0))
     }
 }
 
 impl Ord for PublicKey {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.to_address().cmp(&other.to_address())
+        self.0.cmp(&other.0)
     }
 }
 
 impl PublicKey {
     pub fn from_v1(v1: PublicKeyV1) -> Self {
-        Self(v1)
+        let pk = CompressedPubKey::from(&v1.0.inner().inner());
+        Self(pk.into_address())
     }
 
     pub fn to_address(&self) -> String {
-        CompressedPubKey::from(&self.0).into_address()
+        self.0.to_owned()
     }
 
+    // TODO: Remove result as it's not necessary
     pub fn from_address(value: &str) -> anyhow::Result<Self> {
-        CompressedPubKey::from_address(value)
-            .map(|x| Self(PublicKeyV1::from(x)))
-            .map_err(anyhow::Error::from)
+        Ok(Self(value.to_string()))
     }
 }
 
@@ -55,13 +55,13 @@ impl From<String> for PublicKey {
 
 impl std::hash::Hash for PublicKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.clone().0.inner().inner().x.hash(state);
+        self.0.hash(state);
     }
 }
 
 impl From<PublicKey> for String {
     fn from(value: PublicKey) -> Self {
-        value.to_address()
+        value.0
     }
 }
 
@@ -71,27 +71,23 @@ impl std::fmt::Display for PublicKey {
     }
 }
 
-impl std::fmt::Debug for PublicKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.to_address())
-    }
-}
-
 impl From<PublicKeyV1> for PublicKey {
-    fn from(value: PublicKeyV1) -> Self {
-        PublicKey(value)
+    fn from(v1: PublicKeyV1) -> Self {
+        let pk = CompressedPubKey::from(&v1.0.inner().inner());
+        Self(pk.into_address())
     }
 }
 
 impl From<PublicKey> for PublicKeyV1 {
     fn from(value: PublicKey) -> Self {
-        value.0
+        let pk = CompressedPubKey::from_address(&value.0).unwrap();
+        pk.into()
     }
 }
 
 impl From<PublicKey> for PubKey {
     fn from(value: PublicKey) -> Self {
-        PubKey::from_address(&CompressedPubKey::from(&value.0).into_address()).unwrap()
+        PubKey::from_address(&value.0).unwrap()
     }
 }
 
