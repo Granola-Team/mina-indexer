@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "blockchainLength": {
+      "type": "integer"
+    },
+    "chainId": {
+      "type": "string"
+    },
+    "circulatingSupply": {
+      "type": "string"
+    },
+    "dateTime": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "integer"
+    },
+    "globalSlot": {
+      "type": "integer"
+    },
+    "lockedSupply": {
+      "type": "string"
+    },
+    "minWindowDensity": {
+      "type": "integer"
+    },
+    "nextEpochLedgerHash": {
+      "type": "string"
+    },
+    "previousStateHash": {
+      "type": "string"
+    },
+    "slot": {
+      "type": "integer"
+    },
+    "snarkedLedgerHash": {
+      "type": "string"
+    },
+    "stagedLedgerHash": {
+      "type": "string"
+    },
+    "stakingEpochLedgerHash": {
+      "type": "string"
+    },
+    "stateHash": {
+      "type": "string"
+    },
+    "totalCurrency": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "blockchainLength",
+    "chainId",
+    "circulatingSupply",
+    "dateTime",
+    "epoch",
+    "globalSlot",
+    "lockedSupply",
+    "minWindowDensity",
+    "nextEpochLedgerHash",
+    "previousStateHash",
+    "slot",
+    "snarkedLedgerHash",
+    "stagedLedgerHash",
+    "stakingEpochLedgerHash",
+    "stateHash",
+    "totalCurrency"
+  ]
+}

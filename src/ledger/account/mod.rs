@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Amount(pub u64);
 
+impl ToString for Amount {
+    fn to_string(&self) -> String {
+        nanomina_to_mina(self.0)
+    }
+}
+
 #[derive(PartialEq, Eq, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Nonce(pub u32);
 

@@ -8,8 +8,13 @@ use tracing::debug;
 
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
-    ledger::{account::nanomina_to_mina, store::LedgerStore, Ledger},
+    ledger::{
+        account::{nanomina_to_mina, Amount},
+        store::LedgerStore,
+        Ledger,
+    },
     store::IndexerStore,
+    web::rest::locked_balances::LockedBalances,
 };
 
 /// Returns blockchain summary information about the current chain
@@ -52,11 +57,11 @@ fn millis_to_date_string(millis: i64) -> String {
 
 fn calculate_summary(
     best_tip: &PrecomputedBlock,
-    best_ledger: &Ledger,
+    _best_ledger: &Ledger,
+    locked_balance: Option<Amount>,
 ) -> Option<BlockchainSummary> {
     let blockchain_length = best_tip.blockchain_length;
     let chain_id = "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1".to_owned();
-    let circulating_supply = "N/A".to_owned();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
     let epoch = best_tip.consensus_state().epoch_count.inner().inner();
     let global_slot = best_tip
@@ -64,7 +69,6 @@ fn calculate_summary(
         .global_slot_since_genesis
         .inner()
         .inner();
-    let locked_supply = "N/A".to_owned();
     let min_window_density = best_tip
         .consensus_state()
         .min_window_density
@@ -136,13 +140,11 @@ fn calculate_summary(
     )
     .0;
     let state_hash = best_tip.state_hash.clone();
-
-    let mut total = 0;
-    for (_, account) in best_ledger.accounts.iter() {
-        total += account.balance.0;
-    }
-
-    let total_currency = nanomina_to_mina(total);
+    let total_currency_u64 = best_tip.consensus_state().total_currency.inner().inner();
+    let locked_currency_u64 = locked_balance.map(|a| a.0).unwrap_or(0);
+    let total_currency = nanomina_to_mina(total_currency_u64);
+    let circulating_supply = nanomina_to_mina(total_currency_u64 - locked_currency_u64);
+    let locked_supply = nanomina_to_mina(locked_currency_u64);
 
     Some(BlockchainSummary {
         blockchain_length,
@@ -165,14 +167,23 @@ fn calculate_summary(
 }
 
 #[get("/summary")]
-pub async fn get_blockchain_summary(store: Data<Arc<IndexerStore>>) -> HttpResponse {
+pub async fn get_blockchain_summary(
+    store: Data<Arc<IndexerStore>>,
+    locked_balances: Data<Arc<LockedBalances>>,
+) -> HttpResponse {
     let db = store.as_ref();
     if let Ok(Some(best_tip)) = db.get_best_block() {
         debug!("Found best tip: {:?}", best_tip.state_hash);
         if let Ok(Some(best_ledger)) = db.get_ledger_state_hash(&best_tip.state_hash.clone().into())
         {
+            let global_slot = best_tip
+                .consensus_state()
+                .global_slot_since_genesis
+                .inner()
+                .inner();
+            let locked_amount = locked_balances.get_locked_amount(global_slot);
             debug!("Found ledger for best tip");
-            if let Some(ref summary) = calculate_summary(&best_tip, &best_ledger) {
+            if let Some(ref summary) = calculate_summary(&best_tip, &best_ledger, locked_amount) {
                 debug!("Blockchain summary for the best_tip: {:?}", summary);
                 let body = serde_json::to_string_pretty(summary).unwrap();
                 return HttpResponse::Ok()
