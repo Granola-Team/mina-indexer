@@ -341,8 +341,8 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
 
 fn signer(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     use serde_json::*;
-
-    Value::String(PublicKey::from_v1(value.inner().inner().signer.0.inner()).to_address())
+    let pk: PublicKey = value.inner().inner().signer.0.inner().into();
+    Value::String(pk.0)
 }
 
 fn signature(_value: mina_rs::SignedCommandV1) -> serde_json::Value {

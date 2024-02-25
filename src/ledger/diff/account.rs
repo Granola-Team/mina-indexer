@@ -170,24 +170,23 @@ mod tests {
     #[test]
     fn test_from_command() {
         let source_str = "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG";
-        let source_public_key_result = PublicKey::from_address(source_str).unwrap();
-        let source_public_key = source_public_key_result.clone();
+        let source_public_key = PublicKey::new(source_str);
         let receiver_str = "B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs";
-        let receiver_public_key_result = PublicKey::from_address(receiver_str).unwrap();
-        let receiver_public_key = receiver_public_key_result.clone();
+        let receiver_public_key = PublicKey::new(receiver_str);
+
         let payment_command = Command::Payment(Payment {
-            source: source_public_key,
-            receiver: receiver_public_key,
+            source: source_public_key.clone(),
+            receiver: receiver_public_key.clone(),
             amount: 536900000000.into(),
         });
         let expected_result = vec![
             AccountDiff::Payment(PaymentDiff {
-                public_key: source_public_key_result,
+                public_key: source_public_key,
                 amount: 536900000000.into(),
                 update_type: UpdateType::Deduction,
             }),
             AccountDiff::Payment(PaymentDiff {
-                public_key: receiver_public_key_result,
+                public_key: receiver_public_key,
                 amount: 536900000000.into(),
                 update_type: UpdateType::Deposit,
             }),
@@ -199,18 +198,16 @@ mod tests {
     #[test]
     fn test_from_command_delegation() {
         let delegator_str = "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi";
-        let delegator_public_key_result = PublicKey::from_address(delegator_str).unwrap();
-        let delegator_public_key = delegator_public_key_result.clone();
+        let delegator_public_key = PublicKey::new(delegator_str);
         let delegate_str = "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz";
-        let delegate_public_key_result = PublicKey::from_address(delegate_str).unwrap();
-        let delegate_public_key = delegate_public_key_result.clone();
+        let delegate_public_key = PublicKey::new(delegate_str);
         let delegation_command = Command::Delegation(Delegation {
-            delegator: delegator_public_key,
-            delegate: delegate_public_key,
+            delegator: delegator_public_key.clone(),
+            delegate: delegate_public_key.clone(),
         });
         let expected_result = vec![AccountDiff::Delegation(DelegationDiff {
-            delegator: delegator_public_key_result,
-            delegate: delegate_public_key_result,
+            delegator: delegator_public_key,
+            delegate: delegate_public_key,
         })];
 
         assert_eq!(
@@ -222,11 +219,10 @@ mod tests {
     #[test]
     fn test_from_coinbase() {
         let coinbase_receiver_str = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw";
-        let coinbase_receiver_result = PublicKey::from_address(coinbase_receiver_str).unwrap();
-        let coinbase_receiver = coinbase_receiver_result.clone();
+        let coinbase_receiver = PublicKey::new(coinbase_receiver_str);
         let supercharge_coinbase = true;
         let account_diff =
-            AccountDiff::from_coinbase(coinbase_receiver_result, supercharge_coinbase);
+            AccountDiff::from_coinbase(coinbase_receiver.clone(), supercharge_coinbase);
         let expected_account_diff = AccountDiff::Coinbase(CoinbaseDiff {
             public_key: coinbase_receiver,
             amount: Amount(1440 * (1e9 as u64)),
@@ -238,38 +234,26 @@ mod tests {
     #[test]
     fn test_public_key_payment() {
         let payment_diff = PaymentDiff {
-            public_key: PublicKey::from_address(
-                "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG",
-            )
-            .unwrap(),
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: 536900000000.into(),
             update_type: UpdateType::Deduction,
         };
         let account_diff = AccountDiff::Payment(payment_diff);
         let result = account_diff.public_key();
-        let expected =
-            PublicKey::from_address("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")
-                .unwrap();
+        let expected = PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG");
+
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_public_key_delegation() {
         let delegation_diff = DelegationDiff {
-            delegator: PublicKey::from_address(
-                "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi",
-            )
-            .unwrap(),
-            delegate: PublicKey::from_address(
-                "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz",
-            )
-            .unwrap(),
+            delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi"),
+            delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
         };
         let account_diff = AccountDiff::Delegation(delegation_diff);
         let result = account_diff.public_key();
-        let expected =
-            PublicKey::from_address("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi")
-                .unwrap();
+        let expected = PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
         assert_eq!(result, expected);
     }
 }

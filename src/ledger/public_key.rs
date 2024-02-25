@@ -2,66 +2,40 @@ use mina_serialization_types::v1::PublicKeyV1;
 use mina_signer::{CompressedPubKey, PubKey};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PublicKey(PublicKeyV1);
-
-impl PartialEq for PublicKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for PublicKey {}
-
-impl PartialOrd for PublicKey {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.to_address().cmp(&other.to_address()))
-    }
-}
-
-impl Ord for PublicKey {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.to_address().cmp(&other.to_address())
-    }
-}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PublicKey(pub String);
 
 impl PublicKey {
-    pub fn from_v1(v1: PublicKeyV1) -> Self {
-        Self(v1)
+    pub fn new<S: Into<String>>(key: S) -> Self {
+        Self(key.into())
     }
 
     pub fn to_address(&self) -> String {
-        CompressedPubKey::from(&self.0).into_address()
-    }
-
-    pub fn from_address(value: &str) -> anyhow::Result<Self> {
-        CompressedPubKey::from_address(value)
-            .map(|x| Self(PublicKeyV1::from(x)))
-            .map_err(anyhow::Error::from)
+        self.0.to_owned()
     }
 }
 
 impl From<&str> for PublicKey {
     fn from(value: &str) -> Self {
-        Self::from_address(value).unwrap()
+        Self(value.to_owned())
     }
 }
 
 impl From<String> for PublicKey {
     fn from(value: String) -> Self {
-        Self::from_address(&value).unwrap()
+        Self(value.to_owned())
     }
 }
 
 impl std::hash::Hash for PublicKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.clone().0.inner().inner().x.hash(state);
+        self.0.hash(state);
     }
 }
 
 impl From<PublicKey> for String {
     fn from(value: PublicKey) -> Self {
-        value.to_address()
+        value.0
     }
 }
 
@@ -71,27 +45,23 @@ impl std::fmt::Display for PublicKey {
     }
 }
 
-impl std::fmt::Debug for PublicKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.to_address())
-    }
-}
-
 impl From<PublicKeyV1> for PublicKey {
-    fn from(value: PublicKeyV1) -> Self {
-        PublicKey(value)
+    fn from(v1: PublicKeyV1) -> Self {
+        let pk = CompressedPubKey::from(&v1.0.inner().inner());
+        Self(pk.into_address())
     }
 }
 
 impl From<PublicKey> for PublicKeyV1 {
     fn from(value: PublicKey) -> Self {
-        value.0
+        let pk = CompressedPubKey::from_address(&value.0).unwrap();
+        pk.into()
     }
 }
 
 impl From<PublicKey> for PubKey {
     fn from(value: PublicKey) -> Self {
-        PubKey::from_address(&CompressedPubKey::from(&value.0).into_address()).unwrap()
+        PubKey::from_address(&value.0).unwrap()
     }
 }
 
@@ -116,7 +86,7 @@ mod test {
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
         ];
         for pk in pks {
-            assert_eq!(PublicKey::from_address(pk).unwrap().to_address(), pk);
+            assert_eq!(PublicKey(pk.to_owned()).to_address(), pk);
         }
     }
 }
