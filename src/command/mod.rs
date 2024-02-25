@@ -6,8 +6,9 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::{SignedCommand, SignedCommandWithKind},
     ledger::{account::Amount, post_balances::PostBalance, public_key::PublicKey},
+    protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
-use mina_serialization_types::{staged_ledger_diff as mina_rs, v1 as mina_v1};
+use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
@@ -132,7 +133,7 @@ impl CommandStatusData {
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct UserCommandWithStatus(pub mina_v1::UserCommandWithStatusV1);
+pub struct UserCommandWithStatus(pub mina_rs::UserCommandWithStatusV1);
 
 impl UserCommandWithStatus {
     pub fn is_applied(&self) -> bool {
@@ -204,10 +205,10 @@ impl UserCommandWithStatus {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct PaymentPayload(pub mina_v1::PaymentPayloadV1);
+pub struct PaymentPayload(pub mina_rs::PaymentPayloadV1);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct StakeDelegation(pub mina_v1::StakeDelegationV1);
+pub struct StakeDelegation(pub mina_rs::StakeDelegationV1);
 
 impl Command {
     /// Get the list of commands from the precomputed block
@@ -299,7 +300,7 @@ impl From<mina_rs::TransactionStatus> for CommandStatusData {
 
 impl From<mina_rs::UserCommandWithStatus> for UserCommandWithStatus {
     fn from(value: mina_rs::UserCommandWithStatus) -> Self {
-        Self(versioned::Versioned {
+        Self(Versioned {
             version: 1,
             t: value,
         })

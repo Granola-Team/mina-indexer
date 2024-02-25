@@ -6,16 +6,18 @@ use crate::{
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey},
+    protocol::serialization_types::{
+        consensus_state as mina_consensus,
+        delta_transition_chain_proof::DeltaTransitionChainProofJson,
+        protocol_state::{ProtocolState, ProtocolStateJson},
+        protocol_state_proof::ProtocolStateProofBase64Json,
+        snark_work as mina_snark, staged_ledger_diff as mina_rs,
+    },
 };
 use anyhow::anyhow;
-use mina_serialization_types::{
-    consensus_state as mina_consensus,
-    json::DeltaTransitionChainProofJson,
-    protocol_state::{ProtocolState, ProtocolStateJson},
-    protocol_state_proof::ProtocolStateProofBase64Json,
-    snark_work as mina_snark, staged_ledger_diff as mina_rs,
-    v1::{DeltaTransitionChainProof, ProtocolStateProofV1},
-};
+
+use crate::protocol::serialization_types::delta_transition_chain_proof::DeltaTransitionChainProof;
+use crate::protocol::serialization_types::protocol_state_proof::ProtocolStateProofV1;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
@@ -288,7 +290,7 @@ impl PrecomputedBlock {
         let mut public_keys: HashSet<PublicKey> =
             HashSet::from([self.block_creator(), self.block_stake_winner()]);
 
-        // coinbase receiver if cooinbase is applied
+        // coinbase receiver if coinbase is applied
         if Coinbase::from_precomputed(self).is_coinbase_applied() {
             public_keys.insert(self.coinbase_receiver());
         }

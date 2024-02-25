@@ -3,7 +3,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[cfg(test)]
 mod tests {
-    use mina_serialization_types::json::*;
+    use mina_indexer::protocol::serialization_types::common::{ByteVecJson, CharJson};
     use wasm_bindgen_test::*;
 
     #[wasm_bindgen_test]

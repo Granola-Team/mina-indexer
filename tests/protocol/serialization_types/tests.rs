@@ -1,8 +1,35 @@
 #[cfg(all(test, feature = "browser"))]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-use bin_prot::*;
-use mina_serialization_types::v1::*;
+use mina_indexer::protocol::bin_prot::*;
+use mina_indexer::protocol::serialization_types::bulletproof_challenges::{
+    BulletproofChallengeTuple17V1, BulletproofChallengeTuple18V1, BulletproofChallengeV1,
+    BulletproofChallengesV1, BulletproofPreChallengeV1, ProofStateBulletproofChallengesV1,
+    ScalarChallengeVector2V1,
+};
+use mina_indexer::protocol::serialization_types::common::*;
+use mina_indexer::protocol::serialization_types::delta_transition_chain_proof::DeltaTransitionChainProof;
+use mina_indexer::protocol::serialization_types::field_and_curve_elements::{
+    ECPointV1, ECPointVecV1, FieldElement, FieldElementVecV1, FiniteECPoint,
+    FiniteECPointPairVecV1, FiniteECPointVecV1, InnerCurveScalar,
+};
+use mina_indexer::protocol::serialization_types::protocol_state::*;
+use mina_indexer::protocol::serialization_types::protocol_state_body::ProtocolStateBodyV1;
+use mina_indexer::protocol::serialization_types::protocol_state_proof::{
+    PairingBasedV1, PlonkV1, PrevEvalsV1, ProofStateDeferredValuesV1, ProofStatePairingBasedV1,
+    ProofStateV1, ProofStatementV1, ProtocolStateProofV1, ShiftedValueV1,
+    SpongeDigestBeforeEvaluationsV1,
+};
+use mina_indexer::protocol::serialization_types::signatures::{
+    PublicKey2V1, PublicKeyV1, SignatureV1,
+};
+use mina_indexer::protocol::serialization_types::staged_ledger_diff::{
+    CoinBaseFeeTransferV1, CoinBaseV1, InternalCommandBalanceDataV1, PaymentPayloadV1,
+    SignedCommandFeeTokenV1, SignedCommandMemoV1, SignedCommandPayloadBodyV1,
+    SignedCommandPayloadCommonV1, SignedCommandV1, StagedLedgerDiffTupleV1, StagedLedgerDiffV1,
+    StagedLedgerPreDiffV1, TransactionStatusAuxiliaryDataV1, TransactionStatusBalanceDataV1,
+    TransactionStatusV1, UserCommandV1, UserCommandWithStatusV1,
+};
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
@@ -502,10 +529,7 @@ fn smoke_test_deserialize_block() {
     }
 }
 
-pub(crate) fn select_path<'a>(
-    block: &'a bin_prot::Value,
-    path: impl AsRef<str>,
-) -> &'a bin_prot::Value {
+pub(crate) fn select_path<'a>(block: &'a Value, path: impl AsRef<str>) -> &'a Value {
     // pull out the bin_prot::Value corresponding to the path
     // will panic if the path is invalid
     let path_ref = path.as_ref();
@@ -534,12 +558,12 @@ pub(crate) fn select_path<'a>(
     val
 }
 
-fn test_in_block_ensure_empty(block: &bin_prot::Value, paths: &[&str]) {
+fn test_in_block_ensure_empty(block: &Value, paths: &[&str]) {
     for path in paths {
         let val = select_path(block, path);
 
         let mut bytes = vec![];
-        bin_prot::to_writer(&mut bytes, val)
+        to_writer(&mut bytes, val)
             .map_err(|err| {
                 format!(
                     "Failed writing bin-prot encoded data, err: {err}\npath: {path}\ndata: {:?}",
@@ -551,13 +575,13 @@ fn test_in_block_ensure_empty(block: &bin_prot::Value, paths: &[&str]) {
     }
 }
 
-fn test_in_block<'a, T: Serialize + Deserialize<'a>>(block: &bin_prot::Value, paths: &[&str]) {
+fn test_in_block<'a, T: Serialize + Deserialize<'a>>(block: &Value, paths: &[&str]) {
     for path in paths {
         let val = select_path(block, path);
 
         // write to binary then deserialize into T
         let mut bytes = vec![];
-        bin_prot::to_writer(&mut bytes, val)
+        to_writer(&mut bytes, val)
             .map_err(|err| {
                 format!(
                     "Failed writing bin-prot encoded data, err:{err}\npath: {path}\ndata: {:?}",
@@ -596,7 +620,7 @@ where
     T: Serialize,
 {
     let mut output = vec![];
-    bin_prot::to_writer(&mut output, val).expect("Failed writing bin-prot encoded data");
+    to_writer(&mut output, val).expect("Failed writing bin-prot encoded data");
     assert_eq!(bytes, output)
 }
 

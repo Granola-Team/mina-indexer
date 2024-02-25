@@ -3,10 +3,9 @@ pub mod store;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
+    protocol::serialization_types::snark_work as mina_rs,
 };
-use mina_serialization_types::snark_work as mina_rs;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkSummary {

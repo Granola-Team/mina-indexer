@@ -1,16 +1,14 @@
-use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    command::*,
-    ledger::public_key::PublicKey,
-};
+use crate::protocol::bin_prot;
+use crate::{command::*, protocol::serialization_types::staged_ledger_diff as mina_rs};
 use blake2::digest::VariableOutput;
-use mina_serialization_types::staged_ledger_diff as mina_rs;
+use mina_serialization_versioned::Versioned2;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
-use versioned::Versioned2;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SignedCommand(pub mina_serialization_types::staged_ledger_diff::SignedCommandV1);
+pub struct SignedCommand(
+    pub crate::protocol::serialization_types::staged_ledger_diff::SignedCommandV1,
+);
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithStateHash {

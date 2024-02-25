@@ -7,8 +7,12 @@ pub mod store;
 pub mod vrf_output;
 
 use self::vrf_output::VrfOutput;
-use crate::{block::precomputed::PrecomputedBlock, canonicity::Canonicity};
-use mina_serialization_types::{common::Base58EncodableVersionedType, v1::HashV1, version_bytes};
+use crate::protocol::serialization_types::common::HashV1;
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    canonicity::Canonicity,
+    protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
+};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
