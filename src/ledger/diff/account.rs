@@ -2,8 +2,8 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
     ledger::{Amount, PublicKey},
+    protocol::serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand},
 };
-use mina_serialization_types::staged_ledger_diff::{SignedCommandPayloadCommon, UserCommand};
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]

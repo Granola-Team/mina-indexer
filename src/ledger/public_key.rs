@@ -1,5 +1,5 @@
-use mina_serialization_types::v1::PublicKeyV1;
-use mina_signer::{CompressedPubKey, PubKey};
+use crate::proof_systems::signer::pubkey::{CompressedPubKey, PubKey};
+use crate::protocol::serialization_types::signatures::PublicKeyV1;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]

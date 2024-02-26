@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, result::Result};
+use std::collections::HashMap;
 use tracing::{debug, trace};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -212,7 +212,7 @@ impl Ledger {
                         AccountDiff::Coinbase(_) => Ok(()),
                         AccountDiff::Payment(_) => Err(LedgerError::AccountNotFound.into()),
                         AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
-                    }
+                    };
                 }
             }
         }

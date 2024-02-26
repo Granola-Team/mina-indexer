@@ -2,6 +2,7 @@ mod block;
 mod canonicity;
 mod command;
 mod event;
+mod protocol;
 mod snark_work;
 mod state;
 

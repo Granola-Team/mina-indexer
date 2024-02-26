@@ -2,11 +2,12 @@ use super::{
     account::{Account, Amount, Nonce},
     Ledger,
 };
-use mina_serialization_types::{
-    signatures::{CompressedCurvePoint, PublicKeyJson},
-    v1::PublicKeyV1,
+
+use crate::{
+    proof_systems::signer::pubkey::CompressedPubKey,
+    protocol::serialization_types::signatures::{CompressedCurvePoint, PublicKeyJson, PublicKeyV1},
 };
-use mina_signer::CompressedPubKey;
+
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};

@@ -57,14 +57,8 @@ tools, removing the need for a separate host Rust installation.
 
 ### Building the Project
 
-Run `nix build .?submodules=1` to compile the project. This will
+Run `nix build` to compile the project. This will
 compile the `mina-indexer` binary and place it in `./result/bin`.
-
-**Note:** There is an issue with versions of nix `2.19.x` where it
-doesn't correctly build the binary. Use versions `2.18.x` or
-below. Otherwise, here is a workaround command if you're unable to
-downgrade to a supported version: `nix build
-"git+file://$(pwd)?submodules=1"`
 
 ### Running Tests
 

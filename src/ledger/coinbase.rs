@@ -1,8 +1,7 @@
-use mina_serialization_types::staged_ledger_diff::{CoinBase, CoinBaseFeeTransfer};
-
 use crate::{
     block::precomputed::PrecomputedBlock,
     ledger::{diff::account::AccountDiff, PublicKey},
+    protocol::serialization_types::staged_ledger_diff::{CoinBase, CoinBaseFeeTransfer},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -94,7 +94,6 @@
 
             buildInputs = developmentDependencies;
             shellHook = ''
-              git submodule update --init --recursive
               export TMPDIR=/var/tmp
             '';
           };

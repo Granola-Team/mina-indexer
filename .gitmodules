@@ -1,4 +1,0 @@
-[submodule "mina-rs"]
-	path = mina-rs
-	url = https://github.com/Granola-Team/mina-rs
-	branch = main

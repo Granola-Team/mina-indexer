@@ -1,7 +1,7 @@
 use crate::block::{self, parser::BlockParser, precomputed::PrecomputedBlock};
 use async_priority_channel as priority;
 use async_trait::async_trait;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
