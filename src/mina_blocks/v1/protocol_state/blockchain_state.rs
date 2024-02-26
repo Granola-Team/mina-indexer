@@ -1,5 +1,6 @@
-use crate::mina_blocks::v1::common::from_str;
 use serde::{Deserialize, Serialize};
+
+use crate::mina_blocks::v1::common::from_str;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockchainState {

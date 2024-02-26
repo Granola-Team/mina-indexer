@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::block::precomputed::PrecomputedBlock;
 use mina_serialization_types::staged_ledger_diff as mina_rs;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum InternalCommand {

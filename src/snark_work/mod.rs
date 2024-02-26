@@ -5,7 +5,8 @@ use crate::{
     ledger::public_key::PublicKey,
 };
 use mina_serialization_types::snark_work as mina_rs;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkSummary {

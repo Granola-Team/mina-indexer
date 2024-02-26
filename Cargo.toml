@@ -19,8 +19,7 @@ anyhow = { version = "1.0.69" }
 async-trait = "0.1.64"
 futures = "0.3.26"
 futures-util = "0.3.26"
-serde = "1.0.152"
-serde_derive = "1.0.152"
+serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.92", features = ["raw_value"] }
 clap = { version = "4.1.4", features = ["derive"] }
 thiserror = "1.0.38"
