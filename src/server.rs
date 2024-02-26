@@ -15,7 +15,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{io, sync::mpsc, task::JoinHandle};
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -33,7 +33,7 @@ pub struct IndexerConfiguration {
 
 pub struct MinaIndexer {
     _ipc_join_handle: JoinHandle<()>,
-    _witness_join_handle: JoinHandle<anyhow::Result<()>>,
+    _witness_join_handle: JoinHandle<()>,
 }
 
 #[derive(Debug)]
@@ -73,8 +73,17 @@ impl MinaIndexer {
             ipc_actor.run().await
         });
         let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(config, store, ipc_update_arc.clone()).await?;
-            run(watch_dir, state, ipc_update_arc.clone()).await
+            let state = match initialize(config, store, ipc_update_arc.clone()).await {
+                Ok(state) => state,
+                Err(e) => {
+                    error!("Error in server initialization: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            if let Err(e) = run(watch_dir, state, ipc_update_arc.clone()).await {
+                error!("Error in server run: {}", e);
+                std::process::exit(1);
+            }
         });
 
         Ok(Self {
@@ -237,22 +246,28 @@ pub async fn run(
     loop {
         tokio::select! {
             block_fut = filesystem_receiver.recv_block() => {
-                if let Some(precomputed_block) = block_fut? {
-                    let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-                    debug!("Receiving block (length {}): {}", block.blockchain_length, block.state_hash);
+                match block_fut {
+                    Ok(option_block) => {
+                        if let Some(precomputed_block) = option_block {
+                            let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
+                            debug!("Receiving block (length {}): {}", block.blockchain_length, block.state_hash);
 
-                    if state.block_pipeline(&precomputed_block)? {
-                        info!("Added block (length {}): {}", block.blockchain_length, block.state_hash);
+                            if state.block_pipeline(&precomputed_block)? {
+                                info!("Added block (length {}): {}", block.blockchain_length, block.state_hash);
+                            }
+
+                            ipc_update_sender.send(IpcChannelUpdate {
+                                best_tip: state.best_tip_block().clone(),
+                                summary: Box::new(state.summary_verbose()),
+                                store: Arc::new(state.spawn_secondary_database()?),
+                            }).await?;
+                        } else {
+                            warn!("Block receiver returned None");
+                        }
                     }
-
-                    ipc_update_sender.send(IpcChannelUpdate {
-                        best_tip: state.best_tip_block().clone(),
-                        summary: Box::new(state.summary_verbose()),
-                        store: Arc::new(state.spawn_secondary_database()?),
-                    }).await?;
-                } else {
-                    info!("Block receiver shutdown, system exit");
-                    return Ok(())
+                    Err(e) => {
+                        error!("Unable to receive block: {}", e);
+                    }
                 }
             }
         }
