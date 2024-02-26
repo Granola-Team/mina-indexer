@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 pub struct TransactionSnarkWork {
     // Versioned 1 byte
     pub fee: AmountV1,
-    pub proofs: OneORTwoV1,
     pub prover: PublicKeyV1,
 }
 
@@ -30,7 +29,6 @@ pub type TransactionSnarkWorkV1 = Versioned<TransactionSnarkWork, 1>;
 pub struct TransactionSnarkWorkJson {
     // Versioned 1 byte
     pub fee: DecimalJson,
-    pub proofs: OneORTwoJson,
     pub prover: PublicKeyJson,
 }
 
