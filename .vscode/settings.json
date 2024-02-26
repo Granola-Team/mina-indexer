@@ -2,8 +2,5 @@
     "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
-        "./mina-rs/consensus/Cargo.toml",
-        "./mina-rs/proof-systems/Cargo.toml",
-        "./mina-rs/protocol/serialization-types/Cargo.toml",
     ]
 }
