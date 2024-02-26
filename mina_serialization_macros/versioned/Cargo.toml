@@ -1,0 +1,10 @@
+[package]
+authors = ["Granola <hello@granola.team>"]
+name = "mina_serialization_versioned"
+version = "1.0.0"
+
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1.0.152", features = ["derive"] }
