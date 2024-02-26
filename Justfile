@@ -21,6 +21,12 @@ clean:
   cargo clean
   rm -rf result
 
+format:
+  cargo +nightly fmt --all
+
+format-verify:
+  cargo +nightly fmt --all --check
+
 test: test-unit
   ./test
 
