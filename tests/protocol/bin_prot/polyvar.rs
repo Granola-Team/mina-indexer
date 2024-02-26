@@ -1,6 +1,7 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::protocol::bin_prot::polyvar::TestPolyvar::{None, One, Two};
 use mina_indexer::protocol::bin_prot::{error::Error, to_writer, Deserializer};
 use serde::{Deserialize, Serialize};
 
@@ -10,15 +11,15 @@ enum TestPolyvar {
     // Hash repr 870530776_u32
     // ocaml native integer 1741061553_u32
     #[serde(rename = "None")]
-    VariantNone,
+    None,
     // Hash repr 3953222_u32
     // ocaml native integer 7906445_u32
     #[serde(rename = "One")]
-    VariantOne(bool),
+    One(bool),
     // Hash repr 4203884_u32
     // ocaml native integer 8407769_u32
     #[serde(rename = "Two")]
-    VariantTwo(TestPolyvar2),
+    Two(TestPolyvar2),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -35,7 +36,7 @@ fn test_polyvar_variant_none() {
     let tag = 1741061553_u32.to_le_bytes();
     let mut de = Deserializer::from_reader(tag.as_slice());
     let result: TestPolyvar = Deserialize::deserialize(&mut de).expect("Failed to deserialize");
-    assert_eq!(result, TestPolyvar::VariantNone);
+    assert_eq!(result, None);
 
     let mut re_bytes = vec![];
     to_writer(&mut re_bytes, &result).unwrap();
@@ -50,7 +51,7 @@ fn test_polyvar_variant_one() {
 
     let mut de = Deserializer::from_reader(data.as_slice());
     let result: TestPolyvar = Deserialize::deserialize(&mut de).expect("Failed to deserialize");
-    assert_eq!(result, TestPolyvar::VariantOne(true));
+    assert_eq!(result, One(true));
 
     let mut re_bytes = vec![];
     to_writer(&mut re_bytes, &result).unwrap();
@@ -65,7 +66,7 @@ fn test_polyvar_variant_two() {
 
     let mut de = Deserializer::from_reader(data.as_slice());
     let result: TestPolyvar = Deserialize::deserialize(&mut de).expect("Failed to deserialize");
-    assert_eq!(result, TestPolyvar::VariantTwo(TestPolyvar2::SomeVariant));
+    assert_eq!(result, Two(TestPolyvar2::SomeVariant));
 
     let mut re_bytes = vec![];
     to_writer(&mut re_bytes, &result).unwrap();

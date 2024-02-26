@@ -1,8 +1,12 @@
+// Copyright 2020 ChainSafe Systems
+// SPDX-License-Identifier: Apache-2.0
+
 #[cfg(all(test, feature = "browser"))]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[cfg(test)]
 mod tests {
+    use crate::protocol::test_fixtures::JSON_TEST_BLOCKS;
     use mina_indexer::protocol::serialization_types::common::{ByteVecJson, CharJson};
     use wasm_bindgen_test::*;
 
@@ -28,13 +32,13 @@ mod tests {
 
     #[test]
     fn sok_digest_json() -> anyhow::Result<()> {
-        let block = test_fixtures::JSON_TEST_BLOCKS
+        let block = JSON_TEST_BLOCKS
             .get("mainnet-116121-3NK6myZRzc3GvS5iydv88on2XTEU2btYrjMVkgtbuoeXASRipSa6.json")
             .unwrap();
         let json_value = &block["staged_ledger_diff"]["diff"][0]["completed_works"][0]["proofs"][1]
             ["statement"]["sok_digest"];
         let byte_vec: ByteVecJson = serde_json::from_value(json_value.clone())?;
-        let json_value_from_byte_vec = serde_json::to_value(&byte_vec)?;
+        let json_value_from_byte_vec = serde_json::to_value(byte_vec)?;
         assert_eq!(json_value, &json_value_from_byte_vec);
         Ok(())
     }

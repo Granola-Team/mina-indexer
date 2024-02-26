@@ -1,2 +1,2 @@
-pub mod common;
-pub mod tests;
+mod common;
+mod tests;

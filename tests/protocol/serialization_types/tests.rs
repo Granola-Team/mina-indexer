@@ -1,40 +1,61 @@
+// Copyright 2020 ChainSafe Systems
+// SPDX-License-Identifier: Apache-2.0
+
 #[cfg(all(test, feature = "browser"))]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-use mina_indexer::protocol::bin_prot::*;
-use mina_indexer::protocol::serialization_types::bulletproof_challenges::{
-    BulletproofChallengeTuple17V1, BulletproofChallengeTuple18V1, BulletproofChallengeV1,
-    BulletproofChallengesV1, BulletproofPreChallengeV1, ProofStateBulletproofChallengesV1,
-    ScalarChallengeVector2V1,
+use crate::{
+    block_path_test, block_path_test_batch, block_sum_path_test,
+    protocol::fixtures::test::TEST_BLOCKS,
 };
-use mina_indexer::protocol::serialization_types::common::*;
-use mina_indexer::protocol::serialization_types::delta_transition_chain_proof::DeltaTransitionChainProof;
-use mina_indexer::protocol::serialization_types::field_and_curve_elements::{
-    ECPointV1, ECPointVecV1, FieldElement, FieldElementVecV1, FiniteECPoint,
-    FiniteECPointPairVecV1, FiniteECPointVecV1, InnerCurveScalar,
-};
-use mina_indexer::protocol::serialization_types::protocol_state::*;
-use mina_indexer::protocol::serialization_types::protocol_state_body::ProtocolStateBodyV1;
-use mina_indexer::protocol::serialization_types::protocol_state_proof::{
-    PairingBasedV1, PlonkV1, PrevEvalsV1, ProofStateDeferredValuesV1, ProofStatePairingBasedV1,
-    ProofStateV1, ProofStatementV1, ProtocolStateProofV1, ShiftedValueV1,
-    SpongeDigestBeforeEvaluationsV1,
-};
-use mina_indexer::protocol::serialization_types::signatures::{
-    PublicKey2V1, PublicKeyV1, SignatureV1,
-};
-use mina_indexer::protocol::serialization_types::staged_ledger_diff::{
-    CoinBaseFeeTransferV1, CoinBaseV1, InternalCommandBalanceDataV1, PaymentPayloadV1,
-    SignedCommandFeeTokenV1, SignedCommandMemoV1, SignedCommandPayloadBodyV1,
-    SignedCommandPayloadCommonV1, SignedCommandV1, StagedLedgerDiffTupleV1, StagedLedgerDiffV1,
-    StagedLedgerPreDiffV1, TransactionStatusAuxiliaryDataV1, TransactionStatusBalanceDataV1,
-    TransactionStatusV1, UserCommandV1, UserCommandWithStatusV1,
+use mina_indexer::protocol::{
+    bin_prot::*,
+    serialization_types::{
+        blockchain_state::{BlockchainStateV1, NonSnarkStagedLedgerHashV1, StagedLedgerHashV1},
+        bulletproof_challenges::{
+            BulletproofChallengeTuple17V1, BulletproofChallengeTuple18V1, BulletproofChallengeV1,
+            BulletproofChallengesV1, BulletproofPreChallengeV1, ProofStateBulletproofChallengesV1,
+            ScalarChallengeVector2V1,
+        },
+        common::*,
+        consensus_state::{ConsensusStateV1, VrfOutputTruncatedV1},
+        delta_transition_chain_proof::DeltaTransitionChainProof,
+        epoch_data::{EpochDataV1, EpochLedgerV1},
+        external_transition::ExternalTransitionV1,
+        field_and_curve_elements::{
+            ECPointV1, ECPointVecV1, FieldElement, FieldElementVecV1, FiniteECPoint,
+            FiniteECPointPairVecV1, FiniteECPointVecV1, InnerCurveScalar,
+        },
+        global_slot::GlobalSlotV1,
+        opening_proof::OpeningProofV1,
+        proof_evaluations::ProofEvaluationsV1,
+        proof_messages::{
+            ProofMessageWithDegreeBoundV1, ProofMessageWithoutDegreeBoundListV1, ProofMessagesV1,
+        },
+        protocol_constants::ProtocolConstantsV1,
+        protocol_state::*,
+        protocol_state_body::ProtocolStateBodyV1,
+        protocol_state_proof::{
+            PairingBasedV1, PlonkV1, PrevEvalsV1, PrevXHatV1, ProofOpeningsV1,
+            ProofStateDeferredValuesV1, ProofStatePairingBasedV1, ProofStateV1, ProofStatementV1,
+            ProofV1, ProtocolStateProofV1, ShiftedValueV1, SpongeDigestBeforeEvaluationsV1,
+        },
+        protocol_version::ProtocolVersionV1,
+        signatures::{PublicKey2V1, PublicKeyV1, SignatureV1},
+        snark_work::TransactionSnarkWorkV1,
+        staged_ledger_diff::{
+            CoinBaseFeeTransferV1, CoinBaseV1, InternalCommandBalanceDataV1, PaymentPayloadV1,
+            SignedCommandFeeTokenV1, SignedCommandMemoV1, SignedCommandPayloadBodyV1,
+            SignedCommandPayloadCommonV1, SignedCommandV1, StagedLedgerDiffTupleV1,
+            StagedLedgerDiffV1, StagedLedgerPreDiffV1, TransactionStatusAuxiliaryDataV1,
+            TransactionStatusBalanceDataV1, TransactionStatusV1, UserCommandV1,
+            UserCommandWithStatusV1,
+        },
+    },
 };
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
-use std::str::FromStr;
-use test_fixtures::*;
+use std::{any::TypeId, str::FromStr};
 use wasm_bindgen_test::*;
 
 #[test]
@@ -86,7 +107,7 @@ fn test_protocol_state_body_blockchain_state() {
         TokenIdV1 => "t/protocol_state/t/t/body/t/t/blockchain_state/t/t/snarked_next_available_token"
         BlockTimeV1 => "t/protocol_state/t/t/body/t/t/blockchain_state/t/t/timestamp"
         BlockchainStateV1 => "t/protocol_state/t/t/body/t/t/blockchain_state"
-    };
+    }
 }
 
 #[test]
@@ -99,7 +120,7 @@ fn test_protocol_state_body_blockchain_state_staged_ledger_hash() {
         NonSnarkStagedLedgerHashV1 => "t/protocol_state/t/t/body/t/t/blockchain_state/t/t/staged_ledger_hash/t/t/non_snark"
         Hash2V1 => "t/protocol_state/t/t/body/t/t/blockchain_state/t/t/staged_ledger_hash/t/t/pending_coinbase_hash"
         StagedLedgerHashV1 => "t/protocol_state/t/t/body/t/t/blockchain_state/t/t/staged_ledger_hash"
-    };
+    }
 }
 
 #[test]
@@ -501,9 +522,9 @@ fn smoke_test_roundtrip_block1() {
     assert_eq!(
         block.value["t"]["protocol_state"]["t"]["t"]["previous_state_hash"]["t"],
         Value::Tuple(
-            vec![
+            [
                 30, 76, 197, 215, 115, 43, 42, 245, 198, 30, 253, 134, 49, 117, 82, 71, 182, 181,
-                180, 95, 18, 250, 46, 1, 25, 3, 78, 193, 57, 152, 116, 49,
+                180, 95, 18, 250, 46, 1, 25, 3, 78, 193, 57, 152, 116, 49
             ]
             .iter()
             .map(|c| Value::Char(*c))
@@ -529,11 +550,11 @@ fn smoke_test_deserialize_block() {
     }
 }
 
-pub(crate) fn select_path<'a>(block: &'a Value, path: impl AsRef<str>) -> &'a Value {
+pub(crate) fn select_path(block: &Value, path: impl AsRef<str>) -> &Value {
     // pull out the bin_prot::Value corresponding to the path
     // will panic if the path is invalid
     let path_ref = path.as_ref();
-    if path_ref.len() == 0 {
+    if path_ref.is_empty() {
         return block;
     }
     let mut val = block;
@@ -546,7 +567,7 @@ pub(crate) fn select_path<'a>(block: &'a Value, path: impl AsRef<str>) -> &'a Va
                     println!("Unpacking sum type index {index} for {path_ref}");
                     val = value;
                 }
-                _ => assert!(false, "Sum expected"),
+                _ => panic!("Sum expected"),
             }
         } else {
             val = match usize::from_str(p) {
@@ -624,51 +645,7 @@ where
     assert_eq!(bytes, output)
 }
 
-#[macro_export]
-macro_rules! block_path_test {
-    ($typ:ty, $path:expr) => {
-        for block in TEST_BLOCKS.values() {
-            let start = std::time::Instant::now();
-            test_in_block::<$typ>(&block.value, &[$path]);
-            println!(
-                "block {} duration {:?}",
-                block.block_name,
-                std::time::Instant::now() - start,
-            );
-        }
-    };
-}
-
 // This is introduced to support `block_sum_path_test`
 // match a given path to CoinBase::Zero which is an empty variant
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DummyEmptyVariant;
-
-#[macro_export]
-macro_rules! block_sum_path_test {
-    ($path:expr, $($typ:ty,)*) => {
-        for block in TEST_BLOCKS.values() {
-            println!("Testing block {}", block.block_name);
-            let mut success = 0;
-            $(
-                if TypeId::of::<$typ>() == TypeId::of::<DummyEmptyVariant>() {
-                    if std::panic::catch_unwind(|| test_in_block_ensure_empty(&block.value, &[$path])).is_ok() {
-                        success += 1;
-                    }
-                } else if std::panic::catch_unwind(|| test_in_block::<$typ>(&block.value, &[$path])).is_ok() {
-                    success += 1;
-                }
-            )*
-            assert_eq!(success, 1, "Failing block: {}", block.block_name);
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! block_path_test_batch {
-    ($($typ:ty => $path:expr) *)  => {
-        $(
-            block_path_test!($typ, $path);
-        )*
-    };
-}

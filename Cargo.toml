@@ -8,6 +8,11 @@ name = "mina-indexer"
 test = true
 bench = false
 
+[features]
+# required for tests - see https://github.com/rust-lang/cargo/issues/2911
+default = ["loose_deserialization"]
+loose_deserialization = []
+
 [[bin]]
 name = "mainnet-test"
 test = true
