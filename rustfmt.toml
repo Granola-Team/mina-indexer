@@ -1,3 +1,4 @@
 imports_granularity = "Crate"
 group_imports = "One"
 wrap_comments = true
+newline_style = "Unix"
