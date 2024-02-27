@@ -77,7 +77,10 @@ impl GenesisLedger {
                 Account {
                     public_key: public_key.clone(),
                     // If delegate is None, delegate to yourself
-                    delegate: genesis_account.delegate.map(PublicKey).unwrap_or(public_key),
+                    delegate: genesis_account
+                        .delegate
+                        .map(PublicKey)
+                        .unwrap_or(public_key),
                     balance,
                     nonce: Nonce::default(),
                 },
@@ -92,4 +95,53 @@ impl GenesisLedger {
 pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
     let data = std::fs::read(filename)?;
     Ok(serde_json::from_slice(&data)?)
+}
+
+mod tests {
+    use crate::ledger::public_key::PublicKey;
+
+    use super::{GenesisLedger, GenesisRoot};
+
+    #[test]
+    fn test_genesis_ledger_default_delegation_test() -> anyhow::Result<()> {
+        let ledger_json = r#"{
+            "genesis": {
+                "genesis_state_timestamp": "2021-03-17T00:00:00Z"
+            },
+            "ledger": {
+                "name": "mainnet",
+                "accounts": [
+                    {"pk": "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1","balance":"0"}
+                ]
+            }
+        }"#;
+
+        let root: GenesisRoot = serde_json::from_str(ledger_json)?;
+
+        assert_eq!(
+            "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
+            root.ledger.accounts.first().unwrap().pk
+        );
+        assert_eq!(None, root.ledger.accounts.first().unwrap().delegate);
+
+        let ledger = GenesisLedger::new(root.ledger);
+        let map = ledger.ledger.accounts;
+        let value = map
+            .get(&PublicKey::from(
+                "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
+            ))
+            .unwrap();
+
+        // The delete should be the same as the public key
+        assert_eq!(
+            "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
+            value.public_key.0
+        );
+        assert_eq!(
+            "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
+            value.delegate.0
+        );
+
+        Ok(())
+    }
 }
