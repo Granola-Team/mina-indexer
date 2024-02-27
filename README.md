@@ -81,7 +81,7 @@ nix-shell --run "just test-regression"
 
 ## License (See LICENSE file for full license)
 
-Copyright 2022-2023 Mina Foundation, Inc.
+Copyright 2022-2024 Mina Foundation, Inc.
 
 Free use of this software is granted under the terms of the Mozilla
 Public License 2.0.
