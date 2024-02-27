@@ -1,18 +1,13 @@
 use super::{
     account::{Account, Amount, Nonce},
+    public_key::PublicKey,
     Ledger,
-};
-
-use crate::{
-    proof_systems::signer::pubkey::CompressedPubKey,
-    protocol::serialization_types::signatures::{CompressedCurvePoint, PublicKeyJson, PublicKeyV1},
 };
 
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error, path::Path};
-use tracing::debug;
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
@@ -53,12 +48,6 @@ pub struct GenesisLedger {
     ledger: Ledger,
 }
 
-pub fn string_to_public_key_json(s: String) -> Result<PublicKeyJson, Box<dyn Error>> {
-    let pk = CompressedPubKey::from_address(&s)?;
-    let pk = CompressedCurvePoint::from(&pk);
-    Ok(pk.into())
-}
-
 impl From<GenesisRoot> for GenesisLedger {
     fn from(value: GenesisRoot) -> Self {
         Self::new(value.ledger)
@@ -82,31 +71,16 @@ impl GenesisLedger {
                     .expect("Parsed Genesis Balance has wrong format"),
                 Err(_) => panic!("Unable to parse Genesis Balance"),
             });
-            // Temporary hack to ignore bad PKs in mainnet genesis ledger
-            if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW"
-                || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1"
-            {
-                debug!(
-                    "Known broken public keys... Ignoring {}",
-                    genesis_account.pk
-                );
-                continue;
-            }
-            if let Ok(pk) = string_to_public_key_json(genesis_account.pk) {
-                accounts.insert(
-                    PublicKeyV1::from(pk.clone()).into(),
-                    Account {
-                        public_key: PublicKeyV1::from(pk.clone()).into(),
-                        delegate: genesis_account.delegate.clone().map(|delegate| {
-                            PublicKeyV1::from(string_to_public_key_json(delegate).unwrap()).into()
-                        }),
-                        balance,
-                        nonce: Nonce::default(),
-                    },
-                );
-            } else {
-                panic!("Unparsable public key");
-            }
+            let public_key = PublicKey::from(genesis_account.pk);
+            accounts.insert(
+                public_key.clone(),
+                Account {
+                    public_key,
+                    delegate: genesis_account.delegate.map(PublicKey),
+                    balance,
+                    nonce: Nonce::default(),
+                },
+            );
         }
         GenesisLedger {
             ledger: Ledger { accounts },
