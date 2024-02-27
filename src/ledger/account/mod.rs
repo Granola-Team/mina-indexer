@@ -19,22 +19,18 @@ pub struct Nonce(pub u32);
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
-    pub delegate: Option<PublicKey>,
+    pub delegate: PublicKey,
     pub balance: Amount,
     pub nonce: Nonce,
 }
 
 impl Account {
-    pub fn is_empty(&self) -> bool {
-        self == &Self::empty(self.public_key.clone())
-    }
-
     pub fn empty(public_key: PublicKey) -> Self {
         Account {
-            public_key,
+            public_key: public_key.clone(),
             balance: Amount::default(),
             nonce: Nonce::default(),
-            delegate: None,
+            delegate: public_key,
         }
     }
 
@@ -78,7 +74,7 @@ impl Account {
             public_key: pre.public_key,
             balance: pre.balance,
             nonce: Nonce(pre.nonce.0 + 1),
-            delegate: Some(delegate),
+            delegate,
         }
     }
 }

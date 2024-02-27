@@ -48,7 +48,7 @@ impl Ledger {
 
     fn apply_delegation(&mut self, delegator: PublicKey, new_delegate: PublicKey) {
         if let Some(account) = self.accounts.get_mut(&delegator) {
-            account.delegate = Some(new_delegate);
+            account.delegate = new_delegate;
         }
     }
 
@@ -59,11 +59,12 @@ impl Ledger {
             }
             account.balance = Amount(balance_update.balance);
         } else {
+            let public_key = balance_update.public_key.clone();
             let new_account = Account {
-                public_key: balance_update.public_key.clone(),
+                public_key: public_key.clone(),
                 balance: Amount(balance_update.balance),
                 nonce: Nonce(nonce.unwrap_or(0)),
-                delegate: None,
+                delegate: public_key,
             };
             self.accounts.insert(balance_update.public_key, new_account);
         }
@@ -224,7 +225,7 @@ impl Ledger {
         let mut ledger = Ledger::new();
         for (pubkey, balance, nonce, delgation) in value {
             let pk = PublicKey::new(pubkey);
-            let delegate = delgation.map(PublicKey::new);
+            let delegate = delgation.map(PublicKey::new).unwrap_or(pk.clone());
 
             ledger.accounts.insert(
                 pk.clone(),
@@ -405,7 +406,7 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
-        assert_eq!(account_after.delegate, Some(delegate_key));
+        assert_eq!(account_after.delegate, delegate_key);
     }
 
     #[test]
@@ -468,6 +469,6 @@ mod tests {
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
         assert_eq!(account_before.balance, account_after.balance);
-        assert_eq!(account_after.delegate, Some(delegate_key));
+        assert_eq!(account_after.delegate, delegate_key);
     }
 }

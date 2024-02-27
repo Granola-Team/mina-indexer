@@ -27,7 +27,7 @@ pub struct CoinbaseFeeTransfer {
 impl From<CoinBaseFeeTransfer> for CoinbaseFeeTransfer {
     fn from(value: CoinBaseFeeTransfer) -> Self {
         Self {
-            receiver_pk: value.receiver_pk.into(),
+            receiver_pk: PublicKey::from(value.receiver_pk),
             fee: value.fee.inner().inner(),
         }
     }
@@ -40,7 +40,7 @@ impl CoinbaseKind {
             CoinBase::One(x) => Self::One(x.map(|cb| {
                 let CoinBaseFeeTransfer { receiver_pk, fee } = cb.inner().inner();
                 CoinbaseFeeTransfer {
-                    receiver_pk: receiver_pk.into(),
+                    receiver_pk: PublicKey::from(receiver_pk),
                     fee: fee.inner().inner(),
                 }
             })),
