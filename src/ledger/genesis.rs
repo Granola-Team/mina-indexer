@@ -97,6 +97,7 @@ pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
     Ok(serde_json::from_slice(&data)?)
 }
 
+#[cfg(test)]
 mod tests {
     use crate::ledger::public_key::PublicKey;
 
