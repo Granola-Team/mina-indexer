@@ -1,5 +1,5 @@
 use mina_indexer::ledger::{
-    genesis::{self, GenesisLedger, GenesisRoot},
+    genesis::{self, GenesisLedger},
     Ledger,
 };
 #[test]
@@ -24,7 +24,6 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         genesis_root.ledger.accounts.len(),
         "Total number of genesis accounts"
     );
-    // 805253692.840038233 was manually calculated ignoring the 2 bad accounts balances
     assert_eq!(
         805385692840038233, initial_supply,
         "Mina inital distribution"
