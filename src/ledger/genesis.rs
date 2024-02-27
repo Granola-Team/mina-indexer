@@ -75,8 +75,9 @@ impl GenesisLedger {
             accounts.insert(
                 public_key.clone(),
                 Account {
-                    public_key,
-                    delegate: genesis_account.delegate.map(PublicKey),
+                    public_key: public_key.clone(),
+                    // If delegate is None, delegate to yourself
+                    delegate: genesis_account.delegate.map(PublicKey).unwrap_or(public_key),
                     balance,
                     nonce: Nonce::default(),
                 },
