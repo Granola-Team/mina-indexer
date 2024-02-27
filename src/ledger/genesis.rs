@@ -8,7 +8,6 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-use tracing::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
@@ -72,16 +71,6 @@ impl GenesisLedger {
                     .expect("Parsed Genesis Balance has wrong format"),
                 Err(_) => panic!("Unable to parse Genesis Balance"),
             });
-            // Temporary hack to ignore bad PKs in mainnet genesis ledger
-            if genesis_account.pk == "B62qpyhbvLobnd4Mb52vP7LPFAasb2S6Qphq8h5VV8Sq1m7VNK1VZcW"
-                || genesis_account.pk == "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1"
-            {
-                debug!(
-                    "Known broken public keys... Ignoring {}",
-                    genesis_account.pk
-                );
-                continue;
-            }
             let public_key = PublicKey::from(genesis_account.pk);
             accounts.insert(
                 public_key.clone(),
