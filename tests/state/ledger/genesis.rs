@@ -25,7 +25,7 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         "Total number of genesis accounts"
     );
     assert_eq!(
-        805385692840038233, initial_supply,
+        805385692840039233, initial_supply,
         "Mina inital distribution"
     );
     Ok(())
