@@ -1117,6 +1117,27 @@ test_release() {
     teardown
 }
 
+test_genesis_block_creator() {
+    test=test_genesis_block_creator
+
+    setup
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug
+    sleep 5
+    
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    balance=$(idxr ledger-at-height --height 1 | jq -r .${pk}.balance)
+    
+    # verify that the genesis block winner account gets 1000 magic nanomina
+    assert '1000' $balance
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -1141,6 +1162,7 @@ if [ "$#" -eq 0 ]; then
     test_checkpoint
     test_many_blocks
     test_rest_endpoints
+    test_genesis_block_creator
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1166,6 +1188,7 @@ else
             "test_checkpoint") test_checkpoint ;;
             "test_many_blocks") test_many_blocks ;;
             "test_rest_endpoints") test_rest_endpoints ;;
+            "test_genesis_block_creator") test_genesis_block_creator ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac

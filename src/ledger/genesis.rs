@@ -1,3 +1,5 @@
+use crate::block::genesis::GenesisBlock;
+
 use super::{
     account::{Account, Amount, Nonce},
     public_key::PublicKey,
@@ -64,6 +66,10 @@ impl GenesisLedger {
     /// This is the only way to construct a genesis ledger
     pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
         let mut accounts = HashMap::new();
+        // Add genesis block winner
+        let block_creator = Account::from(GenesisBlock::new().unwrap());
+        let pk = block_creator.public_key.clone();
+        accounts.insert(pk, block_creator);
         for genesis_account in genesis.accounts {
             let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
                 Ok(amt) => (amt * dec!(1_000_000_000))

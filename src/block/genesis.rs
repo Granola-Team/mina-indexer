@@ -1,7 +1,7 @@
 use crate::block::precomputed::PrecomputedBlock;
 use std::path::PathBuf;
 
-pub struct GenesisBlock(PrecomputedBlock);
+pub struct GenesisBlock(pub PrecomputedBlock);
 
 impl GenesisBlock {
     /// Creates the mainnet genesis block as a PCB

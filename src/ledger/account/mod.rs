@@ -1,4 +1,7 @@
-use crate::{constants::MAINNET_ACCOUNT_CREATION_FEE, ledger::public_key::PublicKey};
+use crate::{
+    block::genesis::GenesisBlock, constants::MAINNET_ACCOUNT_CREATION_FEE,
+    ledger::public_key::PublicKey,
+};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -75,6 +78,18 @@ impl Account {
             balance: pre.balance,
             nonce: Nonce(pre.nonce.0 + 1),
             delegate,
+        }
+    }
+}
+
+impl From<GenesisBlock> for Account {
+    fn from(value: GenesisBlock) -> Self {
+        let block_creator = value.0.block_creator();
+        Account {
+            public_key: block_creator.clone(),
+            balance: Amount(1000_u64),
+            delegate: block_creator,
+            nonce: Nonce::default(),
         }
     }
 }
