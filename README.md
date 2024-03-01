@@ -79,12 +79,11 @@ features after updates, use:
 nix-shell --run "just test-regression"
 ```
 
-## License (See LICENSE file for full license)
+## License
 
-Copyright 2022-2024 Mina Foundation, Inc.
+Copyright 2022-2024 Granola Systems Inc.
 
-Free use of this software is granted under the terms of the Mozilla
-Public License 2.0.
+This software is [licensed](LICENSE) under the Apache License, Version 2.0.
 
 ## Contributing
 
