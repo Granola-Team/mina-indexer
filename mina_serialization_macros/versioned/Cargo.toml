@@ -1,5 +1,5 @@
 [package]
-authors = ["Granola <hello@granola.team>"]
+authors = ["ChainSafe Systems Inc., Granola Systems Inc."]
 name = "mina_serialization_versioned"
 version = "1.0.0"
 
