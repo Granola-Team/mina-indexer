@@ -33,7 +33,7 @@ thiserror = "1.0.38"
 glob = "0.3.1"
 mina_serialization_proc_macros = { path = "mina_serialization_macros/proc_macros" }
 mina_serialization_versioned = { path = "mina_serialization_macros/versioned" }
-ark-ec = "0.3.0"
+ark-ec = "0.4.2"
 ark-ff = "0.3.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
