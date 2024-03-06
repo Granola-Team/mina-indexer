@@ -71,7 +71,7 @@ lazy_static = "1.4.0"
 serde_stacker = "0.1.11"
 
 [dependencies.tokio]
-version = "1.25.0"
+version = "1.36.0"
 features = ["full"]
 
 [profile.release]
