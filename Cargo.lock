@@ -1883,9 +1883,9 @@ dependencies = [
 
 [[package]]
 name = "libspeedb-sys"
-version = "0.0.4+2.7.0"
+version = "0.0.5+2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14468e1c90e57078dcc625b045d9ad38ed53550d21282d886c48d521163ed05b"
+checksum = "2973ec08b878ea939c7a1280792c32742a6c7c1838ba1c067ef6239709b7da43"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -2981,9 +2981,9 @@ dependencies = [
 
 [[package]]
 name = "speedb"
-version = "0.0.4"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78a8bab270d7d5a088d3dd9f1eb6ce0f0c5ee6261acff6b04b3e230bfafe8a1c"
+checksum = "f60dc0d8eeb0572590e5ca855bfe33861ebdcbcf92f464672d7746c768e1555a"
 dependencies = [
  "libc",
  "libspeedb-sys",
