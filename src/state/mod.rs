@@ -31,8 +31,9 @@ use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
-/// `root_branch` - represents the tree of blocks connecting back to a known ledger state, e.g. genesis
-/// `dangling_branches` - trees of blocks stemming from an unknown ledger state
+/// `root_branch` - represents the tree of blocks connecting back to a known
+/// ledger state, e.g. genesis `dangling_branches` - trees of blocks stemming
+/// from an unknown ledger state
 #[derive(Debug)]
 pub struct IndexerState {
     /// Indexer phase
@@ -291,7 +292,8 @@ impl IndexerState {
         Ok(block_store_readonly)
     }
 
-    /// Initialize indexer state from a collection of contiguous canonical blocks
+    /// Initialize indexer state from a collection of contiguous canonical
+    /// blocks
     ///
     /// Short-circuits adding canonical blocks to the witness tree
     pub async fn initialize_with_canonical_chain_discovery(
@@ -372,7 +374,8 @@ impl IndexerState {
         self.add_blocks(block_parser).await
     }
 
-    /// Adds blocks to the state according to `block_parser` then changes phase to Watching
+    /// Adds blocks to the state according to `block_parser` then changes phase
+    /// to Watching
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
         self.add_blocks_with_time(block_parser, None).await
     }
@@ -486,7 +489,8 @@ impl IndexerState {
             }
         }
 
-        // if a dangling branch has been extended (forward or reverse) check for new connections to other dangling branches
+        // if a dangling branch has been extended (forward or reverse) check for new
+        // connections to other dangling branches
         if let Some((extended_branch_index, new_node_id, direction)) =
             self.dangling_extension(precomputed_block)?
         {
@@ -503,7 +507,8 @@ impl IndexerState {
         self.new_dangling(precomputed_block).map(|ext| (ext, None))
     }
 
-    /// Extends the root branch forward, potentially causing dangling branches to be merged into it
+    /// Extends the root branch forward, potentially causing dangling branches
+    /// to be merged into it
     fn root_extension(
         &mut self,
         precomputed_block: &PrecomputedBlock,
@@ -1084,7 +1089,8 @@ impl IndexerState {
         Ok(())
     }
 
-    /// Remove diffs corresponding to blocks at or beneath the height of the new canonical tip
+    /// Remove diffs corresponding to blocks at or beneath the height of the new
+    /// canonical tip
     fn prune_diffs_map(&mut self, old_canonical_tip_id: &NodeId) -> anyhow::Result<()> {
         for node_id in self
             .root_branch

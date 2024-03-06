@@ -73,7 +73,8 @@ impl BlockParser {
         )
     }
 
-    /// Returns a new glob-based block parser with paths filtered by a min length
+    /// Returns a new glob-based block parser with paths filtered by a min
+    /// length
     pub fn new_glob_min_length_filtered(
         blocks_dir: &Path,
         min_length_filter: Option<u32>,
@@ -81,7 +82,8 @@ impl BlockParser {
         Self::new_glob_length_filtered(blocks_dir, min_length_filter, None)
     }
 
-    /// Returns a new glob-based block parser with paths filtered by min or max length
+    /// Returns a new glob-based block parser with paths filtered by min or max
+    /// length
     pub fn new_glob_length_filtered(
         blocks_dir: &Path,
         min_length: Option<u32>,
@@ -136,8 +138,8 @@ impl BlockParser {
         }
     }
 
-    /// Length-sorts `block_dir`'s paths and performs _canonical chain discovery_
-    /// separating the block paths into two categories:
+    /// Length-sorts `block_dir`'s paths and performs _canonical chain
+    /// discovery_ separating the block paths into two categories:
     /// - blocks known to be _canonical_
     /// - blocks that are higher than the canonical tip
     fn with_canonical_chain_discovery(
@@ -199,8 +201,8 @@ impl BlockParser {
         Ok(None)
     }
 
-    /// Gets the precomputed block with supplied `state_hash`, it must exist ahead
-    /// of `self`'s current file
+    /// Gets the precomputed block with supplied `state_hash`, it must exist
+    /// ahead of `self`'s current file
     pub async fn get_precomputed_block(
         &mut self,
         state_hash: &str,

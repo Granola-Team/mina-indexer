@@ -1,8 +1,9 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0
 
-//! In this context a diff refers to a difference between two states of the blockchain.
-//! In this case it is between the current state and the proposed next state.
+//! In this context a diff refers to a difference between two states of the
+//! blockchain. In this case it is between the current state and the proposed
+//! next state.
 
 #![allow(missing_docs)] // Don't actually know what many of the types fields are for yet
 

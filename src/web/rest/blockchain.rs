@@ -1,14 +1,3 @@
-use std::sync::Arc;
-
-use crate::protocol::serialization_types::{
-    common::{Base58EncodableVersionedType, HashV1},
-    version_bytes,
-};
-use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
-use chrono::DateTime;
-use serde::Serialize;
-use tracing::debug;
-
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     ledger::{
@@ -16,9 +5,18 @@ use crate::{
         store::LedgerStore,
         Ledger,
     },
+    protocol::serialization_types::{
+        common::{Base58EncodableVersionedType, HashV1},
+        version_bytes,
+    },
     store::IndexerStore,
     web::rest::locked_balances::LockedBalances,
 };
+use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
+use chrono::DateTime;
+use serde::Serialize;
+use std::sync::Arc;
+use tracing::debug;
 
 /// Returns blockchain summary information about the current chain
 #[derive(Serialize, Debug)]
@@ -88,7 +86,7 @@ fn calculate_summary(
             .inner()
             .hash,
     )
-        .0;
+    .0;
 
     let previous_state_hash = best_tip.previous_state_hash().0;
     let slot = best_tip
@@ -111,7 +109,7 @@ fn calculate_summary(
             .inner()
             .snarked_ledger_hash,
     )
-        .0;
+    .0;
     let staged_ledger_hash = LedgerHash::from_hashv1(
         best_tip
             .protocol_state
@@ -129,7 +127,7 @@ fn calculate_summary(
             .inner()
             .ledger_hash,
     )
-        .0;
+    .0;
     let staking_epoch_ledger_hash = LedgerHash::from_hashv1(
         best_tip
             .consensus_state()
@@ -141,7 +139,7 @@ fn calculate_summary(
             .inner()
             .hash,
     )
-        .0;
+    .0;
     let state_hash = best_tip.state_hash.clone();
     let total_currency_u64 = best_tip.consensus_state().total_currency.inner().inner();
     let locked_currency_u64 = locked_balance.map(|a| a.0).unwrap_or(0);

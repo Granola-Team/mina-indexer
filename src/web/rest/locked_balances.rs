@@ -1,9 +1,7 @@
-use std::{collections::HashMap, fs::File, path::Path};
-
+use crate::ledger::account::Amount;
 use csv::Reader;
 use serde::Deserialize;
-
-use crate::ledger::account::Amount;
+use std::{collections::HashMap, fs::File, path::Path};
 
 #[derive(Debug, Deserialize)]
 struct Record {

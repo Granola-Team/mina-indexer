@@ -1,11 +1,9 @@
-use crate::block::genesis::GenesisBlock;
-
 use super::{
     account::{Account, Amount, Nonce},
     public_key::PublicKey,
     Ledger,
 };
-
+use crate::block::genesis::GenesisBlock;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -105,9 +103,8 @@ pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ledger::public_key::PublicKey;
-
     use super::{GenesisLedger, GenesisRoot};
+    use crate::ledger::public_key::PublicKey;
 
     #[test]
     fn test_genesis_ledger_default_delegation_test() -> anyhow::Result<()> {

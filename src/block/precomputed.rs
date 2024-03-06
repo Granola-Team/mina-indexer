@@ -8,16 +8,13 @@ use crate::{
     ledger::{coinbase::Coinbase, public_key::PublicKey},
     protocol::serialization_types::{
         consensus_state as mina_consensus,
-        delta_transition_chain_proof::DeltaTransitionChainProofJson,
+        delta_transition_chain_proof::{DeltaTransitionChainProof, DeltaTransitionChainProofJson},
         protocol_state::{ProtocolState, ProtocolStateJson},
-        protocol_state_proof::ProtocolStateProofBase64Json,
+        protocol_state_proof::{ProtocolStateProofBase64Json, ProtocolStateProofV1},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
 };
 use anyhow::anyhow;
-
-use crate::protocol::serialization_types::delta_transition_chain_proof::DeltaTransitionChainProof;
-use crate::protocol::serialization_types::protocol_state_proof::ProtocolStateProofV1;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
@@ -284,7 +281,8 @@ impl PrecomputedBlock {
         pks
     }
 
-    /// Vec of public keys which send or receive funds in applied commands and coinbase
+    /// Vec of public keys which send or receive funds in applied commands and
+    /// coinbase
     pub fn active_public_keys(&self) -> Vec<PublicKey> {
         // block creator and block stake winner
         let mut public_keys: HashSet<PublicKey> =

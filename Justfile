@@ -22,10 +22,7 @@ clean:
   rm -rf result
 
 format:
-  cargo +nightly fmt --all
-
-format-verify:
-  cargo +nightly fmt --all --check
+  cargo fmt --all
 
 test: test-unit
   ./test
@@ -49,7 +46,7 @@ audit:
   cargo audit
 
 lint: && audit disallow-unused-cargo-deps
-  cargo clippy -- -D warnings
+  cargo fmt --all --check
   cargo clippy --all-targets --all-features -- -D warnings
 
 images:

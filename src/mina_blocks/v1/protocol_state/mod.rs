@@ -5,8 +5,9 @@ pub mod constants;
 use self::{blockchain_state::*, consensus_state::*, constants::*};
 use serde::{Deserialize, Serialize};
 
-/// The Protocol State represents a snapshot of the blockchain's current state, including
-/// consensus information, network parameters, and references to previous blocks.
+/// The Protocol State represents a snapshot of the blockchain's current state,
+/// including consensus information, network parameters, and references to
+/// previous blocks.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolState {
     pub previous_state_hash: String,

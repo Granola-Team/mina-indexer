@@ -17,7 +17,8 @@ use mina_serialization_proc_macros::AutoFrom;
 use mina_serialization_versioned::{impl_strconv_via_json, Versioned, Versioned2};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// An EC point stored in compressed form containing only the x coordinate and one extra bit
+/// An EC point stored in compressed form containing only the x coordinate and
+/// one extra bit
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct CompressedCurvePoint {
     /// The x coordinate of the EC point
@@ -26,7 +27,8 @@ pub struct CompressedCurvePoint {
     pub is_odd: bool,
 }
 
-/// An EC point stored in compressed form containing only the x coordinate and one extra bit (json)
+/// An EC point stored in compressed form containing only the x coordinate and
+/// one extra bit (json)
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
 #[auto_from(CompressedCurvePoint)]
 pub struct PublicKeyJson {
@@ -122,7 +124,8 @@ mod conversions {
     impl From<&CompressedCurvePoint> for CompressedPubKey {
         fn from(t: &CompressedCurvePoint) -> Self {
             CompressedPubKey {
-                // This unwrap is safe as a PublicKeyV1 always has 32 bytes of data and from_bytes does not check if it is on curve
+                // This unwrap is safe as a PublicKeyV1 always has 32 bytes of data and from_bytes
+                // does not check if it is on curve
                 x: BaseField::from_bytes(&t.x)
                     .expect("Wrong number of bytes encountered when converting to BaseField"),
                 is_odd: t.is_odd,
@@ -139,8 +142,8 @@ mod conversions {
     impl From<&CompressedPubKey> for CompressedCurvePoint {
         fn from(t: &CompressedPubKey) -> Self {
             CompressedCurvePoint {
-                // This unwrap of a slice conversion is safe as a CompressedPubKey always has 32 bytes of data which the exact length of
-                // FieldElement
+                // This unwrap of a slice conversion is safe as a CompressedPubKey always has 32
+                // bytes of data which the exact length of FieldElement
                 x: t.x
                     .to_bytes()
                     .as_slice()
@@ -260,8 +263,8 @@ mod conversions {
         fn from(t: &Signature) -> Self {
             SignatureV1(
                 (
-                    // This unwrap of a slice conversion is safe as a CompressedPubKey always has 32 bytes of data which the exact length of
-                    // FieldElement
+                    // This unwrap of a slice conversion is safe as a CompressedPubKey always has
+                    // 32 bytes of data which the exact length of FieldElement
                     t.rx.to_bytes().as_slice().try_into().expect(
                         "Wrong number of bytes encountered when converting to FieldElement",
                     ),

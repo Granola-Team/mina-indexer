@@ -7,11 +7,13 @@ pub mod store;
 pub mod vrf_output;
 
 use self::vrf_output::VrfOutput;
-use crate::protocol::serialization_types::common::HashV1;
 use crate::{
     block::precomputed::PrecomputedBlock,
     canonicity::Canonicity,
-    protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
+    protocol::serialization_types::{
+        common::{Base58EncodableVersionedType, HashV1},
+        version_bytes,
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
@@ -326,9 +328,8 @@ pub fn extract_state_hash(path: &Path) -> String {
 }
 #[cfg(test)]
 mod tests {
-    use crate::block::{extract_block_height_or_max, extract_state_hash};
-
     use super::{precomputed::PrecomputedBlock, Block};
+    use crate::block::{extract_block_height_or_max, extract_state_hash};
     use std::path::{Path, PathBuf};
 
     #[test]

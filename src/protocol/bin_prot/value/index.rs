@@ -10,7 +10,8 @@ pub trait Index {
     fn index_into<'v>(&self, v: &'v Value) -> Option<&'v Value>;
 }
 
-// Numeric indexing, only compatible with List and Tuple (or sum types containing either of these)
+// Numeric indexing, only compatible with List and Tuple (or sum types
+// containing either of these)
 impl Index for usize {
     fn index_into<'v>(&self, v: &'v Value) -> Option<&'v Value> {
         match *v {

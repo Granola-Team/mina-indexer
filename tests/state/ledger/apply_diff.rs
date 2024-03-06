@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use mina_indexer::{
     block::parser::BlockParser,
     ledger::{diff::LedgerDiff, Ledger},
 };
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn account_diffs() {

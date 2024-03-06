@@ -9,7 +9,8 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use num::{FromPrimitive, Unsigned};
 use std::io;
 
-/// Extension trait for readers implementing io::Read to allow them to read a bin_prot encoded values
+/// Extension trait for readers implementing io::Read to allow them to read a
+/// bin_prot encoded values
 pub trait ReadBinProtExt: io::Read {
     /// Read a unit
     fn bin_read_unit(&mut self) -> Result<()> {
@@ -73,7 +74,7 @@ pub trait ReadBinProtExt: io::Read {
                 T::from_u8(byte0)
             }
         }
-            .ok_or(Error::DestinationIntegerOverflow)
+        .ok_or(Error::DestinationIntegerOverflow)
     }
 
     /// Read a variable length natural integer
@@ -102,7 +103,7 @@ pub trait ReadBinProtExt: io::Read {
                 T::from_u8(byte0)
             }
         }
-            .ok_or(Error::DestinationIntegerOverflow)
+        .ok_or(Error::DestinationIntegerOverflow)
     }
 
     /// Read the index of a variant
@@ -137,6 +138,6 @@ pub trait ReadBinProtExt: io::Read {
     }
 }
 
-/// All types that implement `Read` get methods defined in `ReadBinProtIntegerExt`
-/// for free.
+/// All types that implement `Read` get methods defined in
+/// `ReadBinProtIntegerExt` for free.
 impl<W: io::Read + ?Sized> ReadBinProtExt for W {}

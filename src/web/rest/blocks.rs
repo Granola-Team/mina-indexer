@@ -1,5 +1,7 @@
-use std::sync::Arc;
-
+use crate::{
+    block::{precomputed::PrecomputedBlock, store::BlockStore},
+    store::IndexerStore,
+};
 use actix_web::{
     get,
     http::header::ContentType,
@@ -7,11 +9,7 @@ use actix_web::{
     HttpResponse,
 };
 use serde::Deserialize;
-
-use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore},
-    store::IndexerStore,
-};
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 struct Params {

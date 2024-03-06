@@ -87,13 +87,16 @@ impl<'de> Deserialize<'de> for VrfOutputTruncatedBase58Json {
 
 /// This structure encapsulates the succinct state of the consensus protocol.
 ///
-/// The stake distribution information is contained by the staking_epoch_data field.
+/// The stake distribution information is contained by the staking_epoch_data
+/// field.
 ///
 /// Due to its succinct nature, Samasika cannot look back into the past to
-/// obtain ledger snapshots for the stake distribution. Instead, Samasika implements a novel
-/// approach where the future stake distribution snapshot is prepared by the current consensus epoch.
+/// obtain ledger snapshots for the stake distribution. Instead, Samasika
+/// implements a novel approach where the future stake distribution snapshot is
+/// prepared by the current consensus epoch.
 ///
-/// Samasika prepares the past for the future! This future state is stored in the next_epoch_data field.
+/// Samasika prepares the past for the future! This future state is stored in
+/// the next_epoch_data field.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ConsensusState {
     /// Height of block

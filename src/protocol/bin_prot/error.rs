@@ -74,7 +74,8 @@ pub enum Error {
     #[error("Attempted to deserialize an integer into a desgination type that is too small")]
     DestinationIntegerOverflow,
 
-    /// Functionality will not be implemented. Probably it does not make sense for this format
+    /// Functionality will not be implemented. Probably it does not make sense
+    /// for this format
     #[error(
         "Functionality will not be implemented. Probably it does not make sense for this format"
     )]
@@ -84,7 +85,8 @@ pub enum Error {
     #[error("Unexpected end of layout")]
     UnexpectedEndOfLayout,
 
-    /// Layout iterator errored, can be due to invalid layout or mismatch between layout and input
+    /// Layout iterator errored, can be due to invalid layout or mismatch
+    /// between layout and input
     #[error("Layout iterator error")]
     LayoutIteratorError,
 
@@ -92,8 +94,8 @@ pub enum Error {
     #[error("Attempting to deserialize into a loose type without a layout")]
     DeserializingLooseTypeWithoutLayout,
 
-    /// An unknown custom type found in layout that deserializer code does not know
-    /// not to handle
+    /// An unknown custom type found in layout that deserializer code does not
+    /// know not to handle
     #[error("Unknown custom type {typ}")]
     UnknownCustomType {
         /// The custom type identifier
@@ -104,11 +106,13 @@ pub enum Error {
     #[error("Unimplemented rule")]
     UnimplementedRule,
 
-    /// When deserializing a polyvar the tag does not match any known tags for the type
+    /// When deserializing a polyvar the tag does not match any known tags for
+    /// the type
     #[error("Unrecognised Polyvar tag {0}")]
     UnknownPolyvarTag(u32),
 
-    /// When deserializing a polyvar the tag does not match any known tags for the type
+    /// When deserializing a polyvar the tag does not match any known tags for
+    /// the type
     #[error("Input stream has {0} unconsumed bytes")]
     StreamNotFullyConsumed(usize),
 

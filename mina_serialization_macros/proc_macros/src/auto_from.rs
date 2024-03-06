@@ -3,7 +3,6 @@
 
 //!
 //! Utilities for implementing AutoFrom
-//!
 
 use crate::*;
 use syn::{punctuated::Punctuated, AttrStyle, Attribute, Field, Fields, Token, Variant};
