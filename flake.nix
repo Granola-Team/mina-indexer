@@ -48,8 +48,16 @@
             frameworks.CoreServices
           ];
 
+        # used to ensure rustfmt is nightly version to support unstable features
+        nightlyToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain:
+          toolchain.minimal.override {
+            extensions = ["rustfmt"];
+          }
+        );
+
         developmentDependencies = with pkgs;
           [
+            nightlyToolchain.passthru.availableComponents.rustfmt
             rust
             cargo-nextest
             cargo-audit
