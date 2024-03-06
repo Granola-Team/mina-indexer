@@ -25,7 +25,7 @@ async-trait = "0.1.64"
 derive_more = "0.99"
 futures = "0.3.26"
 futures-util = "0.3.26"
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.197", features = ["derive"] }
 serde_json = { version = "1.0.114", features = ["raw_value", "unbounded_depth"] }
 smart-default = "0.7.1"
 clap = { version = "4.1.4", features = ["derive"] }
