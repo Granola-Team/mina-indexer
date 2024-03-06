@@ -11,23 +11,28 @@ use mina_serialization_proc_macros::AutoFrom;
 use mina_serialization_versioned::Versioned2;
 use serde::{Deserialize, Serialize};
 
-/// This structure can be thought of like the block header. It contains the most essential information of a block.
+/// This structure can be thought of like the block header. It contains the most
+/// essential information of a block.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ProtocolState {
-    /// Commitment to previous block (hash of previous protocol state hash and body hash)
+    /// Commitment to previous block (hash of previous protocol state hash and
+    /// body hash)
     pub previous_state_hash: HashV1,
     /// The body of the protocol state
     pub body: ProtocolStateBodyV1,
 }
 
-/// This structure can be thought of like the block header. It contains the most essential information of a block (v1)
+/// This structure can be thought of like the block header. It contains the most
+/// essential information of a block (v1)
 pub type ProtocolStateV1 = Versioned2<ProtocolState, 1, 1>;
 
-/// This structure can be thought of like the block header. It contains the most essential information of a block. (json)
+/// This structure can be thought of like the block header. It contains the most
+/// essential information of a block. (json)
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(ProtocolState)]
 pub struct ProtocolStateJson {
-    /// Commitment to previous block (hash of previous protocol state hash and body hash)
+    /// Commitment to previous block (hash of previous protocol state hash and
+    /// body hash)
     pub previous_state_hash: StateHashV1Json,
     /// The body of the protocol state
     pub body: ProtocolStateBodyJson,

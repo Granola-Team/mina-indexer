@@ -46,8 +46,8 @@ impl<R: Read> Deserializer<R, StronglyTyped> {
 
 #[cfg(feature = "loose_deserialization")]
 impl<R: Read> Deserializer<R, StronglyTyped> {
-    /// Converts a strong type deserializer into a loose type deserializer by providing a
-    /// BinProt type layout
+    /// Converts a strong type deserializer into a loose type deserializer by
+    /// providing a BinProt type layout
     pub fn with_layout(self, layout: &BinProtRule) -> Deserializer<R, LooselyTyped> {
         Deserializer {
             rdr: self.rdr,
@@ -58,16 +58,16 @@ impl<R: Read> Deserializer<R, StronglyTyped> {
     }
 }
 
-/// Convenience method, create a BinProt deserializer from the given reader and then
-/// read from it
+/// Convenience method, create a BinProt deserializer from the given reader and
+/// then read from it
 pub fn from_reader<'de, R: Read, T: Deserialize<'de>>(rdr: R) -> Result<T> {
     let mut de = Deserializer::from_reader(rdr);
     let value = Deserialize::deserialize(&mut de)?;
     Ok(value)
 }
 
-/// Convenience method, create a BinProt deserializer from the given reader and then
-/// read from it.
+/// Convenience method, create a BinProt deserializer from the given reader and
+/// then read from it.
 /// This method also ensures the input byte stream is fully consumed.
 pub fn from_reader_strict<'de, R: Read, T: Deserialize<'de>>(rdr: R) -> Result<T> {
     let mut de = Deserializer::from_reader(rdr);
@@ -97,8 +97,8 @@ impl<'de, 'a, R: Read> de::Deserializer<'de> for &'a mut Deserializer<R, Loosely
     }
 }
 
-// Otherwise if no layout is provided and we are targeting a strong type destination
-// we can go for efficiency
+// Otherwise if no layout is provided and we are targeting a strong type
+// destination we can go for efficiency
 impl<'de, 'a, R: Read> de::Deserializer<'de> for &'a mut Deserializer<R, StronglyTyped> {
     type Error = Error;
     fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value>
@@ -330,8 +330,8 @@ impl<'de, 'a, R: Read> de::Deserializer<'de> for &'a mut Deserializer<R, Strongl
     where
         V: Visitor<'de>,
     {
-        // Deserialize polyvar enum using serde container attribute #[serde(rename = "Polyvar")]
-        // Refer tests/polyvar.rs for more info
+        // Deserialize polyvar enum using serde container attribute #[serde(rename =
+        // "Polyvar")] Refer tests/polyvar.rs for more info
         match name {
             "Polyvar" => {
                 let hash = self.rdr.bin_read_polyvar_tag()?;
@@ -400,7 +400,8 @@ macro_rules! impl_polyvar_enum_access {
                 let index = self
                     .variants
                     .into_iter()
-                    .filter(|v| v.is_ascii()) // Polyvar tag must be within the ASCII range, otherwise computing the caml hash is undefined behaviour.
+                    .filter(|v| v.is_ascii()) // Polyvar tag must be within the ASCII range, otherwise computing the caml hash
+                    // is undefined behaviour.
                     .enumerate()
                     .find_map(|(index, value)| {
                         // Return the first polyvar variant where the hash matches

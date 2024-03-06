@@ -4,10 +4,11 @@
 //!
 //! Versioned wrapper types for serialization
 //!
-//! In the bin-prot Mina wire protocol, each nested type has an associated version. This is to allow for backward
-//! compatibility if parts of the wire protocol change. This simple wrapper type ensures that this information
-//! is included in the serialized output in an identical way to the Mina reference implementation.
-//!
+//! In the bin-prot Mina wire protocol, each nested type has an associated
+//! version. This is to allow for backward compatibility if parts of the wire
+//! protocol change. This simple wrapper type ensures that this information
+//! is included in the serialized output in an identical way to the Mina
+//! reference implementation.
 
 #![deny(warnings)]
 #![deny(missing_docs)]
@@ -32,7 +33,8 @@ pub type Versioned2<T, const MAJOR: u16, const MINOR: u16> = Versioned<Versioned
 pub type Versioned3<T, const MAJOR: u16, const MINOR: u16, const PATCH: u16> =
     Versioned2<Versioned<T, PATCH>, MAJOR, MINOR>;
 
-/// A wrapper around version supporting Major, Minor, Patch, and Revision revisions
+/// A wrapper around version supporting Major, Minor, Patch, and Revision
+/// revisions
 pub type Versioned4<T, const MAJOR: u16, const MINOR: u16, const PATCH: u16, const REVISION: u16> =
     Versioned3<Versioned<T, REVISION>, MAJOR, MINOR, PATCH>;
 

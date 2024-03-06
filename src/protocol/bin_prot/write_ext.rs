@@ -72,10 +72,11 @@ pub trait WriteBinProtExt: io::Write {
     /// bin_prot also supports a slightly different encoding called Nat0
     /// This is an unsigned integer type that is used internally by the protocol
     /// for storing sizes of lists etc.
-    /// <  0x000000080  ->  lower 8 bits of the integer                     (1 byte)
-    /// <  0x000010000  ->  CODE_INT16 followed by lower 16 bits of integer (3 bytes)
-    /// <  0x100000000  ->  CODE_INT32 followed by lower 32 bits of integer (5 bytes)
-    /// >= 0x100000000  ->  CODE_INT64 followed by all 64 bits of integer   (9 bytes)
+    /// <  0x000000080  ->  lower 8 bits of the integer                     (1
+    /// byte) <  0x000010000  ->  CODE_INT16 followed by lower 16 bits of
+    /// integer (3 bytes) <  0x100000000  ->  CODE_INT32 followed by lower
+    /// 32 bits of integer (5 bytes) >= 0x100000000  ->  CODE_INT64 followed
+    /// by all 64 bits of integer   (9 bytes)
     fn bin_write_nat0<T: Into<u64>>(&mut self, n: T) -> Result<usize, io::Error> {
         let n: u64 = n.into();
         match n {
@@ -122,10 +123,11 @@ pub trait WriteBinProtExt: io::Write {
     /// For Polyvar types write the 4 bytes of the tag/hash for a variant
     /// You can convert between ocaml native integer using (x >> 1)
     fn bin_write_polyvar_tag(&mut self, i: u32) -> Result<usize, io::Error> {
-        self.write(&(i << 1 | 1).to_le_bytes()).map(|_| 4) // truncating downcast
+        self.write(&(i << 1 | 1).to_le_bytes()).map(|_| 4) // truncating
+                                                           // downcast
     }
 }
 
-/// All types that implement `Write` get methods defined in `WriteBinProtIntegerExt`
-/// for free.
+/// All types that implement `Write` get methods defined in
+/// `WriteBinProtIntegerExt` for free.
 impl<W: io::Write + ?Sized> WriteBinProtExt for W {}

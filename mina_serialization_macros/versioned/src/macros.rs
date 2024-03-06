@@ -4,7 +4,6 @@
 //!
 //! Macros that help implement common traits for versioned wrapper types.
 //! Helper macros for type conversions
-//!
 
 /// Macro that implements [From] trait for a struct and its versioned wrapper
 #[macro_export]
@@ -38,7 +37,8 @@ macro_rules! impl_from_versioned {
     };
 }
 
-/// Macro that implements [From] trait for a newtype struct and its versioned wrapper
+/// Macro that implements [From] trait for a newtype struct and its versioned
+/// wrapper
 #[macro_export]
 macro_rules! impl_from_for_newtype {
     ($t:ty, $tv:ty) => {

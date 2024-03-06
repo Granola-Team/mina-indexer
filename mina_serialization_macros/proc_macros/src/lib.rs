@@ -70,10 +70,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DataEnum, DeriveInput, FieldsNamed, FieldsUnnamed};
 
-/// A derive macro that automatically implements [From] trait between the annotated type
-/// and types including the attributed target type(s) and their versioned types,
-/// when the target type has identical field names with the annotated one, and each pair of the fields
-/// are convertible between each other
+/// A derive macro that automatically implements [From] trait between the
+/// annotated type and types including the attributed target type(s) and their
+/// versioned types, when the target type has identical field names with the
+/// annotated one, and each pair of the fields are convertible between each
+/// other
 #[proc_macro_derive(AutoFrom, attributes(auto_from))]
 pub fn auto_from_macro(input: TokenStream) -> TokenStream {
     let DeriveInput {

@@ -2,21 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //!
-//! This module implements the logic for traversing a layout in a way that corresponds to how the binary data is arranged out.
-//! Since BinProtRule is a recursive data type the correct traversal is a depth first traversal of the tree defined by the data type
-//! with a few important differences.
+//! This module implements the logic for traversing a layout in a way that
+//! corresponds to how the binary data is arranged out. Since BinProtRule is a
+//! recursive data type the correct traversal is a depth first traversal of the
+//! tree defined by the data type with a few important differences.
 //!
-//! The layout tree includes the concept of Sum(ocaml)/Enum(rust) types. These are nodes in the tree where only one branch should be taken
-//! depending on which variant of the enum we are deserializing. When reading an enum from binary the first byte specifies which variant to deserialize.
-//! It is the responsibility of the driving code to handle when Sum/Option rules are encountered and push the correct next rule to the stack.
+//! The layout tree includes the concept of Sum(ocaml)/Enum(rust) types. These
+//! are nodes in the tree where only one branch should be taken depending on
+//! which variant of the enum we are deserializing. When reading an enum from
+//! binary the first byte specifies which variant to deserialize.
+//! It is the responsibility of the driving code to handle when Sum/Option rules
+//! are encountered and push the correct next rule to the stack.
 //!
-//! The other interesting case is deserializing variable length vector types. When deserializing a vector the length can be read from the binary and then
-//! the element rule pushed back to the stack using the `push_n` method. It will then repeat the given node `n` times to allow it to be deserialized.
+//! The other interesting case is deserializing variable length vector types.
+//! When deserializing a vector the length can be read from the binary and then
+//! the element rule pushed back to the stack using the `push_n` method. It will
+//! then repeat the given node `n` times to allow it to be deserialized.
 //!
-//! The traversal of a layout should be done in parallel with reading a bin_prot encoded binary such that the type tree informs the deserializer how to read the
-//! data and the data informs the traversal how it should handle enum types.
-//! Combined this allows parsing of types defined by the layout into loosely typed representations.
-//!
+//! The traversal of a layout should be done in parallel with reading a bin_prot
+//! encoded binary such that the type tree informs the deserializer how to read
+//! the data and the data informs the traversal how it should handle enum types.
+//! Combined this allows parsing of types defined by the layout into loosely
+//! typed representations.
 
 use crate::protocol::bin_prot::value::layout::{BinProtRule, RuleRef};
 
@@ -38,7 +45,8 @@ impl Iterator for BinProtRuleIterator {
             Some(rule) => {
                 match rule {
                     BinProtRule::List(_rule) => {
-                        // the code driving the iterator should take the list rule, push it
+                        // the code driving the iterator should take the list
+                        // rule, push it
                         // then call repeat the required number of times
                     }
                     BinProtRule::Record(mut rules) => {
@@ -49,11 +57,13 @@ impl Iterator for BinProtRuleIterator {
                         self.stack.extend(rules.drain(0..).rev());
                     }
                     BinProtRule::Sum(_) | BinProtRule::Polyvar(_) => {
-                        // don't add to the stack. Add to the branch field instead
-                        // this must be resolved by calling `branch` before the iterator can continue
+                        // don't add to the stack. Add to the branch field
+                        // instead this must be resolved
+                        // by calling `branch` before the iterator can continue
                     }
                     BinProtRule::Option(_r) => {
-                        // Option is a special case of a Sum where the None variant contain nothing
+                        // Option is a special case of a Sum where the None
+                        // variant contain nothing
                     }
                     BinProtRule::Reference(rule_ref) => match rule_ref {
                         RuleRef::Unresolved(_payload) => {

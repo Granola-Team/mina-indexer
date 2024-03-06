@@ -160,7 +160,9 @@ impl_from_for_newtype!(DecimalJson, AmountV1);
 
 // FIXME: 255 255 cannot be deserialized to u32, use i32 for now
 // Note: Extended_Uint32 is not defined in bin_prot, but comes from mina
-// Block path: t/staged_ledger_diff/t/diff/t/0/t/t/commands/0/t/data/t/t/t/t/payload/t/t/common/t/t/t/valid_until
+// Block path:
+// t/staged_ledger_diff/t/diff/t/0/t/t/commands/0/t/data/t/t/t/t/payload/t/t/
+// common/t/t/t/valid_until
 /// u32 wrapped in 1 version byte
 pub type ExtendedU32 = Versioned2<i32, 1, 1>;
 
@@ -252,7 +254,8 @@ impl<'de> Deserialize<'de> for ByteVecJson {
     }
 }
 
-/// Vector of bytes with a version number. Also encodes its own length when encoded using bin-prot
+/// Vector of bytes with a version number. Also encodes its own length when
+/// encoded using bin-prot
 pub type ByteVecV1 = Versioned<ByteVec, 1>;
 
 /// A wrapper of versioned type that is base58 encodable

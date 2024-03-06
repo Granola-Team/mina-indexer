@@ -1,5 +1,7 @@
-use crate::protocol::bin_prot;
-use crate::{command::*, protocol::serialization_types::staged_ledger_diff as mina_rs};
+use crate::{
+    command::*,
+    protocol::{bin_prot, serialization_types::staged_ledger_diff as mina_rs},
+};
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
 use serde::{Deserialize, Serialize};

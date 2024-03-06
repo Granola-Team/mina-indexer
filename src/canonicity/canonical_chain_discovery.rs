@@ -237,7 +237,8 @@ fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize>
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///
-/// Returns the index of the caonical tip in `paths` and the start index of the first successive block.
+/// Returns the index of the caonical tip in `paths` and the start index of the
+/// first successive block.
 fn find_canonical_tip(
     paths: &[&PathBuf],
     length_start_indices_and_diffs: &[(usize, u32)],
@@ -295,8 +296,8 @@ fn find_canonical_tip(
     }
 }
 
-/// Finds the index of the _highest possible block in the lowest contiguous chain_
-/// and the starting index of the next higher blocks.
+/// Finds the index of the _highest possible block in the lowest contiguous
+/// chain_ and the starting index of the next higher blocks.
 fn last_contiguous_first_noncontiguous_start_idx(
     length_start_indices_and_diffs: &[(usize, u32)],
 ) -> Option<(usize, usize)> {

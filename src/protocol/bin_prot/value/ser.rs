@@ -49,7 +49,7 @@ impl Serialize for Value {
                 name: _,
                 ref index,
                 ref value,
-            } => serializer.serialize_newtype_variant("", *index as u32, "", value), // sum types/enums
+            } => serializer.serialize_newtype_variant("", *index as u32, "", value), /* sum types/enums */
             Value::Polyvar {
                 name: _,
                 ref tag,

@@ -3,7 +3,6 @@
 
 //!
 //! Types that represent errors in mina serialization and deserialization
-//!
 
 use crate::protocol::bin_prot;
 

@@ -3,7 +3,8 @@
 
 //! Defines a BinProt layout
 //! A layout is a data structure that defines a BinProt type.
-//! This is essentially moving the type information from compile time to runtime.
+//! This is essentially moving the type information from compile time to
+//! runtime.
 
 use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
@@ -85,7 +86,8 @@ pub enum BinProtRule {
     CustomForPath(String, Vec<BinProtRule>),
 }
 
-// required due to the strange enum encoding used by yojson (see list_tagged_enum.rs)
+// required due to the strange enum encoding used by yojson (see
+// list_tagged_enum.rs)
 impl TryFrom<ListTaggedEnum> for BinProtRule {
     type Error = String;
     fn try_from(v: ListTaggedEnum) -> Result<Self, Self::Error> {

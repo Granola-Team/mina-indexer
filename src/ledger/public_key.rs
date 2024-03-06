@@ -1,5 +1,7 @@
-use crate::proof_systems::signer::pubkey::{CompressedPubKey, PubKey};
-use crate::protocol::serialization_types::signatures::PublicKeyV1;
+use crate::{
+    proof_systems::signer::pubkey::{CompressedPubKey, PubKey},
+    protocol::serialization_types::signatures::PublicKeyV1,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]

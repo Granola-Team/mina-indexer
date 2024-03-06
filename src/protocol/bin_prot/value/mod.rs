@@ -1,10 +1,12 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0
 
-//! The Value enum, a loosely typed way of representing any valid bin_prot value.
+//! The Value enum, a loosely typed way of representing any valid bin_prot
+//! value.
 //!
-//! Since bin_prot is not a self describing format, deserializing to a loosely typed value required
-//! a supplimentary file that describes the layout of the binary (see layout/)
+//! Since bin_prot is not a self describing format, deserializing to a loosely
+//! typed value required a supplimentary file that describes the layout of the
+//! binary (see layout/)
 
 use serde::Deserialize;
 
@@ -63,11 +65,12 @@ pub enum Value {
     List(Vec<Value>),
 }
 
-// Ensure the value visitor is always used when deserializing to a Value (see visitor.rs)
+// Ensure the value visitor is always used when deserializing to a Value (see
+// visitor.rs)
 //
-// This will always request `deserialize_any` be called since the Value implementation
-// does not describe its own structure. Attempting to deserialize into Value from a
-// non-self describing format will result in an error
+// This will always request `deserialize_any` be called since the Value
+// implementation does not describe its own structure. Attempting to deserialize
+// into Value from a non-self describing format will result in an error
 impl<'de> Deserialize<'de> for Value {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Value, D::Error>

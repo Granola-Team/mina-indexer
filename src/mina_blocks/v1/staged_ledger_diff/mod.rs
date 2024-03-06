@@ -1,9 +1,10 @@
+use super::common::{from_str, from_str_opt};
 use serde::{Deserialize, Serialize};
 
-use super::common::{from_str, from_str_opt};
-
-/// The staged ledger diff represents the list of changes applied to the blockchain's ledger state between two consecutive blocks.
-/// It encapsulates transactions, fees, and other modifications that update the ledger from its previous state to the current one.
+/// The staged ledger diff represents the list of changes applied to the
+/// blockchain's ledger state between two consecutive blocks. It encapsulates
+/// transactions, fees, and other modifications that update the ledger from its
+/// previous state to the current one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StagedLedgerDiff {
     pub diff: Vec<Option<Diff>>,

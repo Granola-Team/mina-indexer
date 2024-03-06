@@ -1,22 +1,11 @@
 pub mod rest;
 
-use std::path::Path;
-use std::sync::Arc;
-
-use actix_cors::Cors;
-use actix_web::middleware;
-use actix_web::web::Data;
-use actix_web::App;
-use actix_web::HttpServer;
-use std::net;
-use tracing::warn;
-
+use self::rest::{accounts, blockchain, blocks, locked_balances::LockedBalances};
 use crate::store::IndexerStore;
-
-use self::rest::accounts;
-use self::rest::blockchain;
-use self::rest::blocks;
-use self::rest::locked_balances::LockedBalances;
+use actix_cors::Cors;
+use actix_web::{middleware, web::Data, App, HttpServer};
+use std::{net, path::Path, sync::Arc};
+use tracing::warn;
 
 fn load_locked_balances<P: AsRef<Path>>(path: P) -> LockedBalances {
     match LockedBalances::from_csv(path) {

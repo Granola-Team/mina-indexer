@@ -19,7 +19,8 @@ async fn extensions() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
-    // root_block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
+    // root_block =
+    // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
     let root_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await
@@ -29,7 +30,8 @@ async fn extensions() {
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
-    // root0_block = mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
+    // root0_block =
+    // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
     let root0_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await
@@ -39,7 +41,8 @@ async fn extensions() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    // child0_block = mainnet-105492-3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ.json
+    // child0_block =
+    // mainnet-105492-3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ.json
     let child0_block = block_parser
         .get_precomputed_block("3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ")
         .await
@@ -49,7 +52,8 @@ async fn extensions() {
         "3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ".to_owned()
     );
 
-    // root1_block = mainnet-105495-3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9.json
+    // root1_block =
+    // mainnet-105495-3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9.json
     let root1_block = block_parser
         .get_precomputed_block("3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9")
         .await
@@ -59,7 +63,8 @@ async fn extensions() {
         "3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9".to_owned()
     );
 
-    // child10_block = mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
+    // child10_block =
+    // mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
     let child10_block = block_parser
         .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
         .await
@@ -69,7 +74,8 @@ async fn extensions() {
         "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
     );
 
-    // child11_block = mainnet-105496-3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k.json
+    // child11_block =
+    // mainnet-105496-3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k.json
     let child11_block = block_parser
         .get_precomputed_block("3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k")
         .await

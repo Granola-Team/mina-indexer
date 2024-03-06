@@ -1,7 +1,8 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0
 
-//! Versioned types that represent finite field and elliptic curve elements, and collections thereof
+//! Versioned types that represent finite field and elliptic curve elements, and
+//! collections thereof
 
 use crate::protocol::serialization_types::common::BigInt256;
 use derive_more::{From, Into};
@@ -11,7 +12,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use smart_default::SmartDefault;
 
 /// Represents an element in a finite field that can be encoded as
-/// a BigInt256. All finite field elements used in Mina satisfiy this requirement
+/// a BigInt256. All finite field elements used in Mina satisfiy this
+/// requirement
 pub type FieldElement = BigInt256;
 
 /// Wrapper type for field element denoting it is on the curves scalar field
@@ -29,8 +31,9 @@ pub type FieldElementVecV1 = Versioned<FieldElementVec, 1>;
 #[auto_from(FieldElementVec)]
 pub struct FieldElementVecJson(pub Vec<FieldElementJson>);
 
-/// An elliptic curve point defined over a base field with elements that fit in a BigInt256
-/// This is a Finite elliptic curve point as this type cannot be used to encode the point-at-infinity
+/// An elliptic curve point defined over a base field with elements that fit in
+/// a BigInt256 This is a Finite elliptic curve point as this type cannot be
+/// used to encode the point-at-infinity
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct FiniteECPoint(pub FieldElement, pub FieldElement);
 
@@ -72,8 +75,8 @@ pub type FiniteECPointPairVecV1 = Versioned<FiniteECPointPairVec, 1>;
 #[auto_from(FiniteECPointPairVec)]
 pub struct FiniteECPointPairVecJson(pub Vec<FiniteECPointPairJson>);
 
-/// Elliptic curve point that can either be the coordinates of a point on the curve
-/// OR it can be the point-at-infinity
+/// Elliptic curve point that can either be the coordinates of a point on the
+/// curve OR it can be the point-at-infinity
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, SmartDefault)]
 pub enum ECPoint {
     /// The point at infinity
@@ -83,12 +86,12 @@ pub enum ECPoint {
     Finite(FiniteECPoint),
 }
 
-/// Elliptic curve point that can either be the coordinates of a point on the curve
-/// OR it can be the point-at-infinity (v1)
+/// Elliptic curve point that can either be the coordinates of a point on the
+/// curve OR it can be the point-at-infinity (v1)
 pub type ECPointV1 = Versioned<ECPoint, 1>;
 
-/// Elliptic curve point that can either be the coordinates of a point on the curve
-/// OR it can be the point-at-infinity (json)
+/// Elliptic curve point that can either be the coordinates of a point on the
+/// curve OR it can be the point-at-infinity (json)
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, SmartDefault)]
 enum ECPointJsonProxy {
     /// The point at infinity
@@ -98,8 +101,8 @@ enum ECPointJsonProxy {
     Finite(FiniteECPointJson),
 }
 
-/// Elliptic curve point that can either be the coordinates of a point on the curve
-/// OR it can be the point-at-infinity (mina json)
+/// Elliptic curve point that can either be the coordinates of a point on the
+/// curve OR it can be the point-at-infinity (mina json)
 #[derive(Clone, Debug, Eq, PartialEq, SmartDefault, AutoFrom)]
 #[auto_from(ECPoint)]
 #[auto_from(ECPointJsonProxy)]

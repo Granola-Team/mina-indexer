@@ -63,11 +63,12 @@ fn missing_parent() {
     }
 
     // mainnet-105500-3NKvv2iBAPhZ8SRCxQEuGTgqTYuFXd2WVANXW6pcsR8pdzLuUj7C.json
-    // which should be present in the canonical chain, is absent from the collection.
-    // Therefore we can't determine the canonical tip from either block with length 105501.
-    // Thus, the highest canonical tip we can find is
+    // which should be present in the canonical chain, is absent from the
+    // collection. Therefore we can't determine the canonical tip from either
+    // block with length 105501. Thus, the highest canonical tip we can find is
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
-    // and the best canonical consists of blocks with lengths 105487, 105488, 105489, 105490.
+    // and the best canonical consists of blocks with lengths 105487, 105488,
+    // 105489, 105490.
     assert_eq!(block_parser.num_canonical, 4);
     assert_eq!(block_parser.total_num_blocks, 35)
 }

@@ -1,14 +1,12 @@
-use std::sync::Arc;
-
+use crate::{block::store::BlockStore, ledger::store::LedgerStore, store::IndexerStore};
 use actix_web::{
     get,
     http::header::ContentType,
     web::{self, Data},
     HttpResponse,
 };
+use std::sync::Arc;
 use tracing::debug;
-
-use crate::{block::store::BlockStore, ledger::store::LedgerStore, store::IndexerStore};
 
 #[get("/accounts/{public_key}")]
 pub async fn get_account(

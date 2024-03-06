@@ -66,7 +66,9 @@ impl<'de, R: Read> DS<R, LooselyTyped> {
                                             None
                                         }
                                     }
-                                    Polyvar::Inherited(_) => unimplemented!(), // don't know how to handle these yet
+                                    Polyvar::Inherited(_) => unimplemented!(), /* don't know how
+                                                                                * to handle these
+                                                                                * yet */
                                 }
                             })
                             .ok_or(Error::UnknownPolyvarTag(tag))?;
@@ -98,7 +100,8 @@ impl<'de, R: Read> DS<R, LooselyTyped> {
                     BinProtRule::List(element_rule) => {
                         // read the length
                         let len = self.rdr.bin_read_nat0()?;
-                        // request the iterator repeats the list elements the current number of times
+                        // request the iterator repeats the list elements the current number of
+                        // times
                         self.mode.layout_iter.push_n(*element_rule, len);
                         // read the elements
                         visitor.visit_seq(SeqAccess::new_list(self, len))
@@ -115,7 +118,7 @@ impl<'de, R: Read> DS<R, LooselyTyped> {
                     | BinProtRule::SelfReference(_)
                     | BinProtRule::TypeClosure(_, _)
                     | BinProtRule::TypeAbstraction(_, _)
-                    | BinProtRule::Reference(_) => Err(Error::UnimplementedRule), // Don't know how to implement these yet
+                    | BinProtRule::Reference(_) => Err(Error::UnimplementedRule), /* Don't know how to implement these yet */
                     BinProtRule::Custom(_) => {
                         // the traverse function should never produce this
                         Err(Error::LayoutIteratorError)
@@ -211,8 +214,8 @@ impl<'de, 'a, R: Read> serde::de::EnumAccess<'de> for ValueEnum<'a, R, LooselyTy
     {
         // bit of a hack here. visit_enum in the visitor is expecting to be able to
         // deserialize the enum details (e.g. variant index and name) from the stream.
-        // Since in this case it comes from the layout file we need to serialize this data
-        // and then return the deserializer to be handled by visit_enum
+        // Since in this case it comes from the layout file we need to serialize this
+        // data and then return the deserializer to be handled by visit_enum
 
         let (index, enum_data) = match self.variant {
             VariantType::Sum(summand) => (

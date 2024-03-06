@@ -45,8 +45,8 @@ pub trait FieldHelpers<F> {
 
     /// Serialize field element to a BigUint
     fn to_biguint(&self) -> BigUint
-        where
-            F: PrimeField,
+    where
+        F: PrimeField,
     {
         BigUint::from_bytes_le(&self.to_bytes())
     }
@@ -56,16 +56,16 @@ pub trait FieldHelpers<F> {
 
     /// Field size in bytes
     fn size_in_bytes() -> usize
-        where
-            F: PrimeField,
+    where
+        F: PrimeField,
     {
         F::size_in_bits() / 8 + (F::size_in_bits() % 8 != 0) as usize
     }
 
     /// Get the modulus as `BigUint`
     fn modulus_biguint() -> BigUint
-        where
-            F: PrimeField,
+    where
+        F: PrimeField,
     {
         BigUint::from_bytes_le(&F::Params::MODULUS.to_bytes_le())
     }

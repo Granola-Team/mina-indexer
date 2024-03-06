@@ -36,10 +36,12 @@ where
     }
 
     // This can be called to serialize a Polyvar which has a 4 byte
-    // tag OR a variant index which is 1-2 bytes. We assume if they fit into a single byte then they
-    // are an index and if they are larger than 1 byte they are a polyvar.
-    // IMPORTANT: This could bug out in the case that a polyvar hash is zero in all places except the lowest byte.
-    // The probability of this happening is vanishingly small but something to be aware of.
+    // tag OR a variant index which is 1-2 bytes. We assume if they fit into a
+    // single byte then they are an index and if they are larger than 1 byte
+    // they are a polyvar. IMPORTANT: This could bug out in the case that a
+    // polyvar hash is zero in all places except the lowest byte.
+    // The probability of this happening is vanishingly small but something to be
+    // aware of.
     fn write_variant_index_or_tag(&mut self, name: &str, variant: &str, index: u32) -> Result<()> {
         if name == "Polyvar" {
             self.writer
@@ -55,8 +57,8 @@ where
     }
 }
 
-/// Convenience function, creates  serializer and uses it to write the given value
-/// to the writer
+/// Convenience function, creates  serializer and uses it to write the given
+/// value to the writer
 pub fn to_writer<W, T>(writer: &mut W, value: &T) -> Result<()>
 where
     W: std::io::Write,
@@ -141,7 +143,8 @@ where
         // This is because a u64 can hold larger positive values than an i64 as it
         // doesn't require reserving the sign bit.
         // This is ok to do as it is never compared with a value larger than 0x80000000
-        // and it is cast back to a u64 before it is serialized. Just something to be aware of.
+        // and it is cast back to a u64 before it is serialized. Just something to be
+        // aware of.
         self.writer.bin_write_integer(v as i64)?;
         Ok(())
     }

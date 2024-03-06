@@ -16,7 +16,9 @@ use serde::{Deserialize, Serialize};
 pub struct EpochLedger {
     /// A unique identifier of the EpochLedger
     pub hash: HashV1,
-    /// The total currency in circulation after the block was produced. New issuance is via the coinbase reward and new account fees can reduce the total issuance.
+    /// The total currency in circulation after the block was produced. New
+    /// issuance is via the coinbase reward and new account fees can reduce the
+    /// total issuance.
     pub total_currency: AmountV1,
 }
 
@@ -29,7 +31,9 @@ pub type EpochLedgerV1 = Versioned2<EpochLedger, 1, 1>;
 pub struct EpochLedgerJson {
     /// A unique identifier of the EpochLedger
     pub hash: LedgerHashV1Json,
-    /// The total currency in circulation after the block was produced. New issuance is via the coinbase reward and new account fees can reduce the total issuance.
+    /// The total currency in circulation after the block was produced. New
+    /// issuance is via the coinbase reward and new account fees can reduce the
+    /// total issuance.
     pub total_currency: U64Json,
 }
 
@@ -42,7 +46,8 @@ pub struct EpochData {
     pub seed: HashV1,
     /// State hash of first block of epoch
     pub start_checkpoint: HashV1,
-    /// State hash of last known block in the first 2/3 of epoch (excluding the current state)
+    /// State hash of last known block in the first 2/3 of epoch (excluding the
+    /// current state)
     pub lock_checkpoint: HashV1,
     /// Length of an epoch
     pub epoch_length: LengthV1,
@@ -61,7 +66,8 @@ pub struct EpochDataJson {
     pub seed: EpochSeedHashV1Json,
     /// State hash of first block of epoch
     pub start_checkpoint: StateHashV1Json,
-    /// State hash of last known block in the first 2/3 of epoch (excluding the current state)
+    /// State hash of last known block in the first 2/3 of epoch (excluding the
+    /// current state)
     pub lock_checkpoint: StateHashV1Json,
     /// Length of an epoch
     pub epoch_length: U32Json,

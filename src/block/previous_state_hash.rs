@@ -56,7 +56,6 @@ impl From<PreviousStateHash> for BlockHash {
 mod test {
     use super::*;
     use crate::block::precomputed::PrecomputedBlock;
-
     use glob::glob;
     use std::path::PathBuf;
 

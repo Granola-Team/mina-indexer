@@ -3,8 +3,9 @@ use std::path::PathBuf;
 
 /// Parses all blocks in ./tests/data/sequential_blocks
 /// Adds them to a fresh state
-/// Verifies the faithfullness of the correspondence between dangling branch `leaves` and the underlying tree's leaf blocks
-/// Verifies the length of the longest chain
+/// Verifies the faithfullness of the correspondence between dangling branch
+/// `leaves` and the underlying tree's leaf blocks Verifies the length of the
+/// longest chain
 #[tokio::test]
 async fn extension() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
