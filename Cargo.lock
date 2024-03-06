@@ -442,6 +442,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-priority-channel"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acde96f444d31031f760c5c43dc786b97d3e1cb2ee49dd06898383fe9a999758"
+dependencies = [
+ "event-listener 4.0.3",
+]
+
+[[package]]
 name = "async-recursion"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2019,7 +2028,7 @@ dependencies = [
  "anyhow",
  "ark-ec",
  "ark-ff",
- "async-priority-channel",
+ "async-priority-channel 0.2.0",
  "async-trait",
  "base64 0.22.0",
  "blake2",
@@ -3503,7 +3512,7 @@ version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5931215e14de2355a3039477138ae08a905abd7ad0265519fd79717ff1380f88"
 dependencies = [
- "async-priority-channel",
+ "async-priority-channel 0.1.0",
  "async-recursion",
  "atomic-take",
  "clearscreen",
