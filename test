@@ -1138,6 +1138,34 @@ test_genesis_block_creator() {
     teardown
 }
 
+test_txn_nonces() {
+    test=test_txn_nonces
+
+    setup
+    dl_mainnet 100 ./blocks
+
+    idxr_server_start \
+        --startup-dir ./blocks \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug
+    sleep 5
+
+    pk=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
+
+    # verify that the nonce matches what's reported from the archive node
+
+    # after block 3
+    nonce=$(idxr ledger-at-height -h 3 | jq -r .${pk}.nonce)
+    assert '4' $nonce
+
+    # after block 3
+    nonce=$(idxr account -k $pk | jq -r .nonce)
+    assert '149' $nonce
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -1160,9 +1188,10 @@ if [ "$#" -eq 0 ]; then
     test_transactions
     test_snark_work
     test_checkpoint
-    test_many_blocks
     test_rest_endpoints
     test_genesis_block_creator
+    test_txn_nonces
+    test_many_blocks
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1186,9 +1215,10 @@ else
             "test_transactions") test_transactions ;;
             "test_snark_work") test_snark_work ;;
             "test_checkpoint") test_checkpoint ;;
-            "test_many_blocks") test_many_blocks ;;
             "test_rest_endpoints") test_rest_endpoints ;;
             "test_genesis_block_creator") test_genesis_block_creator ;;
+            "test_txn_nonces") test_txn_nonces ;;
+            "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac
