@@ -16,7 +16,7 @@ This works with any Serde supported data type or any custom type annotated with 
 Example:
 
 ```rust
-use bin_prot::{from_reader, to_writer};
+use mina_indexer::protocol::bin_prot::{from_reader, to_writer};
 
 fn main() {
   let val: Vec<i64> = vec![20, -22, 38];
@@ -49,7 +49,7 @@ These are created using the `Deserializer::from_reader_with_layout` constructor.
 
 ```rust
 use serde::Deserialize;
-use bin_prot::{Deserializer, BinProtRule, Value};
+use mina_indexer::protocol::bin_prot::{Deserializer, BinProtRule, Value};
 
 // this rule describes a record with two fields, one itself being a record with a bool field
 const RECORD_RULE: &str = r#"
