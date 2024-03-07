@@ -51,7 +51,7 @@ rust_decimal = { version = "1.34.3", features = ["serde"] }
 rust_decimal_macros = "1.34.2"
 bs58 = { version = "0.5.0", features = ["check"] }
 blake2 = "0.10.6"
-tempfile = "3.9.0"
+tempfile = "3.10.1"
 actix-web = "4.5.1"
 actix-cors = "0.7.0"
 base64 = "0.22.0"
