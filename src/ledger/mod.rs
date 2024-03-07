@@ -100,6 +100,9 @@ impl Ledger {
                         AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
                             Account::from_payment(account_before, fee_transfer_diff)
                         }
+                        AccountDiff::FailedTransactionNonce(failed_diff) => {
+                            Account::from_failed_transaction(account_before, failed_diff.nonce)
+                        }
                     };
 
                     self.accounts.insert(diff.public_key(), account_after);
@@ -110,7 +113,8 @@ impl Ledger {
                         AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
                         AccountDiff::Payment(_)
                         | AccountDiff::FeeTransfer(_)
-                        | AccountDiff::FeeTransferViaCoinbase(_) => {
+                        | AccountDiff::FeeTransferViaCoinbase(_)
+                        | AccountDiff::FailedTransactionNonce(_) => {
                             Err(LedgerError::AccountNotFound.into())
                         }
                     };

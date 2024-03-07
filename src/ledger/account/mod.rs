@@ -79,7 +79,7 @@ impl Account {
         Account {
             public_key: pre.public_key.clone(),
             balance: pre.balance.add(&amount),
-            nonce: pre.nonce,
+            nonce: Nonce(pre.nonce.0 + 1),
             delegate: pre.delegate,
         }
     }
@@ -90,6 +90,15 @@ impl Account {
             balance: pre.balance,
             nonce: Nonce(pre.nonce.0 + 1),
             delegate,
+        }
+    }
+
+    pub fn from_failed_transaction(pre: Self, nonce: u32) -> Self {
+        Account {
+            public_key: pre.public_key,
+            balance: pre.balance,
+            nonce: Nonce(nonce + 1),
+            delegate: pre.delegate,
         }
     }
 }

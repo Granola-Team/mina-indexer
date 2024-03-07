@@ -2,7 +2,10 @@ use mina_indexer::{
     block::parser::BlockParser,
     ledger::{
         diff::{
-            account::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType},
+            account::{
+                AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, PaymentDiff,
+                UpdateType,
+            },
             LedgerDiff,
         },
         public_key::PublicKey,
@@ -119,6 +122,20 @@ async fn account_diffs() {
                     *balance += amount.0 as i64;
                 } else {
                     ledger.insert(public_key, (amount.0 as i64, 0));
+                }
+            }
+            AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+                public_key,
+                nonce: new_nonce,
+            }) => {
+                println!("\n* Failed transaction");
+                println!("public_key: {public_key}");
+                println!("nonce:      {new_nonce}");
+
+                if let Some((_, nonce)) = ledger.get_mut(&public_key) {
+                    *nonce += new_nonce;
+                } else {
+                    ledger.insert(public_key, (0, 0));
                 }
             }
         }

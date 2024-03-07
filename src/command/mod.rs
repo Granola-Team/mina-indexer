@@ -189,6 +189,27 @@ impl UserCommandWithStatus {
             },
         }
     }
+
+    pub fn sender(&self) -> PublicKey {
+        match self.data() {
+            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
+                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
+                    let mina_rs::PaymentPayload { source_pk, .. } =
+                        payment_payload_v1.clone().inner().inner();
+                    source_pk.into()
+                }
+                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
+                    let mina_rs::StakeDelegation::SetDelegate { delegator, .. } =
+                        stake_delegation_v1.clone().inner();
+                    delegator.into()
+                }
+            },
+        }
+    }
+
+    pub fn nonce(&self) -> u32 {
+        self.to_command().nonce()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -251,6 +272,13 @@ impl Command {
                 }
             })
             .collect()
+    }
+
+    pub fn nonce(&self) -> u32 {
+        match self {
+            Self::Delegation(Delegation { nonce, .. }) => *nonce,
+            Self::Payment(Payment { nonce, .. }) => *nonce,
+        }
     }
 }
 
