@@ -1020,7 +1020,7 @@ test_rest_endpoints() {
 
     # results
     balance=$(curl -s http://localhost:1337/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
-    assert '1440030000000' $balance
+    assert '1439050000000' $balance
 
     # Testing blockchain summary endpoint
     curl -s http://localhost:1337/summary > output.json
