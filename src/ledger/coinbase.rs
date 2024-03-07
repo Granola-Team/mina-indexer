@@ -101,7 +101,7 @@ impl Coinbase {
         }
     }
 
-    // TODO for fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK work
+    // For fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK work
     pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
         match &self.kind {
             CoinbaseKind::Zero => vec![],
