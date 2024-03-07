@@ -5,7 +5,7 @@ pub mod store;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::{SignedCommand, SignedCommandWithKind},
-    ledger::{account::Amount, post_balances::PostBalance, public_key::PublicKey},
+    ledger::{account::Amount, public_key::PublicKey},
     protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
 use mina_serialization_versioned::Versioned;
@@ -18,7 +18,7 @@ pub enum CommandType {
     Delegation,
 }
 
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
     #[serde(rename = "Stake_delegation")]
@@ -31,24 +31,18 @@ pub struct CommandWithStateHash {
     pub state_hash: BlockHash,
 }
 
-pub struct CommandUpdate {
-    pub source_nonce: u32,
-    pub command_type: CommandType,
-    pub fee_payer: PostBalance,
-    pub source: PostBalance,
-    pub receiver: PostBalance,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Payment {
     pub source: PublicKey,
-    pub receiver: PublicKey,
+    pub nonce: u32,
     pub amount: Amount,
+    pub receiver: PublicKey,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Delegation {
     pub delegator: PublicKey,
+    pub nonce: u32,
     pub delegate: PublicKey,
 }
 
@@ -166,26 +160,18 @@ impl UserCommandWithStatus {
 
     pub fn to_command(&self) -> Command {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(v1) => match v1
-                .inner()
-                .inner()
-                .payload
-                .inner()
-                .inner()
-                .body
-                .inner()
-                .inner()
-            {
+            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
                 mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
                     let mina_rs::PaymentPayload {
                         source_pk,
                         receiver_pk,
                         amount,
                         ..
-                    } = payment_payload_v1.inner().inner();
+                    } = payment_payload_v1.clone().inner().inner();
                     Command::Payment(Payment {
                         source: source_pk.into(),
                         receiver: receiver_pk.into(),
+                        nonce: SignedCommand(v1.clone()).source_nonce(),
                         amount: amount.inner().inner().into(),
                     })
                 }
@@ -193,10 +179,11 @@ impl UserCommandWithStatus {
                     let mina_rs::StakeDelegation::SetDelegate {
                         delegator,
                         new_delegate,
-                    } = stake_delegation_v1.inner();
+                    } = stake_delegation_v1.clone().inner();
                     Command::Delegation(Delegation {
                         delegator: delegator.into(),
                         delegate: new_delegate.into(),
+                        nonce: SignedCommand(v1.clone()).source_nonce(),
                     })
                 }
             },
@@ -219,7 +206,7 @@ impl Command {
             .filter(|&command| command.is_applied())
             .map(|command| match command.clone().data() {
                 mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    match SignedCommand(signed_command).payload_body() {
+                    match SignedCommand(signed_command.clone()).payload_body() {
                         mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                             let source: PublicKey =
                                 payment_payload.clone().inner().inner().source_pk.into();
@@ -234,6 +221,7 @@ impl Command {
                             Self::Payment(Payment {
                                 source,
                                 receiver,
+                                nonce: SignedCommand(signed_command).source_nonce(),
                                 amount: amount.into(),
                             })
                         }
@@ -245,14 +233,16 @@ impl Command {
                                 } => {
                                     let delegator: PublicKey = delegator.into();
                                     let new_delegate: PublicKey = new_delegate.into();
+                                    let nonce = SignedCommand(signed_command).source_nonce();
                                     trace!(
-                                        "Delegation {{ delegator: {}, new_delegate: {} }}",
+                                        "Delegation {{ delegator: {}, new_delegate: {}, nonce: {nonce} }}",
                                         delegator.to_address(),
                                         new_delegate.to_address()
                                     );
                                     Self::Delegation(Delegation {
                                         delegate: new_delegate,
                                         delegator,
+                                        nonce,
                                     })
                                 }
                             }
@@ -283,12 +273,6 @@ impl StakeDelegation {
     pub fn new_delegate(&self) -> PublicKey {
         let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } = self.0.clone().inner();
         new_delegate.into()
-    }
-}
-
-impl CommandUpdate {
-    pub fn is_delegation(&self) -> bool {
-        matches!(self.command_type, CommandType::Delegation)
     }
 }
 
@@ -382,21 +366,25 @@ impl From<Command> for serde_json::Value {
             Command::Payment(Payment {
                 source,
                 receiver,
+                nonce,
                 amount,
             }) => {
                 let mut payment = Map::new();
                 payment.insert("source".into(), Value::String(source.to_address()));
                 payment.insert("receiver".into(), Value::String(receiver.to_address()));
                 payment.insert("amount".into(), Value::Number(Number::from(amount.0)));
+                payment.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Payment".into(), Value::Object(payment));
             }
             Command::Delegation(Delegation {
                 delegate,
                 delegator,
+                nonce,
             }) => {
                 let mut delegation = Map::new();
                 delegation.insert("delegate".into(), Value::String(delegate.to_address()));
                 delegation.insert("delegator".into(), Value::String(delegator.to_address()));
+                delegation.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Stake_delegation".into(), Value::Object(delegation));
             }
         };
@@ -525,19 +513,23 @@ mod test {
                 Command::Payment(Payment {
                     source,
                     receiver,
+                    nonce,
                     amount,
                 }) => {
                     println!("s: {source:?}");
                     println!("r: {receiver:?}");
+                    println!("n: {nonce}");
                     println!("a: {}", amount.0);
                     payments.push((source, receiver, amount));
                 }
                 Command::Delegation(Delegation {
                     delegate,
                     delegator,
+                    nonce,
                 }) => {
                     println!("d: {delegate:?}");
                     println!("t: {delegator:?}");
+                    println!("n: {nonce}");
                     delegations.push((delegate, delegator));
                 }
             }

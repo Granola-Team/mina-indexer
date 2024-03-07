@@ -110,6 +110,12 @@ impl PrecomputedBlock {
     }
 
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
+        let mut commands = self.commands_post_diff();
+        commands.append(&mut self.commands_pre_diff());
+        commands
+    }
+
+    pub fn commands_pre_diff(&self) -> Vec<UserCommandWithStatus> {
         self.staged_ledger_diff
             .diff
             .clone()
@@ -121,6 +127,22 @@ impl PrecomputedBlock {
             .into_iter()
             .map(UserCommandWithStatus)
             .collect()
+    }
+
+    pub fn commands_post_diff(&self) -> Vec<UserCommandWithStatus> {
+        self.staged_ledger_diff
+            .diff
+            .clone()
+            .inner()
+            .1
+            .map_or(vec![], |diff| {
+                diff.inner()
+                    .inner()
+                    .commands
+                    .into_iter()
+                    .map(UserCommandWithStatus)
+                    .collect()
+            })
     }
 
     pub fn accounts_created(&self) -> Vec<PublicKey> {
@@ -187,18 +209,22 @@ impl PrecomputedBlock {
     }
 
     pub fn completed_works(&self) -> Vec<mina_snark::TransactionSnarkWork> {
-        let mut completed_works: Vec<mina_snark::TransactionSnarkWork> = self
-            .staged_ledger_pre_diff()
+        let mut completed_works = self.completed_works_post_diff().unwrap_or_default();
+        completed_works.append(&mut self.completed_works_pre_diff());
+        completed_works
+    }
+
+    pub fn completed_works_pre_diff(&self) -> Vec<mina_snark::TransactionSnarkWork> {
+        self.staged_ledger_pre_diff()
             .completed_works
             .iter()
             .map(|x| x.t.clone())
-            .collect();
-        let mut other = self
-            .staged_ledger_post_diff()
+            .collect()
+    }
+
+    pub fn completed_works_post_diff(&self) -> Option<Vec<mina_snark::TransactionSnarkWork>> {
+        self.staged_ledger_post_diff()
             .map(|diff| diff.completed_works.iter().map(|x| x.t.clone()).collect())
-            .unwrap_or_default();
-        completed_works.append(&mut other);
-        completed_works
     }
 
     pub fn coinbase_receiver_balance(&self) -> Option<u64> {
@@ -211,27 +237,17 @@ impl PrecomputedBlock {
         None
     }
 
-    pub fn fee_transfer_receiver1_balance(&self) -> Option<u64> {
+    pub fn fee_transfer_balances(&self) -> Vec<(u64, Option<u64>)> {
+        let mut res = vec![];
         for internal_balance in self.internal_command_balances() {
             if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
-                return Some(x.inner().receiver1_balance.inner().inner().inner());
+                res.push((
+                    x.t.receiver1_balance.t.t.t,
+                    x.t.receiver2_balance.map(|balance| balance.t.t.t),
+                ));
             }
         }
-
-        None
-    }
-
-    pub fn fee_transfer_receiver2_balance(&self) -> Option<u64> {
-        for internal_balance in self.internal_command_balances() {
-            if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
-                return x
-                    .inner()
-                    .receiver2_balance
-                    .map(|balance| balance.inner().inner().inner());
-            }
-        }
-
-        None
+        res
     }
 
     pub fn coinbase_receiver(&self) -> PublicKey {

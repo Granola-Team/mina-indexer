@@ -1,6 +1,7 @@
 use crate::{
-    block::genesis::GenesisBlock, constants::MAINNET_ACCOUNT_CREATION_FEE,
-    ledger::public_key::PublicKey,
+    block::genesis::GenesisBlock,
+    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -50,24 +51,35 @@ impl Account {
         }
     }
 
-    pub fn from_deduction(pre: Self, amount: Amount) -> Option<Self> {
+    pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
+        use super::UpdateType;
+
+        match payment_diff.update_type {
+            UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
+            UpdateType::Debit(nonce) => {
+                Account::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
+            }
+        }
+    }
+
+    fn from_debit(pre: Self, amount: Amount, nonce: Option<u32>) -> Option<Self> {
         if amount > pre.balance {
             None
         } else {
             Some(Account {
                 public_key: pre.public_key.clone(),
                 balance: pre.balance.sub(&amount),
-                nonce: Nonce(pre.nonce.0 + 1),
+                nonce: Nonce(nonce.unwrap_or(pre.nonce.0)),
                 delegate: pre.delegate,
             })
         }
     }
 
-    pub fn from_deposit(pre: Self, amount: Amount) -> Self {
+    fn from_credit(pre: Self, amount: Amount) -> Self {
         Account {
             public_key: pre.public_key.clone(),
             balance: pre.balance.add(&amount),
-            nonce: Nonce(pre.nonce.0 + 1),
+            nonce: pre.nonce,
             delegate: pre.delegate,
         }
     }

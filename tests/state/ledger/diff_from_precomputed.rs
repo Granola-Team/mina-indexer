@@ -22,31 +22,31 @@ async fn account_diffs() {
         .unwrap();
     let diff = LedgerDiff::from_precomputed(&block);
 
-    let mut ledger: HashMap<PublicKey, i64> = HashMap::from(
+    let mut ledger: HashMap<PublicKey, (i64, u32)> = HashMap::from(
         [
             (
                 "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
-                1000000000000,
+                (1000000000000, 0),
             ),
             (
                 "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
-                1000000000000,
+                (1000000000000, 0),
             ),
             (
                 "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
-                1000000000000,
+                (1000000000000, 0),
             ),
             (
                 "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
-                1000000000000,
+                (1000000000000, 0),
             ),
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-                1000000000000,
+                (1000000000000, 0),
             ),
             (
                 "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
-                1000000000000,
+                (1000000000000, 0),
             ),
         ]
         .map(|(pk, amt)| (PublicKey::new(pk), amt)),
@@ -55,33 +55,47 @@ async fn account_diffs() {
     let initial_ledger = ledger.clone();
 
     println!("=== Account diffs ===");
-    for x in diff.account_diffs {
-        match x {
+    for diff in diff.account_diffs {
+        match diff {
             AccountDiff::Payment(PaymentDiff {
+                public_key,
+                amount,
+                update_type,
+            })
+            | AccountDiff::FeeTransfer(PaymentDiff {
+                public_key,
+                amount,
+                update_type,
+            })
+            | AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
             }) => {
                 println!("\n* Payment");
-                println!("public_key:  {public_key:?}");
+                println!("public_key:  {public_key}");
                 println!("amount:      {}", amount.0);
                 println!("update_type: {update_type:?}");
 
                 match update_type {
-                    UpdateType::Deduction => {
-                        if let Some(balance) = ledger.get_mut(&public_key) {
+                    UpdateType::Debit(new_nonce) => {
+                        if let Some((balance, nonce)) = ledger.get_mut(&public_key) {
                             if amount.0 as i64 > *balance {
-                                println!("deduction amount exceeded balance");
+                                println!("Debit amount exceeded balance");
                                 panic!();
                             }
                             *balance -= amount.0 as i64;
+
+                            if let Some(new_nonce) = new_nonce {
+                                *nonce = new_nonce;
+                            }
                         }
                     }
-                    UpdateType::Deposit => {
-                        if let Some(balance) = ledger.get_mut(&public_key) {
+                    UpdateType::Credit => {
+                        if let Some((balance, _)) = ledger.get_mut(&public_key) {
                             *balance += amount.0 as i64;
                         } else {
-                            ledger.insert(public_key, amount.0 as i64);
+                            ledger.insert(public_key, (amount.0 as i64, 0));
                         }
                     }
                 }
@@ -89,64 +103,67 @@ async fn account_diffs() {
             AccountDiff::Delegation(DelegationDiff {
                 delegate,
                 delegator,
+                nonce,
             }) => {
                 println!("\n* Delegation");
-                println!("delegate:  {delegate:?}");
-                println!("delegator: {delegator:?}");
+                println!("delegate:  {delegate}");
+                println!("delegator: {delegator}");
+                println!("nonce:     {nonce}");
             }
             AccountDiff::Coinbase(CoinbaseDiff { public_key, amount }) => {
                 println!("\n* Coinbase");
-                println!("public_key: {public_key:?}");
+                println!("public_key: {public_key}");
                 println!("amount:     {}", amount.0);
 
-                if let Some(balance) = ledger.get_mut(&public_key) {
+                if let Some((balance, _)) = ledger.get_mut(&public_key) {
                     *balance += amount.0 as i64;
                 } else {
-                    ledger.insert(public_key, amount.0 as i64);
+                    ledger.insert(public_key, (amount.0 as i64, 0));
                 }
             }
         }
     }
 
-    let delta: HashMap<PublicKey, i64> = HashMap::from(
+    let delta: HashMap<PublicKey, (i64, u32)> = HashMap::from(
         [
             (
                 "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
-                -156810000000,
+                (-156810000000, 42427),
             ),
             (
                 "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
-                1439634213000,
+                (1439634213000, 7296),
             ),
             (
                 "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
-                377787000,
+                (377787000, 0),
             ),
             (
                 "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
-                2000,
+                (2000, 0),
             ),
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-                -2002000,
+                (-2002000, 146493),
             ),
             (
                 "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
-                156800000000,
+                (156800000000, 0),
             ),
         ]
         .map(|(pk, amt)| (PublicKey::new(pk), amt)),
     );
 
     for pk in ledger.keys() {
-        let diff = ledger.get(pk).unwrap() - initial_ledger.get(pk).unwrap();
+        let balance_diff = ledger.get(pk).unwrap().0 - initial_ledger.get(pk).unwrap().0;
+        let nonce_diff = ledger.get(pk).unwrap().1 - initial_ledger.get(pk).unwrap().1;
 
-        if delta.get(pk).unwrap() != &diff {
+        if delta.get(pk).unwrap() != &(balance_diff, nonce_diff) {
             println!("Incorrect delta for {}", pk.to_address());
-            println!("Final:   {}", ledger.get(pk).unwrap());
-            println!("Initial: {}", initial_ledger.get(pk).unwrap());
+            println!("Final:   {:?}", ledger.get(pk).unwrap());
+            println!("Initial: {:?}", initial_ledger.get(pk).unwrap());
         }
 
-        assert_eq!(delta.get(pk).unwrap(), &diff);
+        assert_eq!(delta.get(pk).unwrap(), &(balance_diff, nonce_diff));
     }
 }
