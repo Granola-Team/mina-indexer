@@ -28,6 +28,10 @@ pub struct SignedCommandWithData {
 }
 
 impl SignedCommand {
+    pub fn fee(&self) -> u64 {
+        self.payload_common().fee.inner().inner()
+    }
+
     pub fn fee_payer_pk(&self) -> PublicKey {
         self.payload_common().fee_payer_pk.into()
     }
@@ -195,6 +199,7 @@ impl From<SignedCommand> for Command {
                     source: source_pk.into(),
                     receiver: receiver_pk.into(),
                     amount: amount.inner().inner().into(),
+                    nonce: value.source_nonce(),
                 })
             }
             mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
@@ -205,6 +210,7 @@ impl From<SignedCommand> for Command {
                 Command::Delegation(Delegation {
                     delegate: new_delegate.into(),
                     delegator: delegator.into(),
+                    nonce: value.source_nonce(),
                 })
             }
         }
