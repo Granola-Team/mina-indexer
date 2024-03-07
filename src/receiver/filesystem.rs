@@ -12,16 +12,13 @@ use tokio::sync::{
     watch::{self, Sender},
 };
 use tracing::{debug, error, instrument};
-use watchexec::{
-    error::RuntimeError,
-    event::{
-        filekind::{
-            CreateKind,
-            FileEventKind::{Create, Modify},
-        },
-        Event, Priority, Tag,
+use watchexec::{error::RuntimeError, sources::fs::worker, Config};
+use watchexec_events::{
+    filekind::{
+        CreateKind,
+        FileEventKind::{Create, Modify},
     },
-    fs::{worker, WorkingData},
+    Event, Priority, Tag,
 };
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
@@ -35,25 +32,28 @@ pub type FilesystemReceiverResult<T> = std::result::Result<T, FilesystemReceiver
 pub struct FilesystemReceiver {
     parsers: Vec<BlockParser>,
     paths_added: HashSet<PathBuf>,
-    worker_command_sender: Sender<WorkingData>,
+    worker_command_sender: Sender<Config>,
     worker_event_receiver: priority::Receiver<Event, Priority>,
     worker_error_receiver: mpsc::Receiver<RuntimeError>,
 }
 
 impl FilesystemReceiver {
     #[instrument]
-    pub async fn new(
-        event_capacity: usize,
-        error_capacity: usize,
-    ) -> FilesystemReceiverResult<Self> {
+    pub async fn new(event_capacity: u64, error_capacity: usize) -> FilesystemReceiverResult<Self> {
         debug!("initializing new filesystem receiver");
         let (ev_s, worker_event_receiver) = priority::bounded(event_capacity);
         let (er_s, worker_error_receiver) = mpsc::channel(error_capacity);
-        let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());
+
+        let config = Config::default();
+        config.pathset(["."]);
+
+        let (worker_command_sender, _) = watch::channel(config.clone());
 
         tokio::spawn(async {
             debug!("spawning filesystem watcher worker");
-            worker(wd_r, er_s, ev_s).await.expect("should not crash");
+            worker(config.into(), er_s, ev_s)
+                .await
+                .expect("should not crash");
         });
 
         Ok(Self {
@@ -88,17 +88,12 @@ impl FilesystemReceiver {
         }
 
         debug!("sending command to worker with new working data");
-        let mut working_data = WorkingData::default();
         let mut watched_directories = self.watched_directories();
-
         watched_directories.push(PathBuf::from(directory.as_ref()));
-        working_data.pathset = watched_directories
-            .iter()
-            .map(|path_buf| {
-                let path: &Path = path_buf.as_ref();
-                path.into()
-            })
-            .collect();
+
+        let working_data = Config::default();
+        working_data.pathset(watched_directories);
+
         self.worker_command_sender.send_replace(working_data);
 
         Ok(())
