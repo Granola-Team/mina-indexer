@@ -14,9 +14,5 @@ pub trait CanonicityStore {
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>>;
 
     /// Get block canonicity
-    fn get_block_canonicity(
-        &self,
-        state_hash: &BlockHash,
-        best_tip: &BlockHash,
-    ) -> anyhow::Result<Option<Canonicity>>;
+    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>>;
 }
