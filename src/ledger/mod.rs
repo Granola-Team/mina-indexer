@@ -2,7 +2,6 @@ pub mod account;
 pub mod coinbase;
 pub mod diff;
 pub mod genesis;
-pub mod post_balances;
 pub mod public_key;
 pub mod store;
 
@@ -10,18 +9,16 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     ledger::{
         account::{Account, Amount, Nonce},
-        coinbase::Coinbase,
         diff::{
             account::{AccountDiff, UpdateType},
             LedgerDiff,
         },
-        post_balances::{FeeTransferUpdate, PostBalance, PostBalanceUpdate},
         public_key::PublicKey,
     },
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, trace};
+use tracing::debug;
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
@@ -43,107 +40,6 @@ impl Ledger {
     pub fn new() -> Self {
         Ledger {
             accounts: HashMap::new(),
-        }
-    }
-
-    fn apply_delegation(&mut self, delegator: PublicKey, new_delegate: PublicKey) {
-        if let Some(account) = self.accounts.get_mut(&delegator) {
-            account.delegate = new_delegate;
-        }
-    }
-
-    fn apply_balance_update(&mut self, balance_update: PostBalance, nonce: Option<u32>) {
-        if let Some(account) = self.accounts.get_mut(&balance_update.public_key) {
-            if let Some(nonce) = nonce {
-                account.nonce = Nonce(nonce + 1);
-            }
-            account.balance = Amount(balance_update.balance);
-        } else {
-            let public_key = balance_update.public_key.clone();
-            let new_account = Account {
-                public_key: public_key.clone(),
-                balance: Amount(balance_update.balance),
-                nonce: Nonce(nonce.unwrap_or(0)),
-                delegate: public_key,
-            };
-            self.accounts.insert(balance_update.public_key, new_account);
-        }
-    }
-
-    pub fn apply_post_balances(&mut self, precomputed_block: &PrecomputedBlock) {
-        let balance_updates = PostBalanceUpdate::from_precomputed(precomputed_block);
-        for balance_update in balance_updates {
-            trace!(
-                "Applying {}: {}",
-                precomputed_block.blockchain_length,
-                precomputed_block.state_hash
-            );
-
-            match balance_update {
-                PostBalanceUpdate::Coinbase(coinbase_update) => {
-                    trace!(
-                        "(coinbase) {:?} {:?}",
-                        coinbase_update.public_key,
-                        coinbase_update.balance,
-                    );
-
-                    if Coinbase::from_precomputed(precomputed_block).is_coinbase_applied() {
-                        self.apply_balance_update(coinbase_update, None)
-                    }
-                }
-                PostBalanceUpdate::FeeTransfer(fee_update) => match fee_update {
-                    FeeTransferUpdate::One(fee_update) => {
-                        trace!(
-                            "(fee tx 1) {:?} {:?}",
-                            fee_update.public_key,
-                            fee_update.balance,
-                        );
-                        self.apply_balance_update(fee_update, None);
-                    }
-                    FeeTransferUpdate::Two(fee_update1, fee_update2) => {
-                        trace!(
-                            "(fee tx 1) {:?}: {:?}",
-                            fee_update1.public_key,
-                            fee_update1.balance,
-                        );
-                        trace!(
-                            "(fee tx 2) {:?}: {:?}",
-                            fee_update2.public_key,
-                            fee_update2.balance,
-                        );
-                        self.apply_balance_update(fee_update1, None);
-                        self.apply_balance_update(fee_update2, None);
-                    }
-                },
-                PostBalanceUpdate::User(user_update) => {
-                    trace!(
-                        "(fee payer) {:?} {:?}",
-                        user_update.fee_payer.public_key,
-                        user_update.fee_payer.balance,
-                    );
-                    trace!(
-                        "(receiver) {:?}: {:?}",
-                        user_update.receiver.public_key,
-                        user_update.receiver.balance,
-                    );
-                    trace!(
-                        "(source) {:?}: {:?}",
-                        user_update.source.public_key,
-                        user_update.source.balance,
-                    );
-
-                    if user_update.is_delegation() {
-                        self.apply_delegation(
-                            user_update.source.public_key.clone(),
-                            user_update.receiver.public_key.clone(),
-                        );
-                    }
-
-                    self.apply_balance_update(user_update.fee_payer, None);
-                    self.apply_balance_update(user_update.receiver, None);
-                    self.apply_balance_update(user_update.source, Some(user_update.source_nonce));
-                }
-            }
         }
     }
 
@@ -185,15 +81,9 @@ impl Ledger {
             match self.accounts.remove(&diff.public_key()) {
                 Some(account_before) => {
                     let account_after = match &diff {
-                        AccountDiff::Payment(payment_diff) => match &payment_diff.update_type {
-                            UpdateType::Deposit => {
-                                Account::from_deposit(account_before.clone(), payment_diff.amount)
-                            }
-                            UpdateType::Deduction => {
-                                Account::from_deduction(account_before.clone(), payment_diff.amount)
-                                    .unwrap_or(account_before.clone())
-                            }
-                        },
+                        AccountDiff::Payment(payment_diff) => {
+                            Account::from_payment(account_before, payment_diff)
+                        }
                         AccountDiff::Delegation(delegation_diff) => {
                             assert_eq!(account_before.public_key, delegation_diff.delegator);
                             Account::from_delegation(
@@ -204,6 +94,12 @@ impl Ledger {
                         AccountDiff::Coinbase(coinbase_diff) => {
                             Account::from_coinbase(account_before, coinbase_diff.amount)
                         }
+                        AccountDiff::FeeTransfer(fee_transfer_diff) => {
+                            Account::from_payment(account_before, fee_transfer_diff)
+                        }
+                        AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
+                            Account::from_payment(account_before, fee_transfer_diff)
+                        }
                     };
 
                     self.accounts.insert(diff.public_key(), account_after);
@@ -211,8 +107,12 @@ impl Ledger {
                 None => {
                     return match diff {
                         AccountDiff::Coinbase(_) => Ok(()),
-                        AccountDiff::Payment(_) => Err(LedgerError::AccountNotFound.into()),
                         AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
+                        AccountDiff::Payment(_)
+                        | AccountDiff::FeeTransfer(_)
+                        | AccountDiff::FeeTransferViaCoinbase(_) => {
+                            Err(LedgerError::AccountNotFound.into())
+                        }
                     };
                 }
             }
@@ -349,7 +249,7 @@ pub fn is_valid_hash(input: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        account::{Account, Amount},
+        account::Account,
         diff::{
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
@@ -373,7 +273,7 @@ mod tests {
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
                 public_key: public_key.clone(),
                 amount: diff_amount,
-                update_type: UpdateType::Deposit,
+                update_type: UpdateType::Credit,
             })],
         };
         let ledger = Ledger { accounts }
@@ -386,6 +286,7 @@ mod tests {
 
     #[test]
     fn apply_diff_delegation() {
+        let nonce = 42;
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
             PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
@@ -399,6 +300,7 @@ mod tests {
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
                 delegate: delegate_key.clone(),
+                nonce,
             })],
         };
         let ledger = Ledger { accounts }
@@ -406,69 +308,6 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
-        assert_eq!(account_after.delegate, delegate_key);
-    }
-
-    #[test]
-    fn apply_diff_payment_with_post_balance() {
-        let diff_amount = 1.into();
-        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
-        let mut account = Account::empty(public_key.clone());
-
-        account.balance = Amount(10); // Set the balance explicitly
-
-        let account_before = account.clone();
-        let mut accounts = HashMap::new();
-
-        accounts.insert(public_key.clone(), account);
-
-        let ledger_diff = LedgerDiff {
-            public_keys_seen: vec![],
-            account_diffs: vec![AccountDiff::Payment(PaymentDiff {
-                public_key: public_key.clone(),
-                amount: diff_amount,
-                update_type: UpdateType::Deposit,
-            })],
-        };
-        let ledger = Ledger { accounts }
-            .apply_diff(&ledger_diff)
-            .expect("ledger diff application");
-
-        let account_after = ledger.accounts.get(&public_key).expect("account get");
-        assert_eq!(
-            account_after.balance,
-            account_before.balance.add(&diff_amount)
-        );
-    }
-
-    #[test]
-    fn apply_diff_delegation_with_post_balance() {
-        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
-        let delegate_key =
-            PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
-
-        let mut account = Account::empty(public_key.clone());
-
-        account.balance = Amount(20);
-
-        let mut accounts = HashMap::new();
-        accounts.insert(public_key.clone(), account.clone());
-
-        let ledger_diff = LedgerDiff {
-            public_keys_seen: vec![],
-            account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
-                delegator: public_key.clone(),
-                delegate: delegate_key.clone(),
-            })],
-        };
-        let ledger = Ledger { accounts }
-            .apply_diff(&ledger_diff)
-            .expect("ledger diff application");
-
-        let account_before = account;
-        let account_after = ledger.accounts.get(&public_key).expect("account get");
-
-        assert_eq!(account_before.balance, account_after.balance);
         assert_eq!(account_after.delegate, delegate_key);
     }
 }
