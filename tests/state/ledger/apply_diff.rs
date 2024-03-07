@@ -15,7 +15,6 @@ async fn account_diffs() {
         .await
         .unwrap();
     let diff = LedgerDiff::from_precomputed(&block);
-
     let ledger = Ledger::from(vec![
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
@@ -72,64 +71,72 @@ async fn account_diffs() {
     println!("{:?}", ledger);
 
     let ledger = ledger.apply_diff(&diff).unwrap();
-
     let expected = Ledger::from(vec![
         (
             "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
             1000000000000,
-            None,
+            Some(0),
             None,
         ),
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             843190000000,
-            Some(2),
+            Some(42427),
             None,
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
-            Some(6),
+            Some(7296),
             None,
         ),
         (
             "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB",
             1000000000000,
-            None,
+            Some(0),
             None,
         ),
         (
             "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
             1000377787000,
-            Some(1),
+            Some(0),
             None,
         ),
         (
             "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
             999997998000,
-            Some(4),
+            Some(146493),
             None,
         ),
         (
             "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
             1000000002000,
-            Some(2),
+            Some(0),
             None,
         ),
         (
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
             1156800000000,
-            Some(1),
+            Some(0),
             None,
         ),
     ])
     .unwrap();
 
     println!("=== Diff ===");
-    println!("{:?}", diff);
+    println!("{diff:?}");
 
     println!("=== Final ===");
     println!("{ledger:?}");
 
+    println!("Nonce ledger:");
+    for (pk, account) in &ledger.accounts {
+        println!("{pk}: {}", account.nonce.0);
+    }
+
+    println!("Nonce expected:");
+    for (pk, account) in &expected.accounts {
+        println!("{pk}: {}", account.nonce.0);
+    }
     assert_eq!(ledger, expected);
 }

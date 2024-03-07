@@ -625,7 +625,7 @@ impl LedgerStore for IndexerStore {
             .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
         {
             for block in to_apply {
-                ledger.apply_post_balances(&block);
+                ledger._apply_diff_from_precomputed(&block)?;
             }
 
             return Ok(Some(ledger));

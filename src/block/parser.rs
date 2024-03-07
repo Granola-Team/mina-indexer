@@ -327,7 +327,7 @@ mod tests {
     fn blockchain_length_from_path() -> anyhow::Result<()> {
         let expected: Vec<u32> = vec![
             111, 113512, 113518, 175222, 179591, 179594, 195769, 195770, 196577, 2, 206418, 216651,
-            220897, 5929, 26272, 32202, 31640, 31775, 40702, 750, 84160, 84161, 9638, 9644,
+            220897, 320081, 5929, 26272, 32202, 31640, 31775, 40702, 750, 84160, 84161, 9638, 9644,
         ];
         let paths: Vec<PathBuf> = glob::glob("./tests/data/non_sequential_blocks/*")?
             .flatten()
