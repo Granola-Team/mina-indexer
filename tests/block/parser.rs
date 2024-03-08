@@ -1,4 +1,4 @@
-use mina_indexer::block::parser::BlockParser;
+use mina_indexer::block::{parser::BlockParser, precomputed::PrecomputedBlock};
 use std::path::PathBuf;
 use tokio::time::Instant;
 
@@ -9,12 +9,13 @@ async fn representative_benches() {
     let mut block_parser0 = BlockParser::new_testing(&sample_dir0).unwrap();
     let mut logs_processed = 0;
 
-    while let Some(precomputed_block) = block_parser0
+    while let Some(block) = block_parser0
         .next_block()
         .expect("IO Error on block_parser")
     {
+        let block: PrecomputedBlock = block.into();
         logs_processed += 1;
-        dbg!(precomputed_block.state_hash);
+        dbg!(block.state_hash);
     }
 
     println!("./tests/data/non_sequential_blocks");
@@ -27,12 +28,13 @@ async fn representative_benches() {
     let mut block_parser1 = BlockParser::new_testing(&sample_dir1).unwrap();
 
     logs_processed = 0;
-    while let Some(precomputed_block) = block_parser1
+    while let Some(block) = block_parser1
         .next_block()
         .expect("IO Error on block_parser")
     {
+        let block: PrecomputedBlock = block.into();
         logs_processed += 1;
-        dbg!(precomputed_block.state_hash);
+        dbg!(block.state_hash);
     }
 
     println!("./tests/data/sequential_blocks");
@@ -79,7 +81,7 @@ async fn orphaned_blocks() {
                 "tests/data/sequential_blocks/mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json".into(),
                 "tests/data/sequential_blocks/mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json".into(),
             ],
-            successive_paths: vec![
+            recent_paths: vec![
                 "tests/data/sequential_blocks/mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json".into(),
                 "tests/data/sequential_blocks/mainnet-105492-3NKTUzjMZ8GD89XKD4qhnKZVXEfUSRGjHTYncZVQTxipZA9mnKZu.json".into(),
                 "tests/data/sequential_blocks/mainnet-105492-3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN.json".into(),

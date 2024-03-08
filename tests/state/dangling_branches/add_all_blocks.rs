@@ -1,4 +1,7 @@
-use mina_indexer::{block::parser::BlockParser, state::IndexerState};
+use mina_indexer::{
+    block::{parser::BlockParser, precomputed::PrecomputedBlock},
+    state::IndexerState,
+};
 use std::path::PathBuf;
 
 /// Parses all blocks in ./tests/data/sequential_blocks
@@ -12,13 +15,14 @@ async fn extension() {
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     let mut n = 0;
-    if let Some(precomputed_block) = block_parser.next_block().unwrap() {
-        let mut state =
-            IndexerState::new_testing(&precomputed_block, None, None, None, None, None).unwrap();
+    if let Some(block) = block_parser.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
+        let mut state = IndexerState::new_testing(&block, None, None, None, None, None).unwrap();
         n += 1;
 
-        while let Some(precomputed_block) = block_parser.next_block().unwrap() {
-            state.add_block_to_witness_tree(&precomputed_block).unwrap();
+        while let Some(block) = block_parser.next_block().unwrap() {
+            let block: PrecomputedBlock = block.into();
+            state.add_block_to_witness_tree(&block).unwrap();
             n += 1;
         }
 

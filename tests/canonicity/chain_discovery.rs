@@ -1,4 +1,7 @@
-use mina_indexer::{block::parser::BlockParser, constants::*};
+use mina_indexer::{
+    block::{parser::BlockParser, precomputed::PrecomputedBlock},
+    constants::*,
+};
 use std::path::PathBuf;
 
 #[test]
@@ -11,10 +14,11 @@ fn gaps() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
+    while let Some(block) = block_parser.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length, precomputed_block.state_hash
+            block.blockchain_length, block.state_hash
         );
     }
 
@@ -33,10 +37,11 @@ fn contiguous() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
+    while let Some(block) = block_parser.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length, precomputed_block.state_hash
+            block.blockchain_length, block.state_hash
         );
     }
 
@@ -55,10 +60,11 @@ fn missing_parent() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
+    while let Some(block) = block_parser.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length, precomputed_block.state_hash
+            block.blockchain_length, block.state_hash
         );
     }
 
@@ -98,10 +104,11 @@ fn canonical_threshold() {
     )
     .unwrap();
 
-    while let Some(precomputed_block) = block_parser.next_block().unwrap() {
+    while let Some(block) = block_parser.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         println!(
             "length: {}, hash: {}",
-            precomputed_block.blockchain_length, precomputed_block.state_hash
+            block.blockchain_length, block.state_hash
         );
     }
 
