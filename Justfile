@@ -3,6 +3,8 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
+alias fmt := format
+
 default:
   @just --list --justfile {{justfile()}}
 
@@ -22,7 +24,7 @@ clean:
   rm -rf result
 
 format:
-  cargo fmt --all
+  cargo +nightly fmt --all
 
 test: test-unit
   ./test
@@ -46,7 +48,7 @@ audit:
   cargo audit
 
 lint: && audit disallow-unused-cargo-deps
-  cargo fmt --all --check
+  cargo +nightly fmt --all --check
   cargo clippy --all-targets --all-features -- -D warnings
 
 images:
