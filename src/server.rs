@@ -1,5 +1,5 @@
 use crate::{
-    block::{parser::BlockParser, Block, BlockHash, BlockWithoutHeight},
+    block::{parser::BlockParser, BlockHash, BlockWithoutHeight},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
     ledger::genesis::GenesisLedger,
@@ -38,7 +38,6 @@ pub struct MinaIndexer {
 
 #[derive(Debug)]
 pub struct IpcChannelUpdate {
-    pub best_tip: Block,
     pub summary: Box<SummaryVerbose>,
     pub store: Arc<IndexerStore>,
 }
@@ -173,17 +172,12 @@ pub async fn initialize(
             }
         };
 
-        let best_tip = state.best_tip_block().clone();
         let summary = Box::new(state.summary_verbose());
         let store = Arc::new(state.spawn_secondary_database()?);
 
         debug!("Updating IPC state");
         ipc_update_sender
-            .send(IpcChannelUpdate {
-                best_tip,
-                summary,
-                store,
-            })
+            .send(IpcChannelUpdate { summary, store })
             .await?;
 
         match initialization_mode {
@@ -219,7 +213,6 @@ pub async fn initialize(
 
         ipc_update_sender
             .send(IpcChannelUpdate {
-                best_tip: state.best_tip_block().clone(),
                 summary: Box::new(state.summary_verbose()),
                 store: Arc::new(state.spawn_secondary_database()?),
             })
@@ -235,7 +228,7 @@ pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
     filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
     info!(
@@ -257,12 +250,11 @@ pub async fn run(
                             }
 
                             ipc_update_sender.send(IpcChannelUpdate {
-                                best_tip: state.best_tip_block().clone(),
                                 summary: Box::new(state.summary_verbose()),
                                 store: Arc::new(state.spawn_secondary_database()?),
                             }).await?;
                         } else {
-                            warn!("Block receiver returned None");
+                            warn!("Block receiver closed channel");
                         }
                     }
                     Err(e) => {

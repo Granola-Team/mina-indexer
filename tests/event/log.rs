@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, store::BlockStore},
+    block::{parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore},
     canonicity::store::CanonicityStore,
     constants::*,
     event::{store::EventStore, witness_tree::*},
@@ -58,6 +58,7 @@ async fn test() {
     // - update best tip
     // - update canonicities
     while let Some(block) = block_parser1.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store
             .as_ref()

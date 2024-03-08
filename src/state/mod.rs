@@ -3,8 +3,11 @@ pub mod summary;
 
 use crate::{
     block::{
-        genesis::GenesisBlock, parser::BlockParser, precomputed::PrecomputedBlock,
-        store::BlockStore, Block, BlockHash, BlockWithoutHeight,
+        genesis::GenesisBlock,
+        parser::{BlockParser, ParsedBlock},
+        precomputed::PrecomputedBlock,
+        store::BlockStore,
+        Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
@@ -318,7 +321,7 @@ impl IndexerState {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
 
-                if let Some(block) = block_parser.next_block()? {
+                if let Some(ParsedBlock::DeepCanonical(block)) = block_parser.next_block()? {
                     let state_hash = block.state_hash.clone().into();
 
                     // aggregate diffs, apply, and add to db
@@ -396,11 +399,18 @@ impl IndexerState {
             );
         }
 
-        while let Some(block) = block_parser.next_block()? {
+        while let Some(parsed_block) = block_parser.next_block()? {
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
-            self.block_pipeline(&block)?;
+            match parsed_block {
+                ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
+                    self.block_pipeline(&block)?;
+                }
+                ParsedBlock::Orphaned(block) => {
+                    self.add_block_to_store(&block)?;
+                }
+            }
         }
 
         info!(
@@ -748,7 +758,7 @@ impl IndexerState {
     /// Get the status of a block: Canonical, Pending, or Orphaned
     pub fn get_block_status(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return indexer_store.get_block_canonicity(state_hash, &self.best_tip.state_hash);
+            return indexer_store.get_block_canonicity(state_hash);
         }
 
         Ok(None)

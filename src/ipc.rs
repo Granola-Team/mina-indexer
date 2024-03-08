@@ -155,10 +155,9 @@ async fn handle_conn(
 
             if let Some(best_tip) = db.get_best_block()? {
                 if let Ok(Some(ref block)) = db.get_block(&best_tip.state_hash.clone().into()) {
-                    let block_str = if let Some(canonicity) = db.get_block_canonicity(
-                        &block.state_hash.clone().into(),
-                        &best_tip.state_hash.into(),
-                    )? {
+                    let block_str = if let Some(canonicity) =
+                        db.get_block_canonicity(&block.state_hash.clone().into())?
+                    {
                         if verbose {
                             serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
                         } else {
@@ -199,41 +198,36 @@ async fn handle_conn(
 
             if !block::is_valid_state_hash(&state_hash) {
                 invalid_state_hash(&state_hash)
-            } else if let Some(best_tip) = db.get_best_block()? {
-                if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
-                    let block_str = if let Some(canonicity) = db.get_block_canonicity(
-                        &block.state_hash.clone().into(),
-                        &best_tip.state_hash.into(),
-                    )? {
-                        if verbose {
-                            serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
-                        } else {
-                            let block = BlockWithoutHeight::with_canonicity(block, canonicity);
-                            serde_json::to_string_pretty(&block)?
-                        }
+            } else if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
+                let block_str = if let Some(canonicity) =
+                    db.get_block_canonicity(&block.state_hash.clone().into())?
+                {
+                    if verbose {
+                        serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
                     } else {
-                        block_missing_from_db(&block.state_hash)
-                    };
-                    if !path.is_empty() {
-                        info!("Writing block {state_hash} to {path}");
-                        std::fs::write(path, block_str)?;
-                        Some(format!("Block {} written to {path}", block.state_hash))
-                    } else {
-                        info!(
-                            "Writing block to stdout (length {}): {}",
-                            block.blockchain_length, block.state_hash
-                        );
-                        Some(block_str)
+                        let block = BlockWithoutHeight::with_canonicity(block, canonicity);
+                        serde_json::to_string_pretty(&block)?
                     }
                 } else {
-                    error!("Block at state hash not present in store: {}", state_hash);
-                    Some(format!(
-                        "Block at state hash not present in store: {}",
-                        state_hash
-                    ))
+                    block_missing_from_db(&block.state_hash)
+                };
+                if !path.is_empty() {
+                    info!("Writing block {state_hash} to {path}");
+                    std::fs::write(path, block_str)?;
+                    Some(format!("Block {} written to {path}", block.state_hash))
+                } else {
+                    info!(
+                        "Writing block to stdout (length {}): {}",
+                        block.blockchain_length, block.state_hash
+                    );
+                    Some(block_str)
                 }
             } else {
-                best_tip_missing_from_db()
+                error!("Block at state hash not present in store: {}", state_hash);
+                Some(format!(
+                    "Block at state hash not present in store: {}",
+                    state_hash
+                ))
             }
         }
         "blocks-at-height" => {
@@ -243,61 +237,55 @@ async fn handle_conn(
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
 
-            if let Some(best_tip) = db.get_best_block()? {
-                let mut blocks_at_height = db.get_blocks_at_height(height)?;
-                blocks_at_height.sort();
+            let mut blocks_at_height = db.get_blocks_at_height(height)?;
+            blocks_at_height.sort();
 
-                let blocks_str = if verbose {
-                    let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
-                                Some(block.with_canonicity(canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    serde_json::to_string(&blocks)?
-                } else {
-                    let blocks: Vec<BlockWithoutHeight> = blocks_at_height
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    format_vec_jq_compatible(&blocks)
-                };
-
-                if path.is_empty() {
-                    info!("Writing blocks at height {height} to stdout");
-                    Some(blocks_str)
-                } else {
-                    let path: PathBuf = path.into();
-                    if !path.is_dir() {
-                        info!("Writing blocks at height {height} to {}", path.display());
-
-                        std::fs::write(path.clone(), blocks_str)?;
-                        Some(format!(
-                            "Blocks at height {height} written to {}",
-                            path.display()
-                        ))
-                    } else {
-                        file_must_not_be_a_directory(&path)
-                    }
-                }
+            let blocks_str = if verbose {
+                let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) =
+                            db.get_block_canonicity(&block.state_hash.clone().into())
+                        {
+                            Some(block.with_canonicity(canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                serde_json::to_string(&blocks)?
             } else {
-                best_tip_missing_from_db()
+                let blocks: Vec<BlockWithoutHeight> = blocks_at_height
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) =
+                            db.get_block_canonicity(&block.state_hash.clone().into())
+                        {
+                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                format_vec_jq_compatible(&blocks)
+            };
+
+            if path.is_empty() {
+                info!("Writing blocks at height {height} to stdout");
+                Some(blocks_str)
+            } else {
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    info!("Writing blocks at height {height} to {}", path.display());
+
+                    std::fs::write(path.clone(), blocks_str)?;
+                    Some(format!(
+                        "Blocks at height {height} written to {}",
+                        path.display()
+                    ))
+                } else {
+                    file_must_not_be_a_directory(&path)
+                }
             }
         }
         "blocks-at-slot" => {
@@ -307,61 +295,55 @@ async fn handle_conn(
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
 
-            if let Some(best_tip) = db.get_best_block()? {
-                let mut blocks_at_slot = db.get_blocks_at_slot(slot)?;
-                blocks_at_slot.sort();
+            let mut blocks_at_slot = db.get_blocks_at_slot(slot)?;
+            blocks_at_slot.sort();
 
-                let blocks_str = if verbose {
-                    let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
-                                Some(block.with_canonicity(canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    serde_json::to_string(&blocks)?
-                } else {
-                    let blocks: Vec<BlockWithoutHeight> = blocks_at_slot
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    format_vec_jq_compatible(&blocks)
-                };
-
-                if path.is_empty() {
-                    info!("Writing blocks at slot {slot} to stdout");
-                    Some(blocks_str)
-                } else {
-                    let path: PathBuf = path.into();
-                    if !path.is_dir() {
-                        info!("Writing blocks at slot {slot} to {}", path.display());
-
-                        std::fs::write(path.clone(), blocks_str)?;
-                        Some(format!(
-                            "Blocks at slot {slot} written to {}",
-                            path.display()
-                        ))
-                    } else {
-                        file_must_not_be_a_directory(&path)
-                    }
-                }
+            let blocks_str = if verbose {
+                let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) =
+                            db.get_block_canonicity(&block.state_hash.clone().into())
+                        {
+                            Some(block.with_canonicity(canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                serde_json::to_string(&blocks)?
             } else {
-                best_tip_missing_from_db()
+                let blocks: Vec<BlockWithoutHeight> = blocks_at_slot
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) =
+                            db.get_block_canonicity(&block.state_hash.clone().into())
+                        {
+                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                format_vec_jq_compatible(&blocks)
+            };
+
+            if path.is_empty() {
+                info!("Writing blocks at slot {slot} to stdout");
+                Some(blocks_str)
+            } else {
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    info!("Writing blocks at slot {slot} to {}", path.display());
+
+                    std::fs::write(path.clone(), blocks_str)?;
+                    Some(format!(
+                        "Blocks at slot {slot} written to {}",
+                        path.display()
+                    ))
+                } else {
+                    file_must_not_be_a_directory(&path)
+                }
             }
         }
         "blocks-at-public-key" => {
@@ -373,7 +355,7 @@ async fn handle_conn(
 
             if !public_key::is_valid(&pk) {
                 invalid_public_key(&pk)
-            } else if let Some(best_tip) = db.get_best_block()? {
+            } else {
                 let mut blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
                 blocks_at_pk.sort();
 
@@ -381,10 +363,9 @@ async fn handle_conn(
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_pk
                         .iter()
                         .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
+                            if let Ok(Some(canonicity)) =
+                                db.get_block_canonicity(&block.state_hash.clone().into())
+                            {
                                 Some(block.with_canonicity(canonicity))
                             } else {
                                 None
@@ -396,10 +377,9 @@ async fn handle_conn(
                     let blocks: Vec<BlockWithoutHeight> = blocks_at_pk
                         .iter()
                         .flat_map(|block| {
-                            if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                &block.state_hash.clone().into(),
-                                &best_tip.state_hash.clone().into(),
-                            ) {
+                            if let Ok(Some(canonicity)) =
+                                db.get_block_canonicity(&block.state_hash.clone().into())
+                            {
                                 Some(BlockWithoutHeight::with_canonicity(block, canonicity))
                             } else {
                                 None
@@ -426,8 +406,6 @@ async fn handle_conn(
                         file_must_not_be_a_directory(&path)
                     }
                 }
-            } else {
-                best_tip_missing_from_db()
             }
         }
         "best-chain" => {
@@ -480,10 +458,9 @@ async fn handle_conn(
                         let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
                             .iter()
                             .flat_map(|block| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                    &block.state_hash.clone().into(),
-                                    &best_tip.state_hash.clone().into(),
-                                ) {
+                                if let Ok(Some(canonicity)) =
+                                    db.get_block_canonicity(&block.state_hash.clone().into())
+                                {
                                     Some(block.with_canonicity(canonicity))
                                 } else {
                                     None
@@ -495,10 +472,9 @@ async fn handle_conn(
                         let best_chain: Vec<BlockWithoutHeight> = best_chain
                             .iter()
                             .flat_map(|block| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(
-                                    &block.state_hash.clone().into(),
-                                    &best_tip.state_hash.clone().into(),
-                                ) {
+                                if let Ok(Some(canonicity)) =
+                                    db.get_block_canonicity(&block.state_hash.clone().into())
+                                {
                                     Some(BlockWithoutHeight::with_canonicity(block, canonicity))
                                 } else {
                                     None

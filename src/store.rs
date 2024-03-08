@@ -497,15 +497,11 @@ impl CanonicityStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_canonicity(
-        &self,
-        state_hash: &BlockHash,
-        best_tip: &BlockHash,
-    ) -> anyhow::Result<Option<Canonicity>> {
+    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
         self.database.try_catch_up_with_primary().unwrap_or(());
 
-        if let Ok(Some(best_tip)) = self.get_block(best_tip) {
+        if let Ok(Some(best_tip)) = self.get_best_block() {
             if let Some(PrecomputedBlock {
                 blockchain_length, ..
             }) = self.get_block(state_hash)?

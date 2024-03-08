@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, store::BlockStore},
+    block::{parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
     store::IndexerStore,
 };
@@ -24,7 +24,9 @@ fn add_and_get() {
     let mut n = 0;
     let adding = Instant::now();
     while let Some(block) = bp.next_block().unwrap() {
+        let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash.clone();
+
         db.add_block(&block).unwrap();
         blocks.insert(state_hash.clone(), block);
         println!("Added {:?}", &state_hash);
