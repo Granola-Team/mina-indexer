@@ -4,7 +4,7 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     ledger::{
         coinbase::Coinbase,
-        diff::account::{AccountDiff, AccountDiffType},
+        diff::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff},
         PublicKey,
     },
 };
@@ -22,21 +22,38 @@ impl LedgerDiff {
         use crate::command::{Command, Payment};
 
         let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
-        let mut account_diff_applied_txns: Vec<Command> = precomputed_block
+        // applied user commands
+        let mut account_diff_txns: Vec<Command> = precomputed_block
             .commands()
             .into_iter()
-            .filter(|x| x.is_applied())
-            .map(|x| x.to_command())
+            .filter(|txn| txn.is_applied())
+            .map(|txn| txn.to_command())
             .filter(|cmd| match cmd {
                 Command::Payment(Payment { amount, .. }) => amount.0 > 0,
                 Command::Delegation(_) => true,
             })
             .collect();
-        account_diff_applied_txns.sort();
-        let mut account_diff_applied_txns = account_diff_applied_txns
+        account_diff_txns.sort();
+
+        let mut account_diff_txns: Vec<AccountDiff> = account_diff_txns
             .into_iter()
             .flat_map(AccountDiff::from_command)
             .collect();
+
+        // failed user commands
+        account_diff_txns.append(
+            &mut precomputed_block
+                .commands()
+                .iter()
+                .filter(|txn| !txn.is_applied())
+                .map(|txn| {
+                    AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+                        public_key: txn.sender(),
+                        nonce: txn.nonce(),
+                    })
+                })
+                .collect(),
+        );
 
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
@@ -64,7 +81,7 @@ impl LedgerDiff {
         }
 
         let mut account_diffs = Vec::new();
-        account_diffs.append(&mut account_diff_applied_txns);
+        account_diffs.append(&mut account_diff_txns);
 
         if coinbase.is_coinbase_applied() {
             account_diffs.push(coinbase.as_account_diff()[0].clone());

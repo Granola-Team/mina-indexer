@@ -35,6 +35,12 @@ pub struct CoinbaseDiff {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct FailedTransactionNonceDiff {
+    pub public_key: PublicKey,
+    pub nonce: u32,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub enum AccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
@@ -42,6 +48,8 @@ pub enum AccountDiff {
     FeeTransfer(PaymentDiff),
     /// Overrides the fee transfer for SNARK work
     FeeTransferViaCoinbase(PaymentDiff),
+    /// Updates the nonce for a failed txn
+    FailedTransactionNonce(FailedTransactionNonceDiff),
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -105,6 +113,7 @@ impl AccountDiff {
             Self::Coinbase(coinbase_diff) => coinbase_diff.public_key.clone(),
             Self::FeeTransfer(fee_transfer_diff) => fee_transfer_diff.public_key.clone(),
             Self::FeeTransferViaCoinbase(fee_transfer_diff) => fee_transfer_diff.public_key.clone(),
+            Self::FailedTransactionNonce(failed_diff) => failed_diff.public_key.clone(),
         }
     }
 
@@ -145,7 +154,7 @@ impl AccountDiff {
             .collect()
     }
 
-    /// Fees for user commands, applied or failed
+    /// Fees for user commands, applied or failed, aggregated per public key
     pub fn from_transaction_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let coinbase_receiver = &precomputed_block.coinbase_receiver();
         let mut fees =
@@ -157,7 +166,7 @@ impl AccountDiff {
         fees
     }
 
-    /// Fees for SNARK work
+    /// Fees for SNARK work, aggregated per public key
     pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let snark_fees = SnarkWorkSummary::from_precomputed(precomputed_block);
         let mut fee_map = HashMap::new();
@@ -190,7 +199,7 @@ impl AccountDiff {
             .collect()
     }
 
-    /// User command + SNARK work fees
+    /// User command + SNARK work fees, aggregated per public key
     pub fn from_block_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let mut fees = Self::from_transaction_fees(precomputed_block);
         fees.append(&mut Self::from_snark_fees(precomputed_block));
@@ -279,6 +288,12 @@ impl std::fmt::Debug for CoinbaseDiff {
     }
 }
 
+impl std::fmt::Debug for FailedTransactionNonceDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} | Nonce {}", self.public_key, self.nonce)
+    }
+}
+
 impl std::fmt::Debug for AccountDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -288,6 +303,9 @@ impl std::fmt::Debug for AccountDiff {
             AccountDiff::FeeTransfer(pay_diff) => write!(f, "Fee transfer: {pay_diff:?}"),
             AccountDiff::FeeTransferViaCoinbase(pay_diff) => {
                 write!(f, "Fee transfer via coinbase: {pay_diff:?}")
+            }
+            AccountDiff::FailedTransactionNonce(failed_diff) => {
+                write!(f, "Failed transaction: {failed_diff:?}")
             }
         }
     }
