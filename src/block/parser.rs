@@ -10,34 +10,43 @@ use std::{
 };
 use tracing::info;
 
-// TODO change names
 /// Splits block paths into three collections:
-/// - canonical
-/// - successive
-/// - orphaned
+/// - _deep canonical_ (chain of canonical blocks with at least
+///   `canonical_threshold` confirmations, tip is _canonical root_ which becomes
+///   the root of the witness tree)
+/// - _recent_ (descendents of the canonical root)
+/// - _orphaned_ (other blocks at the same height as a deep canonical block)
 ///
-/// Traverses canoncial paths, then successive, then orphaned
+/// Traverses deep canoncial, recent, then orphaned (orphaned paths bypass the
+/// witness tree)
 pub struct BlockParser {
     pub num_canonical: u32,
     pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
     canonical_paths: IntoIter<PathBuf>,
-    successive_paths: IntoIter<PathBuf>,
+    recent_paths: IntoIter<PathBuf>,
     orphaned_paths: IntoIter<PathBuf>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlockParserPaths {
     pub canonical_paths: Vec<PathBuf>,
-    pub successive_paths: Vec<PathBuf>,
+    pub recent_paths: Vec<PathBuf>,
     pub orphaned_paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ParsedBlock {
+    Recent(PrecomputedBlock),
+    DeepCanonical(PrecomputedBlock),
+    Orphaned(PrecomputedBlock),
 }
 
 impl BlockParser {
     pub fn paths(&self) -> BlockParserPaths {
         BlockParserPaths {
             canonical_paths: self.canonical_paths.clone().collect(),
-            successive_paths: self.successive_paths.clone().collect(),
+            recent_paths: self.recent_paths.clone().collect(),
             orphaned_paths: self.orphaned_paths.clone().collect(),
         }
     }
@@ -109,7 +118,7 @@ impl BlockParser {
                 blocks_dir,
                 num_canonical: 0,
                 total_num_blocks: paths.len() as u32,
-                successive_paths: paths.into_iter(),
+                recent_paths: paths.into_iter(),
                 canonical_paths: vec![].into_iter(),
                 orphaned_paths: vec![].into_iter(),
             })
@@ -157,7 +166,7 @@ impl BlockParser {
                 .filter_map(|x| x.ok())
                 .filter(|path| length_from_path(path).is_some())
                 .collect();
-            if let Ok((canonical_paths, successive_paths, orphaned_paths)) = discovery(
+            if let Ok((canonical_paths, recent_paths, orphaned_paths)) = discovery(
                 min_len_filter,
                 max_len_filter,
                 canonical_threshold,
@@ -167,10 +176,10 @@ impl BlockParser {
                 info!("Canonical chain discovery successful...");
                 Ok(Self {
                     num_canonical: canonical_paths.len() as u32,
-                    total_num_blocks: (canonical_paths.len() + successive_paths.len()) as u32,
+                    total_num_blocks: (canonical_paths.len() + recent_paths.len()) as u32,
                     blocks_dir,
                     canonical_paths: canonical_paths.into_iter(),
-                    successive_paths: successive_paths.into_iter(),
+                    recent_paths: recent_paths.into_iter(),
                     orphaned_paths: orphaned_paths.into_iter(),
                 })
             } else {
@@ -182,20 +191,26 @@ impl BlockParser {
     }
 
     /// Traverses `self`'s internal paths
-    /// - canonical
-    /// - successive
+    /// - deep canonical
+    /// - recent
     /// - orphaned
-    pub fn next_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+    pub fn next_block(&mut self) -> anyhow::Result<Option<ParsedBlock>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path).map(Some);
+            return PrecomputedBlock::parse_file(&next_path)
+                .map(ParsedBlock::DeepCanonical)
+                .map(Some);
         }
 
-        if let Some(next_path) = self.successive_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path).map(Some);
+        if let Some(next_path) = self.recent_paths.next() {
+            return PrecomputedBlock::parse_file(&next_path)
+                .map(ParsedBlock::Recent)
+                .map(Some);
         }
 
         if let Some(next_path) = self.orphaned_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path).map(Some);
+            return PrecomputedBlock::parse_file(&next_path)
+                .map(ParsedBlock::Orphaned)
+                .map(Some);
         }
 
         Ok(None)
@@ -209,11 +224,13 @@ impl BlockParser {
     ) -> anyhow::Result<PrecomputedBlock> {
         let mut next_block = self
             .next_block()?
+            .map(<ParsedBlock as Into<PrecomputedBlock>>::into)
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.state_hash != state_hash {
             next_block = self
                 .next_block()?
+                .map(<ParsedBlock as Into<PrecomputedBlock>>::into)
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
 
@@ -226,8 +243,18 @@ impl BlockParser {
             total_num_blocks: paths.len() as u32,
             blocks_dir: blocks_dir.to_path_buf(),
             canonical_paths: vec![].into_iter(),
-            successive_paths: paths.clone().into_iter(),
+            recent_paths: paths.clone().into_iter(),
             orphaned_paths: vec![].into_iter(),
+        }
+    }
+}
+
+impl From<ParsedBlock> for PrecomputedBlock {
+    fn from(value: ParsedBlock) -> Self {
+        match value {
+            ParsedBlock::DeepCanonical(b) => b,
+            ParsedBlock::Orphaned(b) => b,
+            ParsedBlock::Recent(b) => b,
         }
     }
 }
