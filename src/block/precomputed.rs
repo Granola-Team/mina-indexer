@@ -56,22 +56,19 @@ pub struct PrecomputedBlockWithCanonicity {
     pub scheduled_time: String,
     pub blockchain_length: u32,
     pub protocol_state: ProtocolState,
-    pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
-    pub delta_transition_chain_proof: DeltaTransitionChainProof,
 }
 
 impl PrecomputedBlock {
     pub fn from_file_contents(log_contents: BlockFileContents) -> serde_json::Result<Self> {
         let state_hash = log_contents.state_hash;
-        let contents = String::from_utf8_lossy(&log_contents.contents);
         let BlockFile {
             scheduled_time,
             protocol_state,
             protocol_state_proof,
             staged_ledger_diff,
             delta_transition_chain_proof,
-        } = serde_json::from_str(&contents)?;
+        } = serde_json::from_slice(&log_contents.contents)?;
         let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
             blockchain_length
         } else {
@@ -399,13 +396,13 @@ impl PrecomputedBlock {
             self.protocol_state
                 .clone()
                 .body
-                .inner()
-                .inner()
+                .t
+                .t
                 .consensus_state
-                .inner()
-                .inner()
+                .t
+                .t
                 .last_vrf_output
-                .inner()
+                .t
                 .0,
         );
         VrfOutput::new(last_vrf_output.hex_digest())
@@ -418,9 +415,7 @@ impl PrecomputedBlock {
             scheduled_time: self.scheduled_time.clone(),
             blockchain_length: self.blockchain_length,
             protocol_state: self.protocol_state.clone(),
-            protocol_state_proof: self.protocol_state_proof.clone(),
             staged_ledger_diff: self.staged_ledger_diff.clone(),
-            delta_transition_chain_proof: self.delta_transition_chain_proof.clone(),
         }
     }
 }

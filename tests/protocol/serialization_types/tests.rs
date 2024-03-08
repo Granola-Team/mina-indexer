@@ -21,7 +21,6 @@ use mina_indexer::protocol::{
         consensus_state::{ConsensusStateV1, VrfOutputTruncatedV1},
         delta_transition_chain_proof::DeltaTransitionChainProof,
         epoch_data::{EpochDataV1, EpochLedgerV1},
-        external_transition::ExternalTransitionV1,
         field_and_curve_elements::{
             ECPointV1, ECPointVecV1, FieldElement, FieldElementVecV1, FiniteECPoint,
             FiniteECPointPairVecV1, FiniteECPointVecV1, InnerCurveScalar,
@@ -42,12 +41,10 @@ use mina_indexer::protocol::{
         },
         protocol_version::ProtocolVersionV1,
         signatures::{PublicKey2V1, PublicKeyV1, SignatureV1},
-        snark_work::TransactionSnarkWorkV1,
         staged_ledger_diff::{
             CoinBaseFeeTransferV1, CoinBaseV1, InternalCommandBalanceDataV1, PaymentPayloadV1,
             SignedCommandFeeTokenV1, SignedCommandMemoV1, SignedCommandPayloadBodyV1,
-            SignedCommandPayloadCommonV1, SignedCommandV1, StagedLedgerDiffTupleV1,
-            StagedLedgerDiffV1, StagedLedgerPreDiffV1, TransactionStatusAuxiliaryDataV1,
+            SignedCommandPayloadCommonV1, SignedCommandV1, TransactionStatusAuxiliaryDataV1,
             TransactionStatusBalanceDataV1, TransactionStatusV1, UserCommandV1,
             UserCommandWithStatusV1,
         },
@@ -57,14 +54,6 @@ use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, str::FromStr};
 use wasm_bindgen_test::*;
-
-#[test]
-#[wasm_bindgen_test]
-fn test_external_transition() {
-    block_path_test_batch! {
-        ExternalTransitionV1 => ""
-    }
-}
 
 #[test]
 #[wasm_bindgen_test]
@@ -342,46 +331,6 @@ fn test_staged_ledger_state_proof_proof_openings_evals() {
 
 #[test]
 #[wasm_bindgen_test]
-fn test_staged_ledger_diff() {
-    block_path_test_batch! {
-        StagedLedgerDiffV1 => "t/staged_ledger_diff"
-    }
-}
-
-#[test]
-#[wasm_bindgen_test]
-fn test_staged_ledger_diff_diff() {
-    block_path_test_batch! {
-        StagedLedgerDiffTupleV1 => "t/staged_ledger_diff/t/diff"
-    }
-}
-
-#[test]
-#[wasm_bindgen_test]
-fn test_staged_ledger_diff_one() {
-    block_path_test_batch! {
-        Option<StagedLedgerPreDiffV1> => "t/staged_ledger_diff/t/diff/t/1"
-    }
-}
-
-#[test]
-#[wasm_bindgen_test]
-fn test_staged_ledger_diff_diff_two() {
-    block_path_test_batch! {
-        StagedLedgerPreDiffV1 => "t/staged_ledger_diff/t/diff/t/0"
-    }
-}
-
-#[test]
-#[wasm_bindgen_test]
-fn test_staged_ledger_diff_diff_completed_works() {
-    block_path_test_batch! {
-        Vec<TransactionSnarkWorkV1> => "t/staged_ledger_diff/t/diff/t/0/t/t/completed_works"
-    }
-}
-
-#[test]
-#[wasm_bindgen_test]
 fn test_staged_ledger_diff_diff_commands() {
     block_path_test_batch! {
         UserCommandWithStatusV1 => "t/staged_ledger_diff/t/diff/t/0/t/t/commands/0"
@@ -534,20 +483,6 @@ fn smoke_test_roundtrip_block1() {
 
     // check roundtrip
     test_roundtrip(&block.value, block.bytes.as_slice());
-}
-
-#[test]
-#[wasm_bindgen_test]
-fn smoke_test_deserialize_block() {
-    // check we can deserialize into this type without error
-    for (_name, block) in TEST_BLOCKS.iter() {
-        let et: ExternalTransitionV1 = block
-            .external_transitionv1()
-            .expect("Failed to deserialize block");
-
-        // check roundtrip
-        test_roundtrip(&et, block.bytes.as_slice());
-    }
 }
 
 pub(crate) fn select_path(block: &Value, path: impl AsRef<str>) -> &Value {

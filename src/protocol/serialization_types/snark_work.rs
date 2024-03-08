@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 pub struct TransactionSnarkWork {
     // Versioned 1 byte
     pub fee: AmountV1,
-    pub proofs: OneORTwoV1,
     pub prover: PublicKeyV1,
 }
 
@@ -30,37 +29,8 @@ pub type TransactionSnarkWorkV1 = Versioned<TransactionSnarkWork, 1>;
 pub struct TransactionSnarkWorkJson {
     // Versioned 1 byte
     pub fee: DecimalJson,
-    pub proofs: OneORTwoJson,
     pub prover: PublicKeyJson,
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(rename = "Polyvar")]
-pub enum OneORTwo {
-    // Versioned 1 byte
-    #[serde(rename = "One")]
-    One(Box<LedgerProofV1>),
-    #[serde(rename = "Two")]
-    Two(Box<LedgerProofV1>, Box<LedgerProofV1>),
-}
-
-pub type OneORTwoV1 = Versioned<OneORTwo, 1>;
-
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-enum OneORTwoJsonProxy {
-    One(Box<TransactionSnarkJson>),
-    Two(Box<TransactionSnarkJson>, Box<TransactionSnarkJson>),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
-#[auto_from(OneORTwo)]
-#[auto_from(OneORTwoJsonProxy)]
-pub enum OneORTwoJson {
-    One(Box<TransactionSnarkJson>),
-    Two(Box<TransactionSnarkJson>, Box<TransactionSnarkJson>),
-}
-
-impl_mina_enum_json_serde!(OneORTwoJson, OneORTwoJsonProxy);
 
 pub type LedgerProofV1 = Versioned<TransactionSnarkV1, 1>;
 
