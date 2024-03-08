@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 set -ex
 
 # Collect the binaries under test and the test ledger.
@@ -26,6 +26,21 @@ test_cleanup() {
 }
 
 trap test_cleanup EXIT
+
+ephemeral_port() {
+    set +e
+    LOW_BOUND=49152
+    RANGE=16384
+    while true; do
+        CANDIDATE=$[$LOW_BOUND + ($RANDOM % $RANGE)]
+        (echo "" >/dev/tcp/127.0.0.1/${CANDIDATE}) >/dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            echo $CANDIDATE
+            break
+        fi
+    done
+    set -e
+}
 
 idxr() {
     RUST_BACKTRACE=full "$IDXR" "$@"
@@ -1006,6 +1021,8 @@ test_many_blocks() {
 test_rest_endpoints() {
     test=test_rest_endpoints
 
+    port=$(ephemeral_port)
+
     setup
     dl_mainnet 100 ./blocks
 
@@ -1015,15 +1032,15 @@ test_rest_endpoints() {
         --log-dir ./logs \
         --log-level debug \
         --web-hostname "0.0.0.0" \
-        --web-port 1337
+        --web-port "$port"
     sleep 10
 
     # results
-    balance=$(curl -s http://localhost:1337/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
+    balance=$(curl -s http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert '1439050000000' $balance
 
     # Testing blockchain summary endpoint
-    curl -s http://localhost:1337/summary > output.json
+    curl -s http://localhost:${port}/summary > output.json
 
     blockchain_length=$(cat output.json | jq -r .blockchainLength)
     assert '100' $blockchain_length
