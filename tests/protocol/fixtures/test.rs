@@ -3,10 +3,7 @@
 
 use crate::{load_json_test_blocks, load_test_blocks};
 use lazy_static::lazy_static;
-use mina_indexer::protocol::{
-    bin_prot, bin_prot::value::layout::BinProtRule,
-    serialization_types::external_transition::ExternalTransitionV1,
-};
+use mina_indexer::protocol::{bin_prot, bin_prot::value::layout::BinProtRule};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -14,12 +11,6 @@ pub struct BlockFixture {
     pub bytes: Vec<u8>,
     pub value: bin_prot::Value,
     pub block_name: &'static str,
-}
-
-impl BlockFixture {
-    pub fn external_transitionv1(&self) -> anyhow::Result<ExternalTransitionV1> {
-        Ok(bin_prot::from_reader_strict(self.bytes.as_slice())?)
-    }
 }
 
 // FIXME: Move layouts into this crate?
