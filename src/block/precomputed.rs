@@ -8,9 +8,7 @@ use crate::{
     ledger::{coinbase::Coinbase, public_key::PublicKey},
     protocol::serialization_types::{
         consensus_state as mina_consensus,
-        delta_transition_chain_proof::{DeltaTransitionChainProof, DeltaTransitionChainProofJson},
         protocol_state::{ProtocolState, ProtocolStateJson},
-        protocol_state_proof::{ProtocolStateProofBase64Json, ProtocolStateProofV1},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
 };
@@ -29,9 +27,7 @@ pub struct BlockFile {
     #[serde(default = "genesis_timestamp")]
     scheduled_time: String,
     protocol_state: ProtocolStateJson,
-    protocol_state_proof: ProtocolStateProofBase64Json,
     staged_ledger_diff: mina_rs::StagedLedgerDiffJson,
-    delta_transition_chain_proof: DeltaTransitionChainProofJson,
 }
 
 fn genesis_timestamp() -> String {
@@ -44,9 +40,7 @@ pub struct PrecomputedBlock {
     pub scheduled_time: String,
     pub blockchain_length: u32,
     pub protocol_state: ProtocolState,
-    pub protocol_state_proof: ProtocolStateProofV1,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
-    pub delta_transition_chain_proof: DeltaTransitionChainProof,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,9 +59,7 @@ impl PrecomputedBlock {
         let BlockFile {
             scheduled_time,
             protocol_state,
-            protocol_state_proof,
             staged_ledger_diff,
-            delta_transition_chain_proof,
         } = serde_json::from_slice(&log_contents.contents)?;
         let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
             blockchain_length
@@ -79,9 +71,7 @@ impl PrecomputedBlock {
             scheduled_time,
             blockchain_length,
             protocol_state: protocol_state.into(),
-            protocol_state_proof: protocol_state_proof.into(),
             staged_ledger_diff: staged_ledger_diff.into(),
-            delta_transition_chain_proof: delta_transition_chain_proof.into(),
         })
     }
 
