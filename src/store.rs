@@ -22,6 +22,7 @@ use tracing::{trace, warn};
 pub struct IndexerStore {
     pub db_path: PathBuf,
     pub database: DB,
+    pub is_primary: bool,
 }
 
 impl IndexerStore {
@@ -45,6 +46,7 @@ impl IndexerStore {
         Ok(Self {
             db_path: PathBuf::from(secondary),
             database,
+            is_primary: false,
         })
     }
 
@@ -73,6 +75,7 @@ impl IndexerStore {
         Ok(Self {
             db_path: PathBuf::from(path),
             database,
+            is_primary: true,
         })
     }
 
