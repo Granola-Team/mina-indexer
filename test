@@ -762,7 +762,7 @@ test_replay() {
     num_blocks_replay=$(idxr summary -j | jq -r .blocks_processed)
 
     # includes blocks added to watch dir while down
-    assert 20 $num_blocks_replay
+    assert 35 $num_blocks_replay
     assert 20 $best_length_replay
     assert 10 $canonical_length_replay
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay

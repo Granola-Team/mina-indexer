@@ -363,8 +363,10 @@ impl IndexerState {
 
             assert_eq!(self.blocks_processed, block_parser.num_canonical + 1); // +1 genesis
         }
-
-        // now add the successive non-canonical blocks
+        self.report_from_block_count(block_parser, total_time);
+        info!("Finished processing canonical chain");
+        info!("Adding orphaned blocks to the block store");
+        // now add the orphaned blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
             .await
     }
@@ -392,14 +394,13 @@ impl IndexerState {
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
         let mut step_time = total_time;
 
-        if self.blocks_processed == 0 && block_parser.total_num_blocks > 500 {
-            info!(
-                "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
-                self.reporting_freq
-            );
-        }
+        info!(
+            "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
+            self.reporting_freq
+        );
 
         while let Some(parsed_block) = block_parser.next_block()? {
+            self.blocks_processed += 1;
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
@@ -1207,12 +1208,13 @@ impl IndexerState {
         self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
     }
 
-    fn should_report_from_block_count(&self) -> bool {
+    fn should_report_from_block_count(&self, block_parser: &BlockParser) -> bool {
         self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
+            || self.blocks_processed == block_parser.num_canonical + 1
     }
 
     fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
-        if self.should_report_from_block_count() {
+        if self.should_report_from_block_count(block_parser) {
             let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
 
             info!(
@@ -1234,7 +1236,7 @@ impl IndexerState {
         step_time: Instant,
         total_time: Instant,
     ) -> anyhow::Result<()> {
-        if self.should_report_from_block_count()
+        if self.should_report_from_block_count(block_parser)
             || self.should_report_from_time(step_time.elapsed())
         {
             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
