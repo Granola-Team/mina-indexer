@@ -77,8 +77,10 @@ impl IpcActor {
                                     },
                                     Ok(_) => { info!("handled connection"); },
                                 };
-                                debug!("Removing readonly instance at {}", store.db_path.clone().display());
-                                tokio::fs::remove_dir_all(&store.db_path).await.ok();
+                                if !store.is_primary {
+                                    debug!("Removing readonly instance at {}", store.db_path.clone().display());
+                                    tokio::fs::remove_dir_all(&store.db_path).await.ok();
+                                }
                             });
                         }
                     }
