@@ -3,6 +3,7 @@ pub mod coinbase;
 pub mod diff;
 pub mod genesis;
 pub mod public_key;
+pub mod staking;
 pub mod store;
 
 use crate::{
@@ -246,7 +247,7 @@ impl From<u64> for Amount {
     }
 }
 
-pub fn is_valid_hash(input: &str) -> bool {
+pub fn is_valid_ledger_hash(input: &str) -> bool {
     input.starts_with("jx") && input.len() == 51
 }
 
