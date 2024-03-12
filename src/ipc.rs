@@ -11,6 +11,7 @@ use crate::{
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
 };
+use anyhow::bail;
 use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, sync::Arc};
@@ -96,7 +97,6 @@ async fn handle_conn(
     db: &IndexerStore,
     summary: Option<&SummaryVerbose>,
 ) -> Result<(), anyhow::Error> {
-    use anyhow::anyhow;
     use helpers::*;
 
     let (reader, mut writer) = conn.into_split();
@@ -105,7 +105,7 @@ async fn handle_conn(
     let read_size = reader.read_until(0, &mut buffer).await?;
 
     if read_size == 0 {
-        return Err(anyhow!("Unexpected EOF"));
+        bail!("Unexpected EOF");
     }
 
     let mut buffers = buffer.split(|byte| *byte == b' ');
@@ -906,7 +906,7 @@ async fn handle_conn(
             }
         }
         bad_request => {
-            return Err(anyhow!("Malformed request: {bad_request}"));
+            bail!("Malformed request: {}", bad_request);
         }
     };
 

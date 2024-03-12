@@ -22,7 +22,7 @@ use crate::{
     },
     store::IndexerStore,
 };
-use anyhow::anyhow;
+use anyhow::bail;
 use id_tree::NodeId;
 use std::{
     collections::HashMap,
@@ -357,7 +357,7 @@ impl IndexerState {
                         self.canonical_tip = self.best_tip.clone();
                     }
                 } else {
-                    return Err(anyhow!("Block unexpectedly missing"));
+                    bail!("Block unexpectedly missing");
                 }
             }
 
@@ -995,10 +995,14 @@ impl IndexerState {
                                 self.add_block_to_witness_tree(&block)?;
                                 Ok(())
                             } else {
-                                Err(anyhow!("Error: block missing (length {blockchain_length}): {state_hash}"))
+                                bail!(
+                                    "Error: block missing (length {}): {}",
+                                    blockchain_length,
+                                    state_hash
+                                )
                             }
                         } else {
-                            Err(anyhow!("Fatal: no indexer store"))
+                            bail!("Fatal: no indexer store")
                         }
                     }
                 },
