@@ -1,12 +1,15 @@
-use crate::block::{self, parser::BlockParser, precomputed::PrecomputedBlock};
+use super::{Parser, Receiver};
+use crate::{
+    block::{is_valid_block_file, parser::BlockParser, precomputed::PrecomputedBlock},
+    ledger::staking::{is_valid_ledger_file, parser::StakingLedgerParser, StakingLedger},
+};
+use anyhow::anyhow;
 use async_priority_channel as priority;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
 };
-use thiserror::Error;
 use tokio::sync::{
     mpsc,
     watch::{self, Sender},
@@ -24,35 +27,24 @@ use watchexec::{
     fs::{worker, WorkingData},
 };
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, Error)]
-pub enum FilesystemReceiverError {
-    WatchTargetIsNotADirectory(PathBuf),
-    WorkerRuntimeError(String),
-}
-
-pub type FilesystemReceiverResult<T> = std::result::Result<T, FilesystemReceiverError>;
-
-pub struct FilesystemReceiver {
-    parsers: Vec<BlockParser>,
+pub struct FilesystemReceiver<Parser> {
+    parsers: Vec<Parser>,
     paths_added: HashSet<PathBuf>,
     worker_command_sender: Sender<WorkingData>,
     worker_event_receiver: priority::Receiver<Event, Priority>,
     worker_error_receiver: mpsc::Receiver<RuntimeError>,
 }
 
-impl FilesystemReceiver {
+impl<P: Parser> FilesystemReceiver<P> {
     #[instrument]
-    pub async fn new(
-        event_capacity: usize,
-        error_capacity: usize,
-    ) -> FilesystemReceiverResult<Self> {
-        debug!("initializing new filesystem receiver");
-        let (ev_s, worker_event_receiver) = priority::bounded(event_capacity);
-        let (er_s, worker_error_receiver) = mpsc::channel(error_capacity);
+    pub async fn new() -> anyhow::Result<Self> {
+        debug!("Initializing new filesystem {} receiver", P::KIND);
+        let (ev_s, worker_event_receiver) = priority::bounded(1024);
+        let (er_s, worker_error_receiver) = mpsc::channel(64);
         let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());
 
         tokio::spawn(async {
-            debug!("spawning filesystem watcher worker");
+            debug!("spawning filesystem {} watcher worker", P::KIND);
             worker(wd_r, er_s, ev_s).await.expect("should not crash");
         });
 
@@ -66,31 +58,27 @@ impl FilesystemReceiver {
     }
 
     pub fn watched_directories(&self) -> Vec<PathBuf> {
-        self.parsers
-            .iter()
-            .map(|parser| parser.blocks_dir.clone())
-            .collect()
+        self.parsers.iter().map(|parser| parser.path()).collect()
     }
 
-    pub fn load_directory(
-        &mut self,
-        directory: impl AsRef<Path>,
-    ) -> Result<(), FilesystemReceiverError> {
+    pub fn load_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<()> {
         debug!(
-            "loading directory {} into FilesystemReceiver",
-            directory.as_ref().display()
+            "loading directory {} into filesystem {} receiver",
+            directory.as_ref().display(),
+            P::KIND,
         );
 
         if !directory.as_ref().is_dir() {
-            return Err(FilesystemReceiverError::WatchTargetIsNotADirectory(
-                PathBuf::from(directory.as_ref()),
-            ));
+            return Err(anyhow!("{}", directory.as_ref().display()));
         }
 
-        debug!("sending command to worker with new working data");
         let mut working_data = WorkingData::default();
         let mut watched_directories = self.watched_directories();
 
+        debug!(
+            "sending command to {} worker with new working data",
+            P::KIND,
+        );
         watched_directories.push(PathBuf::from(directory.as_ref()));
         working_data.pathset = watched_directories
             .iter()
@@ -106,15 +94,13 @@ impl FilesystemReceiver {
 }
 
 #[async_trait]
-impl super::BlockReceiver for FilesystemReceiver {
-    async fn recv_block(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
+impl Receiver<BlockParser> for FilesystemReceiver<BlockParser> {
+    async fn recv_data(&mut self) -> anyhow::Result<Option<PrecomputedBlock>> {
         loop {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
                     if let Some(error) = error_fut {
-                        return Err(error)
-                            .map_err(|e| FilesystemReceiverError::WorkerRuntimeError(e.to_string()).into()
-                        );
+                        return Err(anyhow!("{} worker runtime error: {error}", BlockParser::KIND));
                     }
                     return Ok(None);
                 },
@@ -136,12 +122,63 @@ impl super::BlockReceiver for FilesystemReceiver {
                                     if self.paths_added.len() == 100 {
                                         self.paths_added.clear()
                                     }
-                                    if block::is_valid_block_file(path) && !self.paths_added.contains(path) {
+                                    if is_valid_block_file(path) && !self.paths_added.contains(path) {
                                         self.paths_added.insert(path.clone());
                                         match PrecomputedBlock::parse_file(path.as_path()) {
                                             Ok(block) => return Ok(Some(block)),
-                                            _ => {
-                                                error!("Cannot parse block at {}", path.display());
+                                            Err(e) => {
+                                                error!("Cannot parse block at {}: {e}", path.display());
+                                                continue;
+                                            },
+                                        }
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+    }
+}
+#[async_trait]
+impl Receiver<StakingLedgerParser> for FilesystemReceiver<StakingLedgerParser> {
+    async fn recv_data(&mut self) -> anyhow::Result<Option<StakingLedger>> {
+        loop {
+            tokio::select! {
+                error_fut = self.worker_error_receiver.recv() => {
+                    if let Some(error) = error_fut {
+                        return Err(anyhow!("{} worker runtime error: {error}", StakingLedgerParser::KIND));
+                    }
+                    return Ok(None);
+                },
+                event_fut = self.worker_event_receiver.recv() => {
+                    if let Ok((event, _priority)) = event_fut {
+                        let mut tags = event
+                        .tags
+                        .iter();
+                        if tags.any(|signal|
+                                matches!(signal, Tag::Path { .. })
+                                ||
+                                matches!(signal, Tag::FileEventKind(Modify(_)))
+                                ||
+                                matches!(signal, Tag::FileEventKind(Create(CreateKind::File)))
+                            )
+                        {
+                            for tag in tags {
+                                if let Tag::Path { path, .. } = tag {
+                                    if self.paths_added.len() == 100 {
+                                        self.paths_added.clear()
+                                    }
+                                    if is_valid_ledger_file(path) && !self.paths_added.contains(path) {
+                                        self.paths_added.insert(path.clone());
+                                        match StakingLedger::parse_file(path.as_path()) {
+                                            Ok(staking_ledger) => return Ok(Some(staking_ledger)),
+                                            Err(e) => {
+                                                error!("Cannot parse staking ledger at {}: {e}", path.display());
                                                 continue;
                                             },
                                         }
@@ -159,19 +196,22 @@ impl super::BlockReceiver for FilesystemReceiver {
     }
 }
 
-impl std::fmt::Display for FilesystemReceiverError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FilesystemReceiverError::WatchTargetIsNotADirectory(directory) => {
-                f.write_str(&format!(
-                    "cannot watch {} for new blocks, it is not a directory",
-                    directory.display()
-                ))
-            }
-            FilesystemReceiverError::WorkerRuntimeError(runtime_error) => f.write_str(&format!(
-                "encountered an error while running the filesystem worker: {}",
-                runtime_error
-            )),
-        }
+impl Parser for BlockParser {
+    type Data = PrecomputedBlock;
+
+    const KIND: &'static str = "block";
+
+    fn path(&self) -> PathBuf {
+        self.blocks_dir.clone()
+    }
+}
+
+impl Parser for StakingLedgerParser {
+    type Data = StakingLedger;
+
+    const KIND: &'static str = "ledger";
+
+    fn path(&self) -> PathBuf {
+        self.ledgers_dir.clone()
     }
 }
