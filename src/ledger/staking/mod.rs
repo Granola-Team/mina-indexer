@@ -159,7 +159,8 @@ impl StakingLedger {
             bail!("Invalid ledger file: {}", path.display())
         } else {
             let file = std::fs::File::open(path)?;
-            let reader = BufReader::new(file);
+            let size = file.metadata()?.len() as usize;
+            let reader = BufReader::with_capacity(size, file);
             let staking_ledger: Vec<StakingAccountJson> = serde_json::from_reader(reader)?;
             let staking_ledger = staking_ledger
                 .into_iter()
