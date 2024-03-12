@@ -1215,22 +1215,60 @@ test_startup_staking_ledgers() {
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
-    # write staking ledger to file
-    idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json
+    # TODO write to file & cat
 
-    token_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.token)
-    public_key_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.pk)
-    balance_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.balance)
-    delegate_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.delegate)
-    voting_for_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+    teardown
+}
 
-    assert $token $token_file
-    assert $pk $public_key_file
-    assert $balance $balance_file
-    assert $delegate $delegate_file
-    assert $voting_for $voting_for_file
-    assert $receipt_chain_hash $receipt_chain_hash_file
+test_watch_staking_ledgers() {
+    test=test_watch_staking_ledgers
+
+    setup
+    idxr_server_start \
+        --block-startup-dir ./blocks \
+        --ledger-watch-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug
+    sleep 1
+
+    # copy epoch 0 staking ledger to watched directory
+    cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
+    sleep 1
+
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    token=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.token)
+    public_key=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.pk)
+    balance=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+
+    assert '1' $token
+    assert $pk $delegate
+    assert $pk $public_key
+    assert '1000' $balance
+    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
+    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
+
+    # copy epoch 42 staking ledger to watched directory
+    cp $STAKING_LEDGERS/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json ./staking-ledgers
+    sleep 1
+
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    token=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.token)
+    public_key=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.pk)
+    balance=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+
+    assert '1' $token
+    assert $pk $delegate
+    assert $pk $public_key
+    assert '1000' $balance
+    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
+    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
     teardown
 }
@@ -1261,6 +1299,7 @@ if [ "$#" -eq 0 ]; then
     test_genesis_block_creator
     test_txn_nonces
     test_startup_staking_ledgers
+    test_watch_staking_ledgers
     test_many_blocks
 else
     # Run only specified tests
@@ -1289,6 +1328,7 @@ else
             "test_genesis_block_creator") test_genesis_block_creator ;;
             "test_txn_nonces") test_txn_nonces ;;
             "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
+            "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
