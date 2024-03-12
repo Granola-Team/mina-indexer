@@ -5,7 +5,7 @@ use anyhow::bail;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, io::BufReader, path::Path};
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
@@ -158,10 +158,8 @@ impl StakingLedger {
         if !is_valid_ledger_file(path) {
             bail!("Invalid ledger file: {}", path.display())
         } else {
-            let file = std::fs::File::open(path)?;
-            let size = file.metadata()?.len() as usize;
-            let reader = BufReader::with_capacity(size, file);
-            let staking_ledger: Vec<StakingAccountJson> = serde_json::from_reader(reader)?;
+            let bytes = std::fs::read(path).expect("read the staking ledger bytes");
+            let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
             let staking_ledger = staking_ledger
                 .into_iter()
                 .map(|acct| (acct.pk.clone(), acct.into()))
