@@ -22,6 +22,8 @@ pub enum ClientCli {
     Checkpoint(CheckpointArgs),
     #[clap(flatten)]
     Ledger(LedgerArgs),
+    #[clap(flatten)]
+    StakingLedger(StakingLedgerArgs),
     /// Shutdown the server
     Shutdown,
     #[clap(flatten)]
@@ -151,29 +153,10 @@ pub struct BestChainArgs {
 
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct BestLedgerArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
 pub struct CheckpointArgs {
     /// Path to write the checkpoint
     #[arg(short, long)]
     path: PathBuf,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct LedgerAtHeightArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Block height of the ledger
-    #[arg(short, long)]
-    height: u32,
 }
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -189,11 +172,61 @@ pub enum LedgerArgs {
 
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
+pub struct BestLedgerArgs {
+    /// Path to write the ledger [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct LedgerAtHeightArgs {
+    /// Path to write the ledger [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Block height of the ledger
+    #[arg(short, long)]
+    height: u32,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
 pub struct LedgerHashArgs {
     /// Path to write the ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// State or ledger hash corresponding to the ledger
+    #[arg(short, long)]
+    hash: String,
+}
+
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum StakingLedgerArgs {
+    /// Query staking ledger by hash
+    StakingLedgerHash(StakingLedgerHashArgs),
+    /// Query ledger by height
+    StakingLedgerEpoch(StakingLedgerAtEpochArgs),
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct StakingLedgerAtEpochArgs {
+    /// Path to write the staking ledger [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Epoch number of the staking ledger
+    #[arg(short, long)]
+    epoch: u32,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct StakingLedgerHashArgs {
+    /// Path to write the ledger [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Ledger hash corresponding to the staking ledger
     #[arg(short, long)]
     hash: String,
 }
@@ -408,6 +441,34 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                         "ledger-at-height {} {}\0",
                         args.height,
                         args.path.clone().unwrap_or("".into()).display(),
+                    )
+                }
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
+            println!("{msg}");
+        }
+        ClientCli::StakingLedger(staking_ledger_args) => {
+            let command = match staking_ledger_args {
+                StakingLedgerArgs::StakingLedgerHash(ledger_hash_args) => {
+                    format!(
+                        "staking-ledger-hash {} {}\0",
+                        ledger_hash_args.hash,
+                        ledger_hash_args.path.clone().unwrap_or("".into()).display()
+                    )
+                }
+                StakingLedgerArgs::StakingLedgerEpoch(ledger_epoch_args) => {
+                    format!(
+                        "staking-ledger-epoch {} {}\0",
+                        ledger_epoch_args.epoch,
+                        ledger_epoch_args
+                            .path
+                            .clone()
+                            .unwrap_or("".into())
+                            .display()
                     )
                 }
             };

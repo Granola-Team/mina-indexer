@@ -45,7 +45,7 @@ impl IpcActor {
     }
 
     #[instrument(skip(self))]
-    pub async fn run(&mut self) -> () {
+    pub async fn run(&mut self) {
         loop {
             tokio::select! {
                 state = self.state_recv.recv() => {
@@ -64,7 +64,7 @@ impl IpcActor {
                     let store = self.store.read().await.clone();
                     let summary = self.summary.read().await.clone();
                     match client {
-                        Err(e) => error!("Error accepting connection: {}", e.to_string()),
+                        Err(e) => error!("Error accepting connection: {e}"),
                         Ok(stream) => {
                             info!("Accepted client connection");
                             tokio::spawn(async move {
@@ -73,10 +73,10 @@ impl IpcActor {
                                     &store,
                                     summary.as_ref()
                                 ).await {
+                                    Ok(_) => { info!("Connection successfully handled"); },
                                     Err(e) => {
                                         error!("Error handling connection: {e}");
                                     },
-                                    Ok(_) => { info!("handled connection"); },
                                 };
                                 if !store.is_primary {
                                     debug!("Removing readonly instance at {}", store.db_path.clone().display());
@@ -599,28 +599,26 @@ async fn handle_conn(
                     error!("Ledger at state hash {hash} is not in the store");
                     Some(format!("Ledger at state hash {hash} is not in the store"))
                 }
-            } else if ledger::is_valid_hash(&hash) {
+            } else if ledger::is_valid_ledger_hash(&hash) {
                 trace!("{hash} is a ledger hash");
 
                 if let Some(ledger) = db.get_ledger(&hash)? {
                     let ledger = ledger.to_string_pretty();
-                    match buffers.next() {
-                        None => {
-                            debug!("Writing ledger at {hash} to stdout");
-                            Some(ledger)
-                        }
-                        Some(path_buffer) => {
-                            let path = String::from_utf8(path_buffer.to_vec())?
-                                .trim_end_matches('\0')
-                                .parse::<PathBuf>()?;
-                            if !path.is_dir() {
-                                debug!("Writing ledger at {hash} to {}", path.display());
+                    if path.is_empty() {
+                        debug!("Writing ledger at hash {hash} to stdout");
+                        Some(ledger)
+                    } else {
+                        let path: PathBuf = path.into();
+                        if !path.is_dir() {
+                            debug!("Writing ledger at {hash} to {}", path.display());
 
-                                std::fs::write(path.clone(), ledger)?;
-                                Some(format!("Ledger at {hash} written to {}", path.display()))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            std::fs::write(path.clone(), ledger)?;
+                            Some(format!(
+                                "Ledger at hash {hash} written to {}",
+                                path.display()
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 } else {
@@ -692,6 +690,75 @@ async fn handle_conn(
                 }
             } else {
                 best_tip_missing_from_db()
+            }
+        }
+        "staking-ledger-hash" => {
+            let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!("Received staking-ledger-hash command for {hash}");
+
+            if ledger::is_valid_ledger_hash(&hash) {
+                trace!("{hash} is a ledger hash");
+
+                if let Some(staking_ledger) = db.get_staking_ledger_hash(&hash.clone().into())? {
+                    let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
+                    if path.is_empty() {
+                        debug!("Writing staking ledger at hash {hash} to stdout");
+                        Some(ledger_json)
+                    } else {
+                        let path: PathBuf = path.into();
+                        if !path.is_dir() {
+                            debug!("Writing ledger at {hash} to {}", path.display());
+
+                            std::fs::write(path.clone(), ledger_json)?;
+                            Some(format!(
+                                "Staking ledger at hash {hash} written to {}",
+                                path.display()
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
+                        }
+                    }
+                } else {
+                    error!("Staking ledger at {hash} is not in the store");
+                    Some(format!("Staking ledger at {hash} is not in the store"))
+                }
+            } else {
+                error!("Invalid ledger hash: {hash}");
+                Some(format!("Invalid ledger hash: {hash}"))
+            }
+        }
+        "staking-ledger-epoch" => {
+            let epoch = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!("Received staking-ledger-epoch {epoch} command");
+
+            if let Some(staking_ledger) = db.get_staking_ledger_at_epoch(epoch)? {
+                let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
+                if path.is_empty() {
+                    debug!("Writing staking ledger at epoch {epoch} to stdout");
+                    Some(ledger_json)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!("Writing ledger at epoch {epoch} to {}", path.display());
+
+                        std::fs::write(path.clone(), ledger_json)?;
+                        Some(format!(
+                            "Staking ledger at epoch {epoch} written to {}",
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
+            } else {
+                error!("Staking ledger at epoch {epoch} is not in the store");
+                Some(format!(
+                    "Staking ledger at epoch {epoch} is not in the store"
+                ))
             }
         }
         "snark-pk" => {

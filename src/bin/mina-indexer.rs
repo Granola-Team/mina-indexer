@@ -56,12 +56,20 @@ pub struct ServerArgs {
         default_value = MAINNET_GENESIS_HASH
     )]
     genesis_hash: String,
-    /// Path to startup blocks directory
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/startup-blocks"))]
-    startup_dir: PathBuf,
-    /// Path to directory to watch for new blocks [default: startup_dir]
-    #[arg(short, long)]
-    watch_dir: Option<PathBuf>,
+    /// Startup directory for precomputed blocks
+    #[arg(alias = "bs", long, default_value = concat!(env!("HOME"), "/.mina-indexer/blocks"))]
+    block_startup_dir: PathBuf,
+    /// Directory to watch for new precomputed blocks [default:
+    /// block_startup_dir]
+    #[arg(alias = "bw", long)]
+    block_watch_dir: Option<PathBuf>,
+    /// Startup directory for staking ledgers
+    #[arg(alias = "ls", long, default_value = concat!(env!("HOME"), "/.mina-indexer/staking-ledgers"))]
+    ledger_startup_dir: PathBuf,
+    /// Directory to watch for new staking ledgers [default:
+    /// ledger_startup_dir]
+    #[arg(alias = "lw", long)]
+    ledger_watch_dir: Option<PathBuf>,
     /// Path to directory for speedb
     #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
     pub database_dir: PathBuf,
@@ -184,8 +192,10 @@ pub fn process_indexer_configuration(
 ) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.genesis_ledger;
     let genesis_hash = args.genesis_hash.into();
-    let startup_dir = args.startup_dir;
-    let watch_dir = args.watch_dir.unwrap_or(startup_dir.clone());
+    let block_startup_dir = args.block_startup_dir;
+    let block_watch_dir = args.block_watch_dir.unwrap_or(block_startup_dir.clone());
+    let ledger_startup_dir = args.ledger_startup_dir;
+    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledger_startup_dir.clone());
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -202,7 +212,8 @@ pub fn process_indexer_configuration(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
-    fs::create_dir_all(watch_dir.clone()).expect("watch_dir should be created");
+    fs::create_dir_all(block_watch_dir.clone()).unwrap();
+    fs::create_dir_all(ledger_watch_dir.clone()).unwrap();
 
     info!("Parsing ledger file at {}", ledger.display());
 
@@ -218,8 +229,10 @@ pub fn process_indexer_configuration(
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 genesis_hash,
-                startup_dir,
-                watch_dir,
+                block_startup_dir,
+                block_watch_dir,
+                ledger_startup_dir,
+                ledger_watch_dir,
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,
@@ -235,8 +248,10 @@ pub fn process_indexer_configuration(
 struct ServerArgsJson {
     genesis_ledger: String,
     genesis_hash: String,
-    startup_dir: String,
-    watch_dir: String,
+    block_startup_dir: String,
+    block_watch_dir: String,
+    ledger_startup_dir: String,
+    ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
     log_level: String,
@@ -253,10 +268,16 @@ impl From<ServerArgs> for ServerArgsJson {
         Self {
             genesis_ledger: value.genesis_ledger.display().to_string(),
             genesis_hash: value.genesis_hash,
-            startup_dir: value.startup_dir.display().to_string(),
-            watch_dir: value
-                .watch_dir
-                .unwrap_or(value.startup_dir)
+            block_startup_dir: value.block_startup_dir.display().to_string(),
+            block_watch_dir: value
+                .block_watch_dir
+                .unwrap_or(value.block_startup_dir)
+                .display()
+                .to_string(),
+            ledger_startup_dir: value.ledger_startup_dir.display().to_string(),
+            ledger_watch_dir: value
+                .ledger_watch_dir
+                .unwrap_or(value.ledger_startup_dir)
                 .display()
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),

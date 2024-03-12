@@ -1,3 +1,4 @@
+use crate::ledger::staking::LedgerHash;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -5,6 +6,7 @@ pub enum DbEvent {
     Block(DbBlockEvent),
     Canonicity(DbCanonicityEvent),
     Ledger(DbLedgerEvent),
+    StakingLedger(DbStakingLedgerEvent),
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -27,6 +29,12 @@ pub enum DbLedgerEvent {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum DbStakingLedgerEvent {
+    AlreadySeenLedger { epoch: u32, ledger_hash: LedgerHash },
+    NewLedger { epoch: u32, ledger_hash: LedgerHash },
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbCanonicityEvent {
     NewCanonicalBlock {
         blockchain_length: u32,
@@ -46,6 +54,7 @@ impl std::fmt::Debug for DbEvent {
             Self::Block(db_block_event) => write!(f, "{:?}", db_block_event),
             Self::Canonicity(db_canonicity_event) => write!(f, "{:?}", db_canonicity_event),
             Self::Ledger(db_ledger_event) => write!(f, "{:?}", db_ledger_event),
+            Self::StakingLedger(db_ledger_event) => write!(f, "{:?}", db_ledger_event),
         }
     }
 }
@@ -91,6 +100,23 @@ impl std::fmt::Debug for DbLedgerEvent {
         match self {
             Self::AlreadySeenLedger(hash) => write!(f, "db: already seen ledger ({hash})"),
             Self::NewLedger { hash, .. } => write!(f, "db: new ledger ({hash})"),
+        }
+    }
+}
+
+impl std::fmt::Debug for DbStakingLedgerEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlreadySeenLedger { epoch, ledger_hash } => write!(
+                f,
+                "db: already seen staking ledger (epoch {epoch}, {})",
+                ledger_hash.0
+            ),
+            Self::NewLedger { epoch, ledger_hash } => write!(
+                f,
+                "db: new staking ledger (epoch {epoch}, {})",
+                ledger_hash.0
+            ),
         }
     }
 }

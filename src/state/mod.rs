@@ -12,7 +12,10 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
-    ledger::{diff::LedgerDiff, genesis::GenesisLedger, store::LedgerStore, Ledger},
+    ledger::{
+        diff::LedgerDiff, genesis::GenesisLedger, staking::parser::StakingLedgerParser,
+        store::LedgerStore, Ledger,
+    },
     state::{
         branch::Branch,
         summary::{
@@ -805,6 +808,20 @@ impl IndexerState {
         self.len() == 0
     }
 
+    /// Add staking ledgers to the underlying ledger store
+    pub fn add_staking_ledgers_to_store(
+        &self,
+        ledgers_dir: &std::path::Path,
+    ) -> anyhow::Result<()> {
+        let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
+                indexer_store.add_staking_ledger(staking_ledger)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Add block to the underlying block store
     pub fn add_block_to_store(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
@@ -1016,6 +1033,17 @@ impl IndexerState {
                         Ok(())
                     }
                 },
+                DbEvent::StakingLedger(DbStakingLedgerEvent::AlreadySeenLedger {
+                    epoch,
+                    ledger_hash,
+                })
+                | DbEvent::StakingLedger(DbStakingLedgerEvent::NewLedger { epoch, ledger_hash }) => {
+                    info!(
+                        "Replay new db staking ledger (epoch {epoch}): {}",
+                        ledger_hash.0
+                    );
+                    Ok(())
+                }
                 DbEvent::Canonicity(canonicity_event) => match canonicity_event {
                     DbCanonicityEvent::NewCanonicalBlock {
                         blockchain_length,
