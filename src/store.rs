@@ -7,7 +7,12 @@ use crate::{
         UserCommandWithStatus,
     },
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::{public_key::PublicKey, store::LedgerStore, Ledger},
+    ledger::{
+        public_key::PublicKey,
+        staking::{LedgerHash, StakingLedger},
+        store::LedgerStore,
+        Ledger,
+    },
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
@@ -633,7 +638,6 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
-    /// Get the ledger at the given ledger hash
     fn get_ledger(&self, ledger_hash: &str) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at {ledger_hash}");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -652,7 +656,6 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
-    /// Get the canonical ledger at the specified height
     fn get_ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at height {height}");
         self.database.try_catch_up_with_primary().unwrap_or(());
@@ -661,6 +664,69 @@ impl LedgerStore for IndexerStore {
             None => Ok(None),
             Some(state_hash) => self.get_ledger_state_hash(&state_hash),
         }
+    }
+
+    fn get_staking_ledger_at_epoch(&self, epoch: u32) -> anyhow::Result<Option<StakingLedger>> {
+        trace!("Getting epoch {epoch} staking ledger");
+
+        let key = format!("staking-{epoch}");
+        if let Some(ledger_result) = self
+            .database
+            .get_pinned_cf(self.ledgers_cf(), key.as_bytes())?
+            .map(|bytes| bytes.to_vec())
+            .map(|bytes| {
+                let ledger_hash = String::from_utf8(bytes)?;
+                self.get_staking_ledger_hash(&ledger_hash.into())
+            })
+        {
+            return ledger_result;
+        }
+
+        Ok(None)
+    }
+
+    fn get_staking_ledger_hash(
+        &self,
+        ledger_hash: &LedgerHash,
+    ) -> anyhow::Result<Option<StakingLedger>> {
+        trace!("Getting staking ledger with hash {}", ledger_hash.0);
+
+        let key = ledger_hash.0.as_bytes();
+        if let Some(bytes) = self.database.get_pinned_cf(self.ledgers_cf(), key)? {
+            return Ok(Some(serde_json::from_slice::<StakingLedger>(&bytes)?));
+        }
+
+        Ok(None)
+    }
+
+    fn add_staking_ledger(&self, staking_ledger: StakingLedger) -> anyhow::Result<()> {
+        trace!("Adding staking ledger {}", staking_ledger.summary());
+
+        // add ledger to db at ledger hash
+        let key = staking_ledger.ledger_hash.0.as_bytes();
+        let value = serde_json::to_vec(&staking_ledger)?;
+        let is_new = self
+            .database
+            .get_pinned_cf(self.ledgers_cf(), key)?
+            .is_none();
+        self.database.put_cf(self.ledgers_cf(), key, value)?;
+
+        // add epoch index
+        let key = format!("staking-{}", staking_ledger.epoch);
+        let value = staking_ledger.ledger_hash.0.as_bytes();
+        self.database
+            .put_cf(self.ledgers_cf(), key.as_bytes(), value)?;
+
+        if is_new {
+            // add new ledger event
+            self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
+                DbStakingLedgerEvent::NewLedger {
+                    epoch: staking_ledger.epoch,
+                    ledger_hash: staking_ledger.ledger_hash,
+                },
+            )))?;
+        }
+        Ok(())
     }
 }
 

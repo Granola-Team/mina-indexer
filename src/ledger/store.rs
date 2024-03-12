@@ -1,4 +1,10 @@
-use crate::{block::BlockHash, ledger::Ledger};
+use crate::{
+    block::BlockHash,
+    ledger::{
+        staking::{LedgerHash, StakingLedger},
+        Ledger,
+    },
+};
 
 /// Store of canonical ledgers
 pub trait LedgerStore {
@@ -16,4 +22,13 @@ pub trait LedgerStore {
 
     /// Get a ledger at a specified `blockchain_length`
     fn get_ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>>;
+
+    /// Add a staking ledger
+    fn add_staking_ledger(&self, staking_ledger: StakingLedger) -> anyhow::Result<()>;
+
+    /// Get the staking ledger for the given epoch
+    fn get_staking_ledger_at_epoch(&self, epoch: u32) -> anyhow::Result<Option<StakingLedger>>;
+
+    /// Get the staking ledger with the given hash
+    fn get_staking_ledger_hash(&self, hash: &LedgerHash) -> anyhow::Result<Option<StakingLedger>>;
 }
