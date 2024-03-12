@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -ex
 
-# Collect the binaries under test and the test ledger.
+# Collect the binaries under test and the test ledgers.
 IDXR="$(pwd)"/target/release/mina-indexer
 LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
+STAKING_LEDGERS="$(pwd)"/tests/data/staking_ledgers
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
 # JSON Schemas
@@ -18,7 +19,7 @@ cd "$TEST_DIR"
 test_cleanup() {
     err=$?
     if [ $err != 0 ]; then
-        echo "\e[0;31mTest failed ($test): $err\e[0;37m"
+        echo "Test failed ($test): $err"
         teardown
         exit 1
     fi
@@ -72,7 +73,7 @@ assert() {
     actual="$2"
 
     if [ "$expected" != "$actual" ]; then
-        echo "\e[0;31mTest Failed: Expected $expected, but got $actual\e[0;37m"
+        echo "Test Failed: Expected $expected, but got $actual"
         exit 1
     else
         echo "Test Passed!"
@@ -93,6 +94,7 @@ assert_directory_exists() {
 setup() {
     echo "setup"
     mkdir blocks
+    mkdir staking-ledgers
     mkdir database
     mkdir logs
 }
@@ -101,6 +103,7 @@ teardown() {
     kill "$(cat idxr_pid)" 2>/dev/null || true
     rm -f ./idxr_pid
     rm -rf ./blocks
+    rm -rf ./staking-ledgers
     rm -rf ./database
     rm -rf ./logs
     rm -f ./mina-indexer.sock
@@ -173,7 +176,7 @@ test_server_startup() {
     
     setup
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -192,7 +195,7 @@ test_ipc_is_available_immediately() {
     dl_mainnet 100 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
@@ -209,14 +212,18 @@ test_startup_dirs_get_created() {
 
     setup
     idxr_server_start \
-        --startup-dir ./startup-blocks \
-        --watch-dir ./watch-blocks \
+        --block-startup-dir ./startup-blocks \
+        --block-watch-dir ./watch-blocks \
+        --ledger-startup-dir ./startup-ledgers \
+        --ledger-watch-dir ./watch-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     sleep 1
 
     assert_directory_exists "./startup-blocks"
     assert_directory_exists "./watch-blocks"
+    assert_directory_exists "./startup-ledgers"
+    assert_directory_exists "./watch-ledgers"
     assert_directory_exists "./database"
     assert_directory_exists "./logs"
 
@@ -237,7 +244,7 @@ test_account_balance_cli() {
 
     setup
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -254,7 +261,7 @@ test_account_public_key_json() {
 
     setup
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -273,7 +280,7 @@ test_canonical_tip() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -298,7 +305,7 @@ test_canonical_threshold() {
     dl_mainnet $num_seq_blocks ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --canonical-threshold $canonical_threshold
@@ -321,7 +328,7 @@ test_best_tip() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -352,7 +359,7 @@ test_blocks() {
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -465,7 +472,7 @@ test_block_copy() {
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -511,7 +518,7 @@ test_missing_blocks() {
     dl_mainnet_range 22 30 ./blocks # missing 21
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -577,7 +584,7 @@ test_best_chain() {
     dl_mainnet 12 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -629,7 +636,7 @@ test_ledgers() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -658,21 +665,21 @@ test_ledgers() {
     assert '607904750000000' $height_balance
 
     # write ledgers to file
-    file=./ledgers/best-$best_height-$best_hash.json
+    file=./ledgers/best-block-$best_height-$best_hash.json
     idxr best-ledger -p $file
     
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
-    file=./ledgers/ledger-$best_height-$best_hash.json
+    file=./ledgers/best-ledger-$best_height-$best_hash.json
     idxr ledger --hash $best_hash -p $file
     
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
-    file=./ledgers/height-$best_height-$best_hash.json
+    file=./ledgers/ledger-height-$best_height-$best_hash.json
     idxr ledger-at-height --height $best_height -p $file
     
     file_result=$(cat $file | jq -r .${pk}.balance)
@@ -691,7 +698,7 @@ test_sync() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -706,7 +713,7 @@ test_sync() {
 
     # sync from previous indexer db
     idxr_server sync \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -734,7 +741,7 @@ test_replay() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -749,7 +756,7 @@ test_replay() {
 
     # replay events from previous indexer instance
     idxr_server replay \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -780,7 +787,7 @@ test_transactions() {
     dl_mainnet 13 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -879,7 +886,7 @@ test_snark_work() {
     dl_mainnet 120 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -935,7 +942,7 @@ test_checkpoint() {
     dl_mainnet 13 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
     sleep 5
@@ -956,7 +963,7 @@ test_checkpoint() {
     # sync a new indexer from checkpointed db
     setup
     idxr_server sync \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./checkpoint \
         --log-dir ./logs
     sleep 5
@@ -986,7 +993,7 @@ test_many_blocks() {
     dl_mainnet 1000 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
@@ -1021,13 +1028,12 @@ test_many_blocks() {
 test_rest_endpoints() {
     test=test_rest_endpoints
 
-    port=$(ephemeral_port)
-
     setup
     dl_mainnet 100 ./blocks
+    port=$(ephemeral_port)
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug \
@@ -1103,7 +1109,7 @@ test_release() {
     dl_mainnet 5000 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1140,7 +1146,7 @@ test_genesis_block_creator() {
     setup
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1162,7 +1168,7 @@ test_txn_nonces() {
     dl_mainnet 100 ./blocks
 
     idxr_server_start \
-        --startup-dir ./blocks \
+        --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1176,9 +1182,93 @@ test_txn_nonces() {
     nonce=$(idxr ledger-at-height -h 3 | jq -r .${pk}.nonce)
     assert '4' $nonce
 
-    # after block 3
+    # after block 100
     nonce=$(idxr account -k $pk | jq -r .nonce)
     assert '149' $nonce
+
+    teardown
+}
+
+test_startup_staking_ledgers() {
+    test=test_startup_staking_ledgers
+
+    setup
+    idxr_server_start \
+        --block-startup-dir ./blocks \
+        --ledger-startup-dir $STAKING_LEDGERS \
+        --database-dir ./database \
+        --log-dir ./logs
+    sleep 1
+
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    token=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.token)
+    public_key=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.pk)
+    balance=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+
+    assert '1' $token
+    assert $pk $delegate
+    assert $pk $public_key
+    assert '1000' $balance
+    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
+    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
+
+    # TODO write to file & cat
+
+    teardown
+}
+
+test_watch_staking_ledgers() {
+    test=test_watch_staking_ledgers
+
+    setup
+    idxr_server_start \
+        --block-startup-dir ./blocks \
+        --ledger-watch-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug
+    sleep 1
+
+    # copy epoch 0 staking ledger to watched directory
+    cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
+    sleep 1
+
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    token=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.token)
+    public_key=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.pk)
+    balance=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(idxr staking-ledger-epoch -e 0 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+
+    assert '1' $token
+    assert $pk $delegate
+    assert $pk $public_key
+    assert '1000' $balance
+    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
+    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
+
+    # copy epoch 42 staking ledger to watched directory
+    cp $STAKING_LEDGERS/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json ./staking-ledgers
+    sleep 1
+
+    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    token=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.token)
+    public_key=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.pk)
+    balance=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+
+    assert '1' $token
+    assert $pk $delegate
+    assert $pk $public_key
+    assert '1000' $balance
+    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
+    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
     teardown
 }
@@ -1208,6 +1298,8 @@ if [ "$#" -eq 0 ]; then
     test_rest_endpoints
     test_genesis_block_creator
     test_txn_nonces
+    test_startup_staking_ledgers
+    test_watch_staking_ledgers
     test_many_blocks
 else
     # Run only specified tests
@@ -1235,6 +1327,8 @@ else
             "test_rest_endpoints") test_rest_endpoints ;;
             "test_genesis_block_creator") test_genesis_block_creator ;;
             "test_txn_nonces") test_txn_nonces ;;
+            "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
+            "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
