@@ -16,7 +16,7 @@ loose_deserialization = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.80" }
+anyhow = { version = "1.0.81" }
 async-trait = "0.1.64"
 derive_more = "0.99"
 futures = "0.3.26"
@@ -25,7 +25,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = { version = "1.0.114", features = ["raw_value", "unbounded_depth"] }
 smart-default = "0.7.1"
 clap = { version = "4.5.2", features = ["derive"] }
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 glob = "0.3.1"
 mina_serialization_proc_macros = { path = "mina_serialization_macros/proc_macros" }
 mina_serialization_versioned = { path = "mina_serialization_macros/versioned" }
