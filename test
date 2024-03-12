@@ -53,7 +53,8 @@ idxr_server() {
 }
 
 idxr_server_start() {
-    idxr_server start "$@"
+    port=$(ephemeral_port)
+    idxr_server start --web-port "$port" "$@"
 }
 
 dl_mainnet() {
@@ -1037,8 +1038,7 @@ test_rest_endpoints() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug \
-        --web-hostname "0.0.0.0" \
-        --web-port "$port"
+        --web-hostname "0.0.0.0"
     sleep 10
 
     # results
