@@ -67,6 +67,10 @@ impl Block {
             global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
         }
     }
+
+    pub fn summary(&self) -> String {
+        format!("(length {}): {}", self.blockchain_length, self.state_hash)
+    }
 }
 
 impl From<Block> for BlockWithoutHeight {
@@ -114,6 +118,10 @@ impl BlockWithoutHeight {
             blockchain_length: block.blockchain_length,
             global_slot_since_genesis: block.global_slot_since_genesis,
         }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("(length {}): {}", self.blockchain_length, self.state_hash)
     }
 }
 
@@ -267,7 +275,7 @@ pub fn is_valid_state_hash(input: &str) -> bool {
     input.starts_with("3N") && input.len() == 52
 }
 
-pub fn is_valid_block_file(path: &Path) -> bool {
+pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {
     if let Some(ext) = path.extension() {
         // check json extension
         if ext.to_str() == Some("json") {
@@ -279,7 +287,7 @@ pub fn is_valid_block_file(path: &Path) -> bool {
                 {
                     let is_valid_hash = parts
                         .last()
-                        .map(|hash| is_valid_state_hash(hash))
+                        .map(|hash| hash_validator(hash))
                         .unwrap_or(false);
                     if parts.len() == 2 {
                         // e.g. mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json
@@ -296,6 +304,10 @@ pub fn is_valid_block_file(path: &Path) -> bool {
         }
     }
     false
+}
+
+pub fn is_valid_block_file(path: &Path) -> bool {
+    is_valid_file_name(path, &is_valid_state_hash)
 }
 
 pub fn length_from_path(path: &Path) -> Option<u32> {

@@ -405,6 +405,10 @@ impl PrecomputedBlock {
             staged_ledger_diff: self.staged_ledger_diff.clone(),
         }
     }
+
+    pub fn summary(&self) -> String {
+        format!("(length {}): {}", self.blockchain_length, self.state_hash)
+    }
 }
 
 impl std::cmp::PartialOrd for PrecomputedBlock {
