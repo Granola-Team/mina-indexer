@@ -123,7 +123,7 @@ impl BlockParser {
                 orphaned_paths: vec![].into_iter(),
             })
         } else {
-            Ok(Self::empty(blocks_dir, &vec![]))
+            Ok(Self::empty(blocks_dir, &[]))
         }
     }
 
@@ -237,13 +237,13 @@ impl BlockParser {
         Ok(next_block)
     }
 
-    fn empty(blocks_dir: &Path, paths: &Vec<PathBuf>) -> Self {
+    fn empty(blocks_dir: &Path, paths: &[PathBuf]) -> Self {
         Self {
             num_canonical: 0,
             total_num_blocks: paths.len() as u32,
             blocks_dir: blocks_dir.to_path_buf(),
             canonical_paths: vec![].into_iter(),
-            recent_paths: paths.clone().into_iter(),
+            recent_paths: Vec::from(paths).into_iter(),
             orphaned_paths: vec![].into_iter(),
         }
     }
