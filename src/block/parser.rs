@@ -2,7 +2,7 @@ use crate::{
     block::{length_from_path, precomputed::PrecomputedBlock},
     canonicity::canonical_chain_discovery::discovery,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use glob::glob;
 use std::{
     path::{Path, PathBuf},
@@ -143,7 +143,7 @@ impl BlockParser {
 
             Ok(Self::empty(&blocks_dir, &paths))
         } else {
-            Err(anyhow!("blocks_dir: {blocks_dir:?}, does not exist!"))
+            bail!("blocks_dir: {:?}, does not exist!", blocks_dir)
         }
     }
 
@@ -186,7 +186,7 @@ impl BlockParser {
                 Ok(Self::empty(&blocks_dir, &paths))
             }
         } else {
-            Err(anyhow!("blocks_dir: {blocks_dir:?}, does not exist!"))
+            bail!("blocks_dir: {:?}, does not exist!", blocks_dir)
         }
     }
 

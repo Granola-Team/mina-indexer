@@ -12,7 +12,7 @@ use crate::{
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
 };
-use anyhow::anyhow;
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
@@ -89,10 +89,7 @@ impl PrecomputedBlock {
             })?;
             Ok(precomputed_block)
         } else {
-            Err(anyhow!(
-                "Invalid precomputed block file name: {}",
-                path.display()
-            ))
+            bail!("Invalid precomputed block file name: {}", path.display())
         }
     }
 
