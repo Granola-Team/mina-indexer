@@ -1,9 +1,9 @@
 use crate::{
-    block::{parser::BlockParser, BlockHash, BlockWithoutHeight},
+    block::{parser::BlockParser, BlockHash},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
     ipc::IpcActor,
-    ledger::genesis::GenesisLedger,
-    receiver::{filesystem::FilesystemReceiver, BlockReceiver},
+    ledger::{genesis::GenesisLedger, staking::parser::StakingLedgerParser, store::LedgerStore},
+    receiver::{filesystem::FilesystemReceiver, Receiver},
     state::{summary::SummaryVerbose, IndexerState, IndexerStateConfig},
     store::IndexerStore,
 };
@@ -15,14 +15,16 @@ use std::{
     sync::Arc,
 };
 use tokio::{io, sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub genesis_ledger: GenesisLedger,
     pub genesis_hash: BlockHash,
-    pub startup_dir: PathBuf,
-    pub watch_dir: PathBuf,
+    pub block_startup_dir: PathBuf,
+    pub block_watch_dir: PathBuf,
+    pub ledger_startup_dir: PathBuf,
+    pub ledger_watch_dir: PathBuf,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
@@ -56,12 +58,13 @@ impl MinaIndexer {
     ) -> anyhow::Result<Self> {
         let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
         let ipc_update_arc = Arc::new(ipc_update_sender);
-        let watch_dir = config.watch_dir.clone();
+        let block_watch_dir = config.block_watch_dir.clone();
+        let ledger_watch_dir = config.ledger_watch_dir.clone();
         let ipc_store = store.clone();
 
         let listener = LocalSocketListener::bind(SOCKET_NAME)
             .or_else(try_remove_old_socket)
-            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {:?}", e.to_string()));
+            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {e}"));
 
         debug!("Local socket listener started");
 
@@ -75,12 +78,19 @@ impl MinaIndexer {
             let state = match initialize(config, store, ipc_update_arc.clone()).await {
                 Ok(state) => state,
                 Err(e) => {
-                    error!("Error in server initialization: {}", e);
+                    error!("Error in server initialization: {e}");
                     std::process::exit(1);
                 }
             };
-            if let Err(e) = run(watch_dir, state, ipc_update_arc.clone()).await {
-                error!("Error in server run: {}", e);
+            if let Err(e) = run(
+                block_watch_dir,
+                ledger_watch_dir,
+                state,
+                ipc_update_arc.clone(),
+            )
+            .await
+            {
+                error!("Error in server run: {e}");
                 std::process::exit(1);
             }
         });
@@ -131,7 +141,8 @@ pub async fn initialize(
     let IndexerConfiguration {
         genesis_ledger,
         genesis_hash,
-        startup_dir,
+        block_startup_dir,
+        ledger_startup_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -141,7 +152,8 @@ pub async fn initialize(
         ..
     } = config;
 
-    fs::create_dir_all(startup_dir.clone()).expect("startup_dir created");
+    fs::create_dir_all(block_startup_dir.clone())?;
+    fs::create_dir_all(ledger_startup_dir.clone())?;
 
     let state_config = IndexerStateConfig {
         genesis_hash,
@@ -157,8 +169,9 @@ pub async fn initialize(
         let mut state = match initialization_mode {
             InitializationMode::New => {
                 info!(
-                    "Initializing indexer state from blocks in {}",
-                    startup_dir.display()
+                    "Initializing indexer state from blocks in {} and staking ledgers in {}",
+                    block_startup_dir.display(),
+                    ledger_startup_dir.display(),
                 );
                 IndexerState::new_from_config(state_config)?
             }
@@ -183,31 +196,38 @@ pub async fn initialize(
         match initialization_mode {
             InitializationMode::New => {
                 let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
-                    &startup_dir,
+                    &block_startup_dir,
                     canonical_threshold,
                     reporting_freq,
                 ) {
                     Ok(block_parser) => block_parser,
                     Err(e) => {
-                        panic!("Obtaining block parser failed: {}", e);
+                        panic!("Obtaining block parser failed: {e}");
                     }
                 };
                 info!("Initializing indexer state");
                 state
                     .initialize_with_canonical_chain_discovery(&mut block_parser)
                     .await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
-                let mut block_parser =
-                    BlockParser::new_glob_min_length_filtered(&startup_dir, min_length_filter)?;
+                let mut block_parser = BlockParser::new_glob_min_length_filtered(
+                    &block_startup_dir,
+                    min_length_filter,
+                )?;
                 state.add_blocks(&mut block_parser).await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
             }
             InitializationMode::Sync => {
                 let min_length_filter = state.sync_from_db()?;
-                let mut block_parser =
-                    BlockParser::new_glob_min_length_filtered(&startup_dir, min_length_filter)?;
+                let mut block_parser = BlockParser::new_glob_min_length_filtered(
+                    &block_startup_dir,
+                    min_length_filter,
+                )?;
                 state.add_blocks(&mut block_parser).await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
             }
         }
 
@@ -226,27 +246,34 @@ pub async fn initialize(
 #[instrument(skip_all)]
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
+    ledger_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
     ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<()> {
-    let mut filesystem_receiver = FilesystemReceiver::new(1024, 64).await?;
-    filesystem_receiver.load_directory(block_watch_dir.as_ref())?;
+    let mut fs_block_receiver = <FilesystemReceiver<BlockParser>>::new().await?;
+    fs_block_receiver.load_directory(block_watch_dir.as_ref())?;
     info!(
         "Block receiver set to watch {}",
         block_watch_dir.as_ref().to_path_buf().display()
     );
 
+    let mut fs_ledger_receiver = <FilesystemReceiver<StakingLedgerParser>>::new().await?;
+    fs_ledger_receiver.load_directory(ledger_watch_dir.as_ref())?;
+    info!(
+        "Staking ledger receiver set to watch {}",
+        ledger_watch_dir.as_ref().to_path_buf().display()
+    );
+
     loop {
         tokio::select! {
-            block_fut = filesystem_receiver.recv_block() => {
+            block_fut = fs_block_receiver.recv_data() => {
                 match block_fut {
-                    Ok(option_block) => {
-                        if let Some(precomputed_block) = option_block {
-                            let block = BlockWithoutHeight::from_precomputed(&precomputed_block);
-                            debug!("Receiving block (length {}): {}", block.blockchain_length, block.state_hash);
+                    Ok(block_opt) => {
+                        if let Some(precomputed_block) = block_opt {
+                            debug!("Receiving block {}", precomputed_block.summary());
 
                             if state.block_pipeline(&precomputed_block)? {
-                                info!("Added block (length {}): {}", block.blockchain_length, block.state_hash);
+                                info!("Added block {}", precomputed_block.summary());
                             }
 
                             ipc_update_sender.send(IpcChannelUpdate {
@@ -254,11 +281,39 @@ pub async fn run(
                                 store: Arc::new(state.spawn_secondary_database()?),
                             }).await?;
                         } else {
-                            warn!("Block receiver closed channel");
+                            error!("Block receiver channel closed");
                         }
                     }
                     Err(e) => {
-                        error!("Unable to receive block: {}", e);
+                        error!("Unable to receive block: {e}");
+                    }
+                }
+            }
+
+            staking_ledger_fut = fs_ledger_receiver.recv_data() => {
+                match staking_ledger_fut {
+                    Ok(ledger_opt) => {
+                        if let Some(staking_ledger) = ledger_opt {
+                            debug!("Receiving staking ledger {}", staking_ledger.summary());
+
+                            if let Some(ref store) = state.indexer_store {
+                                let ledger = staking_ledger.summary();
+                                match store.add_staking_ledger(staking_ledger) {
+                                    Ok(_) => info!("Added staking ledger {ledger}"),
+                                    Err(e) => error!("Error adding staking ledger: {e}"),
+                                }
+                            }
+
+                            ipc_update_sender.send(IpcChannelUpdate {
+                                summary: Box::new(state.summary_verbose()),
+                                store: Arc::new(state.spawn_secondary_database()?),
+                            }).await?;
+                        } else {
+                            error!("Staking ledger receiver closed channel");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Unable to receive staking ledger: {e}");
                     }
                 }
             }
