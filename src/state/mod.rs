@@ -46,13 +46,13 @@ pub struct IndexerState {
     pub phase: IndexerPhase,
     /// Block representing the best tip of the root branch
     pub best_tip: Tip,
-    /// Highest known canonical block
-    pub canonical_tip: Tip,
-    /// Ledger corresponding to the canonical tip
+    /// Highest known canonical block with threshold confirmations
+    pub canonical_root: Tip,
+    /// Ledger corresponding to the canonical root
     pub ledger: Ledger,
     /// Cadence for computing and storing new ledgers
     pub ledger_cadence: u32,
-    /// Map of ledger diffs following the canonical tip
+    /// Map of ledger diffs following the canonical root
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
@@ -63,14 +63,16 @@ pub struct IndexerState {
     pub indexer_store: Option<Arc<IndexerStore>>,
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
-    /// Interval to the prune the root branch
+    /// Interval to prune the root branch
     pub prune_interval: u32,
     /// Frequency to report
     pub reporting_freq: u32,
-    /// Threshold for updating the canonical tip and db ledger
+    /// Threshold for updating the canonical root and db ledger
     pub canonical_update_threshold: u32,
-    /// Number of blocks added to the state
+    /// Number of blocks added to the witness tree
     pub blocks_processed: u32,
+    /// Number of block bytes added to the witness tree
+    pub bytes_processed: u64,
     /// Datetime the indexer started running
     pub init_time: Instant,
 }
@@ -160,7 +162,10 @@ impl IndexerState {
         )?;
         info!("Genesis ledger added to indexer store");
 
-        let genesis_block = GenesisBlock::new()?.to_precomputed();
+        let genesis_block = GenesisBlock::new()?;
+        let genesis_bytes = genesis_block.1;
+        let genesis_block = genesis_block.0;
+
         config.indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
 
@@ -191,7 +196,7 @@ impl IndexerState {
                 LedgerDiff::from_precomputed(&genesis_block),
             )]),
             phase: IndexerPhase::InitializingFromBlockDir,
-            canonical_tip: tip.clone(),
+            canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -200,6 +205,7 @@ impl IndexerState {
             prune_interval: config.prune_interval,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 1, // genesis block
+            bytes_processed: genesis_bytes,
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
@@ -218,7 +224,7 @@ impl IndexerState {
             ledger: config.genesis_ledger.into(),
             diffs_map: HashMap::new(),
             phase: IndexerPhase::SyncingFromDB,
-            canonical_tip: tip.clone(),
+            canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -227,6 +233,7 @@ impl IndexerState {
             prune_interval: config.prune_interval,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 0, // no genesis block included
+            bytes_processed: 0,
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
@@ -236,6 +243,7 @@ impl IndexerState {
     /// Creates a new indexer state for testing
     pub fn new_testing(
         root_block: &PrecomputedBlock,
+        root_block_bytes: u64,
         root_ledger: Option<Ledger>,
         speedb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
@@ -271,7 +279,7 @@ impl IndexerState {
                 LedgerDiff::from_precomputed(root_block),
             )]),
             phase: IndexerPhase::Testing,
-            canonical_tip: tip.clone(),
+            canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
             dangling_branches: Vec::new(),
@@ -281,6 +289,7 @@ impl IndexerState {
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 1, // root block
+            bytes_processed: root_block_bytes,
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
@@ -310,7 +319,7 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diff = LedgerDiff::default();
 
-            if block_parser.num_canonical > self.reporting_freq {
+            if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
                     "Adding blocks to the state, reporting every {}...",
                     self.reporting_freq
@@ -320,12 +329,15 @@ impl IndexerState {
             }
 
             // process canonical blocks first
-            while self.blocks_processed <= block_parser.num_canonical {
+            while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
 
-                if let Some(ParsedBlock::DeepCanonical(block)) = block_parser.next_block()? {
+                if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
+                    block_parser.next_block()?
+                {
                     let state_hash = block.state_hash.clone().into();
+                    self.bytes_processed += block_bytes;
 
                     // aggregate diffs, apply, and add to db
                     let diff = LedgerDiff::from_precomputed(&block);
@@ -348,7 +360,7 @@ impl IndexerState {
                     }
 
                     if self.blocks_processed > 0
-                        && self.blocks_processed == block_parser.num_canonical + 1
+                        && self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
                     {
                         // update root branch
                         self.root_branch = Branch::new(&block)?;
@@ -357,14 +369,17 @@ impl IndexerState {
                             state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
                         };
-                        self.canonical_tip = self.best_tip.clone();
+                        self.canonical_root = self.best_tip.clone();
                     }
                 } else {
                     bail!("Block unexpectedly missing");
                 }
             }
 
-            assert_eq!(self.blocks_processed, block_parser.num_canonical + 1); // +1 genesis
+            assert_eq!(
+                self.blocks_processed,
+                block_parser.num_deep_canonical_blocks + 1
+            ); // +1 genesis
         }
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing canonical chain");
@@ -402,8 +417,9 @@ impl IndexerState {
             self.reporting_freq
         );
 
-        while let Some(parsed_block) = block_parser.next_block()? {
+        while let Some((parsed_block, block_bytes)) = block_parser.next_block()? {
             self.blocks_processed += 1;
+            self.bytes_processed += block_bytes;
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
@@ -706,10 +722,10 @@ impl IndexerState {
             if self.root_branch.height() > self.prune_interval * k {
                 let best_tip_block = self.best_tip_block().clone();
                 debug!(
-                    "Pruning transition frontier: k = {}, best tip length = {}, canonical tip length = {}",
+                    "Pruning transition frontier: k = {}, best tip length = {}, canonical root length = {}",
                     k,
                     self.best_tip_block().blockchain_length,
-                    self.canonical_tip_block().blockchain_length,
+                    self.canonical_root_block().blockchain_length,
                 );
 
                 self.root_branch
@@ -722,8 +738,8 @@ impl IndexerState {
     }
 
     /// The highest known canonical block
-    pub fn canonical_tip_block(&self) -> &Block {
-        self.get_block_from_id(&self.canonical_tip.node_id)
+    pub fn canonical_root_block(&self) -> &Block {
+        self.get_block_from_id(&self.canonical_root.node_id)
     }
 
     /// The highest block known to be a descendant of the root block
@@ -736,15 +752,15 @@ impl IndexerState {
         self.root_branch.branches.get(node_id).unwrap().data()
     }
 
-    /// Updates the canonical tip if the precondition is met
+    /// Updates the canonical root if the precondition is met
     pub fn update_canonical(&mut self) -> anyhow::Result<Option<CanonicalBlocksEvent>> {
         if self.is_canonical_updatable() {
-            let old_canonical_tip_id = self.canonical_tip.node_id.clone();
-            let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_tip_id)?;
+            let old_canonical_root_id = self.canonical_root.node_id.clone();
+            let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_root_id)?;
 
             self.update_ledger(&new_canonical_blocks)?;
             self.update_ledger_store(&new_canonical_blocks)?;
-            self.prune_diffs_map(&old_canonical_tip_id)?;
+            self.prune_diffs_map(&old_canonical_root_id)?;
 
             return Ok(Some(CanonicalBlocksEvent::CanonicalBlocks(
                 new_canonical_blocks,
@@ -755,7 +771,7 @@ impl IndexerState {
     }
 
     fn is_canonical_updatable(&self) -> bool {
-        self.best_tip_block().height - self.canonical_tip_block().height
+        self.best_tip_block().height - self.canonical_root_block().height
             >= self.canonical_update_threshold
     }
 
@@ -809,10 +825,14 @@ impl IndexerState {
     }
 
     /// Add staking ledgers to the underlying ledger store
-    pub fn add_staking_ledgers_to_store(
+    pub fn add_startup_staking_ledgers_to_store(
         &self,
         ledgers_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
+        info!(
+            "Parsing startup staking ledgers in {}",
+            ledgers_dir.display()
+        );
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
@@ -869,7 +889,7 @@ impl IndexerState {
                     indexer_store.get_max_canonical_blockchain_length()?
                 );
 
-                // root branch root is canonical tip
+                // root branch root is canonical root
                 // add all successive NewBlock's to the witness tree
                 if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
                     self.root_branch = Branch::new(&block)?;
@@ -880,7 +900,7 @@ impl IndexerState {
                     };
                     self.diffs_map
                         .insert(tip.state_hash.clone(), LedgerDiff::from_precomputed(&block));
-                    self.canonical_tip = tip.clone();
+                    self.canonical_root = tip.clone();
                     self.best_tip = tip;
 
                     for state_hash in event_log.iter().filter_map(|e| match e {
@@ -1073,7 +1093,7 @@ impl IndexerState {
 
     fn get_new_canonical_blocks(
         &mut self,
-        old_canonical_tip_id: &NodeId,
+        old_canonical_root_id: &NodeId,
     ) -> anyhow::Result<Vec<Block>> {
         let mut canonical_blocks = vec![];
 
@@ -1084,13 +1104,13 @@ impl IndexerState {
             .unwrap()
             .skip(MAINNET_CANONICAL_THRESHOLD.saturating_sub(1) as usize)
         {
-            // only add blocks between the old_canonical_tip and the new one
-            if ancestor_id != old_canonical_tip_id {
+            // only add blocks between the old_canonical_root and the new one
+            if ancestor_id != old_canonical_root_id {
                 let ancestor_block = self.get_block_from_id(ancestor_id).clone();
                 if canonical_blocks.is_empty() {
-                    // update canonical tip
-                    self.canonical_tip.node_id = ancestor_id.clone();
-                    self.canonical_tip.state_hash = ancestor_block.state_hash.clone();
+                    // update canonical root
+                    self.canonical_root.node_id = ancestor_id.clone();
+                    self.canonical_root.state_hash = ancestor_block.state_hash.clone();
                 }
                 canonical_blocks.push(ancestor_block);
             } else {
@@ -1133,15 +1153,15 @@ impl IndexerState {
     }
 
     /// Remove diffs corresponding to blocks at or beneath the height of the new
-    /// canonical tip
-    fn prune_diffs_map(&mut self, old_canonical_tip_id: &NodeId) -> anyhow::Result<()> {
+    /// canonical root
+    fn prune_diffs_map(&mut self, old_canonical_root_id: &NodeId) -> anyhow::Result<()> {
         for node_id in self
             .root_branch
             .branches
-            .traverse_level_order_ids(old_canonical_tip_id)
+            .traverse_level_order_ids(old_canonical_root_id)
             .unwrap()
         {
-            if self.get_block_from_id(&node_id).height <= self.canonical_tip_block().height {
+            if self.get_block_from_id(&node_id).height <= self.canonical_root_block().height {
                 self.diffs_map
                     .remove(&self.get_block_from_id(&node_id).state_hash.clone());
             }
@@ -1171,8 +1191,8 @@ impl IndexerState {
         let witness_tree = WitnessTreeSummaryShort {
             best_tip_hash: self.best_tip_block().state_hash.0.clone(),
             best_tip_length: self.best_tip_block().blockchain_length,
-            canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
-            canonical_tip_length: self.canonical_tip_block().blockchain_length,
+            canonical_root_hash: self.canonical_root_block().state_hash.0.clone(),
+            canonical_root_length: self.canonical_root_block().blockchain_length,
             root_hash: self.root_branch.root_block().state_hash.0.clone(),
             root_height: self.root_branch.height(),
             root_length: self.root_branch.len(),
@@ -1212,8 +1232,8 @@ impl IndexerState {
         let witness_tree = WitnessTreeSummaryVerbose {
             best_tip_hash: self.best_tip_block().state_hash.0.clone(),
             best_tip_length: self.best_tip_block().blockchain_length,
-            canonical_tip_hash: self.canonical_tip_block().state_hash.0.clone(),
-            canonical_tip_length: self.canonical_tip_block().blockchain_length,
+            canonical_root_hash: self.canonical_root_block().state_hash.0.clone(),
+            canonical_root_length: self.canonical_root_block().blockchain_length,
             root_hash: self.root_branch.root_block().state_hash.0.clone(),
             root_height: self.root_branch.height(),
             root_length: self.root_branch.len(),
@@ -1242,23 +1262,26 @@ impl IndexerState {
 
     fn should_report_from_block_count(&self, block_parser: &BlockParser) -> bool {
         self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
-            || self.blocks_processed == block_parser.num_canonical + 1
+            || self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
     }
 
     fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
         if self.should_report_from_block_count(block_parser) {
-            let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let block_rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
 
             info!(
-                "{} blocks parsed and applied in {:?}",
+                "{} blocks ({}) parsed and applied in {:?}",
                 self.blocks_processed,
+                bytesize::ByteSize(self.bytes_processed),
                 total_time.elapsed(),
             );
             info!(
                 "Estimated time: {} min",
-                (block_parser.total_num_blocks - self.blocks_processed) as f64 / (rate * 60_f64)
+                (block_parser.total_num_bytes - self.bytes_processed) as f64
+                    / (bytes_rate * 60_f64)
             );
-            debug!("Rate: {rate} blocks/s");
+            debug!("Rate: {} blocks/s ({}/s)", block_rate, bytes_rate);
         }
     }
 
@@ -1272,25 +1295,31 @@ impl IndexerState {
             || self.should_report_from_time(step_time.elapsed())
         {
             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
-            let canonical_tip: BlockWithoutHeight = self.canonical_tip_block().clone().into();
-            let rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let canonical_root: BlockWithoutHeight = self.canonical_root_block().clone().into();
+            let block_rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
 
             info!(
-                "Parsed and added {} blocks to the witness tree in {:?}",
+                "Parsed and added {} blocks ({}) to the witness tree in {:?}",
                 self.blocks_processed,
+                bytesize::ByteSize(self.bytes_processed),
                 total_time.elapsed(),
             );
 
             debug!("Root height:       {}", self.root_branch.height());
             debug!("Root length:       {}", self.root_branch.len());
-            debug!("Rate:              {rate} blocks/s");
+            debug!(
+                "Rate:              {} blocks/s ({}/s)",
+                block_rate, bytes_rate
+            );
 
             info!(
                 "Estimate rem time: {} hr",
-                (block_parser.total_num_blocks - self.blocks_processed) as f64 / (rate * 3600_f64)
+                (block_parser.total_num_bytes - self.bytes_processed) as f64
+                    / (bytes_rate * 3600_f64)
             );
             info!("Best tip:          {best_tip:?}");
-            info!("Canonical tip:     {canonical_tip:?}");
+            info!("Canonical root:    {canonical_root:?}");
         }
         Ok(())
     }

@@ -57,7 +57,7 @@ async fn test() {
     // - add block to witness tree
     // - update best tip
     // - update canonicities
-    while let Some(block) = block_parser1.next_block().unwrap() {
+    while let Some((block, _)) = block_parser1.next_block().unwrap() {
         let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store

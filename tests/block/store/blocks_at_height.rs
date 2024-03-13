@@ -18,14 +18,14 @@ fn add_and_get() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some(block) = bp.next_block()? {
+    while let Some((block, _)) = bp.next_block()? {
         let block: PrecomputedBlock = block.into();
         db.add_block(&block)?;
-        println!("{}: {}", block.blockchain_length, block.state_hash);
+        println!("{}", block.summary());
     }
 
     for block in db.get_blocks_at_height(105489)? {
-        println!("{}: {}", block.blockchain_length, block.state_hash);
+        println!("{}", block.summary());
     }
 
     assert_eq!(db.get_blocks_at_height(105489)?.len(), 3);
