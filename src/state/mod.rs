@@ -63,14 +63,16 @@ pub struct IndexerState {
     pub indexer_store: Option<Arc<IndexerStore>>,
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
-    /// Interval to the prune the root branch
+    /// Interval to prune the root branch
     pub prune_interval: u32,
     /// Frequency to report
     pub reporting_freq: u32,
-    /// Threshold for updating the canonical tip and db ledger
+    /// Threshold for updating the canonical root and db ledger
     pub canonical_update_threshold: u32,
-    /// Number of blocks added to the state
+    /// Number of blocks added to the witness tree
     pub blocks_processed: u32,
+    /// Number of block bytes added to the witness tree
+    pub bytes_processed: u64,
     /// Datetime the indexer started running
     pub init_time: Instant,
 }
@@ -160,7 +162,10 @@ impl IndexerState {
         )?;
         info!("Genesis ledger added to indexer store");
 
-        let genesis_block = GenesisBlock::new()?.to_precomputed();
+        let genesis_block = GenesisBlock::new()?;
+        let genesis_bytes = genesis_block.1;
+        let genesis_block = genesis_block.0;
+
         config.indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
 
@@ -200,6 +205,7 @@ impl IndexerState {
             prune_interval: config.prune_interval,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 1, // genesis block
+            bytes_processed: genesis_bytes,
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
@@ -227,6 +233,7 @@ impl IndexerState {
             prune_interval: config.prune_interval,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 0, // no genesis block included
+            bytes_processed: 0,
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
@@ -236,6 +243,7 @@ impl IndexerState {
     /// Creates a new indexer state for testing
     pub fn new_testing(
         root_block: &PrecomputedBlock,
+        root_block_bytes: u64,
         root_ledger: Option<Ledger>,
         speedb_path: Option<&std::path::Path>,
         transition_frontier_length: Option<u32>,
@@ -281,6 +289,7 @@ impl IndexerState {
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 1, // root block
+            bytes_processed: root_block_bytes,
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
@@ -310,7 +319,7 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diff = LedgerDiff::default();
 
-            if block_parser.num_canonical > self.reporting_freq {
+            if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
                     "Adding blocks to the state, reporting every {}...",
                     self.reporting_freq
@@ -320,12 +329,15 @@ impl IndexerState {
             }
 
             // process canonical blocks first
-            while self.blocks_processed <= block_parser.num_canonical {
+            while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
 
-                if let Some(ParsedBlock::DeepCanonical(block)) = block_parser.next_block()? {
+                if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
+                    block_parser.next_block()?
+                {
                     let state_hash = block.state_hash.clone().into();
+                    self.bytes_processed += block_bytes;
 
                     // aggregate diffs, apply, and add to db
                     let diff = LedgerDiff::from_precomputed(&block);
@@ -348,7 +360,7 @@ impl IndexerState {
                     }
 
                     if self.blocks_processed > 0
-                        && self.blocks_processed == block_parser.num_canonical + 1
+                        && self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
                     {
                         // update root branch
                         self.root_branch = Branch::new(&block)?;
@@ -364,7 +376,10 @@ impl IndexerState {
                 }
             }
 
-            assert_eq!(self.blocks_processed, block_parser.num_canonical + 1); // +1 genesis
+            assert_eq!(
+                self.blocks_processed,
+                block_parser.num_deep_canonical_blocks + 1
+            ); // +1 genesis
         }
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing canonical chain");
@@ -408,10 +423,10 @@ impl IndexerState {
             step_time = Instant::now();
 
             match parsed_block {
-                ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
+                (ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block), _) => {
                     self.block_pipeline(&block)?;
                 }
-                ParsedBlock::Orphaned(block) => {
+                (ParsedBlock::Orphaned(block), _) => {
                     self.add_block_to_store(&block)?;
                 }
             }
@@ -1242,7 +1257,7 @@ impl IndexerState {
 
     fn should_report_from_block_count(&self, block_parser: &BlockParser) -> bool {
         self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
-            || self.blocks_processed == block_parser.num_canonical + 1
+            || self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
     }
 
     fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
