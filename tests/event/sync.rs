@@ -30,12 +30,12 @@ async fn test() {
 
     // witness trees are functionally equal
     let best_tip: BlockWithoutHeight = state.best_tip_block().clone().into();
-    let canonical_tip: BlockWithoutHeight = state.canonical_tip_block().clone().into();
+    let canonical_root: BlockWithoutHeight = state.canonical_root_block().clone().into();
     let best_tip_sync: BlockWithoutHeight = state_sync.best_tip_block().clone().into();
-    let canonical_tip_sync: BlockWithoutHeight = state_sync.canonical_tip_block().clone().into();
+    let canonical_root_sync: BlockWithoutHeight = state_sync.canonical_root_block().clone().into();
 
     assert_eq!(best_tip, best_tip_sync);
-    assert_eq!(canonical_tip, canonical_tip_sync);
+    assert_eq!(canonical_root, canonical_root_sync);
 
     for state_hash in state_sync.diffs_map.keys() {
         assert_eq!(
