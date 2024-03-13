@@ -208,21 +208,21 @@ pub async fn initialize(
             state
                 .initialize_with_canonical_chain_discovery(&mut block_parser)
                 .await?;
-            state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
         }
         InitializationMode::Replay => {
             let min_length_filter = state.replay_events()?;
             let mut block_parser =
                 BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
         }
         InitializationMode::Sync => {
             let min_length_filter = state.sync_from_db()?;
             let mut block_parser =
                 BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
         }
     }
 

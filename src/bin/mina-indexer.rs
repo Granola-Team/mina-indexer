@@ -94,7 +94,7 @@ pub struct ServerArgs {
     /// Threshold for determining the canonicity of a block
     #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
     canonical_threshold: u32,
-    /// Threshold for updating the canonical tip/ledger
+    /// Threshold for updating the canonical root/ledger
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
     /// Web server hostname for REST and GraphQL
