@@ -16,7 +16,7 @@ use crate::{
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
-use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB };
+use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
