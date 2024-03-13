@@ -12,17 +12,21 @@ use tracing::info;
 
 /// Splits block paths into three collections:
 /// - _deep canonical_ (chain of canonical blocks with at least
-///   `canonical_threshold` confirmations, tip is _canonical root_ which becomes
-///   the root of the witness tree)
-/// - _recent_ (descendents of the canonical root)
-/// - _orphaned_ (other blocks at the same height as a deep canonical block)
+///   `canonical_threshold` confirmations; blocks up to _canonical root_, which
+///   becomes the root of the witness tree)
+/// - _recent_ (descendents of the _canonical root_)
+/// - _orphaned_ (blocks at or below the height of the _canonical root_)
 ///
 /// Traverses deep canoncial, recent, then orphaned (orphaned paths bypass the
 /// witness tree)
 pub struct BlockParser {
-    pub num_canonical: u32,
-    pub total_num_blocks: u32,
     pub blocks_dir: PathBuf,
+    pub blocks_processed: u32,
+    pub total_num_blocks: u32,
+    pub num_deep_canonical_blocks: u32,
+    pub bytes_processed: u64,
+    pub total_num_bytes: u64,
+    pub deep_canonical_bytes: u64,
     canonical_paths: IntoIter<PathBuf>,
     recent_paths: IntoIter<PathBuf>,
     orphaned_paths: IntoIter<PathBuf>,
@@ -102,6 +106,9 @@ impl BlockParser {
             let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
             let mut paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
+            let total_num_bytes = paths
+                .iter()
+                .fold(0, |acc, p| acc + p.metadata().unwrap().len());
 
             if min_length.is_some() {
                 paths.retain(|p| extract_block_height(p) > min_length)
@@ -114,7 +121,11 @@ impl BlockParser {
             paths.sort_by_cached_key(|path| extract_block_height(path));
             Ok(Self {
                 blocks_dir,
-                num_canonical: 0,
+                total_num_bytes,
+                bytes_processed: 0,
+                blocks_processed: 0,
+                deep_canonical_bytes: 0,
+                num_deep_canonical_blocks: 0,
                 total_num_blocks: paths.len() as u32,
                 recent_paths: paths.into_iter(),
                 canonical_paths: vec![].into_iter(),
@@ -162,6 +173,9 @@ impl BlockParser {
             let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
             let paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
+            let total_num_bytes = paths
+                .iter()
+                .fold(0, |acc, p| acc + p.metadata().unwrap().len());
             if let Ok((canonical_paths, recent_paths, orphaned_paths)) = discovery(
                 min_len_filter,
                 max_len_filter,
@@ -170,8 +184,15 @@ impl BlockParser {
                 paths.iter().collect(),
             ) {
                 info!("Canonical chain discovery successful...");
+                let deep_canonical_bytes = canonical_paths
+                    .iter()
+                    .fold(0, |acc, p| acc + p.metadata().unwrap().len());
                 Ok(Self {
-                    num_canonical: canonical_paths.len() as u32,
+                    blocks_processed: 0,
+                    bytes_processed: 0,
+                    total_num_bytes,
+                    deep_canonical_bytes,
+                    num_deep_canonical_blocks: canonical_paths.len() as u32,
                     total_num_blocks: (canonical_paths.len() + recent_paths.len()) as u32,
                     blocks_dir,
                     canonical_paths: canonical_paths.into_iter(),
@@ -186,27 +207,36 @@ impl BlockParser {
         }
     }
 
+    fn update_block(
+        &mut self,
+        path: &Path,
+        designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
+    ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
+        let block_bytes = path.metadata().unwrap().len();
+        match PrecomputedBlock::parse_file(path).map(designation) {
+            Ok(parsed_block) => {
+                self.blocks_processed += 1;
+                self.bytes_processed += block_bytes;
+                Ok(Some((parsed_block, block_bytes)))
+            }
+            Err(e) => bail!("Block parsing error: {}", e),
+        }
+    }
     /// Traverses `self`'s internal paths
     /// - deep canonical
     /// - recent
     /// - orphaned
-    pub fn next_block(&mut self) -> anyhow::Result<Option<ParsedBlock>> {
+    pub fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path)
-                .map(ParsedBlock::DeepCanonical)
-                .map(Some);
+            return self.update_block(&next_path, &ParsedBlock::DeepCanonical);
         }
 
         if let Some(next_path) = self.recent_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path)
-                .map(ParsedBlock::Recent)
-                .map(Some);
+            return self.update_block(&next_path, &ParsedBlock::Recent);
         }
 
         if let Some(next_path) = self.orphaned_paths.next() {
-            return PrecomputedBlock::parse_file(&next_path)
-                .map(ParsedBlock::Orphaned)
-                .map(Some);
+            return self.update_block(&next_path, &ParsedBlock::Orphaned);
         }
 
         Ok(None)
@@ -217,16 +247,16 @@ impl BlockParser {
     pub async fn get_precomputed_block(
         &mut self,
         state_hash: &str,
-    ) -> anyhow::Result<PrecomputedBlock> {
-        let mut next_block = self
+    ) -> anyhow::Result<(PrecomputedBlock, u64)> {
+        let mut next_block: (PrecomputedBlock, u64) = self
             .next_block()?
-            .map(<ParsedBlock as Into<PrecomputedBlock>>::into)
+            .map(|p| (p.0.into(), p.1))
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
-        while next_block.state_hash != state_hash {
+        while next_block.0.state_hash != state_hash {
             next_block = self
                 .next_block()?
-                .map(<ParsedBlock as Into<PrecomputedBlock>>::into)
+                .map(|p| (p.0.into(), p.1))
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
 
@@ -234,8 +264,15 @@ impl BlockParser {
     }
 
     fn empty(blocks_dir: &Path, paths: &[PathBuf]) -> Self {
+        let total_num_bytes = paths
+            .iter()
+            .fold(0, |acc, p| acc + p.metadata().unwrap().len());
         Self {
-            num_canonical: 0,
+            total_num_bytes,
+            bytes_processed: 0,
+            blocks_processed: 0,
+            deep_canonical_bytes: 0,
+            num_deep_canonical_blocks: 0,
             total_num_blocks: paths.len() as u32,
             blocks_dir: blocks_dir.to_path_buf(),
             canonical_paths: vec![].into_iter(),

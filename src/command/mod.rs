@@ -529,7 +529,7 @@ mod test {
             BLOCK_REPORTING_FREQ_NUM,
         )
         .unwrap();
-        let block = bp
+        let (block, _) = bp
             .get_precomputed_block("3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw")
             .await
             .unwrap();
