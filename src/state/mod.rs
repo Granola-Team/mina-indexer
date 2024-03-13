@@ -1203,9 +1203,10 @@ impl IndexerState {
         };
 
         SummaryShort {
+            witness_tree,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            witness_tree,
+            bytes_processed: self.bytes_processed,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1245,9 +1246,10 @@ impl IndexerState {
         };
 
         SummaryVerbose {
+            witness_tree,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            witness_tree,
+            bytes_processed: self.bytes_processed,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }

@@ -5,6 +5,7 @@ use std::str::Lines;
 pub trait Summary {
     fn uptime(&self) -> std::time::Duration;
     fn blocks_processed(&self) -> u32;
+    fn bytes_processed(&self) -> bytesize::ByteSize;
     fn best_tip_length(&self) -> u32;
     fn best_tip_hash(&self) -> String;
     fn canonical_root_length(&self) -> u32;
@@ -23,6 +24,7 @@ pub trait Summary {
 pub struct SummaryShort {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
+    pub bytes_processed: u64,
     pub witness_tree: WitnessTreeSummaryShort,
     pub db_stats: Option<DbStats>,
 }
@@ -31,6 +33,7 @@ pub struct SummaryShort {
 pub struct SummaryVerbose {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
+    pub bytes_processed: u64,
     pub witness_tree: WitnessTreeSummaryVerbose,
     pub db_stats: Option<DbStats>,
 }
@@ -98,6 +101,7 @@ impl From<SummaryVerbose> for SummaryShort {
         Self {
             uptime: value.uptime,
             blocks_processed: value.blocks_processed,
+            bytes_processed: value.bytes_processed,
             witness_tree: value.witness_tree.into(),
             db_stats: value.db_stats,
         }
@@ -125,6 +129,7 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
     writeln!(f, "  Uptime:       {:?}", state.uptime())?;
+    writeln!(f, "  Bytes added:  {}", state.bytes_processed())?;
     writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
 
     writeln!(f, "\n=== Root branch ===")?;
@@ -183,6 +188,10 @@ impl Summary for SummaryShort {
         self.blocks_processed
     }
 
+    fn bytes_processed(&self) -> bytesize::ByteSize {
+        bytesize::ByteSize(self.bytes_processed)
+    }
+
     fn canonical_root_hash(&self) -> String {
         self.witness_tree.canonical_root_hash.clone()
     }
@@ -239,6 +248,10 @@ impl Summary for SummaryVerbose {
 
     fn blocks_processed(&self) -> u32 {
         self.blocks_processed
+    }
+
+    fn bytes_processed(&self) -> bytesize::ByteSize {
+        bytesize::ByteSize(self.bytes_processed)
     }
 
     fn canonical_root_hash(&self) -> String {
