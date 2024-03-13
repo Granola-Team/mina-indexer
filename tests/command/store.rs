@@ -31,7 +31,7 @@ async fn add_and_get() {
     )
     .unwrap();
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
-    let (block, _) = bp.get_precomputed_block(state_hash).await.unwrap();
+    let block = bp.get_precomputed_block(state_hash).await.unwrap();
     let block_cmds = block.commands();
     let pks = block.all_command_public_keys();
 

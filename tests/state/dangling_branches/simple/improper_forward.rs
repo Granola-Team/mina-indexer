@@ -25,7 +25,7 @@ async fn extension() {
 
     // root_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let (root_block, root_block_bytes) = block_parser
+    let root_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await
         .unwrap();
@@ -34,9 +34,7 @@ async fn extension() {
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
-    let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)
-            .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
 
     // root branch
     // - len = 1
@@ -55,7 +53,7 @@ async fn extension() {
 
     // child1 = mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.
     // json
-    let (child1, _) = block_parser
+    let child1 = block_parser
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await
         .unwrap();
@@ -90,7 +88,7 @@ async fn extension() {
 
     // child2 = mainnet-105492-3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN.
     // json
-    let (child2, _) = block_parser
+    let child2 = block_parser
         .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
         .await
         .unwrap();

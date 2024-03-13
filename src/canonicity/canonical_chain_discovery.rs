@@ -10,7 +10,7 @@ use tracing::{debug, info};
 
 /// Separate blocks into 3 length-sorted lists:
 /// - canonical chain
-/// - blocks following the canonical root
+/// - blocks following the canonical tip
 /// - orphaned blocks
 pub fn discovery(
     min_len_filter: Option<u32>,
@@ -75,7 +75,7 @@ pub fn discovery(
         let last_contiguous_idx = last_contiguous_first_noncontiguous_start_idx
             .map(|i| i.1.saturating_sub(1))
             .unwrap_or(paths.len() - 1);
-        let canonical_root_opt = find_canonical_root(
+        let canonical_tip_opt = find_canonical_tip(
             paths.as_slice(),
             &length_start_indices_and_diffs,
             length_start_indices_and_diffs
@@ -86,7 +86,7 @@ pub fn discovery(
             canonical_threshold,
         );
 
-        if canonical_root_opt.is_none()
+        if canonical_tip_opt.is_none()
             || max_num_canonical_blocks(&length_start_indices_and_diffs, last_contiguous_start_idx)
                 < canonical_threshold
         {
@@ -95,17 +95,17 @@ pub fn discovery(
         }
 
         // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
-        // the `last_contiguous_idx` to find the canonical root
-        let (mut curr_length_idx, mut curr_start_idx) = canonical_root_opt.unwrap();
+        // the `last_contiguous_idx` to find the canonical tip
+        let (mut curr_length_idx, mut curr_start_idx) = canonical_tip_opt.unwrap();
         let mut curr_path = paths[curr_length_idx];
 
         info!(
-            "Found canonical root (length {}): {}",
+            "Found canonical tip (length {}): {}",
             extract_block_height(curr_path).unwrap_or(0),
             extract_state_hash(curr_path),
         );
 
-        // handle all blocks that are higher than the canonical root
+        // handle all blocks that are higher than the canonical tip
         if let Some(successive_start_idx) =
             next_length_start_index(paths.as_slice(), curr_length_idx)
         {
@@ -132,7 +132,7 @@ pub fn discovery(
         let time = Instant::now();
         let mut count = 1;
 
-        // descend from the canonical root to the lowest block in the dir,
+        // descend from the canonical tip to the lowest block in the dir,
         // segment by segment, searching for ancestors
         while curr_start_idx > 0 {
             if count % reporting_freq == 0 {
@@ -232,14 +232,14 @@ fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize>
     None
 }
 
-/// Finds the _canonical root_, i.e. the _highest_ block in the
+/// Finds the _canonical tip_, i.e. the _highest_ block in the
 /// _lowest contiguous chain_ with `canonical_threshold` ancestors.
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///
 /// Returns the index of the caonical tip in `paths` and the start index of the
 /// first successive block.
-fn find_canonical_root(
+fn find_canonical_tip(
     paths: &[&PathBuf],
     length_start_indices_and_diffs: &[(usize, u32)],
     mut curr_start_idx: usize,
@@ -274,7 +274,7 @@ fn find_canonical_root(
             if !parent_found {
                 // begin the search again at the previous length
                 if curr_start_idx > canonical_threshold as usize {
-                    return find_canonical_root(
+                    return find_canonical_tip(
                         paths,
                         length_start_indices_and_diffs,
                         curr_start_idx.saturating_sub(1),
@@ -282,12 +282,12 @@ fn find_canonical_root(
                         canonical_threshold,
                     );
                 } else {
-                    // canonical root cannot be found
+                    // canonical tip cannot be found
                     return None;
                 }
             }
 
-            // canonical root found
+            // canonical tip found
             if n == canonical_threshold && parent_found {
                 break;
             }

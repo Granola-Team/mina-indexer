@@ -1,6 +1,6 @@
 use crate::ledger::account::Amount;
 
-pub const BLOCK_REPORTING_FREQ_NUM: u32 = 1000;
+pub const BLOCK_REPORTING_FREQ_NUM: u32 = 5000;
 pub const BLOCK_REPORTING_FREQ_SEC: u64 = 180;
 pub const LEDGER_CADENCE: u32 = 100;
 pub const CANONICAL_UPDATE_THRESHOLD: u32 = PRUNE_INTERVAL_DEFAULT / 5;

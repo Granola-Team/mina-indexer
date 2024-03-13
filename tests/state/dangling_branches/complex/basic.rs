@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 /// Merges two dangling branches
 #[tokio::test]
-async fn extension() -> anyhow::Result<()> {
+async fn extension() {
     // -----------------------------
     //          Root branch
     // -----------------------------
@@ -27,14 +27,15 @@ async fn extension() -> anyhow::Result<()> {
     //      leaf    =>     .
     // -----------------------------
 
-    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block =
     // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
-    let (root_block, root_block_bytes) = block_parser
+    let root_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         root_block.state_hash,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
@@ -42,9 +43,10 @@ async fn extension() -> anyhow::Result<()> {
 
     // middle_block =
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
-    let (middle_block, _) = block_parser
+    let middle_block = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         middle_block.state_hash,
         "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
@@ -52,9 +54,10 @@ async fn extension() -> anyhow::Result<()> {
 
     // leaf_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let (leaf_block, _) = block_parser
+    let leaf_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         leaf_block.state_hash,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
@@ -65,14 +68,13 @@ async fn extension() -> anyhow::Result<()> {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
 
     // --------
     // add leaf
     // --------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!("=== Before Root Branch ===");
@@ -81,7 +83,8 @@ async fn extension() -> anyhow::Result<()> {
         .root_branch
         .clone()
         .branches
-        .write_formatted(&mut tree)?;
+        .write_formatted(&mut tree)
+        .unwrap();
     println!("{tree}");
 
     println!("=== Before Dangling Branch 0 ===");
@@ -91,7 +94,8 @@ async fn extension() -> anyhow::Result<()> {
         .first()
         .unwrap()
         .branches
-        .write_formatted(&mut tree)?;
+        .write_formatted(&mut tree)
+        .unwrap();
     println!("{tree}");
 
     // 1 dangling branch
@@ -121,11 +125,12 @@ async fn extension() -> anyhow::Result<()> {
         .root_branch
         .clone()
         .branches
-        .write_formatted(&mut tree)?;
+        .write_formatted(&mut tree)
+        .unwrap();
     println!("{tree}");
 
     // dangling branch rebases on top of root_branch
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block).unwrap();
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     // no more dangling branches
@@ -153,6 +158,4 @@ async fn extension() -> anyhow::Result<()> {
 
     // branch root should match the tree's root
     assert_eq!(root, branch_root);
-
-    Ok(())
 }

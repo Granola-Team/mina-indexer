@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 /// Creates multiple dangling branches
 #[tokio::test]
-async fn extensions() -> anyhow::Result<()> {
+async fn extensions() {
     // -----------------------
     //       Root branch
     // -----------------------
@@ -23,14 +23,15 @@ async fn extensions() -> anyhow::Result<()> {
     //      .     =>    1
     // -----------------------
 
-    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
+    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root0_block =
     // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
-    let (root0_block, root0_block_bytes) = block_parser
+    let root0_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         root0_block.state_hash,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
@@ -38,9 +39,10 @@ async fn extensions() -> anyhow::Result<()> {
 
     // root1_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let (root1_block, _) = block_parser
+    let root1_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         root1_block.state_hash,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
@@ -51,16 +53,7 @@ async fn extensions() -> anyhow::Result<()> {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new_testing(
-        &root0_block,
-        root0_block_bytes,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let mut state = IndexerState::new_testing(&root0_block, None, None, None, None, None).unwrap();
 
     // Root branch
     // - len = 1
@@ -130,6 +123,4 @@ async fn extensions() -> anyhow::Result<()> {
 
     // branch root should match the tree's root
     assert_eq!(root1, branch_root1);
-
-    Ok(())
 }

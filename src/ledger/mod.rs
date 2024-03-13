@@ -248,12 +248,7 @@ impl From<u64> for Amount {
 }
 
 pub fn is_valid_ledger_hash(input: &str) -> bool {
-    let mut chars = input.chars();
-    let c0 = chars.next();
-    let c1 = chars.next();
-    input.len() == 51
-        && c0 == Some('j')
-        && (c1 == Some('w') || c1 == Some('x') || c1 == Some('y') || c1 == Some('z'))
+    input.starts_with("jx") && input.len() == 51
 }
 
 #[cfg(test)]

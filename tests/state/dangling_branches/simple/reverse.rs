@@ -20,7 +20,7 @@ async fn extension() {
 
     // root_block =
     // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
-    let (root_block, root_block_bytes) = block_parser
+    let root_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await
         .unwrap();
@@ -32,7 +32,7 @@ async fn extension() {
     // *** parent ***
     // new_dangling_root_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let (new_dangling_root_block, _) = block_parser
+    let new_dangling_root_block = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await
         .unwrap();
@@ -44,7 +44,7 @@ async fn extension() {
     // *** child ***
     // new_dangling_root_block =
     // mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
-    let (old_dangling_root_block, _) = block_parser
+    let old_dangling_root_block = block_parser
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await
         .unwrap();
@@ -58,9 +58,7 @@ async fn extension() {
     // ----------------
 
     // root_block is the root of the root branch
-    let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)
-            .unwrap();
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
 
     // old_dangling_root_block is originally the root of the 0th dangling branch
     let (extension_type, _) = state

@@ -31,7 +31,7 @@ async fn store() {
     )
     .unwrap();
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
-    let (block, _) = bp.get_precomputed_block(state_hash).await.unwrap();
+    let block = bp.get_precomputed_block(state_hash).await.unwrap();
     let block_snarks = SnarkWorkSummary::from_precomputed(&block);
     let block_snarks_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(&block);
 
