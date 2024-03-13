@@ -16,7 +16,7 @@ async fn extension() {
 
     // root_block =
     // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
-    let (root_block, _) = block_parser
+    let root_block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await
         .unwrap();
@@ -39,7 +39,7 @@ async fn extension() {
 
     // extend the branch with a child of the root
     let mut tree2 = Branch::new(&root_block).unwrap();
-    let (child_block, _) = block_parser
+    let child_block = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await
         .unwrap();

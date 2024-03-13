@@ -165,73 +165,80 @@ pub async fn initialize(
         ledger_cadence,
         reporting_freq,
     };
-    let mut state = match initialization_mode {
-        InitializationMode::New => {
-            info!(
-                "Initializing indexer state from blocks in {} and staking ledgers in {}",
-                block_startup_dir.display(),
-                ledger_startup_dir.display(),
-            );
-            IndexerState::new_from_config(state_config)?
+    let state = {
+        let mut state = match initialization_mode {
+            InitializationMode::New => {
+                info!(
+                    "Initializing indexer state from blocks in {} and staking ledgers in {}",
+                    block_startup_dir.display(),
+                    ledger_startup_dir.display(),
+                );
+                IndexerState::new_from_config(state_config)?
+            }
+            InitializationMode::Replay => {
+                info!("Replaying indexer events from db at {}", db_path.display());
+                IndexerState::new_without_genesis_events(state_config)?
+            }
+            InitializationMode::Sync => {
+                info!("Syncing indexer state from db at {}", db_path.display());
+                IndexerState::new_without_genesis_events(state_config)?
+            }
+        };
+
+        let summary = Box::new(state.summary_verbose());
+        let store = Arc::new(state.spawn_secondary_database()?);
+
+        debug!("Updating IPC state");
+        ipc_update_sender
+            .send(IpcChannelUpdate { summary, store })
+            .await?;
+
+        match initialization_mode {
+            InitializationMode::New => {
+                let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
+                    &block_startup_dir,
+                    canonical_threshold,
+                    reporting_freq,
+                ) {
+                    Ok(block_parser) => block_parser,
+                    Err(e) => {
+                        panic!("Obtaining block parser failed: {e}");
+                    }
+                };
+                info!("Initializing indexer state");
+                state
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)
+                    .await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            }
+            InitializationMode::Replay => {
+                let min_length_filter = state.replay_events()?;
+                let mut block_parser = BlockParser::new_glob_min_length_filtered(
+                    &block_startup_dir,
+                    min_length_filter,
+                )?;
+                state.add_blocks(&mut block_parser).await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            }
+            InitializationMode::Sync => {
+                let min_length_filter = state.sync_from_db()?;
+                let mut block_parser = BlockParser::new_glob_min_length_filtered(
+                    &block_startup_dir,
+                    min_length_filter,
+                )?;
+                state.add_blocks(&mut block_parser).await?;
+                state.add_staking_ledgers_to_store(&ledger_startup_dir)?;
+            }
         }
-        InitializationMode::Replay => {
-            info!("Replaying indexer events from db at {}", db_path.display());
-            IndexerState::new_without_genesis_events(state_config)?
-        }
-        InitializationMode::Sync => {
-            info!("Syncing indexer state from db at {}", db_path.display());
-            IndexerState::new_without_genesis_events(state_config)?
-        }
+
+        ipc_update_sender
+            .send(IpcChannelUpdate {
+                summary: Box::new(state.summary_verbose()),
+                store: Arc::new(state.spawn_secondary_database()?),
+            })
+            .await?;
+        state
     };
-
-    let summary = Box::new(state.summary_verbose());
-    let store = Arc::new(state.spawn_secondary_database()?);
-
-    debug!("Updating IPC state");
-    ipc_update_sender
-        .send(IpcChannelUpdate { summary, store })
-        .await?;
-
-    match initialization_mode {
-        InitializationMode::New => {
-            let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
-                &block_startup_dir,
-                canonical_threshold,
-                reporting_freq,
-            ) {
-                Ok(block_parser) => block_parser,
-                Err(e) => {
-                    panic!("Obtaining block parser failed: {e}");
-                }
-            };
-            info!("Initializing indexer state");
-            state
-                .initialize_with_canonical_chain_discovery(&mut block_parser)
-                .await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
-        }
-        InitializationMode::Replay => {
-            let min_length_filter = state.replay_events()?;
-            let mut block_parser =
-                BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
-            state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
-        }
-        InitializationMode::Sync => {
-            let min_length_filter = state.sync_from_db()?;
-            let mut block_parser =
-                BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
-            state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
-        }
-    }
-
-    ipc_update_sender
-        .send(IpcChannelUpdate {
-            summary: Box::new(state.summary_verbose()),
-            store: Arc::new(state.spawn_secondary_database()?),
-        })
-        .await?;
 
     Ok(state)
 }

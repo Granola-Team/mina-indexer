@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 /// Merges two dangling branches, ignore others
 #[tokio::test]
-async fn extension() -> anyhow::Result<()> {
+async fn extension() {
     // ---------------- Branches ------------------
     //        Before       |         After
     // ------+-------------+-----------+-----------
@@ -21,13 +21,14 @@ async fn extension() -> anyhow::Result<()> {
     //       |             =>   leaf   |
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir)?;
+    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // root_block =
     // mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
-    let (root_block, root_block_bytes) = block_parser
+    let root_block = block_parser
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         root_block.state_hash,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
@@ -35,9 +36,10 @@ async fn extension() -> anyhow::Result<()> {
 
     // middle_block =
     // mainnet-105493-3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db.json
-    let (middle_block, _) = block_parser
+    let middle_block = block_parser
         .get_precomputed_block("3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         middle_block.state_hash,
         "3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db".to_owned()
@@ -45,9 +47,10 @@ async fn extension() -> anyhow::Result<()> {
 
     // leaf_block =
     // mainnet-105494-3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy.json
-    let (leaf_block, _) = block_parser
+    let leaf_block = block_parser
         .get_precomputed_block("3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         leaf_block.state_hash,
         "3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy".to_owned()
@@ -55,9 +58,10 @@ async fn extension() -> anyhow::Result<()> {
 
     // other_block =
     // mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
-    let (other_block, _) = block_parser
+    let other_block = block_parser
         .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
-        .await?;
+        .await
+        .unwrap();
     assert_eq!(
         other_block.state_hash,
         "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
@@ -68,15 +72,14 @@ async fn extension() -> anyhow::Result<()> {
     // ----------
 
     // root in branch branch
-    let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
 
     // other in dangling branch 0
-    let (extension_type, _) = state.add_block_to_witness_tree(&other_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&other_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // leaf in dangling branch 1
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 2 dangling branches
@@ -91,7 +94,7 @@ async fn extension() -> anyhow::Result<()> {
     for (idx, branch) in state.dangling_branches.iter().enumerate() {
         println!("=== Before Branch {idx} ===");
         let mut tree = String::new();
-        branch.branches.write_formatted(&mut tree)?;
+        branch.branches.write_formatted(&mut tree).unwrap();
         println!("{tree}");
     }
 
@@ -100,13 +103,13 @@ async fn extension() -> anyhow::Result<()> {
     // ----------------
 
     // merges branch 2 into 0
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block).unwrap();
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     for (idx, branch) in state.dangling_branches.iter().enumerate() {
         println!("=== After Branch {idx} ===");
         let mut tree = String::new();
-        branch.branches.write_formatted(&mut tree)?;
+        branch.branches.write_formatted(&mut tree).unwrap();
         println!("{tree}");
     }
 
@@ -142,6 +145,4 @@ async fn extension() -> anyhow::Result<()> {
 
     // branch root should match the tree's root
     assert_eq!(root, branch_root);
-
-    Ok(())
 }

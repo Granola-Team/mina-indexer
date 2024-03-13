@@ -3,13 +3,16 @@ use std::path::PathBuf;
 use tokio::time::Instant;
 
 #[tokio::test]
-async fn representative_benches() -> anyhow::Result<()> {
+async fn representative_benches() {
     let start = Instant::now();
     let sample_dir0 = PathBuf::from("./tests/data/non_sequential_blocks");
     let mut block_parser0 = BlockParser::new_testing(&sample_dir0).unwrap();
     let mut logs_processed = 0;
 
-    while let Some((block, _)) = block_parser0.next_block()? {
+    while let Some(block) = block_parser0
+        .next_block()
+        .expect("IO Error on block_parser")
+    {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
         dbg!(block.state_hash);
@@ -25,7 +28,10 @@ async fn representative_benches() -> anyhow::Result<()> {
     let mut block_parser1 = BlockParser::new_testing(&sample_dir1).unwrap();
 
     logs_processed = 0;
-    while let Some((block, _)) = block_parser1.next_block()? {
+    while let Some(block) = block_parser1
+        .next_block()
+        .expect("IO Error on block_parser")
+    {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
         dbg!(block.state_hash);
@@ -35,17 +41,16 @@ async fn representative_benches() -> anyhow::Result<()> {
     println!("Parse {logs_processed} logs: {:?}\n", start.elapsed());
 
     assert_eq!(logs_processed, block_parser1.total_num_blocks);
-    Ok(())
 }
 
 #[tokio::test]
-async fn get_global_slot_since_genesis() -> anyhow::Result<()> {
+async fn get_global_slot_since_genesis() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // block = mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.
     // json
-    let (block, _) = block_parser
+    let block = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await
         .unwrap();
@@ -54,11 +59,10 @@ async fn get_global_slot_since_genesis() -> anyhow::Result<()> {
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
     assert_eq!(block.global_slot_since_genesis(), 155140);
-    Ok(())
 }
 
 #[tokio::test]
-async fn orphaned_blocks() -> anyhow::Result<()> {
+async fn orphaned_blocks() {
     use mina_indexer::{block::parser::BlockParserPaths, constants::*};
 
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
@@ -116,6 +120,4 @@ async fn orphaned_blocks() -> anyhow::Result<()> {
             ],
         }
     );
-
-    Ok(())
 }

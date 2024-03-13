@@ -26,8 +26,8 @@ async fn test() {
 
     state.add_blocks(&mut block_parser).await.unwrap();
 
-    println!("CANONICAL ROOT: {:?}", state.canonical_root_block());
-    println!("BEST TIP:       {:?}", state.best_tip_block());
+    println!("CANONICAL TIP: {:?}", state.canonical_tip_block());
+    println!("BEST TIP:      {:?}", state.best_tip_block());
     println!("{state}");
 
     assert_eq!(block_parser.total_num_blocks, 20);
