@@ -9,9 +9,9 @@ use std::{
 use tracing::{debug, info};
 
 /// Separate blocks into 3 length-sorted lists:
-/// - canonical chain
-/// - blocks following the canonical root
-/// - orphaned blocks
+/// - deep canonical blocks (canonical up to root)
+/// - recent blocks (following the canonical root)
+/// - orphaned blocks (at or below canonical root)
 pub fn discovery(
     min_len_filter: Option<u32>,
     max_len_filter: Option<u32>,
@@ -19,9 +19,9 @@ pub fn discovery(
     reporting_freq: u32,
     mut paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
-    let mut canonical_state_hashes = HashSet::new();
-    let mut canonical_paths = vec![];
-    let mut successive_paths = vec![];
+    let mut deep_canonical_state_hashes = HashSet::new();
+    let mut deep_canonical_paths = vec![];
+    let mut recent_paths = vec![];
 
     if !paths.is_empty() {
         info!("Sorting startup blocks by length");
@@ -46,7 +46,7 @@ pub fn discovery(
         }
 
         // keep track of:
-        // - diffs between blocks of successive lengths (to find gaps)
+        // - diffs between blocks of recent lengths (to find gaps)
         // - starting index for each collection of blocks of a fixed length
         // - length of the current path under investigation
 
@@ -106,24 +106,19 @@ pub fn discovery(
         );
 
         // handle all blocks that are higher than the canonical root
-        if let Some(successive_start_idx) =
-            next_length_start_index(paths.as_slice(), curr_length_idx)
-        {
-            if successive_start_idx < length_start_indices_and_diffs.len() {
-                for path in paths[successive_start_idx..]
-                    .iter()
-                    .filter(|p| extract_block_height(p).is_some())
-                {
-                    successive_paths.push(path.to_path_buf());
+        if let Some(recent_start_idx) = next_length_start_index(paths.as_slice(), curr_length_idx) {
+            if recent_start_idx < length_start_indices_and_diffs.len() {
+                for path in paths[recent_start_idx..].iter() {
+                    recent_paths.push(path.to_path_buf());
                 }
             }
         }
 
-        // collect the canonical blocks
-        canonical_paths.push(curr_path.clone());
-        canonical_state_hashes.insert(extract_state_hash(curr_path));
+        // collect the deep canonical blocks
+        deep_canonical_paths.push(curr_path.clone());
+        deep_canonical_state_hashes.insert(extract_state_hash(curr_path));
 
-        if canonical_paths.len() < reporting_freq as usize {
+        if deep_canonical_paths.len() < reporting_freq as usize {
             info!("Walking the canonical chain back to genesis");
         } else {
             info!("Walking the canonical chain back to genesis, reporting every {reporting_freq} blocks");
@@ -147,8 +142,8 @@ pub fn discovery(
 
             for path in paths[prev_length_idx..curr_length_idx].iter() {
                 if parent_hash == extract_state_hash(path) {
-                    canonical_paths.push(path.to_path_buf());
-                    canonical_state_hashes.insert(extract_state_hash(path));
+                    deep_canonical_paths.push(path.to_path_buf());
+                    deep_canonical_state_hashes.insert(extract_state_hash(path));
                     curr_path = path;
                     curr_length_idx = prev_length_idx;
                     count += 1;
@@ -172,43 +167,43 @@ pub fn discovery(
         for path in paths[..curr_length_idx].iter() {
             let prev_hash = PreviousStateHash::from_path(curr_path)?.0;
             if prev_hash == extract_state_hash(path) {
-                debug!("Lowest block canonical found");
-                canonical_paths.push(path.to_path_buf());
-                canonical_state_hashes.insert(extract_state_hash(path));
+                debug!("Lowest canonical block found");
+                deep_canonical_paths.push(path.to_path_buf());
+                deep_canonical_state_hashes.insert(extract_state_hash(path));
                 break;
             }
         }
 
         // sort lowest to highest
-        canonical_paths.reverse();
+        deep_canonical_paths.reverse();
 
         info!(
             "Found {} blocks in the canonical chain in {:?}",
-            canonical_paths.len() + 1,
+            deep_canonical_paths.len() as u32 + 1 + canonical_threshold,
             time.elapsed(),
         );
     }
 
-    let max_canonical_length = canonical_paths
+    let max_canonical_length = deep_canonical_paths
         .last()
         .and_then(|p| extract_block_height(p))
         .unwrap_or(1);
 
-    let orphaned: Vec<PathBuf> = paths
+    let orphaned_paths: Vec<PathBuf> = paths
         .into_iter()
         .filter(|p| {
             if let Some(length) = extract_block_height(p) {
                 return length <= max_canonical_length
-                    && !canonical_state_hashes.contains(&extract_state_hash(p));
+                    && !deep_canonical_state_hashes.contains(&extract_state_hash(p));
             }
             false
         })
         .cloned()
         .collect();
     Ok((
-        canonical_paths.to_vec(),
-        successive_paths.to_vec(),
-        orphaned,
+        deep_canonical_paths.to_vec(),
+        recent_paths.to_vec(),
+        orphaned_paths,
     ))
 }
 
@@ -237,8 +232,8 @@ fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize>
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///
-/// Returns the index of the caonical tip in `paths` and the start index of the
-/// first successive block.
+/// Returns the index of the canonical root in `paths` and the start index of
+/// the first recent block.
 fn find_canonical_root(
     paths: &[&PathBuf],
     length_start_indices_and_diffs: &[(usize, u32)],
@@ -287,7 +282,7 @@ fn find_canonical_root(
                 }
             }
 
-            // canonical root found
+            // potential canonical root found
             if n == canonical_threshold && parent_found {
                 break;
             }
