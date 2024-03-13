@@ -1,5 +1,5 @@
 use crate::{
-    block::{length_from_path, precomputed::PrecomputedBlock},
+    block::{extract_block_height, precomputed::PrecomputedBlock},
     canonicity::canonical_chain_discovery::discovery,
 };
 use anyhow::{anyhow, bail};
@@ -82,38 +82,36 @@ impl BlockParser {
         )
     }
 
-    /// Returns a new glob-based block parser with paths filtered by a min
+    /// Returns a new length-sorted block parser with paths filtered by a min
     /// length
-    pub fn new_glob_min_length_filtered(
+    pub fn new_length_sorted_min_filtered(
         blocks_dir: &Path,
         min_length_filter: Option<u32>,
     ) -> anyhow::Result<Self> {
-        Self::new_glob_length_filtered(blocks_dir, min_length_filter, None)
+        Self::new_length_sorted_filtered(blocks_dir, min_length_filter, None)
     }
 
-    /// Returns a new glob-based block parser with paths filtered by min or max
-    /// length
-    pub fn new_glob_length_filtered(
+    /// Returns a new length-sorted block parser with paths filtered by min or
+    /// max length
+    pub fn new_length_sorted_filtered(
         blocks_dir: &Path,
         min_length: Option<u32>,
         max_length: Option<u32>,
     ) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
-            let pattern = format!("{}/*.json", blocks_dir.display());
+            let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
-            let mut paths: Vec<PathBuf> = glob(&pattern)?
-                .filter_map(|x| x.ok())
-                .filter(|path| length_from_path(path).is_some())
-                .collect();
+            let mut paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
 
             if min_length.is_some() {
-                paths.retain(|p| length_from_path(p) > min_length)
+                paths.retain(|p| extract_block_height(p) > min_length)
             }
 
             if max_length.is_some() {
-                paths.retain(|p| length_from_path(p) < max_length)
+                paths.retain(|p| extract_block_height(p) < max_length)
             }
 
+            paths.sort_by_cached_key(|path| extract_block_height(path));
             Ok(Self {
                 blocks_dir,
                 num_canonical: 0,
@@ -127,13 +125,14 @@ impl BlockParser {
         }
     }
 
-    /// Glob-based parse for testing without canonical chain discovery
+    /// Length-sorted parser for testing without canonical chain discovery
     pub fn new_testing(blocks_dir: &Path) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
-            let paths: Vec<PathBuf> = glob(&format!("{}/*.json", blocks_dir.display()))?
+            let mut paths: Vec<PathBuf> = glob(&format!("{}/*-*-*.json", blocks_dir.display()))?
                 .filter_map(|x| x.ok())
                 .collect();
+            paths.sort_by_cached_key(|path| extract_block_height(path));
 
             println!("===== Testing block parser paths =====");
             for path in &paths {
@@ -150,7 +149,7 @@ impl BlockParser {
     /// Length-sorts `block_dir`'s paths and performs _canonical chain
     /// discovery_ separating the block paths into two categories:
     /// - blocks known to be _canonical_
-    /// - blocks that are higher than the canonical tip
+    /// - blocks that are higher than the _canonical root_
     fn with_canonical_chain_discovery(
         blocks_dir: &Path,
         min_len_filter: Option<u32>,
@@ -160,12 +159,9 @@ impl BlockParser {
     ) -> anyhow::Result<Self> {
         info!("Block parser with canonical chain discovery");
         if blocks_dir.exists() {
-            let pattern = format!("{}/*.json", blocks_dir.display());
+            let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
-            let paths: Vec<PathBuf> = glob(&pattern)?
-                .filter_map(|x| x.ok())
-                .filter(|path| length_from_path(path).is_some())
-                .collect();
+            let paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
             if let Ok((canonical_paths, recent_paths, orphaned_paths)) = discovery(
                 min_len_filter,
                 max_len_filter,
