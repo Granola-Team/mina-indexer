@@ -5,7 +5,7 @@ use mina_indexer::{
 use std::path::PathBuf;
 
 #[tokio::test]
-async fn transition_frontier() {
+async fn transition_frontier() -> anyhow::Result<()> {
     //   0
     //  / \
     // 1   6
@@ -18,15 +18,14 @@ async fn transition_frontier() {
     // |
     // 5
 
-    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&blocks_dir).unwrap();
 
     // root_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let root_block = block_parser
+    let (root_block, _) = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         root_block.state_hash,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
@@ -34,10 +33,9 @@ async fn transition_frontier() {
 
     // main_1_block =
     // mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
-    let main_1_block = block_parser
+    let (main_1_block, _) = block_parser
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         main_1_block.state_hash,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
@@ -45,10 +43,9 @@ async fn transition_frontier() {
 
     // fork_block =
     // mainnet-105492-3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN.json
-    let fork_block = block_parser
+    let (fork_block, _) = block_parser
         .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         fork_block.state_hash,
         "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()
@@ -56,10 +53,9 @@ async fn transition_frontier() {
 
     // main_2_block =
     // mainnet-105493-3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db.json
-    let main_2_block = block_parser
+    let (main_2_block, _) = block_parser
         .get_precomputed_block("3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         main_2_block.state_hash,
         "3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db".to_owned()
@@ -67,10 +63,9 @@ async fn transition_frontier() {
 
     // main_3_block =
     // mainnet-105494-3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww.json
-    let main_3_block = block_parser
+    let (main_3_block, _) = block_parser
         .get_precomputed_block("3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         main_3_block.state_hash,
         "3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww".to_owned()
@@ -78,10 +73,9 @@ async fn transition_frontier() {
 
     // main_4_block =
     // mainnet-105495-3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9.json
-    let main_4_block = block_parser
+    let (main_4_block, _) = block_parser
         .get_precomputed_block("3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         main_4_block.state_hash,
         "3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9".to_owned()
@@ -89,17 +83,16 @@ async fn transition_frontier() {
 
     // main_5_block =
     // mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
-    let main_5_block = block_parser
+    let (main_5_block, _) = block_parser
         .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
-        .await
-        .unwrap();
+        .await?;
     assert_eq!(
         main_5_block.state_hash,
         "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
     );
 
     // create the tree and add blocks
-    let mut branch = Branch::new(&root_block).unwrap();
+    let mut branch = Branch::new(&root_block)?;
 
     branch.simple_extension(&fork_block).unwrap();
     branch.simple_extension(&main_1_block).unwrap();
@@ -123,4 +116,5 @@ async fn transition_frontier() {
         Block::from_precomputed(&main_4_block, 0),
         branch.root_block().clone()
     );
+    Ok(())
 }

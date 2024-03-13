@@ -18,7 +18,7 @@ fn add_and_get() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some(block) = bp.next_block()? {
+    while let Some((block, _)) = bp.next_block()? {
         let block: PrecomputedBlock = block.into();
         db.add_block(&block)?;
     }

@@ -7,27 +7,26 @@ use mina_indexer::{
 use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 #[test]
-fn add_and_get() {
-    let store_dir = setup_new_db_dir("block-store-db").unwrap();
-    let log_dir = &PathBuf::from("./tests/data/sequential_blocks");
+fn add_and_get() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("block-store-db")?;
+    let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
-    let db = IndexerStore::new(store_dir.path()).unwrap();
+    let db = IndexerStore::new(store_dir.path())?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
-        log_dir,
+        blocks_dir,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )
-    .unwrap();
+    )?;
 
     let mut blocks = HashMap::new();
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some(block) = bp.next_block().unwrap() {
+    while let Some((block, _)) = bp.next_block()? {
         let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash.clone();
 
-        db.add_block(&block).unwrap();
+        db.add_block(&block)?;
         blocks.insert(state_hash.clone(), block);
         println!("Added {:?}", &state_hash);
         n += 1;
@@ -45,4 +44,5 @@ fn add_and_get() {
     println!("Number of blocks: {n}");
     println!("To insert all:    {add_time:?}");
     println!("To fetch all:     {:?}\n", fetching.elapsed());
+    Ok(())
 }
