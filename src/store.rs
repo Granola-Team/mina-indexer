@@ -16,7 +16,7 @@ use crate::{
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
-use speedb::{ColumnFamilyDescriptor, DB};
+use speedb::{ColumnFamilyDescriptor, DB, DBCompressionType};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -58,6 +58,7 @@ impl IndexerStore {
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
+        cf_opts.set_compression_type(DBCompressionType::Zstd);
         let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
         let lengths = ColumnFamilyDescriptor::new("lengths", cf_opts.clone());
         let slots = ColumnFamilyDescriptor::new("slots", cf_opts.clone());
