@@ -10,7 +10,7 @@ async fn account_diffs() {
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
 
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
-    let block = block_parser
+    let (block, _) = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await
         .unwrap();

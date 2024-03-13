@@ -6,7 +6,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 /// Merges two dangling branches onto the root branch
 #[tokio::test]
-async fn merge() {
+async fn merge() -> anyhow::Result<()> {
     // --------------------------
     //       Root branch
     // ----------+---------------
@@ -29,12 +29,12 @@ async fn merge() {
     //  leaf0  leaf1 =>    .
     // --------------------------
 
-    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&blocks_dir).unwrap();
 
     // root_block =
     // mainnet-105492-3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk.json
-    let root_block = block_parser
+    let (root_block, root_block_bytes) = block_parser
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await
         .unwrap();
@@ -45,7 +45,7 @@ async fn merge() {
 
     // middle_block =
     // mainnet-105493-3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db.json
-    let middle_block = block_parser
+    let (middle_block, _) = block_parser
         .get_precomputed_block("3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db")
         .await
         .unwrap();
@@ -56,7 +56,7 @@ async fn merge() {
 
     // leaf0_block =
     // mainnet-105494-3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy.json
-    let leaf0_block = block_parser
+    let (leaf0_block, _) = block_parser
         .get_precomputed_block("3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy")
         .await
         .unwrap();
@@ -67,7 +67,7 @@ async fn merge() {
 
     // leaf1_block =
     // mainnet-105494-3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww.json
-    let leaf1_block = block_parser
+    let (leaf1_block, _) = block_parser
         .get_precomputed_block("3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww")
         .await
         .unwrap();
@@ -80,20 +80,21 @@ async fn merge() {
     // initialize state
     // ----------------
 
-    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
+    let mut state =
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
 
     // ---------
     // add leaf0
     // ---------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf0_block).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf0_block)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ---------
     // add leaf1
     // ---------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf1_block).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf1_block)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // Root branch
@@ -129,7 +130,7 @@ async fn merge() {
     // add middle block
     // ----------------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block)?;
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     println!("=== After state ===");
@@ -162,4 +163,6 @@ async fn merge() {
 
     // branch root should match the tree's root
     assert_eq!(root0, branch_root0);
+
+    Ok(())
 }
