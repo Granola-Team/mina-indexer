@@ -1,11 +1,10 @@
 pub mod parser;
 
 use crate::{block::BlockHash, ledger::public_key::PublicKey};
-use anyhow::bail;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, io::BufReader, path::Path};
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
@@ -170,26 +169,20 @@ pub fn split_ledger_path(path: &Path) -> (String, u32, LedgerHash) {
 
 impl StakingLedger {
     pub fn parse_file(path: &Path) -> anyhow::Result<StakingLedger> {
-        if !is_valid_ledger_file(path) {
-            bail!("Invalid ledger file: {}", path.display())
-        } else {
-            let file = std::fs::File::open(path)?;
-            let size = file.metadata()?.len() as usize;
-            let reader = BufReader::with_capacity(size, file);
-            let staking_ledger: Vec<StakingAccountJson> = serde_json::from_reader(reader)?;
-            let staking_ledger = staking_ledger
-                .into_iter()
-                .map(|acct| (acct.pk.clone(), acct.into()))
-                .collect();
-            let (network, epoch, ledger_hash) = split_ledger_path(path);
+        let bytes = std::fs::read(path)?;
+        let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
+        let staking_ledger = staking_ledger
+            .into_iter()
+            .map(|acct| (acct.pk.clone(), acct.into()))
+            .collect();
+        let (network, epoch, ledger_hash) = split_ledger_path(path);
 
-            Ok(Self {
-                epoch,
-                network,
-                ledger_hash,
-                staking_ledger,
-            })
-        }
+        Ok(Self {
+            epoch,
+            network,
+            ledger_hash,
+            staking_ledger,
+        })
     }
 
     /// Aggregate each public key's staking delegations and total delegations
