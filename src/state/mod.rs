@@ -321,11 +321,11 @@ impl IndexerState {
 
             if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
-                    "Adding blocks to the state, reporting every {}...",
+                    "Adding blocks to the witness tree, reporting every {}...",
                     self.reporting_freq
                 );
             } else {
-                info!("Adding blocks to the state...");
+                info!("Adding blocks to the witness tree...");
             }
 
             // process canonical blocks first
@@ -382,8 +382,8 @@ impl IndexerState {
             ); // +1 genesis
         }
         self.report_from_block_count(block_parser, total_time);
-        info!("Finished processing canonical chain");
-        info!("Adding orphaned blocks to the block store");
+        info!("Finished processing deep canonical chain");
+        info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
         // now add the orphaned blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
             .await
@@ -428,13 +428,14 @@ impl IndexerState {
                     self.block_pipeline(&block)?;
                 }
                 ParsedBlock::Orphaned(block) => {
+                    info!("Adding orphaned block {}", block.summary());
                     self.add_block_to_store(&block)?;
                 }
             }
         }
 
         info!(
-            "Ingested {} blocks in {:?}",
+            "Ingested and applied {} blocks to the witness tree in {:?}",
             self.blocks_processed,
             total_time.elapsed() + offset,
         );
@@ -444,12 +445,14 @@ impl IndexerState {
         Ok(())
     }
 
+    /// **Block pipeline**
+    /// - add block to
+    ///     - block store
+    ///     - witness tree
+    /// - db processes
+    ///     - best block update
+    ///     - new deep canonical blocks
     pub fn block_pipeline(&mut self, block: &PrecomputedBlock) -> anyhow::Result<bool> {
-        // *** block pipeline ***
-        // - add to db
-        // - add to witness tree
-        // - db processes canonical blocks
-        // - db processes best block update
         if let Some(db_event) = self.add_block_to_store(block)? {
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
                 if let Some(wt_event) = self.add_block_to_witness_tree(block)?.1 {
@@ -485,14 +488,14 @@ impl IndexerState {
     ) -> anyhow::Result<(ExtensionType, Option<WitnessTreeEvent>)> {
         let incoming_length = precomputed_block.blockchain_length;
         if self.root_branch.root_block().blockchain_length > incoming_length {
-            debug!(
-                "Block with state hash {:?} has length {incoming_length} which is too low to add to the witness tree",
-                precomputed_block.state_hash,
+            error!(
+                "Block {} is too low to be added to the witness tree",
+                precomputed_block.summary()
             );
             return Ok((ExtensionType::BlockNotAdded, None));
         }
 
-        self.blocks_processed += 1;
+        // put the pcb's ledger diff in the map
         self.diffs_map.insert(
             precomputed_block.state_hash.clone().into(),
             LedgerDiff::from_precomputed(precomputed_block),
@@ -545,11 +548,7 @@ impl IndexerState {
     ) -> anyhow::Result<Option<ExtensionType>> {
         if let Some((new_node_id, new_block)) = self.root_branch.simple_extension(precomputed_block)
         {
-            trace!(
-                "root extension (length {}): {}",
-                precomputed_block.blockchain_length,
-                precomputed_block.state_hash
-            );
+            trace!("Root extension block {}", precomputed_block.summary());
             // check if new block connects to a dangling branch
             let mut merged_tip_id = None;
             let mut branches_to_remove = Vec::new();
@@ -696,15 +695,16 @@ impl IndexerState {
 
     /// Update the best tip of the root branch
     fn update_best_tip(&mut self, incoming_block: &Block, node_id: &NodeId) {
-        let best_tip_length = self.best_tip_block().blockchain_length;
+        let old_best_tip = self.best_tip_block();
 
-        if incoming_block.blockchain_length == best_tip_length + 1
-            || incoming_block.blockchain_length == best_tip_length
-                && incoming_block < self.best_tip_block()
+        if incoming_block.blockchain_length == old_best_tip.blockchain_length + 1
+            || incoming_block.blockchain_length == old_best_tip.blockchain_length
+                && incoming_block < old_best_tip
         {
-            debug!(
-                "Update best tip (length {}): {}",
-                incoming_block.blockchain_length, incoming_block.state_hash.0
+            info!(
+                "Update best tip {{\n  old: {}\n  new: {} }}",
+                old_best_tip.summary(),
+                incoming_block.summary(),
             );
             self.best_tip.node_id = node_id.clone();
             self.best_tip.state_hash = incoming_block.state_hash.clone();
@@ -733,7 +733,6 @@ impl IndexerState {
             }
             return Ok(Some(canonical_event));
         }
-
         Ok(None)
     }
 
@@ -766,7 +765,6 @@ impl IndexerState {
                 new_canonical_blocks,
             )));
         }
-
         Ok(None)
     }
 
@@ -780,7 +778,6 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_block_canonicity(state_hash);
         }
-
         Ok(None)
     }
 
@@ -799,7 +796,6 @@ impl IndexerState {
                 return indexer_store.get_block(&state_hash);
             }
         }
-
         Ok(None)
     }
 
@@ -808,7 +804,6 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_ledger_at_height(height);
         }
-
         Ok(None)
     }
 
@@ -829,14 +824,25 @@ impl IndexerState {
         &self,
         ledgers_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
-        info!(
-            "Parsing startup staking ledgers in {}",
-            ledgers_dir.display()
-        );
+        match std::fs::read_dir(ledgers_dir) {
+            Ok(dir) => {
+                if dir.count() > 0 {
+                    info!(
+                        "Parsing startup staking ledgers in {}",
+                        ledgers_dir.display()
+                    );
+                }
+            }
+            Err(e) => error!("Error reading startup staking ledgers: {}", e),
+        }
+
+        // parse staking ledgers in ledgers_dir
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
+                let summary = staking_ledger.summary();
                 indexer_store.add_staking_ledger(staking_ledger)?;
+                info!("Added staking ledger {}", summary);
             }
         }
         Ok(())
@@ -1206,7 +1212,7 @@ impl IndexerState {
             witness_tree,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            bytes_processed: self.bytes_processed,
+            bytes_processed: 0,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1249,7 +1255,7 @@ impl IndexerState {
             witness_tree,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            bytes_processed: self.bytes_processed,
+            bytes_processed: 0,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
