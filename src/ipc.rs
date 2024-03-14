@@ -5,86 +5,61 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
+    constants::SOCKET_NAME,
     ledger::{self, public_key, store::LedgerStore},
-    server::{remove_domain_socket, IpcChannelUpdate},
+    server,
     snark_work::store::SnarkStore,
     state::summary::{SummaryShort, SummaryVerbose},
     store::IndexerStore,
 };
 use anyhow::bail;
-use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{path::PathBuf, process, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::{UnixListener, UnixStream},
+    task::JoinHandle,
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
-pub struct IpcActor {
-    state_recv: IpcStateReceiver,
-    listener: LocalSocketListener,
-    summary: RwLock<Option<SummaryVerbose>>,
-    store: RwLock<Arc<IndexerStore>>,
+pub struct UnixSocketServer {
+    store: Arc<IndexerStore>,
 }
 
-type IpcStateReceiver = mpsc::Receiver<IpcChannelUpdate>;
-
-impl IpcActor {
-    #[instrument(skip_all)]
-    pub fn new(
-        listener: LocalSocketListener,
-        store: Arc<IndexerStore>,
-        state_recv: IpcStateReceiver,
-    ) -> Self {
-        debug!("Creating new IPC actor");
-        Self {
-            state_recv,
-            listener,
-            summary: RwLock::new(None),
-            store: RwLock::new(store),
-        }
+/// Some docs
+impl UnixSocketServer {
+    /// Create a new Unix Socket Server
+    pub fn new(store: Arc<IndexerStore>) -> Self {
+        info!("Creating Unix Domain Socket Server");
+        Self { store }
     }
+}
 
-    #[instrument(skip(self))]
-    pub async fn run(&mut self) {
-        loop {
-            tokio::select! {
-                state = self.state_recv.recv() => {
-                    debug!("Received IPC state update");
-                    match state {
-                        None => panic!("IPC channel closed"),
-                        Some(state) => {
-                            debug!("Setting IPC state");
-                            *self.summary.write().await = Some(*state.summary);
-                            *self.store.write().await = state.store;
-                        },
-                    }
-                }
+/// Start the Unix domain server
+/// TODO: Handle when bind fails
+pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
+    server::remove_domain_socket();
+    let listener = UnixListener::bind(SOCKET_NAME).expect("FOOBAR");
+    info!("Unix Socket Server running on: {:?}", SOCKET_NAME);
 
-                client = self.listener.accept() => {
-                    let store = self.store.read().await.clone();
-                    let summary = self.summary.read().await.clone();
-                    match client {
-                        Err(e) => error!("Error accepting connection: {e}"),
-                        Ok(stream) => {
-                            info!("Accepted client connection");
-                            tokio::spawn(async move {
-                                debug!("Handling client connection");
-                                match handle_conn(stream,
-                                    &store,
-                                    summary.as_ref()
-                                ).await {
-                                    Ok(_) => { info!("Connection successfully handled"); },
-                                    Err(e) => {
-                                        error!("Error handling connection: {e}");
-                                    },
-                                };
-                                if !store.is_primary {
-                                    debug!("Removing readonly instance at {}", store.db_path.clone().display());
-                                    tokio::fs::remove_dir_all(&store.db_path).await.ok();
-                                }
-                            });
-                        }
+    tokio::spawn(run(server, listener))
+}
+
+/// Accept client connections and spawn a green thread to handle the connection
+async fn run(server: UnixSocketServer, listener: UnixListener) {
+    loop {
+        tokio::select! {
+            client = listener.accept() => {
+                match client {
+                    Ok((socket, _)) => {
+                        let store = server.store.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_conn(socket, &store).await {
+                                error!("Unable to process Unix socket request: {}", e);
+                            }
+                        });
                     }
+                    Err(e) => error!("Failed to accept connection: {}", e),
                 }
             }
         }
@@ -92,13 +67,9 @@ impl IpcActor {
 }
 
 #[instrument(skip_all)]
-async fn handle_conn(
-    conn: LocalSocketStream,
-    db: &IndexerStore,
-    summary: Option<&SummaryVerbose>,
-) -> Result<(), anyhow::Error> {
+async fn handle_conn(conn: UnixStream, db: &IndexerStore) -> Result<(), anyhow::Error> {
     use helpers::*;
-
+    let summary: Option<&SummaryVerbose> = None;
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -837,8 +808,7 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-
-            remove_domain_socket().unwrap_or(());
+            server::remove_domain_socket();
             process::exit(0);
         }
         "summary" => {

@@ -1,21 +1,20 @@
 use crate::{
     block::{parser::BlockParser, BlockHash},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
-    ipc::IpcActor,
+    ipc::{self, UnixSocketServer},
     ledger::{genesis::GenesisLedger, staking::parser::StakingLedgerParser, store::LedgerStore},
     receiver::{filesystem::FilesystemReceiver, Receiver},
-    state::{summary::SummaryVerbose, IndexerState, IndexerStateConfig},
+    state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
 };
-use interprocess::local_socket::tokio::LocalSocketListener;
 use std::{
     fs,
     path::{Path, PathBuf},
     process,
     sync::Arc,
 };
-use tokio::{io, sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info, instrument, trace};
+use tokio::task::JoinHandle;
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -34,14 +33,8 @@ pub struct IndexerConfiguration {
 }
 
 pub struct MinaIndexer {
-    _ipc_join_handle: JoinHandle<()>,
+    domain_socket_handle: JoinHandle<()>,
     _witness_join_handle: JoinHandle<()>,
-}
-
-#[derive(Debug)]
-pub struct IpcChannelUpdate {
-    pub summary: Box<SummaryVerbose>,
-    pub store: Arc<IndexerStore>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,54 +49,36 @@ impl MinaIndexer {
         config: IndexerConfiguration,
         store: Arc<IndexerStore>,
     ) -> anyhow::Result<Self> {
-        let (ipc_update_sender, ipc_update_receiver) = mpsc::channel::<IpcChannelUpdate>(1);
-        let ipc_update_arc = Arc::new(ipc_update_sender);
         let block_watch_dir = config.block_watch_dir.clone();
         let ledger_watch_dir = config.ledger_watch_dir.clone();
-        let ipc_store = store.clone();
+        let unix_domain_store = store.clone();
 
-        let listener = LocalSocketListener::bind(SOCKET_NAME)
-            .or_else(try_remove_old_socket)
-            .unwrap_or_else(|e| panic!("unable to connect to domain socket: {e}"));
+        // Set up domain socket server
+        let domain_socket_handle = ipc::start(UnixSocketServer::new(unix_domain_store)).await;
 
-        debug!("Local socket listener started");
-
-        let _ipc_join_handle = tokio::spawn(async move {
-            debug!("Spawning IPC Actor");
-
-            let mut ipc_actor = IpcActor::new(listener, ipc_store, ipc_update_receiver);
-            ipc_actor.run().await
-        });
         let _witness_join_handle = tokio::spawn(async move {
-            let state = match initialize(config, store, ipc_update_arc.clone()).await {
+            let state = match initialize(config, store).await {
                 Ok(state) => state,
                 Err(e) => {
                     error!("Error in server initialization: {e}");
                     std::process::exit(1);
                 }
             };
-            if let Err(e) = run(
-                block_watch_dir,
-                ledger_watch_dir,
-                state,
-                ipc_update_arc.clone(),
-            )
-            .await
-            {
-                error!("Error in server run: {e}");
+            if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
+                error!("Error in server run: {}", e);
                 std::process::exit(1);
             }
         });
 
         Ok(Self {
-            _ipc_join_handle,
+            domain_socket_handle,
             _witness_join_handle,
         })
     }
 
     pub async fn await_loop(self) {
         let _ = self._witness_join_handle.await;
-        let _ = self._ipc_join_handle.await;
+        let _ = self.domain_socket_handle.await;
     }
 }
 
@@ -132,7 +107,6 @@ async fn setup_signal_handler() {
 pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
-    ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<IndexerState> {
     info!("Starting mina-indexer server");
     setup_signal_handler().await;
@@ -165,6 +139,7 @@ pub async fn initialize(
         ledger_cadence,
         reporting_freq,
     };
+
     let mut state = match initialization_mode {
         InitializationMode::New => {
             info!(
@@ -183,14 +158,6 @@ pub async fn initialize(
             IndexerState::new_without_genesis_events(state_config)?
         }
     };
-
-    let summary = Box::new(state.summary_verbose());
-    let store = Arc::new(state.spawn_secondary_database()?);
-
-    debug!("Updating IPC state");
-    ipc_update_sender
-        .send(IpcChannelUpdate { summary, store })
-        .await?;
 
     match initialization_mode {
         InitializationMode::New => {
@@ -225,14 +192,6 @@ pub async fn initialize(
             state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
         }
     }
-
-    ipc_update_sender
-        .send(IpcChannelUpdate {
-            summary: Box::new(state.summary_verbose()),
-            store: Arc::new(state.spawn_secondary_database()?),
-        })
-        .await?;
-
     Ok(state)
 }
 
@@ -241,7 +200,6 @@ pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     ledger_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
-    ipc_update_sender: Arc<mpsc::Sender<IpcChannelUpdate>>,
 ) -> anyhow::Result<()> {
     let mut fs_block_receiver = <FilesystemReceiver<BlockParser>>::new().await?;
     fs_block_receiver.load_directory(block_watch_dir.as_ref())?;
@@ -269,10 +227,7 @@ pub async fn run(
                                 info!("Added block {}", precomputed_block.summary());
                             }
 
-                            ipc_update_sender.send(IpcChannelUpdate {
-                                summary: Box::new(state.summary_verbose()),
-                                store: Arc::new(state.spawn_secondary_database()?),
-                            }).await?;
+                            // TODO: state.summary_verbose()
                         } else {
                             error!("Block receiver channel closed");
                         }
@@ -296,11 +251,6 @@ pub async fn run(
                                     Err(e) => error!("Error adding staking ledger: {e}"),
                                 }
                             }
-
-                            ipc_update_sender.send(IpcChannelUpdate {
-                                summary: Box::new(state.summary_verbose()),
-                                store: Arc::new(state.spawn_secondary_database()?),
-                            }).await?;
                         } else {
                             error!("Staking ledger receiver closed channel");
                         }
@@ -314,21 +264,10 @@ pub async fn run(
     }
 }
 
-fn try_remove_old_socket(e: io::Error) -> io::Result<LocalSocketListener> {
-    if e.kind() == io::ErrorKind::AddrInUse {
-        debug!(
-            "Domain socket: {} already in use. Removing old vestige",
-            &SOCKET_NAME
-        );
-        remove_domain_socket()?;
-        LocalSocketListener::bind(SOCKET_NAME)
+pub fn remove_domain_socket() {
+    if let Err(e) = std::fs::remove_file(SOCKET_NAME) {
+        warn!("Unable to remove domain socket file: {} {}", SOCKET_NAME, e);
     } else {
-        Err(e)
+        debug!("Domain socket removed: {}", SOCKET_NAME);
     }
-}
-
-pub fn remove_domain_socket() -> io::Result<()> {
-    std::fs::remove_file(SOCKET_NAME)?;
-    debug!("Domain socket removed: {SOCKET_NAME}");
-    Ok(())
 }
