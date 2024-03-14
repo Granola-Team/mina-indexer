@@ -1267,7 +1267,7 @@ impl IndexerState {
             let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
 
             info!(
-                "{} blocks ({}) parsed and applied in {:?}",
+                "{} blocks ({:?}) parsed and applied in {:?}",
                 self.blocks_processed,
                 bytesize::ByteSize(self.bytes_processed),
                 total_time.elapsed(),

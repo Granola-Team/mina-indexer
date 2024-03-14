@@ -17,7 +17,10 @@ use std::{
     process,
     sync::Arc,
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, RwLock},
+    task::JoinHandle,
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Clone, Debug)]
@@ -64,8 +67,9 @@ impl MinaIndexer {
                     std::process::exit(1);
                 }
             };
+            let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
-            let _ = unix_socket_server::start(UnixSocketServer::new(state)).await;
+            unix_socket_server::start(UnixSocketServer::new(state.clone())).await;
 
             // This modifies the state
             if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
@@ -203,7 +207,7 @@ pub async fn initialize(
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     ledger_watch_dir: impl AsRef<Path>,
-    mut state: IndexerState,
+    state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::channel(100);
     let mut watcher = RecommendedWatcher::new(
@@ -234,7 +238,8 @@ pub async fn run(
                         if block::is_valid_block_file(&path) {
                             debug!("Valid precomputed block file: {}", path.display());
                             if let Ok(block) = PrecomputedBlock::parse_file(&path) {
-                                if let Ok(_) = state.block_pipeline(&block) {
+                                let mut state = state.write().await;
+                                if state.block_pipeline(&block).is_ok() {
                                     info!(
                                         "Added block (length {}): {}",
                                         block.blockchain_length, block.state_hash
@@ -244,22 +249,18 @@ pub async fn run(
                                 warn!("Unable to parse precomputed block: {path:?}");
                             }
                         } else if staking::is_valid_ledger_file(&path) {
+                            let state = state.write().await;
                             if let Some(store) = state.indexer_store.as_ref() {
-                                match StakingLedger::parse_file(&path) {
-                                    Ok(staking_ledger) => {
-                                        let ledger_hash = staking_ledger.ledger_hash.clone();
-                                        match store.add_staking_ledger(staking_ledger) {
-                                            Ok(_) => {
-                                                info!("Added staking ledger {:?}", ledger_hash);
-                                            }
-                                            Err(e) => error!("Error adding staking ledger: {}", e),
+                                if let Ok(staking_ledger) = StakingLedger::parse_file(&path) {
+                                    let ledger_hash = staking_ledger.ledger_hash.clone();
+                                    match store.add_staking_ledger(staking_ledger) {
+                                        Ok(_) => {
+                                            info!("Added staking ledger {:?}", ledger_hash);
                                         }
+                                        Err(e) => error!("Error adding staking ledger: {}", e),
                                     }
-                                    _ => (),
                                 }
                             }
-                        } else {
-                            warn!("Unknown file: {path:?}");
                         }
                     }
                 }
@@ -273,9 +274,7 @@ pub async fn run(
 }
 
 pub fn remove_domain_socket() {
-    if let Err(e) = std::fs::remove_file(SOCKET_NAME) {
-        warn!("Unable to remove domain socket file: {} {}", SOCKET_NAME, e);
-    } else {
+    if std::fs::remove_file(SOCKET_NAME).is_ok() {
         debug!("Domain socket removed: {}", SOCKET_NAME);
     }
 }

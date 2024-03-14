@@ -9,30 +9,27 @@ use crate::{
     ledger::{self, public_key, store::LedgerStore},
     server,
     snark_work::store::SnarkStore,
-    state::{
-        summary::{SummaryShort, SummaryVerbose},
-        IndexerState,
-    },
-    store::IndexerStore,
+    state::{summary::SummaryShort, IndexerState},
 };
 use anyhow::bail;
 use std::{path::PathBuf, process, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{UnixListener, UnixStream},
+    sync::RwLock,
     task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
 pub struct UnixSocketServer {
-    state: IndexerState,
+    state: Arc<RwLock<IndexerState>>,
 }
 
 /// Some docs
 impl UnixSocketServer {
     /// Create a new Unix Socket Server
-    pub fn new(state: IndexerState) -> Self {
+    pub fn new(state: Arc<RwLock<IndexerState>>) -> Self {
         info!("Creating Unix Domain Socket Server");
         Self { state }
     }
@@ -70,9 +67,12 @@ async fn run(server: UnixSocketServer, listener: UnixListener) {
 }
 
 #[instrument(skip_all)]
-async fn handle_conn(conn: UnixStream, state: &IndexerState) -> Result<(), anyhow::Error> {
+async fn handle_conn(
+    conn: UnixStream,
+    state: &Arc<RwLock<IndexerState>>,
+) -> Result<(), anyhow::Error> {
     use helpers::*;
-
+    let state = state.read().await;
     let db = if let Some(store) = state.indexer_store.as_ref() {
         store
     } else {
