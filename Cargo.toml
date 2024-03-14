@@ -36,7 +36,7 @@ hex = "0.4.3"
 rand = "0.8.5"
 byteorder = "1.5.0"
 num = "0.4.1"
-speedb = "0.0.5"
+speedb = { version = "0.0.5", default_features = false, features = ["zstd"] }
 id_tree = { version = "1.8.0", features = ["serde_support"] }
 watchexec = "2.3.0"
 async-priority-channel = "0.1.0"
