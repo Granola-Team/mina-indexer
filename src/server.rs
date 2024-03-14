@@ -1,19 +1,23 @@
 use crate::{
-    block::{parser::BlockParser, BlockHash},
+    block::{self, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
-    ledger::{genesis::GenesisLedger, staking::parser::StakingLedgerParser, store::LedgerStore},
-    receiver::{filesystem::FilesystemReceiver, Receiver},
+    ledger::{
+        genesis::GenesisLedger,
+        staking::{self, StakingLedger},
+        store::LedgerStore,
+    },
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
     unix_socket_server::{self, UnixSocketServer},
 };
+use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     fs,
     path::{Path, PathBuf},
     process,
     sync::Arc,
 };
-use tokio::task::JoinHandle;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Clone, Debug)]
@@ -33,7 +37,7 @@ pub struct IndexerConfiguration {
 }
 
 pub struct MinaIndexer {
-    domain_socket_handle: JoinHandle<()>,
+    //domain_socket_handle: JoinHandle<()>,
     _witness_join_handle: JoinHandle<()>,
 }
 
@@ -51,11 +55,6 @@ impl MinaIndexer {
     ) -> anyhow::Result<Self> {
         let block_watch_dir = config.block_watch_dir.clone();
         let ledger_watch_dir = config.ledger_watch_dir.clone();
-        let unix_domain_store = store.clone();
-
-        // Set up domain socket server
-        let domain_socket_handle =
-            unix_socket_server::start(UnixSocketServer::new(unix_domain_store)).await;
 
         let _witness_join_handle = tokio::spawn(async move {
             let state = match initialize(config, store).await {
@@ -65,6 +64,10 @@ impl MinaIndexer {
                     std::process::exit(1);
                 }
             };
+            // Needs read-only state for summary
+            let _ = unix_socket_server::start(UnixSocketServer::new(state)).await;
+
+            // This modifies the state
             if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
                 error!("Error in server run: {}", e);
                 std::process::exit(1);
@@ -72,14 +75,14 @@ impl MinaIndexer {
         });
 
         Ok(Self {
-            domain_socket_handle,
+            //            domain_socket_handle,
             _witness_join_handle,
         })
     }
 
     pub async fn await_loop(self) {
         let _ = self._witness_join_handle.await;
-        let _ = self.domain_socket_handle.await;
+        //let _ = self.domain_socket_handle.await;
     }
 }
 
@@ -202,67 +205,71 @@ pub async fn run(
     ledger_watch_dir: impl AsRef<Path>,
     mut state: IndexerState,
 ) -> anyhow::Result<()> {
-    let mut fs_block_receiver = <FilesystemReceiver<BlockParser>>::new().await?;
-    fs_block_receiver.load_directory(block_watch_dir.as_ref())?;
+    let (tx, mut rx) = mpsc::channel(100);
+    let mut watcher = RecommendedWatcher::new(
+        move |result| {
+            tx.blocking_send(result).expect("Failed to send event");
+        },
+        Config::default(),
+    )?;
+
+    watcher.watch(block_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+    watcher.watch(ledger_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
     info!(
-        "Block receiver set to watch {}",
-        block_watch_dir.as_ref().to_path_buf().display()
+        "Watching for new blocks in directory: {:?}",
+        block_watch_dir.as_ref()
+    );
+    info!(
+        "Watching for staking ledgers in directory: {:?}",
+        ledger_watch_dir.as_ref()
     );
 
-    let mut fs_ledger_receiver = <FilesystemReceiver<StakingLedgerParser>>::new().await?;
-    fs_ledger_receiver.load_directory(ledger_watch_dir.as_ref())?;
-    info!(
-        "Staking ledger receiver set to watch {}",
-        ledger_watch_dir.as_ref().to_path_buf().display()
-    );
-
-    loop {
-        tokio::select! {
-            block_fut = fs_block_receiver.recv_data() => {
-                match block_fut {
-                    Ok(block_opt) => {
-                        if let Some(precomputed_block) = block_opt {
-                            debug!("Receiving block {}", precomputed_block.summary());
-
-                            if state.block_pipeline(&precomputed_block)? {
-                                info!("Added block {}", precomputed_block.summary());
+    while let Some(res) = rx.recv().await {
+        match res {
+            Ok(event) => {
+                if let EventKind::Create(notify::event::CreateKind::File)
+                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
+                {
+                    for path in event.paths {
+                        if block::is_valid_block_file(&path) {
+                            debug!("Valid precomputed block file: {}", path.display());
+                            if let Ok(block) = PrecomputedBlock::parse_file(&path) {
+                                if let Ok(_) = state.block_pipeline(&block) {
+                                    info!(
+                                        "Added block (length {}): {}",
+                                        block.blockchain_length, block.state_hash
+                                    );
+                                }
+                            } else {
+                                warn!("Unable to parse precomputed block: {path:?}");
                             }
-
-                            // TODO: state.summary_verbose()
-                        } else {
-                            error!("Block receiver channel closed");
-                        }
-                    }
-                    Err(e) => {
-                        error!("Unable to receive block: {e}");
-                    }
-                }
-            }
-
-            staking_ledger_fut = fs_ledger_receiver.recv_data() => {
-                match staking_ledger_fut {
-                    Ok(ledger_opt) => {
-                        if let Some(staking_ledger) = ledger_opt {
-                            debug!("Receiving staking ledger {}", staking_ledger.summary());
-
-                            if let Some(ref store) = state.indexer_store {
-                                let ledger = staking_ledger.summary();
-                                match store.add_staking_ledger(staking_ledger) {
-                                    Ok(_) => info!("Added staking ledger {ledger}"),
-                                    Err(e) => error!("Error adding staking ledger: {e}"),
+                        } else if staking::is_valid_ledger_file(&path) {
+                            if let Some(store) = state.indexer_store.as_ref() {
+                                match StakingLedger::parse_file(&path) {
+                                    Ok(staking_ledger) => {
+                                        let ledger_hash = staking_ledger.ledger_hash.clone();
+                                        match store.add_staking_ledger(staking_ledger) {
+                                            Ok(_) => {
+                                                info!("Added staking ledger {:?}", ledger_hash);
+                                            }
+                                            Err(e) => error!("Error adding staking ledger: {}", e),
+                                        }
+                                    }
+                                    _ => (),
                                 }
                             }
                         } else {
-                            error!("Staking ledger receiver closed channel");
+                            warn!("Unknown file: {path:?}");
                         }
-                    }
-                    Err(e) => {
-                        error!("Unable to receive staking ledger: {e}");
                     }
                 }
             }
+            Err(e) => {
+                error!("Block watcher error: {e:?}");
+            }
         }
     }
+    Ok(())
 }
 
 pub fn remove_domain_socket() {

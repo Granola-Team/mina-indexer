@@ -9,7 +9,10 @@ use crate::{
     ledger::{self, public_key, store::LedgerStore},
     server,
     snark_work::store::SnarkStore,
-    state::summary::{SummaryShort, SummaryVerbose},
+    state::{
+        summary::{SummaryShort, SummaryVerbose},
+        IndexerState,
+    },
     store::IndexerStore,
 };
 use anyhow::bail;
@@ -23,15 +26,15 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
 pub struct UnixSocketServer {
-    store: Arc<IndexerStore>,
+    state: IndexerState,
 }
 
 /// Some docs
 impl UnixSocketServer {
     /// Create a new Unix Socket Server
-    pub fn new(store: Arc<IndexerStore>) -> Self {
+    pub fn new(state: IndexerState) -> Self {
         info!("Creating Unix Domain Socket Server");
-        Self { store }
+        Self { state }
     }
 }
 
@@ -52,9 +55,9 @@ async fn run(server: UnixSocketServer, listener: UnixListener) {
             client = listener.accept() => {
                 match client {
                     Ok((socket, _)) => {
-                        let store = server.store.clone();
+                        let state = server.state.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = handle_conn(socket, &store).await {
+                            if let Err(e) = handle_conn(socket, &state).await {
                                 error!("Unable to process Unix socket request: {}", e);
                             }
                         });
@@ -67,9 +70,14 @@ async fn run(server: UnixSocketServer, listener: UnixListener) {
 }
 
 #[instrument(skip_all)]
-async fn handle_conn(conn: UnixStream, db: &IndexerStore) -> Result<(), anyhow::Error> {
+async fn handle_conn(conn: UnixStream, state: &IndexerState) -> Result<(), anyhow::Error> {
     use helpers::*;
-    let summary: Option<&SummaryVerbose> = None;
+
+    let db = if let Some(store) = state.indexer_store.as_ref() {
+        store
+    } else {
+        bail!("Unable to get a handle on indexer store...");
+    };
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -818,30 +826,28 @@ async fn handle_conn(conn: UnixStream, db: &IndexerStore) -> Result<(), anyhow::
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
 
-            if let Some(summary) = summary {
-                let summary_str = if verbose {
-                    format_json(&summary, json)
-                } else {
-                    let summary: SummaryShort = summary.clone().into();
-                    format_json(&summary, json)
-                };
-
-                if path.is_empty() {
-                    info!("Writing summary to stdout");
-                    Some(summary_str)
-                } else {
-                    let path: PathBuf = path.into();
-                    if !path.is_dir() {
-                        info!("Writing summary to {}", path.display());
-
-                        std::fs::write(&path, summary_str).unwrap();
-                        Some(format!("Summary written to {}", path.display()))
-                    } else {
-                        file_must_not_be_a_directory(&path)
-                    }
-                }
+            let summary = state.summary_verbose();
+            // TODO: won't this always be verbose??
+            let summary_str = if verbose {
+                format_json(&summary, json)
             } else {
-                Some("Summary not available".into())
+                let summary: SummaryShort = summary.clone().into();
+                format_json(&summary, json)
+            };
+
+            if path.is_empty() {
+                info!("Writing summary to stdout");
+                Some(summary_str)
+            } else {
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    info!("Writing summary to {}", path.display());
+
+                    std::fs::write(&path, summary_str).unwrap();
+                    Some(format!("Summary written to {}", path.display()))
+                } else {
+                    file_must_not_be_a_directory(&path)
+                }
             }
         }
         "tx-pk" => {

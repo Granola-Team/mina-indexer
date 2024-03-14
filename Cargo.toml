@@ -16,8 +16,7 @@ loose_deserialization = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.81" }
-async-trait = "0.1.64"
+anyhow = { version = "1.0.80" }
 derive_more = "0.99"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = { version = "1.0.114", features = ["raw_value", "unbounded_depth"] }
@@ -36,8 +35,6 @@ byteorder = "1.5.0"
 num = "0.4.1"
 speedb = { version = "0.0.5", default_features = false, features = ["zstd"] }
 id_tree = { version = "1.8.0", features = ["serde_support"] }
-watchexec = "2.3.0"
-async-priority-channel = "0.1.0"
 uuid = { version = "1.3.1", features = ["v4"] }
 time = { version = "0.3.34", features = ["serde", "serde-human-readable"] }
 tracing = "0.1.37"
@@ -54,6 +51,7 @@ base64 = "0.22.0"
 hex-literal = "0.4.1"
 chrono = "0.4.35"
 csv = "1.3.0"
+notify = "6.1.1"
 
 [dev-dependencies]
 quickcheck = "1.0.3"
