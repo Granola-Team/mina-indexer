@@ -1,11 +1,11 @@
 use crate::{
     block::{parser::BlockParser, BlockHash},
     constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
-    ipc::{self, UnixSocketServer},
     ledger::{genesis::GenesisLedger, staking::parser::StakingLedgerParser, store::LedgerStore},
     receiver::{filesystem::FilesystemReceiver, Receiver},
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
+    unix_socket_server::{self, UnixSocketServer},
 };
 use std::{
     fs,
@@ -54,7 +54,8 @@ impl MinaIndexer {
         let unix_domain_store = store.clone();
 
         // Set up domain socket server
-        let domain_socket_handle = ipc::start(UnixSocketServer::new(unix_domain_store)).await;
+        let domain_socket_handle =
+            unix_socket_server::start(UnixSocketServer::new(unix_domain_store)).await;
 
         let _witness_join_handle = tokio::spawn(async move {
             let state = match initialize(config, store).await {
