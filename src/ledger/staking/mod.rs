@@ -279,14 +279,14 @@ mod tests {
 
     #[test]
     fn parse_file() -> anyhow::Result<()> {
-        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json".into();
+        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path)?;
 
-        assert_eq!(staking_ledger.epoch, 42);
+        assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, "mainnet".to_string());
         assert_eq!(
             staking_ledger.ledger_hash.0,
-            "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH".to_string()
+            "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
         );
         Ok(())
     }
@@ -295,20 +295,20 @@ mod tests {
     fn calculate_delegations() -> anyhow::Result<()> {
         use crate::ledger::public_key::PublicKey;
 
-        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json".into();
+        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path)?;
         let (delegations, total_stake) = staking_ledger.aggregate_delegations()?;
-        let pk: PublicKey = "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG".into();
+        let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
 
         assert_eq!(
             delegations.get(&pk),
             Some(&EpochStakeDelegation {
                 pk,
-                count_delegates: Some(1),
-                total_delegated: Some(83482371134848360)
+                count_delegates: Some(25),
+                total_delegated: Some(13277838425206999)
             })
         );
-        assert_eq!(total_stake, 970970695036801245);
+        assert_eq!(total_stake, 794268782956784283);
         Ok(())
     }
 }
