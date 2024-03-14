@@ -69,6 +69,7 @@ impl IndexerStore {
         let snarks = ColumnFamilyDescriptor::new("snarks", cf_opts);
 
         let mut database_opts = speedb::Options::default();
+        database_opts.set_compression_type(DBCompressionType::Zstd);
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
         let database = speedb::DBWithThreadMode::open_cf_descriptors(
