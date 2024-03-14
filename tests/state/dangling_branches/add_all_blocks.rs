@@ -10,19 +10,20 @@ use std::path::PathBuf;
 /// `leaves` and the underlying tree's leaf blocks Verifies the length of the
 /// longest chain
 #[tokio::test]
-async fn extension() {
-    let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+async fn extension() -> anyhow::Result<()> {
+    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
 
     let mut n = 0;
-    if let Some(block) = block_parser.next_block().unwrap() {
+    if let Some((block, block_bytes)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
-        let mut state = IndexerState::new_testing(&block, None, None, None, None, None).unwrap();
+        let mut state =
+            IndexerState::new_testing(&block, block_bytes, None, None, None, None, None)?;
         n += 1;
 
-        while let Some(block) = block_parser.next_block().unwrap() {
+        while let Some((block, _)) = block_parser.next_block()? {
             let block: PrecomputedBlock = block.into();
-            state.add_block_to_witness_tree(&block).unwrap();
+            state.add_block_to_witness_tree(&block)?;
             n += 1;
         }
 
@@ -110,4 +111,6 @@ async fn extension() {
         // ten blocks in the longest chain
         assert_eq!(longest_chain.len(), 13);
     }
+
+    Ok(())
 }

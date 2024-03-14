@@ -17,6 +17,12 @@ impl PublicKey {
     }
 }
 
+impl std::default::Default for PublicKey {
+    fn default() -> Self {
+        Self("B62qDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTPK".into())
+    }
+}
+
 impl From<&str> for PublicKey {
     fn from(value: &str) -> Self {
         Self(value.to_owned())

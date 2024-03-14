@@ -88,6 +88,21 @@ pub struct TimingJson {
     pub vesting_increment: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AggregatedEpochStakeDelegations {
+    pub epoch: u32,
+    pub network: String,
+    pub ledger_hash: LedgerHash,
+    pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
+}
+
+#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EpochStakeDelegation {
+    pub pk: PublicKey,
+    pub count_delegates: Option<u32>,
+    pub total_delegated: Option<u64>,
+}
+
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
         let token = value.token.parse().expect("token is u32");
@@ -177,6 +192,75 @@ impl StakingLedger {
         }
     }
 
+    /// Aggregate each public key's staking delegations and total delegations
+    /// If the public key has delegated, they cannot be delegated to
+    pub fn aggregate_delegations(
+        &self,
+    ) -> anyhow::Result<(HashMap<PublicKey, EpochStakeDelegation>, u64)> {
+        let mut delegations = HashMap::new();
+        self.staking_ledger
+            .iter()
+            .for_each(|(pk, staking_account)| {
+                let balance = staking_account.balance;
+                let delegate = staking_account.delegate.clone();
+
+                if *pk != delegate {
+                    delegations.insert(pk.clone(), None);
+                }
+
+                match delegations.insert(
+                    delegate.clone(),
+                    Some(EpochStakeDelegation {
+                        pk: delegate.clone(),
+                        total_delegated: Some(balance),
+                        count_delegates: Some(1),
+                    }),
+                ) {
+                    None => (), // first delegation
+                    Some(None) => {
+                        // pk delegated to another pk
+                        delegations.insert(delegate.clone(), None);
+                    }
+                    Some(Some(EpochStakeDelegation {
+                        pk,
+                        total_delegated,
+                        count_delegates,
+                    })) => {
+                        // accumulate delegation
+                        delegations.insert(
+                            delegate,
+                            Some(EpochStakeDelegation {
+                                pk,
+                                total_delegated: total_delegated.map(|acc| acc + balance),
+                                count_delegates: count_delegates.map(|acc| acc + 1),
+                            }),
+                        );
+                    }
+                }
+            });
+
+        let total = delegations.values().fold(0, |acc, x| {
+            acc + x
+                .as_ref()
+                .map(|x| x.total_delegated.unwrap_or_default())
+                .unwrap_or_default()
+        });
+        delegations.iter_mut().for_each(|(pk, delegation)| {
+            if delegation.is_none() {
+                *delegation = Some(EpochStakeDelegation {
+                    pk: pk.clone(),
+                    count_delegates: None,
+                    total_delegated: None,
+                });
+            }
+        });
+        let delegations = delegations
+            .into_iter()
+            .map(|(pk, del)| (pk, del.unwrap_or_default()))
+            .collect();
+        Ok((delegations, total))
+    }
+
     pub fn summary(&self) -> String {
         format!("(epoch {}): {}", self.epoch, self.ledger_hash.0)
     }
@@ -190,20 +274,41 @@ impl From<String> for LedgerHash {
 
 #[cfg(test)]
 mod tests {
-    use super::StakingLedger;
+    use super::{EpochStakeDelegation, StakingLedger};
     use std::path::PathBuf;
 
     #[test]
     fn parse_file() -> anyhow::Result<()> {
-        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json".into();
+        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path)?;
 
-        assert_eq!(staking_ledger.epoch, 42);
+        assert_eq!(staking_ledger.epoch, 0);
+        assert_eq!(staking_ledger.network, "mainnet".to_string());
         assert_eq!(
             staking_ledger.ledger_hash.0,
-            "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH".to_string()
+            "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
         );
+        Ok(())
+    }
 
+    #[test]
+    fn calculate_delegations() -> anyhow::Result<()> {
+        use crate::ledger::public_key::PublicKey;
+
+        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
+        let staking_ledger = StakingLedger::parse_file(&path)?;
+        let (delegations, total_stake) = staking_ledger.aggregate_delegations()?;
+        let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
+
+        assert_eq!(
+            delegations.get(&pk),
+            Some(&EpochStakeDelegation {
+                pk,
+                count_delegates: Some(25),
+                total_delegated: Some(13277838425206999)
+            })
+        );
+        assert_eq!(total_stake, 794268782956784283);
         Ok(())
     }
 }

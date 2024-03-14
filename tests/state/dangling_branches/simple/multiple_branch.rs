@@ -21,7 +21,7 @@ async fn extensions() {
 
     // root_block =
     // mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json
-    let root_block = block_parser
+    let (root_block, root_block_bytes) = block_parser
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await
         .unwrap();
@@ -32,7 +32,7 @@ async fn extensions() {
 
     // root0_block =
     // mainnet-105491-3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3.json
-    let root0_block = block_parser
+    let (root0_block, _) = block_parser
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await
         .unwrap();
@@ -43,7 +43,7 @@ async fn extensions() {
 
     // child0_block =
     // mainnet-105492-3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ.json
-    let child0_block = block_parser
+    let (child0_block, _) = block_parser
         .get_precomputed_block("3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ")
         .await
         .unwrap();
@@ -54,7 +54,7 @@ async fn extensions() {
 
     // root1_block =
     // mainnet-105495-3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9.json
-    let root1_block = block_parser
+    let (root1_block, _) = block_parser
         .get_precomputed_block("3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9")
         .await
         .unwrap();
@@ -65,7 +65,7 @@ async fn extensions() {
 
     // child10_block =
     // mainnet-105496-3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL.json
-    let child10_block = block_parser
+    let (child10_block, _) = block_parser
         .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
         .await
         .expect("WTF");
@@ -76,7 +76,7 @@ async fn extensions() {
 
     // child11_block =
     // mainnet-105496-3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k.json
-    let child11_block = block_parser
+    let (child11_block, _) = block_parser
         .get_precomputed_block("3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k")
         .await
         .unwrap();
@@ -90,7 +90,9 @@ async fn extensions() {
     // ----------------
 
     // root0_block will the be the root of the 0th dangling_branch
-    let mut state = IndexerState::new_testing(&root_block, None, None, None, None, None).unwrap();
+    let mut state =
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)
+            .unwrap();
 
     // ----------
     // add root 0

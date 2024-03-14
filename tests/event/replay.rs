@@ -30,6 +30,9 @@ async fn test() {
 
     // witness trees match
     assert_eq!(state.best_tip_block(), new_state.best_tip_block());
-    assert_eq!(state.canonical_tip_block(), new_state.canonical_tip_block());
+    assert_eq!(
+        state.canonical_root_block(),
+        new_state.canonical_root_block()
+    );
     assert_eq!(state.diffs_map, new_state.diffs_map);
 }

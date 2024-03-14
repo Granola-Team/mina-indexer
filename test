@@ -182,7 +182,7 @@ test_server_startup() {
         --log-dir ./logs
     sleep 5
 
-    result=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
+    result=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
 
     teardown
@@ -273,9 +273,9 @@ test_account_public_key_json() {
     teardown
 }
 
-# Indexer summary returns the correct canonical tip
-test_canonical_tip() {
-    test=test_canonical_tip
+# Indexer summary returns the correct canonical root
+test_canonical_root() {
+    test=test_canonical_root
 
     setup
     dl_mainnet 15 ./blocks
@@ -286,8 +286,8 @@ test_canonical_tip() {
         --log-dir ./logs
     sleep 5
     
-    hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
     
     assert 5 $length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $hash
@@ -312,8 +312,8 @@ test_canonical_threshold() {
         --canonical-threshold $canonical_threshold
     sleep 5
 
-    hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert $(expr $num_seq_blocks - $canonical_threshold) $length
     assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $hash
@@ -482,8 +482,8 @@ test_block_copy() {
     # start without block 11
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert 10 $best_length
     assert 1 $canonical_length
@@ -498,8 +498,8 @@ test_block_copy() {
     # check
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert 11 $best_length
     assert 1 $canonical_length
@@ -529,8 +529,8 @@ test_missing_blocks() {
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert 2 $num_dangling
     assert 10 $best_length
@@ -547,8 +547,8 @@ test_missing_blocks() {
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert 1 $num_dangling
     assert 10 $best_length
@@ -564,8 +564,8 @@ test_missing_blocks() {
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert 0 $num_dangling
     assert 30 $best_length
@@ -645,8 +645,8 @@ test_ledgers() {
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
 
     # canonical ledgers match
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_height=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_height=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     hash_balance=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
     height_balance=$(idxr ledger-at-height --height $canonical_height | jq -r .${pk}.balance)
@@ -720,8 +720,8 @@ test_sync() {
     sleep 5
 
     # post-sync results
-    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
     best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
 
@@ -763,18 +763,17 @@ test_replay() {
     sleep 5
 
     # post-replay results
-    canonical_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length_replay=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    root_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    root_length_replay=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
     best_hash_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     num_blocks_replay=$(idxr summary -j | jq -r .blocks_processed)
 
-    # includes blocks added to watch dir while down
-    assert 35 $num_blocks_replay
+    assert 15 $num_blocks_replay
     assert 20 $best_length_replay
-    assert 10 $canonical_length_replay
+    assert 10 $root_length_replay
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay
-    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $canonical_hash_replay
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $root_hash_replay
 
     teardown
 }
@@ -949,8 +948,8 @@ test_checkpoint() {
     sleep 5
 
     # pre-checkpoint results
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
@@ -970,8 +969,8 @@ test_checkpoint() {
     sleep 5
 
     # post-checkpoint reults
-    canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
     best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
     amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
@@ -1004,8 +1003,8 @@ test_many_blocks() {
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert '1000' $best_length
     assert '990' $canonical_length
@@ -1118,8 +1117,8 @@ test_release() {
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_tip_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_tip_length)
+    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     assert '5000' $best_length
     assert '4990' $canonical_length
@@ -1200,37 +1199,31 @@ test_startup_staking_ledgers() {
         --log-dir ./logs
     sleep 1
 
+    # epoch 0 staking ledger should be in the store, write it to a file
+    idxr staking-ledger-epoch -e 0 -p ./epoch_0_ledger.json
+
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-    token=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.token)
-    public_key=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.pk)
-    balance=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.balance)
-    delegate=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.delegate)
-    voting_for=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+    epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
+
+    epoch=$(cat ./epoch_0_ledger.json | jq -r .epoch)
+    network=$(cat ./epoch_0_ledger.json | jq -r .network)
+    ledger_hash=$(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
+    token=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
+    public_key=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
+    balance=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
     assert '1' $token
+    assert '0' $epoch
     assert $pk $delegate
     assert $pk $public_key
     assert '1000' $balance
+    assert 'mainnet' $network
+    assert $epoch0 $ledger_hash
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
-
-    # write staking ledger to file
-    idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json
-
-    token_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.token)
-    public_key_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.pk)
-    balance_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.balance)
-    delegate_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.delegate)
-    voting_for_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
-
-    assert $token $token_file
-    assert $pk $public_key_file
-    assert $balance $balance_file
-    assert $delegate $delegate_file
-    assert $voting_for $voting_for_file
-    assert $receipt_chain_hash $receipt_chain_hash_file
 
     teardown
 }
@@ -1247,7 +1240,7 @@ test_watch_staking_ledgers() {
         --log-level debug
     sleep 1
 
-    # copy epoch 0 staking ledger to watched directory
+    # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
     sleep 1
 
@@ -1256,6 +1249,11 @@ test_watch_staking_ledgers() {
 
     # check account
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
+
+    epoch=$(cat ./epoch_0_ledger.json | jq -r .epoch)
+    network=$(cat ./epoch_0_ledger.json | jq -r .network)
+    ledger_hash=$(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
     token=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
     public_key=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
     balance=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
@@ -1264,14 +1262,19 @@ test_watch_staking_ledgers() {
     receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
     assert '1' $token
+    assert '0' $epoch
     assert $pk $delegate
     assert $pk $public_key
     assert '1000' $balance
+    assert 'mainnet' $network
+    assert $epoch0 $ledger_hash
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
-    # copy epoch 42 staking ledger to watched directory
-    cp $STAKING_LEDGERS/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json ./staking-ledgers
+    # curl epoch 42 staking ledger from MinaExplorer to watched directory
+    epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
+    curl https://storage.googleapis.com/mina-explorer-ledgers/${epoch42}.json -o ./mainnet-42-${epoch42}.json
+    cp ./mainnet-42-${epoch42}.json ./staking-ledgers/mainnet-42-${epoch42}.json
     sleep 1
 
     # write epoch 42 ledger to file
@@ -1279,6 +1282,10 @@ test_watch_staking_ledgers() {
 
     # check account
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+
+    epoch=$(cat ./epoch_42_ledger.json | jq -r .epoch)
+    network=$(cat ./epoch_42_ledger.json | jq -r .network)
+    ledger_hash=$(cat ./epoch_42_ledger.json | jq -r .ledger_hash)
     token=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.token)
     public_key=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.pk)
     balance=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.balance)
@@ -1287,9 +1294,12 @@ test_watch_staking_ledgers() {
     receipt_chain_hash=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
     assert '1' $token
+    assert '42' $epoch
     assert $pk $delegate
     assert $pk $public_key
     assert '1000' $balance
+    assert 'mainnet' $network
+    assert $epoch42 $ledger_hash
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
@@ -1305,7 +1315,7 @@ if [ "$#" -eq 0 ]; then
     test_startup_dirs_get_created
     test_account_balance_cli
     test_account_public_key_json
-    test_canonical_tip
+    test_canonical_root
     test_canonical_threshold
     test_best_tip
     test_blocks
@@ -1334,7 +1344,7 @@ else
             "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
-            "test_canonical_tip") test_canonical_tip ;;
+            "test_canonical_root") test_canonical_root ;;
             "test_canonical_threshold") test_canonical_threshold ;;
             "test_best_tip") test_best_tip ;;
             "test_blocks") test_blocks ;;

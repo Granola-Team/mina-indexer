@@ -5,10 +5,11 @@ use std::str::Lines;
 pub trait Summary {
     fn uptime(&self) -> std::time::Duration;
     fn blocks_processed(&self) -> u32;
+    fn bytes_processed(&self) -> bytesize::ByteSize;
     fn best_tip_length(&self) -> u32;
     fn best_tip_hash(&self) -> String;
-    fn canonical_tip_length(&self) -> u32;
-    fn canonical_tip_hash(&self) -> String;
+    fn canonical_root_length(&self) -> u32;
+    fn canonical_root_hash(&self) -> String;
     fn root_hash(&self) -> String;
     fn root_height(&self) -> u32;
     fn root_length(&self) -> u32;
@@ -23,6 +24,7 @@ pub trait Summary {
 pub struct SummaryShort {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
+    pub bytes_processed: u64,
     pub witness_tree: WitnessTreeSummaryShort,
     pub db_stats: Option<DbStats>,
 }
@@ -31,6 +33,7 @@ pub struct SummaryShort {
 pub struct SummaryVerbose {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
+    pub bytes_processed: u64,
     pub witness_tree: WitnessTreeSummaryVerbose,
     pub db_stats: Option<DbStats>,
 }
@@ -39,8 +42,8 @@ pub struct SummaryVerbose {
 pub struct WitnessTreeSummaryShort {
     pub best_tip_length: u32,
     pub best_tip_hash: String,
-    pub canonical_tip_length: u32,
-    pub canonical_tip_hash: String,
+    pub canonical_root_length: u32,
+    pub canonical_root_hash: String,
     pub root_hash: String,
     pub root_height: u32,
     pub root_length: u32,
@@ -54,8 +57,8 @@ pub struct WitnessTreeSummaryShort {
 pub struct WitnessTreeSummaryVerbose {
     pub best_tip_length: u32,
     pub best_tip_hash: String,
-    pub canonical_tip_length: u32,
-    pub canonical_tip_hash: String,
+    pub canonical_root_length: u32,
+    pub canonical_root_hash: String,
     pub root_hash: String,
     pub root_height: u32,
     pub root_length: u32,
@@ -98,6 +101,7 @@ impl From<SummaryVerbose> for SummaryShort {
         Self {
             uptime: value.uptime,
             blocks_processed: value.blocks_processed,
+            bytes_processed: value.bytes_processed,
             witness_tree: value.witness_tree.into(),
             db_stats: value.db_stats,
         }
@@ -109,8 +113,8 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
         Self {
             best_tip_length: value.best_tip_length,
             best_tip_hash: value.best_tip_hash,
-            canonical_tip_length: value.canonical_tip_length,
-            canonical_tip_hash: value.canonical_tip_hash,
+            canonical_root_length: value.canonical_root_length,
+            canonical_root_hash: value.canonical_root_hash,
             root_hash: value.root_hash,
             root_height: value.root_height,
             root_length: value.root_length,
@@ -125,21 +129,26 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
     writeln!(f, "  Uptime:       {:?}", state.uptime())?;
+    writeln!(f, "  Bytes added:  {}", state.bytes_processed())?;
     writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
 
     writeln!(f, "\n=== Root branch ===")?;
-    writeln!(f, "  Height:               {}", state.root_height())?;
-    writeln!(f, "  Length:               {}", state.root_length())?;
-    writeln!(f, "  Num leaves:           {}", state.num_leaves())?;
-    writeln!(f, "  Root hash:            {}", state.root_hash())?;
-    writeln!(f, "  Best tip length:      {}", state.best_tip_length())?;
-    writeln!(f, "  Best tip hash:        {}", state.best_tip_hash())?;
+    writeln!(f, "  Height:                {}", state.root_height())?;
+    writeln!(f, "  Length:                {}", state.root_length())?;
+    writeln!(f, "  Num leaves:            {}", state.num_leaves())?;
+    writeln!(f, "  Root hash:             {}", state.root_hash())?;
+    writeln!(f, "  Best tip length:       {}", state.best_tip_length())?;
+    writeln!(f, "  Best tip hash:         {}", state.best_tip_hash())?;
     writeln!(
         f,
-        "  Canonical tip length: {}",
-        state.canonical_tip_length()
+        "  Canonical root length: {}",
+        state.canonical_root_length()
     )?;
-    writeln!(f, "  Canonical tip hash:   {}", state.canonical_tip_hash())?;
+    writeln!(
+        f,
+        "  Canonical root hash:   {}",
+        state.canonical_root_hash()
+    )?;
 
     if state.num_dangling() > 0 {
         writeln!(f, "\n=== Dangling branches ===")?;
@@ -179,12 +188,16 @@ impl Summary for SummaryShort {
         self.blocks_processed
     }
 
-    fn canonical_tip_hash(&self) -> String {
-        self.witness_tree.canonical_tip_hash.clone()
+    fn bytes_processed(&self) -> bytesize::ByteSize {
+        bytesize::ByteSize(self.bytes_processed)
     }
 
-    fn canonical_tip_length(&self) -> u32 {
-        self.witness_tree.canonical_tip_length
+    fn canonical_root_hash(&self) -> String {
+        self.witness_tree.canonical_root_hash.clone()
+    }
+
+    fn canonical_root_length(&self) -> u32 {
+        self.witness_tree.canonical_root_length
     }
 
     fn db_stats(&self) -> DbStats {
@@ -237,12 +250,16 @@ impl Summary for SummaryVerbose {
         self.blocks_processed
     }
 
-    fn canonical_tip_hash(&self) -> String {
-        self.witness_tree.canonical_tip_hash.clone()
+    fn bytes_processed(&self) -> bytesize::ByteSize {
+        bytesize::ByteSize(self.bytes_processed)
     }
 
-    fn canonical_tip_length(&self) -> u32 {
-        self.witness_tree.canonical_tip_length
+    fn canonical_root_hash(&self) -> String {
+        self.witness_tree.canonical_root_hash.clone()
+    }
+
+    fn canonical_root_length(&self) -> u32 {
+        self.witness_tree.canonical_root_length
     }
 
     fn db_stats(&self) -> DbStats {

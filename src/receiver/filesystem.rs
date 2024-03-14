@@ -3,7 +3,7 @@ use crate::{
     block::{is_valid_block_file, parser::BlockParser, precomputed::PrecomputedBlock},
     ledger::staking::{is_valid_ledger_file, parser::StakingLedgerParser, StakingLedger},
 };
-use anyhow::anyhow;
+use anyhow::bail;
 use async_priority_channel as priority;
 use async_trait::async_trait;
 use std::{
@@ -39,8 +39,8 @@ impl<P: Parser> FilesystemReceiver<P> {
     #[instrument]
     pub async fn new() -> anyhow::Result<Self> {
         debug!("Initializing new filesystem {} receiver", P::KIND);
-        let (ev_s, worker_event_receiver) = priority::bounded(1024);
-        let (er_s, worker_error_receiver) = mpsc::channel(64);
+        let (ev_s, worker_event_receiver) = priority::bounded(4096);
+        let (er_s, worker_error_receiver) = mpsc::channel(128);
         let (worker_command_sender, wd_r) = watch::channel(WorkingData::default());
 
         tokio::spawn(async {
@@ -69,7 +69,7 @@ impl<P: Parser> FilesystemReceiver<P> {
         );
 
         if !directory.as_ref().is_dir() {
-            return Err(anyhow!("{}", directory.as_ref().display()));
+            bail!("{}", directory.as_ref().display());
         }
 
         let mut working_data = WorkingData::default();
@@ -100,7 +100,7 @@ impl Receiver<BlockParser> for FilesystemReceiver<BlockParser> {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
                     if let Some(error) = error_fut {
-                        return Err(anyhow!("{} worker runtime error: {error}", BlockParser::KIND));
+                        bail!("{} worker runtime error: {}", BlockParser::KIND, error)
                     }
                     return Ok(None);
                 },
@@ -127,7 +127,7 @@ impl Receiver<BlockParser> for FilesystemReceiver<BlockParser> {
                                         match PrecomputedBlock::parse_file(path.as_path()) {
                                             Ok(block) => return Ok(Some(block)),
                                             Err(e) => {
-                                                error!("Cannot parse block at {}: {e}", path.display());
+                                                error!("Cannot parse block at {}: {}", path.display(), e);
                                                 continue;
                                             },
                                         }
@@ -151,7 +151,7 @@ impl Receiver<StakingLedgerParser> for FilesystemReceiver<StakingLedgerParser> {
             tokio::select! {
                 error_fut = self.worker_error_receiver.recv() => {
                     if let Some(error) = error_fut {
-                        return Err(anyhow!("{} worker runtime error: {error}", StakingLedgerParser::KIND));
+                        bail!("{} worker runtime error: {}", StakingLedgerParser::KIND, error);
                     }
                     return Ok(None);
                 },
@@ -178,7 +178,7 @@ impl Receiver<StakingLedgerParser> for FilesystemReceiver<StakingLedgerParser> {
                                         match StakingLedger::parse_file(path.as_path()) {
                                             Ok(staking_ledger) => return Ok(Some(staking_ledger)),
                                             Err(e) => {
-                                                error!("Cannot parse staking ledger at {}: {e}", path.display());
+                                                error!("Cannot parse staking ledger at {}: {}", path.display(), e);
                                                 continue;
                                             },
                                         }
