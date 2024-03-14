@@ -1200,37 +1200,29 @@ test_startup_staking_ledgers() {
         --log-dir ./logs
     sleep 1
 
+    # write epoch 42 staking ledger to file
+    idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json
+
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-    token=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.token)
-    public_key=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.pk)
-    balance=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.balance)
-    delegate=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.delegate)
-    voting_for=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash=$(idxr staking-ledger-epoch -e 42 | jq -r .staking_ledger.${pk}.receipt_chain_hash)
+    epoch=$(cat ./epoch_42_ledger.json | jq -r .epoch)
+    network=$(cat ./epoch_42_ledger.json | jq -r .network)
+    ledger_hash=$(cat ./epoch_42_ledger.json | jq -r .ledger_hash)
+    token=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.token)
+    public_key=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.pk)
+    balance=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.balance)
+    delegate=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.delegate)
+    voting_for=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
+    receipt_chain_hash=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
     assert '1' $token
+    assert '42' $epoch
     assert $pk $delegate
     assert $pk $public_key
     assert '1000' $balance
+    assert 'mainnet' $network
+    assert 'jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH' $ledger_hash
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
-
-    # write staking ledger to file
-    idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json
-
-    token_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.token)
-    public_key_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.pk)
-    balance_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.balance)
-    delegate_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.delegate)
-    voting_for_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash_file=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
-
-    assert $token $token_file
-    assert $pk $public_key_file
-    assert $balance $balance_file
-    assert $delegate $delegate_file
-    assert $voting_for $voting_for_file
-    assert $receipt_chain_hash $receipt_chain_hash_file
 
     teardown
 }

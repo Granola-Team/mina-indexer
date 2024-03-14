@@ -282,8 +282,8 @@ mod tests {
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json".into();
         let staking_ledger = StakingLedger::parse_file(&path)?;
 
-        assert_eq!(staking_ledger.network, "mainnet".to_string());
         assert_eq!(staking_ledger.epoch, 42);
+        assert_eq!(staking_ledger.network, "mainnet".to_string());
         assert_eq!(
             staking_ledger.ledger_hash.0,
             "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH".to_string()
