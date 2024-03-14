@@ -493,7 +493,7 @@ test_block_copy() {
     # add block 11
     dl_mainnet_single 11 ./blocks_to_copy
     cp ./blocks_to_copy/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json ./blocks
-    sleep 1
+    sleep 5
 
     # check
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -1242,7 +1242,7 @@ test_watch_staking_ledgers() {
 
     # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
-    sleep 1
+    sleep 10
 
     # write epoch 0 ledger to file
     idxr staking-ledger-epoch -e 0 -p ./epoch_0_ledger.json
@@ -1275,7 +1275,7 @@ test_watch_staking_ledgers() {
     epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
     curl https://storage.googleapis.com/mina-explorer-ledgers/${epoch42}.json -o ./mainnet-42-${epoch42}.json
     cp ./mainnet-42-${epoch42}.json ./staking-ledgers/mainnet-42-${epoch42}.json
-    sleep 1
+    sleep 10
 
     # write epoch 42 ledger to file
     idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json

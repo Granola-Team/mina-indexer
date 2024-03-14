@@ -1,6 +1,6 @@
 use crate::{
     block::{self, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash},
-    constants::{MAINNET_TRANSITION_FRONTIER_K, SOCKET_NAME},
+    constants::MAINNET_TRANSITION_FRONTIER_K,
     ledger::{
         genesis::GenesisLedger,
         staking::{self, StakingLedger},
@@ -10,14 +10,17 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{self, UnixSocketServer},
 };
-use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
+use notify_debouncer_full::new_debouncer;
 use std::{
     fs,
     path::{Path, PathBuf},
     process,
     sync::Arc,
+    time::Duration,
 };
 use tokio::{
+    runtime::Handle,
     sync::{mpsc, RwLock},
     task::JoinHandle,
 };
@@ -40,7 +43,6 @@ pub struct IndexerConfiguration {
 }
 
 pub struct MinaIndexer {
-    //domain_socket_handle: JoinHandle<()>,
     _witness_join_handle: JoinHandle<()>,
 }
 
@@ -79,14 +81,12 @@ impl MinaIndexer {
         });
 
         Ok(Self {
-            //            domain_socket_handle,
             _witness_join_handle,
         })
     }
 
     pub async fn await_loop(self) {
         let _ = self._witness_join_handle.await;
-        //let _ = self.domain_socket_handle.await;
     }
 }
 
@@ -210,15 +210,32 @@ pub async fn run(
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::channel(100);
-    let mut watcher = RecommendedWatcher::new(
-        move |result| {
-            tx.blocking_send(result).expect("Failed to send event");
-        },
-        Config::default(),
-    )?;
+    let rt = Handle::current();
 
-    watcher.watch(block_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    watcher.watch(ledger_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+    let mut debouncer = new_debouncer(Duration::from_secs(1), None, move |result| {
+        let tx = tx.clone();
+        rt.spawn(async move {
+            if let Err(e) = tx.send(result).await {
+                error!("Error sending event result: {:?}", e);
+            }
+        });
+    })
+    .unwrap();
+
+    debouncer
+        .watcher()
+        .watch(block_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+    debouncer
+        .watcher()
+        .watch(ledger_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+
+    debouncer
+        .cache()
+        .add_root(block_watch_dir.as_ref(), RecursiveMode::Recursive);
+    debouncer
+        .cache()
+        .add_root(ledger_watch_dir.as_ref(), RecursiveMode::Recursive);
+
     info!(
         "Watching for new blocks in directory: {:?}",
         block_watch_dir.as_ref()
@@ -230,34 +247,37 @@ pub async fn run(
 
     while let Some(res) = rx.recv().await {
         match res {
-            Ok(event) => {
-                if let EventKind::Create(notify::event::CreateKind::File)
-                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
-                {
-                    for path in event.paths {
-                        if block::is_valid_block_file(&path) {
-                            debug!("Valid precomputed block file: {}", path.display());
-                            if let Ok(block) = PrecomputedBlock::parse_file(&path) {
-                                let mut state = state.write().await;
-                                if state.block_pipeline(&block).is_ok() {
-                                    info!(
-                                        "Added block (length {}): {}",
-                                        block.blockchain_length, block.state_hash
-                                    );
+            Ok(events) => {
+                for d_event in events {
+                    let event = d_event.event;
+                    if let EventKind::Create(notify::event::CreateKind::File)
+                    | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
+                    {
+                        for path in event.paths {
+                            if block::is_valid_block_file(&path) {
+                                debug!("Valid precomputed block file: {}", path.display());
+                                if let Ok(block) = PrecomputedBlock::parse_file(&path) {
+                                    let mut state = state.write().await;
+                                    if state.block_pipeline(&block).is_ok() {
+                                        info!(
+                                            "Added block (length {}): {}",
+                                            block.blockchain_length, block.state_hash
+                                        );
+                                    }
+                                } else {
+                                    warn!("Unable to parse precomputed block: {path:?}");
                                 }
-                            } else {
-                                warn!("Unable to parse precomputed block: {path:?}");
-                            }
-                        } else if staking::is_valid_ledger_file(&path) {
-                            let state = state.write().await;
-                            if let Some(store) = state.indexer_store.as_ref() {
-                                if let Ok(staking_ledger) = StakingLedger::parse_file(&path) {
-                                    let ledger_hash = staking_ledger.ledger_hash.clone();
-                                    match store.add_staking_ledger(staking_ledger) {
-                                        Ok(_) => {
-                                            info!("Added staking ledger {:?}", ledger_hash);
+                            } else if staking::is_valid_ledger_file(&path) {
+                                let state = state.write().await;
+                                if let Some(store) = state.indexer_store.as_ref() {
+                                    if let Ok(staking_ledger) = StakingLedger::parse_file(&path) {
+                                        let ledger_hash = staking_ledger.ledger_hash.clone();
+                                        match store.add_staking_ledger(staking_ledger) {
+                                            Ok(_) => {
+                                                info!("Added staking ledger {:?}", ledger_hash);
+                                            }
+                                            Err(e) => error!("Error adding staking ledger: {}", e),
                                         }
-                                        Err(e) => error!("Error adding staking ledger: {}", e),
                                     }
                                 }
                             }
@@ -271,10 +291,4 @@ pub async fn run(
         }
     }
     Ok(())
-}
-
-pub fn remove_domain_socket() {
-    if std::fs::remove_file(SOCKET_NAME).is_ok() {
-        debug!("Domain socket removed: {}", SOCKET_NAME);
-    }
 }

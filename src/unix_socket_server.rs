@@ -7,14 +7,13 @@ use crate::{
     command::{signed, store::CommandStore, Command},
     constants::SOCKET_NAME,
     ledger::{self, public_key, store::LedgerStore},
-    server,
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
 };
 use anyhow::bail;
-use std::{path::PathBuf, process, sync::Arc};
+use std::{io::ErrorKind, path::PathBuf, process, sync::Arc};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{UnixListener, UnixStream},
     sync::RwLock,
     task::JoinHandle,
@@ -36,10 +35,11 @@ impl UnixSocketServer {
 }
 
 /// Start the Unix domain server
-/// TODO: Handle when bind fails
 pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
-    server::remove_domain_socket();
-    let listener = UnixListener::bind(SOCKET_NAME).expect("FOOBAR");
+    let listener = UnixListener::bind(SOCKET_NAME)
+        .or_else(try_remove_old_socket)
+        .unwrap_or_else(|e| panic!("unable to connect to domain socket: {e}"));
+
     info!("Unix Socket Server running on: {:?}", SOCKET_NAME);
 
     tokio::spawn(run(server, listener))
@@ -816,7 +816,7 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-            server::remove_domain_socket();
+            remove_domain_socket().expect("domain socket file deleted");
             process::exit(0);
         }
         "summary" => {
@@ -969,6 +969,25 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
         "The path provided must not be a directory: {}",
         path.display()
     ))
+}
+
+fn try_remove_old_socket(e: io::Error) -> io::Result<UnixListener> {
+    if e.kind() == ErrorKind::AddrInUse {
+        debug!(
+            "Domain socket: {} already in use. Removing old vestige",
+            &SOCKET_NAME
+        );
+        remove_domain_socket()?;
+        UnixListener::bind(SOCKET_NAME)
+    } else {
+        Err(e)
+    }
+}
+
+fn remove_domain_socket() -> io::Result<()> {
+    std::fs::remove_file(SOCKET_NAME)?;
+    debug!("Domain socket removed: {SOCKET_NAME}");
+    Ok(())
 }
 
 mod helpers {
