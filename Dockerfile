@@ -1,6 +1,6 @@
 FROM rust:1.76 as builder
 WORKDIR /usr/src/mina-indexer
-COPY . .
+COPY ./rust .
 RUN apt-get update && apt-get install -y libclang-dev && rm -rf /var/lib/apt/lists/*
 RUN RUST_BACKTRACE=1 cargo build --release
 

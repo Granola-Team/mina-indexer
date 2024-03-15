@@ -1,6 +1,7 @@
 use crate::block::precomputed::PrecomputedBlock;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct GenesisBlock(pub PrecomputedBlock, pub u64);
 
 impl GenesisBlock {
@@ -17,5 +18,27 @@ impl GenesisBlock {
 impl GenesisBlock {
     pub fn to_precomputed(self) -> PrecomputedBlock {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_genesis_block() -> anyhow::Result<()> {
+        match GenesisBlock::new() {
+            Ok(block) => {
+                let state_hash = block.0.state_hash;
+                assert_eq!(
+                    "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
+                    state_hash
+                );
+            }
+            Err(e) => {
+                anyhow::bail!(e);
+            }
+        }
+        Ok(())
     }
 }

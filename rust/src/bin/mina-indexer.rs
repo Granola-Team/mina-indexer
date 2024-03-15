@@ -201,7 +201,6 @@ pub fn process_indexer_configuration(
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
     let reporting_freq = args.reporting_freq;
-
     assert!(
         ledger.is_file(),
         "Ledger file does not exist at {}",
@@ -216,7 +215,6 @@ pub fn process_indexer_configuration(
     fs::create_dir_all(ledger_watch_dir.clone()).unwrap();
 
     info!("Parsing ledger file at {}", ledger.display());
-
     match ledger::genesis::parse_file(&ledger) {
         Err(err) => {
             error!("Unable to parse genesis ledger: {err}");
