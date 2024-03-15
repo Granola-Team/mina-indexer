@@ -33,6 +33,7 @@
 
         runtimeDependencies = with pkgs; [
           openssl
+          zstd
         ];
 
         frameworks = pkgs.darwin.apple_sdk.frameworks;
@@ -76,6 +77,16 @@
         with pkgs; {
           packages = flake-utils.lib.flattenTree rec {
             mina-indexer = rustPlatform.buildRustPackage rec {
+              meta = with lib; {
+                description = "The Mina Indexer is a Mina blockchain analytics tool";
+                longDescription = ''
+                  The Mina Indexer is a re-designed version of the software collectively called the "Mina archive node."
+                '';
+                homepage = "https://github.com/Granola-Team/mina-indexer";
+                license = licenses.asl20;
+                mainProgram = "mina-indexer";
+                platforms = platforms.all;
+              };
               pname = cargo-toml.package.name;
               version = cargo-toml.package.version;
 
@@ -92,8 +103,26 @@
 
               doCheck = false;
             };
-
             default = mina-indexer;
+            dockerImage = pkgs.dockerTools.buildImage {
+              name = "mina-indexer";
+              created = "now";
+              # This is equivalent to `git rev-parse --short HEAD`
+              tag = builtins.substring 0 9 (self.rev or "dev");
+              copyToRoot = pkgs.buildEnv {
+                paths = with pkgs; [
+                  mina-indexer
+                  openssl
+                  zstd
+                  bash
+                  self
+                ];
+                name = "idx-root";
+                pathsToLink = [ "/bin" ];
+              };
+              config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
+            };
+
           };
 
           devShells.default = mkShell {
