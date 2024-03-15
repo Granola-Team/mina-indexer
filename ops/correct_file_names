@@ -30,8 +30,9 @@ while read HASH; do
       if ! diff -pwu "$NAKED_FN" "$DESIRED" 2>&1 >/dev/null; then
         echo "Contents did not match. Record diff."
         jq <"$NAKED_FN" > 1
-	jq <"$DESIRED" > 2
-	diff -pwu 1 2 > "${HASH}.diff" || true
+        jq <"$DESIRED" > 2
+        diff -pwu 1 2 > "${HASH}.diff" || true
+        rm 1 2
       fi
     else
       # It does not use the correct height. Stop.
