@@ -1,12 +1,11 @@
 use crate::constants::{MAINNET_GENESIS_HASH, SOCKET_NAME};
 use clap::{Args, Parser};
-use futures::{
-    io::{AsyncWriteExt, BufReader},
-    AsyncReadExt,
-};
-use interprocess::local_socket::tokio::LocalSocketStream;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, process};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt, BufReader},
+    net::UnixStream,
+};
 use tracing::instrument;
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -334,10 +333,10 @@ pub struct TransactionPublicKeyArgs {
 
 #[instrument]
 pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
-    let conn = match LocalSocketStream::connect(SOCKET_NAME).await {
+    let conn = match UnixStream::connect(SOCKET_NAME).await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Unable to connect to the domain socket server: {e}");
+            eprintln!("Unable to connect to the Unix Socket Server: {}", e);
             process::exit(111);
         }
     };

@@ -1,7 +1,5 @@
 use crate::{
-    block::{
-        get_blockchain_length, get_state_hash, is_valid_block_file, Block, BlockHash, VrfOutput,
-    },
+    block::{get_blockchain_length, get_state_hash, Block, BlockHash, VrfOutput},
     canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
@@ -12,7 +10,6 @@ use crate::{
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
 };
-use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
@@ -77,20 +74,17 @@ impl PrecomputedBlock {
 
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path) -> anyhow::Result<Self> {
-        if is_valid_block_file(path) {
-            let file_name = path.file_name().expect("filename already checked");
-            let blockchain_length = get_blockchain_length(file_name);
-            let state_hash = get_state_hash(file_name).expect("state hash already checked");
-            let log_file_contents = std::fs::read(path)?;
-            let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
-                state_hash,
-                blockchain_length,
-                contents: log_file_contents,
-            })?;
-            Ok(precomputed_block)
-        } else {
-            bail!("Invalid precomputed block file name: {}", path.display())
-        }
+        let file_name = path.file_name().expect("filename already checked");
+        //TODO: Use fast versions of these
+        let blockchain_length = get_blockchain_length(file_name);
+        let state_hash = get_state_hash(file_name).expect("state hash already checked");
+        let log_file_contents = std::fs::read(path)?;
+        let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
+            state_hash,
+            blockchain_length,
+            contents: log_file_contents,
+        })?;
+        Ok(precomputed_block)
     }
 
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {

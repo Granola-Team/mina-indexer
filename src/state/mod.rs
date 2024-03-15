@@ -33,8 +33,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, instrument, trace};
-use uuid::Uuid;
+use tracing::{debug, error, info, trace};
 
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known
@@ -294,17 +293,6 @@ impl IndexerState {
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
         })
-    }
-
-    #[instrument(skip_all)]
-    pub fn spawn_secondary_database(&self) -> anyhow::Result<IndexerStore> {
-        let primary_path = self.indexer_store.as_ref().unwrap().db_path.clone();
-        let mut secondary_path = primary_path.clone();
-        secondary_path.push(Uuid::new_v4().to_string());
-
-        debug!("Spawning secondary readonly Speedb instance");
-        let block_store_readonly = IndexerStore::new_read_only(&primary_path, &secondary_path)?;
-        Ok(block_store_readonly)
     }
 
     /// Initialize indexer state from a collection of contiguous canonical
@@ -1279,7 +1267,7 @@ impl IndexerState {
             let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
 
             info!(
-                "{} blocks ({}) parsed and applied in {:?}",
+                "{} blocks ({:?}) parsed and applied in {:?}",
                 self.blocks_processed,
                 bytesize::ByteSize(self.bytes_processed),
                 total_time.elapsed(),

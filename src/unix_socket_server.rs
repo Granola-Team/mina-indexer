@@ -5,86 +5,61 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
+    constants::SOCKET_NAME,
     ledger::{self, public_key, store::LedgerStore},
-    server::{remove_domain_socket, IpcChannelUpdate},
     snark_work::store::SnarkStore,
-    state::summary::{SummaryShort, SummaryVerbose},
-    store::IndexerStore,
+    state::{summary::SummaryShort, IndexerState},
 };
 use anyhow::bail;
-use futures_util::{io::BufReader, AsyncBufReadExt, AsyncWriteExt};
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-use std::{path::PathBuf, process, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use std::{io::ErrorKind, path::PathBuf, process, sync::Arc};
+use tokio::{
+    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::{UnixListener, UnixStream},
+    sync::RwLock,
+    task::JoinHandle,
+};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
-pub struct IpcActor {
-    state_recv: IpcStateReceiver,
-    listener: LocalSocketListener,
-    summary: RwLock<Option<SummaryVerbose>>,
-    store: RwLock<Arc<IndexerStore>>,
+pub struct UnixSocketServer {
+    state: Arc<RwLock<IndexerState>>,
 }
 
-type IpcStateReceiver = mpsc::Receiver<IpcChannelUpdate>;
-
-impl IpcActor {
-    #[instrument(skip_all)]
-    pub fn new(
-        listener: LocalSocketListener,
-        store: Arc<IndexerStore>,
-        state_recv: IpcStateReceiver,
-    ) -> Self {
-        debug!("Creating new IPC actor");
-        Self {
-            state_recv,
-            listener,
-            summary: RwLock::new(None),
-            store: RwLock::new(store),
-        }
+/// Some docs
+impl UnixSocketServer {
+    /// Create a new Unix Socket Server
+    pub fn new(state: Arc<RwLock<IndexerState>>) -> Self {
+        info!("Creating Unix Domain Socket Server");
+        Self { state }
     }
+}
 
-    #[instrument(skip(self))]
-    pub async fn run(&mut self) {
-        loop {
-            tokio::select! {
-                state = self.state_recv.recv() => {
-                    debug!("Received IPC state update");
-                    match state {
-                        None => panic!("IPC channel closed"),
-                        Some(state) => {
-                            debug!("Setting IPC state");
-                            *self.summary.write().await = Some(*state.summary);
-                            *self.store.write().await = state.store;
-                        },
-                    }
-                }
+/// Start the Unix domain server
+pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
+    let listener = UnixListener::bind(SOCKET_NAME)
+        .or_else(try_remove_old_socket)
+        .unwrap_or_else(|e| panic!("unable to connect to domain socket: {e}"));
 
-                client = self.listener.accept() => {
-                    let store = self.store.read().await.clone();
-                    let summary = self.summary.read().await.clone();
-                    match client {
-                        Err(e) => error!("Error accepting connection: {e}"),
-                        Ok(stream) => {
-                            info!("Accepted client connection");
-                            tokio::spawn(async move {
-                                debug!("Handling client connection");
-                                match handle_conn(stream,
-                                    &store,
-                                    summary.as_ref()
-                                ).await {
-                                    Ok(_) => { info!("Connection successfully handled"); },
-                                    Err(e) => {
-                                        error!("Error handling connection: {e}");
-                                    },
-                                };
-                                if !store.is_primary {
-                                    debug!("Removing readonly instance at {}", store.db_path.clone().display());
-                                    tokio::fs::remove_dir_all(&store.db_path).await.ok();
-                                }
-                            });
-                        }
+    info!("Unix Socket Server running on: {:?}", SOCKET_NAME);
+
+    tokio::spawn(run(server, listener))
+}
+
+/// Accept client connections and spawn a green thread to handle the connection
+async fn run(server: UnixSocketServer, listener: UnixListener) {
+    loop {
+        tokio::select! {
+            client = listener.accept() => {
+                match client {
+                    Ok((socket, _)) => {
+                        let state = server.state.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_conn(socket, &state).await {
+                                error!("Unable to process Unix socket request: {}", e);
+                            }
+                        });
                     }
+                    Err(e) => error!("Failed to accept connection: {}", e),
                 }
             }
         }
@@ -93,12 +68,16 @@ impl IpcActor {
 
 #[instrument(skip_all)]
 async fn handle_conn(
-    conn: LocalSocketStream,
-    db: &IndexerStore,
-    summary: Option<&SummaryVerbose>,
+    conn: UnixStream,
+    state: &Arc<RwLock<IndexerState>>,
 ) -> Result<(), anyhow::Error> {
     use helpers::*;
-
+    let state = state.read().await;
+    let db = if let Some(store) = state.indexer_store.as_ref() {
+        store
+    } else {
+        bail!("Unable to get a handle on indexer store...");
+    };
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -837,8 +816,7 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-
-            remove_domain_socket().unwrap_or(());
+            remove_domain_socket().expect("domain socket file deleted");
             process::exit(0);
         }
         "summary" => {
@@ -848,30 +826,28 @@ async fn handle_conn(
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
 
-            if let Some(summary) = summary {
-                let summary_str = if verbose {
-                    format_json(&summary, json)
-                } else {
-                    let summary: SummaryShort = summary.clone().into();
-                    format_json(&summary, json)
-                };
-
-                if path.is_empty() {
-                    info!("Writing summary to stdout");
-                    Some(summary_str)
-                } else {
-                    let path: PathBuf = path.into();
-                    if !path.is_dir() {
-                        info!("Writing summary to {}", path.display());
-
-                        std::fs::write(&path, summary_str).unwrap();
-                        Some(format!("Summary written to {}", path.display()))
-                    } else {
-                        file_must_not_be_a_directory(&path)
-                    }
-                }
+            let summary = state.summary_verbose();
+            // TODO: won't this always be verbose??
+            let summary_str = if verbose {
+                format_json(&summary, json)
             } else {
-                Some("Summary not available".into())
+                let summary: SummaryShort = summary.clone().into();
+                format_json(&summary, json)
+            };
+
+            if path.is_empty() {
+                info!("Writing summary to stdout");
+                Some(summary_str)
+            } else {
+                let path: PathBuf = path.into();
+                if !path.is_dir() {
+                    info!("Writing summary to {}", path.display());
+
+                    std::fs::write(&path, summary_str).unwrap();
+                    Some(format!("Summary written to {}", path.display()))
+                } else {
+                    file_must_not_be_a_directory(&path)
+                }
             }
         }
         "tx-pk" => {
@@ -993,6 +969,25 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
         "The path provided must not be a directory: {}",
         path.display()
     ))
+}
+
+fn try_remove_old_socket(e: io::Error) -> io::Result<UnixListener> {
+    if e.kind() == ErrorKind::AddrInUse {
+        debug!(
+            "Domain socket: {} already in use. Removing old vestige",
+            &SOCKET_NAME
+        );
+        remove_domain_socket()?;
+        UnixListener::bind(SOCKET_NAME)
+    } else {
+        Err(e)
+    }
+}
+
+fn remove_domain_socket() -> io::Result<()> {
+    std::fs::remove_file(SOCKET_NAME)?;
+    debug!("Domain socket removed: {SOCKET_NAME}");
+    Ok(())
 }
 
 mod helpers {
