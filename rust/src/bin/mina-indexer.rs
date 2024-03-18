@@ -104,8 +104,31 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
     /// Path to the locked supply CSV
-    #[arg(long, default_value = concat!(env!("PWD"), "/data/locked.csv"))]
-    locked_supply_csv: PathBuf,
+    #[arg(long, value_name = "FILE")]
+    locked_supply_csv: Option<PathBuf>,
+}
+
+impl ServerArgs {
+    fn with_dynamic_defaults(mut self) -> Self {
+        let path = match release_profile() {
+            ReleaseProfile::Production => PathBuf::from("/usr/share/mina-indexer/data/locked.csv"),
+            ReleaseProfile::Development => concat!(env!("PWD"), "/data/locked.csv").into(),
+        };
+        self.locked_supply_csv = Some(path);
+        self
+    }
+}
+
+pub enum ReleaseProfile {
+    Production,
+    Development,
+}
+
+fn release_profile() -> ReleaseProfile {
+    match std::env::var("RELEASE").unwrap_or_default().as_str() {
+        "production" => ReleaseProfile::Production,
+        _ => ReleaseProfile::Development,
+    }
 }
 
 #[tokio::main]
@@ -118,6 +141,7 @@ pub async fn main() -> anyhow::Result<()> {
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
             };
+            let args = args.with_dynamic_defaults();
             let locked_supply_csv = args.locked_supply_csv.clone();
             let database_dir = args.database_dir.clone();
             let web_hostname = args.web_hostname.clone();
