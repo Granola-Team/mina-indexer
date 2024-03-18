@@ -16,23 +16,23 @@ use tracing::instrument;
 pub enum ClientCli {
     /// Query account by public key
     Account(AccountArgs),
-    #[clap(flatten)]
+    #[command(subcommand)]
     Block(BlockArgs),
-    #[clap(flatten)]
+    #[command(subcommand)]
     Chain(ChainArgs),
     /// Create a checkpoint of the indexer store
     Checkpoint(CheckpointArgs),
-    #[clap(flatten)]
+    #[command(subcommand)]
     Ledger(LedgerArgs),
-    #[clap(flatten)]
+    #[command(subcommand)]
     StakingLedger(StakingLedgerArgs),
     #[clap(hide = true)]
     Shutdown,
-    #[clap(flatten)]
+    #[clap(subcommand)]
     Snark(SnarkArgs),
     /// Show a summary of the state
     Summary(SummaryArgs),
-    #[clap(flatten)]
+    #[command(subcommand)]
     Transactions(TransactionArgs),
     #[clap(flatten)]
     InternalCommand(InternalCommandArgs),
