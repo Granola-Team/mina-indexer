@@ -135,6 +135,7 @@
                 pathsToLink = [ "/bin" "/usr/share" ];
               };
               config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
+              config.Env = [ "RELEASE=production" ];
             };
 
           };
