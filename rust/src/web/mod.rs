@@ -7,7 +7,7 @@ use actix_web::{middleware, web::Data, App, HttpServer};
 use std::{net, path::Path, sync::Arc};
 use tracing::warn;
 
-fn load_locked_balances<P: AsRef<Path>>(path: P) -> LockedBalances {
+fn load_locked_balances<P: AsRef<Path>>(path: Option<P>) -> LockedBalances {
     match LockedBalances::from_csv(path) {
         Ok(locked_balances) => locked_balances,
         Err(e) => {
@@ -20,7 +20,7 @@ fn load_locked_balances<P: AsRef<Path>>(path: P) -> LockedBalances {
 pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
     state: Arc<IndexerStore>,
     addrs: A,
-    locked_supply: P,
+    locked_supply: Option<P>,
 ) -> std::io::Result<()> {
     let locked = Arc::new(load_locked_balances(locked_supply));
     HttpServer::new(move || {
