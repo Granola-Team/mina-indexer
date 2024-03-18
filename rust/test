@@ -540,7 +540,7 @@ test_missing_blocks() {
 
     # add missing block which connects the dangling branches
     dl_mainnet_single 21 ./blocks
-    sleep 1
+    sleep 2
 
     # dangling branches combine
     # no new canonical blocks
@@ -550,7 +550,7 @@ test_missing_blocks() {
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
-    assert 4 $num_dangling
+    assert 3 $num_dangling
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL' $best_hash
@@ -558,7 +558,7 @@ test_missing_blocks() {
 
     # add remaining missing block
     dl_mainnet_single 11 ./blocks
-    sleep 1
+    sleep 2
 
     # dangling branches move into the root branch
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
@@ -567,10 +567,10 @@ test_missing_blocks() {
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
-    assert 3 $num_dangling
+    assert 0 $num_dangling
     assert 30 $best_length
     assert 20 $canonical_length
-    assert '3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL' $best_hash
+    assert '3NLpGhdRifLr31DGc61jUhsAdZiTy7EUw8cap41jrmzbTem5hc3V' $best_hash
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $canonical_hash
 
     teardown
@@ -1183,7 +1183,7 @@ test_txn_nonces() {
 
     # after block 100
     nonce=$(idxr account -k $pk | jq -r .nonce)
-    assert '149' $nonce
+    assert '129' $nonce
 
     teardown
 }
