@@ -44,12 +44,8 @@ enum ServerCommand {
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     /// Path to the genesis ledger
-    #[arg(
-        short,
-        long,
-        default_value = concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json")
-    )]
-    genesis_ledger: PathBuf,
+    #[arg(short, long, value_name = "FILE")]
+    genesis_ledger: Option<PathBuf>,
     /// Hash of the initial state
     #[arg(
         long,
@@ -110,11 +106,26 @@ pub struct ServerArgs {
 
 impl ServerArgs {
     fn with_dynamic_defaults(mut self) -> Self {
-        let path = match release_profile() {
-            ReleaseProfile::Production => PathBuf::from("/usr/share/mina-indexer/data/locked.csv"),
-            ReleaseProfile::Development => concat!(env!("PWD"), "/data/locked.csv").into(),
-        };
-        self.locked_supply_csv = Some(path);
+        if self.locked_supply_csv.is_none() {
+            let path = match release_profile() {
+                ReleaseProfile::Production => {
+                    PathBuf::from("/usr/share/mina-indexer/data/locked.csv")
+                }
+                ReleaseProfile::Development => concat!(env!("PWD"), "/data/locked.csv").into(),
+            };
+            self.locked_supply_csv = Some(path);
+        }
+        if self.genesis_ledger.is_none() {
+            let ledger_path = match release_profile() {
+                ReleaseProfile::Production => {
+                    PathBuf::from("/usr/share/mina-indexer/data/mainnet.json")
+                }
+                ReleaseProfile::Development => {
+                    concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json").into()
+                }
+            };
+            self.genesis_ledger = Some(ledger_path);
+        }
         self
     }
 }
@@ -214,7 +225,7 @@ pub fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
 ) -> anyhow::Result<IndexerConfiguration> {
-    let ledger = args.genesis_ledger;
+    let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
     let block_startup_dir = args.block_startup_dir;
     let block_watch_dir = args.block_watch_dir.unwrap_or(block_startup_dir.clone());
@@ -283,12 +294,18 @@ struct ServerArgsJson {
     prune_interval: u32,
     canonical_threshold: u32,
     canonical_update_threshold: u32,
+    locked_supply_csv: Option<String>,
 }
 
 impl From<ServerArgs> for ServerArgsJson {
     fn from(value: ServerArgs) -> Self {
+        let value = value.with_dynamic_defaults();
         Self {
-            genesis_ledger: value.genesis_ledger.display().to_string(),
+            genesis_ledger: value
+                .genesis_ledger
+                .expect("Genesis ledger wasn't provided")
+                .display()
+                .to_string(),
             genesis_hash: value.genesis_hash,
             block_startup_dir: value.block_startup_dir.display().to_string(),
             block_watch_dir: value
@@ -311,6 +328,9 @@ impl From<ServerArgs> for ServerArgsJson {
             prune_interval: value.prune_interval,
             canonical_threshold: value.canonical_threshold,
             canonical_update_threshold: value.canonical_update_threshold,
+            locked_supply_csv: value
+                .locked_supply_csv
+                .and_then(|p| p.to_str().map(|s| s.to_owned())),
         }
     }
 }
