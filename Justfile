@@ -19,6 +19,7 @@ prereqs:
   cargo clippy --version
   cargo machete --help 2>&1 >/dev/null
   jq --version
+  check-jsonschema --version
 
 build:
   cargo build --release
