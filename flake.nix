@@ -63,7 +63,6 @@
             cargo-nextest
             cargo-audit
             cargo-machete
-            google-cloud-sdk
             just
             jq       # Used in testing.
             git      # Needed but not declared by Nix's 'stdenv' build.

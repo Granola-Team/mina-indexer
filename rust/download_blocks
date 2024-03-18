@@ -1,24 +1,20 @@
-#!/bin/sh
-set -ex
+#! /bin/sh
+#
+# Populates the "$4" directory with precomputed block records from the Mina
+# "$3" network, beginning with blocks of height "$1" and ending with blocks of
+# height "$2" (less than 1000).
 
-BLOCKS_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
-touch "$BLOCKS_DIR"/block_urls
+set -eu
+set -x
 
-download_blocks_cleanup() {
-    rm -fr "$BLOCKS_DIR"
-}
+MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
-trap download_blocks_cleanup EXIT
-
-BUCKET=$1
-MIN_LENGTH=$2
-MAX_LENGTH=$3
-NETWORK=$4
-OUT_DIR=$5
+MIN_LENGTH=$1
+MAX_LENGTH=$2
+NETWORK=$3
+OUT_DIR=$4
 
 for LENGTH in `seq $MIN_LENGTH $MAX_LENGTH`
 do
-    echo "gs://${BUCKET}/${NETWORK}-${LENGTH}-*.json" >> "$BLOCKS_DIR"/block_urls
-done 2>/dev/null
-
-gsutil -m cp -I "$OUT_DIR" < "$BLOCKS_DIR"/block_urls
+  cp "${MY_DIR}"/tests/initial-blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
+done
