@@ -419,147 +419,146 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
     let command: String = match command {
-        ClientCli::Account(account_args) => {
-            format!("account {:?}\0", account_args)
+        ClientCli::Account(__) => {
+            format!("account {:?}\0", __)
         }
-        ClientCli::Chain(chain_args) => match chain_args {
-            ChainArgs::BestChain(args) => format!(
+        ClientCli::Chain(__) => match __ {
+            ChainArgs::BestChain(__) => format!(
                 "best-chain {} {} {} {} {}\0",
-                args.num,
-                args.verbose,
-                args.start_state_hash,
-                args.end_state_hash.clone().unwrap_or("x".into()),
-                args.path.clone().unwrap_or_default().display()
+                __.num,
+                __.verbose,
+                __.start_state_hash,
+                __.end_state_hash.clone().unwrap_or("x".into()),
+                __.path.clone().unwrap_or_default().display()
             ),
         },
-        ClientCli::Block(block_args) => match block_args {
-            BlockArgs::BestTip(args) => format!(
+        ClientCli::Block(__) => match __ {
+            BlockArgs::BestTip(__) => format!(
                 "block-best-tip {} {}\0",
-                args.verbose,
-                args.path.clone().unwrap_or_default().display()
+                __.verbose,
+                __.path.clone().unwrap_or_default().display()
             ),
-            BlockArgs::Block(args) => format!(
+            BlockArgs::Blocks(__) => format!(
                 "block-state-hash {} {} {}\0",
-                args.state_hash,
-                args.verbose,
-                args.path.clone().unwrap_or_default().display()
+                __.state_hash,
+                __.verbose,
+                __.path.clone().unwrap_or_default().display()
             ),
-            BlockArgs::BlocksAtHeight(args) => format!(
+            BlockArgs::BlocksAtHeight(__) => format!(
                 "blocks-at-height {} {} {}\0",
-                args.height,
-                args.verbose,
-                args.path.clone().unwrap_or_default().display()
+                __.height,
+                __.verbose,
+                __.path.clone().unwrap_or_default().display()
             ),
-            BlockArgs::BlocksAtSlot(args) => format!(
+            BlockArgs::BlocksAtSlot(__) => format!(
                 "blocks-at-slot {} {} {}\0",
-                args.slot,
-                args.verbose,
-                args.path.clone().unwrap_or_default().display()
+                __.slot,
+                __.verbose,
+                __.path.clone().unwrap_or_default().display()
             ),
-            BlockArgs::BlocksAtPublicKey(args) => format!(
+            BlockArgs::BlocksAtPublicKey(__) => format!(
                 "blocks-at-public-key {} {} {}\0",
-                args.public_key,
-                args.verbose,
-                args.path.clone().unwrap_or_default().display()
+                __.public_key,
+                __.verbose,
+                __.path.clone().unwrap_or_default().display()
             ),
         },
-        ClientCli::Checkpoint(checkpoint_args) => {
-            format!("checkpoint {}\0", checkpoint_args.path.display())
+        ClientCli::Checkpoint(__) => {
+            format!("checkpoint {}\0", __.path.display())
         }
-        ClientCli::Ledger(ledger_args) => match ledger_args {
-            LedgerArgs::BestLedger(args) => {
+        ClientCli::Ledger(__) => match __ {
+            LedgerArgs::BestLedger(__) => {
                 format!(
                     "best-ledger {}\0",
-                    args.path.clone().unwrap_or_default().display()
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
-            LedgerArgs::Ledger(args) => {
+            LedgerArgs::Ledger(__) => {
                 format!(
                     "ledger {} {}\0",
-                    args.hash,
-                    args.path.clone().unwrap_or_default().display()
+                    __.hash,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
-            LedgerArgs::LedgerAtHeight(args) => {
+            LedgerArgs::LedgerAtHeight(__) => {
                 format!(
                     "ledger-at-height {} {}\0",
-                    args.height,
-                    args.path.clone().unwrap_or_default().display(),
+                    __.height,
+                    __.path.clone().unwrap_or_default().display(),
                 )
             }
         },
-        ClientCli::StakingLedger(staking_ledger_args) => match staking_ledger_args {
-            StakingLedgerArgs::StakingDelegations(agg_del_args) => {
+        ClientCli::StakingLedger(__) => match __ {
+            StakingLedgerArgs::StakingDelegations(__) => {
                 format!(
                     "staking-delegations {} {} {}\0",
-                    agg_del_args.network,
-                    agg_del_args.epoch,
-                    agg_del_args.path.clone().unwrap_or_default().display()
+                    __.network,
+                    __.epoch,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
-            StakingLedgerArgs::StakingPublicKey(agg_del_args) => {
+            StakingLedgerArgs::StakingPublicKey(__) => {
                 format!(
                     "staking-delegations-pk {} {} {}\0",
-                    agg_del_args.network, agg_del_args.epoch, agg_del_args.public_key
+                    __.network, __.epoch, __.public_key
                 )
             }
-            StakingLedgerArgs::StakingLedgerHash(ledger_hash_args) => {
+            StakingLedgerArgs::StakingLedgerHash(__) => {
                 format!(
                     "staking-ledger-hash {} {}\0",
-                    ledger_hash_args.hash,
-                    ledger_hash_args.path.clone().unwrap_or_default().display()
+                    __.hash,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
-            StakingLedgerArgs::StakingLedgerEpoch(ledger_epoch_args) => {
+            StakingLedgerArgs::StakingLedgerEpoch(__) => {
                 format!(
-                    "staking-ledger-epoch {} {} {}\0",
-                    ledger_epoch_args.network,
-                    ledger_epoch_args.epoch,
-                    ledger_epoch_args.path.clone().unwrap_or_default().display()
+                    "staking-ledger-epoch {} {}\0",
+                    __.epoch,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
         },
-        ClientCli::Snark(snark_args) => match snark_args {
-            SnarkArgs::Snark(snark_args) => {
+        ClientCli::Snark(__) => match __ {
+            SnarkArgs::Snark(__) => {
                 format!(
                     "snark-state-hash {} {}\0",
-                    snark_args.state_hash,
-                    snark_args.path.clone().unwrap_or_default().display()
+                    __.state_hash,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
-            SnarkArgs::SnarkPublicKey(pk_args) => {
+            SnarkArgs::SnarkPublicKey(__) => {
                 format!(
                     "snark-pk {} {}\0",
-                    pk_args.public_key,
-                    pk_args.path.clone().unwrap_or_default().display()
+                    __.public_key,
+                    __.path.clone().unwrap_or_default().display()
                 )
             }
         },
         ClientCli::Shutdown => "shutdown \0".to_string(),
-        ClientCli::Summary(summary_args) => {
+        ClientCli::Summary(__) => {
             format!(
                 "summary {} {} {}\0",
-                summary_args.verbose,
-                summary_args.json,
-                summary_args.path.clone().unwrap_or_default().display()
+                __.verbose,
+                __.json,
+                __.path.clone().unwrap_or_default().display()
             )
         }
-        ClientCli::Transactions(transaction_args) => match transaction_args {
-            TransactionArgs::TxHash(args) => {
-                format!("tx-hash {} {}\0", args.tx_hash, args.verbose)
+        ClientCli::Transaction(__) => match __ {
+            TransactionArgs::TxHash(__) => {
+                format!("tx-hash {} {}\0", __.tx_hash, __.verbose)
             }
-            TransactionArgs::TxPublicKey(pk_args) => {
+            TransactionArgs::TxPublicKey(__) => {
                 format!(
                     "tx-pk {} {} {} {} {}\0",
-                    pk_args.public_key,
-                    pk_args.verbose,
-                    pk_args.start_state_hash,
-                    pk_args.end_state_hash.clone().unwrap_or("x".into()),
-                    pk_args.path.clone().unwrap_or_default().display(),
+                    __.public_key,
+                    __.verbose,
+                    __.start_state_hash,
+                    __.end_state_hash.clone().unwrap_or("x".into()),
+                    __.path.clone().unwrap_or_default().display(),
                 )
             }
-            TransactionArgs::TxStateHash(args) => {
-                format!("tx-state-hash {} {}\0", args.state_hash, args.verbose)
+            TransactionArgs::TxStateHash(__) => {
+                format!("tx-state-hash {} {}\0", __.state_hash, __.verbose)
             }
         },
         ClientCli::InternalCommand(internal_cmd_args) => match internal_cmd_args {
