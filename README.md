@@ -79,6 +79,21 @@ features after updates, use:
 nix-shell --run "just test-regression"
 ```
 
+## Generating Docker Images With Nix
+
+Building docker images from nix must happen from `x86-64-linux`
+machine otherwise you'll need to cross-compile.
+
+Issue the following command to build the docker image and load it into
+docker.
+
+```bash
+nix build .#dockerImage
+docker load < result
+
+docker run --rm -it mina-indexer:<sha> mina-indexer server start --help
+```
+
 ## License
 
 Copyright 2022-2024 Granola Systems Inc.
