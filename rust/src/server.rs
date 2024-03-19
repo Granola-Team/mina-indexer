@@ -203,22 +203,22 @@ pub async fn initialize(
 
 #[cfg(target_os = "linux")]
 fn matches_event_kind(kind: EventKind) -> bool {
-    match kind {
-        EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write))
-        | EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
-
-        _ => false,
-    }
+    matches!(
+        kind,
+        EventKind::Access(notify::event::AccessKind::Close(
+            notify::event::AccessMode::Write
+        )) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+    )
 }
 
 #[cfg(target_os = "macos")]
 fn matches_event_kind(kind: EventKind) -> bool {
-    match kind {
-        EventKind::Modify(notify::event::ModifyKind::Data(notify::event::DataChange::Content))
-        | EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
-
-        _ => false,
-    }
+    matches!(
+        kind,
+        EventKind::Modify(notify::event::ModifyKind::Data(
+            notify::event::DataChange::Content
+        )) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+    )
 }
 
 #[instrument(skip_all)]
