@@ -429,38 +429,36 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
                 __.verbose,
                 __.start_state_hash,
                 __.end_state_hash.clone().unwrap_or("x".into()),
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             ),
         },
         ClientCli::Block(__) => match __ {
-            BlockArgs::BestTip(__) => format!(
-                "block-best-tip {} {}\0",
-                __.verbose,
-                __.path.clone().unwrap_or_default().display()
-            ),
-            BlockArgs::Blocks(__) => format!(
+            BlockArgs::BestTip(__) => {
+                format!("block-best-tip {} {}\0", __.verbose, to_display(&__.path))
+            }
+            BlockArgs::Block(__) => format!(
                 "block-state-hash {} {} {}\0",
                 __.state_hash,
                 __.verbose,
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             ),
             BlockArgs::BlocksAtHeight(__) => format!(
                 "blocks-at-height {} {} {}\0",
                 __.height,
                 __.verbose,
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             ),
             BlockArgs::BlocksAtSlot(__) => format!(
                 "blocks-at-slot {} {} {}\0",
                 __.slot,
                 __.verbose,
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             ),
             BlockArgs::BlocksAtPublicKey(__) => format!(
                 "blocks-at-public-key {} {} {}\0",
                 __.public_key,
                 __.verbose,
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             ),
         },
         ClientCli::Checkpoint(__) => {
@@ -468,24 +466,13 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
         }
         ClientCli::Ledger(__) => match __ {
             LedgerArgs::BestLedger(__) => {
-                format!(
-                    "best-ledger {}\0",
-                    __.path.clone().unwrap_or_default().display()
-                )
+                format!("best-ledger {}\0", to_display(&__.path))
             }
             LedgerArgs::Ledger(__) => {
-                format!(
-                    "ledger {} {}\0",
-                    __.hash,
-                    __.path.clone().unwrap_or_default().display()
-                )
+                format!("ledger {} {}\0", __.hash, to_display(&__.path))
             }
             LedgerArgs::LedgerAtHeight(__) => {
-                format!(
-                    "ledger-at-height {} {}\0",
-                    __.height,
-                    __.path.clone().unwrap_or_default().display(),
-                )
+                format!("ledger-at-height {} {}\0", __.height, to_display(&__.path),)
             }
         },
         ClientCli::StakingLedger(__) => match __ {
@@ -504,17 +491,13 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
                 )
             }
             StakingLedgerArgs::StakingLedgerHash(__) => {
-                format!(
-                    "staking-ledger-hash {} {}\0",
-                    __.hash,
-                    __.path.clone().unwrap_or_default().display()
-                )
+                format!("staking-ledger-hash {} {}\0", __.hash, to_display(&__.path))
             }
             StakingLedgerArgs::StakingLedgerEpoch(__) => {
                 format!(
                     "staking-ledger-epoch {} {}\0",
                     __.epoch,
-                    __.path.clone().unwrap_or_default().display()
+                    to_display(&__.path)
                 )
             }
         },
@@ -523,15 +506,11 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
                 format!(
                     "snark-state-hash {} {}\0",
                     __.state_hash,
-                    __.path.clone().unwrap_or_default().display()
+                    to_display(&__.path)
                 )
             }
             SnarkArgs::SnarkPublicKey(__) => {
-                format!(
-                    "snark-pk {} {}\0",
-                    __.public_key,
-                    __.path.clone().unwrap_or_default().display()
-                )
+                format!("snark-pk {} {}\0", __.public_key, to_display(&__.path))
             }
         },
         ClientCli::Shutdown => "shutdown \0".to_string(),
@@ -540,10 +519,10 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
                 "summary {} {} {}\0",
                 __.verbose,
                 __.json,
-                __.path.clone().unwrap_or_default().display()
+                to_display(&__.path)
             )
         }
-        ClientCli::Transaction(__) => match __ {
+        ClientCli::Transactions(__) => match __ {
             TransactionArgs::TxHash(__) => {
                 format!("tx-hash {} {}\0", __.tx_hash, __.verbose)
             }
@@ -554,7 +533,7 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
                     __.verbose,
                     __.start_state_hash,
                     __.end_state_hash.clone().unwrap_or("x".into()),
-                    __.path.clone().unwrap_or_default().display(),
+                    to_display(&__.path),
                 )
             }
             TransactionArgs::TxStateHash(__) => {
@@ -587,4 +566,8 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     println!("{msg}");
 
     Ok(())
+}
+
+fn to_display(path: &Option<PathBuf>) -> String {
+    path.clone().unwrap_or_default().display().to_string()
 }
