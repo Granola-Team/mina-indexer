@@ -237,8 +237,11 @@ pub async fn run(
         match res {
             Ok(event) => {
                 trace!("Event: {:?}", event.clone());
-                if let EventKind::Modify(notify::event::ModifyKind::Data(notify::event::DataChange::Content))
-                    | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind {
+                if let EventKind::Modify(notify::event::ModifyKind::Data(
+                    notify::event::DataChange::Content,
+                ))
+                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
+                {
                     for path in event.paths {
                         if block::is_valid_block_file(&path) {
                             debug!("Valid precomputed block file: {}", path.display());
