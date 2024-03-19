@@ -201,6 +201,26 @@ pub async fn initialize(
     Ok(state)
 }
 
+#[cfg(target_os = "linux")]
+fn matches_event_kind(kind: EventKind) -> bool {
+    match kind {
+        EventKind::Access(notify::event::AccessKind::Close(notify::event::AccessMode::Write))
+        | EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
+
+        _ => false,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn matches_event_kind(kind: EventKind) -> bool {
+    match kind {
+        EventKind::Modify(notify::event::ModifyKind::Data(notify::event::DataChange::Content))
+        | EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
+
+        _ => false,
+    }
+}
+
 #[instrument(skip_all)]
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
@@ -209,7 +229,6 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::channel(4096);
     let rt = Handle::current();
-
     let mut watcher = RecommendedWatcher::new(
         move |result| {
             let tx = tx.clone();
@@ -237,11 +256,7 @@ pub async fn run(
         match res {
             Ok(event) => {
                 trace!("Event: {:?}", event.clone());
-                if let EventKind::Modify(notify::event::ModifyKind::Data(
-                    notify::event::DataChange::Content,
-                ))
-                | EventKind::Modify(notify::event::ModifyKind::Name(_)) = event.kind
-                {
+                if matches_event_kind(event.kind) {
                     for path in event.paths {
                         if block::is_valid_block_file(&path) {
                             debug!("Valid precomputed block file: {}", path.display());
