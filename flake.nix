@@ -9,71 +9,81 @@
     };
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    rust-overlay,
-    flake-utils,
-    flake-compat,
-    ...
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+      flake-compat,
+      ...
     }:
-    flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"] (
-      system: let
-        overlays = [(import rust-overlay)];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+    flake-utils.lib.eachSystem
+      [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ]
+      (
+        system:
+        let
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs { inherit system overlays; };
 
-        rust = pkgs.rust-bin.fromRustupToolchainFile ./rust/rust-toolchain.toml;
+          rust = pkgs.rust-bin.fromRustupToolchainFile ./rust/rust-toolchain.toml;
 
-        rustPlatform = pkgs.makeRustPlatform {
-          cargo = rust;
-          rustc = rust;
-        };
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = rust;
+            rustc = rust;
+          };
 
-        runtimeDependencies = with pkgs; [
-          openssl
-          zstd
-        ];
-
-        frameworks = pkgs.darwin.apple_sdk.frameworks;
-
-        buildDependencies = with pkgs; [
-            libclang.lib
-            clang
-            pkg-config
-            rustPlatform.bindgenHook]
-          ++ runtimeDependencies
-          ++ lib.optionals stdenv.isDarwin [
-            frameworks.Security
-            frameworks.CoreServices
+          runtimeDependencies = with pkgs; [
+            openssl
+            zstd
           ];
 
-        # used to ensure rustfmt is nightly version to support unstable features
-        nightlyToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain:
-          toolchain.minimal.override {
-            extensions = ["rustfmt"];
-          }
-        );
+          frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-        developmentDependencies = with pkgs;
-          [
-            nightlyToolchain.passthru.availableComponents.rustfmt
-            rust
-            cargo-nextest
-            cargo-audit
-            cargo-machete
-            just
-            jq       # Used in testing.
-            git      # Needed but not declared by Nix's 'stdenv' build.
-            curl
-            check-jsonschema
-          ]
-          ++ buildDependencies;
+          buildDependencies =
+            with pkgs;
+            [
+              libclang.lib
+              clang
+              pkg-config
+              rustPlatform.bindgenHook
+            ]
+            ++ runtimeDependencies
+            ++ lib.optionals stdenv.isDarwin [
+              frameworks.Security
+              frameworks.CoreServices
+            ];
 
-        cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
-      in
-        with pkgs; {
+          # used to ensure rustfmt is nightly version to support unstable features
+          nightlyToolchain = pkgs.rust-bin.selectLatestNightlyWith (
+            toolchain: toolchain.minimal.override { extensions = [ "rustfmt" ]; }
+          );
+
+          developmentDependencies =
+            with pkgs;
+            [
+              nightlyToolchain.passthru.availableComponents.rustfmt
+              rust
+              cargo-nextest
+              cargo-audit
+              cargo-machete
+              just
+              jq # Used in testing.
+              git # Needed but not declared by Nix's 'stdenv' build.
+              curl
+              check-jsonschema
+            ]
+            ++ buildDependencies;
+
+          cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
+        in
+        with pkgs;
+        {
           packages = flake-utils.lib.flattenTree rec {
             mina-indexer = rustPlatform.buildRustPackage rec {
               meta = with lib; {
@@ -103,11 +113,16 @@
               nativeBuildInputs = buildDependencies;
               buildInputs = runtimeDependencies;
 
-              env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
-                    (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
+              env =
+                {
+                  LIBCLANG_PATH = "${libclang.lib}/lib";
+                }
+                // (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) {
+                  NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}";
+                });
 
               doCheck = false;
-              postBuild= ''
+              postBuild = ''
                 set -ex
                 echo "Copying over useful files"
                 mkdir -p $out/usr/share/mina-indexer/data
@@ -131,17 +146,24 @@
                   self
                 ];
                 name = "idx-root";
-                pathsToLink = [ "/bin" "/usr/share" ];
+                pathsToLink = [
+                  "/bin"
+                  "/usr/share"
+                ];
               };
               config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
               config.Env = [ "RELEASE=production" ];
             };
-
           };
 
           devShells.default = mkShell {
-            env = { LIBCLANG_PATH = "${libclang.lib}/lib"; } //
-                  (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) { NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}"; });
+            env =
+              {
+                LIBCLANG_PATH = "${libclang.lib}/lib";
+              }
+              // (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) {
+                NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}";
+              });
 
             buildInputs = developmentDependencies;
             shellHook = ''
@@ -149,5 +171,5 @@
             '';
           };
         }
-    );
+      );
 }
