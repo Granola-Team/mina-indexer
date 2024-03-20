@@ -1,8 +1,8 @@
-use crate::{proof_systems::signer::pubkey::CompressedPubKey, store::IndexerStore};
 use crate::block::store::BlockStore;
-use actix_web::{HttpResponse, Result};
+use crate::{proof_systems::signer::pubkey::CompressedPubKey, store::IndexerStore};
+use actix_web::HttpResponse;
 use async_graphql::{
-    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, Object, Schema, SimpleObject
+    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, Object, Result, Schema, SimpleObject,
 };
 use chrono::DateTime;
 use std::sync::Arc;
@@ -26,13 +26,11 @@ struct Block {
     creator_account: CreatorAccount,
 }
 
-
 #[derive(SimpleObject)]
 struct WinnerAccount {
     /// The public_key for the WinnerAccount
     public_key: String,
 }
-
 
 #[derive(SimpleObject)]
 struct CreatorAccount {
@@ -46,17 +44,20 @@ fn millis_to_date_string(millis: i64) -> String {
     date_time.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
-
 #[Object]
 impl QueryRoot {
-    async fn block<'ctx>(&self, ctx: &Context<'ctx>) -> Block {
-        let db = ctx.data::<Arc<IndexerStore>>().expect("db should be there");
-        let best_tip = db.get_best_block().expect("asdf").unwrap();
+    async fn block<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Block> {
+        let db = ctx.data::<Arc<IndexerStore>>().expect("db to be in context");
+        let best_tip = match db.get_best_block()? {
+            Some(best_tip) => best_tip,
+            None => panic!("unable to find best tip"),
+        };
+
         let winner_account = best_tip.block_creator().0;
         let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
         let pk_creator = best_tip.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
-        Block {
+        Ok(Block {
             state_hash: best_tip.state_hash,
             block_height: best_tip.blockchain_length,
             date_time,
@@ -65,8 +66,8 @@ impl QueryRoot {
             },
             creator_account: CreatorAccount {
                 public_key: creator,
-            }
-        }
+            },
+        })
     }
 }
 
@@ -78,7 +79,7 @@ pub fn build_schema(
         .finish()
 }
 
-pub async fn index_graphiql() -> Result<HttpResponse> {
+pub async fn index_graphiql() -> actix_web::Result<HttpResponse> {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(GraphiQLSource::build().endpoint("/graphql").finish()))
