@@ -69,6 +69,15 @@ dl_mainnet_range() {
     "$BLOCKS_FETCHER" "$1" "$2" mainnet "$3"
 }
 
+wait_for_socket() {
+    while true; do
+        if [ -S "mina-indexer.sock" ]; then
+            return
+        fi
+        sleep 1
+    done
+}
+
 assert() {
     expected="$1"
     actual="$2"
@@ -180,7 +189,7 @@ test_server_startup() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     result=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
@@ -201,7 +210,7 @@ test_ipc_is_available_immediately() {
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
         --genesis-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-    sleep 1
+    wait_for_socket
 
     idxr summary
     teardown
@@ -219,7 +228,7 @@ test_startup_dirs_get_created() {
         --ledger-watch-dir ./watch-ledgers \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     assert_directory_exists "./startup-blocks"
     assert_directory_exists "./watch-blocks"
@@ -248,7 +257,7 @@ test_account_balance_cli() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     result=$(idxr account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
@@ -265,7 +274,7 @@ test_account_public_key_json() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     result=$(idxr account -k B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
@@ -284,7 +293,7 @@ test_canonical_root() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
     
     hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
@@ -310,7 +319,7 @@ test_canonical_threshold() {
         --database-dir ./database \
         --log-dir ./logs \
         --canonical-threshold $canonical_threshold
-    sleep 1
+    wait_for_socket
 
     hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
@@ -332,7 +341,7 @@ test_best_tip() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # best tip query
     hash=$(idxr best-tip | jq -r .state_hash)
@@ -363,7 +372,7 @@ test_blocks() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # basic height query
     hash=$(idxr blocks-at-height -h 10 | jq -r .[0].state_hash)
@@ -477,7 +486,7 @@ test_block_copy() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
 
     # start without block 11
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -523,7 +532,7 @@ test_missing_blocks() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
 
     # start out missing block 11 & 21
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
@@ -588,7 +597,7 @@ test_best_chain() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
@@ -640,7 +649,7 @@ test_ledgers() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
 
@@ -702,7 +711,7 @@ test_sync() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
@@ -745,7 +754,7 @@ test_replay() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
@@ -790,7 +799,7 @@ test_transactions() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # basic pk transaction queries
     transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR | jq -r .)
@@ -890,7 +899,7 @@ test_snark_work() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
 
     # pk SNARK work queries
     # prover has SNARK work in block 111
@@ -946,7 +955,7 @@ test_checkpoint() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # pre-checkpoint results
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
@@ -967,7 +976,7 @@ test_checkpoint() {
         --block-startup-dir ./blocks \
         --database-dir ./checkpoint \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # post-checkpoint reults
     canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
@@ -999,7 +1008,7 @@ test_many_blocks() {
         --log-dir ./logs \
         --ledger-cadence 100 \
         --log-level debug
-    sleep 10
+    wait_for_socket
 
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -1039,7 +1048,7 @@ test_rest_endpoints() {
         --log-dir ./logs \
         --log-level debug \
         --web-hostname "0.0.0.0"
-    sleep 1
+    wait_for_socket
 
     # results
     balance=$(curl -s http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
@@ -1113,7 +1122,7 @@ test_release() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 30
+    wait_for_socket
 
     # results
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -1149,7 +1158,7 @@ test_genesis_block_creator() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
     
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
     balance=$(idxr ledger-at-height --height 1 | jq -r .${pk}.balance)
@@ -1171,7 +1180,7 @@ test_txn_nonces() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
 
     pk=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
 
@@ -1238,7 +1247,7 @@ test_watch_staking_ledgers() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 1
+    wait_for_socket
 
     # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
