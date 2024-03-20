@@ -316,7 +316,7 @@ impl IndexerState {
                 info!("Adding blocks to the witness tree...");
             }
 
-            // process canonical blocks first
+            // process deep canonical blocks first bypassing the witness tree
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
@@ -340,17 +340,14 @@ impl IndexerState {
                     indexer_store.set_max_canonical_blockchain_length(block.blockchain_length)?;
 
                     // compute and store ledger at specified cadence
-                    if self.blocks_processed > 0 && self.blocks_processed % self.ledger_cadence == 0
-                    {
+                    if self.blocks_processed % self.ledger_cadence == 0 {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
                         indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
-                    if self.blocks_processed > 0
-                        && self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
-                    {
-                        // update root branch
+                    if self.blocks_processed == block_parser.num_deep_canonical_blocks + 1 {
+                        // update root branch on last deep canonical block
                         self.root_branch = Branch::new(&block)?;
                         self.ledger._apply_diff(&ledger_diff)?;
                         self.best_tip = Tip {
@@ -401,8 +398,8 @@ impl IndexerState {
         let mut step_time = total_time;
 
         info!(
-            "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
-            self.reporting_freq
+            "Reporting every {}s or {} blocks",
+            BLOCK_REPORTING_FREQ_SEC, self.reporting_freq
         );
 
         while let Some((parsed_block, block_bytes)) = block_parser.next_block()? {
@@ -413,18 +410,20 @@ impl IndexerState {
 
             match parsed_block {
                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
+                    info!("Adding block to witness tree {}", block.summary());
                     self.block_pipeline(&block)?;
                 }
                 ParsedBlock::Orphaned(block) => {
-                    info!("Adding orphaned block {}", block.summary());
+                    debug!("Adding orphaned block to store {}", block.summary());
                     self.add_block_to_store(&block)?;
                 }
             }
         }
 
         info!(
-            "Ingested and applied {} blocks to the witness tree in {:?}",
+            "Ingested and applied {} ({}) blocks to the witness tree in {:?}",
             self.blocks_processed,
+            bytesize::ByteSize::b(self.bytes_processed),
             total_time.elapsed() + offset,
         );
 
@@ -558,13 +557,8 @@ impl IndexerState {
                     .data()
                     .clone();
 
-                if merged_tip_block.blockchain_length > self.best_tip_block().blockchain_length
-                    || merged_tip_block.state_hash.0 > self.best_tip_block().state_hash.0
-                {
-                    self.update_best_tip(&merged_tip_block, &merged_tip_id);
-                }
+                self.update_best_tip(&merged_tip_block, &merged_tip_id);
             }
-
             self.update_best_tip(&new_block, &new_node_id);
 
             if !branches_to_remove.is_empty() {
@@ -681,26 +675,20 @@ impl IndexerState {
         self.best_tip_block().blockchain_length + 1 >= precomputed_block.blockchain_length
     }
 
-    /// Update the best tip of the root branch
+    /// Update the best tip of the root branch if the incoming block is better
     fn update_best_tip(&mut self, incoming_block: &Block, node_id: &NodeId) {
         let old_best_tip = self.best_tip_block();
-
-        if incoming_block.blockchain_length == old_best_tip.blockchain_length + 1
-            || incoming_block.blockchain_length == old_best_tip.blockchain_length
-                && incoming_block < old_best_tip
-        {
+        if incoming_block < old_best_tip {
             info!(
-                "Update best tip {{\n  old: {}\n  new: {} }}",
+                "Update best tip\n    old: {}\n    new: {}",
                 old_best_tip.summary(),
                 incoming_block.summary(),
             );
             self.best_tip.node_id = node_id.clone();
             self.best_tip.state_hash = incoming_block.state_hash.clone();
+        } else {
+            debug!("Best block is better than the incoming block");
         }
-
-        let (id, block) = self.root_branch.best_tip_with_id().unwrap();
-        self.best_tip.node_id = id;
-        self.best_tip.state_hash = block.state_hash;
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
@@ -1243,7 +1231,7 @@ impl IndexerState {
             witness_tree,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            bytes_processed: 0,
+            bytes_processed: self.bytes_processed,
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1263,21 +1251,32 @@ impl IndexerState {
 
     fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
         if self.should_report_from_block_count(block_parser) {
-            let block_rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
-            let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let elapsed = total_time.elapsed().as_secs();
+            let block_rate = self.blocks_processed as f64 / elapsed as f64;
+            let bytes_rate = if elapsed != 0 {
+                self.bytes_processed / elapsed
+            } else {
+                u64::MAX
+            };
 
             info!(
                 "{} blocks ({:?}) parsed and applied in {:?}",
                 self.blocks_processed,
-                bytesize::ByteSize(self.bytes_processed),
+                bytesize::ByteSize::b(self.bytes_processed),
                 total_time.elapsed(),
             );
-            info!(
-                "Estimated time: {} min",
-                (block_parser.total_num_bytes - self.bytes_processed) as f64
-                    / (bytes_rate * 60_f64)
+            debug!(
+                "Rate: {} blocks/s ({}/s)",
+                block_rate,
+                bytesize::ByteSize::b(bytes_rate)
             );
-            debug!("Rate: {} blocks/s ({}/s)", block_rate, bytes_rate);
+
+            info!(
+                "Estimated rem time: {:?}",
+                Duration::from_secs(
+                    (block_parser.total_num_bytes - self.bytes_processed) / bytes_rate
+                )
+            );
         }
     }
 
@@ -1290,15 +1289,19 @@ impl IndexerState {
         if self.should_report_from_block_count(block_parser)
             || self.should_report_from_time(step_time.elapsed())
         {
+            let elapsed = total_time.elapsed().as_secs();
             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
-            let canonical_root: BlockWithoutHeight = self.canonical_root_block().clone().into();
-            let block_rate = self.blocks_processed as f64 / total_time.elapsed().as_secs() as f64;
-            let bytes_rate = self.bytes_processed as f64 / total_time.elapsed().as_secs() as f64;
+            let block_rate = self.blocks_processed as f64 / elapsed as f64;
+            let bytes_rate = if elapsed != 0 {
+                self.bytes_processed / elapsed
+            } else {
+                u64::MAX
+            };
 
             info!(
                 "Parsed and added {} blocks ({}) to the witness tree in {:?}",
                 self.blocks_processed,
-                bytesize::ByteSize(self.bytes_processed),
+                bytesize::ByteSize::b(self.bytes_processed),
                 total_time.elapsed(),
             );
 
@@ -1306,16 +1309,17 @@ impl IndexerState {
             debug!("Root length:       {}", self.root_branch.len());
             debug!(
                 "Rate:              {} blocks/s ({}/s)",
-                block_rate, bytes_rate
+                block_rate,
+                bytesize::ByteSize::b(bytes_rate)
             );
 
+            info!("Current best tip {}", best_tip.summary());
             info!(
-                "Estimate rem time: {} hr",
-                (block_parser.total_num_bytes - self.bytes_processed) as f64
-                    / (bytes_rate * 3600_f64)
+                "Estimate rem time: {:?}",
+                Duration::from_secs(
+                    (block_parser.total_num_bytes - self.bytes_processed) / bytes_rate
+                )
             );
-            info!("Best tip:          {best_tip:?}");
-            info!("Canonical root:    {canonical_root:?}");
         }
         Ok(())
     }
