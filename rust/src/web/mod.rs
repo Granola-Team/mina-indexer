@@ -2,7 +2,7 @@ pub mod graphql;
 pub mod rest;
 
 use self::{
-    graphql::{build_schema, index_graphiql},
+    graphql::{blocks::build_schema, index_graphiql},
     rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
 };
 use crate::store::IndexerStore;
