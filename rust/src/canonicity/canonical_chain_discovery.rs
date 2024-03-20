@@ -54,15 +54,12 @@ pub fn discovery(
         // paths will always have at least 1 item
         let mut curr_length = extract_block_height_or_max(paths.first().unwrap());
 
-        info!("Searching for canonical chain in startup blocks");
-
+        info!("Searching for deep canonical blocks in startup directory");
         for (idx, path) in paths.iter().enumerate() {
             let length = extract_block_height_or_max(path);
             if length > curr_length || idx == 0 {
                 length_start_indices_and_diffs.push((idx, length - curr_length));
                 curr_length = length;
-            } else {
-                continue;
             }
         }
 
@@ -90,7 +87,9 @@ pub fn discovery(
             || max_num_canonical_blocks(&length_start_indices_and_diffs, last_contiguous_start_idx)
                 < canonical_threshold
         {
-            info!("No canoncial blocks can be confidently found. Adding all blocks to the witness tree.");
+            info!(
+                "No deep canoncial blocks were found other than genesis. Adding all blocks to the witness tree."
+            );
             return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
         }
 
@@ -107,7 +106,12 @@ pub fn discovery(
 
         // handle all blocks that are higher than the canonical root
         if let Some(recent_start_idx) = next_length_start_index(paths.as_slice(), curr_length_idx) {
-            if recent_start_idx < length_start_indices_and_diffs.len() {
+            if recent_start_idx
+                < length_start_indices_and_diffs
+                    .last()
+                    .map(|(idx, _)| *idx)
+                    .unwrap_or(0)
+            {
                 for path in paths[recent_start_idx..].iter() {
                     recent_paths.push(path.to_path_buf());
                 }
@@ -121,7 +125,10 @@ pub fn discovery(
         if deep_canonical_paths.len() < reporting_freq as usize {
             info!("Walking the canonical chain back to genesis");
         } else {
-            info!("Walking the canonical chain back to genesis, reporting every {reporting_freq} blocks");
+            info!(
+                "Walking the canonical chain back to genesis, reporting every {} blocks",
+                reporting_freq
+            );
         }
 
         let time = Instant::now();
@@ -131,13 +138,16 @@ pub fn discovery(
         // segment by segment, searching for ancestors
         while curr_start_idx > 0 {
             if count % reporting_freq == 0 {
-                info!("Found {count} canonical blocks in {:?}", time.elapsed());
+                info!(
+                    "Found {} deep canonical blocks in {:?}",
+                    count,
+                    time.elapsed()
+                );
             }
 
             // search for parent in previous segment's blocks
             let mut parent_found = false;
             let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
-
             let parent_hash = PreviousStateHash::from_path(curr_path)?.0;
 
             for path in paths[prev_length_idx..curr_length_idx].iter() {
@@ -188,7 +198,6 @@ pub fn discovery(
         .last()
         .and_then(|p| extract_block_height(p))
         .unwrap_or(1);
-
     let orphaned_paths: Vec<PathBuf> = paths
         .into_iter()
         .filter(|p| {
@@ -200,6 +209,7 @@ pub fn discovery(
         })
         .cloned()
         .collect();
+
     Ok((
         deep_canonical_paths.to_vec(),
         recent_paths.to_vec(),
