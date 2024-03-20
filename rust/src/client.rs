@@ -102,7 +102,7 @@ pub enum Blocks {
     Height {
         /// Retrieve the blocks with given blockchain length
         #[arg(short, long)]
-        height: String,
+        height: u32,
         /// Path to write the block [default: stdout]
         #[arg(short, long)]
         path: Option<PathBuf>,
@@ -131,7 +131,7 @@ pub enum Chain {
     Best {
         /// Number of blocks to include in this suffix
         #[arg(short, long, default_value_t = 10)]
-        num: usize,
+        num: u32,
         /// Path to write the best chain [default: stdout]
         #[arg(short, long)]
         path: Option<PathBuf>,
