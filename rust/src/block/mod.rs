@@ -183,6 +183,7 @@ impl std::cmp::PartialOrd for Block {
 
 impl std::cmp::Ord for Block {
     /// Follows `selectLongerChain`
+    /// A < B means A is better than B
     /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
@@ -388,7 +389,6 @@ mod tests {
         let path0: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json".into();
         let path1: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
         let path2: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLUfaHDcyt9KsYxi1xsSdYE369GAduLxVgRUDE7RuFgSXQBphDK.json".into();
-
         let block0: Block = PrecomputedBlock::parse_file(&path0)?.into();
         let block1: Block = PrecomputedBlock::parse_file(&path1)?.into();
         let block2: Block = PrecomputedBlock::parse_file(&path2)?.into();
@@ -396,6 +396,13 @@ mod tests {
         assert!(block0 < block1);
         assert!(block0 < block2);
         assert!(block1 < block2);
+
+        let path0: PathBuf = "./tests/initial-blocks/mainnet-10-3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5.json".into();
+        let path1: PathBuf = "./tests/initial-blocks/mainnet-10-3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL.json".into();
+        let block0: Block = PrecomputedBlock::parse_file(&path0)?.into();
+        let block1: Block = PrecomputedBlock::parse_file(&path1)?.into();
+
+        assert!(block0 < block1);
         Ok(())
     }
 }
