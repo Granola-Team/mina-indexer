@@ -1,3 +1,4 @@
+pub mod graphql;
 pub mod rest;
 
 use self::rest::{accounts, blockchain, blocks, locked_balances::LockedBalances};
