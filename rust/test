@@ -180,7 +180,7 @@ test_server_startup() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     result=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
@@ -248,7 +248,7 @@ test_account_balance_cli() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     result=$(idxr account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
@@ -265,7 +265,7 @@ test_account_public_key_json() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     result=$(idxr account -k B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
@@ -284,7 +284,7 @@ test_canonical_root() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
     
     hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
@@ -310,7 +310,7 @@ test_canonical_threshold() {
         --database-dir ./database \
         --log-dir ./logs \
         --canonical-threshold $canonical_threshold
-    sleep 5
+    sleep 1
 
     hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
@@ -332,7 +332,7 @@ test_best_tip() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # best tip query
     hash=$(idxr best-tip | jq -r .state_hash)
@@ -363,7 +363,7 @@ test_blocks() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # basic height query
     hash=$(idxr blocks-at-height -h 10 | jq -r .[0].state_hash)
@@ -477,7 +477,7 @@ test_block_copy() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 5
+    sleep 1
 
     # start without block 11
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -487,13 +487,13 @@ test_block_copy() {
 
     assert 10 $best_length
     assert 1 $canonical_length
-    assert '3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL' $best_hash
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add block 11
     dl_mainnet_single 11 ./blocks_to_copy
     cp ./blocks_to_copy/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json ./blocks
-    sleep 5
+    sleep 1
 
     # check
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -523,7 +523,7 @@ test_missing_blocks() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 5
+    sleep 1
 
     # start out missing block 11 & 21
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
@@ -535,12 +535,12 @@ test_missing_blocks() {
     assert 4 $num_dangling
     assert 10 $best_length
     assert 1 $canonical_length
-    assert '3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL' $best_hash
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add missing block which connects the dangling branches
     dl_mainnet_single 21 ./blocks
-    sleep 2
+    sleep 1
 
     # dangling branches combine
     # no new canonical blocks
@@ -553,12 +553,12 @@ test_missing_blocks() {
     assert 3 $num_dangling
     assert 10 $best_length
     assert 1 $canonical_length
-    assert '3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL' $best_hash
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add remaining missing block
     dl_mainnet_single 11 ./blocks
-    sleep 2
+    sleep 1
 
     # dangling branches move into the root branch
     num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
@@ -588,13 +588,13 @@ test_best_chain() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
-    assert '3NKaUU9un6G7XgnN4P2Gprsx1NmjUWncHskDKSCn1uyzD44CWsP3' $result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
     result=$(idxr best-chain -v | jq -r .[0].state_hash)
-    assert '3NKaUU9un6G7XgnN4P2Gprsx1NmjUWncHskDKSCn1uyzD44CWsP3' $result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
     # best chain with bounds
     bounds=$(idxr best-chain \
@@ -618,11 +618,11 @@ test_best_chain() {
     file=./best_chain/best_chain.json
     idxr best-chain -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKaUU9un6G7XgnN4P2Gprsx1NmjUWncHskDKSCn1uyzD44CWsP3' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     idxr best-chain -v -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKaUU9un6G7XgnN4P2Gprsx1NmjUWncHskDKSCn1uyzD44CWsP3' $file_result
+    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     rm -rf best_chain
     teardown
@@ -640,7 +640,7 @@ test_ledgers() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
 
@@ -702,7 +702,7 @@ test_sync() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
@@ -717,19 +717,19 @@ test_sync() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # post-sync results
-    canonical_hash_sync=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length_sync=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
-    best_hash_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length_sync=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    post_best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    post_best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    post_canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    post_canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
 
     # includes blocks added to watch dir while down
-    assert 20 $best_length_sync
-    assert 10 $canonical_length_sync
-    assert '3NL7a7hz1wBwSyebWJ7CLvVPVPreWc5G7yoySrNmhtGaRuFV74hi' $best_hash_sync
-    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $canonical_hash_sync
+    assert 20 $post_best_length
+    assert 10 $post_canonical_length
+    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $post_best_hash
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $post_canonical_hash
 
     teardown
 }
@@ -745,7 +745,7 @@ test_replay() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # kill running indexer and release db lock
     kill "$(cat idxr_pid)" 2>/dev/null || true
@@ -760,7 +760,7 @@ test_replay() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # post-replay results
     root_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
@@ -772,7 +772,7 @@ test_replay() {
     assert 29 $num_blocks_replay
     assert 20 $best_length_replay
     assert 10 $root_length_replay
-    assert '3NL7a7hz1wBwSyebWJ7CLvVPVPreWc5G7yoySrNmhtGaRuFV74hi' $best_hash_replay
+    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $root_hash_replay
 
     teardown
@@ -790,7 +790,7 @@ test_transactions() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # basic pk transaction queries
     transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR | jq -r .)
@@ -888,8 +888,9 @@ test_snark_work() {
     idxr_server_start \
         --block-startup-dir ./blocks \
         --database-dir ./database \
-        --log-dir ./logs
-    sleep 5
+        --log-dir ./logs \
+        --log-level debug
+    sleep 1
 
     # pk SNARK work queries
     # prover has SNARK work in block 111
@@ -945,7 +946,7 @@ test_checkpoint() {
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # pre-checkpoint results
     canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
@@ -966,7 +967,7 @@ test_checkpoint() {
         --block-startup-dir ./blocks \
         --database-dir ./checkpoint \
         --log-dir ./logs
-    sleep 5
+    sleep 1
 
     # post-checkpoint reults
     canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
@@ -1038,7 +1039,7 @@ test_rest_endpoints() {
         --log-dir ./logs \
         --log-level debug \
         --web-hostname "0.0.0.0"
-    sleep 10
+    sleep 1
 
     # results
     balance=$(curl -s http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
@@ -1048,7 +1049,7 @@ test_rest_endpoints() {
     curl -s http://localhost:${port}/summary > output.json
 
     blockchain_length=$(cat output.json | jq -r .blockchainLength)
-    assert '90' $blockchain_length
+    assert '100' $blockchain_length
 
     chain_id=$(cat output.json | jq -r .chainId)
     assert '5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1' $chain_id
@@ -1063,7 +1064,7 @@ test_rest_endpoints() {
     assert '0' $epoch
 
     global_slot=$(cat output.json | jq -r .globalSlot)
-    assert '125' $global_slot
+    assert '145' $global_slot
 
     locked_supply=$(cat output.json | jq -r .lockedSupply)
     assert '716354155' $locked_supply
@@ -1075,22 +1076,22 @@ test_rest_endpoints() {
     assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $next_epoch_ledger_hash
 
     previous_state_hash=$(cat output.json | jq -r .previousStateHash)
-    assert '3NLdvNALUiJZvSscUoc2PJotDeFZQZZ4NSKKaH4WgjVMNPzhWrwQ' $previous_state_hash
+    assert '3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh' $previous_state_hash
 
     slot=$(cat output.json | jq -r .slot)
-    assert '125' $slot
+    assert '145' $slot
 
     snarked_ledger_hash=$(cat output.json | jq -r .snarkedLedgerHash)
     assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $snarked_ledger_hash
 
     staged_ledger_hash=$(cat output.json | jq -r .stagedLedgerHash)
-    assert 'jx1zkN5jcDKHggTgX8kt3i3y2wvwsuNJyiBjcJ9H3aZHSKBwHTr' $staged_ledger_hash
+    assert 'jwWHNKQPdgLxHCsBki57a6zBfNPUFkAQmsrCNq3E7Q8oiNCNdkm' $staged_ledger_hash
 
     staking_epoch_ledger_hash=$(cat output.json | jq -r .stakingEpochLedgerHash)
     assert 'jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee' $staking_epoch_ledger_hash
 
     state_hash=$(cat output.json | jq -r .stateHash)
-    assert '3NKqFMMNG4aqRmJnTHtQdeUi9sKoKCeN6Bb2UFEdmi21oW1rmT1e' $state_hash
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $state_hash
 
     total_currency=$(cat output.json | jq -r .totalCurrency)
     assert '805385692.840039233' $total_currency
@@ -1143,13 +1144,12 @@ test_genesis_block_creator() {
     test=test_genesis_block_creator
 
     setup
-
     idxr_server_start \
         --block-startup-dir ./blocks \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 5
+    sleep 1
     
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
     balance=$(idxr ledger-at-height --height 1 | jq -r .${pk}.balance)
@@ -1171,7 +1171,7 @@ test_txn_nonces() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
-    sleep 5
+    sleep 1
 
     pk=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
 
@@ -1183,7 +1183,7 @@ test_txn_nonces() {
 
     # after block 100
     nonce=$(idxr account -k $pk | jq -r .nonce)
-    assert '129' $nonce
+    assert '149' $nonce
 
     teardown
 }
@@ -1242,7 +1242,7 @@ test_watch_staking_ledgers() {
 
     # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
-    sleep 10
+    sleep 1
 
     # write epoch 0 ledger to file
     idxr staking-ledger-epoch -e 0 -p ./epoch_0_ledger.json
@@ -1275,7 +1275,7 @@ test_watch_staking_ledgers() {
     epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
     curl https://storage.googleapis.com/mina-explorer-ledgers/${epoch42}.json -o ./mainnet-42-${epoch42}.json
     cp ./mainnet-42-${epoch42}.json ./staking-ledgers/mainnet-42-${epoch42}.json
-    sleep 10
+    sleep 1
 
     # write epoch 42 ledger to file
     idxr staking-ledger-epoch -e 42 -p ./epoch_42_ledger.json
@@ -1318,7 +1318,7 @@ if [ "$#" -eq 0 ]; then
     test_canonical_root
     test_canonical_threshold
     test_best_tip
-#    test_blocks
+    test_blocks
     test_block_copy
     test_missing_blocks
     test_best_chain
@@ -1326,7 +1326,7 @@ if [ "$#" -eq 0 ]; then
     test_sync
     test_replay
     test_transactions
-#    test_snark_work
+    test_snark_work
     test_checkpoint
     test_rest_endpoints
     test_genesis_block_creator
