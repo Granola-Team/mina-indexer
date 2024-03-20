@@ -314,6 +314,7 @@ impl BlockStore for IndexerStore {
             }
         }
 
+        blocks.sort();
         Ok(blocks)
     }
 
@@ -373,6 +374,7 @@ impl BlockStore for IndexerStore {
             }
         }
 
+        blocks.sort();
         Ok(blocks)
     }
 
@@ -436,6 +438,7 @@ impl BlockStore for IndexerStore {
             }
         }
 
+        blocks.sort();
         Ok(blocks)
     }
 }

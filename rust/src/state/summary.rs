@@ -129,8 +129,12 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
     writeln!(f, "  Uptime:       {:?}", state.uptime())?;
-    writeln!(f, "  Bytes added:  {}", state.bytes_processed())?;
-    writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
+    writeln!(
+        f,
+        "  Blocks added: {} ({})",
+        state.blocks_processed(),
+        state.bytes_processed(),
+    )?;
 
     writeln!(f, "\n=== Root branch ===")?;
     writeln!(f, "  Height:                {}", state.root_height())?;
@@ -189,7 +193,7 @@ impl Summary for SummaryShort {
     }
 
     fn bytes_processed(&self) -> bytesize::ByteSize {
-        bytesize::ByteSize(self.bytes_processed)
+        bytesize::ByteSize::b(self.bytes_processed)
     }
 
     fn canonical_root_hash(&self) -> String {
@@ -251,7 +255,7 @@ impl Summary for SummaryVerbose {
     }
 
     fn bytes_processed(&self) -> bytesize::ByteSize {
-        bytesize::ByteSize(self.bytes_processed)
+        bytesize::ByteSize::b(self.bytes_processed)
     }
 
     fn canonical_root_hash(&self) -> String {

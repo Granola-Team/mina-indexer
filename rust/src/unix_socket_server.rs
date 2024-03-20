@@ -25,7 +25,6 @@ pub struct UnixSocketServer {
     state: Arc<RwLock<IndexerState>>,
 }
 
-/// Some docs
 impl UnixSocketServer {
     /// Create a new Unix Socket Server
     pub fn new(state: Arc<RwLock<IndexerState>>) -> Self {
@@ -38,10 +37,9 @@ impl UnixSocketServer {
 pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
     let listener = UnixListener::bind(SOCKET_NAME)
         .or_else(try_remove_old_socket)
-        .unwrap_or_else(|e| panic!("unable to connect to domain socket: {e}"));
+        .unwrap_or_else(|e| panic!("unable to connect to domain socket: {}", e));
 
-    info!("Unix Socket Server running on: {:?}", SOCKET_NAME);
-
+    info!("Unix Socket Server running on: {}", SOCKET_NAME);
     tokio::spawn(run(server, listener))
 }
 
@@ -827,7 +825,6 @@ async fn handle_conn(
             let path = path.trim_end_matches('\0');
 
             let summary = state.summary_verbose();
-            // TODO: won't this always be verbose??
             let summary_str = if verbose {
                 format_json(&summary, json)
             } else {

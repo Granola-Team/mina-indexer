@@ -39,7 +39,7 @@ pub struct BlockParserPaths {
     pub orphaned_paths: Vec<PathBuf>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedBlock {
     Recent(PrecomputedBlock),
     DeepCanonical(PrecomputedBlock),
@@ -203,11 +203,11 @@ impl BlockParser {
                 Ok(Self::empty(&blocks_dir, &paths))
             }
         } else {
-            bail!("blocks_dir: {:?}, does not exist!", blocks_dir)
+            bail!("blocks_dir {} does not exist!", blocks_dir.display())
         }
     }
 
-    fn update_block(
+    fn consume_block(
         &mut self,
         path: &Path,
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
@@ -228,15 +228,15 @@ impl BlockParser {
     /// - orphaned
     pub fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return self.update_block(&next_path, &ParsedBlock::DeepCanonical);
+            return self.consume_block(&next_path, &ParsedBlock::DeepCanonical);
         }
 
         if let Some(next_path) = self.recent_paths.next() {
-            return self.update_block(&next_path, &ParsedBlock::Recent);
+            return self.consume_block(&next_path, &ParsedBlock::Recent);
         }
 
         if let Some(next_path) = self.orphaned_paths.next() {
-            return self.update_block(&next_path, &ParsedBlock::Orphaned);
+            return self.consume_block(&next_path, &ParsedBlock::Orphaned);
         }
 
         Ok(None)
@@ -371,7 +371,6 @@ mod tests {
             .iter()
             .map(|x| get_blockchain_length(&OsString::from(x)))
             .collect();
-
         assert_eq!(expected, actual);
 
         let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
@@ -400,7 +399,6 @@ mod tests {
                     .ok()
             })
             .collect();
-
         assert_eq!(expected, actual);
 
         let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
@@ -408,8 +406,8 @@ mod tests {
             .iter()
             .map(|x| length_from_path(Path::new(x)))
             .collect();
-
         assert_eq!(expected, actual);
+
         Ok(())
     }
 

@@ -63,7 +63,7 @@ impl MinaIndexer {
             let state = match initialize(config, store).await {
                 Ok(state) => state,
                 Err(e) => {
-                    error!("Error in server initialization: {e}");
+                    error!("Error in server initialization: {}", e);
                     std::process::exit(1);
                 }
             };
@@ -234,7 +234,7 @@ pub async fn run(
             let tx = tx.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
-                    error!("Error sending event result: {:?}", e);
+                    error!("Error sending event result: {}", e);
                 }
             });
         },
@@ -243,13 +243,13 @@ pub async fn run(
 
     watcher.watch(block_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
     info!(
-        "Watching for new blocks in directory: {:?}",
-        block_watch_dir.as_ref()
+        "Watching for new blocks in directory: {}",
+        block_watch_dir.as_ref().display()
     );
     watcher.watch(ledger_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
     info!(
-        "Watching for staking ledgers in directory: {:?}",
-        ledger_watch_dir.as_ref()
+        "Watching for staking ledgers in directory: {}",
+        ledger_watch_dir.as_ref().display()
     );
 
     while let Some(res) = rx.recv().await {
