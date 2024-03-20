@@ -1,10 +1,14 @@
 pub mod graphql;
 pub mod rest;
 
-use self::rest::{accounts, blockchain, blocks, locked_balances::LockedBalances};
+use self::{
+    graphql::{build_schema, index_graphiql},
+    rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
+};
 use crate::store::IndexerStore;
 use actix_cors::Cors;
-use actix_web::{middleware, web::Data, App, HttpServer};
+use actix_web::{guard, middleware, web, web::Data, App, HttpServer};
+use async_graphql_actix_web::GraphQL;
 use std::{net, path::Path, sync::Arc};
 use tracing::warn;
 
@@ -24,6 +28,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
     locked_supply: Option<P>,
 ) -> std::io::Result<()> {
     let locked = Arc::new(load_locked_balances(locked_supply));
+    let schema = build_schema(state.clone());
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(state.clone()))
@@ -32,6 +37,16 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
             .service(blocks::get_block)
             .service(accounts::get_account)
             .service(blockchain::get_blockchain_summary)
+            .service(
+                web::resource("/graphql")
+                    .guard(guard::Post())
+                    .to(GraphQL::new(schema.clone())),
+            )
+            .service(
+                web::resource("/graphql")
+                    .guard(guard::Get())
+                    .to(index_graphiql),
+            )
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
