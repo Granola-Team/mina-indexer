@@ -1,6 +1,6 @@
 use crate::constants::MAINNET_GENESIS_HASH;
+use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
     process,
@@ -11,7 +11,9 @@ use tokio::{
 };
 use tracing::instrument;
 
-#[derive(Parser, Debug, Serialize, Deserialize)]
+pub const BIN_CODE_CONFIG: config::Configuration = config::standard();
+
+#[derive(Parser, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
     #[clap(subcommand)]
@@ -332,168 +334,9 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
-    let command: String = match command {
-        ClientCli::Accounts(__) => match __ {
-            Accounts::PublicKey { public_key } => {
-                format!("account {}\0", public_key)
-            }
-        },
-        ClientCli::Chain(__) => match __ {
-            Chain::Best {
-                num,
-                verbose,
-                start_state_hash,
-                end_state_hash,
-                path,
-            } => format!(
-                "best {} {} {} {} {}\0",
-                num,
-                verbose,
-                start_state_hash,
-                end_state_hash.clone().unwrap_or("x".into()),
-                to_display(path)
-            ),
-        },
-        ClientCli::Blocks(__) => match __ {
-            Blocks::BestTip { verbose, path } => {
-                format!("best-tip {} {}\0", verbose, to_display(path))
-            }
-            Blocks::StateHash {
-                state_hash,
-                verbose,
-                path,
-            } => format!(
-                "state-hash {} {} {}\0",
-                state_hash,
-                verbose,
-                to_display(path)
-            ),
-            Blocks::Height {
-                height,
-                verbose,
-                path,
-            } => {
-                format!("height {} {} {}\0", height, verbose, to_display(path))
-            }
-            Blocks::Slot {
-                slot,
-                verbose,
-                path,
-            } => {
-                format!("slot {} {} {}\0", slot, verbose, to_display(path))
-            }
-            Blocks::PublicKey {
-                public_key,
-                verbose,
-                path,
-            } => format!(
-                "public-key {} {} {}\0",
-                public_key,
-                verbose,
-                to_display(path)
-            ),
-        },
-        ClientCli::Checkpoints(__) => match __ {
-            Checkpoints::Create { path } => {
-                format!("checkpoint {}\0", path.display())
-            }
-        },
-        ClientCli::Ledger(__) => match __ {
-            Ledger::Best { path } => {
-                format!("best {}\0", to_display(path))
-            }
-            Ledger::Hash { hash, path } => {
-                format!("hash {} {}\0", hash, to_display(path))
-            }
-            Ledger::Height { height, path } => {
-                format!("height {} {}\0", height, to_display(path),)
-            }
-        },
-        ClientCli::StakingLedger(__) => match __ {
-            StakingLedger::Delegations {
-                network,
-                epoch,
-                path,
-            } => {
-                format!(
-                    "staking-delegations {} {} {}\0",
-                    network,
-                    epoch,
-                    to_display(path)
-                )
-            }
-            StakingLedger::PublicKey {
-                network,
-                epoch,
-                public_key,
-            } => {
-                format!(
-                    "staking-delegations-pk {} {} {}\0",
-                    network, epoch, public_key
-                )
-            }
-            StakingLedger::Hash { hash, path } => {
-                format!("staking-ledger-hash {} {}\0", hash, to_display(&path))
-            }
-            StakingLedger::Epoch { epoch, path } => {
-                format!("epoch {} {}\0", epoch, to_display(path))
-            }
-        },
-        ClientCli::Snark(__) => match __ {
-            Snark::StateHash { state_hash, path } => {
-                format!("state-hash {} {}\0", state_hash, to_display(path))
-            }
-            Snark::PublicKey { public_key, path } => {
-                format!("public-key {} {}\0", public_key, to_display(path))
-            }
-        },
-        ClientCli::Shutdown => "shutdown \0".to_string(),
-        ClientCli::Summary {
-            verbose,
-            json,
-            path,
-        } => {
-            format!("summary {} {} {}\0", verbose, json, to_display(path))
-        }
-        ClientCli::Transactions(__) => match __ {
-            Transactions::Hash { hash, verbose } => {
-                format!("hash {} {}\0", hash, verbose)
-            }
-            Transactions::PublicKey {
-                public_key,
-                verbose,
-                start_state_hash,
-                end_state_hash,
-                path,
-            } => {
-                format!(
-                    "public-key {} {} {} {} {}\0",
-                    public_key,
-                    verbose,
-                    start_state_hash,
-                    end_state_hash.clone().unwrap_or("x".into()),
-                    to_display(path)
-                )
-            }
-            Transactions::StateHash {
-                state_hash,
-                verbose,
-                path: _,
-            } => {
-                format!("state-hash {} {}\0", state_hash, verbose)
-            }
-        },
-        ClientCli::InternalCommands(__) => match __ {
-            InternalCommands::PublicKey { path, public_key } => {
-                format!("internal-pk {} {}\0", public_key, to_display(path),)
-            }
-            InternalCommands::StateHash { path, state_hash } => {
-                format!("internal-state-hash {} {}\0", state_hash, to_display(path),)
-            }
-        },
-    };
+    let encoded = bincode::encode_to_vec(command, BIN_CODE_CONFIG).unwrap();
 
-    writer.write_all(command.as_bytes()).await?;
+    writer.write_all(&encoded).await?;
     reader.read_to_end(&mut buffer).await?;
 
     let msg = String::from_utf8(buffer)?;
@@ -501,8 +344,4 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     println!("{msg}");
 
     Ok(())
-}
-
-fn to_display(path: &Option<PathBuf>) -> String {
-    path.clone().unwrap_or_default().display().to_string()
 }
