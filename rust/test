@@ -150,47 +150,47 @@ test_indexer_cli_reports() {
         grep -iq "Usage: mina-indexer server replay"
 
     # Indexer reports usage for client subcommands
-    idxr account --help 2>&1 |
-        grep -iq "Usage: mina-indexer account"
+    idxr accounts --help 2>&1 |
+        grep -iq "Usage: mina-indexer accounts"
 
-    idxr block --help 2>&1 |
-        grep -iq "Usage: mina-indexer block"
+    idxr blocks --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks"
 
-    idxr best-tip --help 2>&1 |
-        grep -iq "Usage: mina-indexer best-tip"
+    idxr blocks best-tip --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks best-tip"
 
-    idxr blocks-at-height --help 2>&1 |
-        grep -iq "Usage: mina-indexer blocks-at-height"
+    idxr blocks height --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks height"
 
-    idxr blocks-at-slot --help 2>&1 |
-        grep -iq "Usage: mina-indexer blocks-at-slot"
+    idxr blocks slot --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks slot"
 
-    idxr blocks-at-public-key --help 2>&1 |
-        grep -iq "Usage: mina-indexer blocks-at-public-key"
+    idxr blocks public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks public-key"
 
-    idxr checkpoint --help 2>&1 |
-        grep -iq "Usage: mina-indexer checkpoint"
+    idxr checkpoints --help 2>&1 |
+        grep -iq "Usage: mina-indexer checkpoints"
 
-    idxr best-ledger --help 2>&1 |
-        grep -iq "Usage: mina-indexer best-ledger"
+    idxr ledger best --help 2>&1 |
+        grep -iq "Usage: mina-indexer ledger best"
 
     idxr ledger --help 2>&1 |
         grep -iq "Usage: mina-indexer ledger"
 
-    idxr ledger-at-height --help 2>&1 |
-        grep -iq "Usage: mina-indexer ledger-at-height"
+    idxr ledger height --help 2>&1 |
+        grep -iq "Usage: mina-indexer ledger height"
 
-    idxr staking-delegations --help 2>&1 |
-        grep -iq "Usage: mina-indexer staking-delegations"
+    idxr staking-ledger delegations --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-ledger delegations"
 
-    idxr staking-public-key --help 2>&1 |
-        grep -iq "Usage: mina-indexer staking-public-key"
+    idxr staking-ledger public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-public key"
 
-    idxr staking-ledger-epoch --help 2>&1 |
-        grep -iq "Usage: mina-indexer staking-ledger-epoch"
+    idxr staking-ledger epoch --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-ledger epoch"
 
-    idxr staking-ledger-hash --help 2>&1 |
-        grep -iq "Usage: mina-indexer staking-ledger-hash"
+    idxr staking-ledger hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-ledger hash"
 
     idxr server shutdown --help 2>&1 |
         grep -iq "Usage: mina-indexer server shutdown"
@@ -198,20 +198,20 @@ test_indexer_cli_reports() {
     idxr summary --help 2>&1 |
         grep -iq "Usage: mina-indexer summary"
 
-    idxr tx-hash --help 2>&1 |
-        grep -iq "Usage: mina-indexer tx-hash"
+    idxr transactions hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer transactions hash"
 
-    idxr tx-public-key --help 2>&1 |
-        grep -iq "Usage: mina-indexer tx-public-key"
+    idxr transactions public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer transactions public-key"
 
-    idxr tx-state-hash --help 2>&1 |
-        grep -iq "Usage: mina-indexer tx-state-hash"
+    idxr transactions state-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer transactions state-hash"
 
-    idxr internal-public-key --help 2>&1 |
-        grep -iq "Usage: mina-indexer internal-public-key"
+    idxr internal-commands public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer internal-commands public-key"
 
-    idxr internal-state-hash --help 2>&1 |
-        grep -iq "Usage: mina-indexer internal-state-hash"
+    idxr internal-commands state-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer internal-commands state-hash"
 }
 
 # Indexer server starts up without any precomputed blocks
@@ -288,7 +288,7 @@ test_account_balance_cli() {
         --log-dir ./logs
     wait_for_socket
 
-    result=$(idxr account --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
+    result=$(idxr accounts --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
 
     teardown
@@ -377,10 +377,10 @@ test_best_tip() {
     wait_for_socket
 
     # best tip query
-    hash=$(idxr best-tip | jq -r .state_hash)
-    canonicity=$(idxr best-tip | jq -r .canonicity)
-    length=$(idxr best-tip | jq -r .blockchain_length)
-    canonicity_v=$(idxr best-tip -v | jq -r .canonicity)
+    hash=$(idxr blocks best-tip | jq -r .state_hash)
+    canonicity=$(idxr blocks best-tip | jq -r .canonicity)
+    length=$(idxr blocks best-tip | jq -r .blockchain_length)
+    canonicity_v=$(idxr blocks best-tip -v | jq -r .canonicity)
 
     # witness tree summary
     wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -409,15 +409,15 @@ test_blocks() {
     wait_for_socket
 
     # basic height query
-    hash=$(idxr blocks-at-height -h 10 | jq -r .[0].state_hash)
-    slot=$(idxr blocks-at-height -h 10 | jq -r .[0].global_slot_since_genesis)
-    length=$(idxr blocks-at-height -h 10 | jq -r .[0].blockchain_length)
-    canonicity=$(idxr blocks-at-height -h 10 | jq -r .[0].canonicity)
+    hash=$(idxr blocks height -h 10 | jq -r .[0].state_hash)
+    slot=$(idxr blocks height -h 10 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks height -h 10 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks height -h 10 | jq -r .[0].canonicity)
 
     # verbose height query
-    hash_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].state_hash)
-    length_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].blockchain_length)
-    canonicity_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].canonicity)
+    hash_v=$(idxr blocks height -h 10 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks height -h 10 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks height -h 10 -v | jq -r .[0].canonicity)
 
     # witness tree summary
     wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -432,15 +432,15 @@ test_blocks() {
     assert 'Canonical' $canonicity_v
 
     # basic slot query
-    hash=$(idxr blocks-at-slot -s 9 | jq -r .[0].state_hash)
-    slot=$(idxr blocks-at-slot -s 9 | jq -r .[0].global_slot_since_genesis)
-    length=$(idxr blocks-at-slot -s 9 | jq -r .[0].blockchain_length)
-    canonicity=$(idxr blocks-at-slot -s 9 | jq -r .[0].canonicity)
+    hash=$(idxr blocks slot -s 9 | jq -r .[0].state_hash)
+    slot=$(idxr blocks slot -s 9 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks slot -s 9 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks slot -s 9 | jq -r .[0].canonicity)
 
     # verbose slot query
-    hash_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].state_hash)
-    length_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].blockchain_length)
-    canonicity_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].canonicity)
+    hash_v=$(idxr blocks slot -s 9 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks slot -s 9 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks slot -s 9 -v | jq -r .[0].canonicity)
 
     assert 9 $slot
     assert $wt_hash $hash
@@ -451,15 +451,15 @@ test_blocks() {
     assert 'Canonical' $canonicity_v
 
     # basic public key query
-    hash=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].state_hash)
-    slot=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].global_slot_since_genesis)
-    length=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].blockchain_length)
-    canonicity=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].canonicity)
+    hash=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].state_hash)
+    slot=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 | jq -r .[0].canonicity)
 
     # verbose public key query
-    hash_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].state_hash)
-    length_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].blockchain_length)
-    canonicity_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].canonicity)
+    hash_v=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].state_hash)
+    length_v=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].canonicity)
 
     assert 9 $slot
     assert $wt_hash $hash
@@ -470,13 +470,13 @@ test_blocks() {
     assert 'Canonical' $canonicity_v
 
     # height 10 = slot 9
-    slot=$(idxr blocks-at-slot -s 9 | jq -r .)
-    height=$(idxr blocks-at-height -h 10 | jq -r .)
+    slot=$(idxr blocks slot -s 9 | jq -r .)
+    height=$(idxr blocks height -h 10 | jq -r .)
     assert "$slot" "$height"
 
     # write at height to file
     file=./blocks_at_height.json
-    idxr blocks-at-height -h 10 -p $file
+    idxr blocks height -h 10 -p $file
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
@@ -486,7 +486,7 @@ test_blocks() {
 
     # write at slot to file
     file=./blocks_at_slot.json
-    idxr blocks-at-slot -s 9 -p $file
+    idxr blocks slot -s 9 -p $file
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
@@ -496,7 +496,7 @@ test_blocks() {
 
     # write at public key to file
     file=./blocks_at_pk.json
-    idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -p $file
+    idxr blocks public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -p $file
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
@@ -636,37 +636,37 @@ test_best_chain() {
         --log-dir ./logs
     wait_for_socket
 
-    result=$(idxr best-chain -n 1 | jq -r .[0].state_hash)
+    result=$(idxr chain best -n 1 | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
-    result=$(idxr best-chain -v | jq -r .[0].state_hash)
+    result=$(idxr chain best -v | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
 
     # best chain with bounds
-    bounds=$(idxr best-chain \
+    bounds=$(idxr chain best \
         --start-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
         --end-state-hash 3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY \
         | jq -r .[0].state_hash)
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $bounds
 
-    bounds=$(idxr best-chain \
+    bounds=$(idxr chain best \
         --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
         --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
         | jq -r .[1].state_hash)
     assert '3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG' $bounds
 
-    bounds=$(idxr best-chain --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
+    bounds=$(idxr chain best --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
         --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
         | jq -r .[2].state_hash)
     assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $bounds
 
     # write best chain to file
     file=./best_chain/best_chain.json
-    idxr best-chain -p $file
+    idxr chain best -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
-    idxr best-chain -v -p $file
+    idxr chain best -v -p $file
     file_result=$(cat $file | jq -r .[0].state_hash)
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
@@ -695,8 +695,8 @@ test_ledgers() {
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_height=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    hash_balance=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
-    height_balance=$(idxr ledger-at-height --height $canonical_height | jq -r .${pk}.balance)
+    hash_balance=$(idxr ledger hash --hash $canonical_hash | jq -r .${pk}.balance)
+    height_balance=$(idxr ledger height --height $canonical_height | jq -r .${pk}.balance)
     assert '607904750000000' $hash_balance
     assert '607904750000000' $height_balance
 
@@ -704,9 +704,9 @@ test_ledgers() {
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    best_result=$(idxr best-ledger | jq -r .${pk}.balance)
-    hash_result=$(idxr ledger --hash $best_hash | jq -r .${pk}.balance)
-    height_balance=$(idxr ledger-at-height --height $best_height | jq -r .${pk}.balance)
+    best_result=$(idxr ledger best | jq -r .${pk}.balance)
+    hash_result=$(idxr ledger hash --hash $best_hash | jq -r .${pk}.balance)
+    height_balance=$(idxr ledger height --height $best_height | jq -r .${pk}.balance)
 
     assert '607904750000000' $best_result
     assert '607904750000000' $hash_result
@@ -714,21 +714,21 @@ test_ledgers() {
 
     # write ledgers to file
     file=./ledgers/best-block-$best_height-$best_hash.json
-    idxr best-ledger -p $file
+    idxr ledger best -p $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
     file=./ledgers/best-ledger-$best_height-$best_hash.json
-    idxr ledger --hash $best_hash -p $file
+    idxr ledger hash --hash $best_hash -p $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
     file=./ledgers/ledger-height-$best_height-$best_hash.json
-    idxr ledger-at-height --height $best_height -p $file
+    idxr ledger height --height $best_height -p $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
@@ -845,18 +845,18 @@ test_transactions() {
     wait_for_socket
 
     # basic pk transaction queries
-    transactions=$(idxr tx-public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR | jq -r .)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .[0].Payment.amount)
+    transactions=$(idxr transactions public-key --public-key B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR | jq -r .)
+    amount=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .[0].Payment.amount)
 
     assert '1000' $amount
     assert '[]' $transactions
 
     # basic pk transaction queries - verbose
-    kind=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.kind)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
-    state_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].state_hash)
-    tx_hash=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].tx_hash)
-    length=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].blockchain_length)
+    kind=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.kind)
+    amount=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
+    state_hash=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].state_hash)
+    tx_hash=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].tx_hash)
+    length=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].blockchain_length)
 
     assert 3 $length
     assert '1000' $amount
@@ -865,29 +865,29 @@ test_transactions() {
     assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
 
     # bounded pk transaction queries
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+    amount=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
         --start-state-hash 3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG \
         --end-state-hash 3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5 \
         | jq -r .[0].Payment.amount)
     assert '1000' $amount
 
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
+    amount=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
         --start-state-hash 3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH \
         --end-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
         | jq -r .[0].Payment.amount)
     assert '1000' $amount
 
     # tx hash query
-    amount=$(idxr tx-hash --tx-hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa | jq -r .Payment.amount)
+    amount=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa | jq -r .Payment.amount)
     assert '1000' $amount
 
     # tx hash query - verbose
-    kind=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.kind)
-    amount=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.amount)
-    status=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .status.kind)
-    tx_hash=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .tx_hash)
-    state_hash=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .state_hash)
-    length=$(idxr tx-hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .blockchain_length)
+    kind=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.kind)
+    amount=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .command.payload.body.amount)
+    status=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .status.kind)
+    tx_hash=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .tx_hash)
+    state_hash=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .state_hash)
+    length=$(idxr transactions hash -t CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa -v | jq -r .blockchain_length)
 
     assert 3 $length
     assert 'Payment' $kind
@@ -897,22 +897,22 @@ test_transactions() {
     assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
 
     # state hash query
-    amount=$(idxr tx-state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.amount)
-    source=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.source)
-    receiver=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.receiver)
+    amount=$(idxr transactions state-hash --state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.amount)
+    source=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.source)
+    receiver=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R | jq -r .[0].Payment.receiver)
 
     assert '1000' $amount
     assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $source
     assert 'B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM' $receiver
 
     # state hash query - verbose
-    kind=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.kind)
+    kind=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.kind)
     assert 'Signed_command' $kind
 
-    amount=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.amount)
-    source=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.source_pk)
-    receiver=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.receiver_pk)
-    token=$(idxr tx-state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.token_id)
+    amount=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.amount)
+    source=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.source_pk)
+    receiver=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.receiver_pk)
+    token=$(idxr transactions state-hash -s 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R -v | jq -r .[0].data.payload.body.token_id)
 
     assert '1' $token
     assert '1000' $amount
@@ -921,7 +921,7 @@ test_transactions() {
 
     # write transactions to file
     file=./transactions/transactions.json
-    idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
+    idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
 
     file_result=$(cat $file | jq -r .[0].Payment.amount)
     assert '1000' $file_result
@@ -947,25 +947,25 @@ test_snark_work() {
 
     # pk SNARK work queries
     # prover has SNARK work in block 111
-    fee=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].fee)
-    prover=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].prover)
-    state_hash=$(idxr snark-public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].state_hash)
+    fee=$(idxr snark public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].fee)
+    prover=$(idxr snark public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].prover)
+    state_hash=$(idxr snark public-key --public-key B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h | jq -r .[0].state_hash)
 
     assert '0' $fee
     assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
     assert '3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK' $state_hash
 
     # state hash SNARK work queries
-    fee=$(idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].fee)
-    prover=$(idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].prover)
+    fee=$(idxr snark state-hash --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].fee)
+    prover=$(idxr snark state-hash --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK | jq -r .[0].prover)
 
     assert '0' $fee
     assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
 
     # write SNARK work from public key to file
     file=./snark_work/snark_work.json
-    idxr snark-public-key -k B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h -p $file
-    
+    idxr snark public-key -k B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h -p $file
+
     fee=$(cat $file | jq -r .[0].fee)
     prover=$(cat $file | jq -r .[0].prover)
     state_hash=$(cat $file | jq -r .[0].state_hash)
@@ -976,7 +976,7 @@ test_snark_work() {
 
     # write SNARK work from block to file
     file=./snark_work/snark_work.json
-    idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK -p $file
+    idxr snark state-hash --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK -p $file
 
     fee=$(cat $file | jq -r .[0].fee)
     prover=$(cat $file | jq -r .[0].prover)
@@ -1007,7 +1007,7 @@ test_checkpoint() {
     canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
+    amount=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     # create checkpoint in ./checkpoint
     idxr checkpoint -p ./checkpoint
@@ -1029,7 +1029,7 @@ test_checkpoint() {
     canonical_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     best_hash_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
+    amount_checkpoint=$(idxr transactions public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
     assert $canonical_length $canonical_length_checkpoint
@@ -1072,11 +1072,11 @@ test_many_blocks() {
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledger --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    balance=$(idxr ledger state-hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledger --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    balance=$(idxr ledger state-hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     teardown
@@ -1188,11 +1188,11 @@ test_release() {
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledger --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    balance=$(idxr ledger state-hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledger --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    balance=$(idxr ledger state-hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     teardown
@@ -1211,7 +1211,7 @@ test_genesis_block_creator() {
     wait_for_socket
 
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-    balance=$(idxr ledger-at-height --height 1 | jq -r .${pk}.balance)
+    balance=$(idxr ledger height --height 1 | jq -r .${pk}.balance)
 
     # verify that the genesis block winner account gets 1000 magic nanomina
     assert '1000' $balance
@@ -1238,7 +1238,7 @@ test_txn_nonces() {
     # verify that the nonce matches what's reported from the archive node
 
     # after block 3
-    nonce=$(idxr ledger-at-height -h 3 | jq -r .${pk}.nonce)
+    nonce=$(idxr ledger height -h 3 | jq -r .${pk}.nonce)
     assert '4' $nonce
 
     # after block 100
@@ -1433,11 +1433,11 @@ test_internal_commands() {
     pk=B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm
     block=3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA
 
-    kind=$(idxr internal-public-key -k $pk | jq -r .[1].kind)
-    amount=$(idxr internal-public-key -k $pk | jq -r .[1].amount)
-    sender=$(idxr internal-public-key -k $pk | jq -r .[1].sender)
-    receiver=$(idxr internal-public-key -k $pk | jq -r .[1].receiver)
-    state_hash=$(idxr internal-public-key -k $pk | jq -r .[1].state_hash)
+    kind=$(idxr internal-commands public-key -k $pk | jq -r .[1].kind)
+    amount=$(idxr internal-commands public-key -k $pk | jq -r .[1].amount)
+    sender=$(idxr internal-commands public-key -k $pk | jq -r .[1].sender)
+    receiver=$(idxr internal-commands public-key -k $pk | jq -r .[1].receiver)
+    state_hash=$(idxr internal-commands public-key -k $pk | jq -r .[1].state_hash)
 
     assert $pk $receiver
     assert $block $state_hash
@@ -1445,10 +1445,10 @@ test_internal_commands() {
     assert 'Fee_transfer' $kind
     assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $sender
 
-    kind=$(idxr internal-public-key -k $pk | jq -r .[0].kind)
-    amount=$(idxr internal-public-key -k $pk | jq -r .[0].amount)
-    receiver=$(idxr internal-public-key -k $pk | jq -r .[0].receiver)
-    state_hash=$(idxr internal-public-key -k $pk | jq -r .[0].state_hash)
+    kind=$(idxr internal-commands public-key -k $pk | jq -r .[0].kind)
+    amount=$(idxr internal-commands public-key -k $pk | jq -r .[0].amount)
+    receiver=$(idxr internal-commands public-key -k $pk | jq -r .[0].receiver)
+    state_hash=$(idxr internal-commands public-key -k $pk | jq -r .[0].state_hash)
 
     assert $pk $receiver
     assert 'Coinbase' $kind
@@ -1457,7 +1457,7 @@ test_internal_commands() {
 
     # write internal commands for public key to file
     file=./internal_commands.json
-    idxr internal-public-key -k $pk -p $file
+    idxr internal-commands public-key -k $pk -p $file
 
     pk_kind=$(cat $file | jq -r .[0].kind)
     pk_amount=$(cat $file | jq -r .[0].amount)
@@ -1470,7 +1470,7 @@ test_internal_commands() {
     assert $state_hash $pk_state_hash
 
     # write internal commands for block to file
-    idxr internal-state-hash -s $block -p $file
+    idxr internal-commands state-hash -s $block -p $file
 
     hash_kind=$(cat $file | jq -r .[0].kind)
     hash_amount=$(cat $file | jq -r .[0].amount)
