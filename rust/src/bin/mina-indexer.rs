@@ -46,58 +46,75 @@ pub struct ServerArgs {
     /// Path to the genesis ledger (JSON)
     #[arg(short, long, value_name = "FILE")]
     genesis_ledger: Option<PathBuf>,
+
     /// Hash of the initial state
     #[arg(
         long,
         default_value = MAINNET_GENESIS_HASH
     )]
     genesis_hash: String,
+
     /// Directory containing the precomputed blocks
     #[arg(long, default_value = "/usr/share/mina-indexer/blocks")]
     blocks_dir: PathBuf,
+
     /// Directory to watch for new precomputed blocks [default: blocks_dir]
     #[arg(long)]
     block_watch_dir: Option<PathBuf>,
+
     /// Directory containing the staking ledgers
     #[arg(long, default_value = "/usr/share/mina-indexer/staking-ledgers")]
     ledgers_dir: PathBuf,
+
     /// Directory to watch for new staking ledgers [default: ledgers_dir]
     #[arg(long)]
     ledger_watch_dir: Option<PathBuf>,
+
     /// Path to directory for speedb
     #[arg(short, long, default_value = "/var/log/mina-indexer/database")]
     pub database_dir: PathBuf,
+
     /// Path to directory for logs
     #[arg(long, default_value = "/var/log/mina-indexer")]
     pub log_dir: PathBuf,
+
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     pub log_level: LevelFilter,
+
     /// Max file log level
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
     pub log_level_file: LevelFilter,
-    /// Cadence for computing and storing ledgers
+
+    /// Number of blocks to add to the canonical chain before persisting a ledger snapshot
     #[arg(long, default_value_t = LEDGER_CADENCE)]
     ledger_cadence: u32,
+
     /// Cadence for reporting progress
     #[arg(long, default_value_t = BLOCK_REPORTING_FREQ_NUM)]
     reporting_freq: u32,
+
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
+
     /// Threshold for determining the canonicity of a block
     #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
     canonical_threshold: u32,
+
     /// Threshold for updating the canonical root/ledger
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
+
     /// Web server hostname for REST and GraphQL
     #[arg(long, default_value = "localhost")]
     web_hostname: String,
+
     /// Web server port for REST and GraphQL
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
-    /// Path to the locked supply CSV
+
+    /// Path to the locked supply file (CSV)
     #[arg(long, value_name = "FILE")]
     locked_supply_csv: Option<PathBuf>,
 }
