@@ -30,7 +30,7 @@ pub struct IndexerConfiguration {
     pub genesis_hash: BlockHash,
     pub blocks_dir: PathBuf,
     pub block_watch_dir: PathBuf,
-    pub ledger_startup_dir: PathBuf,
+    pub ledgers_dir: PathBuf,
     pub ledger_watch_dir: PathBuf,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
@@ -122,7 +122,7 @@ pub async fn initialize(
         genesis_ledger,
         genesis_hash,
         blocks_dir,
-        ledger_startup_dir,
+        ledgers_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -133,7 +133,7 @@ pub async fn initialize(
     } = config;
 
     fs::create_dir_all(blocks_dir.clone())?;
-    fs::create_dir_all(ledger_startup_dir.clone())?;
+    fs::create_dir_all(ledgers_dir.clone())?;
 
     let state_config = IndexerStateConfig {
         genesis_hash,
@@ -151,7 +151,7 @@ pub async fn initialize(
             info!(
                 "Initializing indexer state from blocks in {} and staking ledgers in {}",
                 blocks_dir.display(),
-                ledger_startup_dir.display(),
+                ledgers_dir.display(),
             );
             IndexerState::new_from_config(state_config)?
         }
@@ -181,21 +181,21 @@ pub async fn initialize(
             state
                 .initialize_with_canonical_chain_discovery(&mut block_parser)
                 .await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
         InitializationMode::Replay => {
             let min_length_filter = state.replay_events()?;
             let mut block_parser =
                 BlockParser::new_length_sorted_min_filtered(&blocks_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
         InitializationMode::Sync => {
             let min_length_filter = state.sync_from_db()?;
             let mut block_parser =
                 BlockParser::new_length_sorted_min_filtered(&blocks_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
     }
     Ok(state)

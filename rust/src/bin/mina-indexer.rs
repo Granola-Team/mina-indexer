@@ -59,11 +59,11 @@ pub struct ServerArgs {
     /// blocks_dir]
     #[arg(alias = "bw", long)]
     block_watch_dir: Option<PathBuf>,
-    /// Startup directory for staking ledgers
+    /// Directory containing the staking ledgers
     #[arg(alias = "ls", long, default_value = concat!(env!("HOME"), "/.mina-indexer/staking-ledgers"))]
-    ledger_startup_dir: PathBuf,
+    ledgers_dir: PathBuf,
     /// Directory to watch for new staking ledgers [default:
-    /// ledger_startup_dir]
+    /// ledgers_dir]
     #[arg(alias = "lw", long)]
     ledger_watch_dir: Option<PathBuf>,
     /// Path to directory for speedb
@@ -229,8 +229,8 @@ pub fn process_indexer_configuration(
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
     let block_watch_dir = args.block_watch_dir.unwrap_or(blocks_dir.clone());
-    let ledger_startup_dir = args.ledger_startup_dir;
-    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledger_startup_dir.clone());
+    let ledgers_dir = args.ledgers_dir;
+    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledgers_dir.clone());
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -264,7 +264,7 @@ pub fn process_indexer_configuration(
                 genesis_hash,
                 blocks_dir,
                 block_watch_dir,
-                ledger_startup_dir,
+                ledgers_dir,
                 ledger_watch_dir,
                 prune_interval,
                 canonical_threshold,
@@ -283,7 +283,7 @@ struct ServerArgsJson {
     genesis_hash: String,
     blocks_dir: String,
     block_watch_dir: String,
-    ledger_startup_dir: String,
+    ledgers_dir: String,
     ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
@@ -313,10 +313,10 @@ impl From<ServerArgs> for ServerArgsJson {
                 .unwrap_or(value.blocks_dir)
                 .display()
                 .to_string(),
-            ledger_startup_dir: value.ledger_startup_dir.display().to_string(),
+            ledgers_dir: value.ledgers_dir.display().to_string(),
             ledger_watch_dir: value
                 .ledger_watch_dir
-                .unwrap_or(value.ledger_startup_dir)
+                .unwrap_or(value.ledgers_dir)
                 .display()
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),

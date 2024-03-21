@@ -224,7 +224,7 @@ test_startup_dirs_get_created() {
     idxr_server_start \
         --blocks-dir ./startup-blocks \
         --block-watch-dir ./watch-blocks \
-        --ledger-startup-dir ./startup-ledgers \
+        --ledgers-dir ./startup-ledgers \
         --ledger-watch-dir ./watch-ledgers \
         --database-dir ./database \
         --log-dir ./logs
@@ -1203,7 +1203,7 @@ test_startup_staking_ledgers() {
     setup
     idxr_server_start \
         --blocks-dir ./blocks \
-        --ledger-startup-dir $STAKING_LEDGERS \
+        --ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
         --log-dir ./logs
     sleep 1
