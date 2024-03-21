@@ -22,7 +22,7 @@ use tokio::{
     sync::{mpsc, RwLock},
     task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -227,6 +227,7 @@ pub async fn run(
     ledger_watch_dir: impl AsRef<Path>,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
+    // setup fs-based precomputed block & staking ledger watchers
     let (tx, mut rx) = mpsc::channel(4096);
     let rt = Handle::current();
     let mut watcher = RecommendedWatcher::new(
@@ -252,6 +253,7 @@ pub async fn run(
         ledger_watch_dir.as_ref().display()
     );
 
+    // watch for precomputed blocks & staking ledgers
     while let Some(res) = rx.recv().await {
         match res {
             Ok(event) => {
@@ -260,29 +262,35 @@ pub async fn run(
                     for path in event.paths {
                         if block::is_valid_block_file(&path) {
                             debug!("Valid precomputed block file: {}", path.display());
-                            if let Ok(block) = PrecomputedBlock::parse_file(&path) {
-                                let mut state = state.write().await;
-                                if state.block_pipeline(&block).is_ok() {
-                                    info!(
-                                        "Added block (length {}): {}",
-                                        block.blockchain_length, block.state_hash
-                                    );
+                            match PrecomputedBlock::parse_file(&path) {
+                                Ok(block) => {
+                                    let mut state = state.write().await;
+                                    match state.block_pipeline(&block) {
+                                        Ok(_) => info!("Added block {}", block.summary()),
+                                        Err(e) => error!("Error adding block: {}", e),
+                                    }
                                 }
-                            } else {
-                                warn!("Unable to parse precomputed block: {path:?}");
+                                Err(e) => error!("Error parsing precomputed block: {}", e),
                             }
                         } else if staking::is_valid_ledger_file(&path) {
                             let state = state.write().await;
                             if let Some(store) = state.indexer_store.as_ref() {
-                                if let Ok(staking_ledger) = StakingLedger::parse_file(&path) {
-                                    let ledger_hash = staking_ledger.ledger_hash.clone();
-                                    match store.add_staking_ledger(staking_ledger) {
-                                        Ok(_) => {
-                                            info!("Added staking ledger {:?}", ledger_hash);
+                                match StakingLedger::parse_file(&path) {
+                                    Ok(staking_ledger) => {
+                                        let ledger_summary = staking_ledger.summary();
+                                        match store.add_staking_ledger(staking_ledger) {
+                                            Ok(_) => {
+                                                info!("Added staking ledger {}", ledger_summary);
+                                            }
+                                            Err(e) => error!("Error adding staking ledger: {}", e),
                                         }
-                                        Err(e) => error!("Error adding staking ledger: {}", e),
+                                    }
+                                    Err(e) => {
+                                        error!("Error parsing staking ledger: {}", e)
                                     }
                                 }
+                            } else {
+                                error!("Indexer store unavailable");
                             }
                         }
                     }
