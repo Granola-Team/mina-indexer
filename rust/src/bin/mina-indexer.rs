@@ -90,7 +90,7 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = LEDGER_CADENCE)]
     ledger_cadence: u32,
 
-    /// Cadence for reporting progress
+    /// Number of blocks to process before reporting progress
     #[arg(long, default_value_t = BLOCK_REPORTING_FREQ_NUM)]
     reporting_freq: u32,
 
