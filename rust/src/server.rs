@@ -60,13 +60,10 @@ impl MinaIndexer {
         let ledger_watch_dir = config.ledger_watch_dir.clone();
 
         let _witness_join_handle = tokio::spawn(async move {
-            let state = match initialize(config, store).await {
-                Ok(state) => state,
-                Err(e) => {
-                    error!("Error in server initialization: {}", e);
-                    std::process::exit(1);
-                }
-            };
+            let state = initialize(config, store).await.unwrap_or_else(|e| {
+                error!("Error in server initialization: {}", e);
+                std::process::exit(1);
+            });
             let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
             unix_socket_server::start(UnixSocketServer::new(state.clone())).await;

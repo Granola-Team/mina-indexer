@@ -11,7 +11,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
-    event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
+    event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
         diff::LedgerDiff, genesis::GenesisLedger, staking::parser::StakingLedgerParser,
         store::LedgerStore, Ledger,
@@ -444,11 +444,10 @@ impl IndexerState {
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
                 if let Some(wt_event) = self.add_block_to_witness_tree(block)?.1 {
                     match wt_event {
-                        WitnessTreeEvent::UpdateBestTip(best_tip) => (best_tip, vec![]),
-                        WitnessTreeEvent::UpdateCanonicalChain {
+                        WitnessTreeEvent::UpdateBestTip {
                             best_tip,
-                            canonical_blocks: CanonicalBlocksEvent::CanonicalBlocks(blocks),
-                        } => (best_tip, blocks),
+                            canonical_blocks,
+                        } => (best_tip, canonical_blocks),
                     }
                 } else {
                     return Ok(true);
@@ -496,14 +495,11 @@ impl IndexerState {
                     ExtensionType::RootComplex(block) => block.clone(),
                     _ => unreachable!(),
                 };
-                let canonical_event = self.prune_root_branch()?;
                 return Ok((
                     root_extension,
-                    canonical_event.map(|canonical_blocks| {
-                        WitnessTreeEvent::UpdateCanonicalChain {
-                            best_tip,
-                            canonical_blocks,
-                        }
+                    Some(WitnessTreeEvent::UpdateBestTip {
+                        best_tip,
+                        canonical_blocks: self.prune_root_branch()?,
                     }),
                 ));
             }
@@ -692,24 +688,22 @@ impl IndexerState {
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) -> anyhow::Result<Option<CanonicalBlocksEvent>> {
+    fn prune_root_branch(&mut self) -> anyhow::Result<Vec<Block>> {
         let k = self.transition_frontier_length;
-        if let Some(canonical_event) = self.update_canonical()? {
-            if self.root_branch.height() > self.prune_interval * k {
-                let best_tip_block = self.best_tip_block().clone();
-                debug!(
-                    "Pruning transition frontier: k = {}, best tip length = {}, canonical root length = {}",
-                    k,
-                    self.best_tip_block().blockchain_length,
-                    self.canonical_root_block().blockchain_length,
-                );
+        let canonical_event = self.update_canonical()?;
+        if self.root_branch.height() > self.prune_interval * k {
+            let best_tip_block = self.best_tip_block().clone();
+            debug!(
+                "Pruning transition frontier: k = {}, best tip length = {}, canonical root length = {}",
+                k,
+                self.best_tip_block().blockchain_length,
+                self.canonical_root_block().blockchain_length,
+            );
 
-                self.root_branch
-                    .prune_transition_frontier(k, &best_tip_block);
-            }
-            return Ok(Some(canonical_event));
+            self.root_branch
+                .prune_transition_frontier(k, &best_tip_block);
         }
-        Ok(None)
+        Ok(canonical_event)
     }
 
     /// The highest known canonical block
@@ -728,7 +722,7 @@ impl IndexerState {
     }
 
     /// Updates the canonical root if the precondition is met
-    pub fn update_canonical(&mut self) -> anyhow::Result<Option<CanonicalBlocksEvent>> {
+    pub fn update_canonical(&mut self) -> anyhow::Result<Vec<Block>> {
         if self.is_canonical_updatable() {
             let old_canonical_root_id = self.canonical_root.node_id.clone();
             let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_root_id)?;
@@ -737,11 +731,9 @@ impl IndexerState {
             self.update_ledger_store(&new_canonical_blocks)?;
             self.prune_diffs_map(&old_canonical_root_id)?;
 
-            return Ok(Some(CanonicalBlocksEvent::CanonicalBlocks(
-                new_canonical_blocks,
-            )));
+            return Ok(new_canonical_blocks);
         }
-        Ok(None)
+        Ok(vec![])
     }
 
     fn is_canonical_updatable(&self) -> bool {
@@ -824,7 +816,7 @@ impl IndexerState {
     /// Add block to the underlying block store
     pub fn add_block_to_store(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return Ok(Some(indexer_store.add_block(block)?));
+            return indexer_store.add_block(block);
         }
         Ok(None)
     }
@@ -857,6 +849,7 @@ impl IndexerState {
             let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
             if let Some(IndexerEvent::Db(DbEvent::Canonicity(
                 DbCanonicityEvent::NewCanonicalBlock {
+                    network: _,
                     blockchain_length: canonical_length,
                     state_hash,
                 },
@@ -870,7 +863,7 @@ impl IndexerState {
 
                 // root branch root is canonical root
                 // add all successive NewBlock's to the witness tree
-                if let Some(block) = indexer_store.get_block(&state_hash.clone().into())? {
+                if let Some(block) = indexer_store.get_block(&state_hash.clone())? {
                     self.root_branch = Branch::new(&block)?;
 
                     let tip = Tip {
@@ -884,6 +877,7 @@ impl IndexerState {
 
                     for state_hash in event_log.iter().filter_map(|e| match e {
                         IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                            network: _,
                             state_hash,
                             blockchain_length,
                         })) => {
@@ -895,7 +889,7 @@ impl IndexerState {
                         }
                         _ => None,
                     }) {
-                        if let Some(block) = indexer_store.get_block(&state_hash.into())? {
+                        if let Some(block) = indexer_store.get_block(&state_hash)? {
                             successive_blocks.push(block);
                         } else {
                             panic!(
@@ -918,7 +912,7 @@ impl IndexerState {
                     })) => Some(state_hash.clone()),
                     _ => None,
                 }) {
-                    if let Some(block) = indexer_store.get_block(&state_hash.into())? {
+                    if let Some(block) = indexer_store.get_block(&state_hash)? {
                         successive_blocks.push(block);
                     }
                 }
@@ -966,44 +960,36 @@ impl IndexerState {
 
     fn replay_event(&mut self, event: &IndexerEvent) -> anyhow::Result<()> {
         match event {
-            IndexerEvent::BlockWatcher(block_event) => match block_event {
-                BlockWatcherEvent::SawBlock { state_hash, .. } => {
-                    info!("Replay block with hash {state_hash}");
-                    todo!("replay {:?}", block_event);
-                }
-                BlockWatcherEvent::WatchDir(path) => {
-                    info!("Replay watch dir {}", path.display());
-                    todo!("set fs block watcher {:?}", block_event);
-                }
-            },
-            IndexerEvent::LedgerWatcher(ledger_event) => match ledger_event {
-                LedgerWatcherEvent::NewLedger { hash, path } => {
-                    info!("Replay new ledger hash {hash} at {}", path.display());
-                    todo!("replay {:?}", ledger_event);
-                }
-                LedgerWatcherEvent::WatchDir(path) => {
-                    info!("Replay watch ledger dir {}", path.display());
-                    todo!("set fs ledger watcher {:?}", ledger_event);
-                }
-            },
+            IndexerEvent::BlockWatcher(new_block_event) => {
+                info!("Replay block watcher event: {:?}", new_block_event);
+                todo!("replay {:?}", new_block_event);
+            }
+            IndexerEvent::StakingLedgerWatcher(new_staking_ledger_event) => {
+                info!(
+                    "Replay ledger watcher event: {:?}",
+                    new_staking_ledger_event
+                );
+                todo!("replay {:?}", new_staking_ledger_event);
+            }
             IndexerEvent::Db(db_event) => match db_event {
                 DbEvent::Block(db_block_event) => match db_block_event {
-                    DbBlockEvent::AlreadySeenBlock {
+                    DbBlockEvent::NewBestTip {
+                        network: _,
                         state_hash,
-                        blockchain_length,
+                        blockchain_length: _,
                     } => {
-                        info!("Replay already seen block in db (length {blockchain_length}): {state_hash}");
-                        Ok(())
-                    }
-                    DbBlockEvent::NewBestTip(state_hash) => {
                         info!("Replay new best tip ({state_hash})");
                         Ok(())
                     }
                     DbBlockEvent::NewBlock {
+                        network,
                         blockchain_length,
                         state_hash,
                     } => {
-                        info!("Replay db new block (length {blockchain_length}): {state_hash}");
+                        info!(
+                            "Replay db new {} block (length {}): {}",
+                            network, blockchain_length, state_hash.0
+                        );
                         if let Some(indexer_store) = self.indexer_store.as_ref() {
                             if let Ok(Some(block)) =
                                 indexer_store.get_block(&state_hash.to_string().into())
@@ -1023,28 +1009,40 @@ impl IndexerState {
                     }
                 },
                 DbEvent::Ledger(ledger_event) => match ledger_event {
-                    DbLedgerEvent::AlreadySeenLedger(hash) => {
-                        info!("Replay already seen db ledger with hash {hash}");
-                        Ok(())
-                    }
-                    DbLedgerEvent::NewLedger { hash } => {
-                        info!("Replay new db ledger hash {hash}");
+                    DbLedgerEvent::NewLedger {
+                        network,
+                        state_hash: _,
+                        blockchain_length: _,
+                        ledger_hash,
+                    } => {
+                        info!("Replay db new {} ledger hash {}", network, ledger_hash.0);
                         Ok(())
                     }
                 },
-                DbEvent::StakingLedger(DbStakingLedgerEvent::AlreadySeenLedger {
+                DbEvent::StakingLedger(DbStakingLedgerEvent::NewStakingLedger {
                     epoch,
+                    network,
                     ledger_hash,
-                })
-                | DbEvent::StakingLedger(DbStakingLedgerEvent::NewLedger { epoch, ledger_hash }) => {
+                }) => {
                     info!(
-                        "Replay new db staking ledger (epoch {epoch}): {}",
-                        ledger_hash.0
+                        "Replay db new {} staking ledger (epoch {}): {}",
+                        network, epoch, ledger_hash.0
+                    );
+                    Ok(())
+                }
+                DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
+                    epoch,
+                    network,
+                }) => {
+                    info!(
+                        "Replay db {} aggregate delegations epoch {}",
+                        network, epoch
                     );
                     Ok(())
                 }
                 DbEvent::Canonicity(canonicity_event) => match canonicity_event {
                     DbCanonicityEvent::NewCanonicalBlock {
+                        network: _,
                         blockchain_length,
                         state_hash,
                     } => {
@@ -1053,18 +1051,8 @@ impl IndexerState {
                     }
                 },
             },
-            IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip(block)) => {
-                info!("Replay update best tip {:?}", block);
-                Ok(())
-            }
-            IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain {
-                best_tip,
-                canonical_blocks,
-            }) => {
-                info!(
-                    "Replay update canonical chain {:?}",
-                    (best_tip, canonical_blocks)
-                );
+            IndexerEvent::WitnessTree(update_best_tip_event) => {
+                info!("Replay update best tip: {:?}", update_best_tip_event);
                 Ok(())
             }
         }
@@ -1103,9 +1091,9 @@ impl IndexerState {
         Ok(canonical_blocks)
     }
 
-    /// Add new canonical canonical diffs to the ledger
+    /// Add new canonical diffs to the ledger
     fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
-        // apply the new canonical diffs and store each nth resulting ledger (n = 100)
+        // apply the new canonical diffs and store each nth resulting ledger
         let mut ledger_diff = LedgerDiff::default();
         for canonical_block in canonical_blocks {
             let diff = self

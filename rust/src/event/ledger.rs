@@ -1,17 +1,27 @@
+use crate::ledger::LedgerHash;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum LedgerWatcherEvent {
-    NewLedger { hash: String, path: PathBuf },
-    WatchDir(PathBuf),
+pub enum StakingLedgerWatcherEvent {
+    NewStakingLedger {
+        epoch: u32,
+        network: String,
+        ledger_hash: LedgerHash,
+    },
 }
 
-impl std::fmt::Debug for LedgerWatcherEvent {
+impl std::fmt::Debug for StakingLedgerWatcherEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NewLedger { hash, .. } => write!(f, "ledger: new ({hash})"),
-            Self::WatchDir(path) => write!(f, "ledger: watch dir ({})", path.display()),
+            Self::NewStakingLedger {
+                epoch,
+                network,
+                ledger_hash,
+            } => write!(
+                f,
+                "fs watcher saw {} staking ledger (epoch {}): {}",
+                network, epoch, ledger_hash.0
+            ),
         }
     }
 }
