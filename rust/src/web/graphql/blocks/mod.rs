@@ -1,28 +1,46 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     proof_systems::signer::pubkey::CompressedPubKey,
     store::IndexerStore,
 };
 use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, Object, Result, Schema, SimpleObject,
+    Context, EmptyMutation, EmptySubscription, InputObject, Object, Result, Schema, SimpleObject,
 };
 use chrono::{DateTime, SecondsFormat};
 use std::sync::Arc;
+
+#[derive(InputObject)]
+pub struct BlockQueryInput {
+    state_hash: String,
+}
 
 pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn block<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
+    async fn block<'ctx>(
+        &self,
+        ctx: &Context<'ctx>,
+        query: Option<BlockQueryInput>,
+    ) -> Result<Option<Block>> {
         let db = ctx
             .data::<Arc<IndexerStore>>()
             .expect("db to be in context");
-        let best_tip = match db.get_best_block()? {
-            Some(best_tip) => best_tip,
+        // Choose best tip if query wasn't provided
+        let state_hash_str = match query {
+            Some(query) => query.state_hash,
+            None => match db.get_best_block()? {
+                Some(block) => block.state_hash,
+                None => return Ok(None),
+            },
+        };
+        let state_hash = &BlockHash::from(state_hash_str);
+        let pcb = match db.get_block(state_hash)? {
+            Some(pcb) => pcb,
             None => return Ok(None),
         };
 
-        Ok(Some(Block::from(best_tip)))
+        Ok(Some(Block::from(pcb)))
     }
 }
 
