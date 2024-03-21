@@ -43,7 +43,7 @@ enum ServerCommand {
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to the genesis ledger
+    /// Path to the genesis ledger (JSON)
     #[arg(short, long, value_name = "FILE")]
     genesis_ledger: Option<PathBuf>,
     /// Hash of the initial state
@@ -53,24 +53,22 @@ pub struct ServerArgs {
     )]
     genesis_hash: String,
     /// Directory containing the precomputed blocks
-    #[arg(alias = "bs", long, default_value = concat!(env!("HOME"), "/.mina-indexer/blocks"))]
+    #[arg(long, default_value = "/usr/share/mina-indexer/blocks")]
     blocks_dir: PathBuf,
-    /// Directory to watch for new precomputed blocks [default:
-    /// blocks_dir]
-    #[arg(alias = "bw", long)]
+    /// Directory to watch for new precomputed blocks [default: blocks_dir]
+    #[arg(long)]
     block_watch_dir: Option<PathBuf>,
     /// Directory containing the staking ledgers
-    #[arg(alias = "ls", long, default_value = concat!(env!("HOME"), "/.mina-indexer/staking-ledgers"))]
+    #[arg(long, default_value = "/usr/share/mina-indexer/staking-ledgers")]
     ledgers_dir: PathBuf,
-    /// Directory to watch for new staking ledgers [default:
-    /// ledgers_dir]
-    #[arg(alias = "lw", long)]
+    /// Directory to watch for new staking ledgers [default: ledgers_dir]
+    #[arg(long)]
     ledger_watch_dir: Option<PathBuf>,
     /// Path to directory for speedb
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
+    #[arg(short, long, default_value = "/var/log/mina-indexer/database")]
     pub database_dir: PathBuf,
     /// Path to directory for logs
-    #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
+    #[arg(long, default_value = "/var/log/mina-indexer")]
     pub log_dir: PathBuf,
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
