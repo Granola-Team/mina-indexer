@@ -1,5 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    canonicity::{store::CanonicityStore, Canonicity},
     proof_systems::signer::pubkey::CompressedPubKey,
     store::IndexerStore,
 };
@@ -8,6 +9,7 @@ use async_graphql::{
 };
 use chrono::{DateTime, SecondsFormat};
 use std::sync::Arc;
+use tracing::info;
 
 #[derive(InputObject)]
 pub struct BlockQueryInput {
@@ -22,7 +24,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'ctx>,
         query: Option<BlockQueryInput>,
-    ) -> Result<Option<Block>> {
+    ) -> Result<Option<BlockWithCanonicity>> {
         let db = ctx
             .data::<Arc<IndexerStore>>()
             .expect("db to be in context");
@@ -39,8 +41,12 @@ impl QueryRoot {
             Some(pcb) => pcb,
             None => return Ok(None),
         };
-
-        Ok(Some(Block::from(pcb)))
+        let block = Block::from(pcb);
+        let canonical = db
+            .get_block_canonicity(state_hash)?
+            .map(|status| matches!(status, Canonicity::Canonical))
+            .unwrap_or(false);
+        Ok(Some(BlockWithCanonicity { block, canonical }))
     }
 }
 
@@ -51,6 +57,15 @@ pub fn build_schema(
     Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(store)
         .finish()
+}
+
+#[derive(SimpleObject)]
+pub struct BlockWithCanonicity {
+    /// Value canonical
+    canonical: bool,
+    /// Value block
+    #[graphql(flatten)]
+    block: Block,
 }
 
 #[derive(SimpleObject)]
@@ -91,7 +106,6 @@ impl From<PrecomputedBlock> for Block {
         let date_time = millis_to_date_string(block.timestamp().try_into().unwrap());
         let pk_creator = block.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
-
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
