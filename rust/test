@@ -306,7 +306,7 @@ test_account_public_key_json() {
         --log-dir ./logs
     wait_for_socket
 
-    result=$(idxr account -k B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
+    result=$(idxr accounts --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
 
     teardown
@@ -1241,7 +1241,7 @@ test_txn_nonces() {
     assert '4' $nonce
 
     # after block 100
-    nonce=$(idxr account -k $pk | jq -r .nonce)
+    nonce=$(idxr accounts --public-key $pk | jq -r .nonce)
     assert '149' $nonce
 
     teardown
