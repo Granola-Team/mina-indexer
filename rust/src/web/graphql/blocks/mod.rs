@@ -2,6 +2,10 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
     proof_systems::signer::pubkey::CompressedPubKey,
+    protocol::serialization_types::{
+        common::{Base58EncodableVersionedType, HashV1},
+        version_bytes,
+    },
     store::IndexerStore,
 };
 use async_graphql::{
@@ -88,6 +92,20 @@ struct Block {
     tx_fees: String,
     // Value SNARK fees
     snark_fees: String,
+    // Value blockchain state
+    blockchain_state: BlockchainState,
+}
+
+#[derive(SimpleObject)]
+struct BlockchainState {
+    /// Value utc_date as numeric string
+    utc_date: String,
+    /// Value date as numeric string
+    date: String,
+    /// Value snarked ledger hash
+    snarked_ledger_hash: String,
+    /// Value staged ledger hash
+    staged_ledger_hash: String,
 }
 
 #[derive(SimpleObject)]
@@ -114,6 +132,16 @@ fn millis_to_date_string(millis: i64) -> String {
     date_time.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
+pub struct LedgerHash(pub String);
+
+impl LedgerHash {
+    pub fn from_hashv1(hashv1: HashV1) -> Self {
+        let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
+            hashv1.into();
+        Self(versioned.to_base58_string().unwrap())
+    }
+}
+
 impl From<PrecomputedBlock> for Block {
     fn from(block: PrecomputedBlock) -> Self {
         let winner_account = block.block_creator().0;
@@ -125,6 +153,30 @@ impl From<PrecomputedBlock> for Block {
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();
         let snark_fees = block.snark_fees();
+        let utc_date = block
+            .protocol_state
+            .body
+            .t
+            .t
+            .blockchain_state
+            .t
+            .t
+            .timestamp
+            .t
+            .t
+            .to_string();
+
+        let blockchain_state = block.protocol_state.body.t.t.blockchain_state.t.t;
+        let snarked_ledger_hash =
+            LedgerHash::from_hashv1(blockchain_state.clone().snarked_ledger_hash).0;
+        let staged_ledger_hashv1 = blockchain_state
+            .staged_ledger_hash
+            .t
+            .t
+            .non_snark
+            .t
+            .ledger_hash;
+        let staged_ledger_hash = LedgerHash::from_hashv1(staged_ledger_hashv1).0;
 
         Block {
             state_hash: block.state_hash,
@@ -143,6 +195,12 @@ impl From<PrecomputedBlock> for Block {
             },
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
+            blockchain_state: BlockchainState {
+                date: utc_date.clone(),
+                utc_date,
+                snarked_ledger_hash,
+                staged_ledger_hash,
+            },
         }
     }
 }
