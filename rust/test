@@ -164,6 +164,18 @@ test_indexer_cli_reports() {
     idxr ledger-at-height --help 2>&1 |
         grep -iq "Usage: mina-indexer ledger-at-height"
 
+    idxr staking-delegations --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-delegations"
+
+    idxr staking-public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-public-key"
+
+    idxr staking-ledger-epoch --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-ledger-epoch"
+
+    idxr staking-ledger-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer staking-ledger-hash"
+
     idxr shutdown --help 2>&1 |
         grep -iq "Usage: mina-indexer shutdown"
 
@@ -1231,7 +1243,7 @@ test_startup_staking_ledgers() {
         --ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
         --log-dir ./logs
-    sleep 1
+    wait_for_socket
 
     # epoch 0 staking ledger should be in the store, write it to a file
     idxr staking-ledger-epoch -e 0 -p ./epoch_0_ledger.json
@@ -1341,6 +1353,56 @@ test_watch_staking_ledgers() {
     teardown
 }
 
+test_staking_delegations() {
+    test=test_staking_delegations
+
+    setup
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --ledgers-dir $STAKING_LEDGERS \
+        --database-dir ./database \
+        --log-dir ./logs \
+        --log-level debug
+    wait_for_socket
+
+    # check account
+    pk=B62qrxNgwAdhGYZv1BXQRt2HgopUceFyrtXZMikwsuaHu5FigRJjhwY
+    epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
+
+    epoch=$(idxr staking-public-key -e 0 -k $pk | jq -r .epoch)
+    network=$(idxr staking-public-key -e 0 -k $pk | jq -r .network)
+    public_key=$(idxr staking-public-key -e 0 -k $pk | jq -r .pk)
+    total_stake=$(idxr staking-public-key -e 0 -k $pk | jq -r .total_stake)
+    count_delegates=$(idxr staking-public-key -e 0 -k $pk | jq -r .count_delegates)
+    total_delegated=$(idxr staking-public-key -e 0 -k $pk | jq -r .total_delegated)
+
+    assert '0' $epoch
+    assert $pk $public_key
+    assert 'mainnet' $network
+    assert '794268782956784283' $total_stake
+    assert '2' $count_delegates
+    assert '57617370302858700' $total_delegated
+
+    # write aggregated delegations to file
+    file=./epoch_0_staking_delegations.json
+    idxr staking-delegations -e 0 -p ./epoch_0_staking_delegations.json
+
+    # check account
+    file_epoch=$(cat $file | jq -r .epoch)
+    file_network=$(cat $file | jq -r .network)
+    file_public_key=$(cat $file | jq -r .delegations.${pk}.pk)
+    file_count_delegates=$(cat $file | jq -r .delegations.${pk}.count_delegates)
+    file_total_delegated=$(cat $file | jq -r .delegations.${pk}.total_delegated)
+
+    assert $epoch $file_epoch
+    assert $pk $file_public_key
+    assert $network $file_network
+    assert $count_delegates $file_count_delegates
+    assert $total_delegated $file_total_delegated
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -1368,6 +1430,7 @@ if [ "$#" -eq 0 ]; then
     test_txn_nonces
     test_startup_staking_ledgers
     test_watch_staking_ledgers
+    test_staking_delegations
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1396,6 +1459,7 @@ else
             "test_txn_nonces") test_txn_nonces ;;
             "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
             "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
+            "test_staking_delegations") test_staking_delegations ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
