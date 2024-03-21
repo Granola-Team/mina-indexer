@@ -3,11 +3,7 @@ use crate::{
     ledger::{
         account::{nanomina_to_mina, Amount},
         store::LedgerStore,
-        Ledger,
-    },
-    protocol::serialization_types::{
-        common::{Base58EncodableVersionedType, HashV1},
-        version_bytes,
+        Ledger, LedgerHash,
     },
     store::IndexerStore,
     web::rest::locked_balances::LockedBalances,
@@ -38,16 +34,6 @@ pub struct BlockchainSummary {
     staking_epoch_ledger_hash: String,
     state_hash: String,
     total_currency: String,
-}
-
-pub struct LedgerHash(pub String);
-
-impl LedgerHash {
-    pub fn from_hashv1(hashv1: HashV1) -> Self {
-        let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
-            hashv1.into();
-        Self(versioned.to_base58_string().unwrap())
-    }
 }
 
 fn millis_to_date_string(millis: i64) -> String {
