@@ -1,5 +1,7 @@
 use crate::{
-    block::{get_blockchain_length, get_state_hash, Block, BlockHash, VrfOutput},
+    block::{
+        extract_block_height, extract_network, extract_state_hash, Block, BlockHash, VrfOutput,
+    },
     canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
@@ -14,8 +16,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
 pub struct BlockFileContents {
-    pub(crate) state_hash: String,
-    pub(crate) blockchain_length: Option<u32>,
+    pub(crate) network: String,
+    pub(crate) state_hash: BlockHash,
+    pub(crate) blockchain_length: u32,
     pub(crate) contents: Vec<u8>,
 }
 
@@ -33,6 +36,7 @@ fn genesis_timestamp() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlock {
+    pub network: String,
     pub state_hash: String,
     pub scheduled_time: String,
     pub blockchain_length: u32,
@@ -43,6 +47,7 @@ pub struct PrecomputedBlock {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockWithCanonicity {
     pub canonicity: Option<Canonicity>,
+    pub network: String,
     pub state_hash: String,
     pub scheduled_time: String,
     pub blockchain_length: u32,
@@ -51,22 +56,19 @@ pub struct PrecomputedBlockWithCanonicity {
 }
 
 impl PrecomputedBlock {
-    pub fn from_file_contents(log_contents: BlockFileContents) -> serde_json::Result<Self> {
-        let state_hash = log_contents.state_hash;
+    pub fn from_file_contents(block_file_contents: BlockFileContents) -> serde_json::Result<Self> {
+        let state_hash = block_file_contents.state_hash.0;
         let BlockFile {
             scheduled_time,
             protocol_state,
             staged_ledger_diff,
-        } = serde_json::from_slice(&log_contents.contents)?;
-        let blockchain_length = if let Some(blockchain_length) = log_contents.blockchain_length {
-            blockchain_length
-        } else {
-            protocol_state.body.consensus_state.blockchain_length.0
-        };
+        } = serde_json::from_slice(&block_file_contents.contents)?;
+        let blockchain_length = block_file_contents.blockchain_length;
         Ok(Self {
             state_hash,
             scheduled_time,
             blockchain_length,
+            network: block_file_contents.network,
             protocol_state: protocol_state.into(),
             staged_ledger_diff: staged_ledger_diff.into(),
         })
@@ -74,15 +76,15 @@ impl PrecomputedBlock {
 
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path) -> anyhow::Result<Self> {
-        let file_name = path.file_name().expect("filename already checked");
-        //TODO: Use fast versions of these
-        let blockchain_length = get_blockchain_length(file_name);
-        let state_hash = get_state_hash(file_name).expect("state hash already checked");
-        let log_file_contents = std::fs::read(path)?;
+        let network = extract_network(path);
+        let blockchain_length = extract_block_height(path).expect("length in filename");
+        let state_hash = extract_state_hash(path);
+        let contents = std::fs::read(path)?;
         let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
-            state_hash,
+            network,
+            contents,
             blockchain_length,
-            contents: log_file_contents,
+            state_hash: state_hash.into(),
         })?;
         Ok(precomputed_block)
     }
@@ -411,9 +413,10 @@ impl PrecomputedBlock {
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
         PrecomputedBlockWithCanonicity {
             canonicity: Some(canonicity),
+            network: self.network.clone(),
             state_hash: self.state_hash.clone(),
-            scheduled_time: self.scheduled_time.clone(),
             blockchain_length: self.blockchain_length,
+            scheduled_time: self.scheduled_time.clone(),
             protocol_state: self.protocol_state.clone(),
             staged_ledger_diff: self.staged_ledger_diff.clone(),
         }
