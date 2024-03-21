@@ -74,10 +74,24 @@ struct Block {
     block_height: u32,
     /// Value winning_account
     winner_account: WinnerAccount,
-    /// Value date_time
+    /// Value date_time as ISO 8601 string
     date_time: String,
+    // Value received_time as ISO 8601 string
+    received_time: String,
     /// Value creator account
     creator_account: CreatorAccount,
+    // Value creator public key
+    creator: String,
+    // Value protocol state
+    protocol_state: ProtocolState,
+    // Value transaction fees
+    tx_fees: String
+}
+
+#[derive(SimpleObject)]
+struct ProtocolState {
+    // Value parent state hash
+    previous_state_hash: String,
 }
 
 #[derive(SimpleObject)]
@@ -104,6 +118,10 @@ impl From<PrecomputedBlock> for Block {
         let date_time = millis_to_date_string(block.timestamp().try_into().unwrap());
         let pk_creator = block.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
+        let scheduled_time = block.scheduled_time.clone();
+        let received_time = millis_to_date_string(scheduled_time.parse::<i64>().unwrap());
+        let previous_state_hash = block.previous_state_hash().0;
+        let tx_fees = block.tx_fees();
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -112,8 +130,14 @@ impl From<PrecomputedBlock> for Block {
                 public_key: winner_account,
             },
             creator_account: CreatorAccount {
-                public_key: creator,
+                public_key: creator.clone(),
             },
+            creator,
+            received_time,
+            protocol_state: ProtocolState {
+                previous_state_hash,
+            },
+            tx_fees: tx_fees.to_string(),
         }
     }
 }
