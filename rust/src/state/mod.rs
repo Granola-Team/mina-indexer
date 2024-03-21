@@ -25,7 +25,7 @@ use crate::{
     },
     store::IndexerStore,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use id_tree::NodeId;
 use std::{
     collections::HashMap,
@@ -1114,7 +1114,14 @@ impl IndexerState {
             let diff = self
                 .diffs_map
                 .get(&canonical_block.state_hash)
+                .with_context(|| {
+                    format!(
+                        "Block: {}-{}",
+                        canonical_block.height, canonical_block.state_hash.0
+                    )
+                })
                 .expect("block is in diffs_map");
+
             ledger_diff.append(diff.clone());
         }
 
