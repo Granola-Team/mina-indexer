@@ -86,7 +86,8 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
     pub log_level_file: LevelFilter,
 
-    /// Number of blocks to add to the canonical chain before persisting a ledger snapshot
+    /// Number of blocks to add to the canonical chain before persisting a
+    /// ledger snapshot
     #[arg(long, default_value_t = LEDGER_CADENCE)]
     ledger_cadence: u32,
 
