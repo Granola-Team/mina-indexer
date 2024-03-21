@@ -106,6 +106,10 @@ struct ConsensusState {
     epoch_count: u32,
     /// Value epoch count
     epoch: u32,
+    /// Value has ancestors the same checkpoint window
+    has_ancestor_in_same_checkpoint_window: bool,
+    /// Value last VRF output
+    last_vrf_output: String,
 }
 
 #[derive(SimpleObject)]
@@ -182,7 +186,7 @@ impl From<PrecomputedBlock> for Block {
             .t
             .to_string();
 
-        let blockchain_state = block.protocol_state.body.t.t.blockchain_state.t.t;
+        let blockchain_state = block.protocol_state.body.t.t.blockchain_state.clone().t.t;
         let snarked_ledger_hash =
             LedgerHash::from_hashv1(blockchain_state.clone().snarked_ledger_hash).0;
         let staged_ledger_hashv1 = blockchain_state
@@ -195,14 +199,16 @@ impl From<PrecomputedBlock> for Block {
         let staged_ledger_hash = LedgerHash::from_hashv1(staged_ledger_hashv1).0;
 
         // consensus state
-        let consensus_state = block.protocol_state.body.t.t.consensus_state.t.t;
+        let consensus_state = block.protocol_state.body.t.t.consensus_state.clone().t.t;
 
         let total_currency = consensus_state.total_currency.t.t;
         let blockchain_length = block.blockchain_length;
         let block_height = blockchain_length;
-
         let epoch_count = consensus_state.epoch_count.t.t;
         let epoch = epoch_count;
+        let has_ancestor_in_same_checkpoint_window =
+            consensus_state.has_ancestor_in_same_checkpoint_window;
+        let last_vrf_output = block.last_vrf_output();
 
         Block {
             state_hash: block.state_hash,
@@ -230,6 +236,8 @@ impl From<PrecomputedBlock> for Block {
                     block_height,
                     epoch,
                     epoch_count,
+                    has_ancestor_in_same_checkpoint_window,
+                    last_vrf_output,
                 },
             },
             tx_fees: tx_fees.to_string(),
