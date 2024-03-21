@@ -52,11 +52,11 @@ pub struct ServerArgs {
         default_value = MAINNET_GENESIS_HASH
     )]
     genesis_hash: String,
-    /// Startup directory for precomputed blocks
+    /// Directory containing the precomputed blocks
     #[arg(alias = "bs", long, default_value = concat!(env!("HOME"), "/.mina-indexer/blocks"))]
-    block_startup_dir: PathBuf,
+    blocks_dir: PathBuf,
     /// Directory to watch for new precomputed blocks [default:
-    /// block_startup_dir]
+    /// blocks_dir]
     #[arg(alias = "bw", long)]
     block_watch_dir: Option<PathBuf>,
     /// Startup directory for staking ledgers
@@ -227,8 +227,8 @@ pub fn process_indexer_configuration(
 ) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
-    let block_startup_dir = args.block_startup_dir;
-    let block_watch_dir = args.block_watch_dir.unwrap_or(block_startup_dir.clone());
+    let blocks_dir = args.blocks_dir;
+    let block_watch_dir = args.block_watch_dir.unwrap_or(blocks_dir.clone());
     let ledger_startup_dir = args.ledger_startup_dir;
     let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledger_startup_dir.clone());
     let prune_interval = args.prune_interval;
@@ -262,7 +262,7 @@ pub fn process_indexer_configuration(
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 genesis_hash,
-                block_startup_dir,
+                blocks_dir,
                 block_watch_dir,
                 ledger_startup_dir,
                 ledger_watch_dir,
@@ -281,7 +281,7 @@ pub fn process_indexer_configuration(
 struct ServerArgsJson {
     genesis_ledger: String,
     genesis_hash: String,
-    block_startup_dir: String,
+    blocks_dir: String,
     block_watch_dir: String,
     ledger_startup_dir: String,
     ledger_watch_dir: String,
@@ -307,10 +307,10 @@ impl From<ServerArgs> for ServerArgsJson {
                 .display()
                 .to_string(),
             genesis_hash: value.genesis_hash,
-            block_startup_dir: value.block_startup_dir.display().to_string(),
+            blocks_dir: value.blocks_dir.display().to_string(),
             block_watch_dir: value
                 .block_watch_dir
-                .unwrap_or(value.block_startup_dir)
+                .unwrap_or(value.blocks_dir)
                 .display()
                 .to_string(),
             ledger_startup_dir: value.ledger_startup_dir.display().to_string(),
