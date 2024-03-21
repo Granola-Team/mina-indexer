@@ -201,6 +201,12 @@ impl std::cmp::Ord for Block {
     }
 }
 
+impl std::default::Default for BlockHash {
+    fn default() -> Self {
+        Self("3NLDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
+    }
+}
+
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match serde_json::to_string_pretty(self) {
@@ -318,6 +324,7 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
         None
     }
 }
+
 pub fn extract_block_height(path: &Path) -> Option<u32> {
     let filename = path.file_name().and_then(|x| x.to_str()).unwrap();
     let first_dash = filename.find('-');
@@ -329,6 +336,7 @@ pub fn extract_block_height(path: &Path) -> Option<u32> {
     }
     None
 }
+
 pub fn extract_block_height_or_max(path: &Path) -> u32 {
     extract_block_height(path).unwrap_or(u32::MAX)
 }
@@ -339,11 +347,26 @@ pub fn extract_state_hash(path: &Path) -> String {
     let state_hash = &name[dash_pos + 1..];
     state_hash.to_owned()
 }
+
+pub fn extract_network(path: &Path) -> String {
+    let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
+    let dash_pos = name.rfind('-').unwrap();
+    let state_hash = &name[..dash_pos];
+    state_hash.to_owned()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{precomputed::PrecomputedBlock, Block};
-    use crate::block::{extract_block_height_or_max, extract_state_hash};
+    use super::{
+        extract_block_height_or_max, extract_state_hash, is_valid_state_hash,
+        precomputed::PrecomputedBlock, Block, BlockHash,
+    };
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn default_block_hash_is_valid() {
+        assert!(is_valid_state_hash(&BlockHash::default().0))
+    }
 
     #[test]
     fn extract_state_hash_test() {
