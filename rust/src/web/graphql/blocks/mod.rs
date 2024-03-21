@@ -80,28 +80,32 @@ struct Block {
     winner_account: WinnerAccount,
     /// Value date_time as ISO 8601 string
     date_time: String,
-    // Value received_time as ISO 8601 string
+    /// Value received_time as ISO 8601 string
     received_time: String,
     /// Value creator account
     creator_account: CreatorAccount,
-    // Value creator public key
+    /// Value creator public key
     creator: String,
-    // Value protocol state
+    /// Value protocol state
     protocol_state: ProtocolState,
-    // Value transaction fees
+    /// Value transaction fees
     tx_fees: String,
-    // Value SNARK fees
+    /// Value SNARK fees
     snark_fees: String,
-    // Value blockchain state
-    blockchain_state: BlockchainState,
-    // Value consensus state
-    consensus_state: ConsensusState,
 }
 
 #[derive(SimpleObject)]
 struct ConsensusState {
-    // Value total currency
+    /// Value total currency
     total_currency: u64,
+    /// Value block height
+    blockchain_length: u32,
+    /// Value block height
+    block_height: u32,
+    /// Value epoch count
+    epoch_count: u32,
+    /// Value epoch count
+    epoch: u32,
 }
 
 #[derive(SimpleObject)]
@@ -118,8 +122,12 @@ struct BlockchainState {
 
 #[derive(SimpleObject)]
 struct ProtocolState {
-    // Value parent state hash
+    /// Value parent state hash
     previous_state_hash: String,
+    /// Value blockchain state
+    blockchain_state: BlockchainState,
+    /// Value consensus state
+    consensus_state: ConsensusState,
 }
 
 #[derive(SimpleObject)]
@@ -190,6 +198,11 @@ impl From<PrecomputedBlock> for Block {
         let consensus_state = block.protocol_state.body.t.t.consensus_state.t.t;
 
         let total_currency = consensus_state.total_currency.t.t;
+        let blockchain_length = block.blockchain_length;
+        let block_height = blockchain_length;
+
+        let epoch_count = consensus_state.epoch_count.t.t;
+        let epoch = epoch_count;
 
         Block {
             state_hash: block.state_hash,
@@ -205,16 +218,22 @@ impl From<PrecomputedBlock> for Block {
             received_time,
             protocol_state: ProtocolState {
                 previous_state_hash,
+                blockchain_state: BlockchainState {
+                    date: utc_date.clone(),
+                    utc_date,
+                    snarked_ledger_hash,
+                    staged_ledger_hash,
+                },
+                consensus_state: ConsensusState {
+                    total_currency,
+                    blockchain_length,
+                    block_height,
+                    epoch,
+                    epoch_count,
+                },
             },
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
-            blockchain_state: BlockchainState {
-                date: utc_date.clone(),
-                utc_date,
-                snarked_ledger_hash,
-                staged_ledger_hash,
-            },
-            consensus_state: ConsensusState { total_currency },
         }
     }
 }
