@@ -9,7 +9,6 @@ use async_graphql::{
 };
 use chrono::{DateTime, SecondsFormat};
 use std::sync::Arc;
-use tracing::info;
 
 #[derive(InputObject)]
 pub struct BlockQueryInput {
@@ -28,22 +27,21 @@ impl QueryRoot {
         let db = ctx
             .data::<Arc<IndexerStore>>()
             .expect("db to be in context");
-        // Choose best tip if query wasn't provided
-        let state_hash_str = match query {
-            Some(query) => query.state_hash,
-            None => match db.get_best_block()? {
-                Some(block) => block.state_hash,
+        // Choose geneesis block if query is None
+        let state_hash = match query {
+            Some(query) => BlockHash::from(query.state_hash),
+            None => match db.get_canonical_hash_at_height(1)? {
+                Some(state_hash) => state_hash,
                 None => return Ok(None),
             },
         };
-        let state_hash = &BlockHash::from(state_hash_str);
-        let pcb = match db.get_block(state_hash)? {
+        let pcb = match db.get_block(&state_hash)? {
             Some(pcb) => pcb,
             None => return Ok(None),
         };
         let block = Block::from(pcb);
         let canonical = db
-            .get_block_canonicity(state_hash)?
+            .get_block_canonicity(&state_hash)?
             .map(|status| matches!(status, Canonicity::Canonical))
             .unwrap_or(false);
         Ok(Some(BlockWithCanonicity { block, canonical }))
