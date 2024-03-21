@@ -3,7 +3,7 @@ use crate::{
     canonicity::Canonicity,
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
-    ledger::{coinbase::Coinbase, public_key::PublicKey},
+    ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
     protocol::serialization_types::{
         consensus_state as mina_consensus,
         protocol_state::{ProtocolState, ProtocolStateJson},
@@ -172,6 +172,25 @@ impl PrecomputedBlock {
             .iter()
             .map(|x| x.t.clone())
             .collect()
+    }
+
+    pub fn staged_ledger_hash(&self) -> LedgerHash {
+        LedgerHash::from_hashv1(
+            self.protocol_state
+                .body
+                .t
+                .t
+                .blockchain_state
+                .t
+                .t
+                .staged_ledger_hash
+                .t
+                .t
+                .non_snark
+                .t
+                .ledger_hash
+                .clone(),
+        )
     }
 
     pub fn staged_ledger_diff_tuple(&self) -> mina_rs::StagedLedgerDiffTuple {
