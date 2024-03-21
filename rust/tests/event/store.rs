@@ -1,7 +1,8 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{vrf_output::VrfOutput, Block},
+    block::{vrf_output::VrfOutput, Block, BlockHash},
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
+    ledger::LedgerHash,
     store::IndexerStore,
 };
 
@@ -11,33 +12,31 @@ fn add_and_get_events() {
     let db = IndexerStore::new(store_dir.path()).unwrap();
 
     let event0 = IndexerEvent::BlockWatcher(BlockWatcherEvent::SawBlock {
-        state_hash: "block0".into(),
-        path: ".".into(),
+        blockchain_length: 19,
+        network: "network0".into(),
+        state_hash: BlockHash::default(),
     });
-    let event1 = IndexerEvent::BlockWatcher(BlockWatcherEvent::WatchDir("./block0".into()));
-    let event2 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::AlreadySeenBlock {
+    let event1 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+        blockchain_length: 23,
+        network: "network1".into(),
+        state_hash: BlockHash::default(),
+    }));
+    let event2 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
+        network: "network2".into(),
+        ledger_hash: LedgerHash::default(),
+        state_hash: BlockHash::default(),
+        blockchain_length: 42,
+    }));
+    let event3 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
-        state_hash: "state_hash".into(),
+        network: "network3".into(),
+        state_hash: BlockHash::default(),
     }));
-    let event3 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
-        state_hash: "hash".into(),
-        blockchain_length: 0,
-    }));
-    let event4 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::AlreadySeenLedger(
-        "hash".into(),
-    )));
-    let event5 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
-        hash: "hash".into(),
-    }));
-    let event6 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
-        blockchain_length: 0,
-        state_hash: "hash".into(),
-    }));
-    let event7 = IndexerEvent::LedgerWatcher(LedgerWatcherEvent::NewLedger {
-        hash: "hash".into(),
-        path: "./path".into(),
+    let event4 = IndexerEvent::StakingLedgerWatcher(StakingLedgerWatcherEvent::NewStakingLedger {
+        epoch: 0,
+        network: "mainnet".into(),
+        ledger_hash: LedgerHash("jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".into()),
     });
-    let event8 = IndexerEvent::LedgerWatcher(LedgerWatcherEvent::WatchDir("./path".into()));
     let block = Block {
         parent_hash: "parent_hash".into(),
         state_hash: "state_hash".into(),
@@ -46,10 +45,9 @@ fn add_and_get_events() {
         global_slot_since_genesis: 0,
         hash_last_vrf_output: VrfOutput::new("last_vrf_output".as_bytes().to_vec()),
     };
-    let event9 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip(block.clone()));
-    let event10 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateCanonicalChain {
-        best_tip: block,
-        canonical_blocks: CanonicalBlocksEvent::CanonicalBlocks(vec![]),
+    let event5 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip {
+        best_tip: block.clone(),
+        canonical_blocks: vec![block],
     });
 
     // block, db, and ledger events are recorded
@@ -58,20 +56,12 @@ fn add_and_get_events() {
     assert_eq!(db.add_event(&event2).unwrap(), 3);
     assert_eq!(db.add_event(&event3).unwrap(), 4);
     assert_eq!(db.add_event(&event4).unwrap(), 5);
-    assert_eq!(db.add_event(&event5).unwrap(), 6);
-    assert_eq!(db.add_event(&event6).unwrap(), 7);
-    assert_eq!(db.add_event(&event7).unwrap(), 8);
-    assert_eq!(db.add_event(&event8).unwrap(), 9);
     // witness tree events aren't recorded
-    assert_eq!(db.add_event(&event9).unwrap(), 9);
-    assert_eq!(db.add_event(&event10).unwrap(), 9);
+    assert_eq!(db.add_event(&event5).unwrap(), 5);
 
     let next_seq_num = db.get_next_seq_num().unwrap();
-    assert_eq!(next_seq_num, 9);
+    assert_eq!(next_seq_num, 5);
 
     let event_log = db.get_event_log().unwrap();
-    assert_eq!(
-        event_log,
-        vec![event0, event1, event2, event3, event4, event5, event6, event7, event8]
-    );
+    assert_eq!(event_log, vec![event0, event1, event2, event3, event4]);
 }

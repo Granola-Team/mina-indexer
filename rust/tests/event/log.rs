@@ -64,14 +64,13 @@ async fn test() {
             .as_ref()
             .map(|store| store.add_block(&block).unwrap())
         {
-            if db_event.is_new_block_event() {
+            if db_event.map(|db| db.is_new_block_event()).unwrap_or(false) {
                 if let Some(wt_event) = state1.add_block_to_witness_tree(&block).unwrap().1 {
                     let (best_tip, new_canonical_blocks) = match wt_event {
-                        WitnessTreeEvent::UpdateBestTip(best_tip) => (best_tip, vec![]),
-                        WitnessTreeEvent::UpdateCanonicalChain {
+                        WitnessTreeEvent::UpdateBestTip {
                             best_tip,
-                            canonical_blocks: CanonicalBlocksEvent::CanonicalBlocks(blocks),
-                        } => (best_tip, blocks),
+                            canonical_blocks,
+                        } => (best_tip, canonical_blocks),
                     };
 
                     state1
@@ -86,9 +85,7 @@ async fn test() {
                     });
                     state1.add_block_to_witness_tree(&block).unwrap();
                 }
-            } else {
-                continue;
-            };
+            }
         }
     }
 
