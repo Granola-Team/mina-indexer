@@ -156,7 +156,7 @@ impl SecKey {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mina_rs"))]
 mod tests {
     use super::*;
 

@@ -40,6 +40,9 @@ test-ci: lint test-unit
 test-unit: build
   cd rust && cargo nextest run --release
 
+test-unit-mina-rs:
+  cd rust && cargo nextest run --release --features mina_rs
+
 test-regression: build
   cd rust && ./test
 

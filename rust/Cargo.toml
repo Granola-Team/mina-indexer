@@ -12,6 +12,7 @@ bench = false
 # required for tests - see https://github.com/rust-lang/cargo/issues/2911
 default = ["loose_deserialization"]
 loose_deserialization = []
+mina_rs = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
