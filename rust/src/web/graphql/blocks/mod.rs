@@ -94,6 +94,14 @@ struct Block {
     snark_fees: String,
     // Value blockchain state
     blockchain_state: BlockchainState,
+    // Value consensus state
+    consensus_state: ConsensusState,
+}
+
+#[derive(SimpleObject)]
+struct ConsensusState {
+    // Value total currency
+    total_currency: u64,
 }
 
 #[derive(SimpleObject)]
@@ -178,6 +186,11 @@ impl From<PrecomputedBlock> for Block {
             .ledger_hash;
         let staged_ledger_hash = LedgerHash::from_hashv1(staged_ledger_hashv1).0;
 
+        // consensus state
+        let consensus_state = block.protocol_state.body.t.t.consensus_state.t.t;
+
+        let total_currency = consensus_state.total_currency.t.t;
+
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -201,6 +214,7 @@ impl From<PrecomputedBlock> for Block {
                 snarked_ledger_hash,
                 staged_ledger_hash,
             },
+            consensus_state: ConsensusState { total_currency },
         }
     }
 }
