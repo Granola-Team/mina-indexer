@@ -85,7 +85,9 @@ struct Block {
     // Value protocol state
     protocol_state: ProtocolState,
     // Value transaction fees
-    tx_fees: String
+    tx_fees: String,
+    // Value SNARK fees
+    snark_fees: String,
 }
 
 #[derive(SimpleObject)]
@@ -122,6 +124,8 @@ impl From<PrecomputedBlock> for Block {
         let received_time = millis_to_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();
+        let snark_fees = block.snark_fees();
+
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -138,6 +142,7 @@ impl From<PrecomputedBlock> for Block {
                 previous_state_hash,
             },
             tx_fees: tx_fees.to_string(),
+            snark_fees: snark_fees.to_string(),
         }
     }
 }

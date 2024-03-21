@@ -135,6 +135,13 @@ impl PrecomputedBlock {
             .sum()
     }
 
+    pub fn snark_fees(&self) -> u64 {
+        self.completed_works()
+            .into_iter()
+            .map(|work| work.fee.t.t)
+            .sum()
+    }
+
     pub fn accounts_created(&self) -> Vec<PublicKey> {
         self.commands()
             .into_iter()
