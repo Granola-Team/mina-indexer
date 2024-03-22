@@ -69,7 +69,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mina_rs"))]
 mod tests {
     use super::*;
     use std::collections::HashMap;

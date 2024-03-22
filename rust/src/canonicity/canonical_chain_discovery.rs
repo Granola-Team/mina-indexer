@@ -24,7 +24,7 @@ pub fn discovery(
     let mut recent_paths = vec![];
 
     if !paths.is_empty() {
-        info!("Sorting startup blocks by length");
+        info!("Sorting precomputed blocks by length");
 
         let time = Instant::now();
         paths.sort_by_cached_key(|x| extract_block_height_or_max(x));
@@ -54,7 +54,7 @@ pub fn discovery(
         // paths will always have at least 1 item
         let mut curr_length = extract_block_height_or_max(paths.first().unwrap());
 
-        info!("Searching for deep canonical blocks in startup directory");
+        info!("Searching for deep canonical blocks in blocks directory");
         for (idx, path) in paths.iter().enumerate() {
             let length = extract_block_height_or_max(path);
             if length > curr_length || idx == 0 {

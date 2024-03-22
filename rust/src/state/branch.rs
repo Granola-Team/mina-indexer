@@ -10,11 +10,10 @@ use id_tree::{
     RemoveBehavior::{DropChildren, OrphanChildren},
     Tree,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{instrument, trace};
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Branch {
     pub root: NodeId,
     pub branches: Tree<Block>,

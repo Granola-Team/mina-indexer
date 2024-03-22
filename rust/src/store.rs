@@ -206,7 +206,6 @@ impl BlockStore for IndexerStore {
 
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
         trace!("Getting block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = state_hash.0.as_bytes();
         let blocks_cf = self.blocks_cf();
@@ -446,7 +445,6 @@ impl BlockStore for IndexerStore {
 impl CanonicityStore for IndexerStore {
     fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Adding canonical block (length {height}): {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         // height -> state hash
         let key = height.to_be_bytes();
@@ -470,7 +468,6 @@ impl CanonicityStore for IndexerStore {
 
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>> {
         trace!("Getting canonical hash at height {height}");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = height.to_be_bytes();
         let canonicity_cf = self.canonicity_cf();
@@ -486,7 +483,6 @@ impl CanonicityStore for IndexerStore {
 
     fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>> {
         trace!("Getting max canonical blockchain length");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let canonicity_cf = self.canonicity_cf();
         match self
@@ -501,7 +497,6 @@ impl CanonicityStore for IndexerStore {
 
     fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()> {
         trace!("Setting max canonical blockchain length to {height}");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let canonicity_cf = self.canonicity_cf();
         let value = serde_json::to_vec(&height)?;
@@ -512,7 +507,6 @@ impl CanonicityStore for IndexerStore {
 
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         if let Ok(Some(best_tip)) = self.get_best_block() {
             if let Some(PrecomputedBlock {
@@ -563,7 +557,6 @@ impl CanonicityStore for IndexerStore {
 impl LedgerStore for IndexerStore {
     fn add_ledger(&self, ledger_hash: &str, ledger: Ledger) -> anyhow::Result<()> {
         trace!("Adding ledger at {}", ledger_hash);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add ledger to db
         let key = ledger_hash.as_bytes();
@@ -583,7 +576,6 @@ impl LedgerStore for IndexerStore {
 
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
         trace!("Adding ledger at state hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add ledger to db
         let key = state_hash.0.as_bytes();
@@ -603,7 +595,6 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger_state_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at state hash {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let ledgers_cf = self.ledgers_cf();
         let mut state_hash = state_hash.clone();
@@ -645,7 +636,6 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger(&self, ledger_hash: &str) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at {ledger_hash}");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let ledgers_cf = self.ledgers_cf();
         let key = ledger_hash.as_bytes();
@@ -663,7 +653,6 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at height {height}");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
@@ -743,7 +732,6 @@ impl EventStore for IndexerStore {
         if let IndexerEvent::WitnessTree(_) = event {
             return Ok(seq_num);
         }
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         // add event to db
         let key = seq_num.to_be_bytes();
@@ -762,8 +750,6 @@ impl EventStore for IndexerStore {
     }
 
     fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
-        self.database.try_catch_up_with_primary().unwrap_or(());
-
         let key = seq_num.to_be_bytes();
         let events_cf = self.events_cf();
         let event = self.database.get_pinned_cf(&events_cf, key)?;
@@ -775,7 +761,6 @@ impl EventStore for IndexerStore {
 
     fn get_next_seq_num(&self) -> anyhow::Result<u32> {
         trace!("Getting next event sequence number");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         if let Some(bytes) = self
             .database
@@ -871,7 +856,6 @@ impl CommandStore for IndexerStore {
         command_hash: &str,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting command by hash {}", command_hash);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = command_hash.as_bytes();
         let commands_cf = self.commands_cf();
@@ -886,7 +870,6 @@ impl CommandStore for IndexerStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>> {
         trace!("Getting commands in block {}", state_hash.0);
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let key = state_hash.0.as_bytes();
         let commands_cf = self.commands_cf();
@@ -902,7 +885,6 @@ impl CommandStore for IndexerStore {
     ) -> anyhow::Result<Option<Vec<SignedCommandWithData>>> {
         let pk = pk.to_address();
         trace!("Getting commands for public key {pk}");
-        self.database.try_catch_up_with_primary().unwrap_or(());
 
         let commands_cf = self.commands_cf();
         let mut commands = None;

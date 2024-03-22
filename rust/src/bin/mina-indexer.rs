@@ -43,63 +43,79 @@ enum ServerCommand {
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
-    /// Path to the genesis ledger
+    /// Path to the genesis ledger (JSON)
     #[arg(short, long, value_name = "FILE")]
     genesis_ledger: Option<PathBuf>,
+
     /// Hash of the initial state
     #[arg(
         long,
         default_value = MAINNET_GENESIS_HASH
     )]
     genesis_hash: String,
-    /// Startup directory for precomputed blocks
-    #[arg(alias = "bs", long, default_value = concat!(env!("HOME"), "/.mina-indexer/blocks"))]
-    block_startup_dir: PathBuf,
-    /// Directory to watch for new precomputed blocks [default:
-    /// block_startup_dir]
-    #[arg(alias = "bw", long)]
+
+    /// Directory containing the precomputed blocks
+    #[arg(long, default_value = "/usr/share/mina-indexer/blocks")]
+    blocks_dir: PathBuf,
+
+    /// Directory to watch for new precomputed blocks [default: blocks_dir]
+    #[arg(long)]
     block_watch_dir: Option<PathBuf>,
-    /// Startup directory for staking ledgers
-    #[arg(alias = "ls", long, default_value = concat!(env!("HOME"), "/.mina-indexer/staking-ledgers"))]
-    ledger_startup_dir: PathBuf,
-    /// Directory to watch for new staking ledgers [default:
-    /// ledger_startup_dir]
-    #[arg(alias = "lw", long)]
+
+    /// Directory containing the staking ledgers
+    #[arg(long, default_value = "/usr/share/mina-indexer/staking-ledgers")]
+    ledgers_dir: PathBuf,
+
+    /// Directory to watch for new staking ledgers [default: ledgers_dir]
+    #[arg(long)]
     ledger_watch_dir: Option<PathBuf>,
+
     /// Path to directory for speedb
-    #[arg(short, long, default_value = concat!(env!("HOME"), "/.mina-indexer/database"))]
+    #[arg(short, long, default_value = "/var/log/mina-indexer/database")]
     pub database_dir: PathBuf,
+
     /// Path to directory for logs
-    #[arg(long, default_value = concat!(env!("HOME"), "/.mina-indexer/logs"))]
+    #[arg(long, default_value = "/var/log/mina-indexer")]
     pub log_dir: PathBuf,
+
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
     pub log_level: LevelFilter,
+
     /// Max file log level
     #[arg(long, default_value_t = LevelFilter::DEBUG)]
     pub log_level_file: LevelFilter,
-    /// Cadence for computing and storing ledgers
+
+    /// Number of blocks to add to the canonical chain before persisting a
+    /// ledger snapshot
     #[arg(long, default_value_t = LEDGER_CADENCE)]
     ledger_cadence: u32,
-    /// Cadence for reporting progress
+
+    /// Number of blocks to process before reporting progress
     #[arg(long, default_value_t = BLOCK_REPORTING_FREQ_NUM)]
     reporting_freq: u32,
+
     /// Interval for pruning the root branch
     #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
+
     /// Threshold for determining the canonicity of a block
     #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
     canonical_threshold: u32,
+
     /// Threshold for updating the canonical root/ledger
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
+
     /// Web server hostname for REST and GraphQL
     #[arg(long, default_value = "localhost")]
     web_hostname: String,
+
     /// Web server port for REST and GraphQL
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
-    /// Path to the locked supply CSV
+
+    /// Path to the locked supply file (CSV)
     #[arg(long, value_name = "FILE")]
     locked_supply_csv: Option<PathBuf>,
 }
@@ -227,10 +243,10 @@ pub fn process_indexer_configuration(
 ) -> anyhow::Result<IndexerConfiguration> {
     let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
-    let block_startup_dir = args.block_startup_dir;
-    let block_watch_dir = args.block_watch_dir.unwrap_or(block_startup_dir.clone());
-    let ledger_startup_dir = args.ledger_startup_dir;
-    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledger_startup_dir.clone());
+    let blocks_dir = args.blocks_dir;
+    let block_watch_dir = args.block_watch_dir.unwrap_or(blocks_dir.clone());
+    let ledgers_dir = args.ledgers_dir;
+    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledgers_dir.clone());
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -262,9 +278,9 @@ pub fn process_indexer_configuration(
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 genesis_hash,
-                block_startup_dir,
+                blocks_dir,
                 block_watch_dir,
-                ledger_startup_dir,
+                ledgers_dir,
                 ledger_watch_dir,
                 prune_interval,
                 canonical_threshold,
@@ -281,9 +297,9 @@ pub fn process_indexer_configuration(
 struct ServerArgsJson {
     genesis_ledger: String,
     genesis_hash: String,
-    block_startup_dir: String,
+    blocks_dir: String,
     block_watch_dir: String,
-    ledger_startup_dir: String,
+    ledgers_dir: String,
     ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
@@ -307,16 +323,16 @@ impl From<ServerArgs> for ServerArgsJson {
                 .display()
                 .to_string(),
             genesis_hash: value.genesis_hash,
-            block_startup_dir: value.block_startup_dir.display().to_string(),
+            blocks_dir: value.blocks_dir.display().to_string(),
             block_watch_dir: value
                 .block_watch_dir
-                .unwrap_or(value.block_startup_dir)
+                .unwrap_or(value.blocks_dir)
                 .display()
                 .to_string(),
-            ledger_startup_dir: value.ledger_startup_dir.display().to_string(),
+            ledgers_dir: value.ledgers_dir.display().to_string(),
             ledger_watch_dir: value
                 .ledger_watch_dir
-                .unwrap_or(value.ledger_startup_dir)
+                .unwrap_or(value.ledgers_dir)
                 .display()
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),

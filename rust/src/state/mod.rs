@@ -25,7 +25,7 @@ use crate::{
     },
     store::IndexerStore,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use id_tree::NodeId;
 use std::{
     collections::HashMap,
@@ -803,13 +803,10 @@ impl IndexerState {
         match std::fs::read_dir(ledgers_dir) {
             Ok(dir) => {
                 if dir.count() > 0 {
-                    info!(
-                        "Parsing startup staking ledgers in {}",
-                        ledgers_dir.display()
-                    );
+                    info!("Parsing staking ledgers in {}", ledgers_dir.display());
                 }
             }
-            Err(e) => error!("Error reading startup staking ledgers: {}", e),
+            Err(e) => error!("Error reading staking ledgers: {}", e),
         }
 
         // parse staking ledgers in ledgers_dir
@@ -1114,7 +1111,14 @@ impl IndexerState {
             let diff = self
                 .diffs_map
                 .get(&canonical_block.state_hash)
+                .with_context(|| {
+                    format!(
+                        "Block: {}-{}",
+                        canonical_block.height, canonical_block.state_hash.0
+                    )
+                })
                 .expect("block is in diffs_map");
+
             ledger_diff.append(diff.clone());
         }
 

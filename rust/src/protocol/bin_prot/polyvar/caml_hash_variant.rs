@@ -31,7 +31,7 @@ pub fn caml_hash_variant(label: &str) -> VariantHash {
     }
 */
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mina_rs"))]
 mod tests {
     use super::*;
 

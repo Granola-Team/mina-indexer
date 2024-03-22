@@ -22,15 +22,15 @@ use tokio::{
     sync::{mpsc, RwLock},
     task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub genesis_ledger: GenesisLedger,
     pub genesis_hash: BlockHash,
-    pub block_startup_dir: PathBuf,
+    pub blocks_dir: PathBuf,
     pub block_watch_dir: PathBuf,
-    pub ledger_startup_dir: PathBuf,
+    pub ledgers_dir: PathBuf,
     pub ledger_watch_dir: PathBuf,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
@@ -121,8 +121,8 @@ pub async fn initialize(
     let IndexerConfiguration {
         genesis_ledger,
         genesis_hash,
-        block_startup_dir,
-        ledger_startup_dir,
+        blocks_dir,
+        ledgers_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -132,8 +132,8 @@ pub async fn initialize(
         ..
     } = config;
 
-    fs::create_dir_all(block_startup_dir.clone())?;
-    fs::create_dir_all(ledger_startup_dir.clone())?;
+    fs::create_dir_all(blocks_dir.clone())?;
+    fs::create_dir_all(ledgers_dir.clone())?;
 
     let state_config = IndexerStateConfig {
         genesis_hash,
@@ -150,8 +150,8 @@ pub async fn initialize(
         InitializationMode::New => {
             info!(
                 "Initializing indexer state from blocks in {} and staking ledgers in {}",
-                block_startup_dir.display(),
-                ledger_startup_dir.display(),
+                blocks_dir.display(),
+                ledgers_dir.display(),
             );
             IndexerState::new_from_config(state_config)?
         }
@@ -168,7 +168,7 @@ pub async fn initialize(
     match initialization_mode {
         InitializationMode::New => {
             let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
-                &block_startup_dir,
+                &blocks_dir,
                 canonical_threshold,
                 reporting_freq,
             ) {
@@ -181,21 +181,21 @@ pub async fn initialize(
             state
                 .initialize_with_canonical_chain_discovery(&mut block_parser)
                 .await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
         InitializationMode::Replay => {
             let min_length_filter = state.replay_events()?;
             let mut block_parser =
-                BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
+                BlockParser::new_length_sorted_min_filtered(&blocks_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
         InitializationMode::Sync => {
             let min_length_filter = state.sync_from_db()?;
             let mut block_parser =
-                BlockParser::new_length_sorted_min_filtered(&block_startup_dir, min_length_filter)?;
+                BlockParser::new_length_sorted_min_filtered(&blocks_dir, min_length_filter)?;
             state.add_blocks(&mut block_parser).await?;
-            state.add_startup_staking_ledgers_to_store(&ledger_startup_dir)?;
+            state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
         }
     }
     Ok(state)
@@ -227,6 +227,7 @@ pub async fn run(
     ledger_watch_dir: impl AsRef<Path>,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
+    // setup fs-based precomputed block & staking ledger watchers
     let (tx, mut rx) = mpsc::channel(4096);
     let rt = Handle::current();
     let mut watcher = RecommendedWatcher::new(
@@ -252,6 +253,7 @@ pub async fn run(
         ledger_watch_dir.as_ref().display()
     );
 
+    // watch for precomputed blocks & staking ledgers
     while let Some(res) = rx.recv().await {
         match res {
             Ok(event) => {
@@ -260,29 +262,35 @@ pub async fn run(
                     for path in event.paths {
                         if block::is_valid_block_file(&path) {
                             debug!("Valid precomputed block file: {}", path.display());
-                            if let Ok(block) = PrecomputedBlock::parse_file(&path) {
-                                let mut state = state.write().await;
-                                if state.block_pipeline(&block).is_ok() {
-                                    info!(
-                                        "Added block (length {}): {}",
-                                        block.blockchain_length, block.state_hash
-                                    );
+                            match PrecomputedBlock::parse_file(&path) {
+                                Ok(block) => {
+                                    let mut state = state.write().await;
+                                    match state.block_pipeline(&block) {
+                                        Ok(_) => info!("Added block {}", block.summary()),
+                                        Err(e) => error!("Error adding block: {}", e),
+                                    }
                                 }
-                            } else {
-                                warn!("Unable to parse precomputed block: {path:?}");
+                                Err(e) => error!("Error parsing precomputed block: {}", e),
                             }
                         } else if staking::is_valid_ledger_file(&path) {
                             let state = state.write().await;
                             if let Some(store) = state.indexer_store.as_ref() {
-                                if let Ok(staking_ledger) = StakingLedger::parse_file(&path) {
-                                    let ledger_hash = staking_ledger.ledger_hash.clone();
-                                    match store.add_staking_ledger(staking_ledger) {
-                                        Ok(_) => {
-                                            info!("Added staking ledger {:?}", ledger_hash);
+                                match StakingLedger::parse_file(&path) {
+                                    Ok(staking_ledger) => {
+                                        let ledger_summary = staking_ledger.summary();
+                                        match store.add_staking_ledger(staking_ledger) {
+                                            Ok(_) => {
+                                                info!("Added staking ledger {}", ledger_summary);
+                                            }
+                                            Err(e) => error!("Error adding staking ledger: {}", e),
                                         }
-                                        Err(e) => error!("Error adding staking ledger: {}", e),
+                                    }
+                                    Err(e) => {
+                                        error!("Error parsing staking ledger: {}", e)
                                     }
                                 }
+                            } else {
+                                error!("Indexer store unavailable");
                             }
                         }
                     }

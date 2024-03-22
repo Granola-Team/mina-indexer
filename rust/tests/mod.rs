@@ -2,6 +2,7 @@ mod block;
 mod canonicity;
 mod command;
 mod event;
+#[cfg(all(test, feature = "mina_rs"))]
 mod protocol;
 mod snark_work;
 mod state;

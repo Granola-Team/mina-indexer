@@ -123,7 +123,7 @@ impl IntoIterator for BinProtRule {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mina_rs"))]
 mod tests {
     use super::*;
     use crate::protocol::bin_prot::value::layout::Layout;
