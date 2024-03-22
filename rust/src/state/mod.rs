@@ -74,6 +74,8 @@ pub struct IndexerState {
     pub bytes_processed: u64,
     /// Datetime the indexer started running
     pub init_time: Instant,
+    /// Network blocks and staking ledgers to be processed
+    pub network: String,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +118,7 @@ pub struct IndexerStateConfig {
     pub canonical_update_threshold: u32,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub network: String,
 }
 
 impl IndexerStateConfig {
@@ -127,6 +130,7 @@ impl IndexerStateConfig {
         IndexerStateConfig {
             genesis_ledger,
             indexer_store,
+            network: "mainnet".into(),
             transition_frontier_length,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
@@ -156,6 +160,7 @@ impl IndexerState {
 
         // add genesis block and ledger to indexer store
         config.indexer_store.add_ledger_state_hash(
+            &config.network,
             &MAINNET_GENESIS_PREV_STATE_HASH.into(),
             config.genesis_ledger.clone().into(),
         )?;
@@ -208,6 +213,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
+            network: config.network.clone(),
         })
     }
 
@@ -236,6 +242,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
+            network: config.network.clone(),
         })
     }
 
@@ -254,7 +261,7 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
-                    .add_ledger_state_hash(&root_block.state_hash.clone().into(), ledger)
+                    .add_ledger_state_hash("mainnet", &root_block.state_hash.clone().into(), ledger)
                     .expect("ledger add succeeds");
                 store
                     .set_best_block(&root_block.state_hash.clone().into())
@@ -292,6 +299,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
+            network: "mainnet".into(),
         })
     }
 
@@ -343,7 +351,11 @@ impl IndexerState {
                     if self.blocks_processed % self.ledger_cadence == 0 {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
-                        indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
+                        indexer_store.add_ledger_state_hash(
+                            &self.network,
+                            &state_hash,
+                            self.ledger.clone(),
+                        )?;
                     }
 
                     if self.blocks_processed == block_parser.num_deep_canonical_blocks + 1 {
@@ -767,14 +779,6 @@ impl IndexerState {
         Ok(None)
     }
 
-    /// Get the ledger at the specified height
-    pub fn ledger_at_height(&self, height: u32) -> anyhow::Result<Option<Ledger>> {
-        if let Some(indexer_store) = self.indexer_store.as_ref() {
-            return indexer_store.get_ledger_at_height(height);
-        }
-        Ok(None)
-    }
-
     pub fn len(&self) -> u32 {
         let mut len = self.root_branch.len();
         for dangling in &self.dangling_branches {
@@ -1118,8 +1122,11 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             for canonical_block in canonical_blocks {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
-                    indexer_store
-                        .add_ledger_state_hash(&canonical_block.state_hash, self.ledger.clone())?;
+                    indexer_store.add_ledger_state_hash(
+                        &self.network,
+                        &canonical_block.state_hash,
+                        self.ledger.clone(),
+                    )?;
                 }
             }
         }

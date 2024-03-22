@@ -136,6 +136,7 @@ pub async fn initialize(
         genesis_hash,
         genesis_ledger: genesis_ledger.clone(),
         indexer_store: store,
+        network: "mainnet".into(),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
         canonical_update_threshold,
