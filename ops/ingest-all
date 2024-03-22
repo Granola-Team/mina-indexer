@@ -12,5 +12,4 @@ time \
       --log-level DEBUG \
       --log-level-file DEBUG \
       --log-dir /mnt/mina-log-storage/"$VER"-logs \
-      --ledger-cadence 1000 \
-      --prune-interval 4000
+      --ledger-cadence 5000
