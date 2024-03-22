@@ -803,13 +803,10 @@ impl IndexerState {
         match std::fs::read_dir(ledgers_dir) {
             Ok(dir) => {
                 if dir.count() > 0 {
-                    info!(
-                        "Parsing startup staking ledgers in {}",
-                        ledgers_dir.display()
-                    );
+                    info!("Parsing staking ledgers in {}", ledgers_dir.display());
                 }
             }
-            Err(e) => error!("Error reading startup staking ledgers: {}", e),
+            Err(e) => error!("Error reading staking ledgers: {}", e),
         }
 
         // parse staking ledgers in ledgers_dir

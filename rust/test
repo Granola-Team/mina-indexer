@@ -186,7 +186,8 @@ test_server_startup() {
     
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -205,7 +206,8 @@ test_ipc_is_available_immediately() {
     dl_mainnet 100 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --genesis-ledger "$LEDGER" \
@@ -222,9 +224,9 @@ test_startup_dirs_get_created() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./startup-blocks \
+        --blocks-dir ./startup-blocks \
         --block-watch-dir ./watch-blocks \
-        --ledger-startup-dir ./startup-ledgers \
+        --ledgers-dir ./startup-ledgers \
         --ledger-watch-dir ./watch-ledgers \
         --database-dir ./database \
         --log-dir ./logs
@@ -254,7 +256,8 @@ test_account_balance_cli() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -271,7 +274,8 @@ test_account_public_key_json() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -290,7 +294,8 @@ test_canonical_root() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -315,7 +320,8 @@ test_canonical_threshold() {
     dl_mainnet $num_seq_blocks ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --canonical-threshold $canonical_threshold
@@ -338,7 +344,8 @@ test_best_tip() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -369,7 +376,8 @@ test_blocks() {
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -482,7 +490,8 @@ test_block_copy() {
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -528,7 +537,8 @@ test_missing_blocks() {
     dl_mainnet_range 22 30 ./blocks # missing 21
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -594,7 +604,8 @@ test_best_chain() {
     dl_mainnet 12 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -646,7 +657,8 @@ test_ledgers() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -708,7 +720,8 @@ test_sync() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -723,7 +736,8 @@ test_sync() {
 
     # sync from previous indexer db
     idxr_server sync \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     sleep 1
@@ -751,7 +765,8 @@ test_replay() {
     dl_mainnet 15 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -766,7 +781,8 @@ test_replay() {
 
     # replay events from previous indexer instance
     idxr_server replay \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     sleep 1
@@ -796,7 +812,8 @@ test_transactions() {
     dl_mainnet 13 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -895,7 +912,8 @@ test_snark_work() {
     dl_mainnet 120 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -952,7 +970,8 @@ test_checkpoint() {
     dl_mainnet 13 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
@@ -973,7 +992,8 @@ test_checkpoint() {
     # sync a new indexer from checkpointed db
     setup
     idxr_server sync \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./checkpoint \
         --log-dir ./logs
     wait_for_socket
@@ -1003,7 +1023,8 @@ test_many_blocks() {
     dl_mainnet 1000 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --ledger-cadence 100 \
@@ -1043,7 +1064,8 @@ test_rest_endpoints() {
     port=$(ephemeral_port)
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug \
@@ -1118,7 +1140,8 @@ test_release() {
     dl_mainnet 5000 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1154,7 +1177,8 @@ test_genesis_block_creator() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1176,7 +1200,8 @@ test_txn_nonces() {
     dl_mainnet 100 ./blocks
 
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug
@@ -1202,8 +1227,8 @@ test_startup_staking_ledgers() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
-        --ledger-startup-dir $STAKING_LEDGERS \
+        --blocks-dir ./blocks \
+        --ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
         --log-dir ./logs
     sleep 1
@@ -1242,7 +1267,8 @@ test_watch_staking_ledgers() {
 
     setup
     idxr_server_start \
-        --block-startup-dir ./blocks \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
         --ledger-watch-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
