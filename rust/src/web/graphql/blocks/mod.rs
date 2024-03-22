@@ -110,6 +110,12 @@ struct ConsensusState {
     has_ancestor_in_same_checkpoint_window: bool,
     /// Value last VRF output
     last_vrf_output: String,
+    /// Value minimum window density
+    min_window_density: u32,
+    /// Value current slot
+    slot: u32,
+    /// Value global slot
+    slot_since_genesis: u32,
 }
 
 #[derive(SimpleObject)]
@@ -209,7 +215,9 @@ impl From<PrecomputedBlock> for Block {
         let has_ancestor_in_same_checkpoint_window =
             consensus_state.has_ancestor_in_same_checkpoint_window;
         let last_vrf_output = block.last_vrf_output();
-
+        let min_window_density = consensus_state.min_window_density.t.t;
+        let slot_since_genesis = consensus_state.global_slot_since_genesis.t.t;
+        let slot = consensus_state.curr_global_slot.t.t.slot_number.t.t;
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -238,6 +246,9 @@ impl From<PrecomputedBlock> for Block {
                     epoch_count,
                     has_ancestor_in_same_checkpoint_window,
                     last_vrf_output,
+                    min_window_density,
+                    slot,
+                    slot_since_genesis,
                 },
             },
             tx_fees: tx_fees.to_string(),
