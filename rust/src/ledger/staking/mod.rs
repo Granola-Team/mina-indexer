@@ -1,6 +1,9 @@
 pub mod parser;
 
-use crate::{block::BlockHash, ledger::public_key::PublicKey};
+use crate::{
+    block::BlockHash,
+    ledger::{public_key::PublicKey, LedgerHash},
+};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -13,9 +16,6 @@ pub struct StakingLedger {
     pub ledger_hash: LedgerHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LedgerHash(pub String);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccount {
@@ -93,11 +93,22 @@ pub struct AggregatedEpochStakeDelegations {
     pub network: String,
     pub ledger_hash: LedgerHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
+    pub total_delegations: u64,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EpochStakeDelegation {
     pub pk: PublicKey,
+    pub count_delegates: Option<u32>,
+    pub total_delegated: Option<u64>,
+}
+
+#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AggregatedEpochStakeDelegation {
+    pub pk: PublicKey,
+    pub epoch: u32,
+    pub network: String,
+    pub total_stake: u64,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
 }
@@ -187,9 +198,7 @@ impl StakingLedger {
 
     /// Aggregate each public key's staking delegations and total delegations
     /// If the public key has delegated, they cannot be delegated to
-    pub fn aggregate_delegations(
-        &self,
-    ) -> anyhow::Result<(HashMap<PublicKey, EpochStakeDelegation>, u64)> {
+    pub fn aggregate_delegations(&self) -> anyhow::Result<AggregatedEpochStakeDelegations> {
         let mut delegations = HashMap::new();
         self.staking_ledger
             .iter()
@@ -232,7 +241,7 @@ impl StakingLedger {
                 }
             });
 
-        let total = delegations.values().fold(0, |acc, x| {
+        let total_delegations = delegations.values().fold(0, |acc, x| {
             acc + x
                 .as_ref()
                 .map(|x| x.total_delegated.unwrap_or_default())
@@ -251,7 +260,13 @@ impl StakingLedger {
             .into_iter()
             .map(|(pk, del)| (pk, del.unwrap_or_default()))
             .collect();
-        Ok((delegations, total))
+        Ok(AggregatedEpochStakeDelegations {
+            delegations,
+            total_delegations,
+            epoch: self.epoch,
+            network: self.network.clone(),
+            ledger_hash: self.ledger_hash.clone(),
+        })
     }
 
     pub fn summary(&self) -> String {
@@ -268,6 +283,7 @@ impl From<String> for LedgerHash {
 #[cfg(test)]
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
+    use crate::ledger::staking::AggregatedEpochStakeDelegations;
     use std::path::PathBuf;
 
     #[test]
@@ -290,9 +306,21 @@ mod tests {
 
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path)?;
-        let (delegations, total_stake) = staking_ledger.aggregate_delegations()?;
+        let AggregatedEpochStakeDelegations {
+            epoch,
+            network,
+            ledger_hash,
+            delegations,
+            total_delegations,
+        } = staking_ledger.aggregate_delegations()?;
         let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
 
+        assert_eq!(epoch, 0);
+        assert_eq!(network, "mainnet".to_string());
+        assert_eq!(
+            ledger_hash.0,
+            "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
+        );
         assert_eq!(
             delegations.get(&pk),
             Some(&EpochStakeDelegation {
@@ -301,7 +329,7 @@ mod tests {
                 total_delegated: Some(13277838425206999)
             })
         );
-        assert_eq!(total_stake, 794268782956784283);
+        assert_eq!(total_delegations, 794268782956784283);
         Ok(())
     }
 }

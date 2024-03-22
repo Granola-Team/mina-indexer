@@ -28,15 +28,17 @@ async fn test() {
     let last_best_tip = event_log
         .iter()
         .filter_map(|event| match event {
-            IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBestTip(state_hash))) => {
-                Some(state_hash.clone())
-            }
+            IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBestTip {
+                state_hash,
+                network: _,
+                blockchain_length: _,
+            })) => Some(state_hash.clone()),
             _ => None,
         })
         .last()
         .unwrap();
     assert_eq!(
-        last_best_tip,
+        last_best_tip.0,
         "3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ".to_string()
     );
 
@@ -45,9 +47,10 @@ async fn test() {
         .iter()
         .filter_map(|event| match event {
             IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
+                network: _,
                 state_hash,
                 blockchain_length,
-            })) => Some((*blockchain_length, &state_hash[..])),
+            })) => Some((*blockchain_length, &state_hash.0[..])),
             _ => None,
         })
         .collect();

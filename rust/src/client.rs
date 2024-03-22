@@ -202,21 +202,28 @@ pub struct LedgerHashArgs {
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum StakingLedgerArgs {
+    /// Query staking delegations by epoch
+    StakingDelegations(StakingDelegationsArgs),
+    /// Query staking delegations by public key and epoch
+    StakingPublicKey(StakingPublicKeyArgs),
     /// Query staking ledger by hash
     StakingLedgerHash(StakingLedgerHashArgs),
-    /// Query ledger by height
-    StakingLedgerEpoch(StakingLedgerAtEpochArgs),
+    /// Query staking ledger by epoch
+    StakingLedgerEpoch(StakingLedgerEpochArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct StakingLedgerAtEpochArgs {
+pub struct StakingLedgerEpochArgs {
     /// Path to write the staking ledger [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
     /// Epoch number of the staking ledger
     #[arg(short, long)]
     epoch: u32,
+    /// Network
+    #[arg(short, long, default_value = "mainnet")]
+    network: String,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -228,6 +235,37 @@ pub struct StakingLedgerHashArgs {
     /// Ledger hash corresponding to the staking ledger
     #[arg(short, long)]
     hash: String,
+    /// Network
+    #[arg(short, long, default_value = "mainnet")]
+    network: String,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct StakingPublicKeyArgs {
+    /// Epoch to aggregate staking delegations
+    #[arg(short, long)]
+    epoch: u32,
+    /// Account to aggregate staking delegations
+    #[arg(short = 'k', long)]
+    public_key: String,
+    /// Network for the staking ledger
+    #[arg(short, long, default_value = "mainnet")]
+    network: String,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct StakingDelegationsArgs {
+    /// Epoch to aggregate total delegations
+    #[arg(short, long)]
+    epoch: u32,
+    /// Network for the staking ledger
+    #[arg(short, long, default_value = "mainnet")]
+    network: String,
+    /// Path to write the aggregate delegations
+    #[arg(short, long)]
+    path: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -362,7 +400,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                     args.verbose,
                     args.start_state_hash,
                     args.end_state_hash.clone().unwrap_or("x".into()),
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
             };
             writer.write_all(command.as_bytes()).await?;
@@ -377,31 +415,31 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 BlockArgs::BestTip(args) => format!(
                     "block-best-tip {} {}\0",
                     args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
                 BlockArgs::Block(args) => format!(
                     "block-state-hash {} {} {}\0",
                     args.state_hash,
                     args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
                 BlockArgs::BlocksAtHeight(args) => format!(
                     "blocks-at-height {} {} {}\0",
                     args.height,
                     args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
                 BlockArgs::BlocksAtSlot(args) => format!(
                     "blocks-at-slot {} {} {}\0",
                     args.slot,
                     args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
                 BlockArgs::BlocksAtPublicKey(args) => format!(
                     "blocks-at-public-key {} {} {}\0",
                     args.public_key,
                     args.verbose,
-                    args.path.clone().unwrap_or("".into()).display()
+                    args.path.clone().unwrap_or_default().display()
                 ),
             };
             writer.write_all(command.as_bytes()).await?;
@@ -425,21 +463,21 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 LedgerArgs::BestLedger(args) => {
                     format!(
                         "best-ledger {}\0",
-                        args.path.clone().unwrap_or("".into()).display()
+                        args.path.clone().unwrap_or_default().display()
                     )
                 }
                 LedgerArgs::Ledger(args) => {
                     format!(
                         "ledger {} {}\0",
                         args.hash,
-                        args.path.clone().unwrap_or("".into()).display()
+                        args.path.clone().unwrap_or_default().display()
                     )
                 }
                 LedgerArgs::LedgerAtHeight(args) => {
                     format!(
                         "ledger-at-height {} {}\0",
                         args.height,
-                        args.path.clone().unwrap_or("".into()).display(),
+                        args.path.clone().unwrap_or_default().display(),
                     )
                 }
             };
@@ -452,22 +490,34 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
         }
         ClientCli::StakingLedger(staking_ledger_args) => {
             let command = match staking_ledger_args {
+                StakingLedgerArgs::StakingDelegations(agg_del_args) => {
+                    format!(
+                        "staking-delegations {} {} {}\0",
+                        agg_del_args.network,
+                        agg_del_args.epoch,
+                        agg_del_args.path.clone().unwrap_or_default().display()
+                    )
+                }
+                StakingLedgerArgs::StakingPublicKey(agg_del_args) => {
+                    format!(
+                        "staking-delegations-pk {} {} {}\0",
+                        agg_del_args.network, agg_del_args.epoch, agg_del_args.public_key
+                    )
+                }
                 StakingLedgerArgs::StakingLedgerHash(ledger_hash_args) => {
                     format!(
-                        "staking-ledger-hash {} {}\0",
+                        "staking-ledger-hash {} {} {}\0",
+                        ledger_hash_args.network,
                         ledger_hash_args.hash,
-                        ledger_hash_args.path.clone().unwrap_or("".into()).display()
+                        ledger_hash_args.path.clone().unwrap_or_default().display()
                     )
                 }
                 StakingLedgerArgs::StakingLedgerEpoch(ledger_epoch_args) => {
                     format!(
-                        "staking-ledger-epoch {} {}\0",
+                        "staking-ledger-epoch {} {} {}\0",
+                        ledger_epoch_args.network,
                         ledger_epoch_args.epoch,
-                        ledger_epoch_args
-                            .path
-                            .clone()
-                            .unwrap_or("".into())
-                            .display()
+                        ledger_epoch_args.path.clone().unwrap_or_default().display()
                     )
                 }
             };
@@ -484,14 +534,14 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                     format!(
                         "snark-state-hash {} {}\0",
                         snark_args.state_hash,
-                        snark_args.path.clone().unwrap_or("".into()).display()
+                        snark_args.path.clone().unwrap_or_default().display()
                     )
                 }
                 SnarkArgs::SnarkPublicKey(pk_args) => {
                     format!(
                         "snark-pk {} {}\0",
                         pk_args.public_key,
-                        pk_args.path.clone().unwrap_or("".into()).display()
+                        pk_args.path.clone().unwrap_or_default().display()
                     )
                 }
             };
@@ -512,7 +562,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 "summary {} {} {}\0",
                 summary_args.verbose,
                 summary_args.json,
-                summary_args.path.clone().unwrap_or("".into()).display()
+                summary_args.path.clone().unwrap_or_default().display()
             );
             writer.write_all(command.as_bytes()).await?;
             reader.read_to_end(&mut buffer).await?;
@@ -533,7 +583,7 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                         pk_args.verbose,
                         pk_args.start_state_hash,
                         pk_args.end_state_hash.clone().unwrap_or("x".into()),
-                        pk_args.path.clone().unwrap_or("".into()).display(),
+                        pk_args.path.clone().unwrap_or_default().display(),
                     )
                 }
                 TransactionArgs::TxStateHash(args) => {

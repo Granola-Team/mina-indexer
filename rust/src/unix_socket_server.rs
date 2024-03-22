@@ -6,7 +6,12 @@ use crate::{
     canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
     constants::SOCKET_NAME,
-    ledger::{self, public_key, store::LedgerStore},
+    ledger::{
+        self,
+        public_key::{self, PublicKey},
+        staking::AggregatedEpochStakeDelegation,
+        store::LedgerStore,
+    },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
 };
@@ -670,27 +675,40 @@ async fn handle_conn(
             }
         }
         "staking-ledger-hash" => {
+            let network = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let hash = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
-            info!("Received staking-ledger-hash command for {hash}");
+            info!(
+                "Received staking-ledger-hash {} command for {}",
+                network, hash
+            );
 
             if ledger::is_valid_ledger_hash(&hash) {
-                trace!("{hash} is a ledger hash");
+                trace!("{} is a ledger hash", hash);
 
                 if let Some(staking_ledger) = db.get_staking_ledger_hash(&hash.clone().into())? {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                     if path.is_empty() {
-                        debug!("Writing staking ledger at hash {hash} to stdout");
+                        debug!(
+                            "Writing {} staking ledger with hash {} to stdout",
+                            staking_ledger.network, hash
+                        );
                         Some(ledger_json)
                     } else {
                         let path: PathBuf = path.into();
                         if !path.is_dir() {
-                            debug!("Writing ledger at {hash} to {}", path.display());
-
+                            debug!(
+                                "Writing {} staking ledger with hash {} to {}",
+                                staking_ledger.network,
+                                hash,
+                                path.display()
+                            );
                             std::fs::write(path.clone(), ledger_json)?;
                             Some(format!(
-                                "Staking ledger at hash {hash} written to {}",
+                                "Staking ledger {} with hash {} written to {}",
+                                staking_ledger.network,
+                                hash,
                                 path.display()
                             ))
                         } else {
@@ -707,24 +725,29 @@ async fn handle_conn(
             }
         }
         "staking-ledger-epoch" => {
+            let network = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let epoch = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
             let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
             let path = path.trim_end_matches('\0');
-            info!("Received staking-ledger-epoch {epoch} command");
+            info!(
+                "Received staking-ledger-epoch {} command {}",
+                network, epoch
+            );
 
-            if let Some(staking_ledger) = db.get_staking_ledger_at_epoch(epoch)? {
+            if let Some(staking_ledger) = db.get_staking_ledger_at_epoch(&network, epoch)? {
                 let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                 if path.is_empty() {
-                    debug!("Writing staking ledger at epoch {epoch} to stdout");
+                    debug!("Writing staking ledger at epoch {} to stdout", epoch);
                     Some(ledger_json)
                 } else {
                     let path: PathBuf = path.into();
                     if !path.is_dir() {
-                        debug!("Writing ledger at epoch {epoch} to {}", path.display());
+                        debug!("Writing ledger at epoch {} to {}", epoch, path.display());
 
                         std::fs::write(path.clone(), ledger_json)?;
                         Some(format!(
-                            "Staking ledger at epoch {epoch} written to {}",
+                            "Staking ledger at epoch {} written to {}",
+                            epoch,
                             path.display()
                         ))
                     } else {
@@ -732,9 +755,108 @@ async fn handle_conn(
                     }
                 }
             } else {
-                error!("Staking ledger at epoch {epoch} is not in the store");
+                error!("Staking ledger at epoch {} is not in the store", epoch);
                 Some(format!(
-                    "Staking ledger at epoch {epoch} is not in the store"
+                    "Staking ledger at epoch {} is not in the store",
+                    epoch
+                ))
+            }
+        }
+        "staking-delegations-pk" => {
+            let network = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let epoch = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
+            let pk = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let pk = pk.trim_end_matches('\0');
+            info!(
+                "Received staking-delegations command for {} pk {} epoch {}",
+                network, pk, epoch,
+            );
+
+            if !public_key::is_valid(pk) {
+                invalid_public_key(pk)
+            } else if let Some(aggegated_delegations) = db.get_delegations_epoch(&network, epoch)? {
+                let pk: PublicKey = pk.into();
+                let epoch = aggegated_delegations.epoch;
+                let network = aggegated_delegations.network;
+                let total_delegations = aggegated_delegations.total_delegations;
+                let count_delegates = aggegated_delegations
+                    .delegations
+                    .get(&pk)
+                    .and_then(|agg_del| agg_del.count_delegates);
+                let total_delegated = aggegated_delegations
+                    .delegations
+                    .get(&pk)
+                    .and_then(|agg_del| agg_del.total_delegated);
+                Some(serde_json::to_string_pretty(
+                    &AggregatedEpochStakeDelegation {
+                        pk,
+                        epoch,
+                        network,
+                        count_delegates,
+                        total_delegated,
+                        total_stake: total_delegations,
+                    },
+                )?)
+            } else {
+                error!(
+                    "Public key {} is missing from staking ledger {} epoch {}",
+                    pk, network, epoch
+                );
+                Some(format!(
+                    "Public key {} is missing from staking ledger {} epoch {}",
+                    pk, network, epoch
+                ))
+            }
+        }
+        "staking-delegations" => {
+            let network = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let epoch = String::from_utf8(buffers.next().unwrap().to_vec())?.parse::<u32>()?;
+            let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
+            let path = path.trim_end_matches('\0');
+            info!(
+                "Received staking-delegations command for {} epoch {}",
+                network, epoch
+            );
+
+            let aggregated_delegations = db.get_delegations_epoch(&network, epoch)?;
+            if let Some(agg_del_str) = aggregated_delegations
+                .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
+            {
+                if path.is_empty() {
+                    debug!(
+                        "Writing aggregated staking delegations {} epoch {} to stdout",
+                        network, epoch
+                    );
+                    Some(agg_del_str)
+                } else {
+                    let path: PathBuf = path.into();
+                    if !path.is_dir() {
+                        debug!(
+                            "Writing aggregated staking delegations {} epoch {} to {}",
+                            network,
+                            epoch,
+                            path.display()
+                        );
+
+                        std::fs::write(&path, agg_del_str)?;
+                        Some(format!(
+                            "Aggregated staking delegations {} epoch {} written to {}",
+                            network,
+                            epoch,
+                            path.display()
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
+            } else {
+                error!(
+                    "Unable to aggregate staking delegations {} epoch {}",
+                    network, epoch
+                );
+                Some(format!(
+                    "Unable to aggregate staking delegations {} epoch {}",
+                    network, epoch
                 ))
             }
         }
@@ -840,7 +962,7 @@ async fn handle_conn(
                 if !path.is_dir() {
                     info!("Writing summary to {}", path.display());
 
-                    std::fs::write(&path, summary_str).unwrap();
+                    std::fs::write(&path, summary_str)?;
                     Some(format!("Summary written to {}", path.display()))
                 } else {
                     file_must_not_be_a_directory(&path)

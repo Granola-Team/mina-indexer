@@ -6,12 +6,13 @@ use crate::{
         store::CommandStore,
         UserCommandWithStatus,
     },
+    constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
         public_key::PublicKey,
-        staking::{LedgerHash, StakingLedger},
+        staking::{AggregatedEpochStakeDelegations, StakingLedger},
         store::LedgerStore,
-        Ledger,
+        Ledger, LedgerHash,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
@@ -21,7 +22,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use tracing::{trace, warn};
+use tracing::{error, trace, warn};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -91,7 +92,7 @@ impl IndexerStore {
 
         let checkpoint = Checkpoint::new(&self.database)?;
         Checkpoint::create_checkpoint(&checkpoint, path)
-            .map_err(|e| anyhow!("Error creating db checkpoint: {}", e.to_string()))
+            .map_err(|e| anyhow!("Error creating db checkpoint: {}", e))
     }
 
     pub fn db_path(&self) -> &Path {
@@ -148,13 +149,9 @@ impl IndexerStore {
 }
 
 impl BlockStore for IndexerStore {
-    /// Add the given block at its state hash and record a db event
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<DbEvent> {
-        trace!(
-            "Adding block (length {}): {}",
-            block.blockchain_length,
-            block.state_hash
-        );
+    /// Add the given block at its indices and record a db event
+    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
+        trace!("Adding block {}", block.summary());
 
         // add block to db
         let key = block.state_hash.as_bytes();
@@ -162,15 +159,8 @@ impl BlockStore for IndexerStore {
         let blocks_cf = self.blocks_cf();
 
         if matches!(self.database.get_pinned_cf(&blocks_cf, key), Ok(Some(_))) {
-            trace!(
-                "Block already present (length {}): {}",
-                block.blockchain_length,
-                block.state_hash
-            );
-            return Ok(DbEvent::Block(DbBlockEvent::AlreadySeenBlock {
-                state_hash: block.state_hash.clone(),
-                blockchain_length: block.blockchain_length,
-            }));
+            trace!("Block already present {}", block.summary());
+            return Ok(None);
         }
         self.database.put_cf(&blocks_cf, key, value)?;
 
@@ -196,12 +186,13 @@ impl BlockStore for IndexerStore {
 
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
-            state_hash: block.state_hash.clone(),
+            network: block.network.clone(),
+            state_hash: block.state_hash.clone().into(),
             blockchain_length: block.blockchain_length,
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
 
-        Ok(db_event)
+        Ok(Some(db_event))
     }
 
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
@@ -245,9 +236,18 @@ impl BlockStore for IndexerStore {
         )?;
 
         // record new best tip event
-        self.add_event(&IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBestTip(
-            state_hash.clone().0,
-        ))))?;
+        match self.get_block(state_hash)? {
+            Some(block) => {
+                self.add_event(&IndexerEvent::Db(DbEvent::Block(
+                    DbBlockEvent::NewBestTip {
+                        network: block.network.clone(),
+                        state_hash: block.state_hash.clone().into(),
+                        blockchain_length: block.blockchain_length,
+                    },
+                )))?;
+            }
+            None => error!("Block missing from store: {}", state_hash.0),
+        }
 
         Ok(())
     }
@@ -444,7 +444,11 @@ impl BlockStore for IndexerStore {
 
 impl CanonicityStore for IndexerStore {
     fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
-        trace!("Adding canonical block (length {height}): {}", state_hash.0);
+        trace!(
+            "Adding canonical block (length {}): {}",
+            state_hash.0,
+            height
+        );
 
         // height -> state hash
         let key = height.to_be_bytes();
@@ -458,8 +462,9 @@ impl CanonicityStore for IndexerStore {
         // record new canonical block event
         self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
             DbCanonicityEvent::NewCanonicalBlock {
-                state_hash: state_hash.0.clone(),
+                network: "mainnet".into(),
                 blockchain_length: height,
+                state_hash: state_hash.0.clone().into(),
             },
         )))?;
 
@@ -555,22 +560,13 @@ impl CanonicityStore for IndexerStore {
 }
 
 impl LedgerStore for IndexerStore {
-    fn add_ledger(&self, ledger_hash: &str, ledger: Ledger) -> anyhow::Result<()> {
+    fn add_ledger(&self, ledger_hash: &str, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Adding ledger at {}", ledger_hash);
 
         // add ledger to db
         let key = ledger_hash.as_bytes();
-        let value = ledger.to_string();
-        let value = value.as_bytes();
-        let ledgers_cf = self.ledgers_cf();
-        self.database.put_cf(&ledgers_cf, key, value)?;
-
-        // add new ledger event
-        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-            DbLedgerEvent::NewLedger {
-                hash: ledger_hash.into(),
-            },
-        )))?;
+        let value = state_hash.0.as_bytes();
+        self.database.put_cf(self.ledgers_cf(), key, value)?;
         Ok(())
     }
 
@@ -581,15 +577,37 @@ impl LedgerStore for IndexerStore {
         let key = state_hash.0.as_bytes();
         let value = ledger.to_string();
         let value = value.as_bytes();
-        let ledgers_cf = self.ledgers_cf();
-        self.database.put_cf(&ledgers_cf, key, value)?;
+        self.database.put_cf(self.ledgers_cf(), key, value)?;
 
-        // add new ledger event
-        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-            DbLedgerEvent::NewLedger {
-                hash: state_hash.0.clone(),
-            },
-        )))?;
+        // index on state hash & add new ledger event
+        if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
+            self.add_ledger(MAINNET_GENESIS_LEDGER_HASH, state_hash)?;
+            self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                DbLedgerEvent::NewLedger {
+                    blockchain_length: 0,
+                    network: "mainnet".into(),
+                    state_hash: state_hash.clone(),
+                    ledger_hash: LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
+                },
+            )))?;
+        } else {
+            match self.get_block(state_hash)? {
+                Some(block) => {
+                    let ledger_hash = block.staged_ledger_hash();
+                    self.add_ledger(&ledger_hash.0, state_hash)?;
+                    self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                        DbLedgerEvent::NewLedger {
+                            ledger_hash,
+                            network: block.network.clone(),
+                            state_hash: block.state_hash.clone().into(),
+                            blockchain_length: block.blockchain_length,
+                        },
+                    )))?;
+                }
+                None => error!("Block missing from store {}", state_hash.0),
+            }
+        }
+
         Ok(())
     }
 
@@ -600,21 +618,25 @@ impl LedgerStore for IndexerStore {
         let mut state_hash = state_hash.clone();
         let mut to_apply = vec![];
 
-        // walk chain back to a stored ledger (canonical)
+        // walk chain back to a stored ledger
         // collect blocks to compute the current ledger
         while self
             .database
             .get_pinned_cf(&ledgers_cf, state_hash.0.as_bytes())?
             .is_none()
         {
+            trace!("No ledger found for state hash {}", state_hash);
             if let Some(block) = self.get_block(&state_hash)? {
                 to_apply.push(block.clone());
                 state_hash = block.previous_state_hash();
+                trace!("Checking for ledger at state hash {}", state_hash.0);
             } else {
+                error!("Block missing from store: {}", state_hash.0);
                 return Ok(None);
             }
         }
 
+        trace!("Found ledger for {}", state_hash.0);
         to_apply.reverse();
 
         let key = state_hash.0.as_bytes();
@@ -624,10 +646,25 @@ impl LedgerStore for IndexerStore {
             .map(|bytes| bytes.to_vec())
             .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
         {
-            for block in to_apply {
-                ledger._apply_diff_from_precomputed(&block)?;
-            }
+            if let Some(requested_block) = to_apply.last() {
+                for block in &to_apply {
+                    ledger._apply_diff_from_precomputed(block)?;
+                }
 
+                trace!("Memoizing ledger for block {}", requested_block.summary());
+                self.add_ledger_state_hash(
+                    &requested_block.state_hash.clone().into(),
+                    ledger.clone(),
+                )?;
+                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                    DbLedgerEvent::NewLedger {
+                        network: requested_block.network.clone(),
+                        state_hash: requested_block.state_hash.clone().into(),
+                        ledger_hash: requested_block.staged_ledger_hash(),
+                        blockchain_length: requested_block.blockchain_length,
+                    },
+                )))?;
+            }
             return Ok(Some(ledger));
         }
 
@@ -637,15 +674,21 @@ impl LedgerStore for IndexerStore {
     fn get_ledger(&self, ledger_hash: &str) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting ledger at {ledger_hash}");
 
-        let ledgers_cf = self.ledgers_cf();
         let key = ledger_hash.as_bytes();
-        if let Some(ledger) = self
+        if let Some(state_hash) = self
             .database
-            .get_pinned_cf(&ledgers_cf, key)?
-            .map(|bytes| bytes.to_vec())
-            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+            .get_pinned_cf(self.ledgers_cf(), key)?
+            .map(|bytes| BlockHash(String::from_utf8(bytes.to_vec()).unwrap()))
         {
-            return Ok(Some(ledger));
+            let key = state_hash.0.as_bytes();
+            if let Some(ledger) = self
+                .database
+                .get_pinned_cf(self.ledgers_cf(), key)?
+                .map(|bytes| bytes.to_vec())
+                .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+            {
+                return Ok(Some(ledger));
+            }
         }
 
         Ok(None)
@@ -660,10 +703,14 @@ impl LedgerStore for IndexerStore {
         }
     }
 
-    fn get_staking_ledger_at_epoch(&self, epoch: u32) -> anyhow::Result<Option<StakingLedger>> {
-        trace!("Getting epoch {epoch} staking ledger");
+    fn get_staking_ledger_at_epoch(
+        &self,
+        network: &str,
+        epoch: u32,
+    ) -> anyhow::Result<Option<StakingLedger>> {
+        trace!("Getting staking ledger {} epoch {}", network, epoch);
 
-        let key = format!("staking-{epoch}");
+        let key = format!("staking-{}-{}", network, epoch);
         if let Some(ledger_result) = self
             .database
             .get_pinned_cf(self.ledgers_cf(), key.as_bytes())?
@@ -706,7 +753,10 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
         // add epoch index
-        let key = format!("staking-{}", staking_ledger.epoch);
+        let key = format!(
+            "staking-{}-{}",
+            staking_ledger.network, staking_ledger.epoch
+        );
         let value = staking_ledger.ledger_hash.0.as_bytes();
         self.database
             .put_cf(self.ledgers_cf(), key.as_bytes(), value)?;
@@ -714,13 +764,49 @@ impl LedgerStore for IndexerStore {
         if is_new {
             // add new ledger event
             self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
-                DbStakingLedgerEvent::NewLedger {
+                DbStakingLedgerEvent::NewStakingLedger {
                     epoch: staking_ledger.epoch,
+                    network: staking_ledger.network,
                     ledger_hash: staking_ledger.ledger_hash,
                 },
             )))?;
         }
         Ok(())
+    }
+
+    fn get_delegations_epoch(
+        &self,
+        network: &str,
+        epoch: u32,
+    ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
+        trace!("Getting staking delegations for epoch {}", epoch);
+
+        let key = format!("delegations-{}-{}", network, epoch);
+        if let Some(bytes) = self
+            .database
+            .get_pinned_cf(self.ledgers_cf(), key.clone())?
+        {
+            return Ok(Some(serde_json::from_slice(&bytes)?));
+        } else if let Some(staking_ledger) = self.get_staking_ledger_at_epoch(network, epoch)? {
+            trace!("Memoizing staking delegations {} epoch {}", network, epoch);
+            let aggregated_delegations = staking_ledger.aggregate_delegations()?;
+            self.database.put_cf(
+                self.ledgers_cf(),
+                key,
+                serde_json::to_vec(&aggregated_delegations)?,
+            )?;
+
+            // add new aggregated delegation event
+            self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
+                DbStakingLedgerEvent::AggregateDelegations {
+                    network: network.to_string(),
+                    epoch: staking_ledger.epoch,
+                },
+            )))?;
+            return Ok(Some(aggregated_delegations));
+        }
+
+        Ok(None)
     }
 }
 
@@ -729,7 +815,7 @@ impl EventStore for IndexerStore {
         let seq_num = self.get_next_seq_num()?;
         trace!("Adding event {seq_num}: {:?}", event);
 
-        if let IndexerEvent::WitnessTree(_) = event {
+        if matches!(event, IndexerEvent::WitnessTree(_)) {
             return Ok(seq_num);
         }
 
@@ -788,11 +874,7 @@ impl EventStore for IndexerStore {
 
 impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        trace!(
-            "Adding commands from block (length {}) {}",
-            block.blockchain_length,
-            block.state_hash
-        );
+        trace!("Adding commands from block {}", block.summary());
 
         let commands_cf = self.commands_cf();
         let user_commands = block.commands();
@@ -801,11 +883,7 @@ impl CommandStore for IndexerStore {
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
             let hash = signed.hash_signed_command()?;
-            trace!(
-                "Adding command hash {hash} (length {}, state hash {})",
-                block.blockchain_length,
-                block.state_hash.clone(),
-            );
+            trace!("Adding command hash {} {}", hash, block.summary());
 
             let key = hash.as_bytes();
             let value = serde_json::to_vec(&SignedCommandWithData::from(
@@ -859,9 +937,11 @@ impl CommandStore for IndexerStore {
 
         let key = command_hash.as_bytes();
         let commands_cf = self.commands_cf();
+
         if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
+
         Ok(None)
     }
 
@@ -873,9 +953,11 @@ impl CommandStore for IndexerStore {
 
         let key = state_hash.0.as_bytes();
         let commands_cf = self.commands_cf();
+
         if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
             return Ok(Some(serde_json::from_slice(&commands_bytes)?));
         }
+
         Ok(None)
     }
 
@@ -976,11 +1058,7 @@ impl CommandStore for IndexerStore {
 
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        trace!(
-            "Adding SNARK work from block (length {}) {}",
-            block.blockchain_length,
-            block.state_hash
-        );
+        trace!("Adding SNARK work from block {}", block.summary());
 
         let snarks_cf = self.snarks_cf();
         let completed_works = SnarkWorkSummary::from_precomputed(block);

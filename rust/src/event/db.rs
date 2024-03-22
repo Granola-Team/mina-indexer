@@ -1,4 +1,4 @@
-use crate::ledger::staking::LedgerHash;
+use crate::{block::BlockHash, ledger::LedgerHash};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -11,34 +11,47 @@ pub enum DbEvent {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbBlockEvent {
-    AlreadySeenBlock {
-        state_hash: String,
-        blockchain_length: u32,
-    },
     NewBlock {
-        state_hash: String,
+        network: String,
+        state_hash: BlockHash,
         blockchain_length: u32,
     },
-    NewBestTip(String),
+    NewBestTip {
+        network: String,
+        state_hash: BlockHash,
+        blockchain_length: u32,
+    },
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbLedgerEvent {
-    AlreadySeenLedger(String),
-    NewLedger { hash: String },
+    NewLedger {
+        network: String,
+        state_hash: BlockHash,
+        blockchain_length: u32,
+        ledger_hash: LedgerHash,
+    },
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbStakingLedgerEvent {
-    AlreadySeenLedger { epoch: u32, ledger_hash: LedgerHash },
-    NewLedger { epoch: u32, ledger_hash: LedgerHash },
+    NewStakingLedger {
+        network: String,
+        epoch: u32,
+        ledger_hash: LedgerHash,
+    },
+    AggregateDelegations {
+        network: String,
+        epoch: u32,
+    },
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbCanonicityEvent {
     NewCanonicalBlock {
+        network: String,
+        state_hash: BlockHash,
         blockchain_length: u32,
-        state_hash: String,
     },
 }
 
@@ -62,20 +75,25 @@ impl std::fmt::Debug for DbEvent {
 impl std::fmt::Debug for DbBlockEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlreadySeenBlock {
+            Self::NewBlock {
+                network,
                 state_hash,
                 blockchain_length,
             } => write!(
                 f,
-                "db: already seen block ({blockchain_length}, {state_hash})"
+                "db new {} block (length {}): {}",
+                network, blockchain_length, state_hash
             ),
-            Self::NewBlock {
+            Self::NewBestTip {
+                network,
                 state_hash,
                 blockchain_length,
-                ..
-            } => write!(f, "db: new block ({blockchain_length}, {state_hash})"),
-            Self::NewBestTip(state_hash) => {
-                write!(f, "db: new best tip ({state_hash})")
+            } => {
+                write!(
+                    f,
+                    "db new {} best tip (length {}): {}",
+                    network, blockchain_length, state_hash
+                )
             }
         }
     }
@@ -85,11 +103,13 @@ impl std::fmt::Debug for DbCanonicityEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NewCanonicalBlock {
+                network,
                 state_hash,
                 blockchain_length,
             } => write!(
                 f,
-                "db: new canonical block ({blockchain_length}, {state_hash})"
+                "db new {} canonical block (length {}): {}",
+                network, blockchain_length, state_hash
             ),
         }
     }
@@ -98,8 +118,16 @@ impl std::fmt::Debug for DbCanonicityEvent {
 impl std::fmt::Debug for DbLedgerEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlreadySeenLedger(hash) => write!(f, "db: already seen ledger ({hash})"),
-            Self::NewLedger { hash, .. } => write!(f, "db: new ledger ({hash})"),
+            Self::NewLedger {
+                network,
+                state_hash,
+                blockchain_length,
+                ledger_hash,
+            } => write!(
+                f,
+                "db new {} ledger {} for (length {}): {}",
+                network, ledger_hash.0, blockchain_length, state_hash.0
+            ),
         }
     }
 }
@@ -107,16 +135,16 @@ impl std::fmt::Debug for DbLedgerEvent {
 impl std::fmt::Debug for DbStakingLedgerEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlreadySeenLedger { epoch, ledger_hash } => write!(
+            Self::NewStakingLedger {
+                epoch, ledger_hash, ..
+            } => write!(
                 f,
-                "db: already seen staking ledger (epoch {epoch}, {})",
-                ledger_hash.0
+                "db new staking ledger (epoch {}): {}",
+                epoch, ledger_hash.0
             ),
-            Self::NewLedger { epoch, ledger_hash } => write!(
-                f,
-                "db: new staking ledger (epoch {epoch}, {})",
-                ledger_hash.0
-            ),
+            Self::AggregateDelegations { network, epoch } => {
+                write!(f, "db aggregated delegations {} epoch {}", network, epoch)
+            }
         }
     }
 }

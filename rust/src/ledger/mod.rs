@@ -16,6 +16,10 @@ use crate::{
         },
         public_key::PublicKey,
     },
+    protocol::serialization_types::{
+        common::{Base58EncodableVersionedType, HashV1},
+        version_bytes,
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,6 +39,23 @@ pub struct NonGenesisLedger {
 pub enum LedgerError {
     AccountNotFound,
     InvalidDelegation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LedgerHash(pub String);
+
+impl LedgerHash {
+    pub fn from_hashv1(hashv1: HashV1) -> Self {
+        let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
+            hashv1.into();
+        Self(versioned.to_base58_string().unwrap())
+    }
+}
+
+impl std::default::Default for LedgerHash {
+    fn default() -> Self {
+        Self("jxDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
+    }
 }
 
 impl Ledger {
@@ -264,10 +285,16 @@ mod tests {
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
+        is_valid_ledger_hash,
         public_key::PublicKey,
-        Ledger,
+        Ledger, LedgerHash,
     };
     use std::collections::HashMap;
+
+    #[test]
+    fn default_ledger_hash_is_valid() {
+        assert!(is_valid_ledger_hash(&LedgerHash::default().0))
+    }
 
     #[test]
     fn apply_diff_payment() {

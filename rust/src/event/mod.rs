@@ -8,9 +8,9 @@ pub mod witness_tree;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum IndexerEvent {
-    BlockWatcher(block::BlockWatcherEvent),
     Db(db::DbEvent),
-    LedgerWatcher(ledger::LedgerWatcherEvent),
+    BlockWatcher(block::BlockWatcherEvent),
+    StakingLedgerWatcher(ledger::StakingLedgerWatcherEvent),
     WitnessTree(witness_tree::WitnessTreeEvent),
 }
 
@@ -37,7 +37,7 @@ impl std::fmt::Debug for IndexerEvent {
         match self {
             Self::BlockWatcher(block_event) => write!(f, "{:?}", block_event),
             Self::Db(db_event) => write!(f, "{:?}", db_event),
-            Self::LedgerWatcher(ledger_event) => write!(f, "{:?}", ledger_event),
+            Self::StakingLedgerWatcher(ledger_event) => write!(f, "{:?}", ledger_event),
             Self::WitnessTree(tree_event) => write!(f, "{:?}", tree_event),
         }
     }
