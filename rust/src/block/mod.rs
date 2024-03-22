@@ -350,7 +350,7 @@ pub fn extract_state_hash(path: &Path) -> String {
 
 pub fn extract_network(path: &Path) -> String {
     let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
-    let dash_pos = name.rfind('-').unwrap();
+    let dash_pos = name.find('-').unwrap();
     let state_hash = &name[..dash_pos];
     state_hash.to_owned()
 }
