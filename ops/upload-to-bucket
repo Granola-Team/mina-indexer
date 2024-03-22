@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -eux
+
+linode-cli obj put --acl-public "$@" granola-mina-blocks

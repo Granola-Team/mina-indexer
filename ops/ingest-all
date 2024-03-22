@@ -4,12 +4,11 @@ set -eux
 
 VER="$(git rev-parse --short HEAD)"
 
-time \
-  ./target/release/mina-indexer \
-    server start \
-      --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
-      --database-dir /mnt/mina-log-storage/"$VER"-database \
-      --log-level DEBUG \
-      --log-level-file DEBUG \
-      --log-dir /mnt/mina-log-storage/"$VER"-logs \
-      --ledger-cadence 5000
+./rust/target/release/mina-indexer \
+  server start \
+    --block-startup-dir /mnt/mina-log-storage/mina_network_block_data \
+    --database-dir /mnt/mina-log-storage/"$VER"-database \
+    --log-level DEBUG \
+    --log-level-file DEBUG \
+    --log-dir /mnt/mina-log-storage/"$VER"-logs \
+    --ledger-cadence 5000
