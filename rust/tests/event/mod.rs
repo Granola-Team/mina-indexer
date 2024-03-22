@@ -1,4 +1,5 @@
 mod log;
+mod memoize_ledger;
 mod replay;
 mod store;
 mod sync;
