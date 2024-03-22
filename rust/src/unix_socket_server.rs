@@ -11,6 +11,7 @@ use crate::{
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
         store::LedgerStore,
+        LedgerHash,
     },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
@@ -101,9 +102,11 @@ async fn handle_conn(
             info!("Received account command for {pk}");
 
             if let Some(best_tip) = db.get_best_block()? {
-                if let Some(ledger) =
-                    db.get_ledger_state_hash(&best_tip.state_hash.clone().into())?
-                {
+                if let Some(ledger) = db.get_ledger_state_hash(
+                    &best_tip.network,
+                    &best_tip.state_hash.clone().into(),
+                    false,
+                )? {
                     if !public_key::is_valid(pk) {
                         invalid_public_key(pk)
                     } else {
@@ -513,9 +516,11 @@ async fn handle_conn(
             info!("Received best-ledger command");
 
             if let Some(best_tip) = db.get_best_block()? {
-                if let Some(ledger) =
-                    db.get_ledger_state_hash(&best_tip.state_hash.clone().into())?
-                {
+                if let Some(ledger) = db.get_ledger_state_hash(
+                    &best_tip.network,
+                    &best_tip.state_hash.clone().into(),
+                    false,
+                )? {
                     let path = String::from_utf8(buffers.next().unwrap().to_vec())?;
                     let path = path.trim_end_matches('\0');
                     let ledger = ledger.to_string_pretty();
@@ -558,7 +563,9 @@ async fn handle_conn(
             if block::is_valid_state_hash(&hash) {
                 trace!("{hash} is a state hash");
 
-                if let Some(ledger) = db.get_ledger_state_hash(&hash.clone().into())? {
+                if let Some(ledger) =
+                    db.get_ledger_state_hash("mainnet", &hash.clone().into(), true)?
+                {
                     let ledger = ledger.to_string_pretty();
                     if path.is_empty() {
                         debug!("Writing ledger at state hash {hash} to stdout");
@@ -584,7 +591,7 @@ async fn handle_conn(
             } else if ledger::is_valid_ledger_hash(&hash) {
                 trace!("{hash} is a ledger hash");
 
-                if let Some(ledger) = db.get_ledger(&hash)? {
+                if let Some(ledger) = db.get_ledger("mainnet", &LedgerHash(hash.clone()))? {
                     let ledger = ledger.to_string_pretty();
                     if path.is_empty() {
                         debug!("Writing ledger at hash {hash} to stdout");
@@ -636,8 +643,11 @@ async fn handle_conn(
                                 }
                             }
 
-                            let state_hash = curr_block.state_hash.clone().into();
-                            if let Some(ledger) = db.get_ledger_state_hash(&state_hash)? {
+                            if let Some(ledger) = db.get_ledger_state_hash(
+                                "mainnet",
+                                &curr_block.state_hash.clone().into(),
+                                true,
+                            )? {
                                 ledger.to_string_pretty()
                             } else {
                                 block_missing_from_db(&curr_block.state_hash)
@@ -645,7 +655,7 @@ async fn handle_conn(
                         } else {
                             best_tip_missing_from_db().unwrap()
                         }
-                    } else if let Some(ledger) = db.get_ledger_at_height(height)? {
+                    } else if let Some(ledger) = db.get_ledger_at_height("mainnet", height, true)? {
                         ledger.to_string_pretty()
                     } else {
                         error!("Invalid ledger query. Ledger at height {height} not available");
@@ -687,7 +697,9 @@ async fn handle_conn(
             if ledger::is_valid_ledger_hash(&hash) {
                 trace!("{} is a ledger hash", hash);
 
-                if let Some(staking_ledger) = db.get_staking_ledger_hash(&hash.clone().into())? {
+                if let Some(staking_ledger) =
+                    db.get_staking_ledger_hash(&network, &hash.clone().into())?
+                {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                     if path.is_empty() {
                         debug!(

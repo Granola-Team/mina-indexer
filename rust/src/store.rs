@@ -640,6 +640,7 @@ impl LedgerStore for IndexerStore {
         &self,
         network: &str,
         state_hash: &BlockHash,
+        memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
         trace!(
             "Getting staged ledger {} state hash {}",
@@ -696,20 +697,22 @@ impl LedgerStore for IndexerStore {
                     ledger._apply_diff_from_precomputed(block)?;
                 }
 
-                trace!("Memoizing ledger for block {}", requested_block.summary());
-                self.add_ledger_state_hash(
-                    network,
-                    &requested_block.state_hash.clone().into(),
-                    ledger.clone(),
-                )?;
-                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                    DbLedgerEvent::NewLedger {
-                        network: requested_block.network.clone(),
-                        state_hash: requested_block.state_hash.clone().into(),
-                        ledger_hash: requested_block.staged_ledger_hash(),
-                        blockchain_length: requested_block.blockchain_length,
-                    },
-                )))?;
+                if memoize {
+                    trace!("Memoizing ledger for block {}", requested_block.summary());
+                    self.add_ledger_state_hash(
+                        network,
+                        &requested_block.state_hash.clone().into(),
+                        ledger.clone(),
+                    )?;
+                    self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                        DbLedgerEvent::NewLedger {
+                            network: requested_block.network.clone(),
+                            state_hash: requested_block.state_hash.clone().into(),
+                            ledger_hash: requested_block.staged_ledger_hash(),
+                            blockchain_length: requested_block.blockchain_length,
+                        },
+                    )))?;
+                }
             }
             return Ok(Some(ledger));
         }
@@ -746,12 +749,17 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
-    fn get_ledger_at_height(&self, network: &str, height: u32) -> anyhow::Result<Option<Ledger>> {
+    fn get_ledger_at_height(
+        &self,
+        network: &str,
+        height: u32,
+        memoize: bool,
+    ) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting staged ledger {} height {}", network, height);
 
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
-            Some(state_hash) => self.get_ledger_state_hash(network, &state_hash),
+            Some(state_hash) => self.get_ledger_state_hash(network, &state_hash, memoize),
         }
     }
 
