@@ -116,6 +116,14 @@ struct ConsensusState {
     slot: u32,
     /// Value global slot
     slot_since_genesis: u32,
+    /// Value next epoch data
+    next_epoch_data: NextEpochData,
+}
+
+#[derive(SimpleObject)]
+struct NextEpochData {
+    /// Value seed
+    seed: String,
 }
 
 #[derive(SimpleObject)]
@@ -218,6 +226,12 @@ impl From<PrecomputedBlock> for Block {
         let min_window_density = consensus_state.min_window_density.t.t;
         let slot_since_genesis = consensus_state.global_slot_since_genesis.t.t;
         let slot = consensus_state.curr_global_slot.t.t.slot_number.t.t;
+
+        let seed_hashv1 = consensus_state.next_epoch_data.t.t.seed;
+        let seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
+            seed_hashv1.into();
+        let seed = seed_bs58.to_base58_string().expect("bs58 encoded seed");
+
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -249,6 +263,7 @@ impl From<PrecomputedBlock> for Block {
                     min_window_density,
                     slot,
                     slot_since_genesis,
+                    next_epoch_data: NextEpochData { seed },
                 },
             },
             tx_fees: tx_fees.to_string(),
