@@ -4,9 +4,9 @@ steps:
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
-    nix-shell --pure --run just
-    nix-shell --pure --run "just prereqs"
-    nix-shell --pure --run "just test-ci | tee build.log"
+    nix develop --command just
+    nix develop --command just prereqs
+    nix develop --command just test-ci | tee build.log
   key: prereqs
   artifact_paths: "build.log"
   env:

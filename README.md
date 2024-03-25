@@ -67,7 +67,7 @@ compile the `mina-indexer` binary and place it in `./result/bin`.
 Execute unit tests to validate code functionality with:
 
 ```bash
-nix-shell --run "just test-unit"
+just test-unit
 ```
 
 #### Regression Tests
@@ -76,12 +76,12 @@ To perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-nix-shell --run "just test-regression"
+just test-regression"
 ```
 
 ## Generating Docker Images With Nix
 
-Building docker images from nix must happen from `x86-64-linux`
+Building docker images from Nix must happen from `x86-64-linux`
 machine otherwise you'll need to cross-compile.
 
 Issue the following command to build the docker image and load it into
