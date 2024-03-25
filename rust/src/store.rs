@@ -179,8 +179,11 @@ impl BlockStore for IndexerStore {
             block.global_slot_since_genesis(),
         )?;
 
-        // add block commands
+        // add block user commands
         self.add_commands(block)?;
+
+        // add block internal commands
+        self.add_internal_commands(block)?;
 
         // add block SNARK work
         self.add_snark_work(block)?;
