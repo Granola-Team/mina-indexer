@@ -1,13 +1,22 @@
 use crate::{
-    block::precomputed::PrecomputedBlock,
+    block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum InternalCommandKind {
+    Coinbase,
+    #[serde(rename = "Fee_transfer")]
+    FeeTransfer,
+    #[serde(rename = "Fee_transfer_via_coinbase")]
+    FeeTransferViaCoinbase,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommand {
     Coinbase {
-        pk: PublicKey,
+        receiver: PublicKey,
         amount: u64,
     },
     FeeTransfer {
@@ -22,6 +31,25 @@ pub enum InternalCommand {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum InternalCommandWithData {
+    Coinbase {
+        receiver: PublicKey,
+        amount: u64,
+        state_hash: BlockHash,
+        kind: InternalCommandKind,
+    },
+    // Fee_transfer or Fee_transfer_via_coinbase
+    FeeTransfer {
+        sender: PublicKey,
+        receiver: PublicKey,
+        amount: u64,
+        state_hash: BlockHash,
+        kind: InternalCommandKind,
+    },
+}
+
 impl InternalCommand {
     /// Compute the internal commands for the given precomputed block
     ///
@@ -29,7 +57,7 @@ impl InternalCommand {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
 
-        // replace fee_transfer with fee_transfer_via_coinbase, if any
+        // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
             let fee_transfer = coinbase.fee_transfer();
@@ -88,7 +116,7 @@ impl InternalCommand {
                     }
                 }
                 AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
-                    pk: c.public_key.clone(),
+                    receiver: c.public_key.clone(),
                     amount: c.amount.0,
                 }),
                 _ => (),
@@ -102,9 +130,62 @@ impl InternalCommand {
     }
 }
 
+impl InternalCommandWithData {
+    pub fn from_internal_cmd(cmd: InternalCommand, state_hash: &BlockHash) -> Self {
+        match cmd {
+            InternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
+                receiver,
+                amount,
+                state_hash: state_hash.clone(),
+                kind: InternalCommandKind::Coinbase,
+            },
+            InternalCommand::FeeTransfer {
+                sender,
+                receiver,
+                amount,
+            } => Self::FeeTransfer {
+                sender,
+                receiver,
+                amount,
+                state_hash: state_hash.clone(),
+                kind: InternalCommandKind::FeeTransfer,
+            },
+            InternalCommand::FeeTransferViaCoinbase {
+                sender,
+                receiver,
+                amount,
+            } => Self::FeeTransfer {
+                sender,
+                receiver,
+                amount,
+                state_hash: state_hash.clone(),
+                kind: InternalCommandKind::FeeTransferViaCoinbase,
+            },
+        }
+    }
+
+    pub fn public_keys(&self) -> Vec<PublicKey> {
+        match self {
+            Self::Coinbase { receiver, .. } => vec![receiver.clone()],
+            Self::FeeTransfer {
+                sender, receiver, ..
+            } => vec![sender.clone(), receiver.clone()],
+        }
+    }
+
+    pub fn contains_pk(&self, pk: &PublicKey) -> bool {
+        match self {
+            Self::Coinbase { receiver, .. } => pk == receiver,
+            Self::FeeTransfer {
+                sender, receiver, ..
+            } => pk == sender || pk == receiver,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::InternalCommand;
+    use super::*;
     use crate::block::precomputed::PrecomputedBlock;
 
     #[test]
@@ -117,7 +198,7 @@ mod tests {
             internal_cmds,
             vec![
                 InternalCommand::Coinbase {
-                    pk: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
                     amount: 720000000000
                 },
                 InternalCommand::FeeTransfer {
@@ -127,6 +208,35 @@ mod tests {
                 }
             ]
         );
+
+        let cmds: Vec<InternalCommandWithData> = internal_cmds
+            .into_iter()
+            .map(|cmd| {
+                InternalCommandWithData::from_internal_cmd(
+                    cmd,
+                    &"3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            cmds,
+            vec![
+                InternalCommandWithData::Coinbase {
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 720000000000,
+                    state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
+                    kind: InternalCommandKind::Coinbase
+                },
+                InternalCommandWithData::FeeTransfer {
+                    sender: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 20000000,
+                    state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
+                    kind: InternalCommandKind::FeeTransfer,
+                }
+            ]
+        );
+
         Ok(())
     }
 }

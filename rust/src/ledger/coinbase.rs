@@ -185,7 +185,7 @@ impl Coinbase {
 
     pub fn as_internal_cmd(&self) -> InternalCommand {
         InternalCommand::Coinbase {
-            pk: self.receiver.clone(),
+            receiver: self.receiver.clone(),
             amount: if self.supercharge {
                 2 * MAINNET_COINBASE_REWARD
             } else {
