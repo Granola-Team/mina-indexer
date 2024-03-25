@@ -4,7 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommand {
     Coinbase {
         pk: PublicKey,
@@ -99,5 +99,34 @@ impl InternalCommand {
             internal_cmds.insert(0, coinbase.as_internal_cmd());
         }
         internal_cmds
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InternalCommand;
+    use crate::block::precomputed::PrecomputedBlock;
+
+    #[test]
+    fn from_precomputed() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./tests/initial-blocks/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
+        let block = PrecomputedBlock::parse_file(&path)?;
+        let internal_cmds = InternalCommand::from_precomputed(&block);
+
+        assert_eq!(
+            internal_cmds,
+            vec![
+                InternalCommand::Coinbase {
+                    pk: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 720000000000
+                },
+                InternalCommand::FeeTransfer {
+                    sender: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 20000000
+                }
+            ]
+        );
+        Ok(())
     }
 }
