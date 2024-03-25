@@ -1,6 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
+    constants::*,
     ledger::{coinbase::Coinbase, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
@@ -88,9 +89,9 @@ impl AccountDiff {
 
     pub fn from_coinbase(coinbase: Coinbase) -> Vec<Self> {
         let amount = match coinbase.supercharge {
-            true => 1440,
-            false => 720,
-        } * (1e9 as u64);
+            true => 2 * MAINNET_COINBASE_REWARD,
+            false => MAINNET_COINBASE_REWARD,
+        };
         let mut res = vec![Self::Coinbase(CoinbaseDiff {
             public_key: coinbase.receiver.clone(),
             amount: amount.into(),

@@ -1,5 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
+    command::internal::InternalCommand,
+    constants::*,
     ledger::{
         diff::account::{AccountDiff, PaymentDiff, UpdateType},
         PublicKey,
@@ -179,5 +181,16 @@ impl Coinbase {
             res.append(&mut AccountDiff::from_coinbase(self));
         }
         res
+    }
+
+    pub fn as_internal_cmd(&self) -> InternalCommand {
+        InternalCommand::Coinbase {
+            pk: self.receiver.clone(),
+            amount: if self.supercharge {
+                2 * MAINNET_COINBASE_REWARD
+            } else {
+                MAINNET_COINBASE_REWARD
+            },
+        }
     }
 }
