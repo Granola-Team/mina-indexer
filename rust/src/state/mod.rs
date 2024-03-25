@@ -1149,12 +1149,15 @@ impl IndexerState {
         }
     }
 
+    /// Check that all relevant data & indices exist and are consistent
     fn replay_precomputed_block(
         &self,
         network: &str,
         state_hash: &BlockHash,
         blockchain_length: &u32,
     ) -> anyhow::Result<()> {
+        use crate::command::{internal::InternalCommandWithData, UserCommandWithStatus};
+
         let block_summary = format!("(length {}): {}", blockchain_length, state_hash);
         info!("Replaying {} block {}", network, block_summary);
 
@@ -1181,6 +1184,12 @@ impl IndexerState {
                 .contains(&block));
 
             // check user commands
+            let block_user_cmds: Vec<UserCommandWithStatus> = indexer_store
+                .get_commands_in_block(&block.state_hash.clone().into())?
+                .into_iter()
+                .collect();
+            assert_eq!(block_user_cmds, block.commands());
+
             for cmd_hash in block.command_hashes() {
                 if let Some(signed_cmd) = indexer_store.get_command_by_hash(&cmd_hash)? {
                     assert_eq!(signed_cmd.tx_hash, cmd_hash);
@@ -1188,6 +1197,12 @@ impl IndexerState {
                     assert_eq!(signed_cmd.blockchain_length, *blockchain_length);
                 }
             }
+
+            // check internal commands
+            assert_eq!(
+                InternalCommandWithData::from_precomputed(&block),
+                indexer_store.get_internal_commands(&block.state_hash.clone().into())?
+            );
 
             // check SNARK work
             for pk in block.prover_keys() {

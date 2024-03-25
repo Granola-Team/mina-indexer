@@ -53,12 +53,12 @@ pub enum InternalCommandWithData {
 impl InternalCommand {
     /// Compute the internal commands for the given precomputed block
     ///
-    /// See [LedgerDiff::from_precomputed](../ledger/diff/mod.rs#L21)
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
-        let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
+    /// See `LedgerDiff::from_precomputed`
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
+        let mut account_diff_fees = AccountDiff::from_block_fees(block);
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
-        let coinbase = Coinbase::from_precomputed(precomputed_block);
+        let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
             let fee_transfer = coinbase.fee_transfer();
             let idx = account_diff_fees
@@ -162,6 +162,13 @@ impl InternalCommandWithData {
                 kind: InternalCommandKind::FeeTransferViaCoinbase,
             },
         }
+    }
+
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
+        InternalCommand::from_precomputed(block)
+            .iter()
+            .map(|cmd| Self::from_internal_cmd(cmd.clone(), &block.state_hash.clone().into()))
+            .collect()
     }
 
     pub fn public_keys(&self) -> Vec<PublicKey> {
