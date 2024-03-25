@@ -31,6 +31,8 @@ pub enum ClientCli {
     Summary(SummaryArgs),
     #[clap(flatten)]
     Transactions(TransactionArgs),
+    #[clap(flatten)]
+    InternalCommand(InternalCommandArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -355,18 +357,49 @@ pub struct TransactionPublicKeyArgs {
     /// Path to write the transactions [default: stdout]
     #[arg(short, long)]
     path: Option<PathBuf>,
-    /// Retrieve public key's transaction info
+    /// Query public key transaction info
     #[arg(short = 'k', long)]
     public_key: String,
-    /// Bound the fetched transactions by a start state hash
+    /// Bound the fetched transactions by a start block
     #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
     start_state_hash: String,
-    /// Bound the fetched transactions by an end state hash
+    /// Bound the fetched transactions by an end block
     #[arg(short, long)]
     end_state_hash: Option<String>,
     /// Verbose transaction output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
+}
+
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub enum InternalCommandArgs {
+    /// Query internal commands by public key
+    InternalStateHash(InternalCommandsStateHashArgs),
+    /// Query internal commands by block
+    InternalPublicKey(InternalCommandsPublicKeyArgs),
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct InternalCommandsStateHashArgs {
+    /// Path to write the internal commands [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// State hash of the containing block
+    #[arg(short, long)]
+    state_hash: String,
+}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+#[command(author, version, about, long_about = None)]
+pub struct InternalCommandsPublicKeyArgs {
+    /// Path to write the internal commands [default: stdout]
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    /// Retrieve public key's internal command info
+    #[arg(short = 'k', long)]
+    public_key: String,
 }
 
 #[instrument]
@@ -588,6 +621,30 @@ pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
                 }
                 TransactionArgs::TxStateHash(args) => {
                     format!("tx-state-hash {} {}\0", args.state_hash, args.verbose)
+                }
+            };
+            writer.write_all(command.as_bytes()).await?;
+            reader.read_to_end(&mut buffer).await?;
+
+            let msg = String::from_utf8(buffer)?;
+            let msg = msg.trim_end();
+            println!("{msg}");
+        }
+        ClientCli::InternalCommand(internal_cmd_args) => {
+            let command = match internal_cmd_args {
+                InternalCommandArgs::InternalPublicKey(args) => {
+                    format!(
+                        "internal-pk {} {}\0",
+                        args.public_key,
+                        args.path.clone().unwrap_or_default().display(),
+                    )
+                }
+                InternalCommandArgs::InternalStateHash(args) => {
+                    format!(
+                        "internal-state-hash {} {}\0",
+                        args.state_hash,
+                        args.path.clone().unwrap_or_default().display(),
+                    )
                 }
             };
             writer.write_all(command.as_bytes()).await?;
