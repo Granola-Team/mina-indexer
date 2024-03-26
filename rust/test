@@ -46,10 +46,12 @@ ephemeral_port() {
 
 DOMAIN_SOCKET_PATH="$(pwd)"/mina-indexer.sock
 wait_for_socket() {
-    while true; do
+    num_retries=0
+    while [ $num_retries -lt 10 ]; do
         if [ -S "$DOMAIN_SOCKET_PATH" ]; then
             return
         fi
+        (( num_retries+=1 ))
         sleep 0.25
     done
 }
