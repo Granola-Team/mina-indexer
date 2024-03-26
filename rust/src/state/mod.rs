@@ -435,7 +435,7 @@ impl IndexerState {
         }
 
         info!(
-            "Ingested and applied {} ({}) blocks to the witness tree in {:?}",
+            "Ingested and applied {} blocks ({}) to the witness tree in {:?}",
             self.blocks_processed,
             bytesize::ByteSize::b(self.bytes_processed),
             total_time.elapsed() + offset,

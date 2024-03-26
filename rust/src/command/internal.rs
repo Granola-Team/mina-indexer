@@ -34,15 +34,15 @@ pub enum InternalCommand {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum InternalCommandWithData {
-    Coinbase {
+    // Fee_transfer or Fee_transfer_via_coinbase
+    FeeTransfer {
+        sender: PublicKey,
         receiver: PublicKey,
         amount: u64,
         state_hash: BlockHash,
         kind: InternalCommandKind,
     },
-    // Fee_transfer or Fee_transfer_via_coinbase
-    FeeTransfer {
-        sender: PublicKey,
+    Coinbase {
         receiver: PublicKey,
         amount: u64,
         state_hash: BlockHash,
