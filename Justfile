@@ -59,4 +59,5 @@ lint: && audit disallow-unused-cargo-deps
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
 
 images:
-  docker build .
+  nix build .#dockerImage
+  docker load < ./result
