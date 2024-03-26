@@ -163,6 +163,14 @@ impl SignedCommandWithData {
             blockchain_length,
         }
     }
+
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
+        block
+            .commands()
+            .iter()
+            .map(|cmd| Self::from(cmd, &block.state_hash, block.blockchain_length))
+            .collect()
+    }
 }
 
 impl From<mina_rs::UserCommand> for SignedCommand {

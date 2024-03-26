@@ -190,6 +190,12 @@ test_indexer_cli_reports() {
 
     idxr tx-state-hash --help 2>&1 |
         grep -iq "Usage: mina-indexer tx-state-hash"
+
+    idxr internal-public-key --help 2>&1 |
+        grep -iq "Usage: mina-indexer internal-public-key"
+
+    idxr internal-state-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer internal-state-hash"
 }
 
 # Indexer server starts up without any precomputed blocks
@@ -1385,7 +1391,7 @@ test_staking_delegations() {
 
     # write aggregated delegations to file
     file=./epoch_0_staking_delegations.json
-    idxr staking-delegations -e 0 -p ./epoch_0_staking_delegations.json
+    idxr staking-delegations -e 0 -p $file
 
     # check account
     file_epoch=$(cat $file | jq -r .epoch)
@@ -1399,6 +1405,74 @@ test_staking_delegations() {
     assert $network $file_network
     assert $count_delegates $file_count_delegates
     assert $total_delegated $file_total_delegated
+
+    teardown
+}
+
+test_internal_commands() {
+    test=test_internal_commands
+
+    setup
+    dl_mainnet 11 ./blocks
+
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs
+    wait_for_socket
+
+    pk=B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm
+    block=3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA
+
+    kind=$(idxr internal-public-key -k $pk | jq -r .[1].kind)
+    amount=$(idxr internal-public-key -k $pk | jq -r .[1].amount)
+    sender=$(idxr internal-public-key -k $pk | jq -r .[1].sender)
+    receiver=$(idxr internal-public-key -k $pk | jq -r .[1].receiver)
+    state_hash=$(idxr internal-public-key -k $pk | jq -r .[1].state_hash)
+
+    assert $pk $receiver
+    assert $block $state_hash
+    assert '20000000' $amount
+    assert 'Fee_transfer' $kind
+    assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $sender
+
+    kind=$(idxr internal-public-key -k $pk | jq -r .[0].kind)
+    amount=$(idxr internal-public-key -k $pk | jq -r .[0].amount)
+    receiver=$(idxr internal-public-key -k $pk | jq -r .[0].receiver)
+    state_hash=$(idxr internal-public-key -k $pk | jq -r .[0].state_hash)
+
+    assert $pk $receiver
+    assert 'Coinbase' $kind
+    assert $block $state_hash
+    assert '720000000000' $amount
+
+    # write internal commands for public key to file
+    file=./internal_commands.json
+    idxr internal-public-key -k $pk -p $file
+
+    pk_kind=$(cat $file | jq -r .[0].kind)
+    pk_amount=$(cat $file | jq -r .[0].amount)
+    pk_receiver=$(cat $file | jq -r .[0].receiver)
+    pk_state_hash=$(cat $file | jq -r .[0].state_hash)
+
+    assert $amount $pk_amount
+    assert 'Coinbase'  $pk_kind
+    assert $receiver $pk_receiver
+    assert $state_hash $pk_state_hash
+
+    # write internal commands for block to file
+    idxr internal-state-hash -s $block -p $file
+
+    hash_kind=$(cat $file | jq -r .[0].kind)
+    hash_amount=$(cat $file | jq -r .[0].amount)
+    hash_receiver=$(cat $file | jq -r .[0].receiver)
+    hash_state_hash=$(cat $file | jq -r .[0].state_hash)
+
+    assert $pk_kind $hash_kind
+    assert $pk_amount $hash_amount
+    assert $pk_receiver $hash_receiver
+    assert $pk_state_hash $hash_state_hash
 
     teardown
 }
@@ -1431,6 +1505,7 @@ if [ "$#" -eq 0 ]; then
     test_startup_staking_ledgers
     test_watch_staking_ledgers
     test_staking_delegations
+    test_internal_commands
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1460,6 +1535,7 @@ else
             "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
             "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
             "test_staking_delegations") test_staking_delegations ;;
+            "test_internal_commands") test_internal_commands ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;

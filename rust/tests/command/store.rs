@@ -42,7 +42,6 @@ async fn add_and_get() {
     let result_cmds = indexer_store
         .as_ref()
         .get_commands_in_block(&state_hash.into())
-        .unwrap()
         .unwrap();
     assert_eq!(result_cmds, block_cmds);
 
@@ -58,7 +57,6 @@ async fn add_and_get() {
             .as_ref()
             .get_commands_for_public_key(&pk)
             .unwrap()
-            .unwrap_or(vec![])
             .into_iter()
             .map(SignedCommand::from)
             .collect();
