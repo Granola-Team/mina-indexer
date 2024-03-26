@@ -34,7 +34,8 @@ format:
 test: test-unit
   cd rust && ./test
 
-test-ci: lint test-unit test-regression
+test-ci: lint test-unit
+  cd rust && ./test
 
 test-unit: build
   cd rust && cargo nextest run --release

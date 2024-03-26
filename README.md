@@ -67,7 +67,7 @@ compile the `mina-indexer` binary and place it in `./result/bin`.
 Execute unit tests to validate code functionality with:
 
 ```bash
-just test-unit
+nix-shell --run "just test-unit"
 ```
 
 #### Regression Tests
@@ -76,7 +76,7 @@ To perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-just test-regression"
+nix-shell --run "just test-regression"
 ```
 
 ## Generating OCI Images With Nix
