@@ -5,7 +5,6 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     command::{signed, store::CommandStore, Command},
-    constants::SOCKET_NAME,
     ledger::{
         self,
         public_key::{self, PublicKey},
@@ -17,9 +16,14 @@ use crate::{
     state::{summary::SummaryShort, IndexerState},
 };
 use anyhow::bail;
-use std::{io::ErrorKind, path::PathBuf, process, sync::Arc};
+use std::{
+    io::{self, ErrorKind},
+    path::{Path, PathBuf},
+    process,
+    sync::Arc,
+};
 use tokio::{
-    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{UnixListener, UnixStream},
     sync::RwLock,
     task::JoinHandle,
@@ -32,20 +36,22 @@ pub struct UnixSocketServer {
 }
 
 impl UnixSocketServer {
-    /// Create a new Unix Socket Server
+    /// Create a new Unix domain socket server
     pub fn new(state: Arc<RwLock<IndexerState>>) -> Self {
-        info!("Creating Unix Domain Socket Server");
+        info!("Creating Unix domain socket server");
         Self { state }
     }
 }
 
-/// Start the Unix domain server
-pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
-    let listener = UnixListener::bind(SOCKET_NAME)
-        .or_else(try_remove_old_socket)
-        .unwrap_or_else(|e| panic!("unable to connect to domain socket: {}", e));
-
-    info!("Unix Socket Server running on: {}", SOCKET_NAME);
+/// Start the Unix domain socket server
+pub async fn start(server: UnixSocketServer, domain_socket_path: &Path) -> JoinHandle<()> {
+    let listener = UnixListener::bind(domain_socket_path)
+        .or_else(|e| try_remove_old_socket(e, domain_socket_path))
+        .unwrap_or_else(|e| panic!("Unable to connect to Unix domain socket file: {}", e));
+    info!(
+        "Unix domain socket server running on: {:?}",
+        domain_socket_path
+    );
     tokio::spawn(run(server, listener))
 }
 
@@ -59,7 +65,7 @@ async fn run(server: UnixSocketServer, listener: UnixListener) {
                         let state = server.state.clone();
                         tokio::spawn(async move {
                             if let Err(e) = handle_conn(socket, &state).await {
-                                error!("Unable to process Unix socket request: {}", e);
+                                error!("Unable to process Unix domain socket request: {}", e);
                             }
                         });
                     }
@@ -82,6 +88,7 @@ async fn handle_conn(
     } else {
         bail!("Unable to get a handle on indexer store...");
     };
+    let local_addr = conn.local_addr()?;
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(1024);
@@ -948,7 +955,12 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-            remove_domain_socket().expect("domain socket file deleted");
+            remove_domain_socket(
+                local_addr
+                    .as_pathname()
+                    .expect("Unable to locate Unix domain socket file"),
+            )
+            .expect("Unix domain socket file deleted");
             process::exit(0);
         }
         "summary" => {
@@ -1172,22 +1184,22 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
     ))
 }
 
-fn try_remove_old_socket(e: io::Error) -> io::Result<UnixListener> {
+fn try_remove_old_socket(e: io::Error, domain_socket_path: &Path) -> io::Result<UnixListener> {
     if e.kind() == ErrorKind::AddrInUse {
         debug!(
-            "Domain socket: {} already in use. Removing old vestige",
-            &SOCKET_NAME
+            "Unix domain socket: {:?} already in use. Removing old vestige",
+            domain_socket_path
         );
-        remove_domain_socket()?;
-        UnixListener::bind(SOCKET_NAME)
+        remove_domain_socket(domain_socket_path)?;
+        UnixListener::bind(domain_socket_path)
     } else {
         Err(e)
     }
 }
 
-fn remove_domain_socket() -> io::Result<()> {
-    std::fs::remove_file(SOCKET_NAME)?;
-    debug!("Domain socket removed: {SOCKET_NAME}");
+fn remove_domain_socket(domain_socket_path: &Path) -> io::Result<()> {
+    std::fs::remove_file(domain_socket_path)?;
+    debug!("Unix domain socket removed: {:?}", domain_socket_path);
     Ok(())
 }
 

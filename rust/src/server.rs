@@ -55,6 +55,7 @@ impl MinaIndexer {
     pub async fn new(
         config: IndexerConfiguration,
         store: Arc<IndexerStore>,
+        domain_socket_path: PathBuf,
     ) -> anyhow::Result<Self> {
         let block_watch_dir = config.block_watch_dir.clone();
         let ledger_watch_dir = config.ledger_watch_dir.clone();
@@ -66,7 +67,8 @@ impl MinaIndexer {
             });
             let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
-            unix_socket_server::start(UnixSocketServer::new(state.clone())).await;
+            unix_socket_server::start(UnixSocketServer::new(state.clone()), &domain_socket_path)
+                .await;
 
             // This modifies the state
             if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
