@@ -37,8 +37,8 @@ enum IndexerCommand {
 enum ServerCommand {
     /// Start a new mina indexer by passing arguments on the command line
     Start(ServerArgs),
-    /// Start a new mina indexer from a config file
-    Config(ConfigArgs),
+    /// Start a new mina indexer via a config file
+    StartViaConfig(ConfigArgs),
     /// Start a mina indexer by replaying events from an existing indexer store
     Replay(ServerArgs),
     /// Start a mina indexer by syncing from events in an existing indexer store
@@ -84,10 +84,6 @@ pub struct ServerArgs {
     /// Path to directory for logs
     #[arg(long, default_value = "/var/log/mina-indexer")]
     pub log_dir: PathBuf,
-
-    /// Path to the server config file
-    #[arg(long)]
-    pub config_file: Option<PathBuf>,
 
     /// Max stdout log level
     #[arg(long, default_value_t = LevelFilter::INFO)]
@@ -192,7 +188,7 @@ pub async fn main() -> anyhow::Result<()> {
                 ServerCommand::Start(args) => (args, InitializationMode::New),
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
-                ServerCommand::Config(args) => {
+                ServerCommand::StartViaConfig(args) => {
                     let contents = std::fs::read(args.path.expect("server args config file"))?;
                     let args: ServerArgsJson = serde_json::from_slice(&contents)?;
                     (args.into(), InitializationMode::New)
@@ -204,6 +200,7 @@ pub async fn main() -> anyhow::Result<()> {
             let web_hostname = args.web_hostname.clone();
             let web_port = args.web_port;
 
+            // default to sync if there's a nonempty db dir
             if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
                 if matches!(mode, InitializationMode::New) && dir.count() != 0 {
                     // sync from existing db
@@ -211,24 +208,23 @@ pub async fn main() -> anyhow::Result<()> {
                 }
             }
 
+            // initialize logging
             let log_dir = args.log_dir.clone();
             let log_level_file = args.log_level_file;
             let log_level = args.log_level;
-
             init_tracing_logger(log_dir.clone(), log_level_file, log_level).await?;
 
-            // dump server config
-            let path = args
-                .config_file
-                .clone()
-                .unwrap_or(log_dir.with_file_name("config.json"));
+            // log server config
             let args_json: ServerArgsJson = args.clone().into();
-            std::fs::write(&path, serde_json::to_string_pretty(&args_json)?)?;
+            info!(
+                "Indexer config:\n{}",
+                serde_json::to_string_pretty(&args_json)?
+            );
 
+            // start the servers
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
-
             mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
                 .await
                 .unwrap();
@@ -335,7 +331,6 @@ struct ServerArgsJson {
     ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
-    config_file: String,
     log_level: String,
     log_level_file: String,
     ledger_cadence: u32,
@@ -372,11 +367,6 @@ impl From<ServerArgs> for ServerArgsJson {
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),
             log_dir: value.log_dir.display().to_string(),
-            config_file: value
-                .config_file
-                .unwrap_or(value.log_dir.with_file_name("config.json"))
-                .display()
-                .to_string(),
             log_level: value.log_level.to_string(),
             log_level_file: value.log_level_file.to_string(),
             ledger_cadence: value.ledger_cadence,
@@ -404,7 +394,6 @@ impl From<ServerArgsJson> for ServerArgs {
             ledger_watch_dir: Some(value.ledger_watch_dir.into()),
             database_dir: value.database_dir.into(),
             log_dir: value.log_dir.into(),
-            config_file: Some(value.config_file.into()),
             log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
             log_level_file: LevelFilter::from_str(&value.log_level_file).expect("log level file"),
             ledger_cadence: value.ledger_cadence,
