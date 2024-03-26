@@ -195,18 +195,11 @@ pub async fn main() -> anyhow::Result<()> {
             let log_dir = args.log_dir.clone();
             let log_level_file = args.log_level_file;
             let log_level = args.log_level;
-
             init_tracing_logger(log_dir.clone(), log_level_file, log_level).await?;
-
-            // write server args to config.json
-            let path = log_dir.with_file_name("config.json");
-            let args_json: ServerArgsJson = args.clone().into();
-            std::fs::write(path, serde_json::to_string_pretty(&args_json)?)?;
 
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
-
             mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
                 .await
                 .unwrap();
@@ -238,7 +231,6 @@ async fn init_tracing_logger(
 
     let log_file = std::fs::File::create(log_file)?;
     let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
-
     let stdout_layer = tracing_subscriber::fmt::layer();
     tracing_subscriber::registry()
         .with(stdout_layer.with_filter(log_level_stdout))
@@ -300,64 +292,6 @@ pub fn process_indexer_configuration(
                 ledger_cadence,
                 reporting_freq,
             })
-        }
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ServerArgsJson {
-    genesis_ledger: String,
-    genesis_hash: String,
-    blocks_dir: String,
-    block_watch_dir: String,
-    ledgers_dir: String,
-    ledger_watch_dir: String,
-    database_dir: String,
-    log_dir: String,
-    log_level: String,
-    log_level_file: String,
-    ledger_cadence: u32,
-    reporting_freq: u32,
-    prune_interval: u32,
-    canonical_threshold: u32,
-    canonical_update_threshold: u32,
-    locked_supply_csv: Option<String>,
-}
-
-impl From<ServerArgs> for ServerArgsJson {
-    fn from(value: ServerArgs) -> Self {
-        let value = value.with_dynamic_defaults();
-        Self {
-            genesis_ledger: value
-                .genesis_ledger
-                .expect("Genesis ledger wasn't provided")
-                .display()
-                .to_string(),
-            genesis_hash: value.genesis_hash,
-            blocks_dir: value.blocks_dir.display().to_string(),
-            block_watch_dir: value
-                .block_watch_dir
-                .unwrap_or(value.blocks_dir)
-                .display()
-                .to_string(),
-            ledgers_dir: value.ledgers_dir.display().to_string(),
-            ledger_watch_dir: value
-                .ledger_watch_dir
-                .unwrap_or(value.ledgers_dir)
-                .display()
-                .to_string(),
-            database_dir: value.database_dir.display().to_string(),
-            log_dir: value.log_dir.display().to_string(),
-            log_level: value.log_level.to_string(),
-            log_level_file: value.log_level_file.to_string(),
-            ledger_cadence: value.ledger_cadence,
-            reporting_freq: value.reporting_freq,
-            prune_interval: value.prune_interval,
-            canonical_threshold: value.canonical_threshold,
-            canonical_update_threshold: value.canonical_update_threshold,
-            locked_supply_csv: value
-                .locked_supply_csv
-                .and_then(|p| p.to_str().map(|s| s.to_owned())),
         }
     }
 }
