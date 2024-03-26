@@ -1,7 +1,10 @@
-use crate::constants::{MAINNET_GENESIS_HASH, SOCKET_NAME};
+use crate::constants::MAINNET_GENESIS_HASH;
 use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, process};
+use std::{
+    path::{Path, PathBuf},
+    process,
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
@@ -23,7 +26,7 @@ pub enum ClientCli {
     Ledger(LedgerArgs),
     #[clap(flatten)]
     StakingLedger(StakingLedgerArgs),
-    /// Shutdown the server
+    #[clap(hide = true)]
     Shutdown,
     #[clap(flatten)]
     Snark(SnarkArgs),
@@ -403,11 +406,11 @@ pub struct InternalCommandsPublicKeyArgs {
 }
 
 #[instrument]
-pub async fn run(command: &ClientCli) -> anyhow::Result<()> {
-    let conn = match UnixStream::connect(SOCKET_NAME).await {
+pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Result<()> {
+    let conn = match UnixStream::connect(domain_socket_path).await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Unable to connect to the Unix Socket Server: {}", e);
+            eprintln!("Unable to connect to the Unix domain socket server: {}", e);
             process::exit(111);
         }
     };

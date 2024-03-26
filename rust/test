@@ -43,12 +43,22 @@ ephemeral_port() {
     set -e
 }
 
+DOMAIN_SOCKET_PATH="$(pwd)"/mina-indexer.sock
+wait_for_socket() {
+    while true; do
+        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+            return
+        fi
+        sleep 0.25
+    done
+}
+
 idxr() {
-    RUST_BACKTRACE=full "$IDXR" "$@"
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" "$@"
 }
 
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR" server "$@" &
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" server "$@" &
     echo $! > idxr_pid
 }
 
@@ -67,15 +77,6 @@ dl_mainnet_single() {
 
 dl_mainnet_range() {
     "$BLOCKS_FETCHER" "$1" "$2" mainnet "$3"
-}
-
-wait_for_socket() {
-    while true; do
-        if [ -S "mina-indexer.sock" ]; then
-            return
-        fi
-        sleep 0.25
-    done
 }
 
 assert() {
@@ -116,7 +117,7 @@ teardown() {
     rm -rf ./staking-ledgers
     rm -rf ./database
     rm -rf ./logs
-    rm -f ./mina-indexer.sock
+    rm -f "$DOMAIN_SOCKET_PATH"
 }
 
 test_indexer_cli_reports() {
@@ -176,8 +177,8 @@ test_indexer_cli_reports() {
     idxr staking-ledger-hash --help 2>&1 |
         grep -iq "Usage: mina-indexer staking-ledger-hash"
 
-    idxr shutdown --help 2>&1 |
-        grep -iq "Usage: mina-indexer shutdown"
+    idxr server shutdown --help 2>&1 |
+        grep -iq "Usage: mina-indexer server shutdown"
 
     idxr summary --help 2>&1 |
         grep -iq "Usage: mina-indexer summary"
@@ -201,7 +202,7 @@ test_indexer_cli_reports() {
 # Indexer server starts up without any precomputed blocks
 test_server_startup() {
     test=test_server_startup
-    
+
     setup
     idxr_server_start \
         --blocks-dir ./blocks \
@@ -320,7 +321,7 @@ test_canonical_root() {
     
     hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
-    
+
     assert 5 $length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $hash
 
@@ -377,7 +378,7 @@ test_best_tip() {
     # witness tree summary
     wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    
+
     assert $wt_hash $hash
     assert $wt_length $length
     assert 'Canonical' $canonicity
@@ -414,7 +415,7 @@ test_blocks() {
     # witness tree summary
     wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    
+
     assert 9 $slot
     assert $wt_hash $hash
     assert $wt_hash $hash_v
@@ -433,7 +434,7 @@ test_blocks() {
     hash_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].state_hash)
     length_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].blockchain_length)
     canonicity_v=$(idxr blocks-at-slot -s 9 -v | jq -r .[0].canonicity)
-    
+
     assert 9 $slot
     assert $wt_hash $hash
     assert $wt_hash $hash_v
@@ -452,7 +453,7 @@ test_blocks() {
     hash_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].state_hash)
     length_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].blockchain_length)
     canonicity_v=$(idxr blocks-at-public-key -k B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3 -v | jq -r .[0].canonicity)
-    
+
     assert 9 $slot
     assert $wt_hash $hash
     assert $wt_hash $hash_v
@@ -469,10 +470,10 @@ test_blocks() {
     # write at height to file
     file=./blocks_at_height.json
     idxr blocks-at-height -h 10 -p $file
-    
+
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
-    
+
     assert 9 $slot
     assert 10 $height
 
@@ -482,7 +483,7 @@ test_blocks() {
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
-    
+
     assert 9 $slot
     assert 10 $height
 
@@ -492,7 +493,7 @@ test_blocks() {
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
-    
+
     assert 9 $slot
     assert 10 $height
 
@@ -707,21 +708,21 @@ test_ledgers() {
     # write ledgers to file
     file=./ledgers/best-block-$best_height-$best_hash.json
     idxr best-ledger -p $file
-    
+
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
     file=./ledgers/best-ledger-$best_height-$best_hash.json
     idxr ledger --hash $best_hash -p $file
-    
+
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
 
     file=./ledgers/ledger-height-$best_height-$best_hash.json
     idxr ledger-at-height --height $best_height -p $file
-    
+
     file_result=$(cat $file | jq -r .${pk}.balance)
     assert '607904750000000' $file_result
     rm -f $file
@@ -914,7 +915,7 @@ test_transactions() {
     # write transactions to file
     file=./transactions/transactions.json
     idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -p $file
-    
+
     file_result=$(cat $file | jq -r .[0].Payment.amount)
     assert '1000' $file_result
 
@@ -969,7 +970,7 @@ test_snark_work() {
     # write SNARK work from block to file
     file=./snark_work/snark_work.json
     idxr snark --state-hash 3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK -p $file
-    
+
     fee=$(cat $file | jq -r .[0].fee)
     prover=$(cat $file | jq -r .[0].prover)
 
@@ -1201,10 +1202,10 @@ test_genesis_block_creator() {
         --log-dir ./logs \
         --log-level debug
     wait_for_socket
-    
+
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
     balance=$(idxr ledger-at-height --height 1 | jq -r .${pk}.balance)
-    
+
     # verify that the genesis block winner account gets 1000 magic nanomina
     assert '1000' $balance
 

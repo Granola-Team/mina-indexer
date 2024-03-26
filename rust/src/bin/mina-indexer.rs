@@ -16,6 +16,9 @@ Efficiently index and query the Mina blockchain"))]
 struct Cli {
     #[command(subcommand)]
     command: IndexerCommand,
+    /// Path to the Unix domain socket file
+    #[arg(long, default_value = concat!(env!("PWD"), "/mina-indexer.sock"))]
+    domain_socket_path: PathBuf,
 }
 
 #[derive(Subcommand, Debug)]
@@ -38,6 +41,8 @@ enum ServerCommand {
     Replay(ServerArgs),
     /// Start a mina indexer by syncing from events in an existing indexer store
     Sync(ServerArgs),
+    /// Shutdown the server
+    Shutdown,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -160,10 +165,16 @@ fn release_profile() -> ReleaseProfile {
 
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
-    match Cli::parse().command {
-        IndexerCommand::Client(args) => client::run(&args).await,
+    let cli = Cli::parse();
+    let domain_socket_path = cli.domain_socket_path;
+
+    match cli.command {
+        IndexerCommand::Client(args) => client::run(&args, &domain_socket_path).await,
         IndexerCommand::Server { server_command } => {
             let (args, mut mode) = match server_command {
+                ServerCommand::Shutdown => {
+                    return client::run(&client::ClientCli::Shutdown, &domain_socket_path).await;
+                }
                 ServerCommand::Start(args) => (args, InitializationMode::New),
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
@@ -194,7 +205,7 @@ pub async fn main() -> anyhow::Result<()> {
 
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
-            let indexer = MinaIndexer::new(config, db.clone()).await?;
+            let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
 
             mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
                 .await

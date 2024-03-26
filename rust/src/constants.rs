@@ -15,4 +15,3 @@ pub const MAINNET_TRANSITION_FRONTIER_K: u32 = 290;
 pub const MAINNET_ACCOUNT_CREATION_FEE: Amount = Amount(1e9 as u64);
 pub const MAINNET_COINBASE_REWARD: u64 = 720000000000;
 pub const PRUNE_INTERVAL_DEFAULT: u32 = 10;
-pub const SOCKET_NAME: &str = "mina-indexer.sock";
