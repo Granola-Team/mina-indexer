@@ -1,5 +1,5 @@
 use crate::constants::MAINNET_GENESIS_HASH;
-use clap::{Args, Parser};
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
@@ -14,397 +14,311 @@ use tracing::instrument;
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
-    /// Query account by public key
-    Account(AccountArgs),
+    #[clap(subcommand)]
+    Accounts(Accounts),
+    #[clap(subcommand)]
+    Blocks(Blocks),
+    #[clap(subcommand)]
+    Chain(Chain),
+    #[clap(subcommand)]
+    Checkpoints(Checkpoints),
+    #[clap(subcommand)]
+    Ledger(Ledger),
     #[command(subcommand)]
-    Block(BlockArgs),
-    #[command(subcommand)]
-    Chain(ChainArgs),
-    /// Create a checkpoint of the indexer store
-    Checkpoint(CheckpointArgs),
-    #[command(subcommand)]
-    Ledger(LedgerArgs),
-    #[command(subcommand)]
-    StakingLedger(StakingLedgerArgs),
+    StakingLedger(StakingLedger),
     #[clap(hide = true)]
     Shutdown,
     #[clap(subcommand)]
-    Snark(SnarkArgs),
+    Snark(Snark),
     /// Show a summary of the state
-    Summary(SummaryArgs),
-    #[command(subcommand)]
-    Transactions(TransactionArgs),
-    #[clap(flatten)]
-    InternalCommand(InternalCommandArgs),
+    Summary {
+        /// Path to write the summary [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Verbose output should be redirected to a file
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+        /// Output JSON data
+        #[arg(short, long, default_value_t = false)]
+        json: bool,
+    },
+    #[clap(subcommand)]
+    Transactions(Transactions),
+    #[clap(subcommand)]
+    InternalCommands(InternalCommands),
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct AccountArgs {
-    /// Retrieve public key's account info
-    #[arg(short = 'k', long)]
-    public_key: String,
+/// Query accounts
+pub enum Accounts {
+    PublicKey {
+        /// Retrieve public key's account info
+        #[arg(short = 'k', long)]
+        public_key: String,
+    },
 }
 
-#[derive(Parser, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub enum BlockArgs {
+/// Query blocks
+pub enum Blocks {
     /// Query block by state hash
-    Block(BlockStateHashArgs),
+    StateHash {
+        /// Retrieve the block with given state hash
+        #[arg(short, long)]
+        state_hash: String,
+        /// Path to write the block [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query the best tip block
-    BestTip(BestTipArgs),
+    BestTip {
+        /// Path to write the best tip [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query blocks by global slot number
-    BlocksAtSlot(BlocksAtSlotArgs),
+    Slot {
+        /// Retrieve the blocks in given global slot
+        #[arg(short, long)]
+        slot: String,
+        /// Path to write the block [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query blocks by blockchain length
-    BlocksAtHeight(BlocksAtHeightArgs),
+    Height {
+        /// Retrieve the blocks with given blockchain length
+        #[arg(short, long)]
+        height: String,
+        /// Path to write the block [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query blocks by public key
-    BlocksAtPublicKey(BlocksAtPublicKeyArgs),
+    PublicKey {
+        /// Retrieve the blocks associated with given public key
+        #[arg(short = 'k', long)]
+        public_key: String,
+        /// Path to write the block [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct BestTipArgs {
-    /// Path to write the best tip [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct BlockStateHashArgs {
-    /// Retrieve the block with given state hash
-    #[arg(short, long)]
-    state_hash: String,
-    /// Path to write the block [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct BlocksAtHeightArgs {
-    /// Retrieve the blocks with given blockchain length
-    #[arg(short, long)]
-    height: String,
-    /// Path to write the block [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct BlocksAtSlotArgs {
-    /// Retrieve the blocks in given global slot
-    #[arg(short, long)]
-    slot: String,
-    /// Path to write the block [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct BlocksAtPublicKeyArgs {
-    /// Retrieve the blocks associated with given public key
-    #[arg(short = 'k', long)]
-    public_key: String,
-    /// Path to write the block [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum ChainArgs {
+pub enum Chain {
     /// Query the best chain
-    BestChain(BestChainArgs),
+    Best {
+        /// Number of blocks to include in this suffix
+        #[arg(short, long, default_value_t = 10)]
+        num: usize,
+        /// Path to write the best chain [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Constrain chain query with a start state hash
+        #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
+        start_state_hash: String,
+        /// Constrain chain query with an end state hash
+        #[arg(short, long)]
+        end_state_hash: Option<String>,
+        /// Display the entire precomputed block
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct BestChainArgs {
-    /// Number of blocks to include in this suffix
-    #[arg(short, long, default_value_t = 10)]
-    num: usize,
-    /// Path to write the best chain [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Constrain chain query with a start state hash
-    #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
-    start_state_hash: String,
-    /// Constrain chain query with an end state hash
-    #[arg(short, long)]
-    end_state_hash: Option<String>,
-    /// Display the entire precomputed block
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
+pub enum Checkpoints {
+    /// Create a checkpoint of the indexer store
+    Create {
+        /// Path to write the checkpoint
+        #[arg(short, long)]
+        path: PathBuf,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct CheckpointArgs {
-    /// Path to write the checkpoint
-    #[arg(short, long)]
-    path: PathBuf,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum LedgerArgs {
+pub enum Ledger {
     /// Query the best ledger
-    BestLedger(BestLedgerArgs),
-    /// Query ledger by state hash
-    Ledger(LedgerHashArgs),
+    Best {
+        /// Path to write the ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+    },
+    /// Query ledger by hash (state or ledger)
+    Hash {
+        /// Path to write the ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// State or ledger hash corresponding to the ledger
+        #[arg(short, long)]
+        hash: String,
+    },
     /// Query ledger by height
-    LedgerAtHeight(LedgerAtHeightArgs),
+    Height {
+        /// Path to write the ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Block height of the ledger
+        #[arg(short, long)]
+        height: u32,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct BestLedgerArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct LedgerAtHeightArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Block height of the ledger
-    #[arg(short, long)]
-    height: u32,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct LedgerHashArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// State or ledger hash corresponding to the ledger
-    #[arg(short, long)]
-    hash: String,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum StakingLedgerArgs {
-    /// Query staking delegations by epoch
-    StakingDelegations(StakingDelegationsArgs),
-    /// Query staking delegations by public key and epoch
-    StakingPublicKey(StakingPublicKeyArgs),
+pub enum StakingLedger {
     /// Query staking ledger by hash
-    StakingLedgerHash(StakingLedgerHashArgs),
-    /// Query staking ledger by epoch
-    StakingLedgerEpoch(StakingLedgerEpochArgs),
+    Hash {
+        /// Path to write the staking ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Ledger hash corresponding to the staking ledger
+        #[arg(short, long)]
+        hash: String,
+    },
+    /// Query staking ledger at epoch
+    Epoch {
+        /// Path to write the staking ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Epoch number of the staking ledger
+        #[arg(short, long)]
+        epoch: u32,
+    },
+    Delegations {
+        /// Epoch to aggregate total delegations
+        #[arg(short, long)]
+        epoch: u32,
+        /// Network for the staking ledger
+        #[arg(short, long, default_value = "mainnet")]
+        network: String,
+        /// Path to write the aggregate delegations
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+    },
+    PublicKey {
+        /// Epoch to aggregate staking delegations
+        #[arg(short, long)]
+        epoch: u32,
+        /// Account to aggregate staking delegations
+        #[arg(short = 'k', long)]
+        public_key: String,
+        /// Network for the staking ledger
+        #[arg(short, long, default_value = "mainnet")]
+        network: String,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct StakingLedgerEpochArgs {
-    /// Path to write the staking ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Epoch number of the staking ledger
-    #[arg(short, long)]
-    epoch: u32,
-    /// Network
-    #[arg(short, long, default_value = "mainnet")]
-    network: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct StakingLedgerHashArgs {
-    /// Path to write the ledger [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Ledger hash corresponding to the staking ledger
-    #[arg(short, long)]
-    hash: String,
-    /// Network
-    #[arg(short, long, default_value = "mainnet")]
-    network: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct StakingPublicKeyArgs {
-    /// Epoch to aggregate staking delegations
-    #[arg(short, long)]
-    epoch: u32,
-    /// Account to aggregate staking delegations
-    #[arg(short = 'k', long)]
-    public_key: String,
-    /// Network for the staking ledger
-    #[arg(short, long, default_value = "mainnet")]
-    network: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct StakingDelegationsArgs {
-    /// Epoch to aggregate total delegations
-    #[arg(short, long)]
-    epoch: u32,
-    /// Network for the staking ledger
-    #[arg(short, long, default_value = "mainnet")]
-    network: String,
-    /// Path to write the aggregate delegations
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum SnarkArgs {
+pub enum Snark {
     /// Query SNARK work by state hash
-    Snark(SnarkStateHashArgs),
+    StateHash {
+        /// Path to write the snark work [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// State hash of block to query
+        #[arg(short, long)]
+        state_hash: String,
+    },
     /// Query SNARK work by prover public key
-    SnarkPublicKey(SnarkPublickKeyArgs),
+    PublicKey {
+        /// Path to write the snark work [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// State hash of block to query
+        #[arg(short = 'k', long)]
+        public_key: String,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct SnarkStateHashArgs {
-    /// Path to write the snark work [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// State hash of block to query
-    #[arg(short, long)]
-    state_hash: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct SnarkPublickKeyArgs {
-    /// Path to write the snark work [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// State hash of block to query
-    #[arg(short = 'k', long)]
-    public_key: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct SummaryArgs {
-    /// Path to write the summary [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Verbose output should be redirected to a file
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-    /// Output JSON data
-    #[arg(short, long, default_value_t = false)]
-    json: bool,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum TransactionArgs {
+pub enum Transactions {
     /// Query transactions by their hash
-    TxHash(TransactionHashArgs),
+    Hash {
+        /// Hash of the transaction
+        #[arg(short, long)]
+        hash: String,
+        /// Verbose transaction output
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query transactions by public key
-    TxPublicKey(TransactionPublicKeyArgs),
+    PublicKey {
+        /// Path to write the transactions [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Retrieve public key's transaction info
+        #[arg(short = 'k', long)]
+        public_key: String,
+        /// Bound the fetched transactions by a start state hash
+        #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
+        start_state_hash: String,
+        /// Bound the fetched transactions by an end state hash
+        #[arg(short, long)]
+        end_state_hash: Option<String>,
+        /// Verbose transaction output
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Query transactions by state hash
-    TxStateHash(TransactionStateHashArgs),
+    StateHash {
+        /// Path to write the transactions [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// State hash of the containing block
+        #[arg(short, long)]
+        state_hash: String,
+        /// Verbose transaction output
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
-pub struct TransactionStateHashArgs {
-    /// Path to write the transactions [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// State hash of the containing block
-    #[arg(short, long)]
-    state_hash: String,
-    /// Verbose transaction output
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct TransactionHashArgs {
-    /// Hash of the transaction
-    #[arg(short, long)]
-    tx_hash: String,
-    /// Verbose transaction output
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct TransactionPublicKeyArgs {
-    /// Path to write the transactions [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Query public key transaction info
-    #[arg(short = 'k', long)]
-    public_key: String,
-    /// Bound the fetched transactions by a start block
-    #[arg(short, long, default_value_t = MAINNET_GENESIS_HASH.into())]
-    start_state_hash: String,
-    /// Bound the fetched transactions by an end block
-    #[arg(short, long)]
-    end_state_hash: Option<String>,
-    /// Verbose transaction output
-    #[arg(short, long, default_value_t = false)]
-    verbose: bool,
-}
-
-#[derive(Parser, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub enum InternalCommandArgs {
+pub enum InternalCommands {
     /// Query internal commands by public key
-    InternalStateHash(InternalCommandsStateHashArgs),
+    StateHash {
+        /// Path to write the internal commands [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// State hash of the containing block
+        #[arg(short, long)]
+        state_hash: String,
+    },
     /// Query internal commands by block
-    InternalPublicKey(InternalCommandsPublicKeyArgs),
+    PublicKey {
+        /// Path to write the internal commands [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+        /// Retrieve public key's internal command info
+        #[arg(short = 'k', long)]
+        public_key: String,
+    },
 }
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct InternalCommandsStateHashArgs {
-    /// Path to write the internal commands [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// State hash of the containing block
-    #[arg(short, long)]
-    state_hash: String,
-}
-
-#[derive(Args, Debug, Serialize, Deserialize)]
-#[command(author, version, about, long_about = None)]
-pub struct InternalCommandsPublicKeyArgs {
-    /// Path to write the internal commands [default: stdout]
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-    /// Retrieve public key's internal command info
-    #[arg(short = 'k', long)]
-    public_key: String,
-}
-
 #[instrument]
 pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Result<()> {
     let conn = match UnixStream::connect(domain_socket_path).await {
@@ -419,141 +333,162 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
 
     let command: String = match command {
-        ClientCli::Account(__) => {
-            format!("account {:?}\0", __)
-        }
+        ClientCli::Accounts(__) => match __ {
+            Accounts::PublicKey { public_key } => {
+                format!("account {}\0", public_key)
+            }
+        },
         ClientCli::Chain(__) => match __ {
-            ChainArgs::BestChain(__) => format!(
-                "best-chain {} {} {} {} {}\0",
-                __.num,
-                __.verbose,
-                __.start_state_hash,
-                __.end_state_hash.clone().unwrap_or("x".into()),
-                to_display(&__.path)
+            Chain::Best {
+                num,
+                verbose,
+                start_state_hash,
+                end_state_hash,
+                path,
+            } => format!(
+                "best {} {} {} {} {}\0",
+                num,
+                verbose,
+                start_state_hash,
+                end_state_hash.clone().unwrap_or("x".into()),
+                to_display(path)
             ),
         },
-        ClientCli::Block(__) => match __ {
-            BlockArgs::BestTip(__) => {
-                format!("block-best-tip {} {}\0", __.verbose, to_display(&__.path))
+        ClientCli::Blocks(__) => match __ {
+            Blocks::BestTip { verbose, path } => {
+                format!("best-tip {} {}\0", verbose, to_display(path))
             }
-            BlockArgs::Block(__) => format!(
-                "block-state-hash {} {} {}\0",
-                __.state_hash,
-                __.verbose,
-                to_display(&__.path)
+            Blocks::StateHash {
+                state_hash,
+                verbose,
+                path,
+            } => format!(
+                "state-hash {} {} {}\0",
+                state_hash,
+                verbose,
+                to_display(path)
             ),
-            BlockArgs::BlocksAtHeight(__) => format!(
-                "blocks-at-height {} {} {}\0",
-                __.height,
-                __.verbose,
-                to_display(&__.path)
-            ),
-            BlockArgs::BlocksAtSlot(__) => format!(
-                "blocks-at-slot {} {} {}\0",
-                __.slot,
-                __.verbose,
-                to_display(&__.path)
-            ),
-            BlockArgs::BlocksAtPublicKey(__) => format!(
-                "blocks-at-public-key {} {} {}\0",
-                __.public_key,
-                __.verbose,
-                to_display(&__.path)
+            Blocks::Height {
+                height,
+                verbose,
+                path,
+            } => {
+                format!("height {} {} {}\0", height, verbose, to_display(path))
+            }
+            Blocks::Slot {
+                slot,
+                verbose,
+                path,
+            } => {
+                format!("slot {} {} {}\0", slot, verbose, to_display(path))
+            }
+            Blocks::PublicKey {
+                public_key,
+                verbose,
+                path,
+            } => format!(
+                "public-key {} {} {}\0",
+                public_key,
+                verbose,
+                to_display(path)
             ),
         },
-        ClientCli::Checkpoint(__) => {
-            format!("checkpoint {}\0", __.path.display())
-        }
+        ClientCli::Checkpoints(__) => match __ {
+            Checkpoints::Create { path } => {
+                format!("checkpoint {}\0", path.display())
+            }
+        },
         ClientCli::Ledger(__) => match __ {
-            LedgerArgs::BestLedger(__) => {
-                format!("best-ledger {}\0", to_display(&__.path))
+            Ledger::Best { path } => {
+                format!("best {}\0", to_display(path))
             }
-            LedgerArgs::Ledger(__) => {
-                format!("ledger {} {}\0", __.hash, to_display(&__.path))
+            Ledger::Hash { hash, path } => {
+                format!("hash {} {}\0", hash, to_display(path))
             }
-            LedgerArgs::LedgerAtHeight(__) => {
-                format!("ledger-at-height {} {}\0", __.height, to_display(&__.path),)
+            Ledger::Height { height, path } => {
+                format!("height {} {}\0", height, to_display(path),)
             }
         },
         ClientCli::StakingLedger(__) => match __ {
-            StakingLedgerArgs::StakingDelegations(__) => {
+            StakingLedger::Delegations {
+                network,
+                epoch,
+                path,
+            } => {
                 format!(
                     "staking-delegations {} {} {}\0",
-                    __.network,
-                    __.epoch,
-                    __.path.clone().unwrap_or_default().display()
+                    network,
+                    epoch,
+                    to_display(path)
                 )
             }
-            StakingLedgerArgs::StakingPublicKey(__) => {
+            StakingLedger::PublicKey {
+                network,
+                epoch,
+                public_key,
+            } => {
                 format!(
                     "staking-delegations-pk {} {} {}\0",
-                    __.network, __.epoch, __.public_key
+                    network, epoch, public_key
                 )
             }
-            StakingLedgerArgs::StakingLedgerHash(__) => {
-                format!("staking-ledger-hash {} {}\0", __.hash, to_display(&__.path))
+            StakingLedger::Hash { hash, path } => {
+                format!("staking-ledger-hash {} {}\0", hash, to_display(&path))
             }
-            StakingLedgerArgs::StakingLedgerEpoch(__) => {
-                format!(
-                    "staking-ledger-epoch {} {}\0",
-                    __.epoch,
-                    to_display(&__.path)
-                )
+            StakingLedger::Epoch { epoch, path } => {
+                format!("epoch {} {}\0", epoch, to_display(path))
             }
         },
         ClientCli::Snark(__) => match __ {
-            SnarkArgs::Snark(__) => {
-                format!(
-                    "snark-state-hash {} {}\0",
-                    __.state_hash,
-                    to_display(&__.path)
-                )
+            Snark::StateHash { state_hash, path } => {
+                format!("state-hash {} {}\0", state_hash, to_display(path))
             }
-            SnarkArgs::SnarkPublicKey(__) => {
-                format!("snark-pk {} {}\0", __.public_key, to_display(&__.path))
+            Snark::PublicKey { public_key, path } => {
+                format!("public-key {} {}\0", public_key, to_display(path))
             }
         },
         ClientCli::Shutdown => "shutdown \0".to_string(),
-        ClientCli::Summary(__) => {
-            format!(
-                "summary {} {} {}\0",
-                __.verbose,
-                __.json,
-                to_display(&__.path)
-            )
+        ClientCli::Summary {
+            verbose,
+            json,
+            path,
+        } => {
+            format!("summary {} {} {}\0", verbose, json, to_display(path))
         }
         ClientCli::Transactions(__) => match __ {
-            TransactionArgs::TxHash(__) => {
-                format!("tx-hash {} {}\0", __.tx_hash, __.verbose)
+            Transactions::Hash { hash, verbose } => {
+                format!("hash {} {}\0", hash, verbose)
             }
-            TransactionArgs::TxPublicKey(__) => {
+            Transactions::PublicKey {
+                public_key,
+                verbose,
+                start_state_hash,
+                end_state_hash,
+                path,
+            } => {
                 format!(
-                    "tx-pk {} {} {} {} {}\0",
-                    __.public_key,
-                    __.verbose,
-                    __.start_state_hash,
-                    __.end_state_hash.clone().unwrap_or("x".into()),
-                    to_display(&__.path),
+                    "public-key {} {} {} {} {}\0",
+                    public_key,
+                    verbose,
+                    start_state_hash,
+                    end_state_hash.clone().unwrap_or("x".into()),
+                    to_display(path)
                 )
             }
-            TransactionArgs::TxStateHash(__) => {
-                format!("tx-state-hash {} {}\0", __.state_hash, __.verbose)
+            Transactions::StateHash {
+                state_hash,
+                verbose,
+                path: _,
+            } => {
+                format!("state-hash {} {}\0", state_hash, verbose)
             }
         },
-        ClientCli::InternalCommand(internal_cmd_args) => match internal_cmd_args {
-            InternalCommandArgs::InternalPublicKey(args) => {
-                format!(
-                    "internal-pk {} {}\0",
-                    args.public_key,
-                    args.path.clone().unwrap_or_default().display(),
-                )
+        ClientCli::InternalCommands(__) => match __ {
+            InternalCommands::PublicKey { path, public_key } => {
+                format!("internal-pk {} {}\0", public_key, to_display(path),)
             }
-            InternalCommandArgs::InternalStateHash(args) => {
-                format!(
-                    "internal-state-hash {} {}\0",
-                    args.state_hash,
-                    args.path.clone().unwrap_or_default().display(),
-                )
+            InternalCommands::StateHash { path, state_hash } => {
+                format!("internal-state-hash {} {}\0", state_hash, to_display(path),)
             }
         },
     };
