@@ -6,7 +6,7 @@ use mina_indexer::{
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use tracing::{error, info, instrument};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
@@ -26,7 +26,7 @@ enum IndexerCommand {
     /// Server commands
     Server {
         #[command(subcommand)]
-        server_command: ServerCommand,
+        server_command: Box<ServerCommand>,
     },
     /// Client commands
     #[clap(flatten)]
@@ -37,6 +37,8 @@ enum IndexerCommand {
 enum ServerCommand {
     /// Start a new mina indexer by passing arguments on the command line
     Start(ServerArgs),
+    /// Start a new mina indexer via a config file
+    StartViaConfig(ConfigArgs),
     /// Start a mina indexer by replaying events from an existing indexer store
     Replay(ServerArgs),
     /// Start a mina indexer by syncing from events in an existing indexer store
@@ -125,6 +127,14 @@ pub struct ServerArgs {
     locked_supply_csv: Option<PathBuf>,
 }
 
+#[derive(Parser, Debug, Clone)]
+#[command(author, version, about, long_about = None)]
+pub struct ConfigArgs {
+    /// Path to the server config file
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+}
+
 impl ServerArgs {
     fn with_dynamic_defaults(mut self) -> Self {
         if self.locked_supply_csv.is_none() {
@@ -171,13 +181,18 @@ pub async fn main() -> anyhow::Result<()> {
     match cli.command {
         IndexerCommand::Client(args) => client::run(&args, &domain_socket_path).await,
         IndexerCommand::Server { server_command } => {
-            let (args, mut mode) = match server_command {
+            let (args, mut mode) = match *server_command {
                 ServerCommand::Shutdown => {
                     return client::run(&client::ClientCli::Shutdown, &domain_socket_path).await;
                 }
                 ServerCommand::Start(args) => (args, InitializationMode::New),
                 ServerCommand::Sync(args) => (args, InitializationMode::Sync),
                 ServerCommand::Replay(args) => (args, InitializationMode::Replay),
+                ServerCommand::StartViaConfig(args) => {
+                    let contents = std::fs::read(args.path.expect("server args config file"))?;
+                    let args: ServerArgsJson = serde_json::from_slice(&contents)?;
+                    (args.into(), InitializationMode::New)
+                }
             };
             let args = args.with_dynamic_defaults();
             let locked_supply_csv = args.locked_supply_csv.clone();
@@ -185,6 +200,7 @@ pub async fn main() -> anyhow::Result<()> {
             let web_hostname = args.web_hostname.clone();
             let web_port = args.web_port;
 
+            // default to sync if there's a nonempty db dir
             if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
                 if matches!(mode, InitializationMode::New) && dir.count() != 0 {
                     // sync from existing db
@@ -192,21 +208,23 @@ pub async fn main() -> anyhow::Result<()> {
                 }
             }
 
+            // initialize logging
             let log_dir = args.log_dir.clone();
             let log_level_file = args.log_level_file;
             let log_level = args.log_level;
-
             init_tracing_logger(log_dir.clone(), log_level_file, log_level).await?;
 
-            // write server args to config.json
-            let path = log_dir.with_file_name("config.json");
+            // log server config
             let args_json: ServerArgsJson = args.clone().into();
-            std::fs::write(path, serde_json::to_string_pretty(&args_json)?)?;
+            info!(
+                "Indexer config:\n{}",
+                serde_json::to_string_pretty(&args_json)?
+            );
 
+            // start the servers
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
-
             mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
                 .await
                 .unwrap();
@@ -218,7 +236,7 @@ pub async fn main() -> anyhow::Result<()> {
 
 async fn init_tracing_logger(
     log_dir: PathBuf,
-    log_level: LevelFilter,
+    log_level_file: LevelFilter,
     log_level_stdout: LevelFilter,
 ) -> anyhow::Result<()> {
     let mut log_number = 0;
@@ -229,20 +247,19 @@ async fn init_tracing_logger(
         log_number += 1;
         log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
     }
-    let log_file = PathBuf::from(log_file);
 
     // setup tracing
+    let log_file = PathBuf::from(log_file);
     if let Some(parent) = log_file.parent() {
         fs::create_dir_all(parent).expect("log_file parent should be created");
     }
 
     let log_file = std::fs::File::create(log_file)?;
     let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
-
     let stdout_layer = tracing_subscriber::fmt::layer();
     tracing_subscriber::registry()
         .with(stdout_layer.with_filter(log_level_stdout))
-        .with(file_layer.with_filter(log_level))
+        .with(file_layer.with_filter(log_level_file))
         .init();
     Ok(())
 }
@@ -273,13 +290,13 @@ pub fn process_indexer_configuration(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
-    fs::create_dir_all(block_watch_dir.clone()).unwrap();
-    fs::create_dir_all(ledger_watch_dir.clone()).unwrap();
+    fs::create_dir_all(block_watch_dir.clone())?;
+    fs::create_dir_all(ledger_watch_dir.clone())?;
 
     info!("Parsing ledger file at {}", ledger.display());
     match ledger::genesis::parse_file(&ledger) {
         Err(err) => {
-            error!("Unable to parse genesis ledger: {err}");
+            error!("Unable to parse genesis ledger: {}", err);
             std::process::exit(100)
         }
         Ok(genesis_root) => {
@@ -322,6 +339,8 @@ struct ServerArgsJson {
     canonical_threshold: u32,
     canonical_update_threshold: u32,
     locked_supply_csv: Option<String>,
+    web_hostname: String,
+    web_port: u16,
 }
 
 impl From<ServerArgs> for ServerArgsJson {
@@ -358,6 +377,33 @@ impl From<ServerArgs> for ServerArgsJson {
             locked_supply_csv: value
                 .locked_supply_csv
                 .and_then(|p| p.to_str().map(|s| s.to_owned())),
+            web_hostname: value.web_hostname,
+            web_port: value.web_port,
+        }
+    }
+}
+
+impl From<ServerArgsJson> for ServerArgs {
+    fn from(value: ServerArgsJson) -> Self {
+        Self {
+            genesis_ledger: value.genesis_ledger.parse().ok(),
+            genesis_hash: value.genesis_hash,
+            blocks_dir: value.blocks_dir.into(),
+            block_watch_dir: Some(value.block_watch_dir.into()),
+            ledgers_dir: value.ledgers_dir.into(),
+            ledger_watch_dir: Some(value.ledger_watch_dir.into()),
+            database_dir: value.database_dir.into(),
+            log_dir: value.log_dir.into(),
+            log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
+            log_level_file: LevelFilter::from_str(&value.log_level_file).expect("log level file"),
+            ledger_cadence: value.ledger_cadence,
+            reporting_freq: value.reporting_freq,
+            prune_interval: value.prune_interval,
+            canonical_threshold: value.canonical_threshold,
+            canonical_update_threshold: value.canonical_update_threshold,
+            locked_supply_csv: value.locked_supply_csv.map(|p| p.into()),
+            web_hostname: value.web_hostname,
+            web_port: value.web_port,
         }
     }
 }

@@ -5,6 +5,7 @@ set -ex
 IDXR="$(pwd)"/target/release/mina-indexer
 LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$(pwd)"/tests/data/staking_ledgers
+LOCKED_CSV="$(pwd)"/data/locked.csv
 BLOCKS_FETCHER="$(pwd)"/download_blocks
 
 # JSON Schemas
@@ -45,10 +46,12 @@ ephemeral_port() {
 
 DOMAIN_SOCKET_PATH="$(pwd)"/mina-indexer.sock
 wait_for_socket() {
-    while true; do
+    num_retries=0
+    while [ $num_retries -lt 10 ]; do
         if [ -S "$DOMAIN_SOCKET_PATH" ]; then
             return
         fi
+        (( num_retries+=1 ))
         sleep 0.25
     done
 }
@@ -133,6 +136,18 @@ test_indexer_cli_reports() {
 
     # Indexer server cli subcommand works with default args
     idxr_server --help 2>/dev/null
+
+    idxr_server start --help 2>&1 |
+        grep -iq "Usage: mina-indexer server start"
+
+    idxr_server start-via-config --help 2>&1 |
+        grep -iq "Usage: mina-indexer server start-via-config"
+
+    idxr_server sync --help 2>&1 |
+        grep -iq "Usage: mina-indexer server sync"
+
+    idxr_server replay --help 2>&1 |
+        grep -iq "Usage: mina-indexer server replay"
 
     # Indexer reports usage for client subcommands
     idxr account --help 2>&1 |
@@ -257,14 +272,6 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./watch-ledgers"
     assert_directory_exists "./database"
     assert_directory_exists "./logs"
-
-    # check for server args
-    if [ ! -f "./config.json" ]; then
-        echo "Test Failed: Expected ./config.json to exist, but it does not."
-        exit 1
-    else
-        echo "Test Passed: ./config.json exists."
-    fi
 
     teardown
 }
@@ -1478,6 +1485,59 @@ test_internal_commands() {
     teardown
 }
 
+# Indexer correctly starts from config
+test_start_from_config() {
+    test=test_start_from_config
+
+    setup
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs
+    wait_for_socket
+    teardown
+
+    cp $LEDGER ./mainnet.json
+    cp $LOCKED_CSV ./locked.csv
+
+    setup
+    dl_mainnet 15 ./blocks
+
+    port=$(ephemeral_port)
+    file=./config.json
+    echo "
+    { \"genesis_ledger\": \"./mainnet.json\",
+      \"genesis_hash\": \"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ\",
+      \"blocks_dir\": \"./blocks\",
+      \"block_watch_dir\": \"./blocks\",
+      \"ledgers_dir\": \"./staking-ledgers\",
+      \"ledger_watch_dir\": \"./staking-ledgers\",
+      \"database_dir\": \"./database\",
+      \"log_dir\": \"./logs\",
+      \"log_level\": \"info\",
+      \"log_level_file\": \"debug\",
+      \"ledger_cadence\": 100,
+      \"reporting_freq\": 1000,
+      \"prune_interval\": 10,
+      \"canonical_threshold\": 10,
+      \"canonical_update_threshold\": 2,
+      \"locked_supply_csv\": \"./locked.csv\",
+      \"web_hostname\": \"localhost\",
+      \"web_port\": ${port}
+    }" > $file
+    idxr_server start-via-config -p $file
+    wait_for_socket
+    
+    hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    
+    assert 15 $length
+    assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -1507,6 +1567,7 @@ if [ "$#" -eq 0 ]; then
     test_watch_staking_ledgers
     test_staking_delegations
     test_internal_commands
+    test_start_from_config
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1537,6 +1598,7 @@ else
             "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
             "test_staking_delegations") test_staking_delegations ;;
             "test_internal_commands") test_internal_commands ;;
+            "test_start_from_config") test_start_from_config ;;
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
