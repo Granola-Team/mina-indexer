@@ -4,7 +4,7 @@ pub mod rest;
 pub const ENDPOINT_GRAPHQL: &str = "/graphql";
 
 use self::{
-    graphql::{blocks::build_schema, index_graphiql},
+    graphql::{build_schema, index_graphiql},
     rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
 };
 use crate::store::IndexerStore;
@@ -30,6 +30,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
     locked_supply: Option<P>,
 ) -> std::io::Result<()> {
     let locked = Arc::new(load_locked_balances(locked_supply));
+
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(state.clone()))

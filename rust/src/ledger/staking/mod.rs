@@ -22,13 +22,13 @@ pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,
     pub delegate: PublicKey,
-    token: u32,
-    token_permissions: TokenPermissions,
-    receipt_chain_hash: ReceiptChainHash,
-    voting_for: BlockHash,
-    permissions: Permissions,
-    nonce: Option<u32>,
-    timing: Option<Timing>,
+    pub token: u32,
+    pub token_permissions: TokenPermissions,
+    pub receipt_chain_hash: ReceiptChainHash,
+    pub voting_for: BlockHash,
+    pub permissions: Permissions,
+    pub nonce: Option<u32>,
+    pub timing: Option<Timing>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ pub struct Timing {
 pub struct TokenPermissions {}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReceiptChainHash(String);
+pub struct ReceiptChainHash(pub String);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccountJson {
