@@ -1,7 +1,0 @@
-{
-    "recommendations": [
-        "arrterian.nix-env-selector",
-        "bbenoist.nix",
-        "jnoortheen.nix-ide"
-    ]
-}
