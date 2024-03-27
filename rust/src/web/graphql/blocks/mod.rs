@@ -132,6 +132,8 @@ struct StakingEpochData {
     start_checkpoint: String,
     /// Value lock checkpoint
     lock_checkpoint: String,
+    /// Value staking ledger
+    ledger: StakingEpochDataLedger,
 }
 
 #[derive(SimpleObject)]
@@ -144,6 +146,24 @@ struct NextEpochData {
     start_checkpoint: String,
     /// Value lock checkpoint
     lock_checkpoint: String,
+    /// Value next ledger
+    ledger: NextEpochDataLedger,
+}
+
+#[derive(SimpleObject)]
+struct NextEpochDataLedger {
+    /// Value hash
+    hash: String,
+    /// Value total currency
+    total_currency: u64,
+}
+
+#[derive(SimpleObject)]
+struct StakingEpochDataLedger {
+    /// Value hash
+    hash: String,
+    /// Value total currency
+    total_currency: u64,
 }
 
 #[derive(SimpleObject)]
@@ -268,6 +288,23 @@ impl From<PrecomputedBlock> for Block {
             .to_base58_string()
             .expect("bs58 encoded lock checkpoint");
 
+        let ledger_hashv1 = consensus_state.next_epoch_data.t.t.ledger.t.t.hash;
+        let ledger_hash_bs58: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
+            ledger_hashv1.into();
+        let ledger_hash = ledger_hash_bs58
+            .to_base58_string()
+            .expect("bs58 encoded ledger hash");
+        let ledger_total_currency = consensus_state
+            .next_epoch_data
+            .t
+            .t
+            .ledger
+            .t
+            .t
+            .total_currency
+            .t
+            .t;
+
         // StakingEpochData
         let staking_seed_hashv1 = consensus_state.staking_epoch_data.t.t.seed;
         let staking_seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
@@ -296,6 +333,25 @@ impl From<PrecomputedBlock> for Block {
         let staking_lock_checkpoint = staking_lock_checkpoint_bs58
             .to_base58_string()
             .expect("bs58 encoded lock checkpoint");
+
+        let staking_ledger_hashv1 = consensus_state.staking_epoch_data.t.t.ledger.t.t.hash;
+        let staking_ledger_hash_bs58: Base58EncodableVersionedType<
+            { version_bytes::LEDGER_HASH },
+            _,
+        > = staking_ledger_hashv1.into();
+        let staking_ledger_hash = staking_ledger_hash_bs58
+            .to_base58_string()
+            .expect("bs58 encoded ledger hash");
+        let staking_ledger_total_currency = consensus_state
+            .staking_epoch_data
+            .t
+            .t
+            .ledger
+            .t
+            .t
+            .total_currency
+            .t
+            .t;
 
         Block {
             state_hash: block.state_hash,
@@ -333,12 +389,20 @@ impl From<PrecomputedBlock> for Block {
                         epoch_length,
                         start_checkpoint,
                         lock_checkpoint,
+                        ledger: NextEpochDataLedger {
+                            hash: ledger_hash,
+                            total_currency: ledger_total_currency,
+                        },
                     },
                     staking_epoch_data: StakingEpochData {
                         seed: staking_seed,
                         epoch_length: staking_epoch_length,
                         start_checkpoint: staking_start_checkpoint,
                         lock_checkpoint: staking_lock_checkpoint,
+                        ledger: StakingEpochDataLedger {
+                            hash: staking_ledger_hash,
+                            total_currency: staking_ledger_total_currency,
+                        },
                     },
                 },
             },
