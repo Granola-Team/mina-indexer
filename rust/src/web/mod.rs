@@ -1,6 +1,8 @@
 pub mod graphql;
 pub mod rest;
 
+pub const ENDPOINT_GRAPHQL: &str = "/graphql";
+
 use self::{
     graphql::{blocks::build_schema, index_graphiql},
     rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
@@ -28,7 +30,6 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
     locked_supply: Option<P>,
 ) -> std::io::Result<()> {
     let locked = Arc::new(load_locked_balances(locked_supply));
-    let schema = build_schema(state.clone());
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(state.clone()))
@@ -38,12 +39,12 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
             .service(accounts::get_account)
             .service(blockchain::get_blockchain_summary)
             .service(
-                web::resource("/graphql")
+                web::resource(ENDPOINT_GRAPHQL)
                     .guard(guard::Post())
-                    .to(GraphQL::new(schema.clone())),
+                    .to(GraphQL::new(build_schema(state.clone()))),
             )
             .service(
-                web::resource("/graphql")
+                web::resource(ENDPOINT_GRAPHQL)
                     .guard(guard::Get())
                     .to(index_graphiql),
             )
