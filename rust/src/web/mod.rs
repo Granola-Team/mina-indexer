@@ -1,9 +1,16 @@
+pub mod graphql;
 pub mod rest;
 
-use self::rest::{accounts, blockchain, blocks, locked_balances::LockedBalances};
+pub const ENDPOINT_GRAPHQL: &str = "/graphql";
+
+use self::{
+    graphql::{blocks::build_schema, index_graphiql},
+    rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
+};
 use crate::store::IndexerStore;
 use actix_cors::Cors;
-use actix_web::{middleware, web::Data, App, HttpServer};
+use actix_web::{guard, middleware, web, web::Data, App, HttpServer};
+use async_graphql_actix_web::GraphQL;
 use std::{net, path::Path, sync::Arc};
 use tracing::warn;
 
@@ -31,6 +38,16 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
             .service(blocks::get_block)
             .service(accounts::get_account)
             .service(blockchain::get_blockchain_summary)
+            .service(
+                web::resource(ENDPOINT_GRAPHQL)
+                    .guard(guard::Post())
+                    .to(GraphQL::new(build_schema(state.clone()))),
+            )
+            .service(
+                web::resource(ENDPOINT_GRAPHQL)
+                    .guard(guard::Get())
+                    .to(index_graphiql),
+            )
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })

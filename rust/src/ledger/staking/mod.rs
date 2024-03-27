@@ -19,9 +19,9 @@ pub struct StakingLedger {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccount {
-    pk: PublicKey,
-    balance: u64,
-    delegate: PublicKey,
+    pub pk: PublicKey,
+    pub balance: u64,
+    pub delegate: PublicKey,
     token: u32,
     token_permissions: TokenPermissions,
     receipt_chain_hash: ReceiptChainHash,
