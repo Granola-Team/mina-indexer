@@ -118,6 +118,20 @@ struct ConsensusState {
     slot_since_genesis: u32,
     /// Value next epoch data
     next_epoch_data: NextEpochData,
+    /// Value next epoch data
+    staking_epoch_data: StakingEpochData,
+}
+
+#[derive(SimpleObject)]
+struct StakingEpochData {
+    /// Value seed
+    seed: String,
+    /// Value epoch length
+    epoch_length: u32,
+    /// Value start checkpoint
+    start_checkpoint: String,
+    /// Value lock checkpoint
+    lock_checkpoint: String,
 }
 
 #[derive(SimpleObject)]
@@ -233,6 +247,7 @@ impl From<PrecomputedBlock> for Block {
         let slot_since_genesis = consensus_state.global_slot_since_genesis.t.t;
         let slot = consensus_state.curr_global_slot.t.t.slot_number.t.t;
 
+        // NextEpochData
         let seed_hashv1 = consensus_state.next_epoch_data.t.t.seed;
         let seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
             seed_hashv1.into();
@@ -250,6 +265,35 @@ impl From<PrecomputedBlock> for Block {
         let lock_checkpoint_bs58: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             lock_checkpoint_hashv1.into();
         let lock_checkpoint = lock_checkpoint_bs58
+            .to_base58_string()
+            .expect("bs58 encoded lock checkpoint");
+
+        // StakingEpochData
+        let staking_seed_hashv1 = consensus_state.staking_epoch_data.t.t.seed;
+        let staking_seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
+            staking_seed_hashv1.into();
+        let staking_seed = staking_seed_bs58
+            .to_base58_string()
+            .expect("bs58 encoded seed");
+
+        let staking_epoch_length = consensus_state.staking_epoch_data.t.t.epoch_length.t.t;
+
+        let staking_start_checkpoint_hashv1 =
+            consensus_state.staking_epoch_data.t.t.start_checkpoint;
+        let staking_start_checkpoint_bs58: Base58EncodableVersionedType<
+            { version_bytes::STATE_HASH },
+            _,
+        > = staking_start_checkpoint_hashv1.into();
+        let staking_start_checkpoint = staking_start_checkpoint_bs58
+            .to_base58_string()
+            .expect("bs58 encoded start checkpoint");
+
+        let staking_lock_checkpoint_hashv1 = consensus_state.staking_epoch_data.t.t.lock_checkpoint;
+        let staking_lock_checkpoint_bs58: Base58EncodableVersionedType<
+            { version_bytes::STATE_HASH },
+            _,
+        > = staking_lock_checkpoint_hashv1.into();
+        let staking_lock_checkpoint = staking_lock_checkpoint_bs58
             .to_base58_string()
             .expect("bs58 encoded lock checkpoint");
 
@@ -289,6 +333,12 @@ impl From<PrecomputedBlock> for Block {
                         epoch_length,
                         start_checkpoint,
                         lock_checkpoint,
+                    },
+                    staking_epoch_data: StakingEpochData {
+                        seed: staking_seed,
+                        epoch_length: staking_epoch_length,
+                        start_checkpoint: staking_start_checkpoint,
+                        lock_checkpoint: staking_lock_checkpoint,
                     },
                 },
             },
