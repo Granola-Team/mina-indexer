@@ -19,5 +19,6 @@ steps:
         mina-indexer server start --help
     docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
   key: image
+  depends_on: build
   agents:
     docker: true
