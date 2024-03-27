@@ -124,6 +124,12 @@ struct ConsensusState {
 struct NextEpochData {
     /// Value seed
     seed: String,
+    /// Value epoch length
+    epoch_length: u32,
+    /// Value start checkpoint
+    start_checkpoint: String,
+    /// Value lock checkpoint
+    lock_checkpoint: String,
 }
 
 #[derive(SimpleObject)]
@@ -231,6 +237,21 @@ impl From<PrecomputedBlock> for Block {
         let seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
             seed_hashv1.into();
         let seed = seed_bs58.to_base58_string().expect("bs58 encoded seed");
+        let epoch_length = consensus_state.next_epoch_data.t.t.epoch_length.t.t;
+
+        let start_checkpoint_hashv1 = consensus_state.next_epoch_data.t.t.start_checkpoint;
+        let start_checkpoint_bs58: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
+            start_checkpoint_hashv1.into();
+        let start_checkpoint = start_checkpoint_bs58
+            .to_base58_string()
+            .expect("bs58 encoded start checkpoint");
+
+        let lock_checkpoint_hashv1 = consensus_state.next_epoch_data.t.t.lock_checkpoint;
+        let lock_checkpoint_bs58: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
+            lock_checkpoint_hashv1.into();
+        let lock_checkpoint = lock_checkpoint_bs58
+            .to_base58_string()
+            .expect("bs58 encoded lock checkpoint");
 
         Block {
             state_hash: block.state_hash,
@@ -263,7 +284,12 @@ impl From<PrecomputedBlock> for Block {
                     min_window_density,
                     slot,
                     slot_since_genesis,
-                    next_epoch_data: NextEpochData { seed },
+                    next_epoch_data: NextEpochData {
+                        seed,
+                        epoch_length,
+                        start_checkpoint,
+                        lock_checkpoint,
+                    },
                 },
             },
             tx_fees: tx_fees.to_string(),
