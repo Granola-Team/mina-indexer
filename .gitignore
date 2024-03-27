@@ -1,7 +1,7 @@
-/rust/target/
+target
 result
 .gitconfig
-.direnv/
+.direnv
 
 # Editor Droppings
 .idea*
