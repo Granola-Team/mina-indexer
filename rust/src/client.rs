@@ -214,6 +214,7 @@ pub enum StakingLedger {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+    /// Query staking ledger by ???
     Delegations {
         /// Epoch to aggregate total delegations
         #[arg(long)]
@@ -225,6 +226,7 @@ pub enum StakingLedger {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+    /// Query staking ledger by public key
     PublicKey {
         /// Epoch to aggregate staking delegations
         #[arg(long)]
@@ -311,19 +313,19 @@ pub enum InternalCommands {
     /// Query internal commands by public key
     StateHash {
         /// Path to write the internal commands [default: stdout]
-        #[arg(short, long)]
+        #[arg(long)]
         path: Option<PathBuf>,
         /// State hash of the containing block
-        #[arg(short, long)]
+        #[arg(long)]
         state_hash: String,
     },
     /// Query internal commands by block
     PublicKey {
         /// Path to write the internal commands [default: stdout]
-        #[arg(short, long)]
+        #[arg(long)]
         path: Option<PathBuf>,
         /// Retrieve public key's internal command info
-        #[arg(short = 'k', long)]
+        #[arg(long)]
         public_key: String,
     },
 }
