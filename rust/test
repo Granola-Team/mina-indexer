@@ -512,7 +512,6 @@ test_block_copy() {
     test=test_block_copy
 
     setup
-    mkdir ./blocks_to_copy
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
@@ -535,9 +534,9 @@ test_block_copy() {
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add block 11
-    dl_mainnet_single 11 ./blocks_to_copy
-    cp ./blocks_to_copy/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json ./blocks
+    dl_mainnet_single 11 ./blocks
     sleep 1
+    ls -l ./blocks
 
     # check
     best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
@@ -1527,10 +1526,34 @@ test_start_from_config() {
     }" > $file
     idxr_server start-via-config -p $file
     wait_for_socket
-    
+
     hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
     length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    
+
+    assert 15 $length
+    assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
+
+    teardown
+}
+
+# Indexer correctly starts without blocks dir
+test_start_without_blocks_dir() {
+    test=test_start_without_blocks_dir
+
+    setup
+    idxr_server_start \
+        --block-watch-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs
+    wait_for_socket
+
+    dl_mainnet 15 ./blocks
+    sleep 1
+
+    hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
+    length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+
     assert 15 $length
     assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
 
@@ -1544,6 +1567,7 @@ if [ "$#" -eq 0 ]; then
     test_server_startup
     test_ipc_is_available_immediately
     test_startup_dirs_get_created
+    test_start_without_blocks_dir
     test_account_balance_cli
     test_account_public_key_json
     test_canonical_root
@@ -1575,6 +1599,7 @@ else
             "test_server_startup") test_server_startup ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
             "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
+            "test_start_without_blocks_dir") test_start_without_blocks_dir ;;
             "test_account_balance_cli") test_account_balance_cli ;;
             "test_account_public_key_json") test_account_public_key_json ;;
             "test_canonical_root") test_canonical_root ;;
