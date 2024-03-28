@@ -71,9 +71,10 @@
 
           developmentDependencies =
             with pkgs; [
-              nightlyToolchain.passthru.availableComponents.rustfmt
+              cargo
               git  # Needed but not declared by Nix's 'stdenv' build.
               just  # Main runner
+              nightlyToolchain.passthru.availableComponents.rustfmt
               nix-output-monitor  # Use 'nom' in place of 'nix' to use this.
             ]
             ++ buildDependencies;
