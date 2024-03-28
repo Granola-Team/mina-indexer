@@ -1333,8 +1333,8 @@ test_watch_staking_ledgers() {
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
     # Move epoch 42 staking ledger to watched directory
-    ls -la "$STAKING_LEDGERS"
-    cp "$STAKING_LEDGERS"/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json ./staking-ledgers/
+    epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
+    cp "$STAKING_LEDGERS"/mainnet-42-"$epoch42".json ./staking-ledgers/
     sleep 1
 
     # write epoch 42 ledger to file
