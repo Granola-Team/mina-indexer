@@ -1,5 +1,8 @@
 use crate::{
-    ledger::{staking::StakingAccount, store::LedgerStore},
+    ledger::{
+        staking::{AggregatedEpochStakeDelegations, StakingAccount},
+        store::LedgerStore,
+    },
     store::IndexerStore,
 };
 use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
@@ -35,14 +38,32 @@ impl StakesQueryRoot {
             None => return Ok(None),
         };
 
+        let AggregatedEpochStakeDelegations { delegations, .. } =
+            staking_ledger.aggregate_delegations()?;
+
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let accounts = staking_ledger
             .staking_ledger
             .into_values()
-            .map(|account| LedgerAccountWithMeta {
-                epoch,
-                ledger_hash: ledger_hash.clone(),
-                account: LedgerAccount::from(account),
+            .map(|account| {
+                let pk = account.pk.clone();
+                let result = delegations.get(&pk).unwrap();
+                let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
+                let count_delegates = result.count_delegates.unwrap_or_default();
+                let mut decimal = Decimal::from(total_delegated_nanomina);
+                decimal.set_scale(9).ok();
+                let total_delegated = decimal.to_f64().unwrap_or_default();
+
+                LedgerAccountWithMeta {
+                    epoch,
+                    ledger_hash: ledger_hash.clone(),
+                    account: LedgerAccount::from(account),
+                    delegation_totals: DelegationTotals {
+                        total_delegated,
+                        total_delegated_nanomina,
+                        count_delegates,
+                    },
+                }
             })
             .collect();
 
@@ -56,6 +77,8 @@ pub struct LedgerAccountWithMeta {
     epoch: u32,
     /// Value current ledger hash
     ledger_hash: String,
+    /// Value delegation totals
+    delegation_totals: DelegationTotals,
     /// Value accounts
     #[graphql(flatten)]
     account: LedgerAccount,
@@ -86,6 +109,16 @@ pub struct LedgerAccount {
     voting_for: String,
     /// Value balance nanomina
     balance_nanomina: u64,
+}
+
+#[derive(SimpleObject)]
+pub struct DelegationTotals {
+    /// Value total delegated
+    total_delegated: f64,
+    /// Value total delegated in nanomina
+    total_delegated_nanomina: u64,
+    /// Value count delegates
+    count_delegates: u32,
 }
 
 impl From<StakingAccount> for LedgerAccount {
