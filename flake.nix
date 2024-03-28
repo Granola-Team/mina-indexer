@@ -130,6 +130,11 @@
                 cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/usr/share/mina-indexer/data
                 cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/usr/share/mina-indexer/data
               '';
+              preInstall = ''
+                set -eu
+                mkdir -p $out/var/log/mina-indexer
+                mkdir -p $out/var/lib/mina-indexer
+              '';
             };
             default = mina-indexer;
             dockerImage = pkgs.dockerTools.buildImage {
