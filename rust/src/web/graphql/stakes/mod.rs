@@ -38,8 +38,8 @@ impl StakesQueryRoot {
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let accounts = staking_ledger
             .staking_ledger
-            .into_iter()
-            .map(|(_, account)| LedgerAccountWithMeta {
+            .into_values()
+            .map(|account| LedgerAccountWithMeta {
                 epoch,
                 ledger_hash: ledger_hash.clone(),
                 account: LedgerAccount::from(account),
