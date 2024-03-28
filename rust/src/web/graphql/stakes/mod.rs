@@ -74,12 +74,15 @@ pub struct LedgerAccount {
     /// Value epoch
     pk: String,
     /// Value public key
+    #[graphql(name = "public_key")]
     public_key: String,
     /// Value token
     token: u32,
     /// Value receipt chain hash
+    #[graphql(name = "receipt_chain_hash")]
     receipt_chain_hash: String,
     /// Value voting for
+    #[graphql(name = "voting_for")]
     voting_for: String,
     /// Value balance nanomina
     balance_nanomina: u64,
