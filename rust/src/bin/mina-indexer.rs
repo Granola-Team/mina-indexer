@@ -62,10 +62,10 @@ pub struct ServerArgs {
     genesis_hash: String,
 
     /// Directory containing the precomputed blocks
-    #[arg(long, default_value = "/usr/share/mina-indexer/blocks")]
-    blocks_dir: PathBuf,
+    #[arg(long)]
+    blocks_dir: Option<PathBuf>,
 
-    /// Directory to watch for new precomputed blocks [default: blocks_dir]
+    /// Directory to watch for new precomputed blocks
     #[arg(long)]
     block_watch_dir: Option<PathBuf>,
 
@@ -272,7 +272,11 @@ pub fn process_indexer_configuration(
     let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
-    let block_watch_dir = args.block_watch_dir.unwrap_or(blocks_dir.clone());
+    let block_watch_dir = args.block_watch_dir.unwrap_or(
+        blocks_dir
+            .clone()
+            .unwrap_or("/usr/share/mina-indexer/blocks".into()),
+    );
     let ledgers_dir = args.ledgers_dir;
     let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledgers_dir.clone());
     let prune_interval = args.prune_interval;
@@ -325,7 +329,7 @@ pub fn process_indexer_configuration(
 struct ServerArgsJson {
     genesis_ledger: String,
     genesis_hash: String,
-    blocks_dir: String,
+    blocks_dir: Option<String>,
     block_watch_dir: String,
     ledgers_dir: String,
     ledger_watch_dir: String,
@@ -353,10 +357,10 @@ impl From<ServerArgs> for ServerArgsJson {
                 .display()
                 .to_string(),
             genesis_hash: value.genesis_hash,
-            blocks_dir: value.blocks_dir.display().to_string(),
+            blocks_dir: value.blocks_dir.map(|d| d.display().to_string()),
             block_watch_dir: value
                 .block_watch_dir
-                .unwrap_or(value.blocks_dir)
+                .unwrap_or("/usr/share/mina-indexer/blocks".into())
                 .display()
                 .to_string(),
             ledgers_dir: value.ledgers_dir.display().to_string(),
@@ -388,7 +392,7 @@ impl From<ServerArgsJson> for ServerArgs {
         Self {
             genesis_ledger: value.genesis_ledger.parse().ok(),
             genesis_hash: value.genesis_hash,
-            blocks_dir: value.blocks_dir.into(),
+            blocks_dir: value.blocks_dir.map(|d| d.into()),
             block_watch_dir: Some(value.block_watch_dir.into()),
             ledgers_dir: value.ledgers_dir.into(),
             ledger_watch_dir: Some(value.ledger_watch_dir.into()),
