@@ -51,7 +51,7 @@ enum ServerCommand {
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     /// Path to the genesis ledger (JSON)
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(long, value_name = "FILE")]
     genesis_ledger: Option<PathBuf>,
 
     /// Hash of the initial state
@@ -78,7 +78,7 @@ pub struct ServerArgs {
     ledger_watch_dir: Option<PathBuf>,
 
     /// Path to directory for speedb
-    #[arg(short, long, default_value = "/var/log/mina-indexer/database")]
+    #[arg(long, default_value = "/var/log/mina-indexer/database")]
     pub database_dir: PathBuf,
 
     /// Path to directory for logs
@@ -103,7 +103,7 @@ pub struct ServerArgs {
     reporting_freq: u32,
 
     /// Interval for pruning the root branch
-    #[arg(short, long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
+    #[arg(long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
     prune_interval: u32,
 
     /// Threshold for determining the canonicity of a block
