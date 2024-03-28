@@ -48,8 +48,14 @@
           buildDependencies =
             with pkgs;
             [
-              libclang.lib
+              bash
+              cargo-machete
+              cargo-nextest
+              check-jsonschema
               clang
+              curl
+              jq
+              libclang.lib
               pkg-config
               rustPlatform.bindgenHook
             ]
@@ -65,18 +71,10 @@
           );
 
           developmentDependencies =
-            with pkgs;
-            [
-              nightlyToolchain.passthru.availableComponents.rustfmt
-              rust
-              cargo-nextest
-              cargo-audit
-              cargo-machete
-              just
-              jq # Used in testing.
+            with pkgs; [
+              # nightlyToolchain.passthru.availableComponents.rustfmt
               git # Needed but not declared by Nix's 'stdenv' build.
-              curl
-              check-jsonschema
+              nix-output-monitor  # Use 'nom' in place of 'nix' to use this.
             ]
             ++ buildDependencies;
 
@@ -121,14 +119,23 @@
                   NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}";
                 });
 
-              doCheck = false;
+              postPatch = ''
+                patchShebangs test
+                patchShebangs download_blocks
+              '';
               postBuild = ''
                 set -ex
-                echo "Copying over useful files"
+                cd rust && cargo clippy --all-targets --all-features -- -D warnings
+                cargo machete Cargo.toml
                 mkdir -p $out/usr/share/mina-indexer/data
                 cp ${dataDir}/locked.csv $out/usr/share/mina-indexer/data/locked.csv
                 cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/usr/share/mina-indexer/data
                 cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/usr/share/mina-indexer/data
+              '';
+              doCheck = true;
+              checkPhase = ''
+                cargo nextest run --release
+                ./test
               '';
               preInstall = ''
                 mkdir -p $out/var/log/mina-indexer

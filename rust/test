@@ -1333,9 +1333,7 @@ test_watch_staking_ledgers() {
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
     # curl epoch 42 staking ledger from MinaExplorer to watched directory
-    epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
-    curl https://storage.googleapis.com/mina-explorer-ledgers/${epoch42}.json -o ./mainnet-42-${epoch42}.json
-    cp ./mainnet-42-${epoch42}.json ./staking-ledgers/mainnet-42-${epoch42}.json
+    cp ./tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json ./staking-ledgers/
     sleep 1
 
     # write epoch 42 ledger to file
