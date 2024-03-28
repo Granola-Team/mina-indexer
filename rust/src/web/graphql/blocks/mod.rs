@@ -8,9 +8,7 @@ use crate::{
     },
     store::IndexerStore,
 };
-use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, InputObject, Object, Result, Schema, SimpleObject,
-};
+use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
 use chrono::{DateTime, SecondsFormat};
 use std::sync::Arc;
 
@@ -19,10 +17,11 @@ pub struct BlockQueryInput {
     state_hash: String,
 }
 
-pub struct QueryRoot;
+#[derive(Default)]
+pub struct BlocksQueryRoot;
 
 #[Object]
-impl QueryRoot {
+impl BlocksQueryRoot {
     async fn block<'ctx>(
         &self,
         ctx: &Context<'ctx>,
@@ -50,15 +49,6 @@ impl QueryRoot {
             .unwrap_or(false);
         Ok(Some(BlockWithCanonicity { block, canonical }))
     }
-}
-
-/// Build the schema for the block endpoints
-pub fn build_schema(
-    store: Arc<IndexerStore>,
-) -> Schema<QueryRoot, EmptyMutation, EmptySubscription> {
-    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
-        .data(store)
-        .finish()
 }
 
 #[derive(SimpleObject)]
