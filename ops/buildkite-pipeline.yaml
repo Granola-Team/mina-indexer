@@ -18,3 +18,4 @@ steps:
     docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
   agents:
     docker: true
+    deployment: production
