@@ -1,15 +1,14 @@
 steps:
 
-- label: "Build and Test"
+- label: "Developer Environment Build and Test"
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
     nix develop --command just
     nix develop --command just prereqs
     nix develop --command just test-ci
-  key: build
 
-- label: "Create OCI Image"
+- label: "Nix-Build and Create OCI Image"
   command: |
     nix build .#dockerImage
     docker load < ./result
@@ -17,7 +16,5 @@ steps:
       mina-indexer:"$(git rev-parse --short=9 HEAD)" \
         mina-indexer server start --help
     docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
-  key: image
-  depends_on: build
   agents:
     docker: true
