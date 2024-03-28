@@ -48,7 +48,6 @@
           buildDependencies =
             with pkgs;
             [
-              bash
               cargo-machete
               cargo-nextest
               check-jsonschema
@@ -72,8 +71,9 @@
 
           developmentDependencies =
             with pkgs; [
-              # nightlyToolchain.passthru.availableComponents.rustfmt
-              git # Needed but not declared by Nix's 'stdenv' build.
+              nightlyToolchain.passthru.availableComponents.rustfmt
+              git  # Needed but not declared by Nix's 'stdenv' build.
+              just  # Main runner
               nix-output-monitor  # Use 'nom' in place of 'nix' to use this.
             ]
             ++ buildDependencies;
@@ -125,7 +125,7 @@
               '';
               postBuild = ''
                 set -ex
-                cd rust && cargo clippy --all-targets --all-features -- -D warnings
+                cargo clippy --all-targets --all-features -- -D warnings
                 cargo machete Cargo.toml
                 mkdir -p $out/usr/share/mina-indexer/data
                 cp ${dataDir}/locked.csv $out/usr/share/mina-indexer/data/locked.csv
