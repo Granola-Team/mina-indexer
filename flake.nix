@@ -131,7 +131,6 @@
                 cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/usr/share/mina-indexer/data
               '';
               preInstall = ''
-                set -eu
                 mkdir -p $out/var/log/mina-indexer
                 mkdir -p $out/var/lib/mina-indexer
               '';
