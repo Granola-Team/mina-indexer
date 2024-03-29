@@ -15,5 +15,5 @@ OUT_DIR=$4
 
 for LENGTH in `seq $MIN_LENGTH $MAX_LENGTH`
 do
-  cp "${MY_DIR}"/tests/initial-blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
+  cp "${MY_DIR}"/data/initial-blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
 done

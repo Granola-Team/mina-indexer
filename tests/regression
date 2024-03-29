@@ -9,7 +9,7 @@ IDXR="$SRC"/rust/target/release/mina-indexer
 LEDGER="$SRC"/rust/tests/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$SRC"/rust/tests/data/staking_ledgers
 LOCKED_CSV="$SRC"/rust/data/locked.csv
-BLOCKS_FETCHER="$SRC"/rust/download_blocks
+BLOCKS_FETCHER="$SRC"/tests/download_blocks
 
 # JSON Schemas
 SUMMARY_SCHEMA="$SRC"/rust/tests/json-schemas/summary.json
