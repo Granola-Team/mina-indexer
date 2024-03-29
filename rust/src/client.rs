@@ -12,6 +12,7 @@ use tokio::{
 use tracing::instrument;
 
 pub const BIN_CODE_CONFIG: config::Configuration = config::standard();
+pub const BUFFER_SIZE: usize = 1024;
 
 #[derive(Parser, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
@@ -50,7 +51,7 @@ pub enum ClientCli {
     InternalCommands(InternalCommands),
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 /// Query accounts
 pub enum Accounts {
@@ -61,7 +62,7 @@ pub enum Accounts {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 /// Query blocks
 pub enum Blocks {
@@ -124,7 +125,7 @@ pub enum Blocks {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Chain {
     /// Query the best chain
@@ -147,7 +148,7 @@ pub enum Chain {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Checkpoints {
     /// Create a checkpoint of the indexer store
@@ -158,7 +159,7 @@ pub enum Checkpoints {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Ledger {
     /// Query the best ledger
@@ -187,26 +188,32 @@ pub enum Ledger {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum StakingLedger {
     /// Query staking ledger by hash
     Hash {
-        /// Path to write the staking ledger [default: stdout]
-        #[arg(short, long)]
-        path: Option<PathBuf>,
         /// Ledger hash corresponding to the staking ledger
         #[arg(short, long)]
         hash: String,
-    },
-    /// Query staking ledger at epoch
-    Epoch {
+        /// Network
+        #[arg(short, long, default_value = "mainnet")]
+        network: String,
         /// Path to write the staking ledger [default: stdout]
         #[arg(short, long)]
         path: Option<PathBuf>,
+    },
+    /// Query staking ledger at epoch
+    Epoch {
         /// Epoch number of the staking ledger
         #[arg(short, long)]
         epoch: u32,
+        /// Network
+        #[arg(short, long, default_value = "mainnet")]
+        network: String,
+        /// Path to write the staking ledger [default: stdout]
+        #[arg(short, long)]
+        path: Option<PathBuf>,
     },
     Delegations {
         /// Epoch to aggregate total delegations
@@ -223,16 +230,16 @@ pub enum StakingLedger {
         /// Epoch to aggregate staking delegations
         #[arg(short, long)]
         epoch: u32,
-        /// Account to aggregate staking delegations
-        #[arg(short = 'k', long)]
-        public_key: String,
         /// Network for the staking ledger
         #[arg(short, long, default_value = "mainnet")]
         network: String,
+        /// Account to aggregate staking delegations
+        #[arg(short = 'k', long)]
+        public_key: String,
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Snark {
     /// Query SNARK work by state hash
@@ -255,7 +262,7 @@ pub enum Snark {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Transactions {
     /// Query transactions by their hash
@@ -299,7 +306,7 @@ pub enum Transactions {
     },
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
+#[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum InternalCommands {
     /// Query internal commands by public key
@@ -332,9 +339,9 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     };
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
-    let mut buffer = Vec::with_capacity(1024 * 1024); // 1mb
+    let mut buffer = Vec::with_capacity(BUFFER_SIZE);
 
-    let encoded = bincode::encode_to_vec(command, BIN_CODE_CONFIG).unwrap();
+    let encoded = bincode::encode_to_vec(command, BIN_CODE_CONFIG)?;
 
     writer.write_all(&encoded).await?;
     reader.read_to_end(&mut buffer).await?;
