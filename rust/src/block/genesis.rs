@@ -10,7 +10,7 @@ impl GenesisBlock {
         let genesis_block_path: PathBuf = match std::env::var("RELEASE").unwrap_or_default().as_str() {
             // TODO: This should be handled up the call stack. Writing here so it builds correctly
             "production" => {
-                "/usr/share/mina-indexer/data/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json".into()
+                "/share/mina-indexer/data/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json".into()
             },
             _ => {
                 concat!(env!("PWD"), "/tests/data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json").into()
