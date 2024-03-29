@@ -101,7 +101,12 @@
               pname = cargo-toml.package.name;
               version = cargo-toml.package.version;
 
-              src = ./.;
+              src =
+                lib.cleanSourceWith {
+                  src = lib.cleanSource ./.;
+                  filter = path: type:
+                    (path != ".direnv") && (path != "rust/target");
+                };
               dataDir = ./rust/data;
               testsDataDir = ./rust/tests/data;
 
@@ -121,11 +126,11 @@
                 });
 
               postPatch = ''
-	        ln -s "${./rust/Cargo.lock}" Cargo.lock
+                ln -s "${./rust/Cargo.lock}" Cargo.lock
                 patchShebangs tests/regression
                 patchShebangs tests/download_blocks
               '';
-	      preBuild = "cd rust";
+              preBuild = "cd rust";
               postBuild = ''
                 set -ex
                 mkdir -p $out/share/mina-indexer/data
@@ -135,8 +140,8 @@
               '';
               doCheck = true;
               checkPhase = ''
-	        set -ex
-		cargo fmt --all --check
+                set -ex
+                cargo fmt --all --check
                 cargo clippy --all-targets --all-features -- -D warnings
                 cargo machete Cargo.toml
                 cargo nextest run --release
@@ -168,7 +173,7 @@
                 ];
               };
               config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
-              config.Env = [ "RELEASE=robin" ];
+              config.Env = [ "RELEASE=production" ];
             };
           };
 
