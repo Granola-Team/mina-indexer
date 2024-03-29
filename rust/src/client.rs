@@ -17,20 +17,27 @@ pub const BUFFER_SIZE: usize = 1024;
 #[derive(Parser, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
+    /// Query accounts
     #[clap(subcommand)]
     Accounts(Accounts),
+    /// Query blocks
     #[clap(subcommand)]
     Blocks(Blocks),
+    /// Query the chain
     #[clap(subcommand)]
     Chain(Chain),
+    /// Create a checkpoint of the indexer store
     #[clap(subcommand)]
     Checkpoints(Checkpoints),
+    /// Query ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),
+    /// Query staking ledgers
     #[command(subcommand)]
     StakingLedgers(StakingLedgers),
     #[clap(hide = true)]
     Shutdown,
+    /// Query SNARKs
     #[clap(subcommand)]
     Snarks(Snarks),
     /// Show a summary of the state
@@ -45,8 +52,10 @@ pub enum ClientCli {
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+    /// Query transactions
     #[clap(subcommand)]
     Transactions(Transactions),
+    /// Query internal commands
     #[clap(subcommand)]
     InternalCommands(InternalCommands),
 }
