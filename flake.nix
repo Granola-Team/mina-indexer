@@ -46,8 +46,7 @@
           frameworks = pkgs.darwin.apple_sdk.frameworks;
 
           buildDependencies =
-            with pkgs;
-            [
+            with pkgs; [
               cargo-machete
               cargo-nextest
               check-jsonschema
@@ -102,7 +101,12 @@
               pname = cargo-toml.package.name;
               version = cargo-toml.package.version;
 
-              src = ./rust/.;
+              src =
+                lib.cleanSourceWith {
+                  src = lib.cleanSource ./.;
+                  filter = path: type:
+                    (path != ".direnv") && (path != "rust/target");
+                };
               dataDir = ./rust/data;
               testsDataDir = ./rust/tests/data;
 
@@ -122,13 +126,13 @@
                 });
 
               postPatch = ''
-                patchShebangs test
-                patchShebangs download_blocks
+                ln -s "${./rust/Cargo.lock}" Cargo.lock
+                patchShebangs tests/regression
+                patchShebangs tests/download_blocks
               '';
+              preBuild = "cd rust";
               postBuild = ''
                 set -ex
-                cargo clippy --all-targets --all-features -- -D warnings
-                cargo machete Cargo.toml
                 mkdir -p $out/share/mina-indexer/data
                 cp ${dataDir}/locked.csv $out/share/mina-indexer/data/locked.csv
                 cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
@@ -136,8 +140,12 @@
               '';
               doCheck = true;
               checkPhase = ''
+                set -ex
+                cargo fmt --all --check
+                cargo clippy --all-targets --all-features -- -D warnings
+                cargo machete Cargo.toml
                 cargo nextest run --release
-                ./test
+                ../tests/regression
               '';
               preInstall = ''
                 mkdir -p $out/var/log/mina-indexer

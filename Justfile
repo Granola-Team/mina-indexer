@@ -40,10 +40,10 @@ test-unit-mina-rs:
   cd rust && cargo nextest run --release --features mina_rs
 
 test-regression: build
-  cd rust && ./test
+  ./tests/regression
 
 test-release: build
-  cd rust && ./test test_release
+  ./tests/regression test_release
 
 disallow-unused-cargo-deps:
   cd rust && cargo machete Cargo.toml
