@@ -6,7 +6,7 @@ steps:
     echo PATH=$PATH
     nix develop --command just
     nix develop --command just prereqs
-    nix develop --command just test-ci
+    nix develop --command just test
 
 - label: "Nix-Build and Create OCI Image"
   if: build.branch == "main"

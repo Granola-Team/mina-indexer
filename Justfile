@@ -31,10 +31,7 @@ clean:
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
-test: test-unit
-  cd rust && ./test
-
-test-ci: lint test-unit test-regression
+test: lint test-unit test-regression
 
 test-unit: build
   cd rust && cargo nextest run --release
