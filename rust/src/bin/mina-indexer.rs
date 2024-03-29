@@ -70,7 +70,7 @@ pub struct ServerArgs {
     block_watch_dir: Option<PathBuf>,
 
     /// Directory containing the staking ledgers
-    #[arg(long, default_value = "/usr/share/mina-indexer/staking-ledgers")]
+    #[arg(long, default_value = "/share/mina-indexer/staking-ledgers")]
     ledgers_dir: PathBuf,
 
     /// Directory to watch for new staking ledgers [default: ledgers_dir]
@@ -139,9 +139,7 @@ impl ServerArgs {
     fn with_dynamic_defaults(mut self) -> Self {
         if self.locked_supply_csv.is_none() {
             let path = match release_profile() {
-                ReleaseProfile::Production => {
-                    PathBuf::from("/usr/share/mina-indexer/data/locked.csv")
-                }
+                ReleaseProfile::Production => PathBuf::from("/share/mina-indexer/data/locked.csv"),
                 ReleaseProfile::Development => concat!(env!("PWD"), "/data/locked.csv").into(),
             };
             self.locked_supply_csv = Some(path);
@@ -149,7 +147,7 @@ impl ServerArgs {
         if self.genesis_ledger.is_none() {
             let ledger_path = match release_profile() {
                 ReleaseProfile::Production => {
-                    PathBuf::from("/usr/share/mina-indexer/data/mainnet.json")
+                    PathBuf::from("/share/mina-indexer/data/mainnet.json")
                 }
                 ReleaseProfile::Development => {
                     concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json").into()
@@ -275,7 +273,7 @@ pub fn process_indexer_configuration(
     let block_watch_dir = args.block_watch_dir.unwrap_or(
         blocks_dir
             .clone()
-            .unwrap_or("/usr/share/mina-indexer/blocks".into()),
+            .unwrap_or("/share/mina-indexer/blocks".into()),
     );
     let ledgers_dir = args.ledgers_dir;
     let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledgers_dir.clone());
@@ -360,7 +358,7 @@ impl From<ServerArgs> for ServerArgsJson {
             blocks_dir: value.blocks_dir.map(|d| d.display().to_string()),
             block_watch_dir: value
                 .block_watch_dir
-                .unwrap_or("/usr/share/mina-indexer/blocks".into())
+                .unwrap_or("/share/mina-indexer/blocks".into())
                 .display()
                 .to_string(),
             ledgers_dir: value.ledgers_dir.display().to_string(),
