@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-set -ex
+set -x
+set -eu
+set -o pipefail
 
 # Collect the binaries under test and the test ledgers.
-IDXR="$(pwd)"/target/release/mina-indexer
-LEDGER="$(pwd)"/tests/data/genesis_ledgers/mainnet.json
-STAKING_LEDGERS="$(pwd)"/tests/data/staking_ledgers
-LOCKED_CSV="$(pwd)"/data/locked.csv
-BLOCKS_FETCHER="$(pwd)"/download_blocks
+SRC="$(CDPATH= cd "$(dirname "$0")" && pwd)"/..
+IDXR="$SRC"/rust/target/release/mina-indexer
+LEDGER="$SRC"/rust/tests/data/genesis_ledgers/mainnet.json
+STAKING_LEDGERS="$SRC"/rust/tests/data/staking_ledgers
+LOCKED_CSV="$SRC"/rust/data/locked.csv
+BLOCKS_FETCHER="$SRC"/rust/download_blocks
 
 # JSON Schemas
-SUMMARY_SCHEMA="$(pwd)"/tests/json-schemas/summary.json
+SUMMARY_SCHEMA="$SRC"/rust/tests/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
+DOMAIN_SOCKET_PATH="$TEST_DIR"/mina-indexer.sock
 cd "$TEST_DIR"
 
 # Invoke this function when exiting this script for any reason.
@@ -44,7 +48,6 @@ ephemeral_port() {
     set -e
 }
 
-DOMAIN_SOCKET_PATH="$(pwd)"/mina-indexer.sock
 wait_for_socket() {
     num_retries=0
     while [ $num_retries -lt 10 ]; do
@@ -127,8 +130,7 @@ test_indexer_cli_reports() {
     test=test_indexer_cli_reports
 
     # Indexer reports usage with no arguments
-    idxr 2>&1 |
-        grep -iq "Usage:"
+    ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
 
     # Indexer reports usage for server subcommand
     idxr_server 2>&1 |
