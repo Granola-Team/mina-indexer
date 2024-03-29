@@ -4,7 +4,7 @@ set -eu
 set -o pipefail
 
 # Collect the binaries under test and the test ledgers.
-SRC="$(git rev-parse --show-toplevel)"
+SRC="$(CDPATH= cd "$(dirname "$0")" && pwd)"/..
 IDXR="$SRC"/rust/target/release/mina-indexer
 LEDGER="$SRC"/rust/tests/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$SRC"/rust/tests/data/staking_ledgers
