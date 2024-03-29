@@ -540,8 +540,8 @@ async fn handle_conn(
                 }
             }
         },
-        ClientCli::Ledger(__) => match __ {
-            Ledger::Best { path } => {
+        ClientCli::Ledgers(__) => match __ {
+            Ledgers::Best { path } => {
                 info!("Received best-ledger command");
 
                 if let Some(best_tip) = db.get_best_block()? {
@@ -580,7 +580,7 @@ async fn handle_conn(
                     best_tip_missing_from_db()
                 }
             }
-            Ledger::Hash { hash, path } => {
+            Ledgers::Hash { hash, path } => {
                 info!("Received ledger command for {hash}");
 
                 // check if ledger or state hash and use appropriate getter
@@ -643,7 +643,7 @@ async fn handle_conn(
                     Some(format!("Invalid ledger or state hash: {hash}"))
                 }
             }
-            Ledger::Height { height, path } => {
+            Ledgers::Height { height, path } => {
                 info!("Received ledger-at-height {height} command");
 
                 if let Some(best_tip) = db.get_best_block()? {
@@ -713,13 +713,13 @@ async fn handle_conn(
                 }
             }
         },
-        ClientCli::StakingLedger(__) => match __ {
-            StakingLedger::Hash {
+        ClientCli::StakingLedgers(__) => match __ {
+            StakingLedgers::Hash {
                 hash,
                 network,
                 path,
             } => {
-                info!("Received staking-ledger-hash command for {hash}");
+                info!("Received staking-ledgers-hash command for {hash}");
 
                 if ledger::is_valid_ledger_hash(&hash) {
                     trace!("{hash} is a ledger hash");
@@ -754,12 +754,12 @@ async fn handle_conn(
                     Some(format!("Invalid ledger hash: {hash}"))
                 }
             }
-            StakingLedger::Epoch {
+            StakingLedgers::Epoch {
                 epoch,
                 network,
                 path,
             } => {
-                info!("Received staking-ledger-epoch {epoch} command");
+                info!("Received staking-ledgers-epoch {epoch} command");
 
                 if let Some(staking_ledger) = db.get_staking_ledger_at_epoch(&network, epoch)? {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
@@ -788,7 +788,7 @@ async fn handle_conn(
                     ))
                 }
             }
-            StakingLedger::PublicKey {
+            StakingLedgers::PublicKey {
                 epoch,
                 network,
                 public_key: pk,
@@ -836,7 +836,7 @@ async fn handle_conn(
                     ))
                 }
             }
-            StakingLedger::Delegations {
+            StakingLedgers::Delegations {
                 epoch,
                 network,
                 path,
@@ -889,8 +889,8 @@ async fn handle_conn(
                 }
             }
         },
-        ClientCli::Snark(__) => match __ {
-            Snark::PublicKey {
+        ClientCli::Snarks(__) => match __ {
+            Snarks::PublicKey {
                 public_key: pk,
                 path,
             } => {
@@ -927,7 +927,7 @@ async fn handle_conn(
                     }
                 }
             }
-            Snark::StateHash { state_hash, path } => {
+            Snarks::StateHash { state_hash, path } => {
                 info!("Received SNARK work command for state hash {state_hash}");
 
                 if !block::is_valid_state_hash(&state_hash) {

@@ -26,13 +26,13 @@ pub enum ClientCli {
     #[clap(subcommand)]
     Checkpoints(Checkpoints),
     #[clap(subcommand)]
-    Ledger(Ledger),
+    Ledgers(Ledgers),
     #[command(subcommand)]
-    StakingLedger(StakingLedger),
+    StakingLedgers(StakingLedgers),
     #[clap(hide = true)]
     Shutdown,
     #[clap(subcommand)]
-    Snark(Snark),
+    Snarks(Snarks),
     /// Show a summary of the state
     Summary {
         /// Path to write the summary [default: stdout]
@@ -161,7 +161,7 @@ pub enum Checkpoints {
 
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
-pub enum Ledger {
+pub enum Ledgers {
     /// Query the best ledger
     Best {
         /// Path to write the ledger [default: stdout]
@@ -190,7 +190,7 @@ pub enum Ledger {
 
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
-pub enum StakingLedger {
+pub enum StakingLedgers {
     /// Query staking ledger by hash
     Hash {
         /// Ledger hash corresponding to the staking ledger
@@ -215,6 +215,7 @@ pub enum StakingLedger {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+    /// Query staking ledger delegations by epoch
     Delegations {
         /// Epoch to aggregate total delegations
         #[arg(long)]
@@ -226,6 +227,7 @@ pub enum StakingLedger {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+    /// Query staking ledger by public key
     PublicKey {
         /// Epoch to aggregate staking delegations
         #[arg(long)]
@@ -241,7 +243,7 @@ pub enum StakingLedger {
 
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
-pub enum Snark {
+pub enum Snarks {
     /// Query SNARK work by state hash
     StateHash {
         /// Path to write the snark work [default: stdout]
@@ -312,19 +314,19 @@ pub enum InternalCommands {
     /// Query internal commands by public key
     StateHash {
         /// Path to write the internal commands [default: stdout]
-        #[arg(short, long)]
+        #[arg(long)]
         path: Option<PathBuf>,
         /// State hash of the containing block
-        #[arg(short, long)]
+        #[arg(long)]
         state_hash: String,
     },
     /// Query internal commands by block
     PublicKey {
         /// Path to write the internal commands [default: stdout]
-        #[arg(short, long)]
+        #[arg(long)]
         path: Option<PathBuf>,
         /// Retrieve public key's internal command info
-        #[arg(short = 'k', long)]
+        #[arg(long)]
         public_key: String,
     },
 }
