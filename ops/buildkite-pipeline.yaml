@@ -9,6 +9,7 @@ steps:
     nix develop --command just test-ci
 
 - label: "Nix-Build and Create OCI Image"
+  if: build.branch == "main"
   command: |
     nix build .#dockerImage
     docker load < ./result
