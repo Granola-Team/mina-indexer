@@ -226,7 +226,7 @@ test_server_startup() {
         --log-dir ./logs
     wait_for_socket
 
-    result=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
+    result=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
 
     teardown
@@ -325,9 +325,9 @@ test_canonical_root() {
         --database-dir ./database \
         --log-dir ./logs
     wait_for_socket
-    
-    hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+
+    hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 5 $length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $hash
@@ -353,8 +353,8 @@ test_canonical_threshold() {
         --canonical-threshold $canonical_threshold
     wait_for_socket
 
-    hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert $(expr $num_seq_blocks - $canonical_threshold) $length
     assert '3NKHEHXsScTUd6kMDtoB4tf45MavdXv91qo3HZkLKrkc8XpX5CDv' $hash
@@ -383,8 +383,8 @@ test_best_tip() {
     canonicity_v=$(idxr best-tip -v | jq -r .canonicity)
 
     # witness tree summary
-    wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     assert $wt_hash $hash
     assert $wt_length $length
@@ -420,8 +420,8 @@ test_blocks() {
     canonicity_v=$(idxr blocks-at-height -h 10 -v | jq -r .[0].canonicity)
 
     # witness tree summary
-    wt_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    wt_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     assert 9 $slot
     assert $wt_hash $hash
@@ -523,10 +523,10 @@ test_block_copy() {
     wait_for_socket
 
     # start without block 11
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 10 $best_length
     assert 1 $canonical_length
@@ -539,10 +539,10 @@ test_block_copy() {
     ls -l ./blocks
 
     # check
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 11 $best_length
     assert 1 $canonical_length
@@ -570,11 +570,11 @@ test_missing_blocks() {
     wait_for_socket
 
     # start out missing block 11 & 21
-    num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    num_dangling=$(idxr summary --json | jq -r .witness_tree.num_dangling)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 4 $num_dangling
     assert 10 $best_length
@@ -588,11 +588,11 @@ test_missing_blocks() {
 
     # dangling branches combine
     # no new canonical blocks
-    num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    num_dangling=$(idxr summary --json | jq -r .witness_tree.num_dangling)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 3 $num_dangling
     assert 10 $best_length
@@ -605,11 +605,11 @@ test_missing_blocks() {
     sleep 1
 
     # dangling branches move into the root branch
-    num_dangling=$(idxr summary -j | jq -r .witness_tree.num_dangling)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    num_dangling=$(idxr summary --json | jq -r .witness_tree.num_dangling)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert 0 $num_dangling
     assert 30 $best_length
@@ -691,8 +691,8 @@ test_ledgers() {
     pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
 
     # canonical ledgers match
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_height=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_height=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     hash_balance=$(idxr ledger --hash $canonical_hash | jq -r .${pk}.balance)
     height_balance=$(idxr ledger-at-height --height $canonical_height | jq -r .${pk}.balance)
@@ -700,8 +700,8 @@ test_ledgers() {
     assert '607904750000000' $height_balance
 
     # best ledgers match
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_height=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     best_result=$(idxr best-ledger | jq -r .${pk}.balance)
     hash_result=$(idxr ledger --hash $best_hash | jq -r .${pk}.balance)
@@ -768,10 +768,10 @@ test_sync() {
     sleep 1
 
     # post-sync results
-    post_best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    post_best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    post_canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    post_canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    post_best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    post_best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    post_canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    post_canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     # includes blocks added to watch dir while down
     assert 20 $post_best_length
@@ -813,11 +813,11 @@ test_replay() {
     sleep 1
 
     # post-replay results
-    root_hash_replay=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    root_length_replay=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
-    best_hash_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length_replay=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    num_blocks_replay=$(idxr summary -j | jq -r .blocks_processed)
+    root_hash_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    root_length_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+    best_hash_replay=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length_replay=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    num_blocks_replay=$(idxr summary --json | jq -r .blocks_processed)
 
     assert 29 $num_blocks_replay
     assert 20 $best_length_replay
@@ -1002,10 +1002,10 @@ test_checkpoint() {
     wait_for_socket
 
     # pre-checkpoint results
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
     amount=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     # create checkpoint in ./checkpoint
@@ -1024,10 +1024,10 @@ test_checkpoint() {
     wait_for_socket
 
     # post-checkpoint reults
-    canonical_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
-    best_hash_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length_checkpoint=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    canonical_hash_checkpoint=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+    best_hash_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
     amount_checkpoint=$(idxr tx-public-key -k B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy -v | jq -r .[0].command.payload.body.amount)
 
     assert $canonical_hash $canonical_hash_checkpoint
@@ -1057,10 +1057,10 @@ test_many_blocks() {
     wait_for_socket
 
     # results
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert '1000' $best_length
     assert '990' $canonical_length
@@ -1173,10 +1173,10 @@ test_release() {
     wait_for_socket
 
     # results
-    best_hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary -j | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary -j | jq -r .witness_tree.canonical_root_length)
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert '5000' $best_length
     assert '4990' $canonical_length
@@ -1527,8 +1527,8 @@ test_start_from_config() {
     idxr_server start-via-config -p $file
     wait_for_socket
 
-    hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     assert 15 $length
     assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
@@ -1551,8 +1551,8 @@ test_start_without_blocks_dir() {
     dl_mainnet 15 ./blocks
     sleep 1
 
-    hash=$(idxr summary -j | jq -r .witness_tree.best_tip_hash)
-    length=$(idxr summary -j | jq -r .witness_tree.best_tip_length)
+    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     assert 15 $length
     assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
