@@ -8,7 +8,6 @@ just clean
 just audit
 just lint
 just build
-# just test-unit
+just test-unit
 just test-regression
-# just test
-# just test-ci
+just test
