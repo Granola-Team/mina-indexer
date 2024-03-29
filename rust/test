@@ -17,6 +17,7 @@ SUMMARY_SCHEMA="$SRC"/rust/tests/json-schemas/summary.json
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
+DOMAIN_SOCKET_PATH="$TEST_DIR"/mina-indexer.sock
 cd "$TEST_DIR"
 
 # Invoke this function when exiting this script for any reason.
@@ -47,7 +48,6 @@ ephemeral_port() {
     set -e
 }
 
-DOMAIN_SOCKET_PATH="$SRC"/mina-indexer.sock
 wait_for_socket() {
     num_retries=0
     while [ $num_retries -lt 10 ]; do
