@@ -33,7 +33,7 @@ format:
 
 test: lint test-unit test-regression
 
-test-unit: build
+test-unit:
   cd rust && cargo nextest run --release
 
 test-unit-mina-rs:
