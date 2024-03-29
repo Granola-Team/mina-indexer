@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -ex
+set -x
+set -eu
 
 # Collect the binaries under test and the test ledgers.
 IDXR="$(pwd)"/target/release/mina-indexer
