@@ -129,10 +129,10 @@
                 set -ex
                 cargo clippy --all-targets --all-features -- -D warnings
                 cargo machete Cargo.toml
-                mkdir -p $out/usr/share/mina-indexer/data
-                cp ${dataDir}/locked.csv $out/usr/share/mina-indexer/data/locked.csv
-                cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/usr/share/mina-indexer/data
-                cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/usr/share/mina-indexer/data
+                mkdir -p $out/share/mina-indexer/data
+                cp ${dataDir}/locked.csv $out/share/mina-indexer/data/locked.csv
+                cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
+                cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/share/mina-indexer/data
               '';
               doCheck = true;
               checkPhase = ''
@@ -158,10 +158,10 @@
                   bash
                   self
                 ];
-                name = "idx-root";
+                name = "mina-indexer-root";
                 pathsToLink = [
                   "/bin"
-                  "/usr/share"
+                  "/share"
                 ];
               };
               config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
