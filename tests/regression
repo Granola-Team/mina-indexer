@@ -73,6 +73,24 @@ idxr_server_start() {
     idxr_server start --web-port "$port" "$@"
 }
 
+idxr_server_sync() {
+    port=$(ephemeral_port)
+    idxr_server sync --web-port "$port" \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
+        --log-dir ./logs \
+	"$@"
+}
+idxr_server_replay() {
+    port=$(ephemeral_port)
+    idxr_server replay --web-port "$port" \
+        --blocks-dir ./blocks \
+        --ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-dir ./logs \
+	"$@"
+}
+
 dl_mainnet() {
     "$BLOCKS_FETCHER" 2 "$1" mainnet "$2"
 }
@@ -777,11 +795,7 @@ test_sync() {
     dl_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
-    idxr_server sync \
-        --blocks-dir ./blocks \
-        --ledgers-dir ./staking-ledgers \
-        --database-dir ./database \
-        --log-dir ./logs
+    idxr_server_sync --database-dir ./database
     sleep 1
 
     # post-sync results
@@ -822,11 +836,7 @@ test_replay() {
     dl_mainnet_range 16 20 ./blocks
 
     # replay events from previous indexer instance
-    idxr_server replay \
-        --blocks-dir ./blocks \
-        --ledgers-dir ./staking-ledgers \
-        --database-dir ./database \
-        --log-dir ./logs
+    idxr_server_replay
     sleep 1
 
     # post-replay results
@@ -1033,11 +1043,7 @@ test_checkpoint() {
 
     # sync a new indexer from checkpointed db
     setup
-    idxr_server sync \
-        --blocks-dir ./blocks \
-        --ledgers-dir ./staking-ledgers \
-        --database-dir ./checkpoint \
-        --log-dir ./logs
+    idxr_server_sync --database-dir ./checkpoint
     wait_for_socket
 
     # post-checkpoint reults
@@ -1105,12 +1111,13 @@ test_rest_endpoints() {
     dl_mainnet 100 ./blocks
     port=$(ephemeral_port)
 
-    idxr_server_start \
+    idxr_server start \
         --blocks-dir ./blocks \
         --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug \
+	--web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
 
