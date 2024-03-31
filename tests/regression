@@ -6,13 +6,11 @@ set -o pipefail
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH= cd "$(dirname "$0")" && pwd)"/..
 IDXR="$SRC"/rust/target/release/mina-indexer
-LEDGER="$SRC"/rust/tests/data/genesis_ledgers/mainnet.json
-STAKING_LEDGERS="$SRC"/rust/tests/data/staking_ledgers
-LOCKED_CSV="$SRC"/rust/data/locked.csv
+LEDGER="$SRC"/data/genesis_ledgers/mainnet.json
+STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
+LOCKED_CSV="$SRC"/data/locked.csv
 BLOCKS_FETCHER="$SRC"/tests/download_blocks
-
-# JSON Schemas
-SUMMARY_SCHEMA="$SRC"/rust/tests/json-schemas/summary.json
+SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
