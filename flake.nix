@@ -107,8 +107,7 @@
                   filter = path: type:
                     (path != ".direnv") && (path != "rust/target");
                 };
-              dataDir = ./rust/data;
-              testsDataDir = ./rust/tests/data;
+              dataDir = ./data;
 
               cargoLock = {
                 lockFile = ./rust/Cargo.lock;
@@ -135,8 +134,8 @@
                 set -ex
                 mkdir -p $out/share/mina-indexer/data
                 cp ${dataDir}/locked.csv $out/share/mina-indexer/data/locked.csv
-                cp -r ${testsDataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
-                cp -r ${testsDataDir}/genesis_ledgers/mainnet.json $out/share/mina-indexer/data
+                cp -r ${dataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
+                cp -r ${dataDir}/genesis_ledgers/mainnet.json $out/share/mina-indexer/data
               '';
               doCheck = true;
               checkPhase = ''
