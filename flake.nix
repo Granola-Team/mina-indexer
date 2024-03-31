@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
   };
@@ -111,13 +111,9 @@
               nativeBuildInputs = buildDependencies;
               buildInputs = runtimeDependencies;
 
-              env =
-                {
-                  LIBCLANG_PATH = "${libclang.lib}/lib";
-                }
-                // (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) {
-                  NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}";
-                });
+              env = {
+                LIBCLANG_PATH = "${libclang.lib}/lib";
+              };
 
               postPatch = ''
                 ln -s "${./rust/Cargo.lock}" Cargo.lock
@@ -172,14 +168,9 @@
           };
 
           devShells.default = mkShell {
-            env =
-              {
-                LIBCLANG_PATH = "${libclang.lib}/lib";
-              }
-              // (lib.optionalAttrs (stdenv.cc.isClang && stdenv.isDarwin) {
-                NIX_LDFLAGS = "-l${stdenv.cc.libcxx.cxxabi.libName}";
-              });
-
+            env = {
+              LIBCLANG_PATH = "${libclang.lib}/lib";
+            };
             buildInputs = developmentDependencies;
             shellHook = ''
               export TMPDIR=/var/tmp
