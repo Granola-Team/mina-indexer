@@ -68,6 +68,15 @@ idxr_server() {
     echo $! > idxr_pid
 }
 
+kill_idxr() {
+    PID="$(cat ./idxr_pid)"
+    echo "Killing PID $PID."
+    kill "$PID"
+    wait "$PID" || true  # Required because the return value of 'wait' is the process's exit status.
+    echo "Killed $PID. Deleting PID file."
+    rm -f ./idxr_pid
+}
+
 idxr_server_start() {
     port=$(ephemeral_port)
     idxr_server start --web-port "$port" "$@"
@@ -79,7 +88,7 @@ idxr_server_sync() {
         --blocks-dir ./blocks \
         --ledgers-dir ./staking-ledgers \
         --log-dir ./logs \
-	"$@"
+        "$@"
 }
 idxr_server_replay() {
     port=$(ephemeral_port)
@@ -88,7 +97,7 @@ idxr_server_replay() {
         --ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-dir ./logs \
-	"$@"
+        "$@"
 }
 
 dl_mainnet() {
@@ -135,8 +144,7 @@ setup() {
 }
 
 teardown() {
-    kill "$(cat idxr_pid)" 2>/dev/null || true
-    rm -f ./idxr_pid
+    kill_idxr || rm -f ./idxr_pid
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     rm -rf ./database
@@ -786,10 +794,7 @@ test_sync() {
         --log-dir ./logs
     wait_for_socket
 
-    # kill running indexer and release db lock
-    kill "$(cat idxr_pid)" 2>/dev/null || true
-    rm -f idxr_pid
-    rm ./database/LOCK
+    kill_idxr
 
     # add more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
@@ -827,10 +832,7 @@ test_replay() {
         --log-dir ./logs
     wait_for_socket
 
-    # kill running indexer and release db lock
-    kill "$(cat idxr_pid)" 2>/dev/null || true
-    rm -f idxr_pid
-    rm ./database/LOCK
+    kill_idxr
 
     # add more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
@@ -1117,7 +1119,7 @@ test_rest_endpoints() {
         --database-dir ./database \
         --log-dir ./logs \
         --log-level debug \
-	--web-port "$port" \
+        --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
 
