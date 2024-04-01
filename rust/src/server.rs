@@ -14,7 +14,6 @@ use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process,
     sync::Arc,
 };
 use tokio::{
@@ -66,8 +65,11 @@ impl MinaIndexer {
             });
             let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
-            unix_socket_server::start(UnixSocketServer::new(state.clone(), domain_socket_path))
-                .await;
+            unix_socket_server::run(
+                UnixSocketServer::new(state.clone(), domain_socket_path),
+                wait_for_signal(),
+            )
+            .await;
 
             // This modifies the state
             if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
@@ -93,19 +95,11 @@ async fn wait_for_signal() {
     tokio::select! {
         _ = term.recv() => {
             trace!("Received SIGTERM");
-            process::exit(100);
         },
         _ = int.recv() => {
             info!("Received SIGINT");
-            process::exit(101);
         },
     }
-}
-
-async fn setup_signal_handler() {
-    tokio::spawn(async move {
-        let _ = wait_for_signal().await;
-    });
 }
 
 pub async fn initialize(
@@ -113,7 +107,6 @@ pub async fn initialize(
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
     info!("Starting mina-indexer server");
-    setup_signal_handler().await;
 
     let db_path = store.db_path.clone();
     let IndexerConfiguration {

@@ -18,6 +18,7 @@ use crate::{
 };
 use anyhow::bail;
 use std::{
+    future::Future,
     io::{self, ErrorKind},
     path::{Path, PathBuf},
     process,
@@ -27,7 +28,6 @@ use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
     sync::RwLock,
-    task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
@@ -45,37 +45,44 @@ impl UnixSocketServer {
     }
 }
 
-/// Start the Unix domain socket server
-pub async fn start(server: UnixSocketServer) -> JoinHandle<()> {
+impl UnixSocketServer {
+    async fn run(&self, listener: &UnixListener) -> io::Result<()> {
+        info!("Accepting inbound Unix domain socket connections");
+        loop {
+            let (socket, _) = listener.accept().await?;
+            let state = self.state.clone();
+            // Spawn green thread ato handle connection
+            tokio::spawn(async move {
+                if let Err(e) = handle_conn(socket, &state).await {
+                    error!("Unable to process Unix domain socket request: {}", e);
+                }
+            });
+        }
+    }
+}
+
+/// Start Unix Domain Socket server
+pub async fn run(server: UnixSocketServer, shutdown: impl Future) {
     let listener = UnixListener::bind(server.unix_socket.clone())
         .or_else(|e| try_remove_old_socket(e, &server.unix_socket))
-        .unwrap_or_else(|e| panic!("Unable to connect to Unix domain socket file: {}", e));
+        .unwrap_or_else(|e| panic!("Unable to bind to Unix domain socket file: {}", e));
+
     info!(
         "Unix domain socket server running on: {:?}",
         server.unix_socket
     );
-    tokio::spawn(run(server, listener))
-}
 
-/// Accept client connections and spawn a green thread to handle the connection
-async fn run(server: UnixSocketServer, listener: UnixListener) {
-    loop {
-        tokio::select! {
-            client = listener.accept() => {
-                match client {
-                    Ok((socket, _)) => {
-                        let state = server.state.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = handle_conn(socket, &state).await {
-                                error!("Unable to process Unix domain socket request: {}", e);
-                            }
-                        });
-                    }
-                    Err(e) => error!("Failed to accept connection: {}", e),
-                }
+    tokio::select! {
+        _ = shutdown => {
+            info!("Received shutdown signal");
+        }
+        res = server.run(&listener) => {
+            if let Err(e) = res {
+                error!("Unable to process Unix domain socket request: {}", e);
             }
         }
     }
+    info!("Unix domain socket server shutdown gracefully");
 }
 
 pub async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli> {
