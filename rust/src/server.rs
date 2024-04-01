@@ -66,7 +66,7 @@ impl MinaIndexer {
             });
             let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
-            unix_socket_server::start(UnixSocketServer::new(state.clone()), &domain_socket_path)
+            unix_socket_server::start(UnixSocketServer::new(state.clone(), domain_socket_path))
                 .await;
 
             // This modifies the state
