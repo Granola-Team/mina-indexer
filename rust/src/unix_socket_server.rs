@@ -18,8 +18,9 @@ use crate::{
 };
 use anyhow::bail;
 use std::{
+    future::Future,
     io::{self, ErrorKind},
-    path::Path,
+    path::{Path, PathBuf},
     process,
     sync::Arc,
 };
@@ -27,54 +28,61 @@ use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
     sync::RwLock,
-    task::JoinHandle,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug)]
 pub struct UnixSocketServer {
     state: Arc<RwLock<IndexerState>>,
+    unix_socket: PathBuf,
 }
 
 impl UnixSocketServer {
     /// Create a new Unix domain socket server
-    pub fn new(state: Arc<RwLock<IndexerState>>) -> Self {
+    pub fn new(state: Arc<RwLock<IndexerState>>, unix_socket: PathBuf) -> Self {
         info!("Creating Unix domain socket server");
-        Self { state }
+        Self { state, unix_socket }
     }
 }
 
-/// Start the Unix domain socket server
-pub async fn start(server: UnixSocketServer, domain_socket_path: &Path) -> JoinHandle<()> {
-    let listener = UnixListener::bind(domain_socket_path)
-        .or_else(|e| try_remove_old_socket(e, domain_socket_path))
-        .unwrap_or_else(|e| panic!("Unable to connect to Unix domain socket file: {}", e));
-    info!(
-        "Unix domain socket server running on: {:?}",
-        domain_socket_path
-    );
-    tokio::spawn(run(server, listener))
+impl UnixSocketServer {
+    async fn run(&self, listener: &UnixListener) -> io::Result<()> {
+        info!("Accepting inbound Unix domain socket connections");
+        loop {
+            let (socket, _) = listener.accept().await?;
+            let state = self.state.clone();
+            // Spawn green thread ato handle connection
+            tokio::spawn(async move {
+                if let Err(e) = handle_conn(socket, &state).await {
+                    error!("Unable to process Unix domain socket request: {}", e);
+                }
+            });
+        }
+    }
 }
 
-/// Accept client connections and spawn a green thread to handle the connection
-async fn run(server: UnixSocketServer, listener: UnixListener) {
-    loop {
-        tokio::select! {
-            client = listener.accept() => {
-                match client {
-                    Ok((socket, _)) => {
-                        let state = server.state.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = handle_conn(socket, &state).await {
-                                error!("Unable to process Unix domain socket request: {}", e);
-                            }
-                        });
-                    }
-                    Err(e) => error!("Failed to accept connection: {}", e),
-                }
+/// Start Unix Domain Socket server
+pub async fn run(server: UnixSocketServer, shutdown: impl Future) {
+    let listener = UnixListener::bind(server.unix_socket.clone())
+        .or_else(|e| try_remove_old_socket(e, &server.unix_socket))
+        .unwrap_or_else(|e| panic!("Unable to bind to Unix domain socket file: {}", e));
+
+    info!(
+        "Unix domain socket server running on: {:?}",
+        server.unix_socket
+    );
+
+    tokio::select! {
+        _ = shutdown => {
+            info!("Received shutdown signal");
+        }
+        res = server.run(&listener) => {
+            if let Err(e) = res {
+                error!("Unable to process Unix domain socket request: {}", e);
             }
         }
     }
+    info!("Unix domain socket server shutdown gracefully");
 }
 
 pub async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli> {
@@ -966,7 +974,7 @@ async fn handle_conn(
             writer
                 .write_all(b"Shutting down the Mina Indexer daemon...")
                 .await?;
-            remove_domain_socket(
+            remove_unix_socket(
                 local_addr
                     .as_pathname()
                     .expect("Unable to locate Unix domain socket file"),
@@ -1207,22 +1215,22 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
     ))
 }
 
-fn try_remove_old_socket(e: io::Error, domain_socket_path: &Path) -> io::Result<UnixListener> {
+fn try_remove_old_socket(e: io::Error, unix_socket_path: &PathBuf) -> io::Result<UnixListener> {
     if e.kind() == ErrorKind::AddrInUse {
         debug!(
             "Unix domain socket: {:?} already in use. Removing old vestige",
-            domain_socket_path
+            unix_socket_path
         );
-        remove_domain_socket(domain_socket_path)?;
-        UnixListener::bind(domain_socket_path)
+        remove_unix_socket(unix_socket_path)?;
+        UnixListener::bind(unix_socket_path)
     } else {
         Err(e)
     }
 }
 
-fn remove_domain_socket(domain_socket_path: &Path) -> io::Result<()> {
-    std::fs::remove_file(domain_socket_path)?;
-    debug!("Unix domain socket removed: {:?}", domain_socket_path);
+fn remove_unix_socket(unix_socket_path: &Path) -> io::Result<()> {
+    std::fs::remove_file(unix_socket_path)?;
+    debug!("Unix domain socket removed: {:?}", unix_socket_path);
     Ok(())
 }
 

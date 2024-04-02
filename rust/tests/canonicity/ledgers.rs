@@ -18,7 +18,7 @@ async fn test() -> anyhow::Result<()> {
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)?;
     let mut state = IndexerState::new(genesis_ledger.clone().into(), indexer_store.clone(), 10)?;
 
-    state.add_blocks(&mut block_parser).await?;
+    state.add_blocks(&mut block_parser)?;
 
     let network = "mainnet";
     let indexer_store = state.indexer_store.as_ref().unwrap();

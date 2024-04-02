@@ -24,7 +24,7 @@ async fn test() {
     )
     .unwrap();
 
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     println!("CANONICAL ROOT: {:?}", state.canonical_root_block());
     println!("BEST TIP:       {:?}", state.best_tip_block());
