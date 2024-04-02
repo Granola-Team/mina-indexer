@@ -1081,19 +1081,39 @@ async fn handle_conn(
             Transactions::StateHash {
                 state_hash,
                 verbose,
-                // TODO: why is this unused?
-                path: _,
+                path,
             } => {
                 info!("Received tx-state-hash command for {state_hash}");
                 if !block::is_valid_state_hash(&state_hash) {
                     invalid_state_hash(&state_hash)
                 } else {
-                    Some(db.get_commands_in_block(&state_hash.into()).map(|cmds| {
-                        if verbose {
+                    let block_hash = BlockHash(state_hash.to_owned());
+                    Some(db.get_commands_in_block(&block_hash).map(|cmds| {
+                        let transaction_str = if verbose {
                             format_vec_jq_compatible(&cmds)
                         } else {
                             let cmds: Vec<Command> = cmds.into_iter().map(Command::from).collect();
                             format_vec_jq_compatible(&cmds)
+                        };
+                        if path.is_none() {
+                            debug!("Writing transactions for {state_hash} to stdout");
+                            transaction_str
+                        } else {
+                            let path = path.unwrap();
+                            if !path.is_dir() {
+                                debug!(
+                                    "Writing transactions for {state_hash} to {}",
+                                    path.display()
+                                );
+
+                                std::fs::write(&path, transaction_str).unwrap();
+                                format!(
+                                    "Transactions for {state_hash} written to {}",
+                                    path.display()
+                                )
+                            } else {
+                                file_must_not_be_a_directory(&path).unwrap()
+                            }
                         }
                     })?)
                 }
