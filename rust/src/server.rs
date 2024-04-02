@@ -59,7 +59,7 @@ impl MinaIndexer {
         let block_watch_dir = config.block_watch_dir.clone();
         let ledger_watch_dir = config.ledger_watch_dir.clone();
         let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(config, store).await.unwrap_or_else(|e| {
+            let state = initialize(config, store).unwrap_or_else(|e| {
                 error!("Error in server initialization: {}", e);
                 std::process::exit(1);
             });
@@ -102,7 +102,7 @@ async fn wait_for_signal() {
     }
 }
 
-pub async fn initialize(
+pub fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
@@ -177,9 +177,7 @@ pub async fn initialize(
                     }
                 };
                 info!("Initializing indexer state");
-                state
-                    .initialize_with_canonical_chain_discovery(&mut block_parser)
-                    .await?;
+                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
@@ -188,7 +186,7 @@ pub async fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser).await?;
+                    state.add_blocks(&mut block_parser)?;
                 }
             }
             InitializationMode::Sync => {
@@ -198,7 +196,7 @@ pub async fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser).await?;
+                    state.add_blocks(&mut block_parser)?;
                 }
             }
         }

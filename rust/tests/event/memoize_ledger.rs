@@ -23,7 +23,7 @@ async fn test() -> anyhow::Result<()> {
     let mut state = IndexerState::new(genesis_ledger.clone().into(), indexer_store.clone(), 10)?;
 
     // add all blocks & get store handle
-    state.add_blocks(&mut block_parser).await?;
+    state.add_blocks(&mut block_parser)?;
     let network = "mainnet".to_string();
     let indexer_store = state.indexer_store.as_ref().unwrap();
 

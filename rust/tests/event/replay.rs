@@ -19,7 +19,7 @@ async fn test() {
         IndexerState::new(genesis_ledger.clone().into(), indexer_store.clone(), 10).unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     // fresh state to replay events on top of
     let config = IndexerStateConfig::new(genesis_ledger.into(), indexer_store, 10);

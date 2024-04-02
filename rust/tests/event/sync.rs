@@ -19,7 +19,7 @@ async fn test() {
         IndexerState::new(genesis_root.clone().into(), indexer_store.clone(), 10).unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).await.unwrap();
+    state.add_blocks(&mut block_parser).unwrap();
 
     // fresh state to sync events with no genesis events
     let config = IndexerStateConfig::new(genesis_root.into(), indexer_store, 10);
