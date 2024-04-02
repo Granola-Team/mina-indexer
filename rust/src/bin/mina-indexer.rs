@@ -71,11 +71,11 @@ pub struct ServerArgs {
 
     /// Directory containing the staking ledgers
     #[arg(long)]
-    ledgers_dir: Option<PathBuf>,
+    staking_ledgers_dir: Option<PathBuf>,
 
     /// Directory to watch for new staking ledgers
     #[arg(long)]
-    ledger_watch_dir: Option<PathBuf>,
+    staking_ledger_watch_dir: Option<PathBuf>,
 
     /// Path to directory for speedb
     #[arg(long, default_value = "/var/log/mina-indexer/database")]
@@ -283,9 +283,9 @@ pub fn process_indexer_configuration(
     let block_watch_dir = args
         .block_watch_dir
         .unwrap_or(blocks_dir.clone().unwrap_or(DEFAULT_BLOCKS_DIR.into()));
-    let ledgers_dir = args.ledgers_dir;
-    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(
-        ledgers_dir
+    let staking_ledgers_dir = args.staking_ledgers_dir;
+    let staking_ledger_watch_dir = args.staking_ledger_watch_dir.unwrap_or(
+        staking_ledgers_dir
             .clone()
             .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into()),
     );
@@ -305,7 +305,7 @@ pub fn process_indexer_configuration(
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
     fs::create_dir_all(block_watch_dir.clone())?;
-    fs::create_dir_all(ledger_watch_dir.clone())?;
+    fs::create_dir_all(staking_ledger_watch_dir.clone())?;
 
     info!("Parsing ledger file at {}", ledger.display());
     match ledger::genesis::parse_file(&ledger) {
@@ -322,8 +322,8 @@ pub fn process_indexer_configuration(
                 genesis_hash,
                 blocks_dir,
                 block_watch_dir,
-                ledgers_dir,
-                ledger_watch_dir,
+                staking_ledgers_dir,
+                staking_ledger_watch_dir,
                 prune_interval,
                 canonical_threshold,
                 canonical_update_threshold,
@@ -341,8 +341,8 @@ struct ServerArgsJson {
     genesis_hash: String,
     blocks_dir: Option<String>,
     block_watch_dir: String,
-    ledgers_dir: Option<String>,
-    ledger_watch_dir: String,
+    staking_ledgers_dir: Option<String>,
+    staking_ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
     log_level: String,
@@ -373,9 +373,9 @@ impl From<ServerArgs> for ServerArgsJson {
                 .unwrap_or(DEFAULT_BLOCKS_DIR.into())
                 .display()
                 .to_string(),
-            ledgers_dir: value.ledgers_dir.map(|d| d.display().to_string()),
-            ledger_watch_dir: value
-                .ledger_watch_dir
+            staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.display().to_string()),
+            staking_ledger_watch_dir: value
+                .staking_ledger_watch_dir
                 .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into())
                 .display()
                 .to_string(),
@@ -404,8 +404,8 @@ impl From<ServerArgsJson> for ServerArgs {
             genesis_hash: value.genesis_hash,
             blocks_dir: value.blocks_dir.map(|d| d.into()),
             block_watch_dir: Some(value.block_watch_dir.into()),
-            ledgers_dir: value.ledgers_dir.map(|d| d.into()),
-            ledger_watch_dir: Some(value.ledger_watch_dir.into()),
+            staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
+            staking_ledger_watch_dir: Some(value.staking_ledger_watch_dir.into()),
             database_dir: value.database_dir.into(),
             log_dir: value.log_dir.into(),
             log_level: LevelFilter::from_str(&value.log_level).expect("log level"),

@@ -29,8 +29,8 @@ pub struct IndexerConfiguration {
     pub genesis_hash: BlockHash,
     pub blocks_dir: Option<PathBuf>,
     pub block_watch_dir: PathBuf,
-    pub ledgers_dir: Option<PathBuf>,
-    pub ledger_watch_dir: PathBuf,
+    pub staking_ledgers_dir: Option<PathBuf>,
+    pub staking_ledger_watch_dir: PathBuf,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
@@ -57,7 +57,7 @@ impl MinaIndexer {
         domain_socket_path: PathBuf,
     ) -> anyhow::Result<Self> {
         let block_watch_dir = config.block_watch_dir.clone();
-        let ledger_watch_dir = config.ledger_watch_dir.clone();
+        let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
         let _witness_join_handle = tokio::spawn(async move {
             let state = initialize(config, store).unwrap_or_else(|e| {
                 error!("Error in server initialization: {}", e);
@@ -74,7 +74,7 @@ impl MinaIndexer {
                 .await;
             });
             // This modifies the state
-            if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
+            if let Err(e) = run(block_watch_dir, staking_ledger_watch_dir, state).await {
                 error!("Error in server run: {}", e);
                 std::process::exit(1);
             }
@@ -115,7 +115,7 @@ pub fn initialize(
         genesis_ledger,
         genesis_hash,
         blocks_dir,
-        ledgers_dir,
+        staking_ledgers_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -128,7 +128,7 @@ pub fn initialize(
     blocks_dir
         .iter()
         .for_each(|d| fs::create_dir_all(d.clone()).expect("blocks dir"));
-    ledgers_dir
+    staking_ledgers_dir
         .iter()
         .for_each(|d| fs::create_dir_all(d.clone()).expect("ledgers dir"));
 
@@ -146,7 +146,7 @@ pub fn initialize(
 
     let mut state = match initialization_mode {
         InitializationMode::New => {
-            log_dirs_msg(blocks_dir.as_ref(), ledgers_dir.as_ref());
+            log_dirs_msg(blocks_dir.as_ref(), staking_ledgers_dir.as_ref());
             IndexerState::new_from_config(state_config)?
         }
         InitializationMode::Replay => {
@@ -208,7 +208,7 @@ pub fn initialize(
         }
     }
 
-    ledgers_dir
+    staking_ledgers_dir
         .as_ref()
         .iter()
         .for_each(|d| state.add_startup_staking_ledgers_to_store(d).unwrap());
@@ -238,7 +238,7 @@ fn matches_event_kind(kind: EventKind) -> bool {
 #[instrument(skip_all)]
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
-    ledger_watch_dir: impl AsRef<Path>,
+    staking_ledger_watch_dir: impl AsRef<Path>,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     // setup fs-based precomputed block & staking ledger watchers
@@ -261,10 +261,13 @@ pub async fn run(
         "Watching for new blocks in directory: {}",
         block_watch_dir.as_ref().display()
     );
-    watcher.watch(ledger_watch_dir.as_ref(), RecursiveMode::NonRecursive)?;
+    watcher.watch(
+        staking_ledger_watch_dir.as_ref(),
+        RecursiveMode::NonRecursive,
+    )?;
     info!(
         "Watching for staking ledgers in directory: {}",
-        ledger_watch_dir.as_ref().display()
+        staking_ledger_watch_dir.as_ref().display()
     );
 
     // watch for precomputed blocks & staking ledgers
@@ -329,22 +332,22 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
     }
 }
 
-fn log_dirs_msg(blocks_dir: Option<&PathBuf>, ledgers_dir: Option<&PathBuf>) {
-    if let (Some(blocks_dir), Some(ledgers_dir)) = (blocks_dir, ledgers_dir) {
+fn log_dirs_msg(blocks_dir: Option<&PathBuf>, staking_ledgers_dir: Option<&PathBuf>) {
+    if let (Some(blocks_dir), Some(staking_ledgers_dir)) = (blocks_dir, staking_ledgers_dir) {
         info!(
             "Initializing indexer state from blocks in {} and staking ledgers in {}",
             blocks_dir.display(),
-            ledgers_dir.display(),
+            staking_ledgers_dir.display(),
         );
     } else if let Some(blocks_dir) = blocks_dir.as_ref() {
         info!(
             "Initializing indexer state from blocks in {}",
             blocks_dir.display(),
         );
-    } else if let Some(ledgers_dir) = ledgers_dir.as_ref() {
+    } else if let Some(staking_ledgers_dir) = staking_ledgers_dir.as_ref() {
         info!(
             "Initializing indexer state from staking ledgers in {}",
-            ledgers_dir.display(),
+            staking_ledgers_dir.display(),
         );
     }
 }
