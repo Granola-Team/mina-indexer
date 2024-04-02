@@ -29,7 +29,7 @@ pub struct IndexerConfiguration {
     pub genesis_hash: BlockHash,
     pub blocks_dir: Option<PathBuf>,
     pub block_watch_dir: PathBuf,
-    pub ledgers_dir: PathBuf,
+    pub ledgers_dir: Option<PathBuf>,
     pub ledger_watch_dir: PathBuf,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
@@ -128,7 +128,9 @@ pub fn initialize(
     blocks_dir
         .iter()
         .for_each(|d| fs::create_dir_all(d.clone()).expect("blocks dir"));
-    fs::create_dir_all(ledgers_dir.clone())?;
+    ledgers_dir
+        .iter()
+        .for_each(|d| fs::create_dir_all(d.clone()).expect("ledgers dir"));
 
     let state_config = IndexerStateConfig {
         genesis_hash,
@@ -144,15 +146,7 @@ pub fn initialize(
 
     let mut state = match initialization_mode {
         InitializationMode::New => {
-            let blocks = blocks_dir
-                .as_ref()
-                .map(|d| format!("blocks in {} and ", d.display()))
-                .unwrap_or_default();
-            info!(
-                "Initializing indexer state from {}staking ledgers in {}",
-                blocks,
-                ledgers_dir.display(),
-            );
+            log_dirs_msg(blocks_dir.as_ref(), ledgers_dir.as_ref());
             IndexerState::new_from_config(state_config)?
         }
         InitializationMode::Replay => {
@@ -214,7 +208,10 @@ pub fn initialize(
         }
     }
 
-    state.add_startup_staking_ledgers_to_store(&ledgers_dir)?;
+    ledgers_dir
+        .as_ref()
+        .iter()
+        .for_each(|d| state.add_startup_staking_ledgers_to_store(d).unwrap());
     Ok(state)
 }
 
@@ -329,5 +326,25 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                 }
             }
         }
+    }
+}
+
+fn log_dirs_msg(blocks_dir: Option<&PathBuf>, ledgers_dir: Option<&PathBuf>) {
+    if let (Some(blocks_dir), Some(ledgers_dir)) = (blocks_dir, ledgers_dir) {
+        info!(
+            "Initializing indexer state from blocks in {} and staking ledgers in {}",
+            blocks_dir.display(),
+            ledgers_dir.display(),
+        );
+    } else if let Some(blocks_dir) = blocks_dir.as_ref() {
+        info!(
+            "Initializing indexer state from blocks in {}",
+            blocks_dir.display(),
+        );
+    } else if let Some(ledgers_dir) = ledgers_dir.as_ref() {
+        info!(
+            "Initializing indexer state from staking ledgers in {}",
+            ledgers_dir.display(),
+        );
     }
 }

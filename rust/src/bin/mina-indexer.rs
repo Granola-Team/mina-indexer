@@ -70,10 +70,10 @@ pub struct ServerArgs {
     block_watch_dir: Option<PathBuf>,
 
     /// Directory containing the staking ledgers
-    #[arg(long, default_value = "/share/mina-indexer/staking-ledgers")]
-    ledgers_dir: PathBuf,
+    #[arg(long)]
+    ledgers_dir: Option<PathBuf>,
 
-    /// Directory to watch for new staking ledgers [default: ledgers_dir]
+    /// Directory to watch for new staking ledgers
     #[arg(long)]
     ledger_watch_dir: Option<PathBuf>,
 
@@ -171,6 +171,9 @@ fn release_profile() -> ReleaseProfile {
     }
 }
 
+pub const DEFAULT_BLOCKS_DIR: &str = "/share/mina-indexer/blocks";
+pub const DEFAULT_STAKING_LEDGERS_DIR: &str = "/share/mina-indexer/staking-ledgers";
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -231,7 +234,8 @@ pub async fn main() -> anyhow::Result<()> {
             .await
             .unwrap();
             indexer.await_loop().await;
-            info!("Cleaningly shutting down primary rocksdb");
+
+            info!("Cleanly shutting down primary rocksdb");
             drop(db);
             Ok(())
         }
@@ -276,13 +280,15 @@ pub fn process_indexer_configuration(
     let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
-    let block_watch_dir = args.block_watch_dir.unwrap_or(
-        blocks_dir
-            .clone()
-            .unwrap_or("/share/mina-indexer/blocks".into()),
-    );
+    let block_watch_dir = args
+        .block_watch_dir
+        .unwrap_or(blocks_dir.clone().unwrap_or(DEFAULT_BLOCKS_DIR.into()));
     let ledgers_dir = args.ledgers_dir;
-    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(ledgers_dir.clone());
+    let ledger_watch_dir = args.ledger_watch_dir.unwrap_or(
+        ledgers_dir
+            .clone()
+            .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into()),
+    );
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -335,7 +341,7 @@ struct ServerArgsJson {
     genesis_hash: String,
     blocks_dir: Option<String>,
     block_watch_dir: String,
-    ledgers_dir: String,
+    ledgers_dir: Option<String>,
     ledger_watch_dir: String,
     database_dir: String,
     log_dir: String,
@@ -364,13 +370,13 @@ impl From<ServerArgs> for ServerArgsJson {
             blocks_dir: value.blocks_dir.map(|d| d.display().to_string()),
             block_watch_dir: value
                 .block_watch_dir
-                .unwrap_or("/share/mina-indexer/blocks".into())
+                .unwrap_or(DEFAULT_BLOCKS_DIR.into())
                 .display()
                 .to_string(),
-            ledgers_dir: value.ledgers_dir.display().to_string(),
+            ledgers_dir: value.ledgers_dir.map(|d| d.display().to_string()),
             ledger_watch_dir: value
                 .ledger_watch_dir
-                .unwrap_or(value.ledgers_dir)
+                .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into())
                 .display()
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),
@@ -398,7 +404,7 @@ impl From<ServerArgsJson> for ServerArgs {
             genesis_hash: value.genesis_hash,
             blocks_dir: value.blocks_dir.map(|d| d.into()),
             block_watch_dir: Some(value.block_watch_dir.into()),
-            ledgers_dir: value.ledgers_dir.into(),
+            ledgers_dir: value.ledgers_dir.map(|d| d.into()),
             ledger_watch_dir: Some(value.ledger_watch_dir.into()),
             database_dir: value.database_dir.into(),
             log_dir: value.log_dir.into(),
