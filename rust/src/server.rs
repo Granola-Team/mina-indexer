@@ -10,7 +10,7 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{self, UnixSocketServer},
 };
-use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -65,12 +65,14 @@ impl MinaIndexer {
             });
             let state = Arc::new(RwLock::new(state));
             // Needs read-only state for summary
-            unix_socket_server::run(
-                UnixSocketServer::new(state.clone(), domain_socket_path),
-                wait_for_signal(),
-            )
-            .await;
-
+            let uds_state = state.clone();
+            tokio::spawn(async move {
+                unix_socket_server::run(
+                    UnixSocketServer::new(uds_state, domain_socket_path),
+                    wait_for_signal(),
+                )
+                .await;
+            });
             // This modifies the state
             if let Err(e) = run(block_watch_dir, ledger_watch_dir, state).await {
                 error!("Error in server run: {}", e);
@@ -90,8 +92,8 @@ impl MinaIndexer {
 
 async fn wait_for_signal() {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut term = signal(SignalKind::terminate()).expect("failed to register signal handler");
-    let mut int = signal(SignalKind::interrupt()).expect("failed to register signal handler");
+    let mut term = signal(SignalKind::terminate()).expect("sigterm signal handler registered");
+    let mut int = signal(SignalKind::interrupt()).expect("sigitm signal handler registered");
     tokio::select! {
         _ = term.recv() => {
             trace!("Received SIGTERM");
@@ -269,52 +271,63 @@ pub async fn run(
     );
 
     // watch for precomputed blocks & staking ledgers
-    while let Some(res) = rx.recv().await {
-        match res {
-            Ok(event) => {
-                trace!("Event: {:?}", event.clone());
-                if matches_event_kind(event.kind) {
-                    for path in event.paths {
-                        if block::is_valid_block_file(&path) {
-                            debug!("Valid precomputed block file: {}", path.display());
-                            match PrecomputedBlock::parse_file(&path) {
-                                Ok(block) => {
-                                    let mut state = state.write().await;
-                                    match state.block_pipeline(&block) {
-                                        Ok(_) => info!("Added block {}", block.summary()),
-                                        Err(e) => error!("Error adding block: {}", e),
-                                    }
-                                }
-                                Err(e) => error!("Error parsing precomputed block: {}", e),
-                            }
-                        } else if staking::is_valid_ledger_file(&path) {
-                            let state = state.write().await;
-                            if let Some(store) = state.indexer_store.as_ref() {
-                                match StakingLedger::parse_file(&path) {
-                                    Ok(staking_ledger) => {
-                                        let ledger_summary = staking_ledger.summary();
-                                        match store.add_staking_ledger(staking_ledger) {
-                                            Ok(_) => {
-                                                info!("Added staking ledger {}", ledger_summary);
-                                            }
-                                            Err(e) => error!("Error adding staking ledger: {}", e),
-                                        }
-                                    }
-                                    Err(e) => {
-                                        error!("Error parsing staking ledger: {}", e)
-                                    }
-                                }
-                            } else {
-                                error!("Indexer store unavailable");
-                            }
-                        }
-                    }
-                }
+    loop {
+        tokio::select! {
+            _ = wait_for_signal() => {
+                info!("Ingestion shutdown signal received");
+                break;
             }
-            Err(e) => {
-                error!("Block watcher error: {e:?}");
+            Some(res) = rx.recv() => {
+                match res {
+                    Ok(event) => process_event(event, &state).await,
+                    Err(e) => error!("Ingestion watcher error: {:?}", e),
+                }
             }
         }
     }
+    info!("Ingestion cleanly shutdown");
     Ok(())
+}
+
+async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
+    trace!("Event: {:?}", event.clone());
+    if matches_event_kind(event.kind) {
+        for path in event.paths {
+            if block::is_valid_block_file(&path) {
+                debug!("Valid precomputed block file: {}", path.display());
+                match PrecomputedBlock::parse_file(&path) {
+                    Ok(block) => {
+                        // Acquire write lock
+                        let mut state = state.write().await;
+                        match state.block_pipeline(&block) {
+                            Ok(_) => info!("Added block {}", block.summary()),
+                            Err(e) => error!("Error adding block: {}", e),
+                        }
+                    }
+                    Err(e) => error!("Error parsing precomputed block: {}", e),
+                }
+            } else if staking::is_valid_ledger_file(&path) {
+                // Acquire write lock
+                let state = state.write().await;
+                if let Some(store) = state.indexer_store.as_ref() {
+                    match StakingLedger::parse_file(&path) {
+                        Ok(staking_ledger) => {
+                            let ledger_summary = staking_ledger.summary();
+                            match store.add_staking_ledger(staking_ledger) {
+                                Ok(_) => {
+                                    info!("Added staking ledger {}", ledger_summary);
+                                }
+                                Err(e) => error!("Error adding staking ledger: {}", e),
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error parsing staking ledger: {}", e)
+                        }
+                    }
+                } else {
+                    error!("Indexer store unavailable");
+                }
+            }
+        }
+    }
 }

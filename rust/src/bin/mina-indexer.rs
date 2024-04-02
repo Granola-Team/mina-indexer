@@ -223,10 +223,16 @@ pub async fn main() -> anyhow::Result<()> {
             let config = process_indexer_configuration(args, mode)?;
             let db = Arc::new(IndexerStore::new(&database_dir)?);
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
-            mina_indexer::web::start_web_server(db, (web_hostname, web_port), locked_supply_csv)
-                .await
-                .unwrap();
+            mina_indexer::web::start_web_server(
+                db.clone(),
+                (web_hostname, web_port),
+                locked_supply_csv,
+            )
+            .await
+            .unwrap();
             indexer.await_loop().await;
+            info!("Cleaningly shutting down primary rocksdb");
+            drop(db);
             Ok(())
         }
     }
