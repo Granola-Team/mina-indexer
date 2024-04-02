@@ -1,8 +1,5 @@
 use crate::{
-    ledger::{
-        staking::{AggregatedEpochStakeDelegations, StakingAccount},
-        store::LedgerStore,
-    },
+    ledger::{staking::StakingAccount, store::LedgerStore},
     store::IndexerStore,
 };
 use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
@@ -38,8 +35,8 @@ impl StakesQueryRoot {
             None => return Ok(None),
         };
 
-        let AggregatedEpochStakeDelegations { delegations, .. } =
-            staking_ledger.aggregate_delegations()?;
+        // Delegations will be present if the staking ledger is
+        let delegations = db.get_delegations_epoch("mainnet", epoch)?.unwrap();
 
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let accounts = staking_ledger
@@ -47,9 +44,10 @@ impl StakesQueryRoot {
             .into_values()
             .map(|account| {
                 let pk = account.pk.clone();
-                let result = delegations.get(&pk).unwrap();
+                let result = delegations.delegations.get(&pk).unwrap();
                 let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
                 let count_delegates = result.count_delegates.unwrap_or_default();
+
                 let mut decimal = Decimal::from(total_delegated_nanomina);
                 decimal.set_scale(9).ok();
                 let total_delegated = decimal.to_f64().unwrap_or_default();
