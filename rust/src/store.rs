@@ -807,13 +807,12 @@ impl LedgerStore for IndexerStore {
     }
 
     fn add_staking_ledger(&self, staking_ledger: StakingLedger) -> anyhow::Result<()> {
+        let network = staking_ledger.network.clone();
+        let epoch = staking_ledger.epoch;
         trace!("Adding staking ledger {}", staking_ledger.summary());
 
-        // add ledger to db at ledger hash
-        let key = format!(
-            "{}-{}",
-            staking_ledger.network, staking_ledger.ledger_hash.0
-        );
+        // add ledger at ledger hash
+        let key = format!("{}-{}", network, staking_ledger.ledger_hash.0);
         let key = key.as_bytes();
         let value = serde_json::to_vec(&staking_ledger)?;
         let is_new = self
@@ -823,10 +822,7 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
         // add epoch index
-        let key = format!(
-            "staking-{}-{}",
-            staking_ledger.network, staking_ledger.epoch
-        );
+        let key = format!("staking-{}-{}", network, epoch);
         let value = staking_ledger.ledger_hash.0.as_bytes();
         self.database
             .put_cf(self.ledgers_cf(), key.as_bytes(), value)?;
@@ -835,12 +831,35 @@ impl LedgerStore for IndexerStore {
             // add new ledger event
             self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
                 DbStakingLedgerEvent::NewStakingLedger {
-                    epoch: staking_ledger.epoch,
-                    network: staking_ledger.network,
-                    ledger_hash: staking_ledger.ledger_hash,
+                    epoch,
+                    network: network.clone(),
+                    ledger_hash: staking_ledger.ledger_hash.clone(),
                 },
             )))?;
         }
+
+        // aggregate staking delegations
+        trace!(
+            "Aggregating staking delegations {} epoch {}",
+            network,
+            epoch
+        );
+        let key = format!("delegations-{}-{}", network, epoch);
+        let aggregated_delegations = staking_ledger.aggregate_delegations()?;
+        self.database.put_cf(
+            self.ledgers_cf(),
+            key.as_bytes(),
+            serde_json::to_vec(&aggregated_delegations)?,
+        )?;
+
+        // add new aggregated delegation event
+        self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
+            DbStakingLedgerEvent::AggregateDelegations {
+                network: network.to_string(),
+                epoch: staking_ledger.epoch,
+            },
+        )))?;
+
         Ok(())
     }
 
@@ -854,26 +873,9 @@ impl LedgerStore for IndexerStore {
         let key = format!("delegations-{}-{}", network, epoch);
         if let Some(bytes) = self
             .database
-            .get_pinned_cf(self.ledgers_cf(), key.clone())?
+            .get_pinned_cf(self.ledgers_cf(), key.as_bytes())?
         {
             return Ok(Some(serde_json::from_slice(&bytes)?));
-        } else if let Some(staking_ledger) = self.get_staking_ledger_at_epoch(network, epoch)? {
-            trace!("Memoizing staking delegations {} epoch {}", network, epoch);
-            let aggregated_delegations = staking_ledger.aggregate_delegations()?;
-            self.database.put_cf(
-                self.ledgers_cf(),
-                key,
-                serde_json::to_vec(&aggregated_delegations)?,
-            )?;
-
-            // add new aggregated delegation event
-            self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
-                DbStakingLedgerEvent::AggregateDelegations {
-                    network: network.to_string(),
-                    epoch: staking_ledger.epoch,
-                },
-            )))?;
-            return Ok(Some(aggregated_delegations));
         }
 
         Ok(None)
