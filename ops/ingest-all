@@ -3,12 +3,16 @@
 set -eux
 
 VER="$(git rev-parse --short HEAD)"
+src="$(pwd)"
 
 ./rust/target/release/mina-indexer \
   server start \
-    --block-startup-dir /mnt/mina-log-storage/mina_network_block_data \
-    --database-dir /mnt/mina-log-storage/"$VER"-database \
+    --log-dir /mnt/mina-log-storage/"$VER"-logs \
     --log-level DEBUG \
     --log-level-file DEBUG \
-    --log-dir /mnt/mina-log-storage/"$VER"-logs \
+    --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
+    --database-dir /mnt/mina-log-storage/"$VER"-database \
+    --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
+    --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
+    --locked-supply-csv "$src"/data/locked.csv \
     --ledger-cadence 5000
