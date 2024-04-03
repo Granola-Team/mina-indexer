@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 #[derive(InputObject)]
 pub struct StakeQueryInput {
-    epoch: u32,
+    epoch: Option<u32>,
+    #[graphql(name = "public_key")]
+    public_key: Option<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -36,8 +38,8 @@ impl StakeQueryRoot {
 
         let limit = limit.unwrap_or(100);
         let epoch = match query {
-            Some(query) => query.epoch,
-            None => return Ok(None),
+            Some(ref query) => query.epoch.unwrap_or(0),
+            None => 0,
         };
 
         let staking_ledger = match db.get_staking_ledger_at_epoch("mainnet", epoch)? {
@@ -52,6 +54,14 @@ impl StakeQueryRoot {
         let mut accounts: Vec<LedgerAccountWithMeta> = staking_ledger
             .staking_ledger
             .into_values()
+            .filter(|account| {
+                if let Some(ref query) = query {
+                    if let Some(public_key) = &query.public_key {
+                        return *public_key == account.pk.0;
+                    }
+                }
+                true
+            })
             .map(|account| {
                 let pk = account.pk.clone();
                 let result = delegations.delegations.get(&pk).unwrap();
