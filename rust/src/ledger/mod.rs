@@ -23,7 +23,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::debug;
+use log::debug;
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {

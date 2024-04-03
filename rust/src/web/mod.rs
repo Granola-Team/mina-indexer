@@ -12,7 +12,7 @@ use actix_cors::Cors;
 use actix_web::{guard, middleware, web, web::Data, App, HttpServer};
 use async_graphql_actix_web::GraphQL;
 use std::{net, path::Path, sync::Arc};
-use tracing::warn;
+use log::warn;
 
 fn load_locked_balances<P: AsRef<Path>>(path: Option<P>) -> LockedBalances {
     match LockedBalances::from_csv(path) {

@@ -23,7 +23,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use tracing::{error, trace, warn};
+use log::{error, trace, warn};
 
 #[derive(Debug)]
 pub struct IndexerStore {

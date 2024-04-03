@@ -12,7 +12,7 @@ use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
 use chrono::DateTime;
 use serde::Serialize;
 use std::sync::Arc;
-use tracing::debug;
+use log::debug;
 
 /// Returns blockchain summary information about the current chain
 #[derive(Serialize, Debug)]

@@ -21,7 +21,7 @@ use tokio::{
     sync::{mpsc, RwLock},
     task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument, trace};
+use log::{debug, error, info, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
@@ -235,7 +235,6 @@ fn matches_event_kind(kind: EventKind) -> bool {
     )
 }
 
-#[instrument(skip_all)]
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     staking_ledger_watch_dir: impl AsRef<Path>,

@@ -29,7 +29,7 @@ use tokio::{
     net::{UnixListener, UnixStream},
     sync::RwLock,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 #[derive(Debug)]
 pub struct UnixSocketServer {
@@ -109,7 +109,6 @@ pub async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli>
     bail!("Unexpected Unix domain socket read error");
 }
 
-#[instrument(skip_all)]
 async fn handle_conn(
     conn: UnixStream,
     state: &Arc<RwLock<IndexerState>>,
@@ -1239,32 +1238,32 @@ mod helpers {
 
     pub fn invalid_public_key(input: &str) -> Option<String> {
         let msg = format!("Invalid public key: {input}");
-        warn!(msg);
+        error!("Invalid public key: {}", input);
         Some(msg)
     }
 
     pub fn invalid_tx_hash(input: &str) -> Option<String> {
         let msg = format!("Invalid transaction hash: {input}");
-        warn!(msg);
+        error!("Invalid transaction hash: {}", input);
         Some(msg)
     }
 
     pub fn invalid_state_hash(input: &str) -> Option<String> {
         let msg = format!("Invalid state hash: {input}");
-        warn!(msg);
+        error!("Invalid state hash: {}", input);
         Some(msg)
     }
 
     pub fn block_missing_from_db(state_hash: &str) -> String {
         let msg = format!("Block missing from store: {state_hash}");
-        error!(msg);
+        error!("Block missing from store: {}", state_hash);
         msg
     }
 
     /// Always returns `Some`, safe to `.unwrap()`
     pub fn best_tip_missing_from_db() -> Option<String> {
         let msg = "Best tip block missing from store";
-        error!(msg);
+        error!("Best tip block missing from store");
         Some(msg.to_string())
     }
 

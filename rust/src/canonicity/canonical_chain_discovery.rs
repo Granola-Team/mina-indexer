@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-use tracing::{debug, info};
+use log::{debug, info};
 
 /// Separate blocks into 3 length-sorted lists:
 /// - deep canonical blocks (canonical up to root)

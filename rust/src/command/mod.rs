@@ -10,7 +10,7 @@ use crate::{
 };
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
-use tracing::trace;
+use log::trace;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 pub enum CommandType {

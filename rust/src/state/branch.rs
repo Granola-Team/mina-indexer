@@ -11,7 +11,7 @@ use id_tree::{
     Tree,
 };
 use std::collections::HashMap;
-use tracing::{instrument, trace};
+use log::{trace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Branch {
@@ -94,7 +94,6 @@ impl Branch {
         best_tip_id
     }
 
-    #[instrument(skip(self))]
     /// Returns the node id of the canonical root, if it exists
     pub fn canonical_root_id(&self) -> Option<NodeId> {
         for (n, ancestor_id) in self
