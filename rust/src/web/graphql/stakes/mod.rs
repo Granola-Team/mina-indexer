@@ -57,13 +57,10 @@ impl StakeQueryRoot {
             .filter(|account| {
                 if let Some(ref query) = query {
                     if let Some(public_key) = &query.public_key {
-                        *public_key == account.pk.0
-                    } else {
-                        true
+                        return *public_key == account.pk.0;
                     }
-                } else {
-                    true
                 }
+                true
             })
             .map(|account| {
                 let pk = account.pk.clone();
