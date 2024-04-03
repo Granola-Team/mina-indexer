@@ -9,6 +9,7 @@ use std::sync::Arc;
 #[derive(InputObject)]
 pub struct StakeQueryInput {
     epoch: Option<u32>,
+    #[graphql(name = "public_key")]
     public_key: Option<String>,
 }
 
