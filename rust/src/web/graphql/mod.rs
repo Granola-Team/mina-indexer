@@ -8,7 +8,7 @@ use async_graphql::{http::GraphiQLSource, EmptyMutation, EmptySubscription, Merg
 use std::sync::Arc;
 
 #[derive(MergedObject, Default)]
-pub struct Root(blocks::BlocksQueryRoot, stakes::StakesQueryRoot);
+pub struct Root(blocks::BlocksQueryRoot, stakes::StakeQueryRoot);
 
 /// Build the schema for the block endpoints
 pub fn build_schema(store: Arc<IndexerStore>) -> Schema<Root, EmptyMutation, EmptySubscription> {
