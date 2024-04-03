@@ -4,8 +4,19 @@ set -eux
 
 VER="$(git rev-parse --short HEAD)"
 src="$(pwd)"
+socket="$src"/mina-indexer.sock
+
+wait_for_socket() {
+    while true; do
+        if [ -S "$socket" ]; then
+            return
+        fi
+        sleep 30
+    done
+}
 
 ./rust/target/release/mina-indexer \
+  --domain-socket-path "$socket" \
   server start \
     --log-dir /mnt/mina-log-storage/"$VER"-logs \
     --log-level DEBUG \
@@ -15,4 +26,12 @@ src="$(pwd)"
     --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
     --locked-supply-csv "$src"/data/locked.csv \
-    --ledger-cadence 5000
+    --ledger-cadence 5000 \
+    > /mnt/mina-log-storage/"$VER"-logs/stdout \
+    2> /mnt/mina-log-storage/"$VER"-logs/stderr \
+    &
+
+echo $! > PID
+wait_for_socket
+./rust/target/release/mina-indexer shutdown
+wait "$(cat PID)"
