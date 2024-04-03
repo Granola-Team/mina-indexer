@@ -2,29 +2,39 @@ use crate::{
     ledger::{staking::StakingAccount, store::LedgerStore},
     store::IndexerStore,
 };
-use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
+use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
 
 #[derive(InputObject)]
-pub struct StakesQueryInput {
+pub struct StakeQueryInput {
     epoch: u32,
 }
 
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum StakeSortByInput {
+    BalanceDesc,
+}
+
 #[derive(Default)]
-pub struct StakesQueryRoot;
+pub struct StakeQueryRoot;
 
 #[Object]
-impl StakesQueryRoot {
+impl StakeQueryRoot {
+    // Cache for 1 day
+    #[graphql(cache_control(max_age = 86400))]
     async fn stakes<'ctx>(
         &self,
         ctx: &Context<'ctx>,
-        query: Option<StakesQueryInput>,
+        query: Option<StakeQueryInput>,
+        sort_by: Option<StakeSortByInput>,
+        limit: Option<usize>,
     ) -> Result<Option<Vec<LedgerAccountWithMeta>>> {
         let db = ctx
             .data::<Arc<IndexerStore>>()
             .expect("db to be in context");
 
+        let limit = limit.unwrap_or(100);
         let epoch = match query {
             Some(query) => query.epoch,
             None => return Ok(None),
@@ -39,7 +49,7 @@ impl StakesQueryRoot {
         let delegations = db.get_delegations_epoch("mainnet", epoch)?.unwrap();
 
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
-        let accounts = staking_ledger
+        let mut accounts: Vec<LedgerAccountWithMeta> = staking_ledger
             .staking_ledger
             .into_values()
             .map(|account| {
@@ -65,6 +75,16 @@ impl StakesQueryRoot {
             })
             .collect();
 
+        if let Some(sort_by) = sort_by {
+            match sort_by {
+                StakeSortByInput::BalanceDesc => {
+                    accounts.sort_by(|a, b| {
+                        b.account.balance_nanomina.cmp(&a.account.balance_nanomina)
+                    });
+                }
+            }
+        }
+        accounts.truncate(limit);
         Ok(Some(accounts))
     }
 }
