@@ -1,6 +1,7 @@
 steps:
 
 - label: "Developer Environment Build and Test"
+  key: build
   command: |
     echo HOME=$HOME
     echo PATH=$PATH
@@ -9,6 +10,7 @@ steps:
     nix develop --command just test
 
 - label: "Nix-Build and Create OCI Image"
+  key: image
   if: build.branch == "main"
   command: |
     nix build .#dockerImage
@@ -20,3 +22,11 @@ steps:
   agents:
     docker: true
     deployment: production
+
+- label: "Tier 2 Testing"
+  agents:
+    mina-log-storage: true
+  depends_on:
+  command: |
+    nix develop --command just build
+    ops/ingest-all
