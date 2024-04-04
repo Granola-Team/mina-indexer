@@ -6,8 +6,9 @@ use mina_indexer::{
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
+use log::{error, info, trace, LevelFilter};
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
-use log::{error, info, LevelFilter};
+use stderrlog::{ColorChoice};
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
@@ -201,8 +202,12 @@ pub async fn main() -> anyhow::Result<()> {
             }
 
             // initialize logging
-            // let log_level = args.log_level;
-            // TODO: init logging
+            stderrlog::new()
+                .module(module_path!())
+                .color(ColorChoice::Never)
+                .verbosity(args.log_level)
+                .init()
+                .unwrap();
 
             // log server config
             let args_json: ServerArgsJson = args.clone().into();
@@ -211,10 +216,16 @@ pub async fn main() -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&args_json)?
             );
 
-            // start the servers
+            trace!("Building an indexer configuration");
             let config = process_indexer_configuration(args, mode)?;
+
+            trace!("Creating a new IndexerStore in {}", database_dir.display());
             let db = Arc::new(IndexerStore::new(&database_dir)?);
+
+            trace!("Creating an Indexer listening on {}", domain_socket_path.display());
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
+
+            trace!("Starting the HTTP server listening on {}:{}", web_hostname, web_port);
             mina_indexer::web::start_web_server(
                 db.clone(),
                 (web_hostname, web_port),
@@ -262,7 +273,11 @@ pub fn process_indexer_configuration(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
+
+    trace!("Creating directories if missing: {}", block_watch_dir.display());
     fs::create_dir_all(block_watch_dir.clone())?;
+
+    trace!("Creating directories if missing: {}", staking_ledger_watch_dir.display());
     fs::create_dir_all(staking_ledger_watch_dir.clone())?;
 
     info!("Parsing ledger file at {}", ledger.display());
