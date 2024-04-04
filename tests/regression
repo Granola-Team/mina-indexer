@@ -1608,7 +1608,9 @@ test_clean_shutdown() {
     PID="$(cat ./idxr_pid)"
     kill "$PID"
     ps -p "$PID" || true
-    wait "$PID"  # hangs!
+    wait "$PID"  # Sometimes hangs!
+    ps -p "$PID" || true
+
     teardown
 }
 
