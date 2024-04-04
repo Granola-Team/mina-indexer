@@ -109,6 +109,7 @@ pub async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli>
     bail!("Unexpected Unix domain socket read error");
 }
 
+#[allow(clippy::just_underscores_and_digits)]
 async fn handle_conn(
     conn: UnixStream,
     state: &Arc<RwLock<IndexerState>>,
