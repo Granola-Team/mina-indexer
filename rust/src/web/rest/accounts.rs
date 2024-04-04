@@ -5,8 +5,8 @@ use actix_web::{
     web::{self, Data},
     HttpResponse,
 };
+use log::debug;
 use std::sync::Arc;
-use tracing::debug;
 
 #[get("/accounts/{public_key}")]
 pub async fn get_account(

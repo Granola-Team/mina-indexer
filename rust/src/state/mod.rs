@@ -29,13 +29,13 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use id_tree::NodeId;
+use log::{debug, error, info, trace};
 use std::{
     collections::HashMap,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, trace};
 
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known

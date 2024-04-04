@@ -1,0 +1,8 @@
+RUST_BACKTRACE=1 \
+  ./rust/target/release/mina-indexer \
+    --domain-socket-path ./mina-indexer.sock \
+    server start \
+      --log-level TRACE \
+      --blocks-dir ./blocks \
+      --staking-ledgers-dir ./staking-ledgers \
+      --database-dir ./database

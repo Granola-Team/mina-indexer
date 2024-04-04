@@ -18,12 +18,12 @@ use crate::{
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
 use anyhow::anyhow;
+use log::{error, trace, warn};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use tracing::{error, trace, warn};
 
 #[derive(Debug)]
 pub struct IndexerStore {
