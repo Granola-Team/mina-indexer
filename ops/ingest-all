@@ -15,6 +15,8 @@ wait_for_socket() {
     done
 }
 
+mkdir -p /mnt/mina-log-storage/"$VER"-logs
+
 ./rust/target/release/mina-indexer \
   --domain-socket-path "$socket" \
   server start \
@@ -30,8 +32,7 @@ wait_for_socket() {
     > /mnt/mina-log-storage/"$VER"-logs/stdout \
     2> /mnt/mina-log-storage/"$VER"-logs/stderr \
     &
-
 echo $! > PID
 wait_for_socket
-./rust/target/release/mina-indexer shutdown
+./rust/target/release/mina-indexer --domain-socket-path "$socket" shutdown
 wait "$(cat PID)"
