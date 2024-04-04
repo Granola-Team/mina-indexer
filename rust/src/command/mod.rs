@@ -8,9 +8,9 @@ use crate::{
     ledger::{account::Amount, public_key::PublicKey},
     protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
+use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
-use tracing::trace;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 pub enum CommandType {

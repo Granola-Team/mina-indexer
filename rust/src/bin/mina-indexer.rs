@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
     client,
     constants::*,
@@ -7,8 +8,7 @@ use mina_indexer::{
     store::IndexerStore,
 };
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
-use tracing::{error, info, instrument};
-use tracing_subscriber::{filter::LevelFilter, prelude::*};
+use stderrlog::ColorChoice;
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
@@ -81,17 +81,9 @@ pub struct ServerArgs {
     #[arg(long, default_value = "/var/log/mina-indexer/database")]
     pub database_dir: PathBuf,
 
-    /// Path to directory for logs
-    #[arg(long, default_value = "/var/log/mina-indexer")]
-    pub log_dir: PathBuf,
-
     /// Max stdout log level
-    #[arg(long, default_value_t = LevelFilter::INFO)]
+    #[arg(long, default_value_t = LevelFilter::Warn)]
     pub log_level: LevelFilter,
-
-    /// Max file log level
-    #[arg(long, default_value_t = LevelFilter::DEBUG)]
-    pub log_level_file: LevelFilter,
 
     /// Number of blocks to add to the canonical chain before persisting a
     /// ledger snapshot
@@ -210,10 +202,12 @@ pub async fn main() -> anyhow::Result<()> {
             }
 
             // initialize logging
-            let log_dir = args.log_dir.clone();
-            let log_level_file = args.log_level_file;
-            let log_level = args.log_level;
-            init_tracing_logger(log_dir.clone(), log_level_file, log_level).await?;
+            stderrlog::new()
+                .module(module_path!())
+                .color(ColorChoice::Never)
+                .verbosity(args.log_level)
+                .init()
+                .unwrap();
 
             // log server config
             let args_json: ServerArgsJson = args.clone().into();
@@ -222,10 +216,23 @@ pub async fn main() -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&args_json)?
             );
 
-            // start the servers
+            trace!("Building an indexer configuration");
             let config = process_indexer_configuration(args, mode)?;
+
+            trace!("Creating a new IndexerStore in {}", database_dir.display());
             let db = Arc::new(IndexerStore::new(&database_dir)?);
+
+            trace!(
+                "Creating an Indexer listening on {}",
+                domain_socket_path.display()
+            );
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
+
+            trace!(
+                "Starting the HTTP server listening on {}:{}",
+                web_hostname,
+                web_port
+            );
             mina_indexer::web::start_web_server(
                 db.clone(),
                 (web_hostname, web_port),
@@ -242,37 +249,6 @@ pub async fn main() -> anyhow::Result<()> {
     }
 }
 
-async fn init_tracing_logger(
-    log_dir: PathBuf,
-    log_level_file: LevelFilter,
-    log_level_stdout: LevelFilter,
-) -> anyhow::Result<()> {
-    let mut log_number = 0;
-    let mut log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-    fs::create_dir_all(log_dir.clone()).expect("log_dir should be created");
-
-    while tokio::fs::metadata(&log_file).await.is_ok() {
-        log_number += 1;
-        log_file = format!("{}/mina-indexer-{}.log", log_dir.display(), log_number);
-    }
-
-    // setup tracing
-    let log_file = PathBuf::from(log_file);
-    if let Some(parent) = log_file.parent() {
-        fs::create_dir_all(parent).expect("log_file parent should be created");
-    }
-
-    let log_file = std::fs::File::create(log_file)?;
-    let file_layer = tracing_subscriber::fmt::layer().with_writer(log_file);
-    let stdout_layer = tracing_subscriber::fmt::layer();
-    tracing_subscriber::registry()
-        .with(stdout_layer.with_filter(log_level_stdout))
-        .with(file_layer.with_filter(log_level_file))
-        .init();
-    Ok(())
-}
-
-#[instrument(skip_all)]
 pub fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
@@ -304,7 +280,17 @@ pub fn process_indexer_configuration(
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
+
+    trace!(
+        "Creating block watch directories if missing: {}",
+        block_watch_dir.display()
+    );
     fs::create_dir_all(block_watch_dir.clone())?;
+
+    trace!(
+        "Creating ledger watch directories if missing: {}",
+        staking_ledger_watch_dir.display()
+    );
     fs::create_dir_all(staking_ledger_watch_dir.clone())?;
 
     info!("Parsing ledger file at {}", ledger.display());
@@ -344,9 +330,7 @@ struct ServerArgsJson {
     staking_ledgers_dir: Option<String>,
     staking_ledger_watch_dir: String,
     database_dir: String,
-    log_dir: String,
     log_level: String,
-    log_level_file: String,
     ledger_cadence: u32,
     reporting_freq: u32,
     prune_interval: u32,
@@ -380,9 +364,7 @@ impl From<ServerArgs> for ServerArgsJson {
                 .display()
                 .to_string(),
             database_dir: value.database_dir.display().to_string(),
-            log_dir: value.log_dir.display().to_string(),
             log_level: value.log_level.to_string(),
-            log_level_file: value.log_level_file.to_string(),
             ledger_cadence: value.ledger_cadence,
             reporting_freq: value.reporting_freq,
             prune_interval: value.prune_interval,
@@ -407,9 +389,7 @@ impl From<ServerArgsJson> for ServerArgs {
             staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
             staking_ledger_watch_dir: Some(value.staking_ledger_watch_dir.into()),
             database_dir: value.database_dir.into(),
-            log_dir: value.log_dir.into(),
             log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
-            log_level_file: LevelFilter::from_str(&value.log_level_file).expect("log level file"),
             ledger_cadence: value.ledger_cadence,
             reporting_freq: value.reporting_freq,
             prune_interval: value.prune_interval,

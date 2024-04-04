@@ -9,7 +9,6 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
 };
-use tracing::instrument;
 
 pub const BIN_CODE_CONFIG: config::Configuration = config::standard();
 pub const BUFFER_SIZE: usize = 1024;
@@ -339,7 +338,7 @@ pub enum InternalCommands {
         public_key: String,
     },
 }
-#[instrument]
+
 pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Result<()> {
     let conn = match UnixStream::connect(domain_socket_path).await {
         Ok(conn) => conn,

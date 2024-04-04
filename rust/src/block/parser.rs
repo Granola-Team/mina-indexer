@@ -4,11 +4,11 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use glob::glob;
+use log::info;
 use std::{
     path::{Path, PathBuf},
     vec::IntoIter,
 };
-use tracing::info;
 
 /// Splits block paths into three collections:
 /// - _deep canonical_ (chain of canonical blocks with at least
