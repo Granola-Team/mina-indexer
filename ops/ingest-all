@@ -3,6 +3,7 @@
 set -eux
 
 VER="$(git rev-parse --short HEAD)"
+LOG=/mnt/mina-log-storage/"$VER"-log
 src="$(pwd)"
 socket="$src"/mina-indexer.sock
 
@@ -15,24 +16,23 @@ wait_for_socket() {
     done
 }
 
-mkdir -p /mnt/mina-log-storage/"$VER"-logs
+
+mkdir -p "$LOG"
 
 ./rust/target/release/mina-indexer \
   --domain-socket-path "$socket" \
   server start \
-    --log-dir /mnt/mina-log-storage/"$VER"-logs \
     --log-level DEBUG \
-    --log-level-file DEBUG \
     --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
     --database-dir /mnt/mina-log-storage/"$VER"-database \
     --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
     --locked-supply-csv "$src"/data/locked.csv \
     --ledger-cadence 5000 \
-    > /mnt/mina-log-storage/"$VER"-logs/stdout \
-    2> /mnt/mina-log-storage/"$VER"-logs/stderr \
+    > "$LOG"/out \
+    2> "$LOG"/err \
     &
-echo $! > PID
+PID=$!
 wait_for_socket
 ./rust/target/release/mina-indexer --domain-socket-path "$socket" shutdown
-wait "$(cat PID)"
+wait "$PID"
