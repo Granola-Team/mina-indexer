@@ -10,6 +10,7 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{self, UnixSocketServer},
 };
+use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     fs,
@@ -21,7 +22,6 @@ use tokio::{
     sync::{mpsc, RwLock},
     task::JoinHandle,
 };
-use log::{debug, error, info, trace};
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {

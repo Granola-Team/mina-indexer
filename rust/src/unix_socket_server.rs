@@ -17,6 +17,7 @@ use crate::{
     state::{summary::SummaryShort, IndexerState},
 };
 use anyhow::bail;
+use log::{debug, error, info, trace, warn};
 use std::{
     future::Future,
     io::{self, ErrorKind},
@@ -29,7 +30,6 @@ use tokio::{
     net::{UnixListener, UnixStream},
     sync::RwLock,
 };
-use log::{debug, error, info, trace, warn};
 
 #[derive(Debug)]
 pub struct UnixSocketServer {

@@ -21,9 +21,9 @@ use crate::{
         version_bytes,
     },
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use log::debug;
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {

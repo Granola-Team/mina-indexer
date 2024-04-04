@@ -1,12 +1,12 @@
 use crate::block::{
     extract_block_height, extract_block_height_or_max, extract_state_hash, previous_state_hash::*,
 };
+use log::{debug, info};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
     time::Instant,
 };
-use log::{debug, info};
 
 /// Separate blocks into 3 length-sorted lists:
 /// - deep canonical blocks (canonical up to root)

@@ -10,8 +10,8 @@ use id_tree::{
     RemoveBehavior::{DropChildren, OrphanChildren},
     Tree,
 };
+use log::trace;
 use std::collections::HashMap;
-use log::{trace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Branch {

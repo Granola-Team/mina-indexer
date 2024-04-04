@@ -10,9 +10,9 @@ use crate::{
 };
 use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
 use chrono::DateTime;
+use log::debug;
 use serde::Serialize;
 use std::sync::Arc;
-use log::debug;
 
 /// Returns blockchain summary information about the current chain
 #[derive(Serialize, Debug)]

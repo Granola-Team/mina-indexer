@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
     client,
     constants::*,
@@ -6,9 +7,8 @@ use mina_indexer::{
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
-use log::{error, info, trace, LevelFilter};
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
-use stderrlog::{ColorChoice};
+use stderrlog::ColorChoice;
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
@@ -222,10 +222,17 @@ pub async fn main() -> anyhow::Result<()> {
             trace!("Creating a new IndexerStore in {}", database_dir.display());
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
-            trace!("Creating an Indexer listening on {}", domain_socket_path.display());
+            trace!(
+                "Creating an Indexer listening on {}",
+                domain_socket_path.display()
+            );
             let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
 
-            trace!("Starting the HTTP server listening on {}:{}", web_hostname, web_port);
+            trace!(
+                "Starting the HTTP server listening on {}:{}",
+                web_hostname,
+                web_port
+            );
             mina_indexer::web::start_web_server(
                 db.clone(),
                 (web_hostname, web_port),
@@ -274,10 +281,16 @@ pub fn process_indexer_configuration(
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
 
-    trace!("Creating directories if missing: {}", block_watch_dir.display());
+    trace!(
+        "Creating block watch directories if missing: {}",
+        block_watch_dir.display()
+    );
     fs::create_dir_all(block_watch_dir.clone())?;
 
-    trace!("Creating directories if missing: {}", staking_ledger_watch_dir.display());
+    trace!(
+        "Creating ledger watch directories if missing: {}",
+        staking_ledger_watch_dir.display()
+    );
     fs::create_dir_all(staking_ledger_watch_dir.clone())?;
 
     info!("Parsing ledger file at {}", ledger.display());
