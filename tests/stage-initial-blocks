@@ -2,7 +2,7 @@
 #
 # Populates the "$4" directory with precomputed block records from the Mina
 # "$3" network, beginning with blocks of height "$1" and ending with blocks of
-# height "$2" (less than 1000).
+# height "$2" (less than 120).
 
 set -eu
 

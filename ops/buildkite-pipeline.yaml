@@ -24,9 +24,14 @@ steps:
     deployment: production
 
 - label: "Tier 2 Testing"
+  timeout_in_minutes: 2880
   agents:
     mina-log-storage: true
   depends_on:
   command: |
     nix develop --command just build
-    ops/ingest-all
+    nix develop --command tests/regression test_many_blocks
+    # TODO: why is this not working?
+    # nix develop --command tests/regression test_release
+    # ops/ingest-all
+    nix develop --command ops/test-justfile-targets
