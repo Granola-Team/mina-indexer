@@ -23,7 +23,7 @@ steps:
     docker: true
 
 - label: "Tier 2 Testing"
-  if: build.branch = "robinbb-add-tier2-testing"
+  if: build.branch == "robinbb-add-tier2-testing"
   timeout_in_minutes: 2880
   depends_on:
     build
