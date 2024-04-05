@@ -6,7 +6,7 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
-        signed::{SignedCommand, SignedCommandWithData, TXN_HASH_START},
+        signed::{SignedCommand, SignedCommandWithData},
         store::CommandStore,
         UserCommandWithStatus,
     },
@@ -259,7 +259,6 @@ impl BlockStore for IndexerStore {
             }
             None => error!("Block missing from store: {}", state_hash.0),
         }
-
         Ok(())
     }
 
@@ -495,7 +494,6 @@ impl CanonicityStore for IndexerStore {
                 state_hash: state_hash.0.clone().into(),
             },
         )))?;
-
         Ok(())
     }
 
@@ -662,7 +660,6 @@ impl LedgerStore for IndexerStore {
                 None => error!("Block missing from store {}", state_hash.0),
             }
         }
-
         Ok(())
     }
 
@@ -746,7 +743,6 @@ impl LedgerStore for IndexerStore {
             }
             return Ok(Some(ledger));
         }
-
         Ok(None)
     }
 
@@ -775,7 +771,6 @@ impl LedgerStore for IndexerStore {
                 return Ok(Some(ledger));
             }
         }
-
         Ok(None)
     }
 
@@ -812,7 +807,6 @@ impl LedgerStore for IndexerStore {
         {
             return ledger_result;
         }
-
         Ok(None)
     }
 
@@ -828,7 +822,6 @@ impl LedgerStore for IndexerStore {
         if let Some(bytes) = self.database.get_pinned_cf(self.ledgers_cf(), key)? {
             return Ok(Some(serde_json::from_slice::<StakingLedger>(&bytes)?));
         }
-
         Ok(None)
     }
 
@@ -885,7 +878,6 @@ impl LedgerStore for IndexerStore {
                 epoch: staking_ledger.epoch,
             },
         )))?;
-
         Ok(())
     }
 
@@ -903,7 +895,6 @@ impl LedgerStore for IndexerStore {
         {
             return Ok(Some(serde_json::from_slice(&bytes)?));
         }
-
         Ok(None)
     }
 }
@@ -915,7 +906,7 @@ impl EventStore for IndexerStore {
         let seq_num = self.get_next_seq_num()?;
         trace!("Adding event {seq_num}: {:?}", event);
 
-        if matches!(event, IndexerEvent::WitnessTree(_)) {
+        if let IndexerEvent::WitnessTree(_) = event {
             return Ok(seq_num);
         }
 
@@ -1009,20 +1000,50 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
 }
 
 /// [DBIterator] for user commands (transactions)
-pub fn user_commands_iterator(db: &Arc<IndexerStore>) -> DBIterator<'_> {
+pub fn user_commands_iterator(network: String, db: &Arc<IndexerStore>) -> DBIterator<'_> {
     db.database
-        .prefix_iterator_cf(db.commands_cf(), TXN_HASH_START.as_bytes())
+        .prefix_iterator_cf(db.commands_cf(), network.as_bytes())
 }
 
-/// Transaction hash (starts with [TXN_HASH_START]) from `entry` in
-/// [user_commands_iterator]
-pub fn user_commands_iterator_txn_hash(entry: KvIterator) -> String {
-    String::from_utf8(entry.to_owned().unwrap().0.to_vec()).unwrap()
+/// Network from `entry` in [user_commands_iterator]
+pub fn user_commands_iterator_network(entry: KvIterator) -> anyhow::Result<String> {
+    let bytes = entry.to_owned().unwrap().0;
+    String::from_utf8(bytes[.."mainnet".as_bytes().len()].to_vec())
+        .map_err(|e| anyhow!("Error reading network name: {}", e))
+}
+
+/// Global slot number from `entry` in [user_commands_iterator]
+pub fn user_commands_iterator_global_slot(network: &str, entry: KvIterator) -> u32 {
+    let bytes = entry.to_owned().unwrap().0;
+    let byte = |n: usize| bytes[network.as_bytes().len() + n];
+    u32::from_be_bytes([byte(0), byte(1), byte(2), byte(3)])
+}
+
+/// Transaction hash from `entry` in [user_commands_iterator]
+pub fn user_commands_iterator_txn_hash(network: &str, entry: KvIterator) -> anyhow::Result<String> {
+    String::from_utf8(entry.to_owned().unwrap().0[network.as_bytes().len() + 4..].to_vec())
+        .map_err(|e| anyhow!("Error reading txn hash: {}", e))
 }
 
 /// [SignedCommandWithData] from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_signed_command(entry: KvIterator) -> SignedCommandWithData {
-    serde_json::from_slice::<SignedCommandWithData>(&entry.to_owned().unwrap().1).unwrap()
+pub fn user_commands_iterator_signed_command(
+    entry: KvIterator,
+) -> anyhow::Result<SignedCommandWithData> {
+    Ok(serde_json::from_slice::<SignedCommandWithData>(
+        &entry.to_owned().unwrap().1,
+    )?)
+}
+
+fn global_slot_prefix(network: &str, global_slot: u32) -> Vec<u8> {
+    let mut bytes = network.as_bytes().to_vec();
+    bytes.append(&mut global_slot.to_be_bytes().to_vec());
+    bytes
+}
+
+fn global_slot_prefix_key(network: &str, global_slot: u32, txn_hash: &str) -> Vec<u8> {
+    let mut bytes = global_slot_prefix(network, global_slot);
+    bytes.append(&mut txn_hash.as_bytes().to_vec());
+    bytes
 }
 
 impl CommandStore for IndexerStore {
@@ -1032,20 +1053,33 @@ impl CommandStore for IndexerStore {
         let commands_cf = self.commands_cf();
         let user_commands = block.commands();
 
-        // add: key (txn hash) -> value (signed command with data)
+        // add: key `{network}-{global_slot}-{txn_hash}` -> signed command with data
+        // global_slot is written in big endian so lexicographic ordering corresponds to
+        // slot ordering
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
-            let hash = signed.hash_signed_command()?;
-            trace!("Adding user command hash {} {}", hash, block.summary());
+            let txn_hash = signed.hash_signed_command()?;
+            trace!("Adding user command hash {} {}", txn_hash, block.summary());
 
-            let key = hash.as_bytes();
+            let key = global_slot_prefix_key(
+                &block.network,
+                block.global_slot_since_genesis(),
+                &txn_hash,
+            );
             let value = serde_json::to_vec(&SignedCommandWithData::from(
                 command,
                 &block.state_hash,
                 block.blockchain_length,
                 block.timestamp(),
+                block.global_slot_since_genesis(),
             ))?;
             self.database.put_cf(commands_cf, key, value)?;
+
+            // add: key (txn hash) -> value (network, global slot) so we can
+            // reconstruct the key
+            let key = txn_hash.as_bytes();
+            let value = global_slot_prefix(&block.network, block.global_slot_since_genesis());
+            self.database.put_cf(self.commands_cf(), key, value)?;
         }
 
         // add: key (state hash) -> user commands with status
@@ -1068,6 +1102,7 @@ impl CommandStore for IndexerStore {
                         &block.state_hash,
                         block.blockchain_length,
                         block.timestamp(),
+                        block.global_slot_since_genesis(),
                     )
                 })
                 .collect();
@@ -1084,7 +1119,6 @@ impl CommandStore for IndexerStore {
                 self.database.put_cf(commands_cf, key, next_n.as_bytes())?;
             }
         }
-
         Ok(())
     }
 
@@ -1093,14 +1127,16 @@ impl CommandStore for IndexerStore {
         command_hash: &str,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting user command by hash {}", command_hash);
-
-        let key = command_hash.as_bytes();
-        let commands_cf = self.commands_cf();
-
-        if let Some(commands_bytes) = self.database.get_pinned_cf(commands_cf, key)? {
-            return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+        if let Some(prefix_bytes) = self
+            .database
+            .get_pinned_cf(self.commands_cf(), command_hash.as_bytes())?
+        {
+            let mut key = prefix_bytes.to_vec();
+            key.append(&mut command_hash.as_bytes().to_vec());
+            if let Some(commands_bytes) = self.database.get_pinned_cf(self.commands_cf(), key)? {
+                return Ok(Some(serde_json::from_slice(&commands_bytes)?));
+            }
         }
-
         Ok(None)
     }
 
@@ -1115,7 +1151,6 @@ impl CommandStore for IndexerStore {
         if let Some(commands_bytes) = self.database.get_pinned_cf(self.commands_cf(), key)? {
             return Ok(serde_json::from_slice(&commands_bytes)?);
         }
-
         Ok(vec![])
     }
 
@@ -1148,7 +1183,6 @@ impl CommandStore for IndexerStore {
                 }
             }
         }
-
         Ok(commands)
     }
 
@@ -1194,7 +1228,6 @@ impl CommandStore for IndexerStore {
                 .filter(|c| state_hashes.contains(&c.state_hash))
                 .collect());
         }
-
         Ok(vec![])
     }
 
@@ -1261,7 +1294,6 @@ impl CommandStore for IndexerStore {
             self.database
                 .put_cf(self.commands_cf(), key.as_bytes(), next_n.as_bytes())?;
         }
-
         Ok(())
     }
 
@@ -1282,7 +1314,6 @@ impl CommandStore for IndexerStore {
                 .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, state_hash))
                 .collect());
         }
-
         Ok(vec![])
     }
 
@@ -1315,7 +1346,6 @@ impl CommandStore for IndexerStore {
                 }
             }
         }
-
         Ok(internal_cmds)
     }
 
@@ -1375,7 +1405,6 @@ impl SnarkStore for IndexerStore {
                 self.database.put_cf(&snarks_cf, key, value)?;
             }
         }
-
         Ok(())
     }
 
