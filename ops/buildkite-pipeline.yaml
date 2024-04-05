@@ -21,13 +21,12 @@ steps:
     docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
   agents:
     docker: true
-    deployment: production
 
 - label: "Tier 2 Testing"
+  if: build.branch = "robinbb-add-tier2-testing"
   timeout_in_minutes: 2880
-  agents:
-    mina-log-storage: true
   depends_on:
+    build
   command: |
     nix develop --command just build
     nix develop --command tests/regression test_many_blocks
@@ -35,3 +34,5 @@ steps:
     # nix develop --command tests/regression test_release
     # ops/ingest-all
     nix develop --command ops/test-justfile-targets
+  agents:
+    mina-log-storage: true
