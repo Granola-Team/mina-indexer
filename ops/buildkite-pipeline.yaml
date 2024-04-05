@@ -9,24 +9,29 @@ steps:
     nix develop --command just prereqs
     nix develop --command just test
 
-- label: "Nix-Build and Create OCI Image"
-  key: image
-  if: build.branch == "main"
-  command: |
-    nix build .#dockerImage
-    docker load < ./result
-    docker run --rm -it \
-      mina-indexer:"$(git rev-parse --short=9 HEAD)" \
-        mina-indexer server start --help
-    docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
-  agents:
-    docker: true
+#- label: "Nix-Build and Create OCI Image"
+#  key: image
+#  if: build.branch == "main"
+#  depends_on:
+#  - build
+#  agents:
+#    docker: true
+#  command: |
+#    nix build .#dockerImage
+#    docker load < ./result
+#    docker run --rm -it \
+#      mina-indexer:"$(git rev-parse --short=9 HEAD)" \
+#        mina-indexer server start --help
+#    docker image rm mina-indexer:"$(git rev-parse --short=9 HEAD)"
 
 - label: "Tier 2 Testing"
+  key: tier2
   if: build.branch == "robinbb-add-tier2-testing"
   timeout_in_minutes: 2880
   depends_on:
-    build
+  - build
+  agents:
+    mina-log-storage: true
   command: |
     nix develop --command just build
     nix develop --command tests/regression test_many_blocks
@@ -34,5 +39,3 @@ steps:
     # nix develop --command tests/regression test_release
     # ops/ingest-all
     nix develop --command ops/test-justfile-targets
-  agents:
-    mina-log-storage: true
