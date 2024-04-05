@@ -25,6 +25,7 @@ pub struct SignedCommandWithData {
     pub status: CommandStatusData,
     pub tx_hash: String,
     pub blockchain_length: u32,
+    pub date_time: u64,
 }
 
 impl SignedCommand {
@@ -114,6 +115,8 @@ impl SignedCommand {
         self.payload().common.clone().inner().inner().inner()
     }
 
+    /// This returns a user command (transaction) hash that starts with
+    /// [TXN_HASH_START]
     pub fn hash_signed_command(&self) -> anyhow::Result<String> {
         let mut binprot_bytes = Vec::new();
         bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
@@ -151,6 +154,7 @@ impl SignedCommandWithData {
         user_cmd: &UserCommandWithStatus,
         state_hash: &str,
         blockchain_length: u32,
+        date_time: u64,
     ) -> Self {
         let command = SignedCommand::from(user_cmd.clone());
         Self {
@@ -161,6 +165,7 @@ impl SignedCommandWithData {
                 .expect("valid transaction hash"),
             command,
             blockchain_length,
+            date_time,
         }
     }
 
@@ -168,7 +173,14 @@ impl SignedCommandWithData {
         block
             .commands()
             .iter()
-            .map(|cmd| Self::from(cmd, &block.state_hash, block.blockchain_length))
+            .map(|cmd| {
+                Self::from(
+                    cmd,
+                    &block.state_hash,
+                    block.blockchain_length,
+                    block.timestamp(),
+                )
+            })
             .collect()
     }
 }
@@ -466,8 +478,10 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     Value::Object(payload_obj)
 }
 
+pub const TXN_HASH_START: &str = "Ckp";
+
 pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with("Ckp") && input.len() == 53
+    input.starts_with(TXN_HASH_START) && input.len() == 53
 }
 
 #[cfg(test)]
