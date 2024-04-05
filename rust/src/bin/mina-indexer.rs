@@ -8,7 +8,7 @@ use mina_indexer::{
     store::IndexerStore,
 };
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
-use stderrlog::ColorChoice;
+use stderrlog::{ColorChoice, Timestamp};
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
@@ -205,6 +205,7 @@ pub async fn main() -> anyhow::Result<()> {
             stderrlog::new()
                 .module(module_path!())
                 .color(ColorChoice::Never)
+                .timestamp(Timestamp::Microsecond)
                 .verbosity(args.log_level)
                 .init()
                 .unwrap();
