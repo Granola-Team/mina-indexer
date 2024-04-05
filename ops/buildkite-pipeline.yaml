@@ -11,7 +11,7 @@ steps:
 
 - label: "Tier 2 Testing"
   key: tier2
-  if: build.branch == "robinbb-add-tier2-testing" && build.env('GRANOLA_NIGHTLY_BUILD') == ""
+  if: build.branch == "robinbb-add-tier2-testing" && ! build.env('GRANOLA_NIGHTLY_BUILD') == "true"
   timeout_in_minutes: 2880
   depends_on:
   - build
