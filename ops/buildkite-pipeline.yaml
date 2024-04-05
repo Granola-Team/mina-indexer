@@ -11,7 +11,7 @@ steps:
 
 - label: "Tier 2 Testing"
   key: tier2
-  if: build.branch == "robinbb-add-tier2-testing" && ! build.env('GRANOLA_NIGHTLY_BUILD') == "true"
+  if: build.branch == "main" && build.env('GRANOLA_NIGHTLY_BUILD') == "true"
   timeout_in_minutes: 2880
   depends_on:
   - build
@@ -23,7 +23,7 @@ steps:
     nix develop --command tests/regression test_many_blocks
     # TODO: why is this not working?
     # nix develop --command tests/regression test_release
-    # ops/ingest-all
+    ops/ingest-all
     nix develop --command ops/test-justfile-targets
 
 - label: "Create OCI Image"
