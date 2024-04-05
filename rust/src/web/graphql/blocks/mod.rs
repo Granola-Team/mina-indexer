@@ -1,11 +1,9 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
+    ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
-    protocol::serialization_types::{
-        common::{Base58EncodableVersionedType, HashV1},
-        version_bytes,
-    },
+    protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
     store::IndexerStore,
 };
 use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
@@ -194,16 +192,6 @@ struct CreatorAccount {
 fn millis_to_date_string(millis: i64) -> String {
     let date_time = DateTime::from_timestamp_millis(millis).unwrap();
     date_time.to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
-pub struct LedgerHash(pub String);
-
-impl LedgerHash {
-    pub fn from_hashv1(hashv1: HashV1) -> Self {
-        let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
-            hashv1.into();
-        Self(versioned.to_base58_string().unwrap())
-    }
 }
 
 impl From<PrecomputedBlock> for Block {
