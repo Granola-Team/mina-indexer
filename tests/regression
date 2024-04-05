@@ -9,7 +9,6 @@ IDXR="$SRC"/rust/target/release/mina-indexer
 LEDGER="$SRC"/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 LOCKED_CSV="$SRC"/data/locked.csv
-BLOCKS_FETCHER="$SRC"/tests/download_blocks
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
@@ -57,6 +56,15 @@ wait_for_socket() {
     done
 }
 
+wait_forever_for_socket() {
+    while true; do
+        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+            return
+        fi
+        sleep 10
+    done
+}
+
 idxr() {
     RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" "$@"
 }
@@ -96,15 +104,23 @@ idxr_server_replay() {
         "$@"
 }
 
+stage_mainnet_blocks() {
+    local BLOCKS_FETCHER="$SRC"/tests/stage-blocks
+    "$BLOCKS_FETCHER" 2 "$1" mainnet "$2"
+}
+
 dl_mainnet() {
+    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
     "$BLOCKS_FETCHER" 2 "$1" mainnet "$2"
 }
 
 dl_mainnet_single() {
+    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
     "$BLOCKS_FETCHER" "$1" "$1" mainnet "$2"
 }
 
 dl_mainnet_range() {
+    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
     "$BLOCKS_FETCHER" "$1" "$2" mainnet "$3"
 }
 
@@ -1045,7 +1061,7 @@ test_many_blocks() {
     test=test_many_blocks
 
     setup
-    dl_mainnet 1000 ./blocks
+    stage_mainnet_blocks 1000 ./blocks
 
     idxr_server_start \
         --blocks-dir ./blocks \
@@ -1053,7 +1069,7 @@ test_many_blocks() {
         --database-dir ./database \
         --ledger-cadence 100 \
         --log-level debug
-    wait_for_socket
+    wait_forever_for_socket
 
     # results
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1070,11 +1086,11 @@ test_many_blocks() {
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledgers state-hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledgers state-hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     teardown
@@ -1161,14 +1177,14 @@ test_release() {
     test=test_release
 
     setup
-    dl_mainnet 5000 ./blocks
+    stage_mainnet_blocks 5000 ./blocks
 
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --log-level debug
-    wait_for_socket
+    wait_forever_for_socket
 
     # results
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1185,11 +1201,11 @@ test_release() {
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledgers state-hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledgers state-hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
 
     teardown
