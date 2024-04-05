@@ -3,7 +3,7 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
-        signed::{SignedCommand, SignedCommandWithData},
+        signed::{SignedCommand, SignedCommandWithData, TXN_HASH_START},
         store::CommandStore,
         UserCommandWithStatus,
     },
@@ -17,12 +17,13 @@ use crate::{
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use log::{error, trace, warn};
-use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
+use speedb::{ColumnFamilyDescriptor, DBCompressionType, DBIterator, DB};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 
 #[derive(Debug)]
@@ -944,6 +945,57 @@ impl EventStore for IndexerStore {
     }
 }
 
+type KvIterator<'a> = &'a Result<(Box<[u8]>, Box<[u8]>), speedb::Error>;
+
+const COMMAND_KEY_PREFIX: &str = "user-";
+
+/// Creates a new user command (transaction) database key from a &String
+fn user_command_db_key_str(str: &String) -> String {
+    format!("{COMMAND_KEY_PREFIX}{str}")
+}
+
+/// Creates a new user command (transaction) database key from one &String
+fn user_command_db_key(str: &String) -> Vec<u8> {
+    user_command_db_key_str(str).into_bytes()
+}
+
+/// Creates a new user command (transaction) database key for a public key
+fn user_command_db_key_pk(pk: &String, n: u32) -> Vec<u8> {
+    format!("{}-{n}", user_command_db_key_str(pk)).into_bytes()
+}
+
+/// Returns a user command (transaction) block state hash from a database key
+pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Result<BlockHash> {
+    let db_key_str = std::str::from_utf8(db_key)?;
+    let stripped_key = db_key_str.strip_prefix(COMMAND_KEY_PREFIX);
+
+    if let Some(stripped_key) = stripped_key {
+        let split_key: Vec<&str> = stripped_key.splitn(2, '-').collect();
+
+        if let Some(first_part) = split_key.first() {
+            return Ok(BlockHash(first_part.to_string()));
+        }
+    }
+    bail!("User command key does not start with '{COMMAND_KEY_PREFIX}': {db_key_str}")
+}
+
+/// [DBIterator] for user commands (transactions)
+pub fn user_commands_iterator(db: &Arc<IndexerStore>) -> DBIterator<'_> {
+    db.database
+        .prefix_iterator_cf(db.commands_cf(), TXN_HASH_START.as_bytes())
+}
+
+/// Transaction hash (starts with [TXN_HASH_START]) from `entry` in
+/// [user_commands_iterator]
+pub fn user_commands_iterator_txn_hash(entry: KvIterator) -> String {
+    String::from_utf8(entry.to_owned().unwrap().0.to_vec()).unwrap()
+}
+
+/// [SignedCommandWithData] from `entry` in [user_commands_iterator]
+pub fn user_commands_iterator_signed_command(entry: KvIterator) -> SignedCommandWithData {
+    serde_json::from_slice::<SignedCommandWithData>(&entry.to_owned().unwrap().1).unwrap()
+}
+
 impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
@@ -951,7 +1003,7 @@ impl CommandStore for IndexerStore {
         let commands_cf = self.commands_cf();
         let user_commands = block.commands();
 
-        // add: command hash -> signed command with data
+        // add: key (txn hash) -> value (signed command with data)
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
             let hash = signed.hash_signed_command()?;
@@ -966,10 +1018,10 @@ impl CommandStore for IndexerStore {
             self.database.put_cf(commands_cf, key, value)?;
         }
 
-        // add: state hash -> user commands with status
-        let key = format!("user-{}", block.state_hash);
+        // add: key (state hash) -> user commands with status
+        let key = user_command_db_key(&block.state_hash);
         let value = serde_json::to_vec(&block.commands())?;
-        self.database.put_cf(&commands_cf, key.as_bytes(), value)?;
+        self.database.put_cf(commands_cf, key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
         for pk in block.all_command_public_keys() {
@@ -985,15 +1037,14 @@ impl CommandStore for IndexerStore {
 
             if !block_pk_commands.is_empty() {
                 // write these commands to the next key for pk
-                let key = format!("user-{}-{}", pk.0, n);
+                let key = user_command_db_key_pk(&pk.0, n);
                 let value = serde_json::to_vec(&block_pk_commands)?;
-                self.database.put_cf(commands_cf, key.as_bytes(), value)?;
+                self.database.put_cf(commands_cf, key, value)?;
 
                 // update pk's num commands
-                let key = format!("user-{}", pk.0);
+                let key = user_command_db_key(&pk.0);
                 let next_n = (n + 1).to_string();
-                self.database
-                    .put_cf(&commands_cf, key.as_bytes(), next_n.as_bytes())?;
+                self.database.put_cf(commands_cf, key, next_n.as_bytes())?;
             }
         }
 
@@ -1020,13 +1071,11 @@ impl CommandStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<UserCommandWithStatus>> {
-        trace!("Getting user commands in block {}", state_hash.0);
+        let state_hash = &state_hash.0;
+        trace!("Getting user commands in block {}", state_hash);
 
-        let key = format!("user-{}", state_hash.0);
-        if let Some(commands_bytes) = self
-            .database
-            .get_pinned_cf(self.commands_cf(), key.as_bytes())?
-        {
+        let key = user_command_db_key(state_hash);
+        if let Some(commands_bytes) = self.database.get_pinned_cf(self.commands_cf(), key)? {
             return Ok(serde_json::from_slice(&commands_bytes)?);
         }
 
@@ -1042,7 +1091,7 @@ impl CommandStore for IndexerStore {
         let commands_cf = self.commands_cf();
         let mut commands = vec![];
         fn key_n(pk: &str, n: u32) -> Vec<u8> {
-            format!("user-{}-{}", pk, n).as_bytes().to_vec()
+            user_command_db_key_pk(&pk.to_string(), n).to_vec()
         }
 
         if let Some(n) = self.get_pk_num_commands(&pk.0)? {
@@ -1116,7 +1165,7 @@ impl CommandStore for IndexerStore {
     fn get_pk_num_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
         trace!("Getting number of internal commands for {}", pk);
 
-        let key = format!("user-{}", pk);
+        let key = user_command_db_key(&pk.to_string());
         Ok(self
             .database
             .get_pinned_cf(self.commands_cf(), key)?
