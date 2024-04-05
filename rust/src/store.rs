@@ -1014,6 +1014,7 @@ impl CommandStore for IndexerStore {
                 command,
                 &block.state_hash,
                 block.blockchain_length,
+                block.timestamp(),
             ))?;
             self.database.put_cf(commands_cf, key, value)?;
         }
@@ -1032,7 +1033,14 @@ impl CommandStore for IndexerStore {
             let block_pk_commands: Vec<SignedCommandWithData> = user_commands
                 .iter()
                 .filter(|cmd| cmd.contains_public_key(&pk))
-                .map(|c| SignedCommandWithData::from(c, &block.state_hash, block.blockchain_length))
+                .map(|c| {
+                    SignedCommandWithData::from(
+                        c,
+                        &block.state_hash,
+                        block.blockchain_length,
+                        block.timestamp(),
+                    )
+                })
                 .collect();
 
             if !block_pk_commands.is_empty() {

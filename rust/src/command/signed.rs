@@ -25,6 +25,7 @@ pub struct SignedCommandWithData {
     pub status: CommandStatusData,
     pub tx_hash: String,
     pub blockchain_length: u32,
+    pub date_time: u64,
 }
 
 impl SignedCommand {
@@ -153,6 +154,7 @@ impl SignedCommandWithData {
         user_cmd: &UserCommandWithStatus,
         state_hash: &str,
         blockchain_length: u32,
+        date_time: u64,
     ) -> Self {
         let command = SignedCommand::from(user_cmd.clone());
         Self {
@@ -163,6 +165,7 @@ impl SignedCommandWithData {
                 .expect("valid transaction hash"),
             command,
             blockchain_length,
+            date_time,
         }
     }
 
@@ -170,7 +173,14 @@ impl SignedCommandWithData {
         block
             .commands()
             .iter()
-            .map(|cmd| Self::from(cmd, &block.state_hash, block.blockchain_length))
+            .map(|cmd| {
+                Self::from(
+                    cmd,
+                    &block.state_hash,
+                    block.blockchain_length,
+                    block.timestamp(),
+                )
+            })
             .collect()
     }
 }
