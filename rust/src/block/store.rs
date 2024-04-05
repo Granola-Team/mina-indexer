@@ -49,4 +49,7 @@ pub trait BlockStore {
 
     /// Get blocks for the given public key
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<PrecomputedBlock>>;
+
+    /// Get children of a block
+    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
 }

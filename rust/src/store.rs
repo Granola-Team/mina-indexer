@@ -1,3 +1,6 @@
+//! This module contains the implementations of all store traits for the
+//! [IndexerStore]
+
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
@@ -34,22 +37,26 @@ pub struct IndexerStore {
 }
 
 impl IndexerStore {
+    /// Check these match with the cf helpers below
+    const COLUMN_FAMILIES: [&'static str; 8] = [
+        "blocks",
+        "lengths",
+        "slots",
+        "canonicity",
+        "commands",
+        "events",
+        "ledgers",
+        "snarks",
+    ];
+
+    /// Opens a secondary, read-only instance with all cfs
     pub fn new_read_only(path: &Path, secondary: &Path) -> anyhow::Result<Self> {
         let database_opts = speedb::Options::default();
         let database = speedb::DBWithThreadMode::open_cf_as_secondary(
             &database_opts,
             path,
             secondary,
-            vec![
-                "blocks",
-                "lengths",
-                "slots",
-                "canonicity",
-                "commands",
-                "events",
-                "ledgers",
-                "snarks",
-            ],
+            Self::COLUMN_FAMILIES.to_vec(),
         )?;
         Ok(Self {
             db_path: PathBuf::from(secondary),
@@ -58,34 +65,29 @@ impl IndexerStore {
         })
     }
 
+    /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         cf_opts.set_compression_type(DBCompressionType::Zstd);
-        let blocks = ColumnFamilyDescriptor::new("blocks", cf_opts.clone());
-        let lengths = ColumnFamilyDescriptor::new("lengths", cf_opts.clone());
-        let slots = ColumnFamilyDescriptor::new("slots", cf_opts.clone());
-        let canonicity = ColumnFamilyDescriptor::new("canonicity", cf_opts.clone());
-        let commands = ColumnFamilyDescriptor::new("commands", cf_opts.clone());
-        let events = ColumnFamilyDescriptor::new("events", cf_opts.clone());
-        let ledgers = ColumnFamilyDescriptor::new("ledgers", cf_opts.clone());
-        let snarks = ColumnFamilyDescriptor::new("snarks", cf_opts);
 
         let mut database_opts = speedb::Options::default();
         database_opts.set_compression_type(DBCompressionType::Zstd);
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
-        let database = speedb::DBWithThreadMode::open_cf_descriptors(
-            &database_opts,
-            path,
-            vec![
-                blocks, lengths, slots, canonicity, commands, events, ledgers, snarks,
-            ],
-        )?;
+
+        let column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
+            .iter()
+            .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
+            .collect();
         Ok(Self {
-            db_path: PathBuf::from(path),
-            database,
             is_primary: true,
+            db_path: path.into(),
+            database: speedb::DBWithThreadMode::open_cf_descriptors(
+                &database_opts,
+                path,
+                column_families,
+            )?,
         })
     }
 
@@ -100,6 +102,8 @@ impl IndexerStore {
     pub fn db_path(&self) -> &Path {
         &self.db_path
     }
+
+    /// Column family helpers
 
     fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
@@ -149,6 +153,8 @@ impl IndexerStore {
             .expect("snarks column family exists")
     }
 }
+
+/// [BlockStore] implementation
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
@@ -445,7 +451,24 @@ impl BlockStore for IndexerStore {
         blocks.sort();
         Ok(blocks)
     }
+
+    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        trace!("Getting children of block {}", state_hash);
+
+        if let Some(height) = self.get_block(state_hash)?.map(|b| b.blockchain_length) {
+            let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
+            let mut children: Vec<PrecomputedBlock> = blocks_at_next_height
+                .into_iter()
+                .filter(|b| b.previous_state_hash() == *state_hash)
+                .collect();
+            children.sort();
+            return Ok(children);
+        }
+        bail!("Block missing from store {}", state_hash)
+    }
 }
+
+/// [CanonicityStore] implementation
 
 impl CanonicityStore for IndexerStore {
     fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
@@ -563,6 +586,8 @@ impl CanonicityStore for IndexerStore {
         Ok(None)
     }
 }
+
+/// [LedgerStore] implementation
 
 impl LedgerStore for IndexerStore {
     fn add_ledger(
@@ -883,6 +908,8 @@ impl LedgerStore for IndexerStore {
     }
 }
 
+/// [EventStore] implementation
+
 impl EventStore for IndexerStore {
     fn add_event(&self, event: &IndexerEvent) -> anyhow::Result<u32> {
         let seq_num = self.get_next_seq_num()?;
@@ -944,6 +971,8 @@ impl EventStore for IndexerStore {
         Ok(events)
     }
 }
+
+/// [CommandStore] implementation
 
 type KvIterator<'a> = &'a Result<(Box<[u8]>, Box<[u8]>), speedb::Error>;
 
@@ -1303,6 +1332,8 @@ impl CommandStore for IndexerStore {
             }))
     }
 }
+
+/// [SnarkStore] implementation
 
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
