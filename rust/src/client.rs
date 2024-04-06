@@ -131,6 +131,18 @@ pub enum Blocks {
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+    /// Query a block's children
+    Children {
+        /// Retrieve the children of the block with given state hash
+        #[arg(long)]
+        state_hash: String,
+        /// Path to write the children [default: stdout]
+        #[arg(long)]
+        path: Option<PathBuf>,
+        /// Display the entire precomputed block
+        #[arg(long, default_value_t = false)]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]
@@ -350,7 +362,6 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(BUFFER_SIZE);
-
     let encoded = bincode::encode_to_vec(command, BIN_CODE_CONFIG)?;
 
     writer.write_all(&encoded).await?;
@@ -359,6 +370,5 @@ pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Resu
     let msg = String::from_utf8(buffer)?;
     let msg = msg.trim_end();
     println!("{msg}");
-
     Ok(())
 }
