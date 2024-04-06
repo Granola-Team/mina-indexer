@@ -1617,17 +1617,12 @@ test_clean_shutdown() {
         --block-watch-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database
-
     wait_for_socket
 
-    echo "Sending Mina Indexer a SIGTERM"
-    PID="$(cat ./idxr_pid)"
-    kill "$PID"
-    ps -p "$PID" || true
-    wait "$PID"  # Sometimes hangs!
-    ps -p "$PID" || true
-
-    teardown
+    kill_idxr
+    if [ -f ./idxr_pid ]; then
+        exit 1
+    fi
 }
 
 test_block_children() {
