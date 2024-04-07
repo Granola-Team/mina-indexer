@@ -1667,6 +1667,37 @@ test_block_children() {
     teardown
 }
 
+test_accounts_gql() {
+    test=test_accounts_gql
+
+    setup
+    dl_mainnet 100 ./blocks
+    port=$(ephemeral_port)
+
+
+    idxr_server start \
+        --blocks-dir ./blocks \
+        --staking-ledger-watch-dir ./staking-ledgers \
+        --database-dir ./database \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0"
+    wait_for_socket
+
+    resp=$(curl -X POST -H "Content-Type: application/json" -d '{"query": "{\naccounts(query:{publicKey: \"B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe\"}) {\n  publicKey\n    balance\n    username\n    nonce\n    delegate\n    timeLocked\n}\n}\n"}' -s http://localhost:"$port"/graphql)
+
+    public_key='B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe'
+    delegate='B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe'
+    balance='719020000000'
+    nonce='1'
+
+    assert "$public_key" $(echo "$resp" | jq -r '.data.accounts[0].publicKey')
+    assert "$nonce" $(echo "$resp" | jq -r '.data.accounts[0].nonce')
+    assert "$balance" $(echo "$resp" | jq -r '.data.accounts[0].balance')
+    assert "$delegate" $(echo "$resp" | jq -r '.data.accounts[0].delegate')
+
+    teardown
+}
+
 # Check command-line arguments
 if [ "$#" -eq 0 ]; then
     # No arguments provided, run all tests
@@ -1700,10 +1731,12 @@ if [ "$#" -eq 0 ]; then
     test_internal_commands
     test_start_from_config
     test_clean_shutdown
+    test_accounts_gql
 else
     # Run only specified tests
     for test_name in "$@"; do
         case $test_name in
+            "test_accounts_gql") test_accounts_gql ;;
             "test_indexer_cli_reports") test_indexer_cli_reports ;;
             "test_server_startup") test_server_startup ;;
             "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
