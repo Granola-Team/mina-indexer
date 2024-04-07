@@ -54,6 +54,7 @@ audit:
 lint: && audit disallow-unused-cargo-deps
   cd rust && cargo {{nightly_if_required}} fmt --all --check
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
+  [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 images:
   nix build .#dockerImage
