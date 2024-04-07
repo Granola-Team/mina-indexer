@@ -1,9 +1,5 @@
 {
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url = "github:numtide/flake-utils";
-  };
+  inputs = { rust-overlay.url = "github:oxalica/rust-overlay"; };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachSystem [
@@ -54,7 +50,7 @@
             just
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
-            nixfmt
+            nixfmt-classic
             rust
           ] ++ buildDependencies;
 
