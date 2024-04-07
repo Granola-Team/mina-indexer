@@ -54,6 +54,7 @@
             just
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
+            nixfmt
             rust
           ] ++ buildDependencies;
 
