@@ -38,12 +38,14 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 8] = [
+    const COLUMN_FAMILIES: [&'static str; 10] = [
         "blocks",
         "lengths",
         "slots",
         "canonicity",
         "commands",
+        "mainnet-commands-slot",
+        "mainnet-cmds-txn-global-slot",
         "events",
         "ledgers",
         "snarks",
@@ -58,6 +60,7 @@ impl IndexerStore {
             secondary,
             Self::COLUMN_FAMILIES.to_vec(),
         )?;
+        println!("{:?}", Self::COLUMN_FAMILIES);
         Ok(Self {
             db_path: PathBuf::from(secondary),
             database,
@@ -103,7 +106,7 @@ impl IndexerStore {
         &self.db_path
     }
 
-    /// Column family helpers
+    // Column family helpers
 
     fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
@@ -133,6 +136,18 @@ impl IndexerStore {
         self.database
             .cf_handle("commands")
             .expect("commands column family exists")
+    }
+
+    fn commands_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("mainnet-commands-slot")
+            .expect("mainnet-commands-slot column family exists")
+    }
+
+    fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("mainnet-cmds-txn-global-slot")
+            .expect("mainnet-cmds-txn-global-slot column family exists")
     }
 
     fn ledgers_cf(&self) -> &speedb::ColumnFamily {
@@ -1000,28 +1015,20 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
 }
 
 /// [DBIterator] for user commands (transactions)
-pub fn user_commands_iterator(network: String, db: &Arc<IndexerStore>) -> DBIterator<'_> {
+pub fn user_commands_iterator(db: &Arc<IndexerStore>) -> DBIterator<'_> {
     db.database
-        .prefix_iterator_cf(db.commands_cf(), network.as_bytes())
-}
-
-/// Network from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_network(entry: KvIterator) -> anyhow::Result<String> {
-    let bytes = entry.to_owned().unwrap().0;
-    String::from_utf8(bytes[.."mainnet".as_bytes().len()].to_vec())
-        .map_err(|e| anyhow!("Error reading network name: {}", e))
+        .iterator_cf(db.commands_slot_mainnet_cf(), speedb::IteratorMode::Start)
 }
 
 /// Global slot number from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_global_slot(network: &str, entry: KvIterator) -> u32 {
+pub fn user_commands_iterator_global_slot(entry: KvIterator) -> u32 {
     let bytes = entry.to_owned().unwrap().0;
-    let byte = |n: usize| bytes[network.as_bytes().len() + n];
-    u32::from_be_bytes([byte(0), byte(1), byte(2), byte(3)])
+    u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
 }
 
 /// Transaction hash from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_txn_hash(network: &str, entry: KvIterator) -> anyhow::Result<String> {
-    String::from_utf8(entry.to_owned().unwrap().0[network.as_bytes().len() + 4..].to_vec())
+pub fn user_commands_iterator_txn_hash(entry: KvIterator) -> anyhow::Result<String> {
+    String::from_utf8(entry.to_owned().unwrap().0[4..].to_vec())
         .map_err(|e| anyhow!("Error reading txn hash: {}", e))
 }
 
@@ -1034,14 +1041,13 @@ pub fn user_commands_iterator_signed_command(
     )?)
 }
 
-fn global_slot_prefix(network: &str, global_slot: u32) -> Vec<u8> {
-    let mut bytes = network.as_bytes().to_vec();
-    bytes.append(&mut global_slot.to_be_bytes().to_vec());
-    bytes
+/// The first 4 bytes are global slot in big endian.
+fn global_slot_prefix(global_slot: u32) -> Vec<u8> {
+    global_slot.to_be_bytes().to_vec()
 }
 
-fn global_slot_prefix_key(network: &str, global_slot: u32, txn_hash: &str) -> Vec<u8> {
-    let mut bytes = global_slot_prefix(network, global_slot);
+fn global_slot_prefix_key(global_slot: u32, txn_hash: &str) -> Vec<u8> {
+    let mut bytes = global_slot_prefix(global_slot);
     bytes.append(&mut txn_hash.as_bytes().to_vec());
     bytes
 }
@@ -1050,10 +1056,9 @@ impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
-        let commands_cf = self.commands_cf();
         let user_commands = block.commands();
 
-        // add: key `{network}-{global_slot}-{txn_hash}` -> signed command with data
+        // add: key `{global_slot}{txn_hash}` -> signed command with data
         // global_slot is written in big endian so lexicographic ordering corresponds to
         // slot ordering
         for command in &user_commands {
@@ -1061,11 +1066,7 @@ impl CommandStore for IndexerStore {
             let txn_hash = signed.hash_signed_command()?;
             trace!("Adding user command hash {} {}", txn_hash, block.summary());
 
-            let key = global_slot_prefix_key(
-                &block.network,
-                block.global_slot_since_genesis(),
-                &txn_hash,
-            );
+            let key = global_slot_prefix_key(block.global_slot_since_genesis(), &txn_hash);
             let value = serde_json::to_vec(&SignedCommandWithData::from(
                 command,
                 &block.state_hash,
@@ -1073,19 +1074,24 @@ impl CommandStore for IndexerStore {
                 block.timestamp(),
                 block.global_slot_since_genesis(),
             ))?;
-            self.database.put_cf(commands_cf, key, value)?;
+            self.database
+                .put_cf(self.commands_slot_mainnet_cf(), key, value)?;
 
-            // add: key (txn hash) -> value (network, global slot) so we can
+            // add: key (txn hash) -> value (global slot) so we can
             // reconstruct the key
             let key = txn_hash.as_bytes();
-            let value = global_slot_prefix(&block.network, block.global_slot_since_genesis());
-            self.database.put_cf(self.commands_cf(), key, value)?;
+            let value = block.global_slot_since_genesis().to_be_bytes();
+            self.database.put_cf(
+                self.commands_txn_hash_to_global_slot_mainnet_cf(),
+                key,
+                value,
+            )?;
         }
 
         // add: key (state hash) -> user commands with status
         let key = user_command_db_key(&block.state_hash);
         let value = serde_json::to_vec(&block.commands())?;
-        self.database.put_cf(commands_cf, key, value)?;
+        self.database.put_cf(self.commands_cf(), key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
         for pk in block.all_command_public_keys() {
@@ -1111,12 +1117,13 @@ impl CommandStore for IndexerStore {
                 // write these commands to the next key for pk
                 let key = user_command_db_key_pk(&pk.0, n);
                 let value = serde_json::to_vec(&block_pk_commands)?;
-                self.database.put_cf(commands_cf, key, value)?;
+                self.database.put_cf(self.commands_cf(), key, value)?;
 
                 // update pk's num commands
                 let key = user_command_db_key(&pk.0);
                 let next_n = (n + 1).to_string();
-                self.database.put_cf(commands_cf, key, next_n.as_bytes())?;
+                self.database
+                    .put_cf(self.commands_cf(), key, next_n.as_bytes())?;
             }
         }
         Ok(())
@@ -1127,13 +1134,16 @@ impl CommandStore for IndexerStore {
         command_hash: &str,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting user command by hash {}", command_hash);
-        if let Some(prefix_bytes) = self
-            .database
-            .get_pinned_cf(self.commands_cf(), command_hash.as_bytes())?
-        {
-            let mut key = prefix_bytes.to_vec();
+        if let Some(global_slot_bytes) = self.database.get_pinned_cf(
+            self.commands_txn_hash_to_global_slot_mainnet_cf(),
+            command_hash.as_bytes(),
+        )? {
+            let mut key = global_slot_bytes.to_vec();
             key.append(&mut command_hash.as_bytes().to_vec());
-            if let Some(commands_bytes) = self.database.get_pinned_cf(self.commands_cf(), key)? {
+            if let Some(commands_bytes) = self
+                .database
+                .get_pinned_cf(self.commands_slot_mainnet_cf(), key)?
+            {
                 return Ok(Some(serde_json::from_slice(&commands_bytes)?));
             }
         }

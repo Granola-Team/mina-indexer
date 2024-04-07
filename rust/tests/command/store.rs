@@ -5,10 +5,7 @@ use mina_indexer::{
     constants::*,
     ledger::genesis::parse_file,
     state::IndexerState,
-    store::{
-        user_commands_iterator, user_commands_iterator_global_slot, user_commands_iterator_network,
-        user_commands_iterator_signed_command, user_commands_iterator_txn_hash, IndexerStore,
-    },
+    store::*,
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -78,37 +75,27 @@ async fn add_and_get() -> anyhow::Result<()> {
     }
 
     // iterate over transactions
-    let network = "mainnet";
     let mut curr_slot = 0;
+    for entry in user_commands_iterator(&indexer_store) {
+        // txn hashes should match
+        assert_eq!(
+            user_commands_iterator_signed_command(&entry)?.tx_hash,
+            user_commands_iterator_txn_hash(&entry)?,
+        );
 
-    for entry in user_commands_iterator(network.to_string(), &indexer_store) {
-        // no longer iterating over global slot prefixed keys
-        if String::from_utf8(entry.to_owned()?.0[..network.as_bytes().len()].to_vec())
-            == Ok(network.to_string())
-        {
-            // networks match
-            assert_eq!(network.to_string(), user_commands_iterator_network(&entry)?);
+        // global slot numbers should match
+        let cmd_slot = user_commands_iterator_global_slot(&entry);
+        assert!(curr_slot <= cmd_slot);
+        assert_eq!(
+            cmd_slot,
+            user_commands_iterator_signed_command(&entry)?.global_slot_since_genesis,
+        );
 
-            // txn hashes should match
-            assert_eq!(
-                user_commands_iterator_signed_command(&entry)?.tx_hash,
-                user_commands_iterator_txn_hash(network, &entry)?,
-            );
+        // blocks should be present
+        let state_hash = user_commands_iterator_signed_command(&entry)?.state_hash;
+        assert!(indexer_store.get_block(&state_hash)?.is_some());
 
-            // global slot numbers should match
-            let cmd_slot = user_commands_iterator_global_slot(network, &entry);
-            assert!(curr_slot <= cmd_slot);
-            assert_eq!(
-                cmd_slot,
-                user_commands_iterator_signed_command(&entry)?.global_slot_since_genesis,
-            );
-
-            // blocks should be present
-            let state_hash = user_commands_iterator_signed_command(&entry)?.state_hash;
-            assert!(indexer_store.get_block(&state_hash)?.is_some());
-
-            curr_slot = cmd_slot;
-        }
+        curr_slot = cmd_slot;
     }
     Ok(())
 }
