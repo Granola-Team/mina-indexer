@@ -18,11 +18,23 @@ pub struct Account {
 
 #[derive(InputObject)]
 pub struct AccountQueryInput {
-    public_key: String,
+    public_key: Option<String>,
+    balance: Option<u64>,
+    #[graphql(name = "balance_gt")]
+    balance_gt: Option<u64>,
+    #[graphql(name = "balance_gte")]
+    balance_gte: Option<u64>,
+    #[graphql(name = "balance_lt")]
+    balance_lt: Option<u64>,
+    #[graphql(name = "balance_lte")]
+    balance_lte: Option<u64>,
+    #[graphql(name = "balance_ne")]
+    balance_ne: Option<u64>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum AccountSortByInput {
+    BalanceAsc,
     BalanceDesc,
 }
 
@@ -62,7 +74,27 @@ impl AccountQueryRoot {
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    return *query.public_key == account.public_key.0;
+                    if let Some(public_key) = &query.public_key {
+                        return *public_key == account.public_key.0;
+                    }
+                    if let Some(balance) = &query.balance {
+                        return *balance == account.balance.0;
+                    }
+                    if let Some(balance_gt) = &query.balance_gt {
+                        return *balance_gt < account.balance.0;
+                    }
+                    if let Some(balance_gte) = &query.balance_gte {
+                        return *balance_gte <= account.balance.0;
+                    }
+                    if let Some(balance_lt) = &query.balance_lt {
+                        return *balance_lt > account.balance.0;
+                    }
+                    if let Some(balance_lte) = &query.balance_lte {
+                        return *balance_lte >= account.balance.0;
+                    }
+                    if let Some(balance_ne) = &query.balance_ne {
+                        return *balance_ne != account.balance.0;
+                    }
                 }
                 true
             })
@@ -72,6 +104,9 @@ impl AccountQueryRoot {
             match sort_by {
                 AccountSortByInput::BalanceDesc => {
                     accounts.sort_by(|a, b| b.balance.cmp(&a.balance));
+                }
+                AccountSortByInput::BalanceAsc => {
+                    accounts.sort_by(|a, b| a.balance.cmp(&b.balance));
                 }
             }
         }
