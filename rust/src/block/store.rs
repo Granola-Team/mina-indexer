@@ -17,6 +17,9 @@ pub trait BlockStore {
     /// Get best block from the store
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
 
+    /// Get block hash from the store
+    fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>>;
+
     /// Get number of blocks at the given blockchain length
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32>;
 

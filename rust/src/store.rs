@@ -251,6 +251,21 @@ impl BlockStore for IndexerStore {
         }
     }
 
+    fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>> {
+        trace!("Getting best block hash");
+        match self
+            .database
+            .get_pinned_cf(self.blocks_cf(), Self::BEST_TIP_BLOCK_KEY)?
+            .map(|bytes| bytes.to_vec())
+        {
+            None => Ok(None),
+            Some(bytes) => {
+                let state_hash: BlockHash = String::from_utf8(bytes)?.into();
+                Ok(Some(state_hash))
+            }
+        }
+    }
+
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Setting best block");
 
