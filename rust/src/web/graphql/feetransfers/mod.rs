@@ -3,6 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::InternalCommandWithData, store::CommandStore},
+    constants::MAINNET_GENESIS_HASH,
     store::IndexerStore,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -78,7 +79,8 @@ pub struct FeetransferQueryInput {
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum FeetransferSortByInput {
-    FeeDesc,
+    BlockHeightAsc,
+    BlockHeightDesc,
 }
 
 #[derive(Default)]
@@ -103,12 +105,11 @@ impl FeetransferQueryRoot {
             .data::<Arc<IndexerStore>>()
             .expect("db to be in context");
         let limit = limit.unwrap_or(100);
-        // TODO: Pick a default state_hash
+
         let state_hash = query
-            .unwrap()
-            .state_hash
-            .clone()
-            .unwrap_or("asdf".to_string());
+            .as_ref()
+            .and_then(|q| q.state_hash.as_ref())
+            .map_or(MAINNET_GENESIS_HASH, |s| s);
 
         let state_hash = BlockHash::from(state_hash);
         let pcb = match db.get_block(&state_hash)? {
@@ -132,6 +133,18 @@ impl FeetransferQueryRoot {
                         block: pcb.clone(),
                     })
                     .collect();
+
+                if let Some(sort_by) = sort_by {
+                    match sort_by {
+                        FeetransferSortByInput::BlockHeightAsc => {
+                            internal_commands.sort_by(|a, b| a.block_height.cmp(&b.block_height));
+                        }
+                        FeetransferSortByInput::BlockHeightDesc => {
+                            internal_commands.sort_by(|a, b| b.block_height.cmp(&a.block_height));
+                        }
+                    }
+                }
+
                 internal_commands.truncate(limit);
                 Ok(Some(internal_commands))
             }
