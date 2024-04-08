@@ -33,6 +33,7 @@
             jq
             libclang.lib
             pkg-config
+            procps # For pwait
             rustPlatform.bindgenHook
           ] ++ runtimeDependencies ++ lib.optionals stdenv.isDarwin [
             frameworks.Security

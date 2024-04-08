@@ -86,7 +86,7 @@ kill_idxr() {
     rm -f ./idxr_pid
 
     # Wait no more than 10 seconds for the process.
-    timeout 10s pidwait "$PID" ||
+    timeout 10s pwait "$PID" ||
         true  # Because the process may already be gone, yielding an error.
 }
 
