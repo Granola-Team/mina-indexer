@@ -77,15 +77,17 @@ idxr_server() {
 
 kill_idxr() {
     echo "Shutting down Mina Indexer."
+    idxr server shutdown
 
-    idxr server shutdown ||
-        true
-
+    # Capture the PID before deleting the PID file.
     PID="$(cat ./idxr_pid)"
-    timeout 10 bash -c wait "$PID"
 
-    echo "Killed $PID. Deleting PID file."
+    echo "Deleting PID file."
     rm -f ./idxr_pid
+
+    # Wait no more than 10 seconds for the process.
+    timeout 10s pidwait "$PID" ||
+        true  # Because the process may already be gone, yielding an error.
 }
 
 idxr_server_start() {
@@ -159,7 +161,7 @@ setup() {
 }
 
 teardown() {
-    kill_idxr || rm -f ./idxr_pid
+    kill_idxr
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     rm -rf ./database
