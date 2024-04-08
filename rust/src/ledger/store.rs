@@ -1,5 +1,3 @@
-//! Store of staged ledgers, staking ledgers, and staking delegations
-
 use crate::{
     block::BlockHash,
     ledger::{
@@ -8,6 +6,7 @@ use crate::{
     },
 };
 
+/// Store of canonical ledgers
 pub trait LedgerStore {
     /// Add a ledger with assoociated hash
     fn add_ledger(
