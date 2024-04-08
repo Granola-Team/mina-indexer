@@ -1613,56 +1613,19 @@ test_clean_shutdown() {
 
     setup
     idxr_server_start \
-	    --log-level TRACE \
+	--log-level TRACE \
         --block-watch-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database
+
     wait_for_socket
 
-    kill_idxr
-    if [ -f ./idxr_pid ]; then
-        exit 1
-    fi
-}
-
-test_block_children() {
-    test=test_block_children
-
-    setup
-    dl_mainnet 10 ./blocks
-
-    idxr_server_start \
-        --blocks-dir ./blocks \
-        --staking-ledger-watch-dir ./staking-ledgers \
-        --database-dir ./database
-    wait_for_socket
-
-    block_5_state_hash=3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY
-    children=$(idxr blocks children --state-hash $block_5_state_hash)
-
-    assert 6 $(echo "$children" | jq -r .[0].blockchain_length)
-    assert 'Canonical' $(echo "$children" | jq -r .[0].canonicity)
-    assert 5 $(echo "$children" | jq -r .[0].global_slot_since_genesis)
-    assert $block_5_state_hash $(echo "$children" | jq -r .[0].parent_hash)
-    assert '3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v' $(echo "$children" | jq -r .[0].state_hash)
-
-    assert 6 $(echo "$children" | jq -r .[1].blockchain_length)
-    assert 'Orphaned' $(echo "$children" | jq -r .[1].canonicity)
-    assert 5 $(echo "$children" | jq -r .[1].global_slot_since_genesis)
-    assert $block_5_state_hash $(echo "$children" | jq -r .[1].parent_hash)
-    assert '3NKvdydTvLVDJ9PKAXrisjsXoZQvUy1V2sbComWyB2uyhARCJZ5M' $(echo "$children" | jq -r .[1].state_hash)
-
-    assert 6 $(echo "$children" | jq -r .[2].blockchain_length)
-    assert 'Orphaned' $(echo "$children" | jq -r .[2].canonicity)
-    assert 5 $(echo "$children" | jq -r .[2].global_slot_since_genesis)
-    assert $block_5_state_hash $(echo "$children" | jq -r .[2].parent_hash)
-    assert '3NLM3k3Vk1qs36hZWdbWvi4sqwer3skbgPyHMWrZMBoscNLyjnY2' $(echo "$children" | jq -r .[2].state_hash)
-
-    assert 6 $(echo "$children" | jq -r .[3].blockchain_length)
-    assert 'Orphaned' $(echo "$children" | jq -r .[3].canonicity)
-    assert 5 $(echo "$children" | jq -r .[3].global_slot_since_genesis)
-    assert $block_5_state_hash $(echo "$children" | jq -r .[3].parent_hash)
-    assert '3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45' $(echo "$children" | jq -r .[3].state_hash)
+    echo "Sending Mina Indexer a SIGTERM"
+    PID="$(cat ./idxr_pid)"
+    kill "$PID"
+    ps -p "$PID" || true
+    wait "$PID"  # Sometimes hangs!
+    ps -p "$PID" || true
 
     teardown
 }
@@ -1715,7 +1678,6 @@ if [ "$#" -eq 0 ]; then
     test_block_copy
     test_missing_blocks
     test_best_chain
-    test_block_children
     test_ledgers
     test_sync
     test_replay
@@ -1752,7 +1714,6 @@ else
             "test_block_copy") test_block_copy ;;
             "test_missing_blocks") test_missing_blocks ;;
             "test_best_chain") test_best_chain ;;
-            "test_block_children") test_block_children ;;
             "test_ledgers") test_ledgers ;;
             "test_sync") test_sync ;;
             "test_replay") test_replay ;;

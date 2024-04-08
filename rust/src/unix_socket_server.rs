@@ -424,69 +424,6 @@ async fn handle_conn(
                     }
                 }
             }
-            Blocks::Children {
-                state_hash,
-                verbose,
-                path,
-            } => {
-                info!("Received block-children command for block {}", state_hash);
-
-                let mut children = db.get_block_children(&state_hash.clone().into())?;
-                children.sort();
-
-                let blocks_str = if verbose {
-                    let blocks: Vec<PrecomputedBlockWithCanonicity> = children
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash.clone().into())
-                            {
-                                Some(block.with_canonicity(canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    serde_json::to_string(&blocks)?
-                } else {
-                    let blocks: Vec<BlockWithoutHeight> = children
-                        .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash.clone().into())
-                            {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    format_vec_jq_compatible(&blocks)
-                };
-
-                if path.is_none() {
-                    info!("Writing children of block {} to stdout", state_hash);
-                    Some(blocks_str)
-                } else {
-                    let path = path.unwrap();
-                    if !path.is_dir() {
-                        info!(
-                            "Writing children of block {} to {}",
-                            state_hash,
-                            path.display()
-                        );
-
-                        std::fs::write(path.clone(), blocks_str)?;
-                        Some(format!(
-                            "Children of block {} written to {}",
-                            state_hash,
-                            path.display()
-                        ))
-                    } else {
-                        file_must_not_be_a_directory(&path)
-                    }
-                }
-            }
         },
         ClientCli::Chain(__) => match __ {
             Chain::Best {

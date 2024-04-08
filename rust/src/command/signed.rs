@@ -26,7 +26,6 @@ pub struct SignedCommandWithData {
     pub tx_hash: String,
     pub blockchain_length: u32,
     pub date_time: u64,
-    pub global_slot_since_genesis: u32,
 }
 
 impl SignedCommand {
@@ -156,19 +155,17 @@ impl SignedCommandWithData {
         state_hash: &str,
         blockchain_length: u32,
         date_time: u64,
-        global_slot_since_genesis: u32,
     ) -> Self {
         let command = SignedCommand::from(user_cmd.clone());
         Self {
-            date_time,
-            blockchain_length,
-            global_slot_since_genesis,
             state_hash: state_hash.into(),
             status: user_cmd.status_data(),
             tx_hash: command
                 .hash_signed_command()
                 .expect("valid transaction hash"),
             command,
+            blockchain_length,
+            date_time,
         }
     }
 
@@ -182,7 +179,6 @@ impl SignedCommandWithData {
                     &block.state_hash,
                     block.blockchain_length,
                     block.timestamp(),
-                    block.global_slot_since_genesis(),
                 )
             })
             .collect()
