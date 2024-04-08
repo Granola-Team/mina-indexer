@@ -53,6 +53,7 @@
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
             rust
+            shellcheck
           ] ++ buildDependencies;
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);

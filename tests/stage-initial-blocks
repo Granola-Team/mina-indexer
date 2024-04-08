@@ -6,14 +6,14 @@
 
 set -eu
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 MIN_LENGTH=$1
 MAX_LENGTH=$2
 NETWORK=$3
 OUT_DIR=$4
 
-for LENGTH in `seq $MIN_LENGTH $MAX_LENGTH`
+for LENGTH in $(seq "$MIN_LENGTH" "$MAX_LENGTH")
 do
   cp "${MY_DIR}"/data/initial-blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
 done

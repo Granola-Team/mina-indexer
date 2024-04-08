@@ -12,7 +12,7 @@ MAX_LENGTH=$2
 NETWORK=$3
 OUT_DIR=$4
 
-for LENGTH in `seq $MIN_LENGTH $MAX_LENGTH`
+for LENGTH in $(seq "$MIN_LENGTH" "$MAX_LENGTH")
 do
   cp /mnt/mina-log-storage/mina_network_block_data/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
 done
