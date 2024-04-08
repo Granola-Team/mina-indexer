@@ -4,7 +4,7 @@ set -eu
 set -o pipefail
 
 # Collect the binaries under test and the test ledgers.
-SRC="$(CDPATH= cd "$(dirname "$0")" && pwd)"/..
+SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
 IDXR="$SRC"/rust/target/release/mina-indexer
 LEDGER="$SRC"/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
@@ -35,9 +35,8 @@ ephemeral_port() {
     LOW_BOUND=49152
     RANGE=16384
     while true; do
-        CANDIDATE=$[$LOW_BOUND + ($RANDOM % $RANGE)]
-        (echo "" >/dev/tcp/127.0.0.1/${CANDIDATE}) >/dev/null 2>&1
-        if [ $? -ne 0 ]; then
+        CANDIDATE=$(( LOW_BOUND + (RANDOM % RANGE) ))
+        if ! (echo "" >/dev/tcp/127.0.0.1/${CANDIDATE}) >/dev/null 2>&1; then
             echo $CANDIDATE
             break
         fi
@@ -83,8 +82,7 @@ kill_idxr() {
         true
 
     PID="$(cat ./idxr_pid)"
-    timeout 10 wait "$PID" ||
-        true  # Required because the return value of 'wait' is the process's exit status.
+    timeout 10 bash -c wait "$PID"
 
     echo "Killed $PID. Deleting PID file."
     rm -f ./idxr_pid
@@ -107,8 +105,7 @@ idxr_server_replay() {
     idxr_server replay --web-port "$port" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database \
-        "$@"
+        --database-dir ./database
 }
 
 stage_mainnet_blocks() {
@@ -408,7 +405,7 @@ test_canonical_threshold() {
     hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    assert $(expr $num_seq_blocks - $canonical_threshold) $length
+    assert $(( num_seq_blocks - canonical_threshold )) $length
     assert '3NKHEHXsScTUd6kMDtoB4tf45MavdXv91qo3HZkLKrkc8XpX5CDv' $hash
 
     teardown
