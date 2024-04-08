@@ -81,15 +81,12 @@ kill_idxr() {
     echo "Shutting down Mina Indexer."
     idxr server shutdown
 
-    # Capture the PID before deleting the PID file.
-    PID="$(cat ./idxr_pid)"
+    # Wait no more than 10 seconds for the process.
+    timeout 10s pwait -F ./idxr_pid ||
+        true  # Because the process may already be gone, yielding an error.
 
     echo "Deleting PID file."
     rm -f ./idxr_pid
-
-    # Wait no more than 10 seconds for the process.
-    timeout 10s pwait "$PID" ||
-        true  # Because the process may already be gone, yielding an error.
 }
 
 idxr_server_start() {
