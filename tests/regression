@@ -1637,7 +1637,7 @@ test_clean_shutdown() {
         true
 
     # Check the success of trying to kill the process with SIGTERM.
-    if ps -p "$PID" 2>&1 >/dev/null; then
+    if ps -p "$PID" >/dev/null 2>&1; then
         echo "PID $PID not killed."
         exit 1
     else
