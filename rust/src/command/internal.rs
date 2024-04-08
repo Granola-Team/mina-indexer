@@ -3,6 +3,7 @@ use crate::{
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommandKind {
@@ -11,6 +12,16 @@ pub enum InternalCommandKind {
     FeeTransfer,
     #[serde(rename = "Fee_transfer_via_coinbase")]
     FeeTransferViaCoinbase,
+}
+
+impl fmt::Display for InternalCommandKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            InternalCommandKind::Coinbase => write!(f, "Coinbase"),
+            InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
+            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_Coinbase"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
