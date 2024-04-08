@@ -51,23 +51,6 @@ impl IndexerStore {
         "snarks",
     ];
 
-    /// Opens a secondary, read-only instance with all cfs
-    pub fn new_read_only(path: &Path, secondary: &Path) -> anyhow::Result<Self> {
-        let database_opts = speedb::Options::default();
-        let database = speedb::DBWithThreadMode::open_cf_as_secondary(
-            &database_opts,
-            path,
-            secondary,
-            Self::COLUMN_FAMILIES.to_vec(),
-        )?;
-        println!("{:?}", Self::COLUMN_FAMILIES);
-        Ok(Self {
-            db_path: PathBuf::from(secondary),
-            database,
-            is_primary: false,
-        })
-    }
-
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
