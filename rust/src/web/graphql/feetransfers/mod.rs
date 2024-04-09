@@ -55,23 +55,6 @@ impl FeetransferWithMeta {
     }
 }
 
-async fn fetch_block_by_state_hash(
-    db: &Arc<IndexerStore>,
-    state_hash: String,
-) -> Result<Option<BlockWithCanonicity>> {
-    let state_hash = BlockHash::from(state_hash);
-    let pcb = match db.get_block(&state_hash)? {
-        Some(pcb) => pcb,
-        None => return Ok(None),
-    };
-    let block = Block::from(pcb);
-    let canonical = db
-        .get_block_canonicity(&state_hash)?
-        .map(|status| matches!(status, Canonicity::Canonical))
-        .unwrap_or(false);
-    Ok(Some(BlockWithCanonicity { block, canonical }))
-}
-
 #[derive(InputObject)]
 pub struct FeetransferQueryInput {
     state_hash: Option<String>,
@@ -112,44 +95,54 @@ impl FeetransferQueryRoot {
             .map_or(MAINNET_GENESIS_HASH, |s| s);
 
         let state_hash = BlockHash::from(state_hash);
-        let pcb = match db.get_block(&state_hash)? {
-            Some(pcb) => pcb,
-            None => return Ok(None),
-        };
-        let canonical = db
-            .get_block_canonicity(&state_hash)?
-            .map(|status| matches!(status, Canonicity::Canonical))
-            .unwrap_or(false);
+        let fee_transfers = get_fee_transfers_for_state_hash(db, &state_hash, sort_by, limit);
+        Ok(fee_transfers)
+    }
+}
 
-        match db.get_internal_commands(&BlockHash::from(state_hash)) {
-            Ok(internal_commands) => {
-                let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
-                    .into_iter()
-                    .map(|ft| FeetransferWithMeta {
-                        canonical,
-                        block_height: pcb.blockchain_length,
-                        feetransfer: Feetransfer::from(ft),
-                        date_time: millis_to_date_string(pcb.timestamp().try_into().unwrap()),
-                        block: pcb.clone(),
-                    })
-                    .collect();
+fn get_fee_transfers_for_state_hash(
+    db: &Arc<IndexerStore>,
+    state_hash: &BlockHash,
+    sort_by: Option<FeetransferSortByInput>,
+    limit: usize,
+) -> Option<Vec<FeetransferWithMeta>> {
+    let pcb = match db.get_block(&state_hash).ok()? {
+        Some(pcb) => pcb,
+        None => return None,
+    };
+    let canonical = db
+        .get_block_canonicity(&state_hash).ok()?
+        .map(|status| matches!(status, Canonicity::Canonical))
+        .unwrap_or(false);
 
-                if let Some(sort_by) = sort_by {
-                    match sort_by {
-                        FeetransferSortByInput::BlockHeightAsc => {
-                            internal_commands.sort_by(|a, b| a.block_height.cmp(&b.block_height));
-                        }
-                        FeetransferSortByInput::BlockHeightDesc => {
-                            internal_commands.sort_by(|a, b| b.block_height.cmp(&a.block_height));
-                        }
+    match db.get_internal_commands(&state_hash) {
+        Ok(internal_commands) => {
+            let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
+                .into_iter()
+                .map(|ft| FeetransferWithMeta {
+                    canonical,
+                    block_height: pcb.blockchain_length,
+                    feetransfer: Feetransfer::from(ft),
+                    date_time: millis_to_date_string(pcb.timestamp().try_into().unwrap()),
+                    block: pcb.clone(),
+                })
+                .collect();
+
+            if let Some(sort_by) = sort_by {
+                match sort_by {
+                    FeetransferSortByInput::BlockHeightAsc => {
+                        internal_commands.sort_by(|a, b| a.block_height.cmp(&b.block_height));
+                    }
+                    FeetransferSortByInput::BlockHeightDesc => {
+                        internal_commands.sort_by(|a, b| b.block_height.cmp(&a.block_height));
                     }
                 }
-
-                internal_commands.truncate(limit);
-                Ok(Some(internal_commands))
             }
-            Err(_) => Ok(None),
+
+            internal_commands.truncate(limit);
+            Some(internal_commands)
         }
+        Err(_) => None,
     }
 }
 

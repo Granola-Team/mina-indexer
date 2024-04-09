@@ -1,3 +1,5 @@
+use speedb::DBIterator;
+
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{
@@ -58,5 +60,9 @@ pub trait CommandStore {
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
+    /// Get number of blocks that the public key has internal commands for
     fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+
+    /// Get internal commands interator starting from
+    fn get_internal_commands_interator(&self) -> DBIterator<'_>;
 }

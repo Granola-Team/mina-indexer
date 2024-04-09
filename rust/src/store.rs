@@ -38,7 +38,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 10] = [
+    const COLUMN_FAMILIES: [&'static str; 11] = [
         "blocks",
         "lengths",
         "slots",
@@ -46,6 +46,7 @@ impl IndexerStore {
         "commands",
         "mainnet-commands-slot",
         "mainnet-cmds-txn-global-slot",
+        "mainnet-internal-commands",
         "events",
         "ledgers",
         "snarks",
@@ -119,6 +120,12 @@ impl IndexerStore {
         self.database
             .cf_handle("commands")
             .expect("commands column family exists")
+    }
+
+    fn internal_commands_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("mainnet-internal-commands")
+            .expect("mainnet-internal commands column family exists")
     }
 
     fn commands_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
@@ -1269,11 +1276,22 @@ impl CommandStore for IndexerStore {
 
         // add cmds with data to public keys
         let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
+            .clone()
             .into_iter()
             .map(|c| {
                 InternalCommandWithData::from_internal_cmd(c, &block.state_hash.clone().into())
             })
             .collect();
+
+        for (i, int_cmd) in internal_cmds.iter().enumerate() {
+            let key = format!("internal-{}-{}", block.state_hash, i);
+
+            self.database.put_cf(
+                self.internal_commands_cf(),
+                key.as_bytes(),
+                serde_json::to_vec(&int_cmd)?,
+            )?;
+        }
 
         for pk in block.all_public_keys() {
             trace!("Writing internal commands for {}", pk.0);
@@ -1368,6 +1386,11 @@ impl CommandStore for IndexerStore {
                     .ok()
                     .and_then(|s| s.parse().ok())
             }))
+    }
+
+    fn get_internal_commands_interator(&self) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.internal_commands_cf(), speedb::IteratorMode::Start)
     }
 }
 
