@@ -76,7 +76,7 @@ To perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-just test-regression"
+just test-regression
 ```
 
 ## Generating OCI Images With Nix
