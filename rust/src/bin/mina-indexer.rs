@@ -117,6 +117,14 @@ pub struct ServerArgs {
     /// Path to the locked supply file (CSV)
     #[arg(long, value_name = "FILE")]
     locked_supply_csv: Option<PathBuf>,
+
+    /// Path to the missing block recovery executable
+    #[arg(long)]
+    missing_block_recovery_exe: Option<PathBuf>,
+
+    /// Delay (sec) in between missing block recovery attempts
+    #[arg(long)]
+    missing_block_recovery_delay: Option<u64>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -271,6 +279,9 @@ pub fn process_indexer_configuration(
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
     let reporting_freq = args.reporting_freq;
+    let missing_block_recovery_exe = args.missing_block_recovery_exe;
+    let missing_block_recovery_delay = args.missing_block_recovery_delay;
+
     assert!(
         ledger.is_file(),
         "Ledger file does not exist at {}",
@@ -317,6 +328,8 @@ pub fn process_indexer_configuration(
                 initialization_mode: mode,
                 ledger_cadence,
                 reporting_freq,
+                missing_block_recovery_exe,
+                missing_block_recovery_delay,
             })
         }
     }
@@ -340,6 +353,8 @@ struct ServerArgsJson {
     locked_supply_csv: Option<String>,
     web_hostname: String,
     web_port: u16,
+    missing_block_recovery_exe: Option<String>,
+    missing_block_recovery_delay: Option<u64>,
 }
 
 impl From<ServerArgs> for ServerArgsJson {
@@ -376,6 +391,10 @@ impl From<ServerArgs> for ServerArgsJson {
                 .and_then(|p| p.to_str().map(|s| s.to_owned())),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
+            missing_block_recovery_delay: value.missing_block_recovery_delay,
+            missing_block_recovery_exe: value
+                .missing_block_recovery_exe
+                .map(|p| p.display().to_string()),
         }
     }
 }
@@ -399,6 +418,8 @@ impl From<ServerArgsJson> for ServerArgs {
             locked_supply_csv: value.locked_supply_csv.map(|p| p.into()),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
+            missing_block_recovery_delay: value.missing_block_recovery_delay,
+            missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
         }
     }
 }

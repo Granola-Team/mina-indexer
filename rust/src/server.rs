@@ -13,6 +13,7 @@ use crate::{
 use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -37,6 +38,8 @@ pub struct IndexerConfiguration {
     pub initialization_mode: InitializationMode,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub missing_block_recovery_exe: Option<PathBuf>,
+    pub missing_block_recovery_delay: Option<u64>,
 }
 
 pub struct MinaIndexer {
@@ -58,6 +61,8 @@ impl MinaIndexer {
     ) -> anyhow::Result<Self> {
         let block_watch_dir = config.block_watch_dir.clone();
         let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
+        let missing_block_recovery_delay = config.missing_block_recovery_delay;
+        let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let _witness_join_handle = tokio::spawn(async move {
             let state = initialize(config, store).unwrap_or_else(|e| {
                 error!("Error in server initialization: {}", e);
@@ -74,7 +79,15 @@ impl MinaIndexer {
                 .await;
             });
             // This modifies the state
-            if let Err(e) = run(block_watch_dir, staking_ledger_watch_dir, state).await {
+            if let Err(e) = run(
+                block_watch_dir,
+                staking_ledger_watch_dir,
+                missing_block_recovery_delay,
+                missing_block_recovery_exe,
+                state,
+            )
+            .await
+            {
                 error!("Error in server run: {}", e);
                 std::process::exit(1);
             }
@@ -238,6 +251,8 @@ fn matches_event_kind(kind: EventKind) -> bool {
 pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     staking_ledger_watch_dir: impl AsRef<Path>,
+    missing_block_recovery_delay: Option<u64>,
+    missing_block_recovery_exe_path: Option<PathBuf>,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     // setup fs-based precomputed block & staking ledger watchers
@@ -269,7 +284,8 @@ pub async fn run(
         staking_ledger_watch_dir.as_ref().display()
     );
 
-    // watch for precomputed blocks & staking ledgers
+    // watch for precomputed blocks & staking ledgers, and
+    // recover missing blocks
     loop {
         tokio::select! {
             _ = wait_for_signal() => {
@@ -279,7 +295,12 @@ pub async fn run(
             Some(res) = rx.recv() => {
                 match res {
                     Ok(event) => process_event(event, &state).await,
-                    Err(e) => error!("Ingestion watcher error: {:?}", e),
+                    Err(e) => error!("Ingestion watcher error: {}", e),
+                }
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
+                if let Some(ref missing_block_recovery_exe_path) = missing_block_recovery_exe_path {
+                    recover_missing_blocks(&state, &block_watch_dir, missing_block_recovery_exe_path).await
                 }
             }
         }
@@ -329,6 +350,50 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
             }
         }
     }
+}
+
+async fn recover_missing_blocks(
+    state: &Arc<RwLock<IndexerState>>,
+    block_watch_dir: impl AsRef<Path>,
+    missing_block_recovery_exe: impl AsRef<Path>,
+) {
+    let state = state.read().await;
+    let missing_blocks: HashSet<(u32, BlockHash)> = state
+        .dangling_branches
+        .iter()
+        .map(|b| {
+            (
+                b.root_block().blockchain_length.saturating_sub(1),
+                b.root_block().parent_hash.clone(),
+            )
+        })
+        .collect();
+    missing_blocks.iter().for_each(|parent| {
+        let network = state.network.clone();
+        let mut c =
+            std::process::Command::new(missing_block_recovery_exe.as_ref().display().to_string());
+        let cmd = c.args([
+            &network,
+            &parent.0.to_string(),
+            &parent.1 .0,
+            &block_watch_dir.as_ref().display().to_string(),
+        ]);
+        match cmd.output() {
+            Ok(output) => {
+                use std::io::*;
+                stdout().write_all(&output.stdout).unwrap();
+                stderr().write_all(&output.stderr).unwrap();
+            }
+            Err(e) => error!(
+                "Error recovery missing block: {}, pgm: {}, args: {:?}",
+                e,
+                cmd.get_program().to_str().unwrap(),
+                cmd.get_args()
+                    .map(|arg| arg.to_str().unwrap())
+                    .collect::<Vec<&str>>()
+            ),
+        }
+    });
 }
 
 fn log_dirs_msg(blocks_dir: Option<&PathBuf>, staking_ledgers_dir: Option<&PathBuf>) {
