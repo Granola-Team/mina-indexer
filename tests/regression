@@ -1751,6 +1751,8 @@ test_missing_block_recovery() {
     setup
     dl_mainnet 7 ./blocks
 
+    # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
+    # wait for 3s in between recovery attempts
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -1765,15 +1767,15 @@ test_missing_block_recovery() {
     dl_mainnet_single 15 ./blocks
     dl_mainnet_single 20 ./blocks
 
+    sleep 1
+    assert 3 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+
     # wait for missing block recovery to work its magic
     sleep 5
 
     # check that all dangling branches have resolved & the best block has the right height
-    num_dangling=$(idxr summary --json | jq -r .witness_tree.num_dangling)
-    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-
-    assert 0 $num_dangling
-    assert 20 $best_length
+    assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+    assert 20 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
     teardown
 }
