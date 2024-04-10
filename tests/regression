@@ -1727,14 +1727,6 @@ test_accounts_gql() {
 test_missing_block_recovery() {
     test=test_missing_block_recovery
 
-    cat > ./recovery_script.sh <<EOF
-#!/usr/bin/env bash
-set -x
-cp "$SRC"/tests/data/initial-blocks/"\$1"-*-"\$3".json "\$4"
-EOF
-
-    chmod +x ./recovery_script.sh
-
     setup
     dl_mainnet 7 ./blocks
 
@@ -1742,7 +1734,7 @@ EOF
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
-        --missing-block-recovery-exe ./recovery_script.sh \
+        --missing-block-recovery-exe "$SRC"/tests/recovery.sh \
         --missing-block-recovery-delay 3 \
         --log-level debug
     wait_for_socket
