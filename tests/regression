@@ -1736,15 +1736,23 @@ test_missing_block_recovery() {
         --database-dir ./database \
         --missing-block-recovery-exe "$SRC"/tests/recovery.sh \
         --missing-block-recovery-delay 3 \
+        --missing-block-recovery-batch true \
         --log-level debug
     wait_for_socket
 
-    dl_mainnet_single 10 ./blocks # missing block heights 8 & 9
+    # miss blocks at heights 8-14,16-19
+    dl_mainnet_single 15 ./blocks
+    dl_mainnet_single 20 ./blocks
 
     # wait for missing block recovery to work its magic
-    sleep 10
+    sleep 5
+
+    # check that all dangling branches have resolved & the best block has the right height
     num_dangling=$(idxr summary --json | jq -r .witness_tree.num_dangling)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+
     assert 0 $num_dangling
+    assert 20 $best_length
 
     teardown
 }
