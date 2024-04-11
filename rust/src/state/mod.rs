@@ -546,27 +546,35 @@ impl IndexerState {
         {
             trace!("Root extension block {}", precomputed_block.summary());
             // check if new block connects to a dangling branch
-            let mut merged_tip_id = None;
+            let mut merged_tip_ids = vec![];
             let mut branches_to_remove = Vec::new();
 
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 // new block is the parent of the dangling branch root
                 if is_reverse_extension(dangling_branch, precomputed_block) {
-                    merged_tip_id = self.root_branch.merge_on(&new_node_id, dangling_branch);
+                    merged_tip_ids.push(
+                        self.root_branch
+                            .merge_on(&new_node_id, dangling_branch)
+                            .unwrap(),
+                    );
                     branches_to_remove.push(index);
                 }
             }
 
-            if let Some(merged_tip_id) = merged_tip_id {
+            let best_tip_id = merged_tip_ids.iter().min_by(|a, b| {
+                let a_best_block = self.root_branch.branches.get(a).unwrap().data().clone();
+                let b_best_block = self.root_branch.branches.get(b).unwrap().data().clone();
+                a_best_block.cmp(&b_best_block)
+            });
+            if let Some(merged_tip_id) = best_tip_id {
                 let merged_tip_block = self
                     .root_branch
                     .branches
-                    .get(&merged_tip_id)
+                    .get(merged_tip_id)
                     .unwrap()
                     .data()
                     .clone();
-
-                self.update_best_tip(&merged_tip_block, &merged_tip_id);
+                self.update_best_tip(&merged_tip_block, merged_tip_id);
             }
             self.update_best_tip(&new_block, &new_node_id);
 
