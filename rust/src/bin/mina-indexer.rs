@@ -125,6 +125,10 @@ pub struct ServerArgs {
     /// Delay (sec) in between missing block recovery attempts
     #[arg(long)]
     missing_block_recovery_delay: Option<u64>,
+
+    /// Recover all blocks at all missing heights
+    #[arg(long)]
+    missing_block_recovery_batch: Option<bool>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -281,6 +285,7 @@ pub fn process_indexer_configuration(
     let reporting_freq = args.reporting_freq;
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
+    let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
 
     assert!(
         ledger.is_file(),
@@ -330,6 +335,7 @@ pub fn process_indexer_configuration(
                 reporting_freq,
                 missing_block_recovery_exe,
                 missing_block_recovery_delay,
+                missing_block_recovery_batch,
             })
         }
     }
@@ -355,6 +361,7 @@ struct ServerArgsJson {
     web_port: u16,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
+    missing_block_recovery_batch: Option<bool>,
 }
 
 impl From<ServerArgs> for ServerArgsJson {
@@ -395,6 +402,7 @@ impl From<ServerArgs> for ServerArgsJson {
             missing_block_recovery_exe: value
                 .missing_block_recovery_exe
                 .map(|p| p.display().to_string()),
+            missing_block_recovery_batch: value.missing_block_recovery_batch,
         }
     }
 }
@@ -420,6 +428,7 @@ impl From<ServerArgsJson> for ServerArgs {
             web_port: value.web_port,
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
+            missing_block_recovery_batch: value.missing_block_recovery_batch,
         }
     }
 }

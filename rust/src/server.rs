@@ -40,6 +40,7 @@ pub struct IndexerConfiguration {
     pub reporting_freq: u32,
     pub missing_block_recovery_exe: Option<PathBuf>,
     pub missing_block_recovery_delay: Option<u64>,
+    pub missing_block_recovery_batch: bool,
 }
 
 pub struct MinaIndexer {
@@ -63,38 +64,40 @@ impl MinaIndexer {
         let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
         let missing_block_recovery_delay = config.missing_block_recovery_delay;
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
-        let _witness_join_handle = tokio::spawn(async move {
-            let state = initialize(config, store).unwrap_or_else(|e| {
-                error!("Error in server initialization: {}", e);
-                std::process::exit(1);
-            });
-            let state = Arc::new(RwLock::new(state));
-            // Needs read-only state for summary
-            let uds_state = state.clone();
-            tokio::spawn(async move {
-                unix_socket_server::run(
-                    UnixSocketServer::new(uds_state, domain_socket_path),
-                    wait_for_signal(),
-                )
-                .await;
-            });
-            // This modifies the state
-            if let Err(e) = run(
-                block_watch_dir,
-                staking_ledger_watch_dir,
-                missing_block_recovery_delay,
-                missing_block_recovery_exe,
-                state,
-            )
-            .await
-            {
-                error!("Error in server run: {}", e);
-                std::process::exit(1);
-            }
-        });
-
+        let missing_block_recovery_batch = config.missing_block_recovery_batch;
         Ok(Self {
-            _witness_join_handle,
+            _witness_join_handle: tokio::spawn(async move {
+                let state = initialize(config, store).unwrap_or_else(|e| {
+                    error!("Error in server initialization: {}", e);
+                    std::process::exit(1);
+                });
+                let state = Arc::new(RwLock::new(state));
+
+                // Needs read-only state for summary
+                let uds_state = state.clone();
+                tokio::spawn(async move {
+                    unix_socket_server::run(
+                        UnixSocketServer::new(uds_state, domain_socket_path),
+                        wait_for_signal(),
+                    )
+                    .await;
+                });
+
+                // Modifies the state
+                if let Err(e) = run(
+                    block_watch_dir,
+                    staking_ledger_watch_dir,
+                    missing_block_recovery_delay,
+                    missing_block_recovery_exe,
+                    missing_block_recovery_batch,
+                    state,
+                )
+                .await
+                {
+                    error!("Error in server run: {}", e);
+                    std::process::exit(1);
+                }
+            }),
         })
     }
 
@@ -252,7 +255,8 @@ pub async fn run(
     block_watch_dir: impl AsRef<Path>,
     staking_ledger_watch_dir: impl AsRef<Path>,
     missing_block_recovery_delay: Option<u64>,
-    missing_block_recovery_exe_path: Option<PathBuf>,
+    missing_block_recovery_exe: Option<PathBuf>,
+    missing_block_recovery_batch: bool,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     // setup fs-based precomputed block & staking ledger watchers
@@ -299,8 +303,8 @@ pub async fn run(
                 }
             }
             _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
-                if let Some(ref missing_block_recovery_exe_path) = missing_block_recovery_exe_path {
-                    recover_missing_blocks(&state, &block_watch_dir, missing_block_recovery_exe_path).await
+                if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
+                    recover_missing_blocks(&state, &block_watch_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
                 }
             }
         }
@@ -319,6 +323,14 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
+                        if block.blockchain_length
+                            <= state.root_branch.root_block().blockchain_length
+                            || state
+                                .diffs_map
+                                .contains_key(&block.state_hash.clone().into())
+                        {
+                            return info!("Block not added to witness tree {}", block.summary());
+                        }
                         match state.block_pipeline(&block) {
                             Ok(_) => info!("Added block {}", block.summary()),
                             Err(e) => error!("Error adding block: {}", e),
@@ -352,30 +364,30 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
     }
 }
 
+/// Recovers missing blocks
 async fn recover_missing_blocks(
     state: &Arc<RwLock<IndexerState>>,
     block_watch_dir: impl AsRef<Path>,
     missing_block_recovery_exe: impl AsRef<Path>,
+    batch_recovery: bool,
 ) {
     let state = state.read().await;
-    let missing_blocks: HashSet<(u32, BlockHash)> = state
+    let network = state.network.clone();
+    let missing_parent_lengths: HashSet<u32> = state
         .dangling_branches
         .iter()
-        .map(|b| {
-            (
-                b.root_block().blockchain_length.saturating_sub(1),
-                b.root_block().parent_hash.clone(),
-            )
-        })
+        .map(|b| b.root_block().blockchain_length.saturating_sub(1))
         .collect();
-    missing_blocks.iter().for_each(|parent| {
-        let network = state.network.clone();
+    if missing_parent_lengths.is_empty() {
+        return;
+    }
+
+    let run_missing_blocks_recovery = |blockchain_length: u32| {
         let mut c =
             std::process::Command::new(missing_block_recovery_exe.as_ref().display().to_string());
         let cmd = c.args([
             &network,
-            &parent.0.to_string(),
-            &parent.1 .0,
+            &blockchain_length.to_string(),
             &block_watch_dir.as_ref().display().to_string(),
         ]);
         match cmd.output() {
@@ -393,7 +405,23 @@ async fn recover_missing_blocks(
                     .collect::<Vec<&str>>()
             ),
         }
-    });
+    };
+
+    debug!("Getting missing parent blocks of dangling roots");
+    let min_missing_length = missing_parent_lengths.iter().min().cloned();
+    let max_missing_length = missing_parent_lengths.iter().max().cloned();
+    missing_parent_lengths
+        .into_iter()
+        .for_each(run_missing_blocks_recovery);
+
+    if batch_recovery {
+        let best_tip_length = state.best_tip_block().blockchain_length;
+        if let (Some(min), Some(max)) = (min_missing_length, max_missing_length) {
+            let min_length = best_tip_length.min(min);
+            let max_length = best_tip_length.max(max);
+            (min_length..max_length).for_each(run_missing_blocks_recovery)
+        }
+    }
 }
 
 fn log_dirs_msg(blocks_dir: Option<&PathBuf>, staking_ledgers_dir: Option<&PathBuf>) {
