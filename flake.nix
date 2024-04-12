@@ -30,6 +30,7 @@
             check-jsonschema
             clang
             curl
+            hurl
             jq
             libclang.lib
             pkg-config
