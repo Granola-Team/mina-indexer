@@ -1724,6 +1724,27 @@ test_accounts_gql() {
     teardown
 }
 
+test_hurl() {
+    test=test_hurl
+
+    setup
+    dl_mainnet 100 ./blocks
+    port=$(ephemeral_port)
+
+    idxr_server start \
+        --blocks-dir ./blocks \
+        --staking-ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-level debug \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0"
+    wait_for_socket
+
+    hurl --variable url=http://localhost:"$port"/graphql --test "$SRC"/tests/hurl/*.hurl
+
+    teardown
+}
+
 test_missing_block_recovery() {
     test=test_missing_block_recovery
 
@@ -1791,6 +1812,7 @@ if [ "$#" -eq 0 ]; then
     test_internal_commands
     test_start_from_config
     test_accounts_gql
+    test_hurl
     # TODO: still not working
     # test_clean_shutdown
 else
@@ -1829,6 +1851,7 @@ else
             "test_internal_commands") test_internal_commands ;;
             "test_start_from_config") test_start_from_config ;;
             "test_accounts_gql") test_accounts_gql ;;
+            "test_hurl") test_hurl ;;
             "test_many_blocks") test_many_blocks ;;
             "test_clean_shutdown") test_clean_shutdown ;;
             "test_release") test_release ;;

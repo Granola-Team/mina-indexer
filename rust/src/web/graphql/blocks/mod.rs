@@ -1,19 +1,14 @@
+use super::db;
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
     ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
-    store::IndexerStore,
+    web::graphql::gen::BlockQueryInput,
 };
-use async_graphql::{Context, InputObject, Object, Result, SimpleObject};
+use async_graphql::{Context, Object, Result, SimpleObject};
 use chrono::{DateTime, SecondsFormat};
-use std::sync::Arc;
-
-#[derive(InputObject)]
-pub struct BlockQueryInput {
-    state_hash: String,
-}
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -25,17 +20,24 @@ impl BlocksQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<BlockQueryInput>,
     ) -> Result<Option<BlockWithCanonicity>> {
-        let db = ctx
-            .data::<Arc<IndexerStore>>()
-            .expect("db to be in context");
-        // Choose geneesis block if query is None
-        let state_hash = match query {
-            Some(query) => BlockHash::from(query.state_hash),
-            None => match db.get_canonical_hash_at_height(1)? {
+        let db = db(ctx);
+        // Choose genesis block if query is None
+        let state_hash = if let Some(query) = &query {
+            if let Some(state_hash) = &query.state_hash {
+                BlockHash::from(state_hash.clone())
+            } else {
+                match db.get_canonical_hash_at_height(1)? {
+                    Some(state_hash) => state_hash,
+                    None => return Ok(None),
+                }
+            }
+        } else {
+            match db.get_canonical_hash_at_height(1)? {
                 Some(state_hash) => state_hash,
                 None => return Ok(None),
-            },
+            }
         };
+
         let pcb = match db.get_block(&state_hash)? {
             Some(pcb) => pcb,
             None => return Ok(None),
