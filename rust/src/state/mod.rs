@@ -380,10 +380,12 @@ impl IndexerState {
                 block_parser.num_deep_canonical_blocks + 1
             ); // +1 genesis
         }
+
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing deep canonical chain");
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
-        // now add the orphaned blocks
+
+        // deep canonical & recent blocks added, now add orphaned blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
     }
 
@@ -416,18 +418,18 @@ impl IndexerState {
         );
 
         while let Some((parsed_block, block_bytes)) = block_parser.next_block()? {
-            self.blocks_processed += 1;
-            self.bytes_processed += block_bytes;
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
             match parsed_block {
                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
                     info!("Adding block to witness tree {}", block.summary());
-                    self.block_pipeline(&block)?;
+                    self.block_pipeline(&block, block_bytes)?;
                 }
                 ParsedBlock::Orphaned(block) => {
                     debug!("Adding orphaned block to store {}", block.summary());
+                    self.blocks_processed += 1;
+                    self.bytes_processed += block_bytes;
                     self.add_block_to_store(&block)?;
                 }
             }
@@ -452,8 +454,13 @@ impl IndexerState {
     /// - db processes
     ///     - best block update
     ///     - new deep canonical blocks
-    pub fn block_pipeline(&mut self, block: &PrecomputedBlock) -> anyhow::Result<bool> {
+    pub fn block_pipeline(
+        &mut self,
+        block: &PrecomputedBlock,
+        block_bytes: u64,
+    ) -> anyhow::Result<bool> {
         if let Some(db_event) = self.add_block_to_store(block)? {
+            self.bytes_processed += block_bytes;
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
                 if let Some(wt_event) = self.add_block_to_witness_tree(block)?.1 {
                     match wt_event {
@@ -499,6 +506,7 @@ impl IndexerState {
             precomputed_block.state_hash.clone().into(),
             LedgerDiff::from_precomputed(precomputed_block),
         );
+        self.blocks_processed += 1;
 
         // forward extension on root branch
         if self.is_length_within_root_bounds(precomputed_block) {
@@ -856,10 +864,13 @@ impl IndexerState {
     pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut successive_blocks = vec![];
+        let blocks_processed;
 
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let event_log = indexer_store.get_event_log()?;
             let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
+            blocks_processed = event_log.iter().filter(|e| e.is_new_block_event()).count() as u32;
+
             if let Some(IndexerEvent::Db(DbEvent::Canonicity(
                 DbCanonicityEvent::NewCanonicalBlock {
                     network: _,
@@ -943,6 +954,7 @@ impl IndexerState {
             self.add_block_to_witness_tree(&block)?;
         }
 
+        self.blocks_processed = blocks_processed;
         Ok(min_length_filter)
     }
 
@@ -1158,7 +1170,7 @@ impl IndexerState {
 
     /// Check that all relevant data & indices exist and are consistent
     fn replay_precomputed_block(
-        &self,
+        &mut self,
         network: &str,
         state_hash: &BlockHash,
         blockchain_length: &u32,
@@ -1241,7 +1253,9 @@ impl IndexerState {
                     panic!("Fatal: no SNARK work for public key {}", pk.0);
                 }
             }
+
             // only after all checks pass
+            self.blocks_processed += 1;
             return Ok(());
         }
         panic!(
