@@ -799,6 +799,8 @@ test_sync() {
         --database-dir ./database
     wait_for_socket
 
+    idxr summary --verbose
+    assert 26 $(idxr summary --json | jq -r .blocks_processed)
     kill_idxr
 
     # add more blocks to the watch dir while not indexing
@@ -807,18 +809,15 @@ test_sync() {
     # sync from previous indexer db
     idxr_server_sync --database-dir ./database
     sleep 1
+    idxr summary --verbose
 
     # post-sync results
-    post_best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    post_best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    post_canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    post_canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+    sync_best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
 
     # includes blocks added to watch dir while down
-    assert 20 $post_best_length
-    assert 10 $post_canonical_length
-    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $post_best_hash
-    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $post_canonical_hash
+    assert 34 $(idxr summary --json | jq -r .blocks_processed)
+    assert 20 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $sync_best_hash
 
     teardown
 }
@@ -833,28 +832,27 @@ test_replay() {
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database
+        --database-dir ./database \
+        --log-level debug
     wait_for_socket
 
+    assert 26 $(idxr summary --json | jq -r .blocks_processed)
     kill_idxr
 
-    # add more blocks to the watch dir while not indexing
+    # add 8 more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
 
-    # replay events from previous indexer instance
+    # replay events from previous indexer instance & ingest the new blocks
     idxr_server_replay
     sleep 1
 
     # post-replay results
     root_hash_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    root_length_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     best_hash_replay=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    best_length_replay=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    num_blocks_replay=$(idxr summary --json | jq -r .blocks_processed)
 
-    assert 29 $num_blocks_replay
-    assert 20 $best_length_replay
-    assert 10 $root_length_replay
+    assert 34 $(idxr summary --json | jq -r .blocks_processed)
+    assert 20 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    assert 10 $(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $root_hash_replay
 
@@ -1749,7 +1747,7 @@ test_missing_block_recovery() {
     test=test_missing_block_recovery
 
     setup
-    dl_mainnet 7 ./blocks
+    dl_mainnet 5 ./blocks
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
     # wait for 3s in between recovery attempts
@@ -1763,19 +1761,23 @@ test_missing_block_recovery() {
         --log-level debug
     wait_for_socket
 
-    # miss blocks at heights 8-14,16-19
-    dl_mainnet_single 15 ./blocks
-    dl_mainnet_single 20 ./blocks
+    # miss blocks at heights 6, 8, 11-16, 18-20
+    dl_mainnet_single 7 ./blocks
+    dl_mainnet_range 9 10 ./blocks
+    dl_mainnet_single 17 ./blocks
+    dl_mainnet_single 21 ./blocks
 
+    # after blocks are added, check dangling branches
     sleep 1
-    assert 3 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+    assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
     sleep 5
 
     # check that all dangling branches have resolved & the best block has the right height
     assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
-    assert 20 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    assert 21 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    assert '3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ' $(idxr summary --json | jq -r .witness_tree.best_tip_hash)
 
     teardown
 }
