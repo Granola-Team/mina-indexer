@@ -323,16 +323,21 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
-                        if block.blockchain_length
-                            <= state.root_branch.root_block().blockchain_length
-                            || state
-                                .diffs_map
-                                .contains_key(&block.state_hash.clone().into())
+                        if state
+                            .diffs_map
+                            .contains_key(&block.state_hash.clone().into())
                         {
-                            return info!("Block not added to witness tree {}", block.summary());
+                            return info!(
+                                "Block is already present in the witness tree {}",
+                                block.summary()
+                            );
                         }
-                        match state.block_pipeline(&block) {
-                            Ok(_) => info!("Added block {}", block.summary()),
+                        match state.block_pipeline(&block, path.metadata().unwrap().len()) {
+                            Ok(is_added) => {
+                                if is_added {
+                                    info!("Added block {}", block.summary())
+                                }
+                            }
                             Err(e) => error!("Error adding block: {}", e),
                         }
                     }
