@@ -1283,25 +1283,24 @@ test_startup_staking_ledgers() {
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
     epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
 
-    epoch=$(cat ./epoch_0_ledger.json | jq -r .epoch)
-    network=$(cat ./epoch_0_ledger.json | jq -r .network)
-    ledger_hash=$(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
-    token=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
-    public_key=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
-    balance=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
-    delegate=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
+    # check epoch 0 staking ledger values are correct
     voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
     receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
-    assert '1' $token
-    assert '0' $epoch
-    assert $pk $delegate
-    assert $pk $public_key
-    assert '1000' $balance
-    assert 'mainnet' $network
-    assert $epoch0 $ledger_hash
+    assert 0 $(cat ./epoch_0_ledger.json | jq -r .epoch)
+    assert 1 $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
+    assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
+    assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
+    assert 1000 $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
+    assert $epoch0 $(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
+    assert 'mainnet' $(cat ./epoch_0_ledger.json | jq -r .network)
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
+
+    # check summary staking epoch info
+    max_staking_ledger_hash=$(idxr summary --json | jq -r .max_staking_ledger_hash)
+    assert 42 $(idxr summary --json | jq -r .max_staking_ledger_epoch)
+    assert 'jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH' $max_staking_ledger_hash
 
     teardown
 }
