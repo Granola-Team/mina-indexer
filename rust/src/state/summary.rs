@@ -5,7 +5,8 @@ use std::str::Lines;
 pub trait Summary {
     fn uptime(&self) -> std::time::Duration;
     fn blocks_processed(&self) -> u32;
-    fn bytes_processed(&self) -> bytesize::ByteSize;
+    fn max_staking_ledger_epoch(&self) -> Option<u32>;
+    fn max_staking_ledger_hash(&self) -> Option<String>;
     fn best_tip_length(&self) -> u32;
     fn best_tip_hash(&self) -> String;
     fn canonical_root_length(&self) -> u32;
@@ -24,7 +25,8 @@ pub trait Summary {
 pub struct SummaryShort {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
-    pub bytes_processed: u64,
+    pub max_staking_ledger_epoch: Option<u32>,
+    pub max_staking_ledger_hash: Option<String>,
     pub witness_tree: WitnessTreeSummaryShort,
     pub db_stats: Option<DbStats>,
 }
@@ -33,7 +35,8 @@ pub struct SummaryShort {
 pub struct SummaryVerbose {
     pub uptime: std::time::Duration,
     pub blocks_processed: u32,
-    pub bytes_processed: u64,
+    pub max_staking_ledger_epoch: Option<u32>,
+    pub max_staking_ledger_hash: Option<String>,
     pub witness_tree: WitnessTreeSummaryVerbose,
     pub db_stats: Option<DbStats>,
 }
@@ -101,7 +104,8 @@ impl From<SummaryVerbose> for SummaryShort {
         Self {
             uptime: value.uptime,
             blocks_processed: value.blocks_processed,
-            bytes_processed: value.bytes_processed,
+            max_staking_ledger_epoch: value.max_staking_ledger_epoch,
+            max_staking_ledger_hash: value.max_staking_ledger_hash,
             witness_tree: value.witness_tree.into(),
             db_stats: value.db_stats,
         }
@@ -129,12 +133,18 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
 fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "===== Mina-indexer summary =====")?;
     writeln!(f, "  Uptime:       {:?}", state.uptime())?;
-    writeln!(
-        f,
-        "  Blocks added: {} ({})",
-        state.blocks_processed(),
-        state.bytes_processed(),
-    )?;
+    writeln!(f, "  Blocks added: {}", state.blocks_processed())?;
+    if let (Some(max_staking_ledger_epoch), Some(max_staking_ledger_hash)) = (
+        state.max_staking_ledger_epoch(),
+        state.max_staking_ledger_hash(),
+    ) {
+        writeln!(
+            f,
+            "  Max staking ledger epoch: {}",
+            max_staking_ledger_epoch
+        )?;
+        writeln!(f, "  Max staking ledger hash:  {}", max_staking_ledger_hash)?;
+    }
 
     writeln!(f, "\n=== Root branch ===")?;
     writeln!(f, "  Height:                {}", state.root_height())?;
@@ -143,16 +153,6 @@ fn summary_short(state: &impl Summary, f: &mut std::fmt::Formatter<'_>) -> std::
     writeln!(f, "  Root hash:             {}", state.root_hash())?;
     writeln!(f, "  Best tip length:       {}", state.best_tip_length())?;
     writeln!(f, "  Best tip hash:         {}", state.best_tip_hash())?;
-    writeln!(
-        f,
-        "  Canonical root length: {}",
-        state.canonical_root_length()
-    )?;
-    writeln!(
-        f,
-        "  Canonical root hash:   {}",
-        state.canonical_root_hash()
-    )?;
 
     if state.num_dangling() > 0 {
         writeln!(f, "\n=== Dangling branches ===")?;
@@ -192,8 +192,12 @@ impl Summary for SummaryShort {
         self.blocks_processed
     }
 
-    fn bytes_processed(&self) -> bytesize::ByteSize {
-        bytesize::ByteSize::b(self.bytes_processed)
+    fn max_staking_ledger_epoch(&self) -> Option<u32> {
+        self.max_staking_ledger_epoch
+    }
+
+    fn max_staking_ledger_hash(&self) -> Option<String> {
+        self.max_staking_ledger_hash.clone()
     }
 
     fn canonical_root_hash(&self) -> String {
@@ -254,8 +258,12 @@ impl Summary for SummaryVerbose {
         self.blocks_processed
     }
 
-    fn bytes_processed(&self) -> bytesize::ByteSize {
-        bytesize::ByteSize::b(self.bytes_processed)
+    fn max_staking_ledger_epoch(&self) -> Option<u32> {
+        self.max_staking_ledger_epoch
+    }
+
+    fn max_staking_ledger_hash(&self) -> Option<String> {
+        self.max_staking_ledger_hash.clone()
     }
 
     fn canonical_root_hash(&self) -> String {
