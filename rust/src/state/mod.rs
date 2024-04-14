@@ -62,6 +62,8 @@ pub struct IndexerState {
     pub dangling_branches: Vec<Branch>,
     /// Block database
     pub indexer_store: Option<Arc<IndexerStore>>,
+    /// Staking ledger epochs and ledger hashes
+    pub staking_ledgers: HashMap<u32, LedgerHash>,
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
     /// Interval to prune the root branch
@@ -216,6 +218,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             network: config.network.clone(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -245,6 +248,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             network: config.network.clone(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -302,6 +306,7 @@ impl IndexerState {
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             network: "mainnet".into(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -810,7 +815,7 @@ impl IndexerState {
 
     /// Add staking ledgers to the underlying ledger store
     pub fn add_startup_staking_ledgers_to_store(
-        &self,
+        &mut self,
         ledgers_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
         match std::fs::read_dir(ledgers_dir) {
@@ -826,6 +831,9 @@ impl IndexerState {
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
+                self.staking_ledgers
+                    .insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
+
                 let summary = staking_ledger.summary();
                 indexer_store.add_staking_ledger(staking_ledger)?;
                 info!("Added staking ledger {}", summary);
@@ -1437,12 +1445,18 @@ impl IndexerState {
             max_dangling_height,
             max_dangling_length,
         };
+        let max_staking_ledger_epoch = self.staking_ledgers.keys().max().cloned();
 
         SummaryShort {
             witness_tree,
-            bytes_processed: self.bytes_processed,
+            max_staking_ledger_epoch,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
+            max_staking_ledger_hash: self
+                .staking_ledgers
+                .get(&max_staking_ledger_epoch.unwrap_or(0))
+                .cloned()
+                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1480,12 +1494,18 @@ impl IndexerState {
             max_dangling_length,
             witness_tree: format!("{self}"),
         };
+        let max_staking_ledger_epoch = self.staking_ledgers.keys().max().cloned();
 
         SummaryVerbose {
             witness_tree,
-            bytes_processed: self.bytes_processed,
+            max_staking_ledger_epoch,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
+            max_staking_ledger_hash: self
+                .staking_ledgers
+                .get(&max_staking_ledger_epoch.unwrap_or(0))
+                .cloned()
+                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
