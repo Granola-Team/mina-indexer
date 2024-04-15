@@ -323,16 +323,21 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
-                        if block.blockchain_length
-                            <= state.root_branch.root_block().blockchain_length
-                            || state
-                                .diffs_map
-                                .contains_key(&block.state_hash.clone().into())
+                        if state
+                            .diffs_map
+                            .contains_key(&block.state_hash.clone().into())
                         {
-                            return info!("Block not added to witness tree {}", block.summary());
+                            return info!(
+                                "Block is already present in the witness tree {}",
+                                block.summary()
+                            );
                         }
-                        match state.block_pipeline(&block) {
-                            Ok(_) => info!("Added block {}", block.summary()),
+                        match state.block_pipeline(&block, path.metadata().unwrap().len()) {
+                            Ok(is_added) => {
+                                if is_added {
+                                    info!("Added block {}", block.summary())
+                                }
+                            }
                             Err(e) => error!("Error adding block: {}", e),
                         }
                     }
@@ -340,16 +345,21 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                 }
             } else if staking::is_valid_ledger_file(&path) {
                 // Acquire write lock
-                let state = state.write().await;
+                let mut state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
                     match StakingLedger::parse_file(&path) {
                         Ok(staking_ledger) => {
+                            let epoch = staking_ledger.epoch;
+                            let ledger_hash = staking_ledger.ledger_hash.clone();
                             let ledger_summary = staking_ledger.summary();
                             match store.add_staking_ledger(staking_ledger) {
                                 Ok(_) => {
+                                    state.staking_ledgers.insert(epoch, ledger_hash);
                                     info!("Added staking ledger {}", ledger_summary);
                                 }
-                                Err(e) => error!("Error adding staking ledger: {}", e),
+                                Err(e) => {
+                                    error!("Error adding staking ledger {} {}", ledger_summary, e)
+                                }
                             }
                         }
                         Err(e) => {

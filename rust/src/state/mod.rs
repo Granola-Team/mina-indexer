@@ -62,6 +62,8 @@ pub struct IndexerState {
     pub dangling_branches: Vec<Branch>,
     /// Block database
     pub indexer_store: Option<Arc<IndexerStore>>,
+    /// Staking ledger epochs and ledger hashes
+    pub staking_ledgers: HashMap<u32, LedgerHash>,
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
     /// Interval to prune the root branch
@@ -216,6 +218,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             network: config.network.clone(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -245,6 +248,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             network: config.network.clone(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -302,6 +306,7 @@ impl IndexerState {
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             network: "mainnet".into(),
+            staking_ledgers: HashMap::new(),
         })
     }
 
@@ -380,10 +385,12 @@ impl IndexerState {
                 block_parser.num_deep_canonical_blocks + 1
             ); // +1 genesis
         }
+
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing deep canonical chain");
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
-        // now add the orphaned blocks
+
+        // deep canonical & recent blocks added, now add orphaned blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
     }
 
@@ -416,18 +423,18 @@ impl IndexerState {
         );
 
         while let Some((parsed_block, block_bytes)) = block_parser.next_block()? {
-            self.blocks_processed += 1;
-            self.bytes_processed += block_bytes;
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 
             match parsed_block {
                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
                     info!("Adding block to witness tree {}", block.summary());
-                    self.block_pipeline(&block)?;
+                    self.block_pipeline(&block, block_bytes)?;
                 }
                 ParsedBlock::Orphaned(block) => {
                     debug!("Adding orphaned block to store {}", block.summary());
+                    self.blocks_processed += 1;
+                    self.bytes_processed += block_bytes;
                     self.add_block_to_store(&block)?;
                 }
             }
@@ -452,8 +459,13 @@ impl IndexerState {
     /// - db processes
     ///     - best block update
     ///     - new deep canonical blocks
-    pub fn block_pipeline(&mut self, block: &PrecomputedBlock) -> anyhow::Result<bool> {
+    pub fn block_pipeline(
+        &mut self,
+        block: &PrecomputedBlock,
+        block_bytes: u64,
+    ) -> anyhow::Result<bool> {
         if let Some(db_event) = self.add_block_to_store(block)? {
+            self.bytes_processed += block_bytes;
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
                 if let Some(wt_event) = self.add_block_to_witness_tree(block)?.1 {
                     match wt_event {
@@ -499,6 +511,7 @@ impl IndexerState {
             precomputed_block.state_hash.clone().into(),
             LedgerDiff::from_precomputed(precomputed_block),
         );
+        self.blocks_processed += 1;
 
         // forward extension on root branch
         if self.is_length_within_root_bounds(precomputed_block) {
@@ -802,7 +815,7 @@ impl IndexerState {
 
     /// Add staking ledgers to the underlying ledger store
     pub fn add_startup_staking_ledgers_to_store(
-        &self,
+        &mut self,
         ledgers_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
         match std::fs::read_dir(ledgers_dir) {
@@ -818,6 +831,9 @@ impl IndexerState {
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
+                self.staking_ledgers
+                    .insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
+
                 let summary = staking_ledger.summary();
                 indexer_store.add_staking_ledger(staking_ledger)?;
                 info!("Added staking ledger {}", summary);
@@ -856,10 +872,13 @@ impl IndexerState {
     pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut successive_blocks = vec![];
+        let blocks_processed;
 
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let event_log = indexer_store.get_event_log()?;
             let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
+            blocks_processed = event_log.iter().filter(|e| e.is_new_block_event()).count() as u32;
+
             if let Some(IndexerEvent::Db(DbEvent::Canonicity(
                 DbCanonicityEvent::NewCanonicalBlock {
                     network: _,
@@ -943,6 +962,7 @@ impl IndexerState {
             self.add_block_to_witness_tree(&block)?;
         }
 
+        self.blocks_processed = blocks_processed;
         Ok(min_length_filter)
     }
 
@@ -1158,7 +1178,7 @@ impl IndexerState {
 
     /// Check that all relevant data & indices exist and are consistent
     fn replay_precomputed_block(
-        &self,
+        &mut self,
         network: &str,
         state_hash: &BlockHash,
         blockchain_length: &u32,
@@ -1241,7 +1261,9 @@ impl IndexerState {
                     panic!("Fatal: no SNARK work for public key {}", pk.0);
                 }
             }
+
             // only after all checks pass
+            self.blocks_processed += 1;
             return Ok(());
         }
         panic!(
@@ -1423,12 +1445,18 @@ impl IndexerState {
             max_dangling_height,
             max_dangling_length,
         };
+        let max_staking_ledger_epoch = self.staking_ledgers.keys().max().cloned();
 
         SummaryShort {
             witness_tree,
-            bytes_processed: self.bytes_processed,
+            max_staking_ledger_epoch,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
+            max_staking_ledger_hash: self
+                .staking_ledgers
+                .get(&max_staking_ledger_epoch.unwrap_or(0))
+                .cloned()
+                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1466,12 +1494,18 @@ impl IndexerState {
             max_dangling_length,
             witness_tree: format!("{self}"),
         };
+        let max_staking_ledger_epoch = self.staking_ledgers.keys().max().cloned();
 
         SummaryVerbose {
             witness_tree,
-            bytes_processed: self.bytes_processed,
+            max_staking_ledger_epoch,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
+            max_staking_ledger_hash: self
+                .staking_ledgers
+                .get(&max_staking_ledger_epoch.unwrap_or(0))
+                .cloned()
+                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
