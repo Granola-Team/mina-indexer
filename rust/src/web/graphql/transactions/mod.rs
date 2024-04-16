@@ -2,19 +2,22 @@ use super::{date_time_to_scalar, db, F64Ord};
 use crate::{
     block::BlockHash,
     canonicity::{store::CanonicityStore, Canonicity},
-    command::signed::{SignedCommand, SignedCommandWithData},
+    command::{
+        signed::{self, SignedCommand, SignedCommandWithData},
+        store::CommandStore,
+    },
     ledger::public_key::PublicKey,
     protocol::serialization_types::staged_ledger_diff::{
         SignedCommandPayloadBody, StakeDelegation,
     },
     store::{
         user_commands_iterator, user_commands_iterator_signed_command,
-        user_commands_iterator_txn_hash,
+        user_commands_iterator_txn_hash, IndexerStore,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
@@ -25,10 +28,18 @@ const NANO_F64: f64 = 1_000_000_000_f64;
 impl TransactionsQueryRoot {
     pub async fn transaction(
         &self,
-        _ctx: &Context<'_>,
-        _query: TransactionQueryInput,
+        ctx: &Context<'_>,
+        query: TransactionQueryInput,
     ) -> Result<Option<Transaction>> {
-        todo!()
+        if let Some(hash) = query.hash {
+            if signed::is_valid_tx_hash(&hash) {
+                let db = db(ctx);
+                return Ok(db
+                    .get_command_by_hash(&hash)?
+                    .map(|cmd| txn_from_hash(cmd, db)));
+            }
+        }
+        Ok(None)
     }
 
     pub async fn transactions(
@@ -56,16 +67,7 @@ impl TransactionsQueryRoot {
 
             let cmd = user_commands_iterator_signed_command(&entry)?;
 
-            let block_state_hash = cmd.state_hash.to_owned();
-            let block_date_time = date_time_to_scalar(cmd.date_time as i64);
-
-            let canonical = match db.get_block_canonicity(&block_state_hash.to_owned())? {
-                Some(canonicity) => canonicity == Canonicity::Canonical,
-                None => false,
-            };
-
-            let transaction =
-                Transaction::from_cmd(cmd, block_date_time, &block_state_hash, canonical);
+            let transaction = txn_from_hash(cmd, db);
 
             // Only add transactions that satisfy the input query
             if query.matches(&transaction) {
@@ -78,6 +80,21 @@ impl TransactionsQueryRoot {
 
         Ok(transactions)
     }
+}
+
+fn txn_from_hash(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> Transaction {
+    let block_state_hash = cmd.state_hash.to_owned();
+    let block_date_time = date_time_to_scalar(cmd.date_time as i64);
+
+    let canonical = match db
+        .get_block_canonicity(&block_state_hash.to_owned())
+        .unwrap()
+    {
+        Some(canonicity) => canonicity == Canonicity::Canonical,
+        None => false,
+    };
+
+    Transaction::from_cmd(cmd, block_date_time, &block_state_hash, canonical)
 }
 
 impl Transaction {
