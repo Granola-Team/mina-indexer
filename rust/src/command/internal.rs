@@ -52,12 +52,16 @@ pub enum InternalCommandWithData {
         amount: u64,
         state_hash: BlockHash,
         kind: InternalCommandKind,
+        date_time: i64,
+        block_height: u32,
     },
     Coinbase {
         receiver: PublicKey,
         amount: u64,
         state_hash: BlockHash,
         kind: InternalCommandKind,
+        date_time: i64,
+        block_height: u32,
     },
 }
 
@@ -142,13 +146,15 @@ impl InternalCommand {
 }
 
 impl InternalCommandWithData {
-    pub fn from_internal_cmd(cmd: InternalCommand, state_hash: &BlockHash) -> Self {
+    pub fn from_internal_cmd(cmd: InternalCommand, block: &PrecomputedBlock) -> Self {
         match cmd {
             InternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
                 receiver,
                 amount,
-                state_hash: state_hash.clone(),
+                state_hash: block.state_hash.clone().into(),
                 kind: InternalCommandKind::Coinbase,
+                block_height: block.blockchain_length,
+                date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransfer {
                 sender,
@@ -158,8 +164,10 @@ impl InternalCommandWithData {
                 sender,
                 receiver,
                 amount,
-                state_hash: state_hash.clone(),
+                state_hash: block.state_hash.clone().into(),
                 kind: InternalCommandKind::FeeTransfer,
+                block_height: block.blockchain_length,
+                date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransferViaCoinbase {
                 sender,
@@ -169,8 +177,10 @@ impl InternalCommandWithData {
                 sender,
                 receiver,
                 amount,
-                state_hash: state_hash.clone(),
+                state_hash: block.state_hash.clone().into(),
                 kind: InternalCommandKind::FeeTransferViaCoinbase,
+                block_height: block.blockchain_length,
+                date_time: block.timestamp() as i64,
             },
         }
     }
@@ -178,7 +188,7 @@ impl InternalCommandWithData {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         InternalCommand::from_precomputed(block)
             .iter()
-            .map(|cmd| Self::from_internal_cmd(cmd.clone(), &block.state_hash.clone().into()))
+            .map(|cmd| Self::from_internal_cmd(cmd.clone(), &block))
             .collect()
     }
 
@@ -229,12 +239,7 @@ mod tests {
 
         let cmds: Vec<InternalCommandWithData> = internal_cmds
             .into_iter()
-            .map(|cmd| {
-                InternalCommandWithData::from_internal_cmd(
-                    cmd,
-                    &"3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
-                )
-            })
+            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
             .collect();
         assert_eq!(
             cmds,
@@ -243,7 +248,9 @@ mod tests {
                     receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
                     amount: 720000000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
-                    kind: InternalCommandKind::Coinbase
+                    kind: InternalCommandKind::Coinbase,
+                    block_height: block.blockchain_length,
+                    date_time: block.timestamp() as i64,
                 },
                 InternalCommandWithData::FeeTransfer {
                     sender: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
@@ -251,6 +258,8 @@ mod tests {
                     amount: 20000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
                     kind: InternalCommandKind::FeeTransfer,
+                    block_height: block.blockchain_length,
+                    date_time: block.timestamp() as i64,
                 }
             ]
         );

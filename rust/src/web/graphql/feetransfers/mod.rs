@@ -17,29 +17,23 @@ pub struct Feetransfer {
     pub recipient: String,
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
+    pub block_height: u32,
+    pub date_time: String,
 }
 
 pub struct FeetransferWithMeta {
     /// Value canonicity
     pub canonical: bool,
-    /// Value block height
-    pub block_height: u32,
-    /// Value date time
-    pub date_time: String,
     /// Value optional block
-    pub block: PrecomputedBlock,
+    pub block: Option<PrecomputedBlock>,
     /// Value feetranser
     pub feetransfer: Feetransfer,
 }
 
 #[Object]
 impl FeetransferWithMeta {
-    async fn canonicity(&self) -> bool {
+    async fn canonical(&self) -> bool {
         self.canonical
-    }
-
-    async fn block_height(&self) -> u32 {
-        self.block_height
     }
 
     #[graphql(flatten)]
@@ -48,21 +42,27 @@ impl FeetransferWithMeta {
     }
 
     async fn block_state_hash(&self) -> Option<BlockWithCanonicity> {
-        Some(BlockWithCanonicity {
-            block: Block::from(self.block.clone()),
-            canonical: self.canonical,
-        })
+        match self.block.clone() {
+            Some(block) => Some(BlockWithCanonicity {
+                block: Block::from(block),
+                canonical: self.canonical,
+            }),
+            None => None,
+        }
     }
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct FeetransferQueryInput {
     state_hash: Option<String>,
+    canonical: Option<bool>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum FeetransferSortByInput {
+    #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
+    #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
 
@@ -89,15 +89,66 @@ impl FeetransferQueryRoot {
             .expect("db to be in context");
         let limit = limit.unwrap_or(100);
 
-        let state_hash = query
-            .as_ref()
-            .and_then(|q| q.state_hash.as_ref())
-            .map_or(MAINNET_GENESIS_HASH, |s| s);
+        let has_state_hash = query.as_ref().map_or(false, |q| q.state_hash.is_some());
 
-        let state_hash = BlockHash::from(state_hash);
-        let fee_transfers = get_fee_transfers_for_state_hash(db, &state_hash, sort_by, limit);
-        Ok(fee_transfers)
+        if has_state_hash {
+            let state_hash = query
+                .as_ref()
+                .and_then(|q| q.state_hash.as_ref())
+                .map_or(MAINNET_GENESIS_HASH, |s| s);
+            let state_hash = BlockHash::from(state_hash);
+            return Ok(get_fee_transfers_for_state_hash(
+                db,
+                &state_hash,
+                sort_by,
+                limit,
+            ));
+        }
+        get_fee_transfers(db, query, sort_by, limit)
     }
+}
+
+fn get_fee_transfers(
+    db: &Arc<IndexerStore>,
+    query: Option<FeetransferQueryInput>,
+    sort_by: Option<FeetransferSortByInput>,
+    limit: usize,
+) -> Result<Option<Vec<FeetransferWithMeta>>> {
+    let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::new();
+    let mode: speedb::IteratorMode = match sort_by {
+        Some(FeetransferSortByInput::BlockHeightAsc) => speedb::IteratorMode::Start,
+        Some(FeetransferSortByInput::BlockHeightDesc) => speedb::IteratorMode::End,
+        None => speedb::IteratorMode::End,
+    };
+    for entry in db.get_internal_commands_interator(mode) {
+        let (_, value) = entry?;
+        let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
+        let ft = Feetransfer::from(internal_command);
+        let state_hash = ft.state_hash.clone();
+        let canonical = db
+            .get_block_canonicity(&state_hash.into())?
+            .map(|status| matches!(status, Canonicity::Canonical))
+            .unwrap_or(false);
+
+        let should_filter = query
+            .clone()
+            .and_then(|q| q.canonical)
+            .and_then(|canonicity_filter| Some(canonicity_filter != canonical))
+            .unwrap_or(false);
+        if should_filter {
+            continue;
+        }
+
+        fee_transfers.push(FeetransferWithMeta {
+            canonical,
+            feetransfer: ft,
+            block: None,
+        });
+        if fee_transfers.len() >= limit {
+            break;
+        }
+    }
+    Ok(Some(fee_transfers))
 }
 
 fn get_fee_transfers_for_state_hash(
@@ -111,7 +162,8 @@ fn get_fee_transfers_for_state_hash(
         None => return None,
     };
     let canonical = db
-        .get_block_canonicity(&state_hash).ok()?
+        .get_block_canonicity(&state_hash)
+        .ok()?
         .map(|status| matches!(status, Canonicity::Canonical))
         .unwrap_or(false);
 
@@ -121,20 +173,22 @@ fn get_fee_transfers_for_state_hash(
                 .into_iter()
                 .map(|ft| FeetransferWithMeta {
                     canonical,
-                    block_height: pcb.blockchain_length,
                     feetransfer: Feetransfer::from(ft),
-                    date_time: millis_to_date_string(pcb.timestamp().try_into().unwrap()),
-                    block: pcb.clone(),
+                    block: Some(pcb.clone()),
                 })
                 .collect();
 
             if let Some(sort_by) = sort_by {
                 match sort_by {
                     FeetransferSortByInput::BlockHeightAsc => {
-                        internal_commands.sort_by(|a, b| a.block_height.cmp(&b.block_height));
+                        internal_commands.sort_by(|a, b| {
+                            a.feetransfer.block_height.cmp(&b.feetransfer.block_height)
+                        });
                     }
                     FeetransferSortByInput::BlockHeightDesc => {
-                        internal_commands.sort_by(|a, b| b.block_height.cmp(&a.block_height));
+                        internal_commands.sort_by(|a, b| {
+                            b.feetransfer.block_height.cmp(&a.feetransfer.block_height)
+                        });
                     }
                 }
             }
@@ -154,23 +208,31 @@ impl From<InternalCommandWithData> for Feetransfer {
                 amount,
                 state_hash,
                 kind,
+                date_time,
+                block_height,
                 ..
             } => Self {
                 state_hash: state_hash.0,
                 fee: amount,
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
+                block_height,
+                date_time: millis_to_date_string(date_time),
             },
             InternalCommandWithData::Coinbase {
                 receiver,
                 amount,
                 state_hash,
                 kind,
+                date_time,
+                block_height,
             } => Self {
                 state_hash: state_hash.0,
                 fee: amount,
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
+                block_height,
+                date_time: millis_to_date_string(date_time),
             },
         }
     }

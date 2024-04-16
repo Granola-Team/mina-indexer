@@ -38,7 +38,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 11] = [
+    const COLUMN_FAMILIES: [&'static str; 10] = [
         "blocks",
         "lengths",
         "slots",
@@ -46,7 +46,6 @@ impl IndexerStore {
         "commands",
         "mainnet-commands-slot",
         "mainnet-cmds-txn-global-slot",
-        "mainnet-internal-commands",
         "events",
         "ledgers",
         "snarks",
@@ -63,10 +62,23 @@ impl IndexerStore {
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
 
-        let column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
+        let mut column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
             .iter()
             .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
             .collect();
+
+        // Need to use a custom comparator for fee transfers
+        let mut feetransfer_opts = speedb::Options::default();
+        feetransfer_opts.set_compression_type(DBCompressionType::Zstd);
+        feetransfer_opts.create_missing_column_families(true);
+        feetransfer_opts.create_if_missing(true);
+        feetransfer_opts.set_comparator("feetransfer", Box::new(compare_feetransfer_keys));
+
+        column_families.push(ColumnFamilyDescriptor::new(
+            "mainnet-internal-commands",
+            feetransfer_opts,
+        ));
+
         Ok(Self {
             is_primary: true,
             db_path: path.into(),
@@ -1278,13 +1290,11 @@ impl CommandStore for IndexerStore {
         let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
             .clone()
             .into_iter()
-            .map(|c| {
-                InternalCommandWithData::from_internal_cmd(c, &block.state_hash.clone().into())
-            })
+            .map(|c| InternalCommandWithData::from_internal_cmd(c, &block))
             .collect();
 
-        for (i, int_cmd) in internal_cmds.iter().enumerate() {
-            let key = format!("internal-{}-{}", block.state_hash, i);
+        for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
+            let key = format!("internal_commands-{}-{}", block.blockchain_length, i);
 
             self.database.put_cf(
                 self.internal_commands_cf(),
@@ -1328,6 +1338,7 @@ impl CommandStore for IndexerStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<InternalCommandWithData>> {
         trace!("Getting internal commands in block {}", state_hash.0);
+        let block = self.get_block(state_hash)?.expect("block to exist");
 
         let key = format!("internal-{}", state_hash.0);
         if let Some(commands_bytes) = self
@@ -1337,7 +1348,7 @@ impl CommandStore for IndexerStore {
             let res: Vec<InternalCommand> = serde_json::from_slice(&commands_bytes)?;
             return Ok(res
                 .into_iter()
-                .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, state_hash))
+                .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
                 .collect());
         }
         Ok(vec![])
@@ -1388,10 +1399,25 @@ impl CommandStore for IndexerStore {
             }))
     }
 
-    fn get_internal_commands_interator(&self) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.internal_commands_cf(), speedb::IteratorMode::Start)
+    fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
+        self.database.iterator_cf(self.internal_commands_cf(), mode)
     }
+}
+
+fn compare_feetransfer_keys(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
+    let str_a = std::str::from_utf8(a).expect("Valid UTF-8");
+    let str_b = std::str::from_utf8(b).expect("Valid UTF-8");
+
+    fn extract_block_height(s: &str) -> u32 {
+        let start = s.find('-').expect("Missing first '-' delimiter") + 1;
+        let end = s[start..].find('-').expect("Missing second '-' delimiter") + start;
+        s[start..end].parse::<u32>().expect("Valid block height")
+    }
+
+    let block_height_a = extract_block_height(&str_a);
+    let block_height_b = extract_block_height(&str_b);
+
+    block_height_a.cmp(&block_height_b)
 }
 
 /// [SnarkStore] implementation
