@@ -5,9 +5,9 @@ use crate::{
     command::{internal::InternalCommandWithData, store::CommandStore},
     constants::MAINNET_GENESIS_HASH,
     store::IndexerStore,
+    web::{graphql::db, millis_to_iso_date_string},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
-use chrono::{DateTime, SecondsFormat};
 use std::sync::Arc;
 
 #[derive(SimpleObject)]
@@ -66,12 +66,6 @@ pub enum FeetransferSortByInput {
 #[derive(Default)]
 pub struct FeetransferQueryRoot;
 
-/// convert epoch millis to an ISO 8601 formatted date
-fn millis_to_date_string(millis: i64) -> String {
-    let date_time = DateTime::from_timestamp_millis(millis).unwrap();
-    date_time.to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
 #[Object]
 impl FeetransferQueryRoot {
     async fn feetransfers<'ctx>(
@@ -81,9 +75,7 @@ impl FeetransferQueryRoot {
         sort_by: Option<FeetransferSortByInput>,
         limit: Option<usize>,
     ) -> Result<Option<Vec<FeetransferWithMeta>>> {
-        let db = ctx
-            .data::<Arc<IndexerStore>>()
-            .expect("db to be in context");
+        let db = db(ctx);
         let limit = limit.unwrap_or(100);
 
         let has_state_hash = query.as_ref().map_or(false, |q| q.state_hash.is_some());
@@ -215,7 +207,7 @@ impl From<InternalCommandWithData> for Feetransfer {
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
                 block_height,
-                date_time: millis_to_date_string(date_time),
+                date_time: millis_to_iso_date_string(date_time),
             },
             InternalCommandWithData::Coinbase {
                 receiver,
@@ -230,7 +222,7 @@ impl From<InternalCommandWithData> for Feetransfer {
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
                 block_height,
-                date_time: millis_to_date_string(date_time),
+                date_time: millis_to_iso_date_string(date_time),
             },
         }
     }

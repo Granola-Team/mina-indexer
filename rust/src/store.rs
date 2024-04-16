@@ -68,10 +68,7 @@ impl IndexerStore {
             .collect();
 
         // Need to use a custom comparator for fee transfers
-        let mut feetransfer_opts = speedb::Options::default();
-        feetransfer_opts.set_compression_type(DBCompressionType::Zstd);
-        feetransfer_opts.create_missing_column_families(true);
-        feetransfer_opts.create_if_missing(true);
+        let mut feetransfer_opts = database_opts.clone();
         feetransfer_opts.set_comparator("feetransfer", Box::new(compare_feetransfer_keys));
 
         column_families.push(ColumnFamilyDescriptor::new(
@@ -1294,7 +1291,12 @@ impl CommandStore for IndexerStore {
             .collect();
 
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
-            let key = format!("internal_commands-{}-{}", block.blockchain_length, i);
+            let key = format!(
+                "internal_commands-{}-{}-{}",
+                block.global_slot_since_genesis(),
+                block.state_hash.clone(),
+                i
+            );
 
             self.database.put_cf(
                 self.internal_commands_cf(),
@@ -1408,14 +1410,14 @@ fn compare_feetransfer_keys(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
     let str_a = std::str::from_utf8(a).expect("Valid UTF-8");
     let str_b = std::str::from_utf8(b).expect("Valid UTF-8");
 
-    fn extract_block_height(s: &str) -> u32 {
+    fn extract_global_slot_height_since_genesis(s: &str) -> u32 {
         let start = s.find('-').expect("Missing first '-' delimiter") + 1;
         let end = s[start..].find('-').expect("Missing second '-' delimiter") + start;
         s[start..end].parse::<u32>().expect("Valid block height")
     }
 
-    let block_height_a = extract_block_height(str_a);
-    let block_height_b = extract_block_height(str_b);
+    let block_height_a = extract_global_slot_height_since_genesis(str_a);
+    let block_height_b = extract_global_slot_height_since_genesis(str_b);
 
     block_height_a.cmp(&block_height_b)
 }

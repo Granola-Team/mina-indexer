@@ -19,7 +19,7 @@ impl fmt::Display for InternalCommandKind {
         match self {
             InternalCommandKind::Coinbase => write!(f, "Coinbase"),
             InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
-            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_Coinbase"),
+            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
         }
     }
 }
