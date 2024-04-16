@@ -188,7 +188,7 @@ impl InternalCommandWithData {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         InternalCommand::from_precomputed(block)
             .iter()
-            .map(|cmd| Self::from_internal_cmd(cmd.clone(), &block))
+            .map(|cmd| Self::from_internal_cmd(cmd.clone(), block))
             .collect()
     }
 

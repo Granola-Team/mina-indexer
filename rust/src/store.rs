@@ -1290,7 +1290,7 @@ impl CommandStore for IndexerStore {
         let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
             .clone()
             .into_iter()
-            .map(|c| InternalCommandWithData::from_internal_cmd(c, &block))
+            .map(|c| InternalCommandWithData::from_internal_cmd(c, block))
             .collect();
 
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
@@ -1414,8 +1414,8 @@ fn compare_feetransfer_keys(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
         s[start..end].parse::<u32>().expect("Valid block height")
     }
 
-    let block_height_a = extract_block_height(&str_a);
-    let block_height_b = extract_block_height(&str_b);
+    let block_height_a = extract_block_height(str_a);
+    let block_height_b = extract_block_height(str_b);
 
     block_height_a.cmp(&block_height_b)
 }

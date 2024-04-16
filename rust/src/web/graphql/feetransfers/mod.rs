@@ -42,13 +42,10 @@ impl FeetransferWithMeta {
     }
 
     async fn block_state_hash(&self) -> Option<BlockWithCanonicity> {
-        match self.block.clone() {
-            Some(block) => Some(BlockWithCanonicity {
-                block: Block::from(block),
-                canonical: self.canonical,
-            }),
-            None => None,
-        }
+        self.block.clone().map(|block| BlockWithCanonicity {
+            block: Block::from(block),
+            canonical: self.canonical,
+        })
     }
 }
 
@@ -133,8 +130,9 @@ fn get_fee_transfers(
         let should_filter = query
             .clone()
             .and_then(|q| q.canonical)
-            .and_then(|canonicity_filter| Some(canonicity_filter != canonical))
+            .map(|canonicity_filter| canonicity_filter != canonical)
             .unwrap_or(false);
+
         if should_filter {
             continue;
         }
@@ -157,17 +155,17 @@ fn get_fee_transfers_for_state_hash(
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
 ) -> Option<Vec<FeetransferWithMeta>> {
-    let pcb = match db.get_block(&state_hash).ok()? {
+    let pcb = match db.get_block(state_hash).ok()? {
         Some(pcb) => pcb,
         None => return None,
     };
     let canonical = db
-        .get_block_canonicity(&state_hash)
+        .get_block_canonicity(state_hash)
         .ok()?
         .map(|status| matches!(status, Canonicity::Canonical))
         .unwrap_or(false);
 
-    match db.get_internal_commands(&state_hash) {
+    match db.get_internal_commands(state_hash) {
         Ok(internal_commands) => {
             let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
                 .into_iter()
