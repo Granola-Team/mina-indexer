@@ -54,14 +54,14 @@ impl BlocksQueryRoot {
 #[derive(SimpleObject)]
 pub struct BlockWithCanonicity {
     /// Value canonical
-    canonical: bool,
+    pub canonical: bool,
     /// Value block
     #[graphql(flatten)]
-    block: Block,
+    pub block: Block,
 }
 
 #[derive(SimpleObject)]
-struct Block {
+pub struct Block {
     /// Value state_hash
     state_hash: String,
     /// Value block_height

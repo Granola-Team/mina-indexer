@@ -5,6 +5,7 @@ use crate::{
     },
     ledger::public_key::PublicKey,
 };
+use speedb::DBIterator;
 
 /// Store for internal & user commands
 pub trait CommandStore {
@@ -58,5 +59,9 @@ pub trait CommandStore {
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
+    /// Get number of blocks that the public key has internal commands for
     fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+
+    /// Get internal commands interator starting from
+    fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_>;
 }
