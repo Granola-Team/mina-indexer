@@ -70,6 +70,15 @@ pub struct FeetransferQueryRoot;
 
 #[Object]
 impl FeetransferQueryRoot {
+    async fn feetransfer<'ctx>(
+        &self,
+        ctx: &Context<'ctx>,
+        query: Option<FeetransferQueryInput>,
+    ) -> Result<Option<FeetransferWithMeta>> {
+        let db = db(ctx);
+        Ok(None)
+    }
+
     async fn feetransfers<'ctx>(
         &self,
         ctx: &Context<'ctx>,
