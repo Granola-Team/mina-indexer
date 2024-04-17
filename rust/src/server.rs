@@ -38,6 +38,7 @@ pub struct IndexerConfiguration {
     pub initialization_mode: InitializationMode,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub domain_socket_path: PathBuf,
     pub missing_block_recovery_exe: Option<PathBuf>,
     pub missing_block_recovery_delay: Option<u64>,
     pub missing_block_recovery_batch: bool,
@@ -58,13 +59,13 @@ impl MinaIndexer {
     pub async fn new(
         config: IndexerConfiguration,
         store: Arc<IndexerStore>,
-        domain_socket_path: PathBuf,
     ) -> anyhow::Result<Self> {
         let block_watch_dir = config.block_watch_dir.clone();
         let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
         let missing_block_recovery_delay = config.missing_block_recovery_delay;
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = config.missing_block_recovery_batch;
+        let domain_socket_path = config.domain_socket_path.clone();
         Ok(Self {
             _witness_join_handle: tokio::spawn(async move {
                 let state = initialize(config, store).unwrap_or_else(|e| {
