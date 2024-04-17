@@ -1,4 +1,4 @@
-use super::{date_time_to_scalar, db, F64Ord};
+use super::{date_time_to_scalar, db};
 use crate::{
     block::BlockHash,
     canonicity::{store::CanonicityStore, Canonicity},
@@ -17,7 +17,7 @@ use crate::{
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use std::{cmp::Ordering, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
@@ -54,7 +54,17 @@ impl TransactionsQueryRoot {
 
         let mut transactions: Vec<Option<Transaction>> = Vec::new();
 
-        let iter = user_commands_iterator(db);
+        // sort mode
+        let mode = match sort_by {
+            TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
+                speedb::IteratorMode::Start
+            }
+            TransactionSortByInput::BlockheightDesc | TransactionSortByInput::DatetimeDesc => {
+                speedb::IteratorMode::End
+            }
+        };
+
+        let iter = user_commands_iterator(db, mode).take(limit);
 
         for entry in iter {
             let txn_hash = user_commands_iterator_txn_hash(&entry)?;
@@ -74,9 +84,6 @@ impl TransactionsQueryRoot {
                 transactions.push(Some(transaction));
             };
         }
-
-        sort_transactions(sort_by, &mut transactions);
-        transactions.truncate(limit);
 
         Ok(transactions)
     }
@@ -160,35 +167,6 @@ impl Transaction {
             }
         }
     }
-
-    fn cmp(&self, other: &Self, sort_by: TransactionSortByInput) -> Ordering {
-        match sort_by {
-            TransactionSortByInput::AmountAsc => self.amount.cmp(&other.amount),
-            TransactionSortByInput::AmountDesc => other.amount.cmp(&self.amount),
-            TransactionSortByInput::BlockheightAsc => self.block_height.cmp(&other.block_height),
-            TransactionSortByInput::BlockheightDesc => other.block_height.cmp(&self.block_height),
-            TransactionSortByInput::BlockstatehashAsc => {
-                self.block.state_hash.cmp(&self.block.state_hash)
-            }
-            TransactionSortByInput::BlockstatehashDesc => {
-                self.block.state_hash.cmp(&self.block.state_hash)
-            }
-            TransactionSortByInput::DatetimeAsc => self.block.date_time.cmp(&other.block.date_time),
-            TransactionSortByInput::DatetimeDesc => {
-                other.block.date_time.cmp(&self.block.date_time)
-            }
-            TransactionSortByInput::FeeAsc => self.fee.cmp(&other.fee),
-            TransactionSortByInput::FeeDesc => other.fee.cmp(&self.fee),
-            TransactionSortByInput::HashAsc => self.hash.cmp(&other.hash),
-            TransactionSortByInput::HashDesc => other.hash.cmp(&self.hash),
-            TransactionSortByInput::KindAsc => self.kind.cmp(&other.kind),
-            TransactionSortByInput::KindDesc => other.kind.cmp(&self.kind),
-            TransactionSortByInput::NonceAsc => self.nonce.cmp(&other.nonce),
-            TransactionSortByInput::NonceDesc => other.nonce.cmp(&self.nonce),
-            TransactionSortByInput::TokenAsc => self.token.cmp(&other.token),
-            TransactionSortByInput::TokenDesc => other.token.cmp(&self.token),
-        }
-    }
 }
 
 impl TransactionQueryInput {
@@ -249,24 +227,10 @@ impl TransactionQueryInput {
 #[derive(Clone, Copy, Debug, Enum, Eq, PartialEq)]
 #[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
 pub enum TransactionSortByInput {
-    AmountAsc,
-    AmountDesc,
     BlockheightAsc,
     BlockheightDesc,
-    BlockstatehashAsc,
-    BlockstatehashDesc,
     DatetimeAsc,
     DatetimeDesc,
-    FeeAsc,
-    FeeDesc,
-    HashAsc,
-    HashDesc,
-    KindAsc,
-    KindDesc,
-    NonceAsc,
-    NonceDesc,
-    TokenAsc,
-    TokenDesc,
 }
 
 #[derive(Clone, Debug, SimpleObject)]
@@ -295,21 +259,4 @@ pub struct TransactionBlock {
 #[derive(Clone, Debug, PartialEq, SimpleObject)]
 pub struct TransactionReceiver {
     pub public_key: String,
-}
-
-fn sort_transactions(sort_by: TransactionSortByInput, transactions: &mut [Option<Transaction>]) {
-    transactions.sort_by(|a, b| {
-        if let (Some(a), Some(b)) = (a, b) {
-            a.cmp(b, sort_by)
-        } else {
-            // Place None values at the end
-            if a.is_none() && b.is_none() {
-                Ordering::Equal
-            } else if a.is_none() {
-                Ordering::Greater
-            } else {
-                Ordering::Less
-            }
-        }
-    });
 }

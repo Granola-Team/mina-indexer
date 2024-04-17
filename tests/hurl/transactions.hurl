@@ -1,6 +1,6 @@
 POST {{url}}
 ```graphql
-query Transactions($limit: Int = 10, $sort_by: TransactionSortByInput!, $query: TransactionQueryInput!) {
+query Transactions($limit: Int, $sort_by: TransactionSortByInput!, $query: TransactionQueryInput!) {
   transactions(limit: $limit, sortBy: $sort_by, query: $query ) {
     blockHeight
     canonical

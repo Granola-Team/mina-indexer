@@ -7,6 +7,7 @@ use mina_indexer::{
     state::IndexerState,
     store::*,
 };
+use speedb::IteratorMode;
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
@@ -76,7 +77,7 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     // iterate over transactions
     let mut curr_slot = 0;
-    for entry in user_commands_iterator(&indexer_store) {
+    for entry in user_commands_iterator(&indexer_store, IteratorMode::End) {
         // txn hashes should match
         assert_eq!(
             user_commands_iterator_signed_command(&entry)?.tx_hash,
