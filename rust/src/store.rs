@@ -22,7 +22,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use log::{error, trace, warn};
-use speedb::{ColumnFamilyDescriptor, DBCompressionType, DBIterator, DB};
+use speedb::{ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -1029,9 +1029,8 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
 }
 
 /// [DBIterator] for user commands (transactions)
-pub fn user_commands_iterator(db: &Arc<IndexerStore>) -> DBIterator<'_> {
-    db.database
-        .iterator_cf(db.commands_slot_mainnet_cf(), speedb::IteratorMode::Start)
+pub fn user_commands_iterator<'a>(db: &'a Arc<IndexerStore>, mode: IteratorMode) -> DBIterator<'a> {
+    db.database.iterator_cf(db.commands_slot_mainnet_cf(), mode)
 }
 
 /// Global slot number from `entry` in [user_commands_iterator]
