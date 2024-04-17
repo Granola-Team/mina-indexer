@@ -53,6 +53,8 @@ impl FeetransferWithMeta {
 pub struct FeetransferQueryInput {
     state_hash: Option<String>,
     canonical: Option<bool>,
+    and: Option<Vec<FeetransferQueryInput>>,
+    or: Option<Vec<FeetransferQueryInput>>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -97,43 +99,46 @@ impl FeetransferQueryRoot {
     }
 }
 
+fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &String) -> Result<bool> {
+    let canonicity = db
+        .get_block_canonicity(&BlockHash::from(state_hash.clone()))?
+        .map(|status| matches!(status, Canonicity::Canonical))
+        .unwrap_or(false);
+    Ok(canonicity)
+}
+
 fn get_fee_transfers(
     db: &Arc<IndexerStore>,
     query: Option<FeetransferQueryInput>,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
 ) -> Result<Option<Vec<FeetransferWithMeta>>> {
-    let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::new();
+    let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
     let mode: speedb::IteratorMode = match sort_by {
         Some(FeetransferSortByInput::BlockHeightAsc) => speedb::IteratorMode::Start,
         Some(FeetransferSortByInput::BlockHeightDesc) => speedb::IteratorMode::End,
         None => speedb::IteratorMode::End,
     };
+
     for entry in db.get_internal_commands_interator(mode) {
         let (_, value) = entry?;
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from(internal_command);
         let state_hash = ft.state_hash.clone();
-        let canonical = db
-            .get_block_canonicity(&state_hash.into())?
-            .map(|status| matches!(status, Canonicity::Canonical))
-            .unwrap_or(false);
 
-        let should_filter = query
-            .clone()
-            .and_then(|q| q.canonical)
-            .map(|canonicity_filter| canonicity_filter != canonical)
-            .unwrap_or(false);
-
-        if should_filter {
-            continue;
-        }
-
-        fee_transfers.push(FeetransferWithMeta {
-            canonical,
+        let feetransfer_with_meta = FeetransferWithMeta {
+            canonical: get_block_canonicity(db, &state_hash)?,
             feetransfer: ft,
             block: None,
-        });
+        };
+
+        if query
+            .as_ref()
+            .map_or(false, |q| q.matches(&feetransfer_with_meta))
+        {
+            fee_transfers.push(feetransfer_with_meta);
+        }
+
         if fee_transfers.len() >= limit {
             break;
         }
@@ -225,5 +230,30 @@ impl From<InternalCommandWithData> for Feetransfer {
                 date_time: millis_to_iso_date_string(date_time),
             },
         }
+    }
+}
+
+impl FeetransferQueryInput {
+    pub fn matches(&self, ft: &FeetransferWithMeta) -> bool {
+        let mut matches = true;
+
+        if let Some(state_hash) = &self.state_hash {
+            matches = matches && &ft.feetransfer.state_hash == state_hash;
+        }
+
+        if let Some(canonical) = &self.canonical {
+            matches = matches && &ft.canonical == canonical;
+        }
+
+        if let Some(query) = &self.and {
+            matches = matches && query.iter().all(|and| and.matches(ft));
+        }
+
+        if let Some(query) = &self.or {
+            if !query.is_empty() {
+                matches = matches && query.iter().any(|or| or.matches(ft));
+            }
+        }
+        matches
     }
 }
