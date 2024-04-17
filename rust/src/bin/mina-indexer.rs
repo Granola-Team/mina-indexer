@@ -129,6 +129,12 @@ pub struct ServerArgs {
     /// Recover all blocks at all missing heights
     #[arg(long)]
     missing_block_recovery_batch: Option<bool>,
+
+    /// Domain socket path
+    domain_socket_path: Option<PathBuf>,
+
+    /// Indexer process ID
+    pid: Option<u32>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -140,7 +146,7 @@ pub struct ConfigArgs {
 }
 
 impl ServerArgs {
-    fn with_dynamic_defaults(mut self) -> Self {
+    fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
         if self.locked_supply_csv.is_none() {
             let path = match release_profile() {
                 ReleaseProfile::Production => PathBuf::from("/share/mina-indexer/data/locked.csv"),
@@ -159,6 +165,8 @@ impl ServerArgs {
             };
             self.genesis_ledger = Some(ledger_path);
         }
+        self.pid = Some(pid);
+        self.domain_socket_path = Some(domain_socket_path);
         self
     }
 }
@@ -199,7 +207,7 @@ pub async fn main() -> anyhow::Result<()> {
                     (args.into(), InitializationMode::New)
                 }
             };
-            let args = args.with_dynamic_defaults();
+            let args = args.with_dynamic_defaults(domain_socket_path.clone(), std::process::id());
             let locked_supply_csv = args.locked_supply_csv.clone();
             let database_dir = args.database_dir.clone();
             let web_hostname = args.web_hostname.clone();
@@ -239,7 +247,7 @@ pub async fn main() -> anyhow::Result<()> {
                 "Creating an Indexer listening on {}",
                 domain_socket_path.display()
             );
-            let indexer = MinaIndexer::new(config, db.clone(), domain_socket_path).await?;
+            let indexer = MinaIndexer::new(config, db.clone()).await?;
 
             trace!(
                 "Starting the HTTP server listening on {}:{}",
@@ -283,6 +291,9 @@ pub fn process_indexer_configuration(
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
     let reporting_freq = args.reporting_freq;
+    let domain_socket_path = args
+        .domain_socket_path
+        .unwrap_or("./mina-indexer.sock".into());
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
@@ -333,6 +344,7 @@ pub fn process_indexer_configuration(
                 initialization_mode: mode,
                 ledger_cadence,
                 reporting_freq,
+                domain_socket_path,
                 missing_block_recovery_exe,
                 missing_block_recovery_delay,
                 missing_block_recovery_batch,
@@ -359,6 +371,8 @@ struct ServerArgsJson {
     locked_supply_csv: Option<String>,
     web_hostname: String,
     web_port: u16,
+    pid: Option<u32>,
+    domain_socket_path: Option<String>,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_batch: Option<bool>,
@@ -366,7 +380,9 @@ struct ServerArgsJson {
 
 impl From<ServerArgs> for ServerArgsJson {
     fn from(value: ServerArgs) -> Self {
-        let value = value.with_dynamic_defaults();
+        let pid = value.pid.unwrap();
+        let domain_socket_path = value.domain_socket_path.clone().unwrap();
+        let value = value.with_dynamic_defaults(domain_socket_path, pid);
         Self {
             genesis_ledger: value
                 .genesis_ledger
@@ -398,6 +414,8 @@ impl From<ServerArgs> for ServerArgsJson {
                 .and_then(|p| p.to_str().map(|s| s.to_owned())),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
+            pid: value.pid,
+            domain_socket_path: value.domain_socket_path.map(|s| s.display().to_string()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value
                 .missing_block_recovery_exe
@@ -426,6 +444,8 @@ impl From<ServerArgsJson> for ServerArgs {
             locked_supply_csv: value.locked_supply_csv.map(|p| p.into()),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
+            pid: value.pid,
+            domain_socket_path: value.domain_socket_path.map(|s| s.into()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
