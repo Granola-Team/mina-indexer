@@ -38,8 +38,9 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 11] = [
+    const COLUMN_FAMILIES: [&'static str; 12] = [
         "blocks",
+        "blocks-global-slot-idx",
         "lengths",
         "slots",
         "canonicity",
@@ -96,6 +97,12 @@ impl IndexerStore {
     fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks")
+            .expect("blocks column family exists")
+    }
+
+    fn blocks_global_slot_idx_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("blocks-global-slot-idx")
             .expect("blocks column family exists")
     }
 
@@ -178,6 +185,19 @@ impl BlockStore for IndexerStore {
         }
         self.database.put_cf(&blocks_cf, key, value)?;
 
+        fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
+            let global_slot = block.global_slot_since_genesis();
+            global_slot_prefix(global_slot)
+        }
+
+        // add to global slots block index
+        {
+            let key = global_slot_block_key(block);
+            let value = block.state_hash.as_bytes();
+            let blocks_global_slot_idx_cf = self.blocks_global_slot_idx_cf();
+            self.database
+                .put_cf(&blocks_global_slot_idx_cf, key, value)?;
+        }
         // add block for each public key
         for pk in block.all_public_keys() {
             self.add_block_at_public_key(&pk, &block.state_hash.clone().into())?;
@@ -1018,6 +1038,15 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
         }
     }
     bail!("User command key does not start with '{COMMAND_KEY_PREFIX}': {db_key_str}")
+}
+
+/// [DBIterator] for blocks
+pub fn blocks_global_slot_idx_iterator<'a>(
+    db: &'a Arc<IndexerStore>,
+    mode: IteratorMode,
+) -> DBIterator<'a> {
+    db.database
+        .iterator_cf(db.blocks_global_slot_idx_cf(), mode)
 }
 
 /// [DBIterator] for user commands (transactions)
