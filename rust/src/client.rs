@@ -282,6 +282,11 @@ pub enum Snarks {
         #[arg(long)]
         public_key: String,
     },
+    Top {
+        /// Number of SNARK rovers to include in list
+        #[arg(long, default_value_t = 10)]
+        num: usize,
+    },
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]
@@ -352,13 +357,12 @@ pub enum InternalCommands {
 }
 
 pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Result<()> {
-    let conn = match UnixStream::connect(domain_socket_path).await {
-        Ok(conn) => conn,
-        Err(e) => {
+    let conn = UnixStream::connect(domain_socket_path)
+        .await
+        .unwrap_or_else(|e| {
             eprintln!("Unable to connect to the Unix domain socket server: {}", e);
             process::exit(111);
-        }
-    };
+        });
     let (reader, mut writer) = conn.into_split();
     let mut reader = BufReader::new(reader);
     let mut buffer = Vec::with_capacity(BUFFER_SIZE);
