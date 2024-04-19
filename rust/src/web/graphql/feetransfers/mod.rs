@@ -71,14 +71,6 @@ pub struct FeetransferQueryRoot;
 
 #[Object]
 impl FeetransferQueryRoot {
-    async fn feetransfer<'ctx>(
-        &self,
-        ctx: &Context<'ctx>,
-        query: Option<FeetransferQueryInput>,
-    ) -> Result<Option<FeetransferWithMeta>> {
-        Ok(None)
-    }
-
     async fn feetransfers<'ctx>(
         &self,
         ctx: &Context<'ctx>,
@@ -108,9 +100,9 @@ impl FeetransferQueryRoot {
     }
 }
 
-fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &String) -> Result<bool> {
+fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> Result<bool> {
     let canonicity = db
-        .get_block_canonicity(&BlockHash::from(state_hash.clone()))?
+        .get_block_canonicity(&BlockHash::from(state_hash.to_owned()))?
         .map(|status| matches!(status, Canonicity::Canonical))
         .unwrap_or(false);
     Ok(canonicity)
