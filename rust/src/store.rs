@@ -38,7 +38,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 10] = [
+    const COLUMN_FAMILIES: [&'static str; 11] = [
         "blocks",
         "lengths",
         "slots",
@@ -46,6 +46,7 @@ impl IndexerStore {
         "commands",
         "mainnet-commands-slot",
         "mainnet-cmds-txn-global-slot",
+        "mainnet-internal-commands",
         "events",
         "ledgers",
         "snarks",
@@ -62,19 +63,10 @@ impl IndexerStore {
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
 
-        let mut column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
+        let column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
             .iter()
             .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
             .collect();
-
-        // Need to use a custom comparator for fee transfers
-        let mut feetransfer_opts = database_opts.clone();
-        feetransfer_opts.set_comparator("feetransfer", Box::new(compare_feetransfer_keys));
-
-        column_families.push(ColumnFamilyDescriptor::new(
-            "mainnet-internal-commands",
-            feetransfer_opts,
-        ));
 
         Ok(Self {
             is_primary: true,
@@ -1289,17 +1281,22 @@ impl CommandStore for IndexerStore {
             .map(|c| InternalCommandWithData::from_internal_cmd(c, block))
             .collect();
 
-        for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
-            let key = format!(
-                "internal_commands-{}-{}-{}",
-                block.global_slot_since_genesis(),
-                block.state_hash.clone(),
-                i
-            );
+        fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
+            let mut bytes = global_slot_prefix(global_slot);
+            bytes.append(&mut state_hash.as_bytes().to_vec());
+            bytes.append(&mut index.to_be_bytes().to_vec());
+            bytes
+        }
 
+        for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
+            let key = internal_commmand_key(
+                block.global_slot_since_genesis(),
+                &block.state_hash.clone(),
+                i,
+            );
             self.database.put_cf(
                 self.internal_commands_cf(),
-                key.as_bytes(),
+                key,
                 serde_json::to_vec(&int_cmd)?,
             )?;
         }
@@ -1403,22 +1400,6 @@ impl CommandStore for IndexerStore {
     fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.internal_commands_cf(), mode)
     }
-}
-
-fn compare_feetransfer_keys(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
-    let str_a = std::str::from_utf8(a).expect("Valid UTF-8");
-    let str_b = std::str::from_utf8(b).expect("Valid UTF-8");
-
-    fn extract_global_slot_height_since_genesis(s: &str) -> u32 {
-        let start = s.find('-').expect("Missing first '-' delimiter") + 1;
-        let end = s[start..].find('-').expect("Missing second '-' delimiter") + start;
-        s[start..end].parse::<u32>().expect("Valid block height")
-    }
-
-    let block_height_a = extract_global_slot_height_since_genesis(str_a);
-    let block_height_b = extract_global_slot_height_since_genesis(str_b);
-
-    block_height_a.cmp(&block_height_b)
 }
 
 /// [SnarkStore] implementation

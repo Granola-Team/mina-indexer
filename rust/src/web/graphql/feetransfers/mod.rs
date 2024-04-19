@@ -10,7 +10,7 @@ use crate::{
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug)]
 pub struct Feetransfer {
     pub state_hash: String,
     pub fee: u64,
@@ -21,6 +21,7 @@ pub struct Feetransfer {
     pub date_time: String,
 }
 
+#[derive(Debug)]
 pub struct FeetransferWithMeta {
     /// Value canonicity
     pub canonical: bool,
@@ -75,7 +76,6 @@ impl FeetransferQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<FeetransferQueryInput>,
     ) -> Result<Option<FeetransferWithMeta>> {
-        let db = db(ctx);
         Ok(None)
     }
 
@@ -143,7 +143,7 @@ fn get_fee_transfers(
 
         if query
             .as_ref()
-            .map_or(false, |q| q.matches(&feetransfer_with_meta))
+            .map_or(true, |q| q.matches(&feetransfer_with_meta))
         {
             fee_transfers.push(feetransfer_with_meta);
         }
