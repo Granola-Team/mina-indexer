@@ -52,7 +52,7 @@ impl TransactionsQueryRoot {
         let db = db(ctx);
         let limit = limit.unwrap_or(100);
 
-        let mut transactions: Vec<Option<Transaction>> = Vec::new();
+        let mut transactions: Vec<Option<Transaction>> = Vec::with_capacity(limit);
 
         // sort mode
         let mode = match sort_by {
@@ -64,7 +64,7 @@ impl TransactionsQueryRoot {
             }
         };
 
-        let iter = user_commands_iterator(db, mode).take(limit);
+        let iter = user_commands_iterator(db, mode);
 
         for entry in iter {
             let txn_hash = user_commands_iterator_txn_hash(&entry)?;
@@ -83,6 +83,10 @@ impl TransactionsQueryRoot {
             if query.matches(&transaction) {
                 transactions.push(Some(transaction));
             };
+
+            if transactions.len() == limit {
+                break;
+            }
         }
 
         Ok(transactions)
