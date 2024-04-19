@@ -18,12 +18,15 @@ use crate::{
         store::LedgerStore,
         Ledger, LedgerHash,
     },
-    snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
+    snark_work::{
+        store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
+    },
 };
 use anyhow::{anyhow, bail};
 use log::{error, trace, warn};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -38,7 +41,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 12] = [
+    const COLUMN_FAMILIES: [&'static str; 14] = [
         "blocks",
         "blocks-global-slot-idx",
         "lengths",
@@ -51,6 +54,8 @@ impl IndexerStore {
         "events",
         "ledgers",
         "snarks",
+        "snark-work-top-producers",
+        "snark-work-top-producers-sort",
     ];
 
     /// Creates a new _primary_ indexer store
@@ -164,6 +169,20 @@ impl IndexerStore {
         self.database
             .cf_handle("snarks")
             .expect("snarks column family exists")
+    }
+
+    /// CF for storing all snark work fee totals
+    fn snark_top_producers_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snark-work-top-producers")
+            .expect("snark-work-top-producers column family exists")
+    }
+
+    /// CF for sorting all snark work fee totals
+    fn snark_top_producers_sort_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snark-work-top-producers-sort")
+            .expect("snark-work-top-producers-sort column family exists")
     }
 }
 
@@ -1433,18 +1452,34 @@ impl CommandStore for IndexerStore {
 
 /// [SnarkStore] implementation
 
+/// [DBIterator] for snark work
+pub fn top_snarkers_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DBIterator<'a> {
+    db.database
+        .iterator_cf(db.snark_top_producers_sort_cf(), mode)
+}
+
+/// The first 8 bytes are total fees in big endian.
+fn total_fee_prefix(total_fee: u64) -> Vec<u8> {
+    total_fee.to_be_bytes().to_vec()
+}
+
+fn total_fee_prefix_key(total_fee: u64, suffix: &str) -> Vec<u8> {
+    let mut bytes = total_fee_prefix(total_fee);
+    bytes.append(&mut suffix.as_bytes().to_vec());
+    bytes
+}
+
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding SNARK work from block {}", block.summary());
 
-        let snarks_cf = self.snarks_cf();
         let completed_works = SnarkWorkSummary::from_precomputed(block);
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
         // add: state hash -> snark work
         let key = block.state_hash.as_bytes();
         let value = serde_json::to_vec(&completed_works)?;
-        self.database.put_cf(snarks_cf, key, value)?;
+        self.database.put_cf(self.snarks_cf(), key, value)?;
 
         // add: "pk -> linked list of SNARK work summaries with state hash"
         for pk in block.prover_keys() {
@@ -1464,15 +1499,17 @@ impl SnarkStore for IndexerStore {
                 // write these SNARKs to the next key for pk
                 let key = format!("{pk_str}{n}").as_bytes().to_vec();
                 let value = serde_json::to_vec(&block_pk_snarks)?;
-                self.database.put_cf(snarks_cf, key, value)?;
+                self.database.put_cf(self.snarks_cf(), key, value)?;
 
                 // update pk's next index
                 let key = pk_str.as_bytes();
                 let next_n = (n + 1).to_string();
                 let value = next_n.as_bytes();
-                self.database.put_cf(&snarks_cf, key, value)?;
+                self.database.put_cf(self.snarks_cf(), key, value)?;
             }
         }
+
+        self.update_top_snarkers(completed_works)?;
         Ok(())
     }
 
@@ -1534,6 +1571,58 @@ impl SnarkStore for IndexerStore {
             return Ok(Some(serde_json::from_slice(&snarks_bytes)?));
         }
         Ok(None)
+    }
+
+    fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()> {
+        let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();
+        for snark in snarks {
+            let key = snark.prover.0.as_bytes();
+            if prover_fees.get(&snark.prover).is_some() {
+                prover_fees.get_mut(&snark.prover).unwrap().1 += snark.fee;
+            } else {
+                let old_total = self
+                    .database
+                    .get_pinned_cf(self.snark_top_producers_cf(), key)?
+                    .map_or(0, |fee_bytes| {
+                        serde_json::from_slice::<u64>(&fee_bytes).expect("fee is u64")
+                    });
+                prover_fees.insert(snark.prover.clone(), (old_total, snark.fee));
+
+                // delete the stale data
+                self.database.delete_cf(
+                    self.snark_top_producers_sort_cf(),
+                    total_fee_prefix_key(old_total, &snark.prover.0),
+                )?
+            }
+        }
+
+        // replace stale data with updated
+        for (prover, (old_total, new_fees)) in prover_fees.iter() {
+            let total_fees = old_total + new_fees;
+            let key = total_fee_prefix_key(total_fees, &prover.0);
+            self.database
+                .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
+        }
+
+        Ok(())
+    }
+
+    fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+        Ok(top_snarkers_iterator(self, IteratorMode::End)
+            .take(n)
+            .map(|res| {
+                res.map(|(bytes, _)| SnarkWorkTotal {
+                    prover: String::from_utf8(bytes[8..].to_vec())
+                        .expect("public key bytes")
+                        .into(),
+                    total_fees: u64::from_be_bytes([
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7],
+                    ]),
+                })
+                .expect("snark work iterator")
+            })
+            .collect())
     }
 }
 
