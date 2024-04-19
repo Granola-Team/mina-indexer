@@ -432,7 +432,7 @@ impl IndexerState {
                     self.block_pipeline(&block, block_bytes)?;
                 }
                 ParsedBlock::Orphaned(block) => {
-                    debug!("Adding orphaned block to store {}", block.summary());
+                    trace!("Adding orphaned block to store {}", block.summary());
                     self.blocks_processed += 1;
                     self.bytes_processed += block_bytes;
                     self.add_block_to_store(&block)?;
