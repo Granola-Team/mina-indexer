@@ -5,10 +5,20 @@ use crate::{
     ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
+    store::{blocks_global_slot_idx_iterator, IndexerStore},
     web::graphql::gen::BlockQueryInput,
 };
-use async_graphql::{Context, Object, Result, SimpleObject};
+use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use chrono::{DateTime, SecondsFormat};
+use std::sync::Arc;
+
+pub fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> Result<bool> {
+    let canonicity = db
+        .get_block_canonicity(&BlockHash::from(state_hash.to_owned()))?
+        .map(|status| matches!(status, Canonicity::Canonical))
+        .unwrap_or(false);
+    Ok(canonicity)
+}
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -49,6 +59,58 @@ impl BlocksQueryRoot {
             .unwrap_or(false);
         Ok(Some(BlockWithCanonicity { block, canonical }))
     }
+
+    async fn blocks<'ctx>(
+        &self,
+        ctx: &Context<'ctx>,
+        query: Option<BlockQueryInput>,
+        limit: Option<usize>,
+        sort_by: Option<BlockSortByInput>,
+    ) -> Result<Option<Vec<BlockWithCanonicity>>> {
+        let db = db(ctx);
+        let limit = limit.unwrap_or(100);
+
+        let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
+
+        // sort mode
+        let mode = match sort_by {
+            Some(BlockSortByInput::BlockHeightAsc) => speedb::IteratorMode::Start,
+            Some(BlockSortByInput::BlockHeightDesc) => speedb::IteratorMode::End,
+            None => speedb::IteratorMode::End,
+        };
+
+        let iter = blocks_global_slot_idx_iterator(db, mode);
+
+        for entry in iter {
+            let (_, value) = entry?;
+            let state_hash = String::from_utf8(value.into_vec()).expect("state hash");
+            let pcb = db
+                .get_block(&BlockHash::from(state_hash.clone()))?
+                .expect("block to be returned");
+            let canonical = get_block_canonicity(db, &state_hash)?;
+            let block = BlockWithCanonicity {
+                canonical,
+                block: Block::from(pcb),
+            };
+
+            if query.as_ref().map_or(true, |q| q.matches(&block)) {
+                blocks.push(block);
+            }
+
+            if blocks.len() >= limit {
+                break;
+            }
+        }
+        Ok(Some(blocks))
+    }
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum BlockSortByInput {
+    #[graphql(name = "BLOCKHEIGHT_ASC")]
+    BlockHeightAsc,
+    #[graphql(name = "BLOCKHEIGHT_DESC")]
+    BlockHeightDesc,
 }
 
 #[derive(SimpleObject)]
@@ -389,5 +451,30 @@ impl From<PrecomputedBlock> for Block {
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
         }
+    }
+}
+
+impl BlockQueryInput {
+    pub fn matches(&self, block: &BlockWithCanonicity) -> bool {
+        let mut matches = true;
+
+        if let Some(state_hash) = &self.state_hash {
+            matches = matches && &block.block.state_hash == state_hash;
+        }
+
+        if let Some(canonical) = &self.canonical {
+            matches = matches && &block.canonical == canonical;
+        }
+
+        if let Some(query) = &self.and {
+            matches = matches && query.iter().all(|and| and.matches(block));
+        }
+
+        if let Some(query) = &self.or {
+            if !query.is_empty() {
+                matches = matches && query.iter().any(|or| or.matches(block));
+            }
+        }
+        matches
     }
 }
