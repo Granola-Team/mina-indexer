@@ -31,33 +31,30 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
-        // Choose genesis block if query is None
-        let state_hash = if let Some(query) = &query {
-            if let Some(state_hash) = &query.state_hash {
-                BlockHash::from(state_hash.clone())
-            } else {
-                match db.get_canonical_hash_at_height(1)? {
-                    Some(state_hash) => state_hash,
-                    None => return Ok(None),
-                }
-            }
-        } else {
-            match db.get_canonical_hash_at_height(1)? {
-                Some(state_hash) => state_hash,
-                None => return Ok(None),
-            }
-        };
 
-        let pcb = match db.get_block(&state_hash)? {
-            Some(pcb) => pcb,
-            None => return Ok(None),
-        };
-        let block = Block::from(pcb);
-        let canonical = db
-            .get_block_canonicity(&state_hash)?
-            .map(|status| matches!(status, Canonicity::Canonical))
-            .unwrap_or(false);
-        Ok(Some(BlockWithCanonicity { block, canonical }))
+        // sort mode
+        let mode = speedb::IteratorMode::Start;
+        let iter = blocks_global_slot_idx_iterator(db, mode);
+
+        let mut result: Option<BlockWithCanonicity> = None;
+        for entry in iter {
+            let (_, value) = entry?;
+            let state_hash = String::from_utf8(value.into_vec()).expect("state hash");
+            let pcb = db
+                .get_block(&BlockHash::from(state_hash.clone()))?
+                .expect("block to be returned");
+            let canonical = get_block_canonicity(db, &state_hash)?;
+            let block = BlockWithCanonicity {
+                canonical,
+                block: Block::from(pcb),
+            };
+
+            if query.as_ref().map_or(true, |q| q.matches(&block)) {
+                result = Some(block);
+                break;
+            }
+        }
+        Ok(result)
     }
 
     async fn blocks<'ctx>(
