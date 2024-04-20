@@ -33,3 +33,18 @@ jsonpath "$.data.blocks[0].snarkFees" == "0"
 
 duration < 1000
 
+POST {{url}}
+```graphql
+{
+  blocks(query: {creatorAccount: {publicKey: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
+    stateHash
+    blockHeight
+    winnerAccount {
+      publicKey
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.blocks" count == 2

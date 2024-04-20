@@ -32,6 +32,26 @@ impl BlocksQueryRoot {
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
 
+        // Use constant time access if we have state hash
+        if let Some(state_hash) = query.clone().and_then(|input| input.state_hash) {
+            let state_hash = &BlockHash::from(state_hash);
+            let pcb = match db.get_block(state_hash)? {
+                Some(pcb) => pcb,
+                None => return Ok(None),
+            };
+            let block = Block::from(pcb);
+            let canonical = db
+                .get_block_canonicity(state_hash)?
+                .map(|status| matches!(status, Canonicity::Canonical))
+                .unwrap_or(false);
+
+            let block = BlockWithCanonicity { block, canonical };
+            if query.unwrap().matches(&block) {
+                return Ok(Some(block));
+            }
+            return Ok(None);
+        }
+
         // sort mode
         let mode = speedb::IteratorMode::Start;
         let iter = blocks_global_slot_idx_iterator(db, mode);
@@ -463,6 +483,12 @@ impl BlockQueryInput {
             matches = matches && &block.canonical == canonical;
         }
 
+        if let Some(creator_account) = &self.creator_account {
+            if let Some(public_key) = creator_account.public_key.clone() {
+                let creator_pub_key = &block.block.creator_account.public_key;
+                matches = matches && *creator_pub_key == public_key;
+            }
+        }
         if let Some(query) = &self.and {
             matches = matches && query.iter().all(|and| and.matches(block));
         }
