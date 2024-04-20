@@ -930,6 +930,7 @@ test_snark_work() {
     dl_mainnet 120 ./blocks
 
     idxr_server_start_standard \
+        --canonical-threshold 5 \
         --log-level debug
     wait_for_socket
 
