@@ -1,4 +1,4 @@
-use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash};
+use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal};
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
@@ -22,4 +22,10 @@ pub trait SnarkStore {
 
     /// Get number of blocks which pk is a SNARK work prover
     fn get_pk_num_prover_blocks(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+
+    /// Update top snark work producers
+    fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()>;
+
+    /// Get top snark work producers
+    fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
 }

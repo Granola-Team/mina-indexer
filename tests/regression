@@ -972,6 +972,10 @@ test_snark_work() {
     assert '0' $fee
     assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $prover
 
+    # get top 5 SNARKers
+    assert 0 $(idxr snarks top --num 5 | jq -r .[0].total_fees)
+    assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $(idxr snarks top --num 5 | jq -r .[0].prover)
+
     rm -rf ./snark_work
     teardown
 }

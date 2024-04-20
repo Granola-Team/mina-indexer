@@ -1031,6 +1031,10 @@ async fn handle_conn(
                         })
                 }
             }
+            Snarks::Top { num } => {
+                info!("Received top {num} SNARKers command");
+                Some(serde_json::to_string_pretty(&db.get_top_snarkers(num)?)?)
+            }
         },
         ClientCli::Shutdown => {
             info!("Received shutdown command");

@@ -13,6 +13,12 @@ pub struct SnarkWorkSummary {
     pub prover: PublicKey,
 }
 
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnarkWorkTotal {
+    pub total_fees: u64,
+    pub prover: PublicKey,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWork {
     pub fee: u64,
