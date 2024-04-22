@@ -8,9 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SignedCommand(
-    pub crate::protocol::serialization_types::staged_ledger_diff::SignedCommandV1,
-);
+pub struct SignedCommand(pub mina_rs::SignedCommandV1);
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithStateHash {
@@ -395,14 +393,7 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
         nonce,
         valid_until,
         memo,
-    } = payload
-        .clone()
-        .inner()
-        .inner()
-        .common
-        .inner()
-        .inner()
-        .inner();
+    } = payload.t.t.common.t.t.t.clone();
     common.insert(
         "fee".into(),
         Value::Number(Number::from(fee.inner().inner())),
@@ -493,8 +484,8 @@ mod tests {
     use crate::block::precomputed::PrecomputedBlock;
     use std::path::PathBuf;
 
-    #[tokio::test]
-    async fn transaction_hash() {
+    #[test]
+    fn transaction_hash() {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX

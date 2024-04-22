@@ -77,7 +77,7 @@ impl FeetransferQueryRoot {
         query: Option<FeetransferQueryInput>,
         sort_by: Option<FeetransferSortByInput>,
         limit: Option<usize>,
-    ) -> Result<Option<Vec<FeetransferWithMeta>>> {
+    ) -> Result<Vec<FeetransferWithMeta>> {
         let db = db(ctx);
         let limit = limit.unwrap_or(100);
 
@@ -113,12 +113,12 @@ fn get_fee_transfers(
     query: Option<FeetransferQueryInput>,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
-) -> Result<Option<Vec<FeetransferWithMeta>>> {
+) -> Result<Vec<FeetransferWithMeta>> {
     let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
-    let mode: speedb::IteratorMode = match sort_by {
-        Some(FeetransferSortByInput::BlockHeightAsc) => speedb::IteratorMode::Start,
-        Some(FeetransferSortByInput::BlockHeightDesc) => speedb::IteratorMode::End,
-        None => speedb::IteratorMode::End,
+    let mode: speedb::IteratorMode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
+        speedb::IteratorMode::Start
+    } else {
+        speedb::IteratorMode::End
     };
 
     for entry in db.get_internal_commands_interator(mode) {
@@ -126,7 +126,6 @@ fn get_fee_transfers(
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from(internal_command);
         let state_hash = ft.state_hash.clone();
-
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical: get_block_canonicity(db, &state_hash)?,
             feetransfer: ft,
@@ -144,7 +143,7 @@ fn get_fee_transfers(
             break;
         }
     }
-    Ok(Some(fee_transfers))
+    Ok(fee_transfers)
 }
 
 fn get_fee_transfers_for_state_hash(
@@ -152,16 +151,15 @@ fn get_fee_transfers_for_state_hash(
     state_hash: &BlockHash,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
-) -> Option<Vec<FeetransferWithMeta>> {
-    let pcb = match db.get_block(state_hash).ok()? {
-        Some(pcb) => pcb,
-        None => return None,
+) -> Vec<FeetransferWithMeta> {
+    let pcb = match db.get_block(state_hash) {
+        Ok(Some(pcb)) => pcb,
+        _ => return vec![],
     };
-    let canonical = db
-        .get_block_canonicity(state_hash)
-        .ok()?
-        .map(|status| matches!(status, Canonicity::Canonical))
-        .unwrap_or(false);
+    let canonical = match db.get_block_canonicity(state_hash) {
+        Ok(Some(canonicity)) => matches!(canonicity, Canonicity::Canonical),
+        _ => false,
+    };
 
     match db.get_internal_commands(state_hash) {
         Ok(internal_commands) => {
@@ -190,9 +188,9 @@ fn get_fee_transfers_for_state_hash(
             }
 
             internal_commands.truncate(limit);
-            Some(internal_commands)
+            internal_commands
         }
-        Err(_) => None,
+        Err(_) => vec![],
     }
 }
 

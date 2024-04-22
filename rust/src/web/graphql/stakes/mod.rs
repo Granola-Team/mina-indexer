@@ -1,4 +1,6 @@
 use crate::{
+    block::store::BlockStore,
+    constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
     store::IndexerStore,
 };
@@ -37,9 +39,14 @@ impl StakeQueryRoot {
             .expect("db to be in context");
 
         let limit = limit.unwrap_or(100);
+
+        // default to current epoch
+        let curr_epoch = db.get_best_block()?.map_or(0, |block| {
+            block.global_slot_since_genesis() / MAINNET_EPOCH_SLOT_COUNT
+        });
         let epoch = match query {
-            Some(ref query) => query.epoch.unwrap_or(0),
-            None => 0,
+            Some(ref query) => query.epoch.unwrap_or(curr_epoch),
+            None => curr_epoch,
         };
 
         let staking_ledger = match db.get_staking_ledger_at_epoch("mainnet", epoch)? {
@@ -67,11 +74,10 @@ impl StakeQueryRoot {
                 let result = delegations.delegations.get(&pk).unwrap();
                 let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
                 let count_delegates = result.count_delegates.unwrap_or_default();
-
                 let mut decimal = Decimal::from(total_delegated_nanomina);
                 decimal.set_scale(9).ok();
-                let total_delegated = decimal.to_f64().unwrap_or_default();
 
+                let total_delegated = decimal.to_f64().unwrap_or_default();
                 LedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
@@ -85,15 +91,10 @@ impl StakeQueryRoot {
             })
             .collect();
 
-        if let Some(sort_by) = sort_by {
-            match sort_by {
-                StakeSortByInput::BalanceDesc => {
-                    accounts.sort_by(|a, b| {
-                        b.account.balance_nanomina.cmp(&a.account.balance_nanomina)
-                    });
-                }
-            }
+        if let Some(StakeSortByInput::BalanceDesc) = sort_by {
+            accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina));
         }
+
         accounts.truncate(limit);
         Ok(Some(accounts))
     }
@@ -154,6 +155,7 @@ impl From<StakingAccount> for LedgerAccount {
         let balance_nanomina = acc.balance;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
+
         let balance = decimal.to_f64().unwrap_or_default();
         let nonce = acc.nonce.unwrap_or_default();
         let delegate = acc.delegate.0;
@@ -162,9 +164,8 @@ impl From<StakingAccount> for LedgerAccount {
         let token = acc.token;
         let receipt_chain_hash = acc.receipt_chain_hash.0;
         let voting_for = acc.voting_for.0;
-
         Self {
-            chain_id: "5f704c".to_string(),
+            chain_id: MAINNET_CHAIN_ID[..6].to_string(),
             balance,
             nonce,
             delegate,

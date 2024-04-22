@@ -13,7 +13,7 @@ use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
     InputValueResult, MergedObject, Scalar, ScalarType, Schema, Value,
 };
-use std::{cmp::Ordering, sync::Arc};
+use std::sync::Arc;
 
 #[derive(MergedObject, Default)]
 pub struct Root(
@@ -25,14 +25,14 @@ pub struct Root(
     snarks::SnarkQueryRoot,
 );
 
-/// Build the schema for the block endpoints
+/// Build schema for all endpoints
 pub fn build_schema(store: Arc<IndexerStore>) -> Schema<Root, EmptyMutation, EmptySubscription> {
     Schema::build(Root::default(), EmptyMutation, EmptySubscription)
         .data(store)
         .finish()
 }
 
-pub async fn index_graphiql() -> actix_web::Result<HttpResponse> {
+pub async fn indexer_graphiql() -> actix_web::Result<HttpResponse> {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(GraphiQLSource::build().endpoint(ENDPOINT_GRAPHQL).finish()))
@@ -45,6 +45,7 @@ pub(crate) fn db<'a>(ctx: &'a Context) -> &'a Arc<IndexerStore> {
 
 #[derive(Debug, Clone)]
 pub struct Long(pub String);
+
 #[Scalar]
 impl ScalarType for Long {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -53,6 +54,7 @@ impl ScalarType for Long {
             _ => Err(InputValueError::expected_type(value)),
         }
     }
+
     fn to_value(&self) -> Value {
         Value::String(self.0.to_string())
     }
@@ -60,6 +62,7 @@ impl ScalarType for Long {
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct DateTime(pub String);
+
 #[Scalar]
 impl ScalarType for DateTime {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -68,6 +71,7 @@ impl ScalarType for DateTime {
             _ => Err(InputValueError::expected_type(value)),
         }
     }
+
     fn to_value(&self) -> Value {
         Value::String(self.0.to_string())
     }
@@ -78,18 +82,10 @@ pub(crate) fn date_time_to_scalar(millis: i64) -> DateTime {
     DateTime(millis_to_iso_date_string(millis))
 }
 
-trait F64Ord {
-    /// Returns an [Ordering] comparing this [f64] value and `other`.
-    ///
-    /// Defaults to [Ordering::Greater]
-    fn cmp(&self, other: &f64) -> Ordering;
-}
+pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> bool {
+    use crate::canonicity::{store::CanonicityStore, Canonicity};
 
-impl F64Ord for f64 {
-    fn cmp(&self, other: &f64) -> Ordering {
-        match self.partial_cmp(other) {
-            Some(ord) => ord,
-            None => Ordering::Greater,
-        }
-    }
+    db.get_block_canonicity(&state_hash.to_owned().into())
+        .map(|status| matches!(status, Some(Canonicity::Canonical)))
+        .unwrap_or(false)
 }
