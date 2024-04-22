@@ -539,12 +539,17 @@ impl CanonicityStore for IndexerStore {
 
         // height -> state hash
         let key = height.to_be_bytes();
-        let value = serde_json::to_vec(&state_hash)?;
+        let value = serde_json::to_vec(state_hash)?;
         let canonicity_cf = self.canonicity_cf();
         self.database.put_cf(&canonicity_cf, key, value)?;
 
         // update canonical chain length
         self.set_max_canonical_blockchain_length(height)?;
+
+        // update top snarkers based on the incoming canonical block
+        if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
+            self.update_top_snarkers(completed_works)?;
+        }
 
         // record new canonical block event
         self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
@@ -1508,8 +1513,6 @@ impl SnarkStore for IndexerStore {
                 self.database.put_cf(self.snarks_cf(), key, value)?;
             }
         }
-
-        self.update_top_snarkers(completed_works)?;
         Ok(())
     }
 
