@@ -21,11 +21,11 @@ variables {
 ```
 HTTP 200
 [Asserts]
-jsonpath "$.data.feetransfers[0].stateHash" == "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4"
-jsonpath "$.data.feetransfers[0].recipient" == "B62qqa9g4CFfkSuX2j22S52z6UfcDcS9tMTgQrFKZ21v7GrEP6Zu5Tc"
+jsonpath "$.data.feetransfers[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
 jsonpath "$.data.feetransfers[0].fee" == 10000000
 jsonpath "$.data.feetransfers[0].type" == "Fee_transfer"
-jsonpath "$.data.feetransfers[0].blockHeight" == 100
+jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[0].canonical" == true
-jsonpath "$.data.feetransfers[0].dateTime" == "2021-03-17T07:15:00.000Z"
+jsonpath "$.data.feetransfers[0].dateTime" == "2021-03-17T08:39:00.000Z"
 duration < 1000

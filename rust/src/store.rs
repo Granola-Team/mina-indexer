@@ -206,7 +206,10 @@ impl BlockStore for IndexerStore {
 
         fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
             let global_slot = block.global_slot_since_genesis();
-            global_slot_prefix(global_slot)
+            let mut bytes = global_slot_prefix(global_slot);
+            let mut state_hash_bytes = block.state_hash.as_bytes().to_vec();
+            bytes.append(&mut state_hash_bytes);
+            bytes
         }
 
         // add to global slots block index
