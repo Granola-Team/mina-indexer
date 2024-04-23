@@ -22,13 +22,13 @@ variables {
 ```
 HTTP 200
 [Asserts]
-jsonpath "$.data.blocks[0].stateHash" == "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4"
+jsonpath "$.data.blocks[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 jsonpath "$.data.blocks[0].txFees" == "10000000"
-jsonpath "$.data.blocks[0].blockHeight" == 100
+jsonpath "$.data.blocks[0].blockHeight" == 120
 jsonpath "$.data.blocks[0].canonical" == true
-jsonpath "$.data.blocks[0].creator" == "B62qrxNgwAdhGYZv1BXQRt2HgopUceFyrtXZMikwsuaHu5FigRJjhwY"
-jsonpath "$.data.blocks[0].dateTime" == "2021-03-17T07:15:00.000Z"
-jsonpath "$.data.blocks[0].receivedTime" == "2021-03-17T07:15:32.734Z"
+jsonpath "$.data.blocks[0].creator" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
+jsonpath "$.data.blocks[0].dateTime" == "2021-03-17T08:39:00.000Z"
+jsonpath "$.data.blocks[0].receivedTime" == "2021-03-17T08:39:40.591Z"
 jsonpath "$.data.blocks[0].snarkFees" == "0"
 
 duration < 1000
@@ -47,4 +47,4 @@ POST {{url}}
 ```
 HTTP 200
 [Asserts]
-jsonpath "$.data.blocks" count == 2
+jsonpath "$.data.blocks" count == 3

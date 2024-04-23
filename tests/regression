@@ -1635,7 +1635,7 @@ test_hurl() {
     test=test_hurl
 
     setup
-    dl_mainnet 100 ./blocks
+    dl_mainnet 120 ./blocks
     port=$(ephemeral_port)
 
     idxr_server start \

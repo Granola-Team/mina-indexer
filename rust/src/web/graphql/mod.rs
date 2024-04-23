@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod blocks;
 pub mod feetransfers;
 pub mod gen;
+pub mod snarks;
 pub mod stakes;
 pub mod transactions;
 
@@ -21,6 +22,7 @@ pub struct Root(
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
+    snarks::SnarkQueryRoot,
 );
 
 /// Build the schema for the block endpoints
