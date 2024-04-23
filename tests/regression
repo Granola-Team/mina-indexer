@@ -1640,7 +1640,7 @@ test_hurl() {
 
     idxr_server start \
         --blocks-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
+        --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
         --log-level debug \
         --web-port "$port" \
