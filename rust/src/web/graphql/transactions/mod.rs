@@ -6,8 +6,9 @@ use crate::{
         store::CommandStore,
     },
     ledger::public_key::PublicKey,
-    protocol::serialization_types::staged_ledger_diff::{
-        SignedCommandPayloadBody, StakeDelegation,
+    protocol::serialization_types::{
+        staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation},
+        version_bytes,
     },
     store::{
         user_commands_iterator, user_commands_iterator_signed_command,
@@ -16,12 +17,13 @@ use crate::{
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
+
+const MINA_SCALE: u32 = 9;
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
-
-const NANO_F64: f64 = 1_000_000_000_f64;
 
 #[Object]
 impl TransactionsQueryRoot {
@@ -106,6 +108,20 @@ fn txn_from_hash(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> Transact
     )
 }
 
+pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
+    let encoded_memo = bs58::encode(bytes)
+        .with_check_version(version_bytes::USER_COMMAND_MEMO)
+        .into_string();
+    Ok(encoded_memo)
+}
+
+pub fn nanomina_to_mina_f64(num: u64) -> f64 {
+    let mut dec = Decimal::from(num);
+    dec.set_scale(MINA_SCALE).unwrap();
+
+    dec.to_f64().expect("converted to f64")
+}
+
 impl Transaction {
     pub fn from_cmd(
         cmd: SignedCommandWithData,
@@ -140,21 +156,17 @@ impl Transaction {
                 };
 
                 let receiver = PublicKey::from(receiver).0;
-                let mut memo = String::from_utf8(common.memo.t.0).unwrap();
-                // ignore memos with nonsense unicode
-                if memo.starts_with('\u{0001}') {
-                    memo = String::new();
-                };
+                let memo = decode_memo(common.memo.t.0).expect("decoded memo");
 
                 Self {
-                    amount: amount as f64 / NANO_F64,
+                    amount: nanomina_to_mina_f64(amount),
                     block: TransactionBlock {
                         date_time: block_date_time,
                         state_hash: block_state_hash.0.to_owned(),
                     },
                     block_height: cmd.blockchain_length as i64,
                     canonical,
-                    fee: fee as f64 / NANO_F64,
+                    fee: nanomina_to_mina_f64(fee),
                     from: Some(PublicKey::from(sender).0),
                     hash: cmd.tx_hash,
                     kind: Some(kind.to_string()),
