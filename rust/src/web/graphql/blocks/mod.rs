@@ -1,6 +1,7 @@
 use super::{db, get_block_canonicity};
 use crate::{
     block::{self, precomputed::PrecomputedBlock, store::BlockStore},
+    command::internal::{InternalCommand, InternalCommandWithData},
     ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
@@ -26,8 +27,8 @@ impl BlocksQueryRoot {
         if query.is_none() {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| BlockWithCanonicity {
+                    canonical: get_block_canonicity(db, &pcb.state_hash),
                     block: pcb.into(),
-                    canonical: true,
                 })
             })?);
         }
@@ -153,6 +154,32 @@ pub struct Block {
     tx_fees: String,
     /// Value SNARK fees
     snark_fees: String,
+    /// Value transactions
+    transactions: Transactions,
+}
+
+#[derive(SimpleObject)]
+struct Transactions {
+    /// Value coinbase
+    coinbase: u64,
+    /// Value coinbase receiver account
+    coinbase_receiver_account: CoinbaseReceiverAccount,
+    /// Value fee transfer
+    fee_transfer: Vec<BlockFeetransfer>,
+}
+
+#[derive(SimpleObject)]
+struct BlockFeetransfer {
+    pub fee: u64,
+    pub recipient: String,
+    #[graphql(name = "type")]
+    pub feetransfer_kind: String,
+}
+
+#[derive(SimpleObject)]
+struct CoinbaseReceiverAccount {
+    /// Value public key
+    public_key: String,
 }
 
 #[derive(SimpleObject)]
@@ -403,7 +430,20 @@ impl From<PrecomputedBlock> for Block {
             .total_currency
             .t
             .t;
+        let coinbase_receiver_account = block.coinbase_receiver().0;
+        let supercharged = consensus_state.supercharge_coinbase;
 
+        let coinbase: u64 = if supercharged {
+            1440000000000
+        } else {
+            720000000000
+        };
+
+        let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(&block)
+            .into_iter()
+            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
+            .map(|ft| ft.into())
+            .collect();
         Block {
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
@@ -459,6 +499,13 @@ impl From<PrecomputedBlock> for Block {
             },
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
+            transactions: Transactions {
+                coinbase,
+                coinbase_receiver_account: CoinbaseReceiverAccount {
+                    public_key: coinbase_receiver_account,
+                },
+                fee_transfer: fee_transfers,
+            },
         }
     }
 }
@@ -486,5 +533,32 @@ impl BlockQueryInput {
             }
         }
         matches
+    }
+}
+
+impl From<InternalCommandWithData> for BlockFeetransfer {
+    fn from(int_cmd: InternalCommandWithData) -> Self {
+        match int_cmd {
+            InternalCommandWithData::FeeTransfer {
+                receiver,
+                amount,
+                kind,
+                ..
+            } => Self {
+                fee: amount,
+                recipient: receiver.0,
+                feetransfer_kind: kind.to_string(),
+            },
+            InternalCommandWithData::Coinbase {
+                receiver,
+                amount,
+                kind,
+                ..
+            } => Self {
+                fee: amount,
+                recipient: receiver.0,
+                feetransfer_kind: kind.to_string(),
+            },
+        }
     }
 }
