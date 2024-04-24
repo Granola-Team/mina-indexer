@@ -4,7 +4,7 @@ pub mod rest;
 pub const ENDPOINT_GRAPHQL: &str = "/graphql";
 
 use self::{
-    graphql::{build_schema, index_graphiql},
+    graphql::{build_schema, indexer_graphiql},
     rest::{accounts, blockchain, blocks, locked_balances::LockedBalances},
 };
 use crate::store::IndexerStore;
@@ -49,7 +49,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
             .service(
                 web::resource(ENDPOINT_GRAPHQL)
                     .guard(guard::Get())
-                    .to(index_graphiql),
+                    .to(indexer_graphiql),
             )
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
@@ -59,12 +59,12 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
     .await
 }
 
-/// convert epoch milliseconds to an ISO 8601 formatted date
+/// Convert epoch milliseconds to an ISO 8601 formatted date
 pub(crate) fn millis_to_iso_date_string(millis: i64) -> String {
     from_timestamp_millis(millis).to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-// convert epoch milliseconds to DateTime<Utc>
+/// Convert epoch milliseconds to DateTime<Utc>
 fn from_timestamp_millis(millis: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_millis(millis).unwrap()
 }

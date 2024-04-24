@@ -921,6 +921,7 @@ test_transactions() {
     rm -rf ./transactions
     teardown
 }
+
 # Indexer server returns correct SNARK work
 test_snark_work() {
     test=test_snark_work

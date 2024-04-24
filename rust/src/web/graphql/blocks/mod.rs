@@ -1,24 +1,14 @@
-use super::db;
+use super::{db, get_block_canonicity};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    canonicity::{store::CanonicityStore, Canonicity},
+    block::{self, precomputed::PrecomputedBlock, store::BlockStore},
     ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{common::Base58EncodableVersionedType, version_bytes},
-    store::{blocks_global_slot_idx_iterator, IndexerStore},
+    store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use chrono::{DateTime, SecondsFormat};
-use std::sync::Arc;
-
-pub fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> Result<bool> {
-    let canonicity = db
-        .get_block_canonicity(&BlockHash::from(state_hash.to_owned()))?
-        .map(|status| matches!(status, Canonicity::Canonical))
-        .unwrap_or(false);
-    Ok(canonicity)
-}
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -32,49 +22,56 @@ impl BlocksQueryRoot {
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
 
+        // no query filters => get the best block
+        if query.is_none() {
+            return Ok(db.get_best_block().map(|b| {
+                b.map(|pcb| BlockWithCanonicity {
+                    block: pcb.into(),
+                    canonical: true,
+                })
+            })?);
+        }
+
         // Use constant time access if we have state hash
         if let Some(state_hash) = query.clone().and_then(|input| input.state_hash) {
-            let state_hash = &BlockHash::from(state_hash);
-            let pcb = match db.get_block(state_hash)? {
+            if !block::is_valid_state_hash(&state_hash) {
+                return Ok(None);
+            }
+
+            let pcb = match db.get_block(&state_hash.clone().into())? {
                 Some(pcb) => pcb,
                 None => return Ok(None),
             };
-            let block = Block::from(pcb);
-            let canonical = db
-                .get_block_canonicity(state_hash)?
-                .map(|status| matches!(status, Canonicity::Canonical))
-                .unwrap_or(false);
+            let block = BlockWithCanonicity {
+                canonical: get_block_canonicity(db, &state_hash),
+                block: pcb.into(),
+            };
 
-            let block = BlockWithCanonicity { block, canonical };
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
             }
             return Ok(None);
         }
 
-        // sort mode
-        let mode = speedb::IteratorMode::Start;
-        let iter = blocks_global_slot_idx_iterator(db, mode);
+        // TODO bound query search space if given any inputs
 
-        let mut result: Option<BlockWithCanonicity> = None;
-        for entry in iter {
-            let (_, value) = entry?;
-            let state_hash = String::from_utf8(value.into_vec()).expect("state hash");
+        // else iterate from the end
+        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End) {
+            let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let pcb = db
-                .get_block(&BlockHash::from(state_hash.clone()))?
+                .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
-            let canonical = get_block_canonicity(db, &state_hash)?;
             let block = BlockWithCanonicity {
-                canonical,
-                block: Block::from(pcb),
+                canonical: get_block_canonicity(db, &state_hash),
+                block: pcb.into(),
             };
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
-                result = Some(block);
-                break;
+                return Ok(Some(block));
             }
         }
-        Ok(result)
+
+        Ok(None)
     }
 
     async fn blocks<'ctx>(
@@ -83,42 +80,38 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
         limit: Option<usize>,
         sort_by: Option<BlockSortByInput>,
-    ) -> Result<Option<Vec<BlockWithCanonicity>>> {
+    ) -> Result<Vec<BlockWithCanonicity>> {
         let db = db(ctx);
         let limit = limit.unwrap_or(100);
-
         let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
-
-        // sort mode
-        let mode = match sort_by {
-            Some(BlockSortByInput::BlockHeightAsc) => speedb::IteratorMode::Start,
-            Some(BlockSortByInput::BlockHeightDesc) => speedb::IteratorMode::End,
-            None => speedb::IteratorMode::End,
+        let mode = if let Some(BlockSortByInput::BlockHeightAsc) = sort_by {
+            speedb::IteratorMode::Start
+        } else {
+            speedb::IteratorMode::End
         };
 
-        let iter = blocks_global_slot_idx_iterator(db, mode);
+        // TODO bound query search space if given any inputs
 
-        for entry in iter {
-            let (_, value) = entry?;
-            let state_hash = String::from_utf8(value.into_vec()).expect("state hash");
+        for entry in blocks_global_slot_idx_iterator(db, mode) {
+            let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let pcb = db
-                .get_block(&BlockHash::from(state_hash.clone()))?
+                .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
-            let canonical = get_block_canonicity(db, &state_hash)?;
             let block = BlockWithCanonicity {
-                canonical,
-                block: Block::from(pcb),
+                canonical: get_block_canonicity(db, &state_hash),
+                block: pcb.into(),
             };
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
             }
 
-            if blocks.len() >= limit {
+            if blocks.len() == limit {
                 break;
             }
         }
-        Ok(Some(blocks))
+
+        Ok(blocks)
     }
 }
 
@@ -265,7 +258,7 @@ struct WinnerAccount {
 
 #[derive(SimpleObject)]
 struct CreatorAccount {
-    /// The public_key for the WinnerAccount
+    /// The public_key for the CreatorAccount
     public_key: String,
 }
 
@@ -474,25 +467,20 @@ impl From<PrecomputedBlock> for Block {
 impl BlockQueryInput {
     pub fn matches(&self, block: &BlockWithCanonicity) -> bool {
         let mut matches = true;
-
         if let Some(state_hash) = &self.state_hash {
             matches = matches && &block.block.state_hash == state_hash;
         }
-
         if let Some(canonical) = &self.canonical {
             matches = matches && &block.canonical == canonical;
         }
-
         if let Some(creator_account) = &self.creator_account {
-            if let Some(public_key) = creator_account.public_key.clone() {
-                let creator_pub_key = &block.block.creator_account.public_key;
-                matches = matches && *creator_pub_key == public_key;
+            if let Some(public_key) = creator_account.public_key.as_ref() {
+                matches = matches && block.block.creator_account.public_key == *public_key;
             }
         }
         if let Some(query) = &self.and {
             matches = matches && query.iter().all(|and| and.matches(block));
         }
-
         if let Some(query) = &self.or {
             if !query.is_empty() {
                 matches = matches && query.iter().any(|or| or.matches(block));

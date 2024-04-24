@@ -188,6 +188,12 @@ impl IndexerStore {
 
 /// [BlockStore] implementation
 
+fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
+    let mut res = global_slot_prefix(block.global_slot_since_genesis());
+    res.append(&mut block.state_hash.as_bytes().to_vec());
+    res
+}
+
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
     fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
@@ -204,22 +210,13 @@ impl BlockStore for IndexerStore {
         }
         self.database.put_cf(&blocks_cf, key, value)?;
 
-        fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
-            let global_slot = block.global_slot_since_genesis();
-            let mut bytes = global_slot_prefix(global_slot);
-            let mut state_hash_bytes = block.state_hash.as_bytes().to_vec();
-            bytes.append(&mut state_hash_bytes);
-            bytes
-        }
-
         // add to global slots block index
-        {
-            let key = global_slot_block_key(block);
-            let value = block.state_hash.as_bytes();
-            let blocks_global_slot_idx_cf = self.blocks_global_slot_idx_cf();
-            self.database
-                .put_cf(&blocks_global_slot_idx_cf, key, value)?;
-        }
+        self.database.put_cf(
+            self.blocks_global_slot_idx_cf(),
+            global_slot_block_key(block),
+            b"",
+        )?;
+
         // add block for each public key
         for pk in block.all_public_keys() {
             self.add_block_at_public_key(&pk, &block.state_hash.clone().into())?;
@@ -258,10 +255,9 @@ impl BlockStore for IndexerStore {
         trace!("Getting block with hash {}", state_hash.0);
 
         let key = state_hash.0.as_bytes();
-        let blocks_cf = self.blocks_cf();
         match self
             .database
-            .get_pinned_cf(&blocks_cf, key)?
+            .get_pinned_cf(self.blocks_cf(), key)?
             .map(|bytes| bytes.to_vec())
         {
             None => Ok(None),
@@ -1033,7 +1029,7 @@ impl EventStore for IndexerStore {
 
 /// [CommandStore] implementation
 
-type KvIterator<'a> = &'a Result<(Box<[u8]>, Box<[u8]>), speedb::Error>;
+type KvIteratorEntry<'a> = &'a Result<(Box<[u8]>, Box<[u8]>), speedb::Error>;
 
 const COMMAND_KEY_PREFIX: &str = "user-";
 
@@ -1068,6 +1064,10 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
 }
 
 /// [DBIterator] for blocks
+/// - key: `{global slot BE bytes}{state hash bytes}`
+/// - value: empty byte
+///
+/// Use [blocks_global_slot_idx_state_hash_from_entry] to extract state hash
 pub fn blocks_global_slot_idx_iterator<'a>(
     db: &'a Arc<IndexerStore>,
     mode: IteratorMode,
@@ -1076,26 +1076,34 @@ pub fn blocks_global_slot_idx_iterator<'a>(
         .iterator_cf(db.blocks_global_slot_idx_cf(), mode)
 }
 
+/// Extracts state hash from the iterator entry (key)
+pub fn blocks_global_slot_idx_state_hash_from_entry(
+    entry: KvIteratorEntry,
+) -> anyhow::Result<String> {
+    let key = entry.to_owned()?.0;
+    Ok(String::from_utf8(key[4..].to_vec()).expect("state hash"))
+}
+
 /// [DBIterator] for user commands (transactions)
 pub fn user_commands_iterator<'a>(db: &'a Arc<IndexerStore>, mode: IteratorMode) -> DBIterator<'a> {
     db.database.iterator_cf(db.commands_slot_mainnet_cf(), mode)
 }
 
 /// Global slot number from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_global_slot(entry: KvIterator) -> u32 {
+pub fn user_commands_iterator_global_slot(entry: KvIteratorEntry) -> u32 {
     let bytes = entry.to_owned().unwrap().0;
     u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
 }
 
 /// Transaction hash from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_txn_hash(entry: KvIterator) -> anyhow::Result<String> {
+pub fn user_commands_iterator_txn_hash(entry: KvIteratorEntry) -> anyhow::Result<String> {
     String::from_utf8(entry.to_owned().unwrap().0[4..].to_vec())
         .map_err(|e| anyhow!("Error reading txn hash: {}", e))
 }
 
 /// [SignedCommandWithData] from `entry` in [user_commands_iterator]
 pub fn user_commands_iterator_signed_command(
-    entry: KvIterator,
+    entry: KvIteratorEntry,
 ) -> anyhow::Result<SignedCommandWithData> {
     Ok(serde_json::from_slice::<SignedCommandWithData>(
         &entry.to_owned().unwrap().1,

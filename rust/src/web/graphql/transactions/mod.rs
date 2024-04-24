@@ -1,7 +1,6 @@
-use super::{date_time_to_scalar, db};
+use super::{date_time_to_scalar, db, get_block_canonicity};
 use crate::{
     block::BlockHash,
-    canonicity::{store::CanonicityStore, Canonicity},
     command::{
         signed::{self, SignedCommand, SignedCommandWithData},
         store::CommandStore,
@@ -31,14 +30,25 @@ impl TransactionsQueryRoot {
         ctx: &Context<'_>,
         query: TransactionQueryInput,
     ) -> Result<Option<Transaction>> {
+        let db = db(ctx);
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
-                let db = db(ctx);
                 return Ok(db
                     .get_command_by_hash(&hash)?
                     .map(|cmd| txn_from_hash(cmd, db)));
             }
+        } else {
+            // no query filter => return the most recent transaction
+            return Ok(user_commands_iterator(db, speedb::IteratorMode::End)
+                .next()
+                .and_then(|entry| {
+                    let txn_hash = user_commands_iterator_txn_hash(&entry).unwrap();
+                    db.get_command_by_hash(&txn_hash)
+                        .unwrap()
+                        .map(|cmd| txn_from_hash(cmd, db))
+                }));
         }
+
         Ok(None)
     }
 
@@ -48,13 +58,10 @@ impl TransactionsQueryRoot {
         query: TransactionQueryInput,
         limit: Option<usize>,
         sort_by: TransactionSortByInput,
-    ) -> Result<Vec<Option<Transaction>>> {
+    ) -> Result<Vec<Transaction>> {
         let db = db(ctx);
         let limit = limit.unwrap_or(100);
-
-        let mut transactions: Vec<Option<Transaction>> = Vec::with_capacity(limit);
-
-        // sort mode
+        let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
         let mode = match sort_by {
             TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
                 speedb::IteratorMode::Start
@@ -64,24 +71,19 @@ impl TransactionsQueryRoot {
             }
         };
 
-        let iter = user_commands_iterator(db, mode);
+        // TODO bound query search space if given any inputs
 
-        for entry in iter {
-            let txn_hash = user_commands_iterator_txn_hash(&entry)?;
-
-            if let Some(query_txn_hash) = query.hash.to_owned() {
-                if txn_hash != query_txn_hash {
-                    continue;
-                }
+        for entry in user_commands_iterator(db, mode) {
+            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&entry).ok() {
+                continue;
             }
 
+            // Only add transactions that satisfy the input query
             let cmd = user_commands_iterator_signed_command(&entry)?;
-
             let transaction = txn_from_hash(cmd, db);
 
-            // Only add transactions that satisfy the input query
             if query.matches(&transaction) {
-                transactions.push(Some(transaction));
+                transactions.push(transaction);
             };
 
             if transactions.len() == limit {
@@ -96,16 +98,12 @@ impl TransactionsQueryRoot {
 fn txn_from_hash(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> Transaction {
     let block_state_hash = cmd.state_hash.to_owned();
     let block_date_time = date_time_to_scalar(cmd.date_time as i64);
-
-    let canonical = match db
-        .get_block_canonicity(&block_state_hash.to_owned())
-        .unwrap()
-    {
-        Some(canonicity) => canonicity == Canonicity::Canonical,
-        None => false,
-    };
-
-    Transaction::from_cmd(cmd, block_date_time, &block_state_hash, canonical)
+    Transaction::from_cmd(
+        cmd,
+        block_date_time,
+        &block_state_hash,
+        get_block_canonicity(db, &block_state_hash.0),
+    )
 }
 
 impl Transaction {
@@ -176,54 +174,43 @@ impl Transaction {
 impl TransactionQueryInput {
     pub fn matches(&self, transaction: &Transaction) -> bool {
         let mut matches = true;
-
         if let Some(hash) = &self.hash {
             matches = matches && &transaction.hash == hash;
         }
         if let Some(fee) = self.fee {
             matches = matches && transaction.fee == fee;
         }
-
         if self.kind.is_some() {
             matches = matches && transaction.kind == self.kind;
         }
-
         if let Some(canonical) = self.canonical {
             matches = matches && transaction.canonical == canonical;
         }
-
         if self.from.is_some() {
             matches = matches && transaction.from == self.from;
         }
-
         if let Some(to) = &self.to {
             matches = matches && &transaction.to == to;
         }
-
         if let Some(memo) = &self.memo {
             matches = matches && &transaction.memo == memo;
         }
-
         if let Some(query) = &self.and {
             matches = matches && query.iter().all(|and| and.matches(transaction));
         }
-
         if let Some(query) = &self.or {
             if !query.is_empty() {
                 matches = matches && query.iter().any(|or| or.matches(transaction));
             }
         }
-
         if let Some(__) = &self.date_time_gte {
             matches = matches && transaction.block.date_time >= *__;
         }
-
         if let Some(__) = &self.date_time_lte {
             matches = matches && transaction.block.date_time <= *__;
         }
 
         // TODO: implement matches for all the other optional vars
-
         matches
     }
 }

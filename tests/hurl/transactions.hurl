@@ -32,4 +32,11 @@ variables {
 HTTP 200
 [Asserts]
 jsonpath "$.data.transactions[0].blockHeight" == 3
+jsonpath "$.data.transactions[0].memo" == ""
+jsonpath "$.data.transactions[0].hash" == "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+
+jsonpath "$.data.transactions[49].blockHeight" == 59
+jsonpath "$.data.transactions[49].memo" == ""
+jsonpath "$.data.transactions[49].hash" == "CkpZ3EzeQLT4m3mLUwyKFdvF3cjvvFGUzR9jug14E8bFryTpTsxYz"
+
 duration < 1000
