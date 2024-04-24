@@ -78,11 +78,10 @@ impl BlocksQueryRoot {
         &self,
         ctx: &Context<'ctx>,
         query: Option<BlockQueryInput>,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
     ) -> Result<Vec<BlockWithCanonicity>> {
         let db = db(ctx);
-        let limit = limit.unwrap_or(100);
         let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
         let mode = if let Some(BlockSortByInput::BlockHeightAsc) = sort_by {
             speedb::IteratorMode::Start

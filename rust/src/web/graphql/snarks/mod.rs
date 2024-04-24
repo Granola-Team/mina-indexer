@@ -70,10 +70,9 @@ impl SnarkQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<SnarkQueryInput>,
         sort_by: Option<SnarkSortByInput>,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<SnarkWithCanonicity>> {
         let db = db(ctx);
-        let limit = limit.unwrap_or(100);
         let mut snarks = Vec::with_capacity(limit);
         let mode: speedb::IteratorMode = if let Some(SnarkSortByInput::BlockHeightAsc) = sort_by {
             speedb::IteratorMode::Start

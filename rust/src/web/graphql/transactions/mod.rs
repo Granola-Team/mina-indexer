@@ -58,11 +58,10 @@ impl TransactionsQueryRoot {
         &self,
         ctx: &Context<'_>,
         query: TransactionQueryInput,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
         sort_by: TransactionSortByInput,
     ) -> Result<Vec<Transaction>> {
         let db = db(ctx);
-        let limit = limit.unwrap_or(100);
         let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
         let mode = match sort_by {
             TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {

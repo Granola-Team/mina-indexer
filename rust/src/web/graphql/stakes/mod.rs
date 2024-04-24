@@ -1,12 +1,11 @@
+use super::db;
 use crate::{
     block::store::BlockStore,
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
-    store::IndexerStore,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use std::sync::Arc;
 
 #[derive(InputObject)]
 pub struct StakeQueryInput {
@@ -32,13 +31,9 @@ impl StakeQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<StakeQueryInput>,
         sort_by: Option<StakeSortByInput>,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<LedgerAccountWithMeta>>> {
-        let db = ctx
-            .data::<Arc<IndexerStore>>()
-            .expect("db to be in context");
-
-        let limit = limit.unwrap_or(100);
+        let db = db(ctx);
 
         // default to current epoch
         let curr_epoch = db.get_best_block()?.map_or(0, |block| {

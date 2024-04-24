@@ -76,11 +76,9 @@ impl FeetransferQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<FeetransferQueryInput>,
         sort_by: Option<FeetransferSortByInput>,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<FeetransferWithMeta>> {
         let db = db(ctx);
-        let limit = limit.unwrap_or(100);
-
         let has_state_hash = query.as_ref().map_or(false, |q| q.state_hash.is_some());
 
         if has_state_hash {

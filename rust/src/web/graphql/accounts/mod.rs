@@ -1,10 +1,9 @@
+use super::db;
 use crate::{
     block::store::BlockStore,
     ledger::{account::Account as LAccount, store::LedgerStore},
-    store::IndexerStore,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
-use std::sync::Arc;
 
 #[derive(SimpleObject)]
 pub struct Account {
@@ -48,12 +47,9 @@ impl AccountQueryRoot {
         ctx: &Context<'ctx>,
         query: Option<AccountQueryInput>,
         sort_by: Option<AccountSortByInput>,
-        limit: Option<usize>,
+        #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<Account>>> {
-        let db = ctx
-            .data::<Arc<IndexerStore>>()
-            .expect("db to be in context");
-        let limit = limit.unwrap_or(100);
+        let db = db(ctx);
         let state_hash = match db.get_best_block_hash() {
             Ok(Some(state_hash)) => state_hash,
             Ok(None) => return Ok(None),
