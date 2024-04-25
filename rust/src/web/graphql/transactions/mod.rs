@@ -39,16 +39,6 @@ impl TransactionsQueryRoot {
                     .get_command_by_hash(&hash)?
                     .map(|cmd| txn_from_hash(cmd, db)));
             }
-        } else {
-            // no query filter => return the most recent transaction
-            return Ok(user_commands_iterator(db, speedb::IteratorMode::End)
-                .next()
-                .and_then(|entry| {
-                    let txn_hash = user_commands_iterator_txn_hash(&entry).unwrap();
-                    db.get_command_by_hash(&txn_hash)
-                        .unwrap()
-                        .map(|cmd| txn_from_hash(cmd, db))
-                }));
         }
 
         Ok(None)
