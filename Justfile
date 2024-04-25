@@ -6,7 +6,7 @@
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
 # Non-Nix environment needs nightly toolchain installed and requires +nightly
-is_rustfmt_nightly := `rustfmt --version | grep stable || echo "true"`
+is_rustfmt_nightly := `cd rust && rustfmt --version | grep stable || echo "true"`
 nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" }
 
 default:
@@ -20,6 +20,9 @@ prereqs:
   cd rust && cargo machete --help 2>&1 >/dev/null
   jq --version
   check-jsonschema --version
+  hurl --version
+  docker --version
+  shellcheck --version
 
 build:
   cd rust && cargo build --release
