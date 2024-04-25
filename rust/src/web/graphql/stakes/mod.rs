@@ -12,6 +12,8 @@ pub struct StakeQueryInput {
     epoch: Option<u32>,
     #[graphql(name = "public_key")]
     public_key: Option<String>,
+    delegate: Option<String>,
+    ledger_hash: Option<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -62,6 +64,16 @@ impl StakeQueryRoot {
                         return *public_key == account.pk.0;
                     }
                 }
+                if let Some(ref query) = query {
+                    if let Some(delegate) = &query.delegate {
+                        return *delegate == account.delegate.0;
+                    }
+                }
+                if let Some(ref query) = query {
+                    if let Some(ledger_hash_from_query) = &query.ledger_hash {
+                        return *ledger_hash_from_query == ledger_hash;
+                    }
+                }
                 true
             })
             .map(|account| {
@@ -73,6 +85,15 @@ impl StakeQueryRoot {
                 decimal.set_scale(9).ok();
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
+
+                let timing = account.timing.as_ref().map(|timing| StakeTiming {
+                    cliff_amount: Some(timing.cliff_amount),
+                    cliff_time: Some(timing.cliff_time),
+                    initial_minimum_balance: Some(timing.initial_minimum_balance),
+                    vesting_increment: Some(timing.vesting_increment),
+                    vesting_period: Some(timing.vesting_period),
+                });
+
                 LedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
@@ -82,6 +103,7 @@ impl StakeQueryRoot {
                         total_delegated_nanomina,
                         count_delegates,
                     },
+                    timing,
                 }
             })
             .collect();
@@ -106,6 +128,8 @@ pub struct LedgerAccountWithMeta {
     /// Value accounts
     #[graphql(flatten)]
     account: LedgerAccount,
+    /// Value timing
+    timing: Option<StakeTiming>,
 }
 
 #[derive(SimpleObject)]
@@ -143,6 +167,20 @@ pub struct DelegationTotals {
     total_delegated_nanomina: u64,
     /// Value count delegates
     count_delegates: u32,
+}
+
+#[derive(SimpleObject)]
+struct StakeTiming {
+    #[graphql(name = "cliff_amount")]
+    pub cliff_amount: Option<u64>,
+    #[graphql(name = "cliff_time")]
+    pub cliff_time: Option<u64>,
+    #[graphql(name = "initial_minimum_balance")]
+    pub initial_minimum_balance: Option<u64>,
+    #[graphql(name = "vesting_increment")]
+    pub vesting_increment: Option<u64>,
+    #[graphql(name = "vesting_period")]
+    pub vesting_period: Option<u64>,
 }
 
 impl From<StakingAccount> for LedgerAccount {
