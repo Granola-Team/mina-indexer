@@ -219,7 +219,7 @@ struct BlockTransactionReceiver {
 
 #[derive(SimpleObject)]
 struct BlockFeetransfer {
-    pub fee: u64,
+    pub fee: String,
     pub recipient: String,
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
@@ -600,7 +600,7 @@ impl From<InternalCommandWithData> for BlockFeetransfer {
                 kind,
                 ..
             } => Self {
-                fee: amount,
+                fee: amount.to_string(),
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
             },
@@ -610,7 +610,7 @@ impl From<InternalCommandWithData> for BlockFeetransfer {
                 kind,
                 ..
             } => Self {
-                fee: amount,
+                fee: amount.to_string(),
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
             },
