@@ -18,6 +18,7 @@ use crate::{
         },
         version_bytes,
     },
+    snark_work::SnarkWorkSummary,
     store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
     web::graphql::gen::BlockQueryInput,
 };
@@ -169,6 +170,23 @@ pub struct Block {
     snark_fees: String,
     /// Value transactions
     transactions: Transactions,
+    /// Value snark jobs
+    snark_jobs: Vec<SnarkJob>,
+}
+
+#[derive(SimpleObject)]
+
+struct SnarkJob {
+    /// Value block state hash
+    block_state_hash: String,
+    /// Valuable block height
+    block_height: u32,
+    /// Value date time
+    date_time: String,
+    /// Value fee
+    fee: f64,
+    /// Value prover
+    prover: String,
 }
 
 #[derive(SimpleObject)]
@@ -498,7 +516,22 @@ impl From<PrecomputedBlock> for Block {
             .into_iter()
             .map(|cmd| cmd.into())
             .collect();
+
+        let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(&block)
+            .into_iter()
+            .map(|snark| {
+                (
+                    snark,
+                    block.state_hash.clone(),
+                    block_height,
+                    date_time.clone(),
+                )
+                    .into()
+            })
+            .collect();
+
         Block {
+            snark_jobs,
             state_hash: block.state_hash,
             block_height: block.blockchain_length,
             date_time,
@@ -614,6 +647,18 @@ impl From<InternalCommandWithData> for BlockFeetransfer {
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
             },
+        }
+    }
+}
+
+impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
+    fn from(value: (SnarkWorkSummary, String, u32, String)) -> Self {
+        Self {
+            block_state_hash: value.1,
+            block_height: value.2,
+            date_time: value.3,
+            fee: nanomina_to_mina_f64(value.0.fee),
+            prover: value.0.prover.to_string(),
         }
     }
 }

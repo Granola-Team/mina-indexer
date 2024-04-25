@@ -105,3 +105,26 @@ jsonpath "$.data.blocks[0].transactions.userCommands[0].fee" == 0.01
 jsonpath "$.data.blocks[0].transactions.userCommands[0].blockHeight" == 3
 
 duration < 1000
+
+POST {{url}}
+```graphql
+{
+  blocks(query: {stateHash: "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm"}) {
+    snarkJobs {
+      blockHeight
+      blockStateHash
+      dateTime
+      prover
+      fee
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.blocks[0].snarkJobs" count == 64
+jsonpath "$.data.blocks[0].snarkJobs[0].blockHeight" == 111
+jsonpath "$.data.blocks[0].snarkJobs[0].blockStateHash" == "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm"
+jsonpath "$.data.blocks[0].snarkJobs[0].dateTime" == "2021-03-17T08:06:00.000Z"
+jsonpath "$.data.blocks[0].snarkJobs[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.blocks[0].snarkJobs[0].fee" == 0
