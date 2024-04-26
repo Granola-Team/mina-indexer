@@ -198,7 +198,12 @@ impl From<StakingAccount> for LedgerAccount {
         let receipt_chain_hash = acc.receipt_chain_hash.0;
         let voting_for = acc.voting_for.0;
         Self {
-            chain_id: MAINNET_CHAIN_ID[..6].to_string(),
+            chain_id: chain_id(
+                MAINNET_GENESIS_HASH,
+                MAINNET_GENESIS_CONSTANTS,
+                MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+            )[..6]
+                .to_string(),
             balance,
             nonce,
             delegate,
