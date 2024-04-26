@@ -253,7 +253,7 @@ impl BlockParser {
             .map(|p| (p.0.into(), p.1))
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
-        while next_block.0.state_hash != state_hash {
+        while next_block.0.state_hash().0 != state_hash {
             next_block = self
                 .next_block()?
                 .map(|p| (p.0.into(), p.1))

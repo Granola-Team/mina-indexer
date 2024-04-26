@@ -1,7 +1,6 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
-    mina_blocks::MinaBlock,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
     web::graphql::{db, get_block_canonicity},
@@ -125,7 +124,7 @@ impl SnarkQueryInput {
     pub fn matches(&self, snark: &SnarkWithCanonicity) -> bool {
         let mut matches = true;
         if let Some(state_hash) = &self.state_hash {
-            matches = matches && &snark.block.state_hash == state_hash;
+            matches = matches && &snark.block.state_hash().0 == state_hash;
         }
         if let Some(canonical) = &self.canonical {
             matches = matches && &snark.canonical == canonical;

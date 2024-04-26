@@ -32,7 +32,7 @@ async fn extensions() -> anyhow::Result<()> {
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await?;
     assert_eq!(
-        root0_block.state_hash,
+        root0_block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
@@ -42,7 +42,7 @@ async fn extensions() -> anyhow::Result<()> {
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await?;
     assert_eq!(
-        root1_block.state_hash,
+        root1_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 

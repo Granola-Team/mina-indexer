@@ -21,7 +21,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
     // we declare this to be the root tree
@@ -44,7 +44,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        child_block.state_hash,
+        child_block.state_hash().0,
         "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
     );
     tree2

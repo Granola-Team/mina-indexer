@@ -12,7 +12,7 @@ async fn representative_benches() -> anyhow::Result<()> {
     while let Some((block, _)) = block_parser0.next_block()? {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
-        dbg!(block.state_hash);
+        dbg!(block.state_hash());
     }
 
     println!("./tests/data/non_sequential_blocks");
@@ -28,7 +28,7 @@ async fn representative_benches() -> anyhow::Result<()> {
     while let Some((block, _)) = block_parser1.next_block()? {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
-        dbg!(block.state_hash);
+        dbg!(block.state_hash());
     }
 
     println!("./tests/data/sequential_blocks");
@@ -50,7 +50,7 @@ async fn get_global_slot_since_genesis() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(
-        block.state_hash,
+        block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
     assert_eq!(block.global_slot_since_genesis(), 155140);

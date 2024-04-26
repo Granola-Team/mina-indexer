@@ -37,7 +37,7 @@ mod test {
     fn test_parse_genesis_block() -> anyhow::Result<()> {
         match GenesisBlock::new() {
             Ok(block) => {
-                let state_hash = block.0.state_hash;
+                let state_hash = block.0.state_hash().0;
                 assert_eq!(
                     "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
                     state_hash

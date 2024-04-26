@@ -59,6 +59,9 @@ pub const STATE_BODY_HASH: u8 = 0x11;
 /// base58 version check byte for v1 (mainnet) txn hash
 pub const V1_TXN_HASH: u8 = 0x12;
 
+/// base58 version check byte for v2 (berkeley) txn hash
+pub const V2_TXN_HASH: u8 = 0x1d;
+
 /// base58 version check byte for user command
 pub const USER_COMMAND: u8 = 0x13;
 
@@ -88,9 +91,6 @@ pub const VERIFICATION_KEY: u8 = 0x1b;
 
 /// base58 version check byte for token id key
 pub const TOKEN_ID_KEY: u8 = 0x1c;
-
-/// base58 version check byte for berkeley txn hash
-pub const TXN_HASH: u8 = 0x1d;
 
 /// base58 version check byte for private key
 pub const PRIVATE_KEY: u8 = 0x5a;

@@ -436,6 +436,7 @@ pub type LedgerHashV1Json = HashV1Json<{ version_bytes::LEDGER_HASH }>;
 pub type ChainHashV1Json = LedgerHashV1Json;
 
 /// base58 string representation of a v1 (mainnet) coinbase hash
+/// Q: why does this work?
 pub type CoinBaseHashV1Json = HashV1Json<{ version_bytes::RECEIPT_CHAIN_HASH }>;
 
 /// base58 string representation of a coinbase hash

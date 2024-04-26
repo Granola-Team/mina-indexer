@@ -151,9 +151,9 @@ impl InternalCommandWithData {
             InternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
                 receiver,
                 amount,
-                state_hash: block.state_hash.clone().into(),
+                state_hash: block.state_hash(),
                 kind: InternalCommandKind::Coinbase,
-                block_height: block.blockchain_length,
+                block_height: block.blockchain_length(),
                 date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransfer {
@@ -164,9 +164,9 @@ impl InternalCommandWithData {
                 sender,
                 receiver,
                 amount,
-                state_hash: block.state_hash.clone().into(),
+                state_hash: block.state_hash(),
                 kind: InternalCommandKind::FeeTransfer,
-                block_height: block.blockchain_length,
+                block_height: block.blockchain_length(),
                 date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransferViaCoinbase {
@@ -177,9 +177,9 @@ impl InternalCommandWithData {
                 sender,
                 receiver,
                 amount,
-                state_hash: block.state_hash.clone().into(),
+                state_hash: block.state_hash(),
                 kind: InternalCommandKind::FeeTransferViaCoinbase,
-                block_height: block.blockchain_length,
+                block_height: block.blockchain_length(),
                 date_time: block.timestamp() as i64,
             },
         }
@@ -249,7 +249,7 @@ mod tests {
                     amount: 720000000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
                     kind: InternalCommandKind::Coinbase,
-                    block_height: block.blockchain_length,
+                    block_height: block.blockchain_length(),
                     date_time: block.timestamp() as i64,
                 },
                 InternalCommandWithData::FeeTransfer {
@@ -258,7 +258,7 @@ mod tests {
                     amount: 20000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
                     kind: InternalCommandKind::FeeTransfer,
-                    block_height: block.blockchain_length,
+                    block_height: block.blockchain_length(),
                     date_time: block.timestamp() as i64,
                 }
             ]

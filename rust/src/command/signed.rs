@@ -182,8 +182,8 @@ impl SignedCommandWithData {
             .map(|cmd| {
                 Self::from(
                     cmd,
-                    &block.state_hash,
-                    block.blockchain_length,
+                    &block.state_hash().0,
+                    block.blockchain_length(),
                     block.timestamp(),
                     block.global_slot_since_genesis(),
                 )

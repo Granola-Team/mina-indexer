@@ -35,10 +35,7 @@ fn contiguous() -> anyhow::Result<()> {
 
     while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
-        println!(
-            "length: {}, hash: {}",
-            block.blockchain_length, block.state_hash
-        );
+        println!("{}", block.summary());
     }
 
     // lengths 2..11 are known to be canonical
@@ -58,10 +55,7 @@ fn missing_parent() -> anyhow::Result<()> {
 
     while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
-        println!(
-            "length: {}, hash: {}",
-            block.blockchain_length, block.state_hash
-        );
+        println!("{}", block.summary());
     }
 
     // mainnet-105500-3NKvv2iBAPhZ8SRCxQEuGTgqTYuFXd2WVANXW6pcsR8pdzLuUj7C.json
