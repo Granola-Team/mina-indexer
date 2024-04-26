@@ -1,4 +1,4 @@
-use super::{date_time_to_scalar, db, get_block_canonicity};
+use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64};
 use crate::{
     block::BlockHash,
     command::{
@@ -17,10 +17,7 @@ use crate::{
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
-
-const MINA_SCALE: u32 = 9;
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
@@ -102,13 +99,6 @@ pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
         .with_check_version(version_bytes::USER_COMMAND_MEMO)
         .into_string();
     Ok(encoded_memo)
-}
-
-pub fn nanomina_to_mina_f64(num: u64) -> f64 {
-    let mut dec = Decimal::from(num);
-    dec.set_scale(MINA_SCALE).unwrap();
-
-    dec.to_f64().expect("converted to f64")
 }
 
 impl Transaction {
