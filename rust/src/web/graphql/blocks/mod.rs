@@ -184,7 +184,7 @@ struct SnarkJob {
     /// Value date time
     date_time: String,
     /// Value fee
-    fee: f64,
+    fee: u64,
     /// Value prover
     prover: String,
 }
@@ -192,7 +192,7 @@ struct SnarkJob {
 #[derive(SimpleObject)]
 struct Transactions {
     /// Value coinbase
-    coinbase: u64,
+    coinbase: String,
     /// Value coinbase receiver account
     coinbase_receiver_account: CoinbaseReceiverAccount,
     /// Value fee transfer
@@ -587,7 +587,7 @@ impl From<PrecomputedBlock> for Block {
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
-                coinbase,
+                coinbase: coinbase.to_string(),
                 coinbase_receiver_account: CoinbaseReceiverAccount {
                     public_key: coinbase_receiver_account,
                 },
@@ -657,7 +657,7 @@ impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
             block_state_hash: value.1,
             block_height: value.2,
             date_time: value.3,
-            fee: nanomina_to_mina_f64(value.0.fee),
+            fee: value.0.fee,
             prover: value.0.prover.to_string(),
         }
     }
