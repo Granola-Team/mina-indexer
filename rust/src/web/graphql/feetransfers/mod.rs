@@ -1,4 +1,7 @@
-use super::blocks::{Block, BlockWithCanonicity};
+use super::{
+    blocks::{Block, BlockWithCanonicity},
+    get_block_canonicity,
+};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
@@ -98,14 +101,6 @@ impl FeetransferQueryRoot {
     }
 }
 
-fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> Result<bool> {
-    let canonicity = db
-        .get_block_canonicity(&BlockHash::from(state_hash.to_owned()))?
-        .map(|status| matches!(status, Canonicity::Canonical))
-        .unwrap_or(false);
-    Ok(canonicity)
-}
-
 fn get_fee_transfers(
     db: &Arc<IndexerStore>,
     query: Option<FeetransferQueryInput>,
@@ -125,7 +120,7 @@ fn get_fee_transfers(
         let ft = Feetransfer::from(internal_command);
         let state_hash = ft.state_hash.clone();
         let feetransfer_with_meta = FeetransferWithMeta {
-            canonical: get_block_canonicity(db, &state_hash)?,
+            canonical: get_block_canonicity(db, &state_hash),
             feetransfer: ft,
             block: None,
         };
