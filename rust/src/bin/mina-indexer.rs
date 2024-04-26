@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
+    chain_id::chain_id,
     client,
     constants::*,
     ledger::{self, genesis::GenesisLedger},
@@ -297,6 +298,11 @@ pub fn process_indexer_configuration(
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
+    let chain_id = chain_id(
+        MAINNET_GENESIS_HASH,
+        MAINNET_GENESIS_CONSTANTS,
+        MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+    );
 
     assert!(
         ledger.is_file(),
@@ -334,6 +340,7 @@ pub fn process_indexer_configuration(
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 genesis_hash,
+                chain_id,
                 blocks_dir,
                 block_watch_dir,
                 staking_ledgers_dir,

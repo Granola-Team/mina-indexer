@@ -10,6 +10,7 @@ use crate::{
         Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
+    chain_id::{chain_id, store::ChainIdStore, ChainId},
     command::store::CommandStore,
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
@@ -45,42 +46,65 @@ use std::{
 pub struct IndexerState {
     /// Indexer phase
     pub phase: IndexerPhase,
+
     /// Block representing the best tip of the root branch
     pub best_tip: Tip,
+
     /// Highest known canonical block with threshold confirmations
     pub canonical_root: Tip,
+
     /// Ledger corresponding to the canonical root
     pub ledger: Ledger,
+
     /// Cadence for computing and storing new ledgers
     pub ledger_cadence: u32,
+
     /// Map of ledger diffs following the canonical root
     pub diffs_map: HashMap<BlockHash, LedgerDiff>,
+
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
+
     /// Dynamic, dangling branches eventually merged into the `root_branch`
     /// needed for the possibility of missing blocks
     pub dangling_branches: Vec<Branch>,
+
     /// Block database
     pub indexer_store: Option<Arc<IndexerStore>>,
+
     /// Staking ledger epochs and ledger hashes
     pub staking_ledgers: HashMap<u32, LedgerHash>,
+
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
+
     /// Interval to prune the root branch
     pub prune_interval: u32,
+
     /// Frequency to report
     pub reporting_freq: u32,
+
     /// Threshold for updating the canonical root and db ledger
     pub canonical_update_threshold: u32,
+
     /// Number of blocks added to the witness tree
     pub blocks_processed: u32,
+
     /// Number of block bytes added to the witness tree
     pub bytes_processed: u64,
+
     /// Datetime the indexer started running
     pub init_time: Instant,
+
     /// Network blocks and staking ledgers to be processed
-    pub network: String,
+    pub network: Network,
+
+    /// Chain id for current network
+    pub chain_id: ChainId,
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Network(pub String);
 
 #[derive(Debug, Clone)]
 pub struct Tip {
@@ -123,6 +147,7 @@ pub struct IndexerStateConfig {
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
     pub network: String,
+    pub chain_id: ChainId,
 }
 
 impl IndexerStateConfig {
@@ -130,10 +155,16 @@ impl IndexerStateConfig {
         genesis_ledger: GenesisLedger,
         indexer_store: Arc<IndexerStore>,
         transition_frontier_length: u32,
+        // TODO other genesis constants?
     ) -> Self {
         IndexerStateConfig {
             genesis_ledger,
             indexer_store,
+            chain_id: chain_id(
+                MAINNET_GENESIS_HASH,
+                MAINNET_GENESIS_CONSTANTS,
+                MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+            ),
             network: "mainnet".into(),
             transition_frontier_length,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
@@ -190,6 +221,12 @@ impl IndexerState {
             .indexer_store
             .add_canonical_block(1, &config.genesis_hash)?;
 
+        // set chain id
+        let chain_id = config.chain_id;
+        config
+            .indexer_store
+            .set_chain_id_for_network(&chain_id, &Network("mainnet".to_string()))?;
+
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -207,6 +244,7 @@ impl IndexerState {
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
+            chain_id,
             dangling_branches: Vec::new(),
             indexer_store: Some(config.indexer_store),
             transition_frontier_length: config.transition_frontier_length,
@@ -217,7 +255,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            network: config.network.clone(),
+            network: Network(config.network.clone()),
             staking_ledgers: HashMap::new(),
         })
     }
@@ -237,6 +275,7 @@ impl IndexerState {
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
+            chain_id: config.chain_id,
             dangling_branches: Vec::new(),
             indexer_store: Some(config.indexer_store),
             transition_frontier_length: config.transition_frontier_length,
@@ -247,7 +286,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            network: config.network.clone(),
+            network: Network(config.network.clone()),
             staking_ledgers: HashMap::new(),
         })
     }
@@ -294,6 +333,7 @@ impl IndexerState {
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
+            chain_id: ChainId("TESTING".to_string()),
             dangling_branches: Vec::new(),
             indexer_store: indexer_store.map(Arc::new),
             transition_frontier_length: transition_frontier_length
@@ -305,7 +345,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
-            network: "mainnet".into(),
+            network: Network("mainnet".into()),
             staking_ledgers: HashMap::new(),
         })
     }
@@ -359,7 +399,7 @@ impl IndexerState {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
                         indexer_store.add_ledger_state_hash(
-                            &self.network,
+                            &self.network.0,
                             &state_hash,
                             self.ledger.clone(),
                         )?;
@@ -1386,7 +1426,7 @@ impl IndexerState {
             for canonical_block in canonical_blocks {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
                     indexer_store.add_ledger_state_hash(
-                        &self.network,
+                        &self.network.0,
                         &canonical_block.state_hash,
                         self.ledger.clone(),
                     )?;

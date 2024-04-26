@@ -1,5 +1,6 @@
 use crate::{
     block::{self, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash},
+    chain_id::ChainId,
     constants::MAINNET_TRANSITION_FRONTIER_K,
     ledger::{
         genesis::GenesisLedger,
@@ -28,6 +29,7 @@ use tokio::{
 pub struct IndexerConfiguration {
     pub genesis_ledger: GenesisLedger,
     pub genesis_hash: BlockHash,
+    pub chain_id: ChainId,
     pub blocks_dir: Option<PathBuf>,
     pub block_watch_dir: PathBuf,
     pub staking_ledgers_dir: Option<PathBuf>,
@@ -139,6 +141,7 @@ pub fn initialize(
         initialization_mode,
         ledger_cadence,
         reporting_freq,
+        chain_id,
         ..
     } = config;
 
@@ -154,6 +157,7 @@ pub fn initialize(
         genesis_ledger: genesis_ledger.clone(),
         indexer_store: store,
         network: "mainnet".into(),
+        chain_id,
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
         canonical_update_threshold,
@@ -289,20 +293,23 @@ pub async fn run(
         staking_ledger_watch_dir.as_ref().display()
     );
 
-    // watch for precomputed blocks & staking ledgers, and
-    // recover missing blocks
     loop {
         tokio::select! {
+            // watch for shutdown signal
             _ = wait_for_signal() => {
                 info!("Ingestion shutdown signal received");
                 break;
             }
+
+            // watch for precomputed blocks & staking ledgers
             Some(res) = rx.recv() => {
                 match res {
                     Ok(event) => process_event(event, &state).await,
                     Err(e) => error!("Ingestion watcher error: {}", e),
                 }
             }
+
+            // recover any missing blocks
             _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
                 if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
                     recover_missing_blocks(&state, &block_watch_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
@@ -310,6 +317,7 @@ pub async fn run(
             }
         }
     }
+
     info!("Ingestion cleanly shutdown");
     Ok(())
 }
@@ -383,7 +391,7 @@ async fn recover_missing_blocks(
     batch_recovery: bool,
 ) {
     let state = state.read().await;
-    let network = state.network.clone();
+    let network = state.network.0.clone();
     let missing_parent_lengths: HashSet<u32> = state
         .dangling_branches
         .iter()

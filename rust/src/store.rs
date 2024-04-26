@@ -2,8 +2,13 @@
 //! [IndexerStore]
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{
+        precomputed::{PrecomputedBlock, PrecomputedBlockV1, PrecomputedBlockV2},
+        store::BlockStore,
+        BlockHash,
+    },
     canonicity::{store::CanonicityStore, Canonicity},
+    chain_id::{store::ChainIdStore, ChainId},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
@@ -21,6 +26,7 @@ use crate::{
     snark_work::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
+    state::Network,
 };
 use anyhow::{anyhow, bail};
 use log::{error, trace, warn};
@@ -604,9 +610,14 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
 
         if let Ok(Some(best_tip)) = self.get_best_block() {
-            if let Some(PrecomputedBlock {
-                blockchain_length, ..
-            }) = self.get_block(state_hash)?
+            if let Some(
+                PrecomputedBlock::V1(PrecomputedBlockV1 {
+                    blockchain_length, ..
+                })
+                | PrecomputedBlock::V2(PrecomputedBlockV2 {
+                    blockchain_length, ..
+                }),
+            ) = self.get_block(state_hash)?
             {
                 if blockchain_length > best_tip.blockchain_length {
                     return Ok(Some(Canonicity::Pending));
@@ -1588,6 +1599,8 @@ impl SnarkStore for IndexerStore {
     }
 
     fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()> {
+        trace!("Updating top SNARK workers");
+
         let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();
         for snark in snarks {
             let key = snark.prover.0.as_bytes();
@@ -1622,6 +1635,8 @@ impl SnarkStore for IndexerStore {
     }
 
     fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+        trace!("Getting top {n} SNARK workers");
+
         Ok(top_snarkers_iterator(self, IteratorMode::End)
             .take(n)
             .map(|res| {
@@ -1640,7 +1655,55 @@ impl SnarkStore for IndexerStore {
     }
 }
 
+impl ChainIdStore for IndexerStore {
+    fn set_chain_id_for_network(
+        &self,
+        chain_id: &ChainId,
+        network: &Network,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting chain id '{}' for network '{}'",
+            chain_id.0,
+            network.0
+        );
+
+        // add the new pair
+        let key = chain_id.0.as_bytes();
+        let value = network.0.as_bytes();
+        self.database.put(key, value)?;
+
+        // update current network/chain_id
+        self.database.put(Self::CHAIN_ID_KEY, key)?;
+        Ok(())
+    }
+
+    fn get_network(&self, chain_id: &ChainId) -> anyhow::Result<Network> {
+        trace!("Getting network for chain id: {}", chain_id.0);
+        Ok(Network(String::from_utf8(
+            self.database
+                .get(chain_id.0.as_bytes())?
+                .expect("network is present"),
+        )?))
+    }
+
+    fn get_current_network(&self) -> anyhow::Result<Network> {
+        trace!("Getting current network");
+        self.get_network(&self.get_chain_id()?)
+    }
+
+    fn get_chain_id(&self) -> anyhow::Result<ChainId> {
+        trace!("Getting chain id");
+
+        Ok(ChainId(String::from_utf8(
+            self.database
+                .get(Self::CHAIN_ID_KEY)?
+                .expect("chain id set"),
+        )?))
+    }
+}
+
 impl IndexerStore {
+    const CHAIN_ID_KEY: &'static [u8] = "current_chain_id".as_bytes();
     const BEST_TIP_BLOCK_KEY: &'static [u8] = "best_tip_block".as_bytes();
     const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();

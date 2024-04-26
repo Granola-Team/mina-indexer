@@ -10,6 +10,7 @@ use crate::{
         CommandStatusData,
     },
     ledger::{public_key::PublicKey, LedgerHash},
+    mina_blocks::MinaBlock,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{
         common::Base58EncodableVersionedType,
@@ -41,7 +42,7 @@ impl BlocksQueryRoot {
         if query.is_none() {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| BlockWithCanonicity {
-                    canonical: get_block_canonicity(db, &pcb.state_hash),
+                    canonical: get_block_canonicity(db, &pcb.state_hash().0),
                     block: pcb.into(),
                 })
             })?);

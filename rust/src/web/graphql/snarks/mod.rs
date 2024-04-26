@@ -1,6 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
+    mina_blocks::MinaBlock,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
     web::graphql::{db, get_block_canonicity},
@@ -30,11 +31,11 @@ pub struct SnarkWithCanonicity {
 impl SnarkWithCanonicity {
     /// Value state hash
     async fn state_hash(&self) -> String {
-        self.block.state_hash.clone()
+        self.block.state_hash().0
     }
     /// Value block height
     async fn block_height(&self) -> u32 {
-        self.block.blockchain_length
+        self.block.blockchain_length()
     }
     /// Value date time
     async fn date_time(&self) -> String {

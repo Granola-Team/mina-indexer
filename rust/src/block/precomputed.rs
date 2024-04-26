@@ -6,6 +6,7 @@ use crate::{
     command::{signed::SignedCommand, UserCommandWithStatus},
     constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
+    mina_blocks::MinaBlock,
     protocol::serialization_types::{
         consensus_state as mina_consensus,
         protocol_state::{ProtocolState, ProtocolStateJson},
@@ -35,7 +36,24 @@ fn genesis_timestamp() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlock {
+pub enum PrecomputedBlock {
+    V1(PrecomputedBlockV1),
+    V2(PrecomputedBlockV2),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrecomputedBlockV1 {
+    pub network: String,
+    pub state_hash: String,
+    pub scheduled_time: String,
+    pub blockchain_length: u32,
+    pub protocol_state: ProtocolState,
+    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrecomputedBlockV2 {
+    // TODO
     pub network: String,
     pub state_hash: String,
     pub scheduled_time: String,
@@ -463,6 +481,26 @@ impl std::cmp::Eq for PrecomputedBlock {}
 fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
     for pk in new_pks {
         pks.insert(pk);
+    }
+}
+
+impl MinaBlock for PrecomputedBlock {
+    fn blockchain_length(&self) -> u32 {
+        match self {
+            Self::V1(PrecomputedBlockV1 {
+                blockchain_length, ..
+            })
+            | Self::V2(PrecomputedBlockV2 {
+                blockchain_length, ..
+            }) => blockchain_length,
+        }
+    }
+
+    fn state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(PrecomputedBlockV1 { state_hash, .. })
+            | Self::V2(PrecomputedBlockV2 { state_hash, .. }) => state_hash.into(),
+        }
     }
 }
 
