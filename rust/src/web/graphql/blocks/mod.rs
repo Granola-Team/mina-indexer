@@ -1,6 +1,6 @@
 use super::{
-    db, get_block_canonicity,
-    transactions::{decode_memo, nanomina_to_mina_f64},
+    db, get_block_canonicity, millis_to_iso_date_string, nanomina_to_mina_f64,
+    transactions::decode_memo,
     MAINNET_COINBASE_REWARD,
 };
 use crate::{
@@ -24,7 +24,6 @@ use crate::{
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use chrono::{DateTime, SecondsFormat};
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -356,20 +355,14 @@ struct CreatorAccount {
     public_key: String,
 }
 
-/// convert epoch millis to an ISO 8601 formatted date
-fn millis_to_date_string(millis: i64) -> String {
-    let date_time = DateTime::from_timestamp_millis(millis).unwrap();
-    date_time.to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
 impl From<PrecomputedBlock> for Block {
     fn from(block: PrecomputedBlock) -> Self {
         let winner_account = block.block_creator().0;
-        let date_time = millis_to_date_string(block.timestamp().try_into().unwrap());
+        let date_time = millis_to_iso_date_string(block.timestamp().try_into().unwrap());
         let pk_creator = block.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
         let scheduled_time = block.scheduled_time().clone();
-        let received_time = millis_to_date_string(scheduled_time.parse::<i64>().unwrap());
+        let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();
         let snark_fees = block.snark_fees();
