@@ -119,7 +119,7 @@ fn get_fee_transfers(
         speedb::IteratorMode::End
     };
 
-    for entry in db.get_internal_commands_interator(mode) {
+    for entry in db.internal_commands_interator(mode) {
         let (_, value) = entry?;
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from(internal_command);

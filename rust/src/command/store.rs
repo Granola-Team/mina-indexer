@@ -63,5 +63,5 @@ pub trait CommandStore {
     fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
 
     /// Get internal commands interator starting from
-    fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_>;
+    fn internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_>;
 }

@@ -138,7 +138,7 @@ impl IndexerStore {
     fn internal_commands_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("mainnet-internal-commands")
-            .expect("mainnet-internal commands column family exists")
+            .expect("mainnet-internal-commands column family exists")
     }
 
     fn commands_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
@@ -1121,6 +1121,17 @@ fn global_slot_prefix_key(global_slot: u32, txn_hash: &str) -> Vec<u8> {
     bytes
 }
 
+/// Internal command key
+/// - 4 global slot BE bytes
+/// - state hash bytes
+/// - 4 index BE bytes
+fn internal_commmand_key(global_slot: u32, state_hash: &str, index: u32) -> Vec<u8> {
+    let mut bytes = global_slot_prefix(global_slot);
+    bytes.append(&mut state_hash.as_bytes().to_vec());
+    bytes.append(&mut index.to_be_bytes().to_vec());
+    bytes
+}
+
 impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
@@ -1345,18 +1356,11 @@ impl CommandStore for IndexerStore {
             .map(|c| InternalCommandWithData::from_internal_cmd(c, block))
             .collect();
 
-        fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = global_slot_prefix(global_slot);
-            bytes.append(&mut state_hash.as_bytes().to_vec());
-            bytes.append(&mut index.to_be_bytes().to_vec());
-            bytes
-        }
-
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
             let key = internal_commmand_key(
                 block.global_slot_since_genesis(),
-                &block.state_hash.clone(),
-                i,
+                &block.state_hash,
+                i as u32,
             );
             self.database.put_cf(
                 self.internal_commands_cf(),
@@ -1461,7 +1465,7 @@ impl CommandStore for IndexerStore {
             }))
     }
 
-    fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
+    fn internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.internal_commands_cf(), mode)
     }
 }

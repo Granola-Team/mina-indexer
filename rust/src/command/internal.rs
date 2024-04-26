@@ -130,14 +130,11 @@ impl InternalCommand {
                         })
                     }
                 }
-                AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
-                    receiver: c.public_key.clone(),
-                    amount: c.amount.0,
-                }),
                 _ => (),
             }
         }
 
+        // return the coinbase as the first internl command
         if coinbase.is_coinbase_applied() {
             internal_cmds.insert(0, coinbase.as_internal_cmd());
         }
