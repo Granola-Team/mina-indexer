@@ -435,8 +435,11 @@ pub type LedgerHashV1Json = HashV1Json<{ version_bytes::LEDGER_HASH }>;
 /// base58 string representation of a chain hash
 pub type ChainHashV1Json = LedgerHashV1Json;
 
+/// base58 string representation of a v1 (mainnet) coinbase hash
+pub type CoinBaseHashV1Json = HashV1Json<{ version_bytes::RECEIPT_CHAIN_HASH }>;
+
 /// base58 string representation of a coinbase hash
-pub type CoinBaseHashV1Json = HashV1Json<{ version_bytes::COINBASE_HASH }>;
+pub type CoinBaseHashV2Json = HashV1Json<{ version_bytes::COINBASE_HASH }>;
 
 /// base58 string representation of a coinbase hash
 pub type EpochSeedHashV1Json = HashV1Json<{ version_bytes::EPOCH_SEED }>;
