@@ -90,7 +90,7 @@ POST {{url}}
 HTTP 200
 [Asserts]
 jsonpath "$.data.blocks[0].stateHash" == "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R"
-jsonpath "$.data.blocks[0].transactions.coinbase" == 720000000000
+jsonpath "$.data.blocks[0].transactions.coinbase" == "720000000000"
 jsonpath "$.data.blocks[0].transactions.coinbaseReceiverAccount.publicKey" == "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1"
 jsonpath "$.data.blocks[0].transactions.feeTransfer" count == 2
 jsonpath "$.data.blocks[0].transactions.feeTransfer[0].type" == "Coinbase"
