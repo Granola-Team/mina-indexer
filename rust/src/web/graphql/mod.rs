@@ -11,7 +11,7 @@ use crate::{constants::*, store::IndexerStore};
 use actix_web::HttpResponse;
 use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
-    InputValueResult, MergedObject, Scalar, ScalarType, Schema, Value,
+    InputValueResult, MergedObject, Scalar, ScalarType, Schema, SimpleObject, Value,
 };
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
@@ -98,4 +98,10 @@ pub(crate) fn nanomina_to_mina_f64(num: u64) -> f64 {
     dec.set_scale(MINA_SCALE).unwrap();
 
     dec.to_f64().expect("converted to f64")
+}
+
+#[derive(Clone, Debug, PartialEq, SimpleObject)]
+#[graphql(name = "PublicKey")]
+pub(crate) struct PK {
+    pub public_key: String,
 }

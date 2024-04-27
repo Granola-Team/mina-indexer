@@ -1,4 +1,4 @@
-use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64};
+use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64, PK};
 use crate::{
     block::BlockHash,
     command::{
@@ -151,7 +151,7 @@ impl Transaction {
                     kind: Some(kind.to_string()),
                     memo,
                     nonce: nonce as i64,
-                    receiver: TransactionReceiver {
+                    receiver: PK {
                         public_key: receiver.to_owned(),
                     },
                     to: receiver,
@@ -227,7 +227,8 @@ pub struct Transaction {
     pub kind: Option<String>,
     pub memo: String,
     pub nonce: i64,
-    pub receiver: TransactionReceiver,
+    /// The receiver's public key
+    receiver: PK,
     pub to: String,
     pub token: Option<i64>,
 }
@@ -236,9 +237,4 @@ pub struct Transaction {
 pub struct TransactionBlock {
     pub date_time: DateTime,
     pub state_hash: String,
-}
-
-#[derive(Clone, Debug, PartialEq, SimpleObject)]
-pub struct TransactionReceiver {
-    pub public_key: String,
 }

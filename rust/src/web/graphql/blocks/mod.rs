@@ -1,6 +1,6 @@
 use super::{
     db, get_block_canonicity, millis_to_iso_date_string, nanomina_to_mina_f64,
-    transactions::decode_memo,
+    transactions::decode_memo, PK,
     MAINNET_COINBASE_REWARD,
 };
 use crate::{
@@ -152,14 +152,14 @@ pub struct Block {
     state_hash: String,
     /// Value block_height
     block_height: u32,
-    /// Value winning_account
-    winner_account: WinnerAccount,
+    /// The public_key for the winner account
+    winner_account: PK,
     /// Value date_time as ISO 8601 string
     date_time: String,
     /// Value received_time as ISO 8601 string
     received_time: String,
-    /// Value creator account
-    creator_account: CreatorAccount,
+    /// The public_key for the creator account
+    creator_account: PK,
     /// Value creator public key
     creator: String,
     /// Value protocol state
@@ -193,8 +193,8 @@ struct SnarkJob {
 struct Transactions {
     /// Value coinbase
     coinbase: String,
-    /// Value coinbase receiver account
-    coinbase_receiver_account: CoinbaseReceiverAccount,
+    /// The public key for the coinbase receiver account
+    coinbase_receiver_account: PK,
     /// Value fee transfer
     fee_transfer: Vec<BlockFeetransfer>,
     /// Value user commands
@@ -241,12 +241,6 @@ struct BlockFeetransfer {
     pub recipient: String,
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
-}
-
-#[derive(SimpleObject)]
-struct CoinbaseReceiverAccount {
-    /// Value public key
-    public_key: String,
 }
 
 #[derive(SimpleObject)]
@@ -341,18 +335,6 @@ struct ProtocolState {
     blockchain_state: BlockchainState,
     /// Value consensus state
     consensus_state: ConsensusState,
-}
-
-#[derive(SimpleObject)]
-struct WinnerAccount {
-    /// The public_key for the WinnerAccount
-    public_key: String,
-}
-
-#[derive(SimpleObject)]
-struct CreatorAccount {
-    /// The public_key for the CreatorAccount
-    public_key: String,
 }
 
 impl From<PrecomputedBlock> for Block {
@@ -511,10 +493,10 @@ impl From<PrecomputedBlock> for Block {
             state_hash: block.state_hash().0,
             block_height: block.blockchain_length(),
             date_time,
-            winner_account: WinnerAccount {
+            winner_account: PK {
                 public_key: winner_account,
             },
-            creator_account: CreatorAccount {
+            creator_account: PK {
                 public_key: creator.clone(),
             },
             creator,
@@ -564,7 +546,7 @@ impl From<PrecomputedBlock> for Block {
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
                 coinbase: coinbase.to_string(),
-                coinbase_receiver_account: CoinbaseReceiverAccount {
+                coinbase_receiver_account: PK {
                     public_key: coinbase_receiver_account,
                 },
                 fee_transfer: fee_transfers,
