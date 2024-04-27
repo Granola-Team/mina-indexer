@@ -486,7 +486,7 @@ pub fn is_valid_tx_hash(input: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::precomputed::PrecomputedBlock;
+    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
     #[test]
@@ -496,7 +496,7 @@ mod tests {
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
 
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file).unwrap();
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion(0)).unwrap();
         let hashes = precomputed_block.command_hashes();
         let expect = vec![
             "CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string(),

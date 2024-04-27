@@ -1,3 +1,4 @@
+use super::precomputed::PcbVersion;
 use crate::{
     block::{extract_block_height, precomputed::PrecomputedBlock},
     canonicity::canonical_chain_discovery::discovery,
@@ -213,7 +214,7 @@ impl BlockParser {
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
     ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         let block_bytes = path.metadata().unwrap().len();
-        match PrecomputedBlock::parse_file(path).map(designation) {
+        match PrecomputedBlock::parse_file(path, PcbVersion(0)).map(designation) {
             Ok(parsed_block) => {
                 self.blocks_processed += 1;
                 self.bytes_processed += block_bytes;

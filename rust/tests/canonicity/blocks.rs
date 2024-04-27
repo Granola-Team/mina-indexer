@@ -4,6 +4,7 @@ use mina_indexer::{
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
     ledger::genesis::GenesisRoot,
+    server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
 };
@@ -19,6 +20,7 @@ async fn test() {
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
     let mut state = IndexerState::new(
         genesis_ledger.into(),
+        IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )

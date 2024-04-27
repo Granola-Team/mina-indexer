@@ -2,6 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     ledger::genesis::GenesisRoot,
+    server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
 };
@@ -15,7 +16,12 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)?;
-    let mut state = IndexerState::new(genesis_ledger.clone().into(), indexer_store.clone(), 10)?;
+    let mut state = IndexerState::new(
+        genesis_ledger.clone().into(),
+        IndexerVersion::new_testing(),
+        indexer_store.clone(),
+        10,
+    )?;
 
     // add all blocks to the state
     state.add_blocks(&mut block_parser)?;

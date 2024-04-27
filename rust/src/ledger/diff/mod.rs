@@ -126,7 +126,10 @@ impl std::fmt::Debug for LedgerDiff {
 
 #[cfg(test)]
 mod tests {
-    use crate::{block::precomputed::PrecomputedBlock, ledger::diff::LedgerDiff};
+    use crate::{
+        block::precomputed::{PcbVersion, PrecomputedBlock},
+        ledger::diff::LedgerDiff,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -134,7 +137,7 @@ mod tests {
         use crate::ledger::diff::account::AccountDiffType::*;
 
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK.json");
-        let block = PrecomputedBlock::parse_file(&path)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
         let ledger_diff = LedgerDiff::from_precomputed(&block);
         let expected = LedgerDiff::from(&[
             (
@@ -184,7 +187,7 @@ mod tests {
         use crate::ledger::diff::account::AccountDiffType::*;
 
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-320081-3NK3bLM3eMyCum34ovAGCUw2GWUqDxkNwiti8XtKBYrocinp8oZM.json");
-        let block = PrecomputedBlock::parse_file(&path)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
         let mut ledger_diff = LedgerDiff::from_precomputed(&block);
         let mut expected = LedgerDiff::from(&[
             (

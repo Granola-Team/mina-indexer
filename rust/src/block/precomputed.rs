@@ -36,6 +36,9 @@ fn genesis_timestamp() -> String {
     MAINNET_GENESIS_TIMESTAMP.to_string()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PcbVersion(pub u32);
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PrecomputedBlock {
     V1(PrecomputedBlockV1),
@@ -75,13 +78,20 @@ pub struct PrecomputedBlockWithCanonicity {
 }
 
 impl PrecomputedBlock {
-    pub fn from_file_contents(block_file_contents: BlockFileContents) -> serde_json::Result<Self> {
+    pub fn from_file_contents(
+        block_file_contents: BlockFileContents,
+        version: PcbVersion,
+    ) -> serde_json::Result<Self> {
         let state_hash = block_file_contents.state_hash.0;
         let BlockFile {
             scheduled_time,
             protocol_state,
             staged_ledger_diff,
-        } = serde_json::from_slice(&block_file_contents.contents)?;
+        } = if version == PcbVersion(0) {
+            serde_json::from_slice(&block_file_contents.contents)?
+        } else {
+            todo!("{} block parser", version)
+        };
         let blockchain_length = block_file_contents.blockchain_length;
 
         // TODO distinguish different versions
@@ -96,17 +106,20 @@ impl PrecomputedBlock {
     }
 
     /// Parses the precomputed block if the path is a valid block file
-    pub fn parse_file(path: &Path) -> anyhow::Result<Self> {
+    pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let network = extract_network(path);
         let blockchain_length = extract_block_height(path).expect("length in filename");
         let state_hash = extract_state_hash(path);
         let contents = std::fs::read(path)?;
-        let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
-            contents,
-            blockchain_length,
-            network: Network(network),
-            state_hash: state_hash.into(),
-        })?;
+        let precomputed_block = PrecomputedBlock::from_file_contents(
+            BlockFileContents {
+                contents,
+                blockchain_length,
+                network: Network(network),
+                state_hash: state_hash.into(),
+            },
+            version,
+        )?;
         Ok(precomputed_block)
     }
 
@@ -574,6 +587,12 @@ impl std::cmp::Ord for PrecomputedBlock {
 
 impl std::cmp::Eq for PrecomputedBlock {}
 
+impl std::fmt::Display for PcbVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "v{}", self.0)
+    }
+}
+
 fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
     for pk in new_pks {
         pks.insert(pk);
@@ -582,14 +601,14 @@ fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{PrecomputedBlock, VrfOutput};
+    use super::*;
     use hex_literal::hex;
     use std::path::PathBuf;
 
     #[test]
     fn vrf_output() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
         assert_eq!(
             block.last_vrf_output(),
             "bgHnww8tqHDhk3rBpW9tse_L_WPup7yKDKigNvoeBwA=".to_string()

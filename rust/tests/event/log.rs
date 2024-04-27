@@ -5,6 +5,7 @@ use mina_indexer::{
     constants::*,
     event::{store::EventStore, witness_tree::*},
     ledger::genesis::GenesisRoot,
+    server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
 };
@@ -38,12 +39,14 @@ async fn test() {
 
     let mut state0 = IndexerState::new(
         genesis_root.clone().into(),
+        IndexerVersion::new_testing(),
         indexer_store0.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
     let mut state1 = IndexerState::new(
         genesis_root.into(),
+        IndexerVersion::new_testing(),
         indexer_store1.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )

@@ -3,7 +3,7 @@ use super::{
     public_key::PublicKey,
     Ledger,
 };
-use crate::block::genesis::GenesisBlock;
+use crate::{block::genesis::GenesisBlock, constants::*};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -46,6 +46,27 @@ pub struct GenesisAccounts {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
     ledger: Ledger,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisConstants {
+    pub k: u32,
+    pub slots_per_epoch: u32,
+    pub slots_per_sub_window: u32,
+    pub delta: u32,
+    pub txpool_max_size: u32,
+}
+
+impl std::default::Default for GenesisConstants {
+    fn default() -> Self {
+        Self {
+            delta: MAINNET_DELTA,
+            k: MAINNET_TRANSITION_FRONTIER_K,
+            txpool_max_size: MAINNET_TXPOOL_MAX_SIZE,
+            slots_per_epoch: MAINNET_EPOCH_SLOT_COUNT,
+            slots_per_sub_window: MAINNET_SLOTS_PER_SUB_WINDOW,
+        }
+    }
 }
 
 impl From<GenesisRoot> for GenesisLedger {
