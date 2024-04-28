@@ -34,7 +34,7 @@ impl TransactionsQueryRoot {
             if signed::is_valid_tx_hash(&hash) {
                 return Ok(db
                     .get_command_by_hash(&hash)?
-                    .map(|cmd| txn_from_hash(cmd, db)));
+                    .map(|cmd| TransactionWithBlock::new(cmd, db)));
             }
         }
 
@@ -68,7 +68,7 @@ impl TransactionsQueryRoot {
 
             // Only add transactions that satisfy the input query
             let cmd = user_commands_iterator_signed_command(&entry)?;
-            let transaction = txn_from_hash(cmd, db);
+            let transaction = TransactionWithBlock::new(cmd, db);
 
             if query.matches(&transaction) {
                 transactions.push(transaction);
@@ -83,15 +83,17 @@ impl TransactionsQueryRoot {
     }
 }
 
-fn txn_from_hash(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> TransactionWithBlock {
-    let block_state_hash = cmd.state_hash.to_owned();
-    let block_date_time = date_time_to_scalar(cmd.date_time as i64);
-    TransactionWithBlock {
-        transaction: Transaction::new(cmd, get_block_canonicity(db, &block_state_hash.0)),
-        block: TransactionBlock {
-            date_time: block_date_time,
-            state_hash: block_state_hash.0.to_owned(),
-        },
+impl TransactionWithBlock {
+    fn new(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> TransactionWithBlock {
+        let block_state_hash = cmd.state_hash.to_owned();
+        let block_date_time = date_time_to_scalar(cmd.date_time as i64);
+        TransactionWithBlock {
+            transaction: Transaction::new(cmd, get_block_canonicity(db, &block_state_hash.0)),
+            block: TransactionBlock {
+                date_time: block_date_time,
+                state_hash: block_state_hash.0.to_owned(),
+            },
+        }
     }
 }
 
