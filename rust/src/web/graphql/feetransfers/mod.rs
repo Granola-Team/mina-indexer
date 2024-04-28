@@ -47,7 +47,7 @@ impl FeetransferWithMeta {
 
     async fn block_state_hash(&self) -> Option<BlockWithCanonicity> {
         self.block.clone().map(|block| BlockWithCanonicity {
-            block: Block::from(block),
+            block: Block::new(block, self.canonical),
             canonical: self.canonical,
         })
     }
