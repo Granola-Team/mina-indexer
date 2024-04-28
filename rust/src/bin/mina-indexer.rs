@@ -309,13 +309,28 @@ pub fn process_indexer_configuration(
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
 
+    // pick up genesis constants from the given file or use defaults
     let genesis_constants = {
+        let mut constants = GenesisConstants::default();
         if let Some(path) = args.genesis_constants {
-            let contents = std::fs::read(path)?;
-            serde_json::from_slice::<GenesisConstants>(&contents)?
-        } else {
-            GenesisConstants::default()
+            if let Ok(ref contents) = std::fs::read(path) {
+                if let Ok(override_constants) = serde_json::from_slice::<GenesisConstants>(contents)
+                {
+                    constants.override_with(override_constants);
+                } else {
+                    error!(
+                        "Error parsing supplied genesis constants. Using default constants:\n{}",
+                        serde_json::to_string_pretty(&constants)?
+                    )
+                }
+            } else {
+                error!(
+                    "Error reading genesis constants file. Using default constants:\n{}",
+                    serde_json::to_string_pretty(&constants)?
+                )
+            }
         }
+        constants
     };
     let constraint_system_digests = args.constraint_system_digests.unwrap_or(
         MAINNET_CONSTRAINT_SYSTEM_DIGESTS

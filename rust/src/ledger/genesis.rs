@@ -48,23 +48,51 @@ pub struct GenesisLedger {
     ledger: Ledger,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenesisConstants {
-    pub k: u32,
-    pub slots_per_epoch: u32,
-    pub slots_per_sub_window: u32,
-    pub delta: u32,
-    pub txpool_max_size: u32,
+    pub k: Option<u32>,
+    pub slots_per_epoch: Option<u32>,
+    pub slots_per_sub_window: Option<u32>,
+    pub delta: Option<u32>,
+    pub txpool_max_size: Option<u32>,
+}
+
+impl GenesisConstants {
+    pub fn override_with(&mut self, constants: Self) {
+        let Self {
+            delta,
+            k,
+            slots_per_epoch,
+            slots_per_sub_window,
+            txpool_max_size,
+        } = constants;
+
+        if delta.is_some() {
+            self.delta = delta;
+        }
+        if k.is_some() {
+            self.k = k;
+        }
+        if slots_per_epoch.is_some() {
+            self.slots_per_epoch = slots_per_epoch;
+        }
+        if slots_per_sub_window.is_some() {
+            self.slots_per_sub_window = slots_per_sub_window;
+        }
+        if txpool_max_size.is_some() {
+            self.txpool_max_size = txpool_max_size;
+        }
+    }
 }
 
 impl std::default::Default for GenesisConstants {
     fn default() -> Self {
         Self {
-            delta: MAINNET_DELTA,
-            k: MAINNET_TRANSITION_FRONTIER_K,
-            txpool_max_size: MAINNET_TXPOOL_MAX_SIZE,
-            slots_per_epoch: MAINNET_EPOCH_SLOT_COUNT,
-            slots_per_sub_window: MAINNET_SLOTS_PER_SUB_WINDOW,
+            delta: Some(MAINNET_DELTA),
+            k: Some(MAINNET_TRANSITION_FRONTIER_K),
+            txpool_max_size: Some(MAINNET_TXPOOL_MAX_SIZE),
+            slots_per_epoch: Some(MAINNET_EPOCH_SLOT_COUNT),
+            slots_per_sub_window: Some(MAINNET_SLOTS_PER_SUB_WINDOW),
         }
     }
 }
@@ -124,8 +152,9 @@ pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
 
 #[cfg(test)]
 mod tests {
-    use super::{GenesisLedger, GenesisRoot};
+    use super::{GenesisConstants, GenesisLedger, GenesisRoot};
     use crate::ledger::public_key::PublicKey;
+    use std::path::PathBuf;
 
     #[test]
     fn test_genesis_ledger_default_delegation_test() -> anyhow::Result<()> {
@@ -166,6 +195,41 @@ mod tests {
             "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
             value.delegate.0
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn override_genesis_constants() -> anyhow::Result<()> {
+        let mut none_constants = GenesisConstants::default();
+        let none_path: PathBuf = "./tests/data/genesis_constants/none.json".into();
+        none_constants.override_with(serde_json::from_slice::<GenesisConstants>(&std::fs::read(
+            none_path,
+        )?)?);
+        assert_eq!(none_constants, GenesisConstants::default());
+
+        let mut some_constants = GenesisConstants::default();
+        let some_path: PathBuf = "./tests/data/genesis_constants/some.json".into();
+        let some_constants_file =
+            serde_json::from_slice::<GenesisConstants>(&std::fs::read(some_path)?)?;
+
+        some_constants.override_with(some_constants_file);
+        assert_eq!(
+            some_constants,
+            GenesisConstants {
+                delta: Some(1),
+                txpool_max_size: Some(1000),
+                ..GenesisConstants::default()
+            }
+        );
+
+        let mut all_constants = GenesisConstants::default();
+        let all_path: PathBuf = "./tests/data/genesis_constants/all.json".into();
+        let all_constants_file =
+            serde_json::from_slice::<GenesisConstants>(&std::fs::read(all_path)?)?;
+
+        all_constants.override_with(all_constants_file.clone());
+        assert_eq!(all_constants, all_constants_file);
 
         Ok(())
     }

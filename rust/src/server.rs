@@ -166,11 +166,11 @@ pub fn initialize(
     let chain_id = chain_id(
         &genesis_hash.0,
         &[
-            genesis_constants.k,
-            genesis_constants.slots_per_epoch,
-            genesis_constants.slots_per_sub_window,
-            genesis_constants.delta,
-            genesis_constants.txpool_max_size,
+            genesis_constants.k.unwrap(),
+            genesis_constants.slots_per_epoch.unwrap(),
+            genesis_constants.slots_per_sub_window.unwrap(),
+            genesis_constants.delta.unwrap(),
+            genesis_constants.txpool_max_size.unwrap(),
         ],
         constraint_system_digests
             .iter()
@@ -356,6 +356,10 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
         for path in event.paths {
             if block::is_valid_block_file(&path) {
                 debug!("Valid precomputed block file: {}", path.display());
+
+                // TODO how to handle stop slots/blocks & final ledger?
+                // Can we generate the new ledger & load the new network's config from a
+                // specific block?
 
                 let mut version = state.read().await.version.clone();
                 match PrecomputedBlock::parse_file(&path, version.version.clone()) {
