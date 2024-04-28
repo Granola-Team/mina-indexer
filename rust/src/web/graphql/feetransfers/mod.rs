@@ -108,7 +108,7 @@ fn get_fee_transfers(
     limit: usize,
 ) -> Result<Vec<FeetransferWithMeta>> {
     let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
-    let mode: speedb::IteratorMode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
+    let mode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
         speedb::IteratorMode::Start
     } else {
         speedb::IteratorMode::End
