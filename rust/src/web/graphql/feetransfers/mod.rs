@@ -1,4 +1,7 @@
-use super::blocks::{Block, BlockWithCanonicity};
+use super::{
+    blocks::{Block, BlockWithCanonicity},
+    get_block_canonicity,
+};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
@@ -44,7 +47,7 @@ impl FeetransferWithMeta {
 
     async fn block_state_hash(&self) -> Option<BlockWithCanonicity> {
         self.block.clone().map(|block| BlockWithCanonicity {
-            block: Block::from(block),
+            block: Block::new(block, self.canonical),
             canonical: self.canonical,
         })
     }
@@ -98,14 +101,6 @@ impl FeetransferQueryRoot {
     }
 }
 
-fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> Result<bool> {
-    let canonicity = db
-        .get_block_canonicity(&BlockHash::from(state_hash.to_owned()))?
-        .map(|status| matches!(status, Canonicity::Canonical))
-        .unwrap_or(false);
-    Ok(canonicity)
-}
-
 fn get_fee_transfers(
     db: &Arc<IndexerStore>,
     query: Option<FeetransferQueryInput>,
@@ -113,7 +108,7 @@ fn get_fee_transfers(
     limit: usize,
 ) -> Result<Vec<FeetransferWithMeta>> {
     let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
-    let mode: speedb::IteratorMode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
+    let mode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
         speedb::IteratorMode::Start
     } else {
         speedb::IteratorMode::End
@@ -125,7 +120,7 @@ fn get_fee_transfers(
         let ft = Feetransfer::from(internal_command);
         let state_hash = ft.state_hash.clone();
         let feetransfer_with_meta = FeetransferWithMeta {
-            canonical: get_block_canonicity(db, &state_hash)?,
+            canonical: get_block_canonicity(db, &state_hash),
             feetransfer: ft,
             block: None,
         };

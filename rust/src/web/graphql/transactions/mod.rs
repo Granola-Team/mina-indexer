@@ -1,9 +1,9 @@
-use super::{date_time_to_scalar, db, get_block_canonicity};
+use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64, PK};
 use crate::{
-    block::BlockHash,
     command::{
         signed::{self, SignedCommand, SignedCommandWithData},
         store::CommandStore,
+        CommandStatusData,
     },
     ledger::public_key::PublicKey,
     protocol::serialization_types::{
@@ -17,10 +17,7 @@ use crate::{
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
-
-const MINA_SCALE: u32 = 9;
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
@@ -31,13 +28,13 @@ impl TransactionsQueryRoot {
         &self,
         ctx: &Context<'_>,
         query: TransactionQueryInput,
-    ) -> Result<Option<Transaction>> {
+    ) -> Result<Option<TransactionWithBlock>> {
         let db = db(ctx);
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
                 return Ok(db
                     .get_command_by_hash(&hash)?
-                    .map(|cmd| txn_from_hash(cmd, db)));
+                    .map(|cmd| TransactionWithBlock::new(cmd, db)));
             }
         }
 
@@ -50,9 +47,9 @@ impl TransactionsQueryRoot {
         query: TransactionQueryInput,
         #[graphql(default = 100)] limit: usize,
         sort_by: TransactionSortByInput,
-    ) -> Result<Vec<Transaction>> {
+    ) -> Result<Vec<TransactionWithBlock>> {
         let db = db(ctx);
-        let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
+        let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
         let mode = match sort_by {
             TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
                 speedb::IteratorMode::Start
@@ -71,7 +68,7 @@ impl TransactionsQueryRoot {
 
             // Only add transactions that satisfy the input query
             let cmd = user_commands_iterator_signed_command(&entry)?;
-            let transaction = txn_from_hash(cmd, db);
+            let transaction = TransactionWithBlock::new(cmd, db);
 
             if query.matches(&transaction) {
                 transactions.push(transaction);
@@ -86,15 +83,18 @@ impl TransactionsQueryRoot {
     }
 }
 
-fn txn_from_hash(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> Transaction {
-    let block_state_hash = cmd.state_hash.to_owned();
-    let block_date_time = date_time_to_scalar(cmd.date_time as i64);
-    Transaction::from_cmd(
-        cmd,
-        block_date_time,
-        &block_state_hash,
-        get_block_canonicity(db, &block_state_hash.0),
-    )
+impl TransactionWithBlock {
+    fn new(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> TransactionWithBlock {
+        let block_state_hash = cmd.state_hash.to_owned();
+        let block_date_time = date_time_to_scalar(cmd.date_time as i64);
+        TransactionWithBlock {
+            transaction: Transaction::new(cmd, get_block_canonicity(db, &block_state_hash.0)),
+            block: TransactionBlock {
+                date_time: block_date_time,
+                state_hash: block_state_hash.0.to_owned(),
+            },
+        }
+    }
 }
 
 pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
@@ -104,20 +104,14 @@ pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
     Ok(encoded_memo)
 }
 
-pub fn nanomina_to_mina_f64(num: u64) -> f64 {
-    let mut dec = Decimal::from(num);
-    dec.set_scale(MINA_SCALE).unwrap();
-
-    dec.to_f64().expect("converted to f64")
-}
-
 impl Transaction {
-    pub fn from_cmd(
-        cmd: SignedCommandWithData,
-        block_date_time: DateTime,
-        block_state_hash: &BlockHash,
-        canonical: bool,
-    ) -> Self {
+    pub fn new(cmd: SignedCommandWithData, canonical: bool) -> Self {
+        let failure_reason = match cmd.status {
+            CommandStatusData::Applied { .. } => "".to_owned(),
+            CommandStatusData::Failed(failed_types, _) => failed_types
+                .first()
+                .map_or("".to_owned(), |f| f.to_string()),
+        };
         match cmd.command {
             SignedCommand(signed_cmd) => {
                 let payload = signed_cmd.t.t.payload;
@@ -149,19 +143,16 @@ impl Transaction {
 
                 Self {
                     amount: nanomina_to_mina_f64(amount),
-                    block: TransactionBlock {
-                        date_time: block_date_time,
-                        state_hash: block_state_hash.0.to_owned(),
-                    },
                     block_height: cmd.blockchain_length as i64,
                     canonical,
+                    failure_reason,
                     fee: nanomina_to_mina_f64(fee),
-                    from: Some(PublicKey::from(sender).0),
+                    from: PublicKey::from(sender).0,
                     hash: cmd.tx_hash,
-                    kind: Some(kind.to_string()),
+                    kind: kind.to_string(),
                     memo,
                     nonce: nonce as i64,
-                    receiver: TransactionReceiver {
+                    receiver: PK {
                         public_key: receiver.to_owned(),
                     },
                     to: receiver,
@@ -173,22 +164,23 @@ impl Transaction {
 }
 
 impl TransactionQueryInput {
-    pub fn matches(&self, transaction: &Transaction) -> bool {
+    fn matches(&self, transaction_with_block: &TransactionWithBlock) -> bool {
         let mut matches = true;
+        let transaction = transaction_with_block.transaction.clone();
         if let Some(hash) = &self.hash {
             matches = matches && &transaction.hash == hash;
         }
         if let Some(fee) = self.fee {
             matches = matches && transaction.fee == fee;
         }
-        if self.kind.is_some() {
-            matches = matches && transaction.kind == self.kind;
+        if let Some(ref kind) = &self.kind {
+            matches = matches && &transaction.kind == kind;
         }
         if let Some(canonical) = self.canonical {
             matches = matches && transaction.canonical == canonical;
         }
-        if self.from.is_some() {
-            matches = matches && transaction.from == self.from;
+        if let Some(ref from) = self.from {
+            matches = matches && &transaction.from == from;
         }
         if let Some(to) = &self.to {
             matches = matches && &transaction.to == to;
@@ -197,18 +189,18 @@ impl TransactionQueryInput {
             matches = matches && &transaction.memo == memo;
         }
         if let Some(query) = &self.and {
-            matches = matches && query.iter().all(|and| and.matches(transaction));
+            matches = matches && query.iter().all(|and| and.matches(transaction_with_block));
         }
         if let Some(query) = &self.or {
             if !query.is_empty() {
-                matches = matches && query.iter().any(|or| or.matches(transaction));
+                matches = matches && query.iter().any(|or| or.matches(transaction_with_block));
             }
         }
         if let Some(__) = &self.date_time_gte {
-            matches = matches && transaction.block.date_time >= *__;
+            matches = matches && transaction_with_block.block.date_time >= *__;
         }
         if let Some(__) = &self.date_time_lte {
-            matches = matches && transaction.block.date_time <= *__;
+            matches = matches && transaction_with_block.block.date_time <= *__;
         }
 
         // TODO: implement matches for all the other optional vars
@@ -227,28 +219,31 @@ pub enum TransactionSortByInput {
 
 #[derive(Clone, Debug, SimpleObject)]
 pub struct Transaction {
-    pub amount: f64,
-    pub block: TransactionBlock,
-    pub block_height: i64,
-    pub canonical: bool,
-    pub fee: f64,
-    pub from: Option<String>,
-    pub hash: String,
-    pub kind: Option<String>,
-    pub memo: String,
-    pub nonce: i64,
-    pub receiver: TransactionReceiver,
-    pub to: String,
-    pub token: Option<i64>,
+    amount: f64,
+    block_height: i64,
+    canonical: bool,
+    failure_reason: String,
+    fee: f64,
+    from: String,
+    hash: String,
+    kind: String,
+    memo: String,
+    nonce: i64,
+    /// The receiver's public key
+    receiver: PK,
+    to: String,
+    token: Option<i64>,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct TransactionWithBlock {
+    block: TransactionBlock,
+    #[graphql(flatten)]
+    transaction: Transaction,
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject)]
-pub struct TransactionBlock {
-    pub date_time: DateTime,
-    pub state_hash: String,
-}
-
-#[derive(Clone, Debug, PartialEq, SimpleObject)]
-pub struct TransactionReceiver {
-    pub public_key: String,
+struct TransactionBlock {
+    date_time: DateTime,
+    state_hash: String,
 }

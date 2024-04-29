@@ -1,22 +1,17 @@
 use super::{
-    db, get_block_canonicity,
-    transactions::{decode_memo, nanomina_to_mina_f64},
-    MAINNET_COINBASE_REWARD,
+    db, get_block_canonicity, millis_to_iso_date_string, transactions::Transaction,
+    MAINNET_COINBASE_REWARD, PK,
 };
 use crate::{
     block::{self, precomputed::PrecomputedBlock, store::BlockStore},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
-        signed::{SignedCommand, SignedCommandWithData},
-        CommandStatusData,
+        signed::SignedCommandWithData,
     },
-    ledger::{public_key::PublicKey, LedgerHash},
+    ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{
-        common::Base58EncodableVersionedType,
-        staged_ledger_diff::{
-            SignedCommandPayloadBody, StakeDelegation, TransactionStatusFailedType,
-        },
+        common::Base58EncodableVersionedType, staged_ledger_diff::TransactionStatusFailedType,
         version_bytes,
     },
     snark_work::SnarkWorkSummary,
@@ -24,7 +19,6 @@ use crate::{
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use chrono::{DateTime, SecondsFormat};
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -39,11 +33,15 @@ impl BlocksQueryRoot {
         let db = db(ctx);
 
         // no query filters => get the best block
+
         if query.is_none() {
             return Ok(db.get_best_block().map(|b| {
-                b.map(|pcb| BlockWithCanonicity {
-                    canonical: get_block_canonicity(db, &pcb.state_hash().0),
-                    block: pcb.into(),
+                b.map(|pcb| {
+                    let canonical = get_block_canonicity(db, &pcb.state_hash().0);
+                    BlockWithCanonicity {
+                        canonical,
+                        block: Block::new(pcb, canonical),
+                    }
                 })
             })?);
         }
@@ -58,9 +56,10 @@ impl BlocksQueryRoot {
                 Some(pcb) => pcb,
                 None => return Ok(None),
             };
+            let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
-                canonical: get_block_canonicity(db, &state_hash),
-                block: pcb.into(),
+                canonical,
+                block: Block::new(pcb, canonical),
             };
 
             if query.unwrap().matches(&block) {
@@ -77,9 +76,10 @@ impl BlocksQueryRoot {
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
+            let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
-                canonical: get_block_canonicity(db, &state_hash),
-                block: pcb.into(),
+                canonical,
+                block: Block::new(pcb, canonical),
             };
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
@@ -112,9 +112,10 @@ impl BlocksQueryRoot {
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
+            let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
-                canonical: get_block_canonicity(db, &state_hash),
-                block: pcb.into(),
+                canonical,
+                block: Block::new(pcb, canonical),
             };
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
@@ -153,14 +154,14 @@ pub struct Block {
     state_hash: String,
     /// Value block_height
     block_height: u32,
-    /// Value winning_account
-    winner_account: WinnerAccount,
+    /// The public_key for the winner account
+    winner_account: PK,
     /// Value date_time as ISO 8601 string
     date_time: String,
     /// Value received_time as ISO 8601 string
     received_time: String,
-    /// Value creator account
-    creator_account: CreatorAccount,
+    /// The public_key for the creator account
+    creator_account: PK,
     /// Value creator public key
     creator: String,
     /// Value protocol state
@@ -194,46 +195,12 @@ struct SnarkJob {
 struct Transactions {
     /// Value coinbase
     coinbase: String,
-    /// Value coinbase receiver account
-    coinbase_receiver_account: CoinbaseReceiverAccount,
+    /// The public key for the coinbase receiver account
+    coinbase_receiver_account: PK,
     /// Value fee transfer
     fee_transfer: Vec<BlockFeetransfer>,
     /// Value user commands
-    user_commands: Vec<UserCommand>,
-}
-
-#[derive(SimpleObject)]
-struct UserCommand {
-    /// Value block height
-    block_height: u32,
-    /// Value from
-    from: String,
-    /// Value to
-    to: String,
-    /// Value hash
-    hash: String,
-    /// Value fee
-    fee: f64,
-    /// Value amount
-    amount: f64,
-    /// Value kind
-    kind: String,
-    /// Value nonce
-    nonce: u32,
-    /// Value memo
-    memo: String,
-    /// Value token
-    token: u64,
-    /// Value failure reason
-    failure_reason: String,
-    /// Value transaction receiver
-    receiver: BlockTransactionReceiver,
-}
-
-#[derive(SimpleObject)]
-struct BlockTransactionReceiver {
-    /// Value public key
-    public_key: String,
+    user_commands: Vec<Transaction>,
 }
 
 #[derive(SimpleObject)]
@@ -242,12 +209,6 @@ struct BlockFeetransfer {
     pub recipient: String,
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
-}
-
-#[derive(SimpleObject)]
-struct CoinbaseReceiverAccount {
-    /// Value public key
-    public_key: String,
 }
 
 #[derive(SimpleObject)]
@@ -344,32 +305,14 @@ struct ProtocolState {
     consensus_state: ConsensusState,
 }
 
-#[derive(SimpleObject)]
-struct WinnerAccount {
-    /// The public_key for the WinnerAccount
-    public_key: String,
-}
-
-#[derive(SimpleObject)]
-struct CreatorAccount {
-    /// The public_key for the CreatorAccount
-    public_key: String,
-}
-
-/// convert epoch millis to an ISO 8601 formatted date
-fn millis_to_date_string(millis: i64) -> String {
-    let date_time = DateTime::from_timestamp_millis(millis).unwrap();
-    date_time.to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
-impl From<PrecomputedBlock> for Block {
-    fn from(block: PrecomputedBlock) -> Self {
+impl Block {
+    pub fn new(block: PrecomputedBlock, canonical: bool) -> Self {
         let winner_account = block.block_creator().0;
-        let date_time = millis_to_date_string(block.timestamp().try_into().unwrap());
+        let date_time = millis_to_iso_date_string(block.timestamp().try_into().unwrap());
         let pk_creator = block.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
         let scheduled_time = block.scheduled_time().clone();
-        let received_time = millis_to_date_string(scheduled_time.parse::<i64>().unwrap());
+        let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();
         let snark_fees = block.snark_fees();
@@ -503,9 +446,9 @@ impl From<PrecomputedBlock> for Block {
             .map(|ft| ft.into())
             .collect();
 
-        let user_commands: Vec<UserCommand> = SignedCommandWithData::from_precomputed(&block)
+        let user_commands: Vec<Transaction> = SignedCommandWithData::from_precomputed(&block)
             .into_iter()
-            .map(|cmd| cmd.into())
+            .map(|cmd| Transaction::new(cmd, canonical))
             .collect();
 
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(&block)
@@ -513,15 +456,15 @@ impl From<PrecomputedBlock> for Block {
             .map(|snark| (snark, block.state_hash().0, block_height, date_time.clone()).into())
             .collect();
 
-        Block {
+        Self {
             snark_jobs,
             state_hash: block.state_hash().0,
             block_height: block.blockchain_length(),
             date_time,
-            winner_account: WinnerAccount {
+            winner_account: PK {
                 public_key: winner_account,
             },
-            creator_account: CreatorAccount {
+            creator_account: PK {
                 public_key: creator.clone(),
             },
             creator,
@@ -571,7 +514,7 @@ impl From<PrecomputedBlock> for Block {
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
                 coinbase: coinbase.to_string(),
-                coinbase_receiver_account: CoinbaseReceiverAccount {
+                coinbase_receiver_account: PK {
                     public_key: coinbase_receiver_account,
                 },
                 fee_transfer: fee_transfers,
@@ -642,62 +585,6 @@ impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
             date_time: value.3,
             fee: value.0.fee,
             prover: value.0.prover.to_string(),
-        }
-    }
-}
-
-impl From<SignedCommandWithData> for UserCommand {
-    fn from(cmd: SignedCommandWithData) -> Self {
-        let failure_reason = match cmd.status {
-            CommandStatusData::Applied { .. } => "".to_owned(),
-            CommandStatusData::Failed(failed_types, _) => failed_types
-                .first()
-                .map_or("".to_owned(), |f| f.to_string()),
-        };
-        match cmd.command {
-            SignedCommand(signed_cmd) => {
-                let payload = signed_cmd.t.t.payload;
-                let common = payload.t.t.common.t.t.t;
-                let token = common.fee_token.t.t.t;
-                let nonce = common.nonce.t.t;
-                let fee = common.fee.t.t;
-                let (sender, receiver, kind, token_id, amount) = {
-                    match payload.t.t.body.t.t {
-                        SignedCommandPayloadBody::PaymentPayload(payload) => (
-                            payload.t.t.source_pk,
-                            payload.t.t.receiver_pk,
-                            "PAYMENT",
-                            token,
-                            payload.t.t.amount.t.t,
-                        ),
-                        SignedCommandPayloadBody::StakeDelegation(payload) => {
-                            let StakeDelegation::SetDelegate {
-                                delegator,
-                                new_delegate,
-                            } = payload.t;
-                            (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
-                        }
-                    }
-                };
-
-                let memo = decode_memo(common.memo.t.0).expect("decoded memo");
-                Self {
-                    amount: nanomina_to_mina_f64(amount),
-                    failure_reason,
-                    block_height: cmd.blockchain_length,
-                    fee: nanomina_to_mina_f64(fee),
-                    from: PublicKey::from(sender).0,
-                    hash: cmd.tx_hash,
-                    kind: kind.to_owned(),
-                    memo,
-                    nonce: nonce.try_into().unwrap(),
-                    receiver: BlockTransactionReceiver {
-                        public_key: PublicKey::from(receiver.clone()).0,
-                    },
-                    to: PublicKey::from(receiver).0,
-                    token: token_id,
-                }
-            }
         }
     }
 }
