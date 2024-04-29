@@ -3,7 +3,7 @@ pub mod store;
 use crate::constants::*;
 use hex::ToHex;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ChainId(pub String);
 
 impl ChainId {

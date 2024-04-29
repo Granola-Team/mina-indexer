@@ -3,6 +3,7 @@ use mina_indexer::{
     block::{genesis::GenesisBlock, store::BlockStore},
     constants::*,
     ledger::genesis::parse_file,
+    server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
 };
@@ -17,6 +18,7 @@ fn block_added() -> anyhow::Result<()> {
 
     let indexer = IndexerState::new(
         genesis_root.into(),
+        IndexerVersion::new_testing(),
         indexer_store,
         MAINNET_TRANSITION_FRONTIER_K,
     )?;

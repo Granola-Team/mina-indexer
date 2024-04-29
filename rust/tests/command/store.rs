@@ -4,6 +4,7 @@ use mina_indexer::{
     command::{signed::SignedCommand, store::CommandStore},
     constants::*,
     ledger::genesis::parse_file,
+    server::IndexerVersion,
     state::IndexerState,
     store::*,
 };
@@ -19,6 +20,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     let genesis_root = parse_file(genesis_ledger_path)?;
     let indexer = IndexerState::new(
         genesis_root.into(),
+        IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )?;

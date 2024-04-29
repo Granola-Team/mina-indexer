@@ -3,6 +3,7 @@ use mina_indexer::{
     block::parser::BlockParser,
     constants::*,
     ledger::genesis::parse_file,
+    server::IndexerVersion,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     state::IndexerState,
     store::IndexerStore,
@@ -19,6 +20,7 @@ async fn store() {
     let genesis_root = parse_file(genesis_ledger_path).unwrap();
     let indexer = IndexerState::new(
         genesis_root.into(),
+        IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )

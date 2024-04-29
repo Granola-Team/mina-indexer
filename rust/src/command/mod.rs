@@ -516,7 +516,11 @@ fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serd
 #[cfg(test)]
 mod test {
     use super::{Command, Delegation, Payment};
-    use crate::{block::parser::BlockParser, constants::*, ledger::account::nanomina_to_mina};
+    use crate::{
+        block::{parser::BlockParser, precomputed::PcbVersion},
+        constants::*,
+        ledger::account::nanomina_to_mina,
+    };
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -786,7 +790,7 @@ mod test {
         let contents = std::fs::read(path.clone())?;
         let mina_json: Value =
             from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
-        let block = PrecomputedBlock::parse_file(&path)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 

@@ -3,6 +3,7 @@ use mina_indexer::{
     block::parser::BlockParser,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::genesis::GenesisRoot,
+    server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
 };
@@ -16,8 +17,13 @@ async fn test() {
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
-    let mut state =
-        IndexerState::new(genesis_root.clone().into(), indexer_store.clone(), 10).unwrap();
+    let mut state = IndexerState::new(
+        genesis_root.clone().into(),
+        IndexerVersion::new_testing(),
+        indexer_store.clone(),
+        10,
+    )
+    .unwrap();
 
     // add all blocks to the state
     state.add_blocks(&mut block_parser).unwrap();

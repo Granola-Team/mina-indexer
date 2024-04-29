@@ -1,9 +1,14 @@
 use crate::{
-    block::{self, parser::BlockParser, precomputed::PrecomputedBlock, BlockHash},
-    chain_id::ChainId,
-    constants::MAINNET_TRANSITION_FRONTIER_K,
+    block::{
+        self,
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+        BlockHash, Network,
+    },
+    chain_id::{chain_id, ChainId},
+    constants::*,
     ledger::{
-        genesis::GenesisLedger,
+        genesis::{GenesisConstants, GenesisLedger},
         staking::{self, StakingLedger},
         store::LedgerStore,
     },
@@ -14,7 +19,7 @@ use crate::{
 use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -26,10 +31,19 @@ use tokio::{
 };
 
 #[derive(Clone, Debug)]
+pub struct IndexerVersion {
+    pub network: Network,
+    pub chain_id: ChainId,
+    pub version: PcbVersion,
+    pub history: HashMap<ChainId, PcbVersion>,
+}
+
+#[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub genesis_ledger: GenesisLedger,
     pub genesis_hash: BlockHash,
-    pub chain_id: ChainId,
+    pub genesis_constants: GenesisConstants,
+    pub constraint_system_digests: Vec<String>,
     pub blocks_dir: Option<PathBuf>,
     pub block_watch_dir: PathBuf,
     pub staking_ledgers_dir: Option<PathBuf>,
@@ -46,9 +60,7 @@ pub struct IndexerConfiguration {
     pub missing_block_recovery_batch: bool,
 }
 
-pub struct MinaIndexer {
-    _witness_join_handle: JoinHandle<()>,
-}
+pub struct MinaIndexer(JoinHandle<()>);
 
 #[derive(Debug, Clone)]
 pub enum InitializationMode {
@@ -68,44 +80,42 @@ impl MinaIndexer {
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = config.missing_block_recovery_batch;
         let domain_socket_path = config.domain_socket_path.clone();
-        Ok(Self {
-            _witness_join_handle: tokio::spawn(async move {
-                let state = initialize(config, store).unwrap_or_else(|e| {
-                    error!("Error in server initialization: {}", e);
-                    std::process::exit(1);
-                });
-                let state = Arc::new(RwLock::new(state));
+        Ok(Self(tokio::spawn(async move {
+            let state = initialize(config, store).unwrap_or_else(|e| {
+                error!("Error in server initialization: {}", e);
+                std::process::exit(1);
+            });
+            let state = Arc::new(RwLock::new(state));
 
-                // Needs read-only state for summary
-                let uds_state = state.clone();
-                tokio::spawn(async move {
-                    unix_socket_server::run(
-                        UnixSocketServer::new(uds_state, domain_socket_path),
-                        wait_for_signal(),
-                    )
-                    .await;
-                });
-
-                // Modifies the state
-                if let Err(e) = run(
-                    block_watch_dir,
-                    staking_ledger_watch_dir,
-                    missing_block_recovery_delay,
-                    missing_block_recovery_exe,
-                    missing_block_recovery_batch,
-                    state,
+            // Needs read-only state for summary
+            let uds_state = state.clone();
+            tokio::spawn(async move {
+                unix_socket_server::run(
+                    UnixSocketServer::new(uds_state, domain_socket_path),
+                    wait_for_signal(),
                 )
-                .await
-                {
-                    error!("Error in server run: {}", e);
-                    std::process::exit(1);
-                }
-            }),
-        })
+                .await;
+            });
+
+            // Modifies the state
+            if let Err(e) = run(
+                block_watch_dir,
+                staking_ledger_watch_dir,
+                missing_block_recovery_delay,
+                missing_block_recovery_exe,
+                missing_block_recovery_batch,
+                state,
+            )
+            .await
+            {
+                error!("Error in server run: {}", e);
+                std::process::exit(1);
+            }
+        })))
     }
 
     pub async fn await_loop(self) {
-        let _ = self._witness_join_handle.await;
+        let _ = self.0.await;
     }
 }
 
@@ -141,7 +151,8 @@ pub fn initialize(
         initialization_mode,
         ledger_cadence,
         reporting_freq,
-        chain_id,
+        genesis_constants,
+        constraint_system_digests,
         ..
     } = config;
 
@@ -152,12 +163,26 @@ pub fn initialize(
         .iter()
         .for_each(|d| fs::create_dir_all(d.clone()).expect("ledgers dir"));
 
+    let chain_id = chain_id(
+        &genesis_hash.0,
+        &[
+            genesis_constants.k.unwrap(),
+            genesis_constants.slots_per_epoch.unwrap(),
+            genesis_constants.slots_per_sub_window.unwrap(),
+            genesis_constants.delta.unwrap(),
+            genesis_constants.txpool_max_size.unwrap(),
+        ],
+        constraint_system_digests
+            .iter()
+            .map(|x| x.as_str())
+            .collect::<Vec<&str>>()
+            .as_slice(),
+    );
     let state_config = IndexerStateConfig {
         genesis_hash,
-        genesis_ledger: genesis_ledger.clone(),
         indexer_store: store,
-        network: "mainnet".into(),
-        chain_id,
+        genesis_ledger: genesis_ledger.clone(),
+        version: IndexerVersion::new("mainnet", &chain_id),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
         canonical_update_threshold,
@@ -293,6 +318,8 @@ pub async fn run(
         staking_ledger_watch_dir.as_ref().display()
     );
 
+    // watch for precomputed blocks & staking ledgers, and
+    // recover missing blocks
     loop {
         tokio::select! {
             // watch for shutdown signal
@@ -304,7 +331,7 @@ pub async fn run(
             // watch for precomputed blocks & staking ledgers
             Some(res) = rx.recv() => {
                 match res {
-                    Ok(event) => process_event(event, &state).await,
+                    Ok(event) => process_event(event, &state).await?,
                     Err(e) => error!("Ingestion watcher error: {}", e),
                 }
             }
@@ -322,23 +349,34 @@ pub async fn run(
     Ok(())
 }
 
-async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
-    trace!("Event: {:?}", event.clone());
+/// Precomputed block & staking ledger event handler
+async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyhow::Result<()> {
+    trace!("Event: {event:?}");
     if matches_event_kind(event.kind) {
         for path in event.paths {
             if block::is_valid_block_file(&path) {
                 debug!("Valid precomputed block file: {}", path.display());
-                match PrecomputedBlock::parse_file(&path) {
+
+                // TODO how to handle stop slots/blocks & final ledger?
+                // Can we generate the new ledger & load the new network's config from a
+                // specific block?
+
+                let mut version = state.read().await.version.clone();
+                match PrecomputedBlock::parse_file(&path, version.version.clone()) {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
+
+                        // check if the block is already in the witness tree
                         if state.diffs_map.contains_key(&block.state_hash()) {
-                            return info!(
+                            return Ok(info!(
                                 "Block is already present in the witness tree {}",
                                 block.summary()
-                            );
+                            ));
                         }
-                        match state.block_pipeline(&block, path.metadata().unwrap().len()) {
+
+                        // if the block isn't in the witness tree, pipeline it
+                        match state.block_pipeline(&block, path.metadata()?.len()) {
                             Ok(is_added) => {
                                 if is_added {
                                     info!("Added block {}", block.summary())
@@ -346,18 +384,30 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
                             }
                             Err(e) => error!("Error adding block: {}", e),
                         }
+
+                        // check for block parser version update
+                        if state.version.chain_id.0 != *MAINNET_GENESIS_HASH {
+                            trace!("Changing block parser from {}", version.version);
+                            version.version.0 += 1;
+
+                            trace!("Block parser changed to {}", version.version);
+                            version.chain_id = state.version.chain_id.clone();
+                        }
                     }
                     Err(e) => error!("Error parsing precomputed block: {}", e),
                 }
             } else if staking::is_valid_ledger_file(&path) {
                 // Acquire write lock
+                let version = state.read().await.version.clone();
                 let mut state = state.write().await;
+
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match StakingLedger::parse_file(&path) {
+                    match StakingLedger::parse_file(&path, version.version.clone()) {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();
                             let ledger_summary = staking_ledger.summary();
+
                             match store.add_staking_ledger(staking_ledger) {
                                 Ok(_) => {
                                     state.staking_ledgers.insert(epoch, ledger_hash);
@@ -378,6 +428,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) {
             }
         }
     }
+
+    Ok(())
 }
 
 /// Recovers missing blocks
@@ -388,7 +440,7 @@ async fn recover_missing_blocks(
     batch_recovery: bool,
 ) {
     let state = state.read().await;
-    let network = state.network.0.clone();
+    let network = state.version.network.0.clone();
     let missing_parent_lengths: HashSet<u32> = state
         .dangling_branches
         .iter()
@@ -437,6 +489,21 @@ async fn recover_missing_blocks(
             let max_length = best_tip_length.max(max);
             (min_length..max_length).for_each(run_missing_blocks_recovery)
         }
+    }
+}
+
+impl IndexerVersion {
+    pub fn new(network: &str, chain_id: &ChainId) -> Self {
+        Self {
+            chain_id: chain_id.clone(),
+            version: PcbVersion(0),
+            network: Network(network.into()),
+            history: HashMap::from([(chain_id.clone(), PcbVersion(0))]),
+        }
+    }
+
+    pub fn new_testing() -> Self {
+        Self::new("mainnet", &ChainId("TESTING".into()))
     }
 }
 

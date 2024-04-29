@@ -1,10 +1,12 @@
 use clap::{Parser, Subcommand};
 use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
-    chain_id::chain_id,
     client,
     constants::*,
-    ledger::{self, genesis::GenesisLedger},
+    ledger::{
+        self,
+        genesis::{GenesisConstants, GenesisLedger},
+    },
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
 };
@@ -61,6 +63,14 @@ pub struct ServerArgs {
         default_value = MAINNET_GENESIS_HASH
     )]
     genesis_hash: String,
+
+    /// Path to the genesis constants (JSON)
+    #[arg(long)]
+    genesis_constants: Option<PathBuf>,
+
+    /// Override the constraint system digests
+    #[arg(long)]
+    constraint_system_digests: Option<Vec<String>>,
 
     /// Directory containing the precomputed blocks
     #[arg(long)]
@@ -298,10 +308,35 @@ pub fn process_indexer_configuration(
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
-    let chain_id = chain_id(
-        MAINNET_GENESIS_HASH,
-        MAINNET_GENESIS_CONSTANTS,
-        MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+
+    // pick up genesis constants from the given file or use defaults
+    let genesis_constants = {
+        let mut constants = GenesisConstants::default();
+        if let Some(path) = args.genesis_constants {
+            if let Ok(ref contents) = std::fs::read(path) {
+                if let Ok(override_constants) = serde_json::from_slice::<GenesisConstants>(contents)
+                {
+                    constants.override_with(override_constants);
+                } else {
+                    error!(
+                        "Error parsing supplied genesis constants. Using default constants:\n{}",
+                        serde_json::to_string_pretty(&constants)?
+                    )
+                }
+            } else {
+                error!(
+                    "Error reading genesis constants file. Using default constants:\n{}",
+                    serde_json::to_string_pretty(&constants)?
+                )
+            }
+        }
+        constants
+    };
+    let constraint_system_digests = args.constraint_system_digests.unwrap_or(
+        MAINNET_CONSTRAINT_SYSTEM_DIGESTS
+            .iter()
+            .map(|x| x.to_string())
+            .collect(),
     );
 
     assert!(
@@ -340,7 +375,8 @@ pub fn process_indexer_configuration(
             Ok(IndexerConfiguration {
                 genesis_ledger,
                 genesis_hash,
-                chain_id,
+                genesis_constants,
+                constraint_system_digests,
                 blocks_dir,
                 block_watch_dir,
                 staking_ledgers_dir,
@@ -364,6 +400,8 @@ pub fn process_indexer_configuration(
 struct ServerArgsJson {
     genesis_ledger: String,
     genesis_hash: String,
+    genesis_constants: Option<String>,
+    constraint_system_digests: Option<Vec<String>>,
     blocks_dir: Option<String>,
     block_watch_dir: String,
     staking_ledgers_dir: Option<String>,
@@ -397,6 +435,8 @@ impl From<ServerArgs> for ServerArgsJson {
                 .display()
                 .to_string(),
             genesis_hash: value.genesis_hash,
+            genesis_constants: value.genesis_constants.map(|g| g.display().to_string()),
+            constraint_system_digests: value.constraint_system_digests,
             blocks_dir: value.blocks_dir.map(|d| d.display().to_string()),
             block_watch_dir: value
                 .block_watch_dir
@@ -437,6 +477,8 @@ impl From<ServerArgsJson> for ServerArgs {
         Self {
             genesis_ledger: value.genesis_ledger.parse().ok(),
             genesis_hash: value.genesis_hash,
+            genesis_constants: value.genesis_constants.map(|g| g.into()),
+            constraint_system_digests: value.constraint_system_digests,
             blocks_dir: value.blocks_dir.map(|d| d.into()),
             block_watch_dir: Some(value.block_watch_dir.into()),
             staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),

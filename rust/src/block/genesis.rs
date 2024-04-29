@@ -1,3 +1,4 @@
+use super::precomputed::PcbVersion;
 use crate::block::precomputed::PrecomputedBlock;
 use std::path::PathBuf;
 
@@ -17,7 +18,7 @@ impl GenesisBlock {
             }
         };
         Ok(Self(
-            PrecomputedBlock::parse_file(&genesis_block_path)?,
+            PrecomputedBlock::parse_file(&genesis_block_path, PcbVersion(0))?,
             genesis_block_path.metadata().unwrap().len(),
         ))
     }

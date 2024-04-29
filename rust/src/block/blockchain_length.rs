@@ -68,7 +68,7 @@ impl From<BlockchainLengthBlock> for u32 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::block::precomputed::PrecomputedBlock;
+    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
     #[test]
@@ -83,7 +83,8 @@ mod test {
                         },
                 },
         } = serde_json::from_slice(&std::fs::read(&path)?)?;
-        let pcb = PrecomputedBlock::parse_file(&path)?;
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
+
         assert_eq!(blockchain_length.parse::<u32>()?, pcb.blockchain_length());
         Ok(())
     }

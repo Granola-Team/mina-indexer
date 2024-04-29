@@ -55,7 +55,7 @@ impl From<PreviousStateHash> for BlockHash {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::block::precomputed::PrecomputedBlock;
+    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use glob::glob;
     use std::path::PathBuf;
 
@@ -67,7 +67,7 @@ mod test {
 
         for path in paths {
             let previous_state_hash = PreviousStateHash::from_path(&path)?.0;
-            let block = PrecomputedBlock::parse_file(&path)?;
+            let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
             assert_eq!(previous_state_hash, block.previous_state_hash().0);
         }
         Ok(())

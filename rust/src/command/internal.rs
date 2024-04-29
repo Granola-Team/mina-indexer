@@ -214,12 +214,12 @@ impl InternalCommandWithData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::precomputed::PrecomputedBlock;
+    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
 
     #[test]
     fn from_precomputed() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./tests/initial-blocks/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
-        let block = PrecomputedBlock::parse_file(&path)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
         let internal_cmds = InternalCommand::from_precomputed(&block);
 
         assert_eq!(

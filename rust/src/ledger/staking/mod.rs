@@ -1,9 +1,10 @@
 pub mod parser;
 
 use crate::{
-    block::BlockHash,
+    block::{precomputed::PcbVersion, BlockHash},
     ledger::{public_key::PublicKey, LedgerHash},
 };
+use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -179,7 +180,9 @@ pub fn split_ledger_path(path: &Path) -> (String, u32, LedgerHash) {
 }
 
 impl StakingLedger {
-    pub fn parse_file(path: &Path) -> anyhow::Result<StakingLedger> {
+    pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<StakingLedger> {
+        trace!("Parsing {} staking ledger", version);
+
         let bytes = std::fs::read(path)?;
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
         let staking_ledger = staking_ledger
@@ -283,13 +286,13 @@ impl From<String> for LedgerHash {
 #[cfg(test)]
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
-    use crate::ledger::staking::AggregatedEpochStakeDelegations;
+    use crate::{block::precomputed::PcbVersion, ledger::staking::AggregatedEpochStakeDelegations};
     use std::path::PathBuf;
 
     #[test]
     fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path)?;
+        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion(0))?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, "mainnet".to_string());
@@ -305,7 +308,7 @@ mod tests {
         use crate::ledger::public_key::PublicKey;
 
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path)?;
+        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion(0))?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
