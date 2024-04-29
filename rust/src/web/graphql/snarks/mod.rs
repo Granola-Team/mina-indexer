@@ -30,11 +30,11 @@ pub struct SnarkWithCanonicity {
 impl SnarkWithCanonicity {
     /// Value state hash
     async fn state_hash(&self) -> String {
-        self.block.state_hash.clone()
+        self.block.state_hash().0
     }
     /// Value block height
     async fn block_height(&self) -> u32 {
-        self.block.blockchain_length
+        self.block.blockchain_length()
     }
     /// Value date time
     async fn date_time(&self) -> String {
@@ -124,7 +124,7 @@ impl SnarkQueryInput {
     pub fn matches(&self, snark: &SnarkWithCanonicity) -> bool {
         let mut matches = true;
         if let Some(state_hash) = &self.state_hash {
-            matches = matches && &snark.block.state_hash == state_hash;
+            matches = matches && &snark.block.state_hash().0 == state_hash;
         }
         if let Some(canonical) = &self.canonical {
             matches = matches && &snark.canonical == canonical;

@@ -25,7 +25,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
@@ -37,7 +37,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        new_dangling_root_block.state_hash,
+        new_dangling_root_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
@@ -49,7 +49,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        old_dangling_root_block.state_hash,
+        old_dangling_root_block.state_hash().0,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
     );
 

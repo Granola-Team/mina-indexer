@@ -1,3 +1,4 @@
+use super::Network;
 use crate::{
     block::{
         extract_block_height, extract_network, extract_state_hash, Block, BlockHash, VrfOutput,
@@ -7,6 +8,7 @@ use crate::{
     constants::MAINNET_GENESIS_TIMESTAMP,
     ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
     protocol::serialization_types::{
+        blockchain_state::BlockchainState,
         consensus_state as mina_consensus,
         protocol_state::{ProtocolState, ProtocolStateJson},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
@@ -16,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
 pub struct BlockFileContents {
-    pub(crate) network: String,
+    pub(crate) network: Network,
     pub(crate) state_hash: BlockHash,
     pub(crate) blockchain_length: u32,
     pub(crate) contents: Vec<u8>,
@@ -35,7 +37,24 @@ fn genesis_timestamp() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlock {
+pub enum PrecomputedBlock {
+    V1(PrecomputedBlockV1),
+    V2(PrecomputedBlockV2),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrecomputedBlockV1 {
+    pub network: String,
+    pub state_hash: String,
+    pub scheduled_time: String,
+    pub blockchain_length: u32,
+    pub protocol_state: ProtocolState,
+    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrecomputedBlockV2 {
+    // TODO berkeley precomputed block
     pub network: String,
     pub state_hash: String,
     pub scheduled_time: String,
@@ -64,14 +83,16 @@ impl PrecomputedBlock {
             staged_ledger_diff,
         } = serde_json::from_slice(&block_file_contents.contents)?;
         let blockchain_length = block_file_contents.blockchain_length;
-        Ok(Self {
+
+        // TODO distinguish different versions
+        Ok(Self::V1(PrecomputedBlockV1 {
             state_hash,
             scheduled_time,
             blockchain_length,
-            network: block_file_contents.network,
+            network: block_file_contents.network.0,
             protocol_state: protocol_state.into(),
             staged_ledger_diff: staged_ledger_diff.into(),
-        })
+        }))
     }
 
     /// Parses the precomputed block if the path is a valid block file
@@ -81,9 +102,9 @@ impl PrecomputedBlock {
         let state_hash = extract_state_hash(path);
         let contents = std::fs::read(path)?;
         let precomputed_block = PrecomputedBlock::from_file_contents(BlockFileContents {
-            network,
             contents,
             blockchain_length,
+            network: Network(network),
             state_hash: state_hash.into(),
         })?;
         Ok(precomputed_block)
@@ -96,33 +117,47 @@ impl PrecomputedBlock {
     }
 
     pub fn commands_pre_diff(&self) -> Vec<UserCommandWithStatus> {
-        self.staged_ledger_diff
-            .diff
-            .clone()
-            .inner()
-            .0
-            .inner()
-            .inner()
-            .commands
-            .into_iter()
-            .map(UserCommandWithStatus)
-            .collect()
+        match self {
+            Self::V1(PrecomputedBlockV1 {
+                staged_ledger_diff, ..
+            })
+            | Self::V2(PrecomputedBlockV2 {
+                staged_ledger_diff, ..
+            }) => staged_ledger_diff
+                .diff
+                .clone()
+                .inner()
+                .0
+                .inner()
+                .inner()
+                .commands
+                .into_iter()
+                .map(UserCommandWithStatus)
+                .collect(),
+        }
     }
 
     pub fn commands_post_diff(&self) -> Vec<UserCommandWithStatus> {
-        self.staged_ledger_diff
-            .diff
-            .clone()
-            .inner()
-            .1
-            .map_or(vec![], |diff| {
-                diff.inner()
-                    .inner()
-                    .commands
-                    .into_iter()
-                    .map(UserCommandWithStatus)
-                    .collect()
+        match self {
+            Self::V1(PrecomputedBlockV1 {
+                staged_ledger_diff, ..
             })
+            | Self::V2(PrecomputedBlockV2 {
+                staged_ledger_diff, ..
+            }) => staged_ledger_diff
+                .diff
+                .clone()
+                .inner()
+                .1
+                .map_or(vec![], |diff| {
+                    diff.inner()
+                        .inner()
+                        .commands
+                        .into_iter()
+                        .map(UserCommandWithStatus)
+                        .collect()
+                }),
+        }
     }
 
     pub fn tx_fees(&self) -> u64 {
@@ -167,14 +202,32 @@ impl PrecomputedBlock {
     }
 
     pub fn consensus_state(&self) -> mina_consensus::ConsensusState {
-        self.protocol_state
-            .body
-            .clone()
-            .inner()
-            .inner()
-            .consensus_state
-            .inner()
-            .inner()
+        match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => protocol_state
+                .body
+                .clone()
+                .inner()
+                .inner()
+                .consensus_state
+                .inner()
+                .inner(),
+        }
+    }
+
+    pub fn blockchain_state(&self) -> BlockchainState {
+        match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => protocol_state
+                .body
+                .clone()
+                .inner()
+                .inner()
+                .blockchain_state
+                .t
+                .t
+                .to_owned(),
+        }
     }
 
     pub fn block_creator(&self) -> PublicKey {
@@ -194,8 +247,9 @@ impl PrecomputedBlock {
     }
 
     pub fn staged_ledger_hash(&self) -> LedgerHash {
-        LedgerHash::from_hashv1(
-            self.protocol_state
+        LedgerHash::from_hashv1(match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => protocol_state
                 .body
                 .t
                 .t
@@ -209,11 +263,18 @@ impl PrecomputedBlock {
                 .t
                 .ledger_hash
                 .clone(),
-        )
+        })
     }
 
     pub fn staged_ledger_diff_tuple(&self) -> mina_rs::StagedLedgerDiffTuple {
-        self.staged_ledger_diff.diff.clone().inner()
+        match self {
+            Self::V1(PrecomputedBlockV1 {
+                staged_ledger_diff, ..
+            })
+            | Self::V2(PrecomputedBlockV2 {
+                staged_ledger_diff, ..
+            }) => staged_ledger_diff.diff.clone().inner(),
+        }
     }
 
     pub fn staged_ledger_pre_diff(&self) -> mina_rs::StagedLedgerPreDiff {
@@ -354,34 +415,54 @@ impl PrecomputedBlock {
     }
 
     pub fn global_slot_since_genesis(&self) -> u32 {
-        self.protocol_state
-            .body
-            .t
-            .t
-            .consensus_state
-            .t
-            .t
-            .global_slot_since_genesis
-            .t
-            .t
+        match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => {
+                protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .global_slot_since_genesis
+                    .t
+                    .t
+            }
+        }
     }
 
     pub fn timestamp(&self) -> u64 {
-        self.protocol_state
-            .body
-            .clone()
-            .inner()
-            .inner()
-            .blockchain_state
-            .inner()
-            .inner()
-            .timestamp
-            .inner()
-            .inner()
+        match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => protocol_state
+                .body
+                .clone()
+                .inner()
+                .inner()
+                .blockchain_state
+                .inner()
+                .inner()
+                .timestamp
+                .inner()
+                .inner(),
+        }
+    }
+
+    pub fn scheduled_time(&self) -> String {
+        match self {
+            Self::V1(PrecomputedBlockV1 { scheduled_time, .. })
+            | Self::V2(PrecomputedBlockV2 { scheduled_time, .. }) => scheduled_time.clone(),
+        }
     }
 
     pub fn previous_state_hash(&self) -> BlockHash {
-        BlockHash::from_hashv1(self.protocol_state.previous_state_hash.clone())
+        BlockHash::from_hashv1(match self {
+            Self::V1(PrecomputedBlockV1 { protocol_state, .. })
+            | Self::V2(PrecomputedBlockV2 { protocol_state, .. }) => {
+                protocol_state.previous_state_hash.clone()
+            }
+        })
     }
 
     pub fn command_hashes(&self) -> Vec<String> {
@@ -393,54 +474,87 @@ impl PrecomputedBlock {
 
     /// Base64 encoded string
     pub fn last_vrf_output(&self) -> String {
-        let last_vrf_output = VrfOutput::new(
-            self.protocol_state
-                .clone()
-                .body
-                .inner()
-                .inner()
-                .consensus_state
-                .inner()
-                .inner()
-                .last_vrf_output
-                .inner()
-                .0,
-        );
+        let last_vrf_output = VrfOutput::new(self.consensus_state().last_vrf_output.t.0.clone());
         last_vrf_output.base64_encode()
     }
 
     /// Blake2b hex digest of last_vrf_output
     pub fn hash_last_vrf_output(&self) -> VrfOutput {
-        let last_vrf_output = VrfOutput::new(
-            self.protocol_state
-                .clone()
-                .body
-                .t
-                .t
-                .consensus_state
-                .t
-                .t
-                .last_vrf_output
-                .t
-                .0,
-        );
+        let last_vrf_output = VrfOutput::new(self.consensus_state().last_vrf_output.t.0.clone());
         VrfOutput::new(last_vrf_output.hex_digest())
     }
 
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
-        PrecomputedBlockWithCanonicity {
-            canonicity: Some(canonicity),
-            network: self.network.clone(),
-            state_hash: self.state_hash.clone(),
-            blockchain_length: self.blockchain_length,
-            scheduled_time: self.scheduled_time.clone(),
-            protocol_state: self.protocol_state.clone(),
-            staged_ledger_diff: self.staged_ledger_diff.clone(),
+        match self {
+            Self::V1(PrecomputedBlockV1 {
+                network,
+                state_hash,
+                scheduled_time,
+                blockchain_length,
+                protocol_state,
+                staged_ledger_diff,
+            })
+            | Self::V2(PrecomputedBlockV2 {
+                network,
+                state_hash,
+                scheduled_time,
+                blockchain_length,
+                protocol_state,
+                staged_ledger_diff,
+            }) => PrecomputedBlockWithCanonicity {
+                canonicity: Some(canonicity),
+                network: network.to_owned(),
+                state_hash: state_hash.to_owned(),
+                blockchain_length: *blockchain_length,
+                scheduled_time: scheduled_time.to_owned(),
+                protocol_state: protocol_state.to_owned(),
+                staged_ledger_diff: staged_ledger_diff.to_owned(),
+            },
         }
     }
 
     pub fn summary(&self) -> String {
-        format!("(length {}): {}", self.blockchain_length, self.state_hash)
+        match self {
+            PrecomputedBlock::V1(PrecomputedBlockV1 {
+                state_hash,
+                blockchain_length,
+                ..
+            })
+            | PrecomputedBlock::V2(PrecomputedBlockV2 {
+                state_hash,
+                blockchain_length,
+                ..
+            }) => format!("(length {blockchain_length}): {state_hash}"),
+        }
+    }
+
+    pub fn state_hash(&self) -> BlockHash {
+        match self {
+            PrecomputedBlock::V1(PrecomputedBlockV1 { state_hash, .. })
+            | PrecomputedBlock::V2(PrecomputedBlockV2 { state_hash, .. }) => {
+                state_hash.to_owned().into()
+            }
+        }
+    }
+
+    pub fn blockchain_length(&self) -> u32 {
+        match self {
+            PrecomputedBlock::V1(PrecomputedBlockV1 {
+                blockchain_length, ..
+            })
+            | PrecomputedBlock::V2(PrecomputedBlockV2 {
+                blockchain_length, ..
+            }) => *blockchain_length,
+        }
+    }
+
+    pub fn network(&self) -> Network {
+        match self {
+            PrecomputedBlock::V1(PrecomputedBlockV1 { network, .. })
+            | PrecomputedBlock::V2(PrecomputedBlockV2 { network, .. }) => {
+                Network(network.to_owned())
+            }
+        }
     }
 }
 

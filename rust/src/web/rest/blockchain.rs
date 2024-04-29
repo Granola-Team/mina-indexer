@@ -47,7 +47,7 @@ fn calculate_summary(
     _best_ledger: &Ledger,
     locked_balance: Option<Amount>,
 ) -> Option<BlockchainSummary> {
-    let blockchain_length = best_tip.blockchain_length;
+    let blockchain_length = best_tip.blockchain_length();
     let chain_id = "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1".to_owned();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
     let epoch = best_tip.consensus_state().epoch_count.inner().inner();
@@ -83,29 +83,11 @@ fn calculate_summary(
         .slot_number
         .inner()
         .inner();
-    let snarked_ledger_hash = LedgerHash::from_hashv1(
-        best_tip
-            .protocol_state
-            .body
-            .clone()
-            .inner()
-            .inner()
-            .blockchain_state
-            .inner()
-            .inner()
-            .snarked_ledger_hash,
-    )
-    .0;
+    let snarked_ledger_hash =
+        LedgerHash::from_hashv1(best_tip.blockchain_state().snarked_ledger_hash).0;
     let staged_ledger_hash = LedgerHash::from_hashv1(
         best_tip
-            .protocol_state
-            .body
-            .clone()
-            .inner()
-            .inner()
-            .blockchain_state
-            .inner()
-            .inner()
+            .blockchain_state()
             .staged_ledger_hash
             .inner()
             .inner()
@@ -126,7 +108,7 @@ fn calculate_summary(
             .hash,
     )
     .0;
-    let state_hash = best_tip.state_hash.clone();
+    let state_hash = best_tip.state_hash().0;
     let total_currency_u64 = best_tip.consensus_state().total_currency.inner().inner();
     let locked_currency_u64 = locked_balance.map(|a| a.0).unwrap_or(0);
     let total_currency = nanomina_to_mina(total_currency_u64);
@@ -162,7 +144,7 @@ pub async fn get_blockchain_summary(
     if let Ok(Some(best_tip)) = db.get_best_block() {
         debug!("Found best tip: {}", best_tip.summary());
         if let Ok(Some(best_ledger)) =
-            db.get_ledger_state_hash(&best_tip.network, &best_tip.state_hash.clone().into(), true)
+            db.get_ledger_state_hash(&best_tip.network().0, &best_tip.state_hash(), true)
         {
             let global_slot = best_tip
                 .consensus_state()

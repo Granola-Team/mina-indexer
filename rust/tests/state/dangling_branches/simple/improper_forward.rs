@@ -30,7 +30,7 @@ async fn extension() {
         .await
         .unwrap();
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
@@ -64,7 +64,7 @@ async fn extension() {
         ExtensionType::RootSimple(_)
     ));
     assert_eq!(
-        child1.state_hash,
+        child1.state_hash().0,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
     );
 
@@ -98,7 +98,7 @@ async fn extension() {
 
     assert!(matches!(extension_type, ExtensionType::RootSimple(_)));
     assert_eq!(
-        child2.state_hash,
+        child2.state_hash().0,
         "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()
     );
 

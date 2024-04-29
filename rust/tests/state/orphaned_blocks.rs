@@ -26,7 +26,11 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     let state_hash0 = "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".into();
     assert!(state.diffs_map.contains_key(&state_hash0));
     assert_eq!(
-        indexer_store.get_block(&state_hash0)?.unwrap().state_hash,
+        indexer_store
+            .get_block(&state_hash0)?
+            .unwrap()
+            .state_hash()
+            .0,
         state_hash0.0
     );
 
@@ -36,14 +40,22 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     let state_hash1 = "3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh".into();
     assert!(!state.diffs_map.contains_key(&state_hash1));
     assert_eq!(
-        indexer_store.get_block(&state_hash1)?.unwrap().state_hash,
+        indexer_store
+            .get_block(&state_hash1)?
+            .unwrap()
+            .state_hash()
+            .0,
         state_hash1.0
     );
 
     let state_hash2 = "3NLUfaHDcyt9KsYxi1xsSdYE369GAduLxVgRUDE7RuFgSXQBphDK".into();
     assert!(!state.diffs_map.contains_key(&state_hash2));
     assert_eq!(
-        indexer_store.get_block(&state_hash2)?.unwrap().state_hash,
+        indexer_store
+            .get_block(&state_hash2)?
+            .unwrap()
+            .state_hash()
+            .0,
         state_hash2.0
     );
 

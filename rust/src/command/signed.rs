@@ -1,6 +1,9 @@
 use crate::{
     command::*,
-    protocol::{bin_prot, serialization_types::staged_ledger_diff as mina_rs},
+    protocol::{
+        bin_prot,
+        serialization_types::{staged_ledger_diff as mina_rs, version_bytes::V1_TXN_HASH},
+    },
 };
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
@@ -131,7 +134,9 @@ impl SignedCommand {
         hash.insert(0, hash.len() as u8);
         hash.insert(0, 1);
 
-        Ok(bs58::encode(hash).with_check_version(0x12).into_string())
+        Ok(bs58::encode(hash)
+            .with_check_version(V1_TXN_HASH)
+            .into_string())
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
@@ -177,8 +182,8 @@ impl SignedCommandWithData {
             .map(|cmd| {
                 Self::from(
                     cmd,
-                    &block.state_hash,
-                    block.blockchain_length,
+                    &block.state_hash().0,
+                    block.blockchain_length(),
                     block.timestamp(),
                     block.global_slot_since_genesis(),
                 )

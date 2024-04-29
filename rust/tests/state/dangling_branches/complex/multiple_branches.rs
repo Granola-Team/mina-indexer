@@ -39,7 +39,7 @@ async fn merge() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
     );
 
@@ -50,7 +50,7 @@ async fn merge() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(
-        middle_block.state_hash,
+        middle_block.state_hash().0,
         "3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db".to_owned()
     );
 
@@ -61,7 +61,7 @@ async fn merge() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(
-        leaf0_block.state_hash,
+        leaf0_block.state_hash().0,
         "3NKXsaznJ6WdyA4PHfXxn25RzVanzQsNMZrxjidbhoBug8R4LZDy".to_owned()
     );
 
@@ -72,7 +72,7 @@ async fn merge() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(
-        leaf1_block.state_hash,
+        leaf1_block.state_hash().0,
         "3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww".to_owned()
     );
 

@@ -2,8 +2,13 @@
 //! [IndexerStore]
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{
+        precomputed::{PrecomputedBlock, PrecomputedBlockV1, PrecomputedBlockV2},
+        store::BlockStore,
+        BlockHash, Network,
+    },
     canonicity::{store::CanonicityStore, Canonicity},
+    chain_id::{store::ChainIdStore, ChainId},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
@@ -190,7 +195,7 @@ impl IndexerStore {
 
 fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
     let mut res = global_slot_prefix(block.global_slot_since_genesis());
-    res.append(&mut block.state_hash.as_bytes().to_vec());
+    res.append(&mut block.state_hash().0.as_bytes().to_vec());
     res
 }
 
@@ -200,15 +205,19 @@ impl BlockStore for IndexerStore {
         trace!("Adding block {}", block.summary());
 
         // add block to db
-        let key = block.state_hash.as_bytes();
+        let state_hash = block.state_hash().0;
         let value = serde_json::to_vec(&block)?;
-        let blocks_cf = self.blocks_cf();
 
-        if matches!(self.database.get_pinned_cf(&blocks_cf, key), Ok(Some(_))) {
+        if matches!(
+            self.database
+                .get_pinned_cf(self.blocks_cf(), state_hash.as_bytes()),
+            Ok(Some(_))
+        ) {
             trace!("Block already present {}", block.summary());
             return Ok(None);
         }
-        self.database.put_cf(&blocks_cf, key, value)?;
+        self.database
+            .put_cf(self.blocks_cf(), state_hash.as_bytes(), value)?;
 
         // add to global slots block index
         self.database.put_cf(
@@ -219,15 +228,15 @@ impl BlockStore for IndexerStore {
 
         // add block for each public key
         for pk in block.all_public_keys() {
-            self.add_block_at_public_key(&pk, &block.state_hash.clone().into())?;
+            self.add_block_at_public_key(&pk, &block.state_hash().0.into())?;
         }
 
         // add block to height list
-        self.add_block_at_height(&block.state_hash.clone().into(), block.blockchain_length)?;
+        self.add_block_at_height(&block.state_hash().0.into(), block.blockchain_length())?;
 
         // add block to slots list
         self.add_block_at_slot(
-            &block.state_hash.clone().into(),
+            &block.state_hash().0.into(),
             block.global_slot_since_genesis(),
         )?;
 
@@ -242,9 +251,9 @@ impl BlockStore for IndexerStore {
 
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
-            network: block.network.clone(),
-            state_hash: block.state_hash.clone().into(),
-            blockchain_length: block.blockchain_length,
+            network: block.network().0,
+            state_hash: block.state_hash().0.into(),
+            blockchain_length: block.blockchain_length(),
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
 
@@ -310,9 +319,9 @@ impl BlockStore for IndexerStore {
             Some(block) => {
                 self.add_event(&IndexerEvent::Db(DbEvent::Block(
                     DbBlockEvent::NewBestTip {
-                        network: block.network.clone(),
-                        state_hash: block.state_hash.clone().into(),
-                        blockchain_length: block.blockchain_length,
+                        network: block.network().0,
+                        state_hash: block.state_hash().0.into(),
+                        blockchain_length: block.blockchain_length(),
                     },
                 )))?;
             }
@@ -513,7 +522,7 @@ impl BlockStore for IndexerStore {
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>> {
         trace!("Getting children of block {}", state_hash);
 
-        if let Some(height) = self.get_block(state_hash)?.map(|b| b.blockchain_length) {
+        if let Some(height) = self.get_block(state_hash)?.map(|b| b.blockchain_length()) {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
             let mut children: Vec<PrecomputedBlock> = blocks_at_next_height
                 .into_iter()
@@ -604,11 +613,16 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
 
         if let Ok(Some(best_tip)) = self.get_best_block() {
-            if let Some(PrecomputedBlock {
-                blockchain_length, ..
-            }) = self.get_block(state_hash)?
+            if let Some(
+                PrecomputedBlock::V1(PrecomputedBlockV1 {
+                    blockchain_length, ..
+                })
+                | PrecomputedBlock::V2(PrecomputedBlockV2 {
+                    blockchain_length, ..
+                }),
+            ) = self.get_block(state_hash)?
             {
-                if blockchain_length > best_tip.blockchain_length {
+                if blockchain_length > best_tip.blockchain_length() {
                     return Ok(Some(Canonicity::Pending));
                 } else if let Some(max_canonical_length) =
                     self.get_max_canonical_blockchain_length()?
@@ -616,8 +630,8 @@ impl CanonicityStore for IndexerStore {
                     if blockchain_length > max_canonical_length {
                         // follow best chain back from tip to given block
                         let mut curr_block = best_tip;
-                        while curr_block.state_hash != state_hash.to_string()
-                            && curr_block.blockchain_length > max_canonical_length
+                        while curr_block.state_hash() != *state_hash
+                            && curr_block.blockchain_length() > max_canonical_length
                         {
                             if let Some(parent) =
                                 self.get_block(&curr_block.previous_state_hash())?
@@ -628,8 +642,8 @@ impl CanonicityStore for IndexerStore {
                             }
                         }
 
-                        if curr_block.state_hash == state_hash.to_string()
-                            && curr_block.blockchain_length > max_canonical_length
+                        if curr_block.state_hash() == *state_hash
+                            && curr_block.blockchain_length() > max_canonical_length
                         {
                             return Ok(Some(Canonicity::Canonical));
                         } else {
@@ -715,9 +729,9 @@ impl LedgerStore for IndexerStore {
                     self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                         DbLedgerEvent::NewLedger {
                             ledger_hash,
-                            network: block.network.clone(),
-                            state_hash: block.state_hash.clone().into(),
-                            blockchain_length: block.blockchain_length,
+                            network: block.network().0,
+                            state_hash: block.state_hash().0.into(),
+                            blockchain_length: block.blockchain_length(),
                         },
                     )))?;
                 }
@@ -792,15 +806,15 @@ impl LedgerStore for IndexerStore {
                     trace!("Memoizing ledger for block {}", requested_block.summary());
                     self.add_ledger_state_hash(
                         network,
-                        &requested_block.state_hash.clone().into(),
+                        &requested_block.state_hash().0.into(),
                         ledger.clone(),
                     )?;
                     self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                         DbLedgerEvent::NewLedger {
-                            network: requested_block.network.clone(),
-                            state_hash: requested_block.state_hash.clone().into(),
+                            network: requested_block.network().0,
+                            state_hash: requested_block.state_hash().0.into(),
                             ledger_hash: requested_block.staged_ledger_hash(),
-                            blockchain_length: requested_block.blockchain_length,
+                            blockchain_length: requested_block.blockchain_length(),
                         },
                     )))?;
                 }
@@ -1138,8 +1152,8 @@ impl CommandStore for IndexerStore {
             let key = global_slot_prefix_key(block.global_slot_since_genesis(), &txn_hash);
             let value = serde_json::to_vec(&SignedCommandWithData::from(
                 command,
-                &block.state_hash,
-                block.blockchain_length,
+                &block.state_hash().0,
+                block.blockchain_length(),
                 block.timestamp(),
                 block.global_slot_since_genesis(),
             ))?;
@@ -1158,7 +1172,7 @@ impl CommandStore for IndexerStore {
         }
 
         // add: key (state hash) -> user commands with status
-        let key = user_command_db_key(&block.state_hash);
+        let key = user_command_db_key(&block.state_hash().0);
         let value = serde_json::to_vec(&block.commands())?;
         self.database.put_cf(self.commands_cf(), key, value)?;
 
@@ -1174,8 +1188,8 @@ impl CommandStore for IndexerStore {
                 .map(|c| {
                     SignedCommandWithData::from(
                         c,
-                        &block.state_hash,
-                        block.blockchain_length,
+                        &block.state_hash().0,
+                        block.blockchain_length(),
                         block.timestamp(),
                         block.global_slot_since_genesis(),
                     )
@@ -1280,8 +1294,8 @@ impl CommandStore for IndexerStore {
         );
 
         if let (Some(start_block), Some(end_block)) = (start_block_opt, end_block_opt) {
-            let start_height = start_block.blockchain_length;
-            let end_height = end_block.blockchain_length;
+            let start_height = start_block.blockchain_length();
+            let end_height = end_block.blockchain_length();
 
             if end_height < start_height {
                 warn!("Block (length {end_height}) {end_state_hash} is lower than block (length {start_height}) {start_state_hash}");
@@ -1290,7 +1304,7 @@ impl CommandStore for IndexerStore {
 
             let mut num = end_height - start_height;
             let mut prev_hash = end_block.previous_state_hash();
-            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash.into()];
+            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash().0.into()];
             while let Some(block) = self.get_block(&prev_hash)? {
                 if num == 0 {
                     break;
@@ -1330,7 +1344,7 @@ impl CommandStore for IndexerStore {
         trace!("Adding internal commands for block {}", block.summary());
 
         // add cmds to state hash
-        let key = format!("internal-{}", block.state_hash);
+        let key = format!("internal-{}", block.state_hash().0);
         let internal_cmds = InternalCommand::from_precomputed(block);
         self.database.put_cf(
             self.commands_cf(),
@@ -1353,11 +1367,8 @@ impl CommandStore for IndexerStore {
         }
 
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
-            let key = internal_commmand_key(
-                block.global_slot_since_genesis(),
-                &block.state_hash.clone(),
-                i,
-            );
+            let key =
+                internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash().0, i);
             self.database.put_cf(
                 self.internal_commands_cf(),
                 key,
@@ -1493,7 +1504,8 @@ impl SnarkStore for IndexerStore {
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
         // add: state hash -> snark work
-        let key = block.state_hash.as_bytes();
+        let state_hash = block.state_hash().0;
+        let key = state_hash.as_bytes();
         let value = serde_json::to_vec(&completed_works)?;
         self.database.put_cf(self.snarks_cf(), key, value)?;
 
@@ -1588,6 +1600,8 @@ impl SnarkStore for IndexerStore {
     }
 
     fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()> {
+        trace!("Updating top SNARK workers");
+
         let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();
         for snark in snarks {
             let key = snark.prover.0.as_bytes();
@@ -1622,6 +1636,8 @@ impl SnarkStore for IndexerStore {
     }
 
     fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+        trace!("Getting top {n} SNARK workers");
+
         Ok(top_snarkers_iterator(self, IteratorMode::End)
             .take(n)
             .map(|res| {
@@ -1640,7 +1656,55 @@ impl SnarkStore for IndexerStore {
     }
 }
 
+impl ChainIdStore for IndexerStore {
+    fn set_chain_id_for_network(
+        &self,
+        chain_id: &ChainId,
+        network: &Network,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting chain id '{}' for network '{}'",
+            chain_id.0,
+            network.0
+        );
+
+        // add the new pair
+        let key = chain_id.0.as_bytes();
+        let value = network.0.as_bytes();
+        self.database.put(key, value)?;
+
+        // update current network/chain_id
+        self.database.put(Self::CHAIN_ID_KEY, key)?;
+        Ok(())
+    }
+
+    fn get_network(&self, chain_id: &ChainId) -> anyhow::Result<Network> {
+        trace!("Getting network for chain id: {}", chain_id.0);
+        Ok(Network(String::from_utf8(
+            self.database
+                .get(chain_id.0.as_bytes())?
+                .expect("network is present"),
+        )?))
+    }
+
+    fn get_current_network(&self) -> anyhow::Result<Network> {
+        trace!("Getting current network");
+        self.get_network(&self.get_chain_id()?)
+    }
+
+    fn get_chain_id(&self) -> anyhow::Result<ChainId> {
+        trace!("Getting chain id");
+
+        Ok(ChainId(String::from_utf8(
+            self.database
+                .get(Self::CHAIN_ID_KEY)?
+                .expect("chain id set"),
+        )?))
+    }
+}
+
 impl IndexerStore {
+    const CHAIN_ID_KEY: &'static [u8] = "current_chain_id".as_bytes();
     const BEST_TIP_BLOCK_KEY: &'static [u8] = "best_tip_block".as_bytes();
     const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();

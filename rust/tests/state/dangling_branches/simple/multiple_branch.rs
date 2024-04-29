@@ -26,7 +26,7 @@ async fn extensions() {
         .await
         .unwrap();
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
@@ -37,7 +37,7 @@ async fn extensions() {
         .await
         .unwrap();
     assert_eq!(
-        root0_block.state_hash,
+        root0_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
@@ -48,7 +48,7 @@ async fn extensions() {
         .await
         .unwrap();
     assert_eq!(
-        child0_block.state_hash,
+        child0_block.state_hash().0,
         "3NKt8qae6VMefUXGdprN1Nve78zCQr9FFaMyRfQbj8Mza1FKcXEQ".to_owned()
     );
 
@@ -59,7 +59,7 @@ async fn extensions() {
         .await
         .unwrap();
     assert_eq!(
-        root1_block.state_hash,
+        root1_block.state_hash().0,
         "3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9".to_owned()
     );
 
@@ -70,7 +70,7 @@ async fn extensions() {
         .await
         .expect("WTF");
     assert_eq!(
-        child10_block.state_hash,
+        child10_block.state_hash().0,
         "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
     );
 
@@ -81,7 +81,7 @@ async fn extensions() {
         .await
         .unwrap();
     assert_eq!(
-        child11_block.state_hash,
+        child11_block.state_hash().0,
         "3NKE1aiFviFWrYMN5feKm3L7C4Zqp3czkwAtcXj1tdbaGDZ47L1k".to_owned()
     );
 

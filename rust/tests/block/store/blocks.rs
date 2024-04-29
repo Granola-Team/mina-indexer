@@ -24,7 +24,7 @@ fn add_and_get() -> anyhow::Result<()> {
     let adding = Instant::now();
     while let Some((block, _)) = bp.next_block()? {
         let block: PrecomputedBlock = block.into();
-        let state_hash = block.state_hash.clone();
+        let state_hash = block.state_hash();
 
         db.add_block(&block)?;
         blocks.insert(state_hash.clone(), block);

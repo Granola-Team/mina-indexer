@@ -1,6 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
+    chain_id::chain_id,
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
 };
@@ -202,7 +203,8 @@ impl From<StakingAccount> for LedgerAccount {
                 MAINNET_GENESIS_HASH,
                 MAINNET_GENESIS_CONSTANTS,
                 MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
-            )[..6]
+            )
+            .0[..6]
                 .to_string(),
             balance,
             nonce,

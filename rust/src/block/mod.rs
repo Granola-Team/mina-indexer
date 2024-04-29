@@ -18,6 +18,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct Network(pub String);
+
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub parent_hash: BlockHash,
@@ -55,14 +58,13 @@ impl BlockHash {
 
 impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
-        let parent_hash =
-            BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = precomputed_block.state_hash.clone().into();
+        let parent_hash = precomputed_block.previous_state_hash();
+        let state_hash = precomputed_block.state_hash();
         Self {
             height,
             state_hash,
             parent_hash,
-            blockchain_length: precomputed_block.blockchain_length,
+            blockchain_length: precomputed_block.blockchain_length(),
             hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
             global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
         }
@@ -87,25 +89,18 @@ impl From<Block> for BlockWithoutHeight {
 
 impl BlockWithoutHeight {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let parent_hash =
-            BlockHash::from_hashv1(precomputed_block.protocol_state.previous_state_hash.clone());
-        let state_hash = precomputed_block.state_hash.clone().into();
+        let parent_hash = precomputed_block.previous_state_hash();
+        let state_hash = precomputed_block.state_hash();
         Self {
             parent_hash,
             state_hash,
             canonicity: None,
             global_slot_since_genesis: precomputed_block
-                .protocol_state
-                .body
-                .t
-                .t
-                .consensus_state
-                .t
-                .t
+                .consensus_state()
                 .global_slot_since_genesis
                 .t
                 .t,
-            blockchain_length: precomputed_block.blockchain_length,
+            blockchain_length: precomputed_block.blockchain_length(),
         }
     }
 
@@ -128,10 +123,10 @@ impl BlockWithoutHeight {
 impl From<PrecomputedBlock> for Block {
     fn from(value: PrecomputedBlock) -> Self {
         Self {
-            height: value.blockchain_length,
+            height: value.blockchain_length().saturating_sub(1),
             parent_hash: value.previous_state_hash(),
-            blockchain_length: value.blockchain_length,
-            state_hash: value.state_hash.clone().into(),
+            blockchain_length: value.blockchain_length(),
+            state_hash: value.state_hash(),
             hash_last_vrf_output: value.hash_last_vrf_output(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
         }
@@ -141,10 +136,10 @@ impl From<PrecomputedBlock> for Block {
 impl From<&PrecomputedBlock> for Block {
     fn from(value: &PrecomputedBlock) -> Self {
         Self {
-            height: value.blockchain_length,
+            height: value.blockchain_length().saturating_sub(1),
             parent_hash: value.previous_state_hash(),
-            blockchain_length: value.blockchain_length,
-            state_hash: value.state_hash.clone().into(),
+            blockchain_length: value.blockchain_length(),
+            state_hash: value.state_hash(),
             hash_last_vrf_output: value.hash_last_vrf_output(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
         }
@@ -156,8 +151,8 @@ impl From<&PrecomputedBlock> for BlockWithoutHeight {
         Self {
             canonicity: None,
             parent_hash: value.previous_state_hash(),
-            state_hash: value.state_hash.clone().into(),
-            blockchain_length: value.blockchain_length,
+            state_hash: value.state_hash(),
+            blockchain_length: value.blockchain_length(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
         }
     }

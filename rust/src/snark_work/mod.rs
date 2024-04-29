@@ -69,7 +69,7 @@ impl SnarkWorkSummaryWithStateHash {
         block
             .completed_works()
             .into_iter()
-            .map(|snark| Self::from(snark, &block.state_hash.clone().into()))
+            .map(|snark| Self::from(snark, &block.state_hash()))
             .collect()
     }
 
@@ -205,10 +205,7 @@ mod test {
             let completed_works_state_hash_json = Value::Array(
                 arr.into_iter()
                     .map(|x| {
-                        remove_proofs(add_state_hash(
-                            convert_snark_work(x),
-                            &block.state_hash.clone().into(),
-                        ))
+                        remove_proofs(add_state_hash(convert_snark_work(x), &block.state_hash()))
                     })
                     .collect(),
             );
@@ -245,10 +242,7 @@ mod test {
             let completed_works_state_hash_json = Value::Array(
                 arr.into_iter()
                     .map(|x| {
-                        remove_proofs(add_state_hash(
-                            convert_snark_work(x),
-                            &block.state_hash.clone().into(),
-                        ))
+                        remove_proofs(add_state_hash(convert_snark_work(x), &block.state_hash()))
                     })
                     .collect(),
             );

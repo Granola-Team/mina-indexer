@@ -1,6 +1,7 @@
 use super::{
     db, get_block_canonicity,
     transactions::{decode_memo, nanomina_to_mina_f64},
+    MAINNET_COINBASE_REWARD,
 };
 use crate::{
     block::{self, precomputed::PrecomputedBlock, store::BlockStore},
@@ -41,7 +42,7 @@ impl BlocksQueryRoot {
         if query.is_none() {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| BlockWithCanonicity {
-                    canonical: get_block_canonicity(db, &pcb.state_hash),
+                    canonical: get_block_canonicity(db, &pcb.state_hash().0),
                     block: pcb.into(),
                 })
             })?);
@@ -367,25 +368,15 @@ impl From<PrecomputedBlock> for Block {
         let date_time = millis_to_date_string(block.timestamp().try_into().unwrap());
         let pk_creator = block.consensus_state().block_creator;
         let creator = CompressedPubKey::from(&pk_creator).into_address();
-        let scheduled_time = block.scheduled_time.clone();
+        let scheduled_time = block.scheduled_time().clone();
         let received_time = millis_to_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();
         let snark_fees = block.snark_fees();
-        let utc_date = block
-            .protocol_state
-            .body
-            .t
-            .t
-            .blockchain_state
-            .t
-            .t
-            .timestamp
-            .t
-            .t
-            .to_string();
+        let utc_date = block.timestamp().to_string();
 
-        let blockchain_state = block.protocol_state.body.t.t.blockchain_state.clone().t.t;
+        // blockchain state
+        let blockchain_state = block.blockchain_state();
         let snarked_ledger_hash =
             LedgerHash::from_hashv1(blockchain_state.clone().snarked_ledger_hash).0;
         let staged_ledger_hashv1 = blockchain_state
@@ -398,10 +389,10 @@ impl From<PrecomputedBlock> for Block {
         let staged_ledger_hash = LedgerHash::from_hashv1(staged_ledger_hashv1).0;
 
         // consensus state
-        let consensus_state = block.protocol_state.body.t.t.consensus_state.clone().t.t;
+        let consensus_state = block.consensus_state();
 
         let total_currency = consensus_state.total_currency.t.t;
-        let blockchain_length = block.blockchain_length;
+        let blockchain_length = block.blockchain_length();
         let block_height = blockchain_length;
         let epoch_count = consensus_state.epoch_count.t.t;
         let epoch = epoch_count;
@@ -497,13 +488,13 @@ impl From<PrecomputedBlock> for Block {
             .total_currency
             .t
             .t;
+
         let coinbase_receiver_account = block.coinbase_receiver().0;
         let supercharged = consensus_state.supercharge_coinbase;
-
         let coinbase: u64 = if supercharged {
-            1440000000000
+            2 * MAINNET_COINBASE_REWARD
         } else {
-            720000000000
+            MAINNET_COINBASE_REWARD
         };
 
         let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(&block)
@@ -519,21 +510,13 @@ impl From<PrecomputedBlock> for Block {
 
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(&block)
             .into_iter()
-            .map(|snark| {
-                (
-                    snark,
-                    block.state_hash.clone(),
-                    block_height,
-                    date_time.clone(),
-                )
-                    .into()
-            })
+            .map(|snark| (snark, block.state_hash().0, block_height, date_time.clone()).into())
             .collect();
 
         Block {
             snark_jobs,
-            state_hash: block.state_hash,
-            block_height: block.blockchain_length,
+            state_hash: block.state_hash().0,
+            block_height: block.blockchain_length(),
             date_time,
             winner_account: WinnerAccount {
                 public_key: winner_account,

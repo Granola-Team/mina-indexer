@@ -27,7 +27,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await?;
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
@@ -37,7 +37,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk")
         .await?;
     assert_eq!(
-        main_1_block.state_hash,
+        main_1_block.state_hash().0,
         "3NKAqzELKDp2BbdKKwdRWEoMNehyMrxJGCoGCyH1t1PyyH7VQMgk".to_owned()
     );
 
@@ -47,7 +47,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
         .await?;
     assert_eq!(
-        fork_block.state_hash,
+        fork_block.state_hash().0,
         "3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN".to_owned()
     );
 
@@ -57,7 +57,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db")
         .await?;
     assert_eq!(
-        main_2_block.state_hash,
+        main_2_block.state_hash().0,
         "3NKakum3B2Tigw9TSsxwvXvV3x8L2LvrJ3yXFLEAJDMZu2vkn7db".to_owned()
     );
 
@@ -67,7 +67,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww")
         .await?;
     assert_eq!(
-        main_3_block.state_hash,
+        main_3_block.state_hash().0,
         "3NKqd3XGqkLmZVmPC3iG6AnrwQoZdBKdmYTzEJT3vwwnn2H1Z4ww".to_owned()
     );
 
@@ -77,7 +77,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9")
         .await?;
     assert_eq!(
-        main_4_block.state_hash,
+        main_4_block.state_hash().0,
         "3NKmDYoFs5MRNE4PoGMkMT5udM4JrnB5NJYFLJcDUUob363aj5e9".to_owned()
     );
 
@@ -87,7 +87,7 @@ async fn transition_frontier() -> anyhow::Result<()> {
         .get_precomputed_block("3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL")
         .await?;
     assert_eq!(
-        main_5_block.state_hash,
+        main_5_block.state_hash().0,
         "3NK7yacg7pjHgV52sUmbNv9p7xxrKUV4sevy4Su5j6CrdTjyzaPL".to_owned()
     );
 

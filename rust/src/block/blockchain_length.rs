@@ -84,7 +84,7 @@ mod test {
                 },
         } = serde_json::from_slice(&std::fs::read(&path)?)?;
         let pcb = PrecomputedBlock::parse_file(&path)?;
-        assert_eq!(blockchain_length.parse::<u32>()?, pcb.blockchain_length);
+        assert_eq!(blockchain_length.parse::<u32>()?, pcb.blockchain_length());
         Ok(())
     }
 }

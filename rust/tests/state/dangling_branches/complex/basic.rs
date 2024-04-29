@@ -36,7 +36,7 @@ async fn extension() -> anyhow::Result<()> {
         .get_precomputed_block("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT")
         .await?;
     assert_eq!(
-        root_block.state_hash,
+        root_block.state_hash().0,
         "3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_owned()
     );
 
@@ -46,7 +46,7 @@ async fn extension() -> anyhow::Result<()> {
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
         .await?;
     assert_eq!(
-        middle_block.state_hash,
+        middle_block.state_hash().0,
         "3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC".to_owned()
     );
 
@@ -56,7 +56,7 @@ async fn extension() -> anyhow::Result<()> {
         .get_precomputed_block("3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3")
         .await?;
     assert_eq!(
-        leaf_block.state_hash,
+        leaf_block.state_hash().0,
         "3NKizDx3nnhXha2WqHDNUvJk9jW7GsonsEGYs26tCPW2Wow1ZoR3".to_owned()
     );
 
@@ -149,7 +149,7 @@ async fn extension() -> anyhow::Result<()> {
         .data();
     let leaves: Vec<Block> = root_branch.leaves().to_vec();
 
-    assert_eq!(leaves.first().unwrap().state_hash.0, leaf_block.state_hash);
+    assert_eq!(leaves.first().unwrap().state_hash, leaf_block.state_hash());
 
     // branch root should match the tree's root
     assert_eq!(root, branch_root);
