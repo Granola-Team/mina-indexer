@@ -443,6 +443,7 @@ impl Block {
         let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(&block)
             .into_iter()
             .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
+            .filter(|x| matches!(x, InternalCommandWithData::FeeTransfer { .. }))
             .map(|ft| ft.into())
             .collect();
 

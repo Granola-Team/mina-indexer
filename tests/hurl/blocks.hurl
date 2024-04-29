@@ -92,10 +92,10 @@ HTTP 200
 jsonpath "$.data.blocks[0].stateHash" == "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R"
 jsonpath "$.data.blocks[0].transactions.coinbase" == "720000000000"
 jsonpath "$.data.blocks[0].transactions.coinbaseReceiverAccount.publicKey" == "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1"
-jsonpath "$.data.blocks[0].transactions.feeTransfer" count == 2
-jsonpath "$.data.blocks[0].transactions.feeTransfer[0].type" == "Coinbase"
+jsonpath "$.data.blocks[0].transactions.feeTransfer" count == 1
+jsonpath "$.data.blocks[0].transactions.feeTransfer[0].type" == "Fee_transfer"
 jsonpath "$.data.blocks[0].transactions.feeTransfer[0].recipient" == "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1"
-jsonpath "$.data.blocks[0].transactions.feeTransfer[0].fee" == "720000000000"
+jsonpath "$.data.blocks[0].transactions.feeTransfer[0].fee" == "120000000"
 jsonpath "$.data.blocks[0].transactions.userCommands" count == 4
 jsonpath "$.data.blocks[0].transactions.userCommands[0].kind" == "PAYMENT"
 jsonpath "$.data.blocks[0].transactions.userCommands[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
