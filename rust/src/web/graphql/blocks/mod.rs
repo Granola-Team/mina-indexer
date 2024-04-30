@@ -49,7 +49,7 @@ impl BlocksQueryRoot {
         }
 
         // Use constant time access if we have state hash
-        if let Some(state_hash) = query.clone().and_then(|input| input.state_hash) {
+        if let Some(state_hash) = query.as_ref().and_then(|input| input.state_hash.clone()) {
             if !is_valid_state_hash(&state_hash) {
                 return Ok(None);
             }
@@ -140,10 +140,11 @@ impl BlocksQueryRoot {
         }
 
         // coinbase receiver query
-        if let Some(coinbase_receiver) = query
-            .as_ref()
-            .and_then(|q| q.coinbase_receiver.clone().and_then(|cb| cb.public_key))
-        {
+        if let Some(coinbase_receiver) = query.as_ref().and_then(|q| {
+            q.coinbase_receiver
+                .as_ref()
+                .and_then(|cb| cb.public_key.clone())
+        }) {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
