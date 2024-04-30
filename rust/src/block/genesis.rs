@@ -18,7 +18,7 @@ impl GenesisBlock {
             }
         };
         Ok(Self(
-            PrecomputedBlock::parse_file(&genesis_block_path, PcbVersion(0))?,
+            PrecomputedBlock::parse_file(&genesis_block_path, PcbVersion::V1)?,
             genesis_block_path.metadata().unwrap().len(),
         ))
     }

@@ -21,6 +21,7 @@ use crate::{
         version_bytes,
     },
 };
+use anyhow::bail;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -49,6 +50,18 @@ impl LedgerHash {
         let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
             hashv1.into();
         Self(versioned.to_base58_string().unwrap())
+    }
+}
+
+impl std::str::FromStr for LedgerHash {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if is_valid_ledger_hash(s) {
+            Ok(Self(s.to_string()))
+        } else {
+            bail!("Invalid ledger hash: {}", s)
+        }
     }
 }
 
@@ -292,7 +305,7 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn default_ledger_hash_is_valid() {
+    fn default_ledger_hash_is_valid_public_key() {
         assert!(is_valid_ledger_hash(&LedgerHash::default().0))
     }
 

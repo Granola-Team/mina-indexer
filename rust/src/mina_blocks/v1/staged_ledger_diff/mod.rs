@@ -1,4 +1,4 @@
-use super::common::{from_str, from_str_opt};
+use crate::mina_blocks::common::{from_str, from_str_opt};
 use serde::{Deserialize, Serialize};
 
 /// The staged ledger diff represents the list of changes applied to the
@@ -22,6 +22,7 @@ pub struct Diff {
 pub struct CompletedWork {
     pub fee: String,
     pub prover: String,
+
     #[serde(skip_deserializing)]
     proofs: serde_json::Value,
 }
@@ -67,6 +68,7 @@ pub enum PayloadBody {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PayloadKind {
     Payment,
+
     #[serde(rename = "Stake_delegation")]
     StakeDelegation,
 }
@@ -90,8 +92,10 @@ pub struct DelegationPayloadBody {
 pub struct PaymentPayload {
     #[serde(deserialize_with = "from_str")]
     pub amount: u64,
+
     #[serde(deserialize_with = "from_str")]
     pub token_id: u64,
+
     pub source_pk: String,
     pub receiver_pk: String,
 }
@@ -100,10 +104,13 @@ pub struct PaymentPayload {
 pub struct PayloadCommon {
     #[serde(deserialize_with = "from_str")]
     pub fee_payer_pk: String,
+
     #[serde(deserialize_with = "from_str")]
     pub nonce: u32,
+
     #[serde(deserialize_with = "from_str")]
     pub valid_until: u64,
+
     #[serde(deserialize_with = "from_str")]
     pub fee_token: u64,
     pub fee: String,
@@ -132,6 +139,7 @@ pub enum CoinbaseKind {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoinbaseFeeTransfer {
     pub receiver_pk: String,
+
     #[serde(deserialize_with = "from_str")]
     pub fee: u64,
 }
@@ -147,28 +155,58 @@ pub enum AuxiliaryData {
 pub struct AppliedAuxData {
     #[serde(deserialize_with = "from_str_opt")]
     pub fee_payer_account_creation_fee_paid: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub receiver_account_creation_fee_paid: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub created_token: Option<u64>,
 }
 
+/// See https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/transaction_status.ml
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FailureReason {
     Predicate,
+
+    #[serde(rename = "Source_not_present")]
     SourceNotPresent,
+
+    #[serde(rename = "Receiver_not_present")]
     ReceiverNotPresent,
+
+    #[serde(rename = "Amount_insufficient_to_create_account")]
     AmountInsufficientToCreateAccount,
+
+    #[serde(rename = "Cannot_pay_creation_fee_in_token")]
     CannotPayCreationFeeInToken,
+
+    #[serde(rename = "Source_insufficient_balance")]
     SourceInsufficientBalance,
+
+    #[serde(rename = "Source_minimum_balance_violation")]
     SourceMinimumBalanceViolation,
+
+    #[serde(rename = "Receiver_already_exists")]
     ReceiverAlreadyExists,
+
+    #[serde(rename = "Not_token_owner")]
     NotTokenOwner,
+
+    #[serde(rename = "Mismatched_token_permissions")]
     MismatchedTokenPermissions,
     Overflow,
+
+    #[serde(rename = "Signed_command_on_snapp_account")]
     SignedCommandOnSnappAccount,
+
+    #[serde(rename = "Snapp_account_not_present")]
     SnappAccountNotPresent,
+
+    #[serde(rename = "Update_not_permitted")]
     UpdateNotPermitted,
+
+    #[serde(rename = "Incorrect_nonce")]
     IncorrectNonce,
 }
 
@@ -176,8 +214,10 @@ pub enum FailureReason {
 pub struct BalanaceData {
     #[serde(deserialize_with = "from_str_opt")]
     pub fee_payer_balance: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub source_balance: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub receiver_balance: Option<u64>,
 }
@@ -192,6 +232,7 @@ pub enum InternalCommandBalanceData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum InternalCommandKind {
     Coinbase,
+
     #[serde(rename = "Fee_transfer")]
     FeeTransfer,
 }
@@ -200,6 +241,7 @@ pub enum InternalCommandKind {
 pub struct CoinbaseBalanceData {
     #[serde(deserialize_with = "from_str_opt")]
     pub coinbase_receiver_balance: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub fee_transfer_receiver_balance: Option<u64>,
 }
@@ -208,6 +250,7 @@ pub struct CoinbaseBalanceData {
 pub struct FeeTransferBalanceData {
     #[serde(deserialize_with = "from_str_opt")]
     pub receiver1_balance: Option<u64>,
+
     #[serde(deserialize_with = "from_str_opt")]
     pub receiver2_balance: Option<u64>,
 }

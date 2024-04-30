@@ -28,6 +28,7 @@ pub struct BlockParser {
     pub bytes_processed: u64,
     pub total_num_bytes: u64,
     pub deep_canonical_bytes: u64,
+    pub version: PcbVersion,
     canonical_paths: IntoIter<PathBuf>,
     recent_paths: IntoIter<PathBuf>,
     orphaned_paths: IntoIter<PathBuf>,
@@ -59,11 +60,13 @@ impl BlockParser {
     /// Returns a new block parser which employs canonical chain discovery
     pub fn new_with_canonical_chain_discovery(
         blocks_dir: &Path,
+        version: PcbVersion,
         canonical_threshold: u32,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         Self::with_canonical_chain_discovery(
             blocks_dir,
+            version,
             None,
             None,
             canonical_threshold,
@@ -74,12 +77,14 @@ impl BlockParser {
     /// Returns a new ccd block parser with paths filtered by max length
     pub fn new_with_canonical_chain_discovery_filtered(
         blocks_dir: &Path,
+        version: PcbVersion,
         block_length: u32,
         canonical_threshold: u32,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         Self::with_canonical_chain_discovery(
             blocks_dir,
+            version,
             None,
             Some(block_length),
             canonical_threshold,
@@ -91,22 +96,25 @@ impl BlockParser {
     /// length
     pub fn new_length_sorted_min_filtered(
         blocks_dir: &Path,
+        version: PcbVersion,
         min_length_filter: Option<u32>,
     ) -> anyhow::Result<Self> {
-        Self::new_length_sorted_filtered(blocks_dir, min_length_filter, None)
+        Self::new_length_sorted_filtered(blocks_dir, version, min_length_filter, None)
     }
 
     /// Returns a new length-sorted block parser with paths filtered by min or
     /// max length
     pub fn new_length_sorted_filtered(
         blocks_dir: &Path,
+        version: PcbVersion,
         min_length: Option<u32>,
         max_length: Option<u32>,
     ) -> anyhow::Result<Self> {
         if blocks_dir.exists() {
-            let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
-            let mut paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
+            let mut paths: Vec<PathBuf> = glob(&format!("{}/*-*-*.json", blocks_dir.display()))?
+                .filter_map(|x| x.ok())
+                .collect();
             let total_num_bytes = paths
                 .iter()
                 .fold(0, |acc, p| acc + p.metadata().unwrap().len());
@@ -121,6 +129,7 @@ impl BlockParser {
 
             paths.sort_by_cached_key(|path| extract_block_height(path));
             Ok(Self {
+                version,
                 blocks_dir,
                 total_num_bytes,
                 bytes_processed: 0,
@@ -164,6 +173,7 @@ impl BlockParser {
     /// - blocks that are higher than the _canonical root_
     fn with_canonical_chain_discovery(
         blocks_dir: &Path,
+        version: PcbVersion,
         min_len_filter: Option<u32>,
         max_len_filter: Option<u32>,
         canonical_threshold: u32,
@@ -189,13 +199,14 @@ impl BlockParser {
                     .iter()
                     .fold(0, |acc, p| acc + p.metadata().unwrap().len());
                 Ok(Self {
-                    blocks_processed: 0,
-                    bytes_processed: 0,
+                    version,
+                    blocks_dir,
                     total_num_bytes,
+                    bytes_processed: 0,
+                    blocks_processed: 0,
                     deep_canonical_bytes,
                     num_deep_canonical_blocks: canonical_paths.len() as u32,
                     total_num_blocks: (canonical_paths.len() + recent_paths.len()) as u32,
-                    blocks_dir,
                     canonical_paths: canonical_paths.into_iter(),
                     recent_paths: recent_paths.into_iter(),
                     orphaned_paths: orphaned_paths.into_iter(),
@@ -214,7 +225,7 @@ impl BlockParser {
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
     ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         let block_bytes = path.metadata().unwrap().len();
-        match PrecomputedBlock::parse_file(path, PcbVersion(0)).map(designation) {
+        match PrecomputedBlock::parse_file(path, self.version.clone()).map(designation) {
             Ok(parsed_block) => {
                 self.blocks_processed += 1;
                 self.bytes_processed += block_bytes;
@@ -272,6 +283,7 @@ impl BlockParser {
             total_num_bytes,
             bytes_processed: 0,
             blocks_processed: 0,
+            version: PcbVersion::V1,
             deep_canonical_bytes: 0,
             num_deep_canonical_blocks: 0,
             total_num_blocks: paths.len() as u32,

@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, store::BlockStore},
+    block::{parser::BlockParser, precomputed::PcbVersion, store::BlockStore},
     ledger::genesis::GenesisRoot,
     server::IndexerVersion,
     state::IndexerState,
@@ -12,7 +12,8 @@ use std::{path::PathBuf, sync::Arc};
 async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("orphaned-blocks")?;
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_with_canonical_chain_discovery(&log_dir, 10, 10)?;
+    let mut block_parser =
+        BlockParser::new_with_canonical_chain_discovery(&log_dir, PcbVersion::V1, 10, 10)?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
     let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)?;

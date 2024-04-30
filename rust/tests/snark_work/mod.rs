@@ -1,6 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::parser::BlockParser,
+    block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
     ledger::genesis::parse_file,
     server::IndexerVersion,
@@ -28,6 +28,7 @@ async fn store() {
 
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )

@@ -29,7 +29,7 @@ impl StakingLedgerParser {
 
     pub fn next_ledger(&mut self) -> anyhow::Result<Option<StakingLedger>> {
         if let Some(next_path) = self.ledger_paths.next() {
-            return StakingLedger::parse_file(&next_path, PcbVersion(0)).map(Some);
+            return StakingLedger::parse_file(&next_path, PcbVersion::V1).map(Some);
         }
         Ok(None)
     }

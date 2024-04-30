@@ -1036,7 +1036,7 @@ impl IndexerState {
                         info!("Replay new {} best tip {}", network, block_summary);
 
                         if let Some(block) = indexer_store.get_block(state_hash)? {
-                            assert_eq!(block.network().0, *network);
+                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             return Ok(());
@@ -1055,7 +1055,7 @@ impl IndexerState {
                         info!("Replaying db new {} block {}", network, block_summary);
 
                         if let Ok(Some(block)) = indexer_store.get_block(state_hash) {
-                            assert_eq!(block.network().0, *network);
+                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             self.add_block_to_witness_tree(&block)?;
@@ -1149,7 +1149,7 @@ impl IndexerState {
                     {
                         assert_eq!(canonical_hash, *state_hash);
                         if let Some(block) = indexer_store.get_block(state_hash)? {
-                            assert_eq!(block.network().0, *network);
+                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             return Ok(());
@@ -1214,7 +1214,7 @@ impl IndexerState {
 
         let indexer_store = self.indexer_store_or_panic();
         if let Some(block) = indexer_store.get_block(state_hash)? {
-            assert_eq!(block.network().0, *network);
+            assert_eq!(block.network(), *network);
             assert_eq!(block.state_hash(), *state_hash);
             assert_eq!(block.blockchain_length(), *blockchain_length);
 

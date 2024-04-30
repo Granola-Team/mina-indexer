@@ -1,3 +1,4 @@
+use super::precomputed::PcbVersion;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
@@ -55,4 +56,10 @@ pub trait BlockStore {
 
     /// Get children of a block
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
+
+    /// TODO
+    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
+
+    /// TODO
+    fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 }
