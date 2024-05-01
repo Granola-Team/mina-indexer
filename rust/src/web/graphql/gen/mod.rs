@@ -576,11 +576,33 @@ pub struct BlockTransactionUserCommandToAccountQueryInput {
     pub or: Option<Vec<BlockTransactionUserCommandToAccountQueryInput>>,
     pub token_nin: Option<Vec<Option<i64>>>,
 }
+
 #[derive(InputObject, Clone)]
 pub struct BlockCreatorAccountQueryInput {
     pub or: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub and: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub public_key: Option<String>,
+}
+
+#[derive(InputObject, Clone)]
+pub struct CoinbaseReceiverQueryInput {
+    pub or: Option<Vec<CoinbaseReceiverQueryInput>>,
+    pub and: Option<Vec<CoinbaseReceiverQueryInput>>,
+    pub public_key: Option<String>,
+}
+
+#[derive(InputObject, Clone)]
+pub struct BlockchainLengthQueryInput {
+    pub or: Option<Vec<BlockchainLengthQueryInput>>,
+    pub and: Option<Vec<BlockchainLengthQueryInput>>,
+    pub blockchain_length: Option<u32>,
+}
+
+#[derive(InputObject, Clone)]
+pub struct GlobalSlotQueryInput {
+    pub or: Option<Vec<GlobalSlotQueryInput>>,
+    pub and: Option<Vec<GlobalSlotQueryInput>>,
+    pub global_slot_since_genesis: Option<u32>,
 }
 
 #[derive(InputObject)]
@@ -710,6 +732,9 @@ pub struct BlockQueryInput {
     pub or: Option<Vec<BlockQueryInput>>,
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
+    pub blockchain_length: Option<u32>,
+    pub global_slot_since_genesis: Option<u32>,
+    pub coinbase_receiver: Option<String>,
 }
 #[derive(InputObject)]
 pub struct BlockProtocolStateQueryInput {

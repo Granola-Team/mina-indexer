@@ -1,11 +1,14 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
-    snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
+    snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
+    store::{
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry, IndexerStore,
+    },
     web::graphql::{db, get_block_canonicity},
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
+use std::sync::Arc;
 
 #[derive(SimpleObject, Debug)]
 pub struct Snark {
@@ -46,6 +49,7 @@ impl SnarkWithCanonicity {
 pub struct SnarkQueryInput {
     state_hash: Option<String>,
     canonical: Option<bool>,
+    prover: Option<String>,
     and: Option<Vec<SnarkQueryInput>>,
     or: Option<Vec<SnarkQueryInput>>,
 }
@@ -72,12 +76,34 @@ impl SnarkQueryRoot {
     ) -> Result<Vec<SnarkWithCanonicity>> {
         let db = db(ctx);
         let mut snarks = Vec::with_capacity(limit);
-        let mode: speedb::IteratorMode = if let Some(SnarkSortByInput::BlockHeightAsc) = sort_by {
-            speedb::IteratorMode::Start
-        } else {
-            speedb::IteratorMode::End
-        };
+        let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
 
+        // prover query
+        if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
+            let mut snarks =
+                db.get_snark_work_by_public_key(&prover.into())?
+                    .map_or(vec![], |snarks| {
+                        snarks
+                            .into_iter()
+                            .filter_map(|s| {
+                                snark_summary_matches_query(db, &query, s).ok().flatten()
+                            })
+                            .collect()
+                    });
+
+            snarks.truncate(limit);
+            match sort_by {
+                SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
+                SnarkSortByInput::BlockHeightDesc => (),
+            }
+            return Ok(snarks);
+        }
+
+        // general query
+        let mode = match sort_by {
+            SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
+            SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
+        };
         for entry in blocks_global_slot_idx_iterator(db, mode) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let block = db
@@ -111,8 +137,42 @@ impl SnarkQueryRoot {
     }
 }
 
+fn snark_summary_matches_query(
+    db: &Arc<IndexerStore>,
+    query: &Option<SnarkQueryInput>,
+    snark: SnarkWorkSummaryWithStateHash,
+) -> anyhow::Result<Option<SnarkWithCanonicity>> {
+    let canonical = get_block_canonicity(db, &snark.state_hash);
+    Ok(db
+        .get_block(&snark.state_hash.clone().into())?
+        .and_then(|block| {
+            let snark_with_canonicity = SnarkWithCanonicity {
+                block,
+                canonical,
+                snark: snark.into(),
+            };
+            if query
+                .as_ref()
+                .map_or(true, |q| q.matches(&snark_with_canonicity))
+            {
+                Some(snark_with_canonicity)
+            } else {
+                None
+            }
+        }))
+}
+
 impl From<SnarkWorkSummary> for Snark {
     fn from(snark: SnarkWorkSummary) -> Self {
+        Snark {
+            fee: snark.fee,
+            prover: snark.prover.0,
+        }
+    }
+}
+
+impl From<SnarkWorkSummaryWithStateHash> for Snark {
+    fn from(snark: SnarkWorkSummaryWithStateHash) -> Self {
         Snark {
             fee: snark.fee,
             prover: snark.prover.0,

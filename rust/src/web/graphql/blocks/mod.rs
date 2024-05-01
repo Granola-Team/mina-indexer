@@ -15,10 +15,13 @@ use crate::{
         version_bytes,
     },
     snark_work::SnarkWorkSummary,
-    store::{blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry},
+    store::{
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry, IndexerStore,
+    },
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -99,24 +102,71 @@ impl BlocksQueryRoot {
     ) -> Result<Vec<BlockWithCanonicity>> {
         let db = db(ctx);
         let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
-        let mode = if let Some(BlockSortByInput::BlockHeightAsc) = sort_by {
-            speedb::IteratorMode::Start
-        } else {
-            speedb::IteratorMode::End
+        let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
+
+        // state hash query
+        if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
+            let block = db.get_block(&state_hash.clone().into())?;
+            return Ok(block
+                .into_iter()
+                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .collect());
+        }
+
+        // block height query
+        if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
+            let blocks = db.get_blocks_at_height(blockchain_length)?;
+            let mut res: Vec<BlockWithCanonicity> = blocks
+                .into_iter()
+                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .collect();
+
+            res.truncate(limit);
+            return Ok(res);
+        }
+
+        // global slot query
+        if let Some(global_slot_since_genesis) =
+            query.as_ref().and_then(|q| q.global_slot_since_genesis)
+        {
+            let blocks = db.get_blocks_at_slot(global_slot_since_genesis)?;
+            let mut res: Vec<BlockWithCanonicity> = blocks
+                .into_iter()
+                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .collect();
+
+            res.truncate(limit);
+            return Ok(res);
+        }
+
+        // coinbase receiver query
+        if let Some(coinbase_receiver) = query.as_ref().and_then(|q| q.coinbase_receiver.clone()) {
+            let mut blocks: Vec<BlockWithCanonicity> = db
+                .get_blocks_at_public_key(&coinbase_receiver.into())?
+                .into_iter()
+                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .collect();
+
+            blocks.truncate(limit);
+            match sort_by {
+                BlockSortByInput::BlockHeightAsc => blocks.reverse(),
+                BlockSortByInput::BlockHeightDesc => (),
+            }
+            return Ok(blocks);
+        }
+
+        // handle general search with global slot iterator
+        let mode = match sort_by {
+            BlockSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
+            BlockSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
-
-        // TODO bound query search space if given any inputs
-
         for entry in blocks_global_slot_idx_iterator(db, mode) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
             let canonical = get_block_canonicity(db, &state_hash);
-            let block = BlockWithCanonicity {
-                canonical,
-                block: Block::new(pcb, canonical),
-            };
+            let block = BlockWithCanonicity::from_precomputed(pcb, canonical);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
@@ -128,6 +178,23 @@ impl BlocksQueryRoot {
         }
 
         Ok(blocks)
+    }
+}
+
+fn precomputed_matches_query(
+    db: &Arc<IndexerStore>,
+    query: &Option<BlockQueryInput>,
+    block: PrecomputedBlock,
+) -> Option<BlockWithCanonicity> {
+    let canonical = get_block_canonicity(db, &block.state_hash().0);
+    let block_with_canonicity = BlockWithCanonicity::from_precomputed(block, canonical);
+    if query
+        .as_ref()
+        .map_or(true, |q| q.matches(&block_with_canonicity))
+    {
+        Some(block_with_canonicity)
+    } else {
+        None
     }
 }
 
@@ -548,6 +615,15 @@ impl BlockQueryInput {
             }
         }
         matches
+    }
+}
+
+impl BlockWithCanonicity {
+    pub fn from_precomputed(block: PrecomputedBlock, canonical: bool) -> Self {
+        Self {
+            canonical,
+            block: Block::new(block, canonical),
+        }
     }
 }
 
