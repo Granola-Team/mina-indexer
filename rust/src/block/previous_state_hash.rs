@@ -56,18 +56,18 @@ impl From<PreviousStateHash> for BlockHash {
 mod test {
     use super::*;
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
-    use glob::glob;
     use std::path::PathBuf;
 
     #[test]
     fn previous_state_hash_deserializer_test() -> anyhow::Result<()> {
-        let paths: Vec<PathBuf> = glob("./tests/data/canonical_chain_discovery/contiguous/*.json")?
-            .filter_map(|x| x.ok())
-            .collect();
+        let paths: Vec<PathBuf> =
+            glob::glob("./tests/data/canonical_chain_discovery/contiguous/*.json")?
+                .filter_map(|x| x.ok())
+                .collect();
 
         for path in paths {
             let previous_state_hash = PreviousStateHash::from_path(&path)?.0;
-            let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
+            let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
             assert_eq!(previous_state_hash, block.previous_state_hash().0);
         }
         Ok(())

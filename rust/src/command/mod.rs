@@ -129,12 +129,28 @@ impl CommandStatusData {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct UserCommandWithStatus(pub mina_rs::UserCommandWithStatusV1);
 
-impl UserCommandWithStatus {
-    pub fn is_applied(&self) -> bool {
+pub trait UserCommandWithStatusT {
+    fn is_applied(&self) -> bool;
+
+    fn status_data(&self) -> CommandStatusData;
+
+    fn contains_public_key(&self, pk: &PublicKey) -> bool;
+
+    fn data(&self) -> mina_rs::UserCommand;
+
+    fn to_command(&self) -> Command;
+
+    fn sender(&self) -> PublicKey;
+
+    fn nonce(&self) -> u32;
+}
+
+impl UserCommandWithStatusT for UserCommandWithStatus {
+    fn is_applied(&self) -> bool {
         self.status_data().is_applied()
     }
 
-    pub fn status_data(&self) -> CommandStatusData {
+    fn status_data(&self) -> CommandStatusData {
         match self.0.t.status.t.clone() {
             mina_rs::TransactionStatus::Applied(auxiliary_data, balance_data) => {
                 CommandStatusData::Applied {
@@ -149,16 +165,16 @@ impl UserCommandWithStatus {
         }
     }
 
-    pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
+    fn contains_public_key(&self, pk: &PublicKey) -> bool {
         let signed = SignedCommand::from(self.clone());
         signed.all_command_public_keys().contains(pk)
     }
 
-    pub fn data(&self) -> mina_rs::UserCommand {
+    fn data(&self) -> mina_rs::UserCommand {
         self.0.clone().inner().data.inner().inner()
     }
 
-    pub fn to_command(&self) -> Command {
+    fn to_command(&self) -> Command {
         match self.data() {
             mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
                 mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
@@ -190,7 +206,7 @@ impl UserCommandWithStatus {
         }
     }
 
-    pub fn sender(&self) -> PublicKey {
+    fn sender(&self) -> PublicKey {
         match self.data() {
             mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
                 mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
@@ -207,7 +223,7 @@ impl UserCommandWithStatus {
         }
     }
 
-    pub fn nonce(&self) -> u32 {
+    fn nonce(&self) -> u32 {
         self.to_command().nonce()
     }
 }
@@ -524,11 +540,12 @@ mod test {
     use std::path::PathBuf;
 
     #[tokio::test]
-    async fn from_precomputed() {
+    async fn mainnet_from_precomputed() {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
         let log_dir = PathBuf::from("./tests/data/non_sequential_blocks");
         let mut bp = BlockParser::new_with_canonical_chain_discovery(
             &log_dir,
+            PcbVersion::V1,
             MAINNET_CANONICAL_THRESHOLD,
             BLOCK_REPORTING_FREQ_NUM,
         )
@@ -679,7 +696,7 @@ mod test {
     }
 
     #[test]
-    fn user_command_with_status_json() -> anyhow::Result<()> {
+    fn mainnet_user_command_with_status_json() -> anyhow::Result<()> {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
@@ -790,7 +807,7 @@ mod test {
         let contents = std::fs::read(path.clone())?;
         let mina_json: Value =
             from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 

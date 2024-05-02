@@ -44,6 +44,7 @@ pub struct IndexerConfiguration {
     pub genesis_hash: BlockHash,
     pub genesis_constants: GenesisConstants,
     pub constraint_system_digests: Vec<String>,
+    pub version: PcbVersion,
     pub blocks_dir: Option<PathBuf>,
     pub block_watch_dir: PathBuf,
     pub staking_ledgers_dir: Option<PathBuf>,
@@ -153,6 +154,7 @@ pub fn initialize(
         reporting_freq,
         genesis_constants,
         constraint_system_digests,
+        version,
         ..
     } = config;
 
@@ -210,6 +212,7 @@ pub fn initialize(
             InitializationMode::New => {
                 let mut block_parser = match BlockParser::new_with_canonical_chain_discovery(
                     blocks_dir,
+                    version,
                     canonical_threshold,
                     reporting_freq,
                 ) {
@@ -223,8 +226,11 @@ pub fn initialize(
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
-                let mut block_parser =
-                    BlockParser::new_length_sorted_min_filtered(blocks_dir, min_length_filter)?;
+                let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                    blocks_dir,
+                    version,
+                    min_length_filter,
+                )?;
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
@@ -233,8 +239,11 @@ pub fn initialize(
             }
             InitializationMode::Sync => {
                 let min_length_filter = state.sync_from_db()?;
-                let mut block_parser =
-                    BlockParser::new_length_sorted_min_filtered(blocks_dir, min_length_filter)?;
+                let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                    blocks_dir,
+                    version,
+                    min_length_filter,
+                )?;
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
@@ -388,7 +397,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                         // check for block parser version update
                         if state.version.chain_id.0 != *MAINNET_GENESIS_HASH {
                             trace!("Changing block parser from {}", version.version);
-                            version.version.0 += 1;
+                            version.version.update()?;
 
                             trace!("Block parser changed to {}", version.version);
                             version.chain_id = state.version.chain_id.clone();
@@ -496,9 +505,9 @@ impl IndexerVersion {
     pub fn new(network: &str, chain_id: &ChainId) -> Self {
         Self {
             chain_id: chain_id.clone(),
-            version: PcbVersion(0),
+            version: PcbVersion::V1,
             network: Network(network.into()),
-            history: HashMap::from([(chain_id.clone(), PcbVersion(0))]),
+            history: HashMap::from([(chain_id.clone(), PcbVersion::V1)]),
         }
     }
 

@@ -1,6 +1,10 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::{parser::BlockParser, precomputed::PrecomputedBlock, store::BlockStore},
+    block::{
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+        store::BlockStore,
+    },
     canonicity::store::CanonicityStore,
     constants::*,
     event::{store::EventStore, witness_tree::*},
@@ -18,6 +22,7 @@ async fn test() {
     let store_dir0 = setup_new_db_dir("event-log-store0").unwrap();
     let mut block_parser0 = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )
@@ -26,6 +31,7 @@ async fn test() {
     let store_dir1 = setup_new_db_dir("event-log-store1").unwrap();
     let mut block_parser1 = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )

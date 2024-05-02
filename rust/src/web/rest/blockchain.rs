@@ -144,7 +144,7 @@ pub async fn get_blockchain_summary(
     if let Ok(Some(best_tip)) = db.get_best_block() {
         debug!("Found best tip: {}", best_tip.summary());
         if let Ok(Some(best_ledger)) =
-            db.get_ledger_state_hash(&best_tip.network().0, &best_tip.state_hash(), true)
+            db.get_ledger_state_hash(&best_tip.network(), &best_tip.state_hash(), true)
         {
             let global_slot = best_tip
                 .consensus_state()

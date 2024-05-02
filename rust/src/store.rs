@@ -3,7 +3,7 @@
 
 use crate::{
     block::{
-        precomputed::{PrecomputedBlock, PrecomputedBlockV1, PrecomputedBlockV2},
+        precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
         BlockHash, Network,
     },
@@ -13,7 +13,7 @@ use crate::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
         store::CommandStore,
-        UserCommandWithStatus,
+        UserCommandWithStatus, UserCommandWithStatusT,
     },
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
@@ -46,11 +46,12 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 14] = [
-        "blocks",
+    const COLUMN_FAMILIES: [&'static str; 16] = [
+        "blocks-state-hash",
+        "blocks-version",
         "blocks-global-slot-idx",
-        "lengths",
-        "slots",
+        "blocks-at-length",
+        "blocks-at-slot",
         "canonicity",
         "commands",
         "mainnet-commands-slot",
@@ -61,6 +62,7 @@ impl IndexerStore {
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
+        "chain-id-to-network", // [chain_id_to_network_cf]
     ];
 
     /// Creates a new _primary_ indexer store
@@ -78,7 +80,6 @@ impl IndexerStore {
             .iter()
             .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
             .collect();
-
         Ok(Self {
             is_primary: true,
             db_path: path.into(),
@@ -104,10 +105,18 @@ impl IndexerStore {
 
     // Column family helpers
 
+    /// CF for storing all blocks: state hash -> versioned pcb
     fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
-            .cf_handle("blocks")
-            .expect("blocks column family exists")
+            .cf_handle("blocks-state-hash")
+            .expect("blocks-state-hash column family exists")
+    }
+
+    /// CF for storing state hash ->
+    fn blocks_version_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("blocks-version")
+            .expect("blocks-version column family exists")
     }
 
     fn blocks_global_slot_idx_cf(&self) -> &speedb::ColumnFamily {
@@ -118,14 +127,14 @@ impl IndexerStore {
 
     fn lengths_cf(&self) -> &speedb::ColumnFamily {
         self.database
-            .cf_handle("lengths")
-            .expect("lengths column family exists")
+            .cf_handle("blocks-at-length")
+            .expect("blocks-at-length column family exists")
     }
 
     fn slots_cf(&self) -> &speedb::ColumnFamily {
         self.database
-            .cf_handle("slots")
-            .expect("slots column family exists")
+            .cf_handle("blocks-at-slot")
+            .expect("blocks-at-slot column family exists")
     }
 
     fn canonicity_cf(&self) -> &speedb::ColumnFamily {
@@ -189,6 +198,13 @@ impl IndexerStore {
             .cf_handle("snark-work-top-producers-sort")
             .expect("snark-work-top-producers-sort column family exists")
     }
+
+    /// CF for storing chain_id -> network
+    fn chain_id_to_network_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("chain-id-to-network")
+            .expect("chain-id-to-network column family exists")
+    }
 }
 
 /// [BlockStore] implementation
@@ -228,17 +244,14 @@ impl BlockStore for IndexerStore {
 
         // add block for each public key
         for pk in block.all_public_keys() {
-            self.add_block_at_public_key(&pk, &block.state_hash().0.into())?;
+            self.add_block_at_public_key(&pk, &block.state_hash())?;
         }
 
         // add block to height list
-        self.add_block_at_height(&block.state_hash().0.into(), block.blockchain_length())?;
+        self.add_block_at_height(&block.state_hash(), block.blockchain_length())?;
 
         // add block to slots list
-        self.add_block_at_slot(
-            &block.state_hash().0.into(),
-            block.global_slot_since_genesis(),
-        )?;
+        self.add_block_at_slot(&block.state_hash(), block.global_slot_since_genesis())?;
 
         // add block user commands
         self.add_commands(block)?;
@@ -249,10 +262,13 @@ impl BlockStore for IndexerStore {
         // add block SNARK work
         self.add_snark_work(block)?;
 
+        // store pcb's version
+        self.set_block_version(&block.state_hash(), block.version())?;
+
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
-            network: block.network().0,
-            state_hash: block.state_hash().0.into(),
+            network: block.network(),
+            state_hash: block.state_hash(),
             blockchain_length: block.blockchain_length(),
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
@@ -264,44 +280,28 @@ impl BlockStore for IndexerStore {
         trace!("Getting block with hash {}", state_hash.0);
 
         let key = state_hash.0.as_bytes();
-        match self
+        Ok(self
             .database
             .get_pinned_cf(self.blocks_cf(), key)?
-            .map(|bytes| bytes.to_vec())
-        {
-            None => Ok(None),
-            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-        }
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
     }
 
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>> {
         trace!("Getting best block");
-        match self
-            .database
-            .get_pinned_cf(self.blocks_cf(), Self::BEST_TIP_BLOCK_KEY)?
-            .map(|bytes| bytes.to_vec())
-        {
+        match self.get_best_block_hash()? {
             None => Ok(None),
-            Some(bytes) => {
-                let state_hash: BlockHash = String::from_utf8(bytes)?.into();
-                self.get_block(&state_hash)
-            }
+            Some(state_hash) => self.get_block(&state_hash),
         }
     }
 
     fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>> {
         trace!("Getting best block hash");
-        match self
+        Ok(self
             .database
             .get_pinned_cf(self.blocks_cf(), Self::BEST_TIP_BLOCK_KEY)?
-            .map(|bytes| bytes.to_vec())
-        {
-            None => Ok(None),
-            Some(bytes) => {
-                let state_hash: BlockHash = String::from_utf8(bytes)?.into();
-                Ok(Some(state_hash))
-            }
-        }
+            .map(|bytes| {
+                <String as Into<BlockHash>>::into(String::from_utf8(bytes.to_vec()).unwrap())
+            }))
     }
 
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
@@ -311,7 +311,7 @@ impl BlockStore for IndexerStore {
         self.database.put_cf(
             self.blocks_cf(),
             Self::BEST_TIP_BLOCK_KEY,
-            state_hash.to_string().as_bytes(),
+            state_hash.0.as_bytes(),
         )?;
 
         // record new best tip event
@@ -319,8 +319,8 @@ impl BlockStore for IndexerStore {
             Some(block) => {
                 self.add_event(&IndexerEvent::Db(DbEvent::Block(
                     DbBlockEvent::NewBestTip {
-                        network: block.network().0,
-                        state_hash: block.state_hash().0.into(),
+                        network: block.network(),
+                        state_hash: block.state_hash(),
                         blockchain_length: block.blockchain_length(),
                     },
                 )))?;
@@ -533,6 +533,24 @@ impl BlockStore for IndexerStore {
         }
         bail!("Block missing from store {}", state_hash)
     }
+
+    fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>> {
+        trace!("Getting block {} version", state_hash.0);
+
+        let key = state_hash.0.as_bytes();
+        Ok(self
+            .database
+            .get_cf(self.blocks_version_cf(), key)?
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
+    }
+
+    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
+        trace!("Setting block {} version to {}", state_hash.0, version);
+
+        let key = state_hash.0.as_bytes();
+        let value = serde_json::to_vec(&version)?;
+        Ok(self.database.put_cf(self.blocks_version_cf(), key, value)?)
+    }
 }
 
 /// [CanonicityStore] implementation
@@ -613,17 +631,14 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
 
         if let Ok(Some(best_tip)) = self.get_best_block() {
-            if let Some(
-                PrecomputedBlock::V1(PrecomputedBlockV1 {
-                    blockchain_length, ..
-                })
-                | PrecomputedBlock::V2(PrecomputedBlockV2 {
-                    blockchain_length, ..
-                }),
-            ) = self.get_block(state_hash)?
-            {
+            if let Some(blockchain_length) = self.get_block(state_hash)?.map(|pcb| match pcb {
+                PrecomputedBlock::V1(v1) => v1.blockchain_length,
+                PrecomputedBlock::V2(pcb_v2) => {
+                    pcb_v2.protocol_state.body.consensus_state.blockchain_length
+                }
+            }) {
                 if blockchain_length > best_tip.blockchain_length() {
-                    return Ok(Some(Canonicity::Pending));
+                    return Ok(None);
                 } else if let Some(max_canonical_length) =
                     self.get_max_canonical_blockchain_length()?
                 {
@@ -729,8 +744,8 @@ impl LedgerStore for IndexerStore {
                     self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                         DbLedgerEvent::NewLedger {
                             ledger_hash,
-                            network: block.network().0,
-                            state_hash: block.state_hash().0.into(),
+                            network: block.network(),
+                            state_hash: block.state_hash(),
                             blockchain_length: block.blockchain_length(),
                         },
                     )))?;
@@ -806,13 +821,13 @@ impl LedgerStore for IndexerStore {
                     trace!("Memoizing ledger for block {}", requested_block.summary());
                     self.add_ledger_state_hash(
                         network,
-                        &requested_block.state_hash().0.into(),
+                        &requested_block.state_hash(),
                         ledger.clone(),
                     )?;
                     self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                         DbLedgerEvent::NewLedger {
-                            network: requested_block.network().0,
-                            state_hash: requested_block.state_hash().0.into(),
+                            network: requested_block.network(),
+                            state_hash: requested_block.state_hash(),
                             ledger_hash: requested_block.staged_ledger_hash(),
                             blockchain_length: requested_block.blockchain_length(),
                         },
@@ -1304,7 +1319,7 @@ impl CommandStore for IndexerStore {
 
             let mut num = end_height - start_height;
             let mut prev_hash = end_block.previous_state_hash();
-            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash().0.into()];
+            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash()];
             while let Some(block) = self.get_block(&prev_hash)? {
                 if num == 0 {
                     break;
@@ -1669,12 +1684,15 @@ impl ChainIdStore for IndexerStore {
         );
 
         // add the new pair
-        let key = chain_id.0.as_bytes();
-        let value = network.0.as_bytes();
-        self.database.put(key, value)?;
+        self.database.put_cf(
+            self.chain_id_to_network_cf(),
+            chain_id.0.as_bytes(),
+            network.0.as_bytes(),
+        )?;
 
-        // update current network/chain_id
-        self.database.put(Self::CHAIN_ID_KEY, key)?;
+        // update current chain_id
+        self.database
+            .put(Self::CHAIN_ID_KEY, chain_id.0.as_bytes())?;
         Ok(())
     }
 
@@ -1682,7 +1700,7 @@ impl ChainIdStore for IndexerStore {
         trace!("Getting network for chain id: {}", chain_id.0);
         Ok(Network(String::from_utf8(
             self.database
-                .get(chain_id.0.as_bytes())?
+                .get_cf(self.chain_id_to_network_cf(), chain_id.0.as_bytes())?
                 .expect("network is present"),
         )?))
     }
@@ -1694,7 +1712,6 @@ impl ChainIdStore for IndexerStore {
 
     fn get_chain_id(&self) -> anyhow::Result<ChainId> {
         trace!("Getting chain id");
-
         Ok(ChainId(String::from_utf8(
             self.database
                 .get(Self::CHAIN_ID_KEY)?

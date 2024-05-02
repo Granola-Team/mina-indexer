@@ -62,7 +62,7 @@ pub struct Timing {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenPermissions {}
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptChainHash(pub String);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,6 +283,15 @@ impl From<String> for LedgerHash {
     }
 }
 
+impl std::str::FromStr for ReceiptChainHash {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO validate receipt chain hash?
+        Ok(Self(s.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
@@ -292,7 +301,7 @@ mod tests {
     #[test]
     fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion(0))?;
+        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, "mainnet".to_string());
@@ -308,7 +317,7 @@ mod tests {
         use crate::ledger::public_key::PublicKey;
 
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion(0))?;
+        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,

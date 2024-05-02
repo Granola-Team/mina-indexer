@@ -2,6 +2,7 @@ use crate::{
     proof_systems::signer::pubkey::{CompressedPubKey, PubKey},
     protocol::serialization_types::signatures::PublicKeyV1,
 };
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,6 +21,18 @@ impl PublicKey {
 impl std::default::Default for PublicKey {
     fn default() -> Self {
         Self("B62qDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTPK".into())
+    }
+}
+
+impl std::str::FromStr for PublicKey {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if is_valid_public_key(s) {
+            Ok(Self(s.to_string()))
+        } else {
+            bail!("Invalid public key: {}", s)
+        }
     }
 }
 
@@ -73,7 +86,7 @@ impl From<PublicKey> for PubKey {
     }
 }
 
-pub fn is_valid(pk: &str) -> bool {
+pub fn is_valid_public_key(pk: &str) -> bool {
     pk.starts_with("B62q") && pk.len() == 55
 }
 

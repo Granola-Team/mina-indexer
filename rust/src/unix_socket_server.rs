@@ -133,11 +133,11 @@ async fn handle_conn(
 
                 if let Some(best_tip) = db.get_best_block()? {
                     if let Some(ledger) = db.get_ledger_state_hash(
-                        &best_tip.network().0,
+                        &best_tip.network(),
                         &best_tip.state_hash(),
                         false,
                     )? {
-                        if !public_key::is_valid(&pk) {
+                        if !public_key::is_valid_public_key(&pk) {
                             invalid_public_key(&pk)
                         } else {
                             let pk = pk.into();
@@ -167,34 +167,27 @@ async fn handle_conn(
                 info!("Received best-tip command");
 
                 if let Some(best_tip) = db.get_best_block()? {
-                    if let Ok(Some(ref block)) = db.get_block(&best_tip.state_hash()) {
-                        let block_str = if let Some(canonicity) =
-                            db.get_block_canonicity(&block.state_hash())?
-                        {
-                            if verbose {
-                                serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
-                            } else {
-                                let block = BlockWithoutHeight::with_canonicity(block, canonicity);
-                                serde_json::to_string_pretty(&block)?
-                            }
+                    let block_str = if let Some(canonicity) =
+                        db.get_block_canonicity(&best_tip.state_hash())?
+                    {
+                        if verbose {
+                            serde_json::to_string_pretty(&best_tip.with_canonicity(canonicity))?
                         } else {
-                            block_missing_from_db(&block.state_hash().0)
-                        };
-                        if path.is_some() {
-                            let path = &path.unwrap();
-                            info!("Writing best tip block to {:?}", path);
-                            std::fs::write(path, block_str)?;
-                            Some(format!("Best block written to {}", path.display()))
-                        } else {
-                            info!("Writing best tip block to stdout");
-                            Some(block_str)
+                            let block = BlockWithoutHeight::with_canonicity(&best_tip, canonicity);
+                            serde_json::to_string_pretty(&block)?
                         }
                     } else {
-                        error!("Best tip block is not in the store {}", best_tip.summary());
-                        Some(format!(
-                            "Best tip block is not in the store {}",
-                            best_tip.summary()
-                        ))
+                        block_missing_from_db(&best_tip.state_hash().0)
+                    };
+
+                    if path.is_some() {
+                        let path = &path.unwrap();
+                        info!("Writing best tip block to {:?}", path);
+                        std::fs::write(path, block_str)?;
+                        Some(format!("Best block written to {}", path.display()))
+                    } else {
+                        info!("Writing best tip block to stdout");
+                        Some(block_str)
                     }
                 } else {
                     best_tip_missing_from_db()
@@ -363,7 +356,7 @@ async fn handle_conn(
             } => {
                 info!("Received blocks-at-public-key command");
 
-                if !public_key::is_valid(&pk) {
+                if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else {
                     let mut blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
@@ -611,7 +604,7 @@ async fn handle_conn(
 
                 if let Some(best_tip) = db.get_best_block()? {
                     if let Some(ledger) = db.get_ledger_state_hash(
-                        &best_tip.network().0,
+                        &best_tip.network(),
                         &best_tip.state_hash(),
                         false,
                     )? {
@@ -858,7 +851,7 @@ async fn handle_conn(
                     network, pk, epoch,
                 );
 
-                if !public_key::is_valid(&pk) {
+                if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else if let Some(aggegated_delegations) =
                     db.get_delegations_epoch(&network, epoch)?
@@ -956,7 +949,7 @@ async fn handle_conn(
             } => {
                 info!("Received SNARK work command for public key {pk}");
 
-                if !public_key::is_valid(&pk) {
+                if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else {
                     let snarks = db
@@ -1092,7 +1085,7 @@ async fn handle_conn(
                 };
                 info!("Received tx-public-key command for {pk}");
 
-                if !public_key::is_valid(&pk) {
+                if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else if !block::is_valid_state_hash(&start_state_hash.0) {
                     invalid_state_hash(&start_state_hash.0)
@@ -1188,7 +1181,7 @@ async fn handle_conn(
                 path,
                 public_key: pk,
             } => {
-                if !public_key::is_valid(&pk) {
+                if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else {
                     let internal_cmds = db.get_internal_commands_public_key(&pk.clone().into())?;

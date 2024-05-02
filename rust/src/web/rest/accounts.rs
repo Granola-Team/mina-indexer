@@ -17,7 +17,7 @@ pub async fn get_account(
     if let Ok(Some(best_tip)) = db.get_best_block() {
         debug!("Found best tip: {:?}", best_tip.state_hash().0);
         if let Ok(Some(ledger)) =
-            db.get_ledger_state_hash(&best_tip.network().0, &best_tip.state_hash(), true)
+            db.get_ledger_state_hash(&best_tip.network(), &best_tip.state_hash(), true)
         {
             debug!("Found ledger for best tip");
             let account = ledger.accounts.get(&public_key.clone().into());

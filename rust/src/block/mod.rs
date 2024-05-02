@@ -15,6 +15,7 @@ use crate::{
         version_bytes,
     },
 };
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
@@ -154,6 +155,18 @@ impl From<&PrecomputedBlock> for BlockWithoutHeight {
             state_hash: value.state_hash(),
             blockchain_length: value.blockchain_length(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
+        }
+    }
+}
+
+impl std::str::FromStr for BlockHash {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if is_valid_state_hash(s) {
+            Ok(Self(s.to_string()))
+        } else {
+            bail!("Invalid state hash: {}", s)
         }
     }
 }
@@ -360,7 +373,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     #[test]
-    fn default_block_hash_is_valid() {
+    fn default_block_hash_is_valid_public_key() {
         assert!(is_valid_state_hash(&BlockHash::default().0))
     }
 
@@ -408,9 +421,9 @@ mod tests {
         let path0: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json".into();
         let path1: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
         let path2: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLUfaHDcyt9KsYxi1xsSdYE369GAduLxVgRUDE7RuFgSXQBphDK.json".into();
-        let block0: Block = PrecomputedBlock::parse_file(&path0, PcbVersion(0))?.into();
-        let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion(0))?.into();
-        let block2: Block = PrecomputedBlock::parse_file(&path2, PcbVersion(0))?.into();
+        let block0: Block = PrecomputedBlock::parse_file(&path0, PcbVersion::V1)?.into();
+        let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion::V1)?.into();
+        let block2: Block = PrecomputedBlock::parse_file(&path2, PcbVersion::V1)?.into();
 
         assert!(block0 < block1);
         assert!(block0 < block2);
@@ -418,8 +431,8 @@ mod tests {
 
         let path0: PathBuf = "./tests/initial-blocks/mainnet-10-3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5.json".into();
         let path1: PathBuf = "./tests/initial-blocks/mainnet-10-3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL.json".into();
-        let block0: Block = PrecomputedBlock::parse_file(&path0, PcbVersion(0))?.into();
-        let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion(0))?.into();
+        let block0: Block = PrecomputedBlock::parse_file(&path0, PcbVersion::V1)?.into();
+        let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion::V1)?.into();
 
         assert!(block0 < block1);
         Ok(())

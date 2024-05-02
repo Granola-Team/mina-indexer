@@ -62,3 +62,9 @@ pub fn from_timestamp_millis(millis: i64) -> DateTime<Utc> {
 pub fn millis_to_global_slot(millis: i64) -> u64 {
     (millis as u64 - MAINNET_GENESIS_TIMESTAMP) / MAINNET_BLOCK_SLOT_TIME_MILLIS
 }
+
+pub mod berkeley {
+    pub const BERKELEY_GENESIS_STATE_HASH: &str =
+        "3NK512ryRJvj1TUKGgPoGZeHSNbn37e9BbnpyeqHL9tvKLeD8yrY";
+    pub const BERKELEY_GENESIS_TIMESTAMP: u64 = 1706882461000;
+}

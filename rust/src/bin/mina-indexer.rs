@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
+    block::precomputed::PcbVersion,
     client,
     constants::*,
     ledger::{
@@ -377,6 +378,7 @@ pub fn process_indexer_configuration(
                 genesis_hash,
                 genesis_constants,
                 constraint_system_digests,
+                version: PcbVersion::V1, // TODO make configurable
                 blocks_dir,
                 block_watch_dir,
                 staking_ledgers_dir,

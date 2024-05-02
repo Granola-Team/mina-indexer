@@ -30,7 +30,7 @@ pub struct SnarkWithCanonicity {
 impl SnarkWithCanonicity {
     /// Value state hash
     async fn state_hash(&self) -> String {
-        self.block.state_hash().0
+        self.block.state_hash().0.to_owned()
     }
     /// Value block height
     async fn block_height(&self) -> u32 {
@@ -38,7 +38,7 @@ impl SnarkWithCanonicity {
     }
     /// Value date time
     async fn date_time(&self) -> String {
-        millis_to_iso_date_string(self.block.timestamp().try_into().unwrap())
+        millis_to_iso_date_string(self.block.timestamp() as i64)
     }
 }
 

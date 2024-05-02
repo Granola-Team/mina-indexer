@@ -1,4 +1,7 @@
-use mina_indexer::block::{parser::BlockParser, precomputed::PrecomputedBlock};
+use mina_indexer::block::{
+    parser::BlockParser,
+    precomputed::{PcbVersion, PrecomputedBlock},
+};
 use std::path::PathBuf;
 use tokio::time::Instant;
 
@@ -64,6 +67,7 @@ async fn orphaned_blocks() -> anyhow::Result<()> {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let block_parser = BlockParser::new_with_canonical_chain_discovery(
         &log_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )

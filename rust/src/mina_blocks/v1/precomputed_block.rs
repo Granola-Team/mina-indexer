@@ -1,6 +1,5 @@
-use super::{
-    common::from_str, protocol_state::ProtocolState, staged_ledger_diff::StagedLedgerDiff,
-};
+use super::{protocol_state::ProtocolState, staged_ledger_diff::StagedLedgerDiff};
+use crate::mina_blocks::common::from_str;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -9,20 +8,23 @@ pub struct PrecomputedBlock {
     /// Time the block is scheduled to be produced
     #[serde(deserialize_with = "from_str")]
     pub scheduled_time: u64,
+
     /// Summary of the current state
     pub protocol_state: ProtocolState,
+
     /// Collection of ledger updates
     pub staged_ledger_diff: StagedLedgerDiff,
+
     #[serde(skip_deserializing)]
     pub protocol_state_proof: serde_json::Value,
+
     #[serde(skip_deserializing)]
     pub delta_transition_chain_proof: serde_json::Value,
 }
 
 pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<PrecomputedBlock> {
     let contents = std::fs::read(path)?;
-    let block = serde_json::from_slice(&contents)?;
-    Ok(block)
+    Ok(serde_json::from_slice(&contents)?)
 }
 
 #[cfg(test)]

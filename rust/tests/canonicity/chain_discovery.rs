@@ -1,5 +1,8 @@
 use mina_indexer::{
-    block::{parser::BlockParser, precomputed::PrecomputedBlock},
+    block::{
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+    },
     constants::*,
 };
 use std::path::PathBuf;
@@ -9,6 +12,7 @@ fn gaps() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/gaps");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )?;
@@ -29,6 +33,7 @@ fn contiguous() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )?;
@@ -49,6 +54,7 @@ fn missing_parent() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/missing_parent");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )?;
@@ -75,6 +81,7 @@ fn one_block() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/one_block");
     let block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )?;
@@ -90,6 +97,7 @@ fn canonical_threshold() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
+        PcbVersion::V1,
         canonical_threshold,
         BLOCK_REPORTING_FREQ_NUM,
     )?;

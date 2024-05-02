@@ -185,7 +185,7 @@ mod test {
         // mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
         let contents = std::fs::read(path.clone())?;
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
         if let Value::Array(arr) = from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]
             ["completed_works"]
@@ -222,7 +222,7 @@ mod test {
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK.json".into();
         let contents = std::fs::read(path.clone())?;
         let contents = String::from_utf8_lossy(&contents);
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion(0))?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
         if let Value::Array(arr) = from_str::<Value>(&contents)?["staged_ledger_diff"]["diff"][1]
             ["completed_works"]
