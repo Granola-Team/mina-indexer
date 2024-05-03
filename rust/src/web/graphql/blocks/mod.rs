@@ -36,7 +36,6 @@ impl BlocksQueryRoot {
         let db = db(ctx);
 
         // no query filters => get the best block
-
         if query.is_none() {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| {
@@ -71,9 +70,8 @@ impl BlocksQueryRoot {
             return Ok(None);
         }
 
-        // TODO bound query search space if given any inputs
-
         // else iterate from the end
+        // TODO bound query search space if given any inputs
         for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let pcb = db
@@ -115,43 +113,101 @@ impl BlocksQueryRoot {
 
         // block height query
         if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
-            let blocks = db.get_blocks_at_height(blockchain_length)?;
-            let mut res: Vec<BlockWithCanonicity> = blocks
+            let mut blocks: Vec<BlockWithCanonicity> = db
+                .get_blocks_at_height(blockchain_length)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
 
-            res.truncate(limit);
-            return Ok(res);
+            reorder_asc(&mut blocks, sort_by);
+            blocks.truncate(limit);
+            return Ok(blocks);
         }
 
         // global slot query
         if let Some(global_slot_since_genesis) =
             query.as_ref().and_then(|q| q.global_slot_since_genesis)
         {
-            let blocks = db.get_blocks_at_slot(global_slot_since_genesis)?;
-            let mut res: Vec<BlockWithCanonicity> = blocks
+            let mut blocks: Vec<BlockWithCanonicity> = db
+                .get_blocks_at_slot(global_slot_since_genesis)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
 
-            res.truncate(limit);
-            return Ok(res);
+            reorder_asc(&mut blocks, sort_by);
+            blocks.truncate(limit);
+            return Ok(blocks);
         }
 
         // coinbase receiver query
-        if let Some(coinbase_receiver) = query.as_ref().and_then(|q| q.coinbase_receiver.clone()) {
+        if let Some(coinbase_receiver) = query
+            .as_ref()
+            .and_then(|q| q.coinbase_receiver.clone().and_then(|cb| cb.public_key))
+        {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
 
+            reorder_asc(&mut blocks, sort_by);
             blocks.truncate(limit);
-            match sort_by {
-                BlockSortByInput::BlockHeightAsc => blocks.reverse(),
-                BlockSortByInput::BlockHeightDesc => (),
+            return Ok(blocks);
+        }
+
+        // block height bounded query
+        if query
+            .as_ref()
+            .map(|q| {
+                q.block_height_gt.is_some()
+                    || q.block_height_gte.is_some()
+                    || q.block_height_lt.is_some()
+                    || q.block_height_lte.is_some()
+            })
+            .unwrap()
+        {
+            let (min, max) = match query.as_ref() {
+                Some(block_query_input) => {
+                    let BlockQueryInput {
+                        block_height_gt,
+                        block_height_gte,
+                        block_height_lt,
+                        block_height_lte,
+                        ..
+                    } = block_query_input;
+                    (
+                        // min = max of the gt(e) heights or 1
+                        block_height_gt
+                            .map(|h| h.max(block_height_gte.unwrap_or_default()))
+                            .unwrap_or(1),
+                        // max = max of the lt(e) heights or best tip height
+                        block_height_lt
+                            .map(|h| h.max(block_height_lte.unwrap_or_default()))
+                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
+                            .min(db.get_best_block()?.unwrap().blockchain_length()),
+                    )
+                }
+                None => (1, db.get_best_block()?.unwrap().blockchain_length()),
+            };
+
+            let mut block_heights: Vec<u32> = (min..=max).collect();
+            reorder_desc(&mut block_heights, sort_by);
+
+            for height in block_heights {
+                for block in db.get_blocks_at_height(height)? {
+                    if let Some(block_with_canonicity) =
+                        precomputed_matches_query(db, &query, block)
+                    {
+                        blocks.push(block_with_canonicity);
+
+                        if blocks.len() == limit {
+                            break;
+                        }
+                    }
+                }
             }
+
+            reorder_desc(&mut blocks, sort_by);
             return Ok(blocks);
         }
 
@@ -178,6 +234,20 @@ impl BlocksQueryRoot {
         }
 
         Ok(blocks)
+    }
+}
+
+fn reorder_asc<T>(values: &mut [T], sort_by: BlockSortByInput) {
+    match sort_by {
+        BlockSortByInput::BlockHeightAsc => values.reverse(),
+        BlockSortByInput::BlockHeightDesc => (),
+    }
+}
+
+fn reorder_desc<T>(values: &mut [T], sort_by: BlockSortByInput) {
+    match sort_by {
+        BlockSortByInput::BlockHeightAsc => (),
+        BlockSortByInput::BlockHeightDesc => values.reverse(),
     }
 }
 
@@ -221,6 +291,8 @@ pub struct Block {
     state_hash: String,
     /// Value block_height
     block_height: u32,
+    /// Value global_slot_since_genesis
+    global_slot_since_genesis: u32,
     /// The public_key for the winner account
     winner_account: PK,
     /// Value date_time as ISO 8601 string
@@ -229,6 +301,8 @@ pub struct Block {
     received_time: String,
     /// The public_key for the creator account
     creator_account: PK,
+    /// The public_key for the coinbase_receiver
+    coinbase_receiver: PK,
     /// Value creator public key
     creator: String,
     /// Value protocol state
@@ -525,10 +599,14 @@ impl Block {
             .collect();
 
         Self {
+            date_time,
             snark_jobs,
             state_hash: block.state_hash().0,
             block_height: block.blockchain_length(),
-            date_time,
+            global_slot_since_genesis: block.global_slot_since_genesis(),
+            coinbase_receiver: PK {
+                public_key: block.coinbase_receiver().0,
+            },
             winner_account: PK {
                 public_key: winner_account,
             },
@@ -592,26 +670,67 @@ impl Block {
     }
 }
 
+fn check_option<T: PartialEq>(matches: &mut bool, opt: &Option<T>, block_value: &T) {
+    if let Some(value) = opt {
+        *matches &= block_value == value;
+    }
+}
+
 impl BlockQueryInput {
     pub fn matches(&self, block: &BlockWithCanonicity) -> bool {
         let mut matches = true;
-        if let Some(state_hash) = &self.state_hash {
-            matches = matches && &block.block.state_hash == state_hash;
+        let Self {
+            creator_account,
+            canonical,
+            or,
+            and,
+            state_hash,
+            blockchain_length,
+            global_slot_since_genesis,
+            coinbase_receiver,
+            block_height_gt,
+            block_height_gte,
+            block_height_lt,
+            block_height_lte,
+        } = self;
+
+        check_option(&mut matches, canonical, &block.canonical);
+        check_option(&mut matches, state_hash, &block.block.state_hash);
+        check_option(&mut matches, blockchain_length, &block.block.block_height);
+        check_option(
+            &mut matches,
+            global_slot_since_genesis,
+            &block.block.global_slot_since_genesis,
+        );
+
+        if let Some(height) = block_height_gt {
+            matches &= block.block.block_height > *height;
         }
-        if let Some(canonical) = &self.canonical {
-            matches = matches && &block.canonical == canonical;
+        if let Some(height) = block_height_gte {
+            matches &= block.block.block_height >= *height;
         }
-        if let Some(creator_account) = &self.creator_account {
+        if let Some(height) = block_height_lt {
+            matches &= block.block.block_height < *height;
+        }
+        if let Some(height) = block_height_lte {
+            matches &= block.block.block_height <= *height;
+        }
+        if let Some(creator_account) = creator_account {
             if let Some(public_key) = creator_account.public_key.as_ref() {
-                matches = matches && block.block.creator_account.public_key == *public_key;
+                matches &= block.block.creator_account.public_key == *public_key;
             }
         }
-        if let Some(query) = &self.and {
-            matches = matches && query.iter().all(|and| and.matches(block));
+        if let Some(coinbase_receiver) = coinbase_receiver {
+            if let Some(public_key) = coinbase_receiver.public_key.as_ref() {
+                matches &= block.block.coinbase_receiver.public_key == *public_key;
+            }
         }
-        if let Some(query) = &self.or {
+        if let Some(query) = and {
+            matches &= query.iter().all(|and| and.matches(block));
+        }
+        if let Some(query) = or {
             if !query.is_empty() {
-                matches = matches && query.iter().any(|or| or.matches(block));
+                matches &= query.iter().any(|or| or.matches(block));
             }
         }
         matches
