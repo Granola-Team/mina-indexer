@@ -128,14 +128,15 @@ impl GenesisLedger {
             accounts.insert(
                 public_key.clone(),
                 Account {
+                    balance,
+                    username: None,
+                    nonce: Nonce::default(),
                     public_key: public_key.clone(),
                     // If delegate is None, delegate to yourself
                     delegate: genesis_account
                         .delegate
                         .map(PublicKey)
                         .unwrap_or(public_key),
-                    balance,
-                    nonce: Nonce::default(),
                 },
             );
         }

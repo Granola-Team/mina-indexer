@@ -169,10 +169,11 @@ impl Ledger {
             ledger.accounts.insert(
                 pk.clone(),
                 Account {
+                    delegate,
                     public_key: pk,
+                    username: None,
                     balance: balance.into(),
                     nonce: Nonce(nonce.unwrap_or_default()),
-                    delegate,
                 },
             );
         }

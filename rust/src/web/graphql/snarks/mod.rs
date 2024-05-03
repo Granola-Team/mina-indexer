@@ -1,6 +1,7 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
+    ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::{
         blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry, IndexerStore,
@@ -91,11 +92,12 @@ impl SnarkQueryRoot {
                             .collect()
                     });
 
-            snarks.truncate(limit);
             match sort_by {
                 SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
                 SnarkSortByInput::BlockHeightDesc => (),
             }
+
+            snarks.truncate(limit);
             return Ok(snarks);
         }
 
@@ -183,18 +185,32 @@ impl From<SnarkWorkSummaryWithStateHash> for Snark {
 impl SnarkQueryInput {
     pub fn matches(&self, snark: &SnarkWithCanonicity) -> bool {
         let mut matches = true;
-        if let Some(state_hash) = &self.state_hash {
-            matches = matches && &snark.block.state_hash().0 == state_hash;
+        let Self {
+            state_hash,
+            canonical,
+            prover,
+            and,
+            or,
+        } = self;
+
+        if let Some(state_hash) = state_hash {
+            matches &= snark.block.state_hash().0 == *state_hash;
         }
-        if let Some(canonical) = &self.canonical {
-            matches = matches && &snark.canonical == canonical;
+        if let Some(prover) = prover {
+            matches &= snark
+                .block
+                .prover_keys()
+                .contains(&<String as Into<PublicKey>>::into(prover.clone()));
         }
-        if let Some(query) = &self.and {
-            matches = matches && query.iter().all(|and| and.matches(snark));
+        if let Some(canonical) = canonical {
+            matches &= snark.canonical == *canonical;
         }
-        if let Some(query) = &self.or {
+        if let Some(query) = and {
+            matches &= query.iter().all(|and| and.matches(snark));
+        }
+        if let Some(query) = or {
             if !query.is_empty() {
-                matches = matches && query.iter().any(|or| or.matches(snark));
+                matches &= query.iter().any(|or| or.matches(snark));
             }
         }
         matches
