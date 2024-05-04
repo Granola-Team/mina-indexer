@@ -739,6 +739,18 @@ pub struct BlockQueryInput {
 
     #[graphql(name = "block_height_lte")]
     pub block_height_lte: Option<u32>,
+
+    #[graphql(name = "global_slot_gt")]
+    pub global_slot_gt: Option<u32>,
+
+    #[graphql(name = "global_slot_gte")]
+    pub global_slot_gte: Option<u32>,
+
+    #[graphql(name = "global_slot_lt")]
+    pub global_slot_lt: Option<u32>,
+
+    #[graphql(name = "global_slot_lte")]
+    pub global_slot_lte: Option<u32>,
 }
 #[derive(InputObject)]
 pub struct BlockProtocolStateQueryInput {
