@@ -66,11 +66,9 @@ pub struct ServerArgs {
     genesis_hash: String,
 
     /// Path to the genesis constants (JSON)
-    #[arg(long)]
     genesis_constants: Option<PathBuf>,
 
     /// Override the constraint system digests
-    #[arg(long)]
     constraint_system_digests: Option<Vec<String>>,
 
     /// Directory containing the precomputed blocks

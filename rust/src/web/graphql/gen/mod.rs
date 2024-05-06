@@ -576,10 +576,20 @@ pub struct BlockTransactionUserCommandToAccountQueryInput {
     pub or: Option<Vec<BlockTransactionUserCommandToAccountQueryInput>>,
     pub token_nin: Option<Vec<Option<i64>>>,
 }
+
 #[derive(InputObject, Clone)]
 pub struct BlockCreatorAccountQueryInput {
     pub or: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub and: Option<Vec<BlockCreatorAccountQueryInput>>,
+    #[graphql(name = "public_key")]
+    pub public_key: Option<String>,
+}
+
+#[derive(InputObject, Clone)]
+pub struct BlockCoinbaseReceiverQueryInput {
+    pub or: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
+    pub and: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
+    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
 }
 
@@ -706,10 +716,41 @@ pub struct BlockSnarkJobQueryInput {
 #[derive(InputObject, Clone)]
 pub struct BlockQueryInput {
     pub creator_account: Option<BlockCreatorAccountQueryInput>,
+    pub coinbase_receiver: Option<BlockCoinbaseReceiverQueryInput>,
     pub canonical: Option<bool>,
     pub or: Option<Vec<BlockQueryInput>>,
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
+
+    #[graphql(name = "blockchain_length")]
+    pub blockchain_length: Option<u32>,
+
+    #[graphql(name = "global_slot_since_genesis")]
+    pub global_slot_since_genesis: Option<u32>,
+
+    #[graphql(name = "block_height_gt")]
+    pub block_height_gt: Option<u32>,
+
+    #[graphql(name = "block_height_gte")]
+    pub block_height_gte: Option<u32>,
+
+    #[graphql(name = "block_height_lt")]
+    pub block_height_lt: Option<u32>,
+
+    #[graphql(name = "block_height_lte")]
+    pub block_height_lte: Option<u32>,
+
+    #[graphql(name = "global_slot_gt")]
+    pub global_slot_gt: Option<u32>,
+
+    #[graphql(name = "global_slot_gte")]
+    pub global_slot_gte: Option<u32>,
+
+    #[graphql(name = "global_slot_lt")]
+    pub global_slot_lt: Option<u32>,
+
+    #[graphql(name = "global_slot_lte")]
+    pub global_slot_lte: Option<u32>,
 }
 #[derive(InputObject)]
 pub struct BlockProtocolStateQueryInput {

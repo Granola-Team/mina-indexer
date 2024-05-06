@@ -3,6 +3,7 @@ use crate::{
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
 };
+use anyhow::bail;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +27,11 @@ pub struct Account {
     pub delegate: PublicKey,
     pub balance: Amount,
     pub nonce: Nonce,
+    pub username: Option<Username>,
 }
+
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct Username(pub String);
 
 impl Account {
     pub fn empty(public_key: PublicKey) -> Self {
@@ -35,19 +40,30 @@ impl Account {
             balance: Amount::default(),
             nonce: Nonce::default(),
             delegate: public_key,
+            username: None,
         }
+    }
+
+    pub fn set_username(&mut self, username: String) -> anyhow::Result<()> {
+        const MAX_USERNAME_LENGTH: usize = 32;
+        if username.len() <= MAX_USERNAME_LENGTH {
+            self.username = Some(Username(username));
+            return Ok(());
+        }
+        bail!(
+            "Invalid username (length == {} > {MAX_USERNAME_LENGTH})",
+            username.len()
+        )
     }
 
     pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
         Account {
-            public_key: pre.public_key.clone(),
             balance: if pre.balance.0 == 0 {
                 amount.sub(&MAINNET_ACCOUNT_CREATION_FEE)
             } else {
                 pre.balance.add(&amount)
             },
-            nonce: pre.nonce,
-            delegate: pre.delegate,
+            ..pre
         }
     }
 
@@ -67,10 +83,9 @@ impl Account {
             None
         } else {
             Some(Account {
-                public_key: pre.public_key.clone(),
                 balance: pre.balance.sub(&amount),
                 nonce: Nonce(nonce.unwrap_or(pre.nonce.0)),
-                delegate: pre.delegate,
+                ..pre
             })
         }
     }
@@ -80,26 +95,29 @@ impl Account {
             public_key: pre.public_key.clone(),
             balance: pre.balance.add(&amount),
             nonce: Nonce(pre.nonce.0 + 1),
-            delegate: pre.delegate,
+            ..pre
         }
     }
 
     pub fn from_delegation(pre: Self, delegate: PublicKey) -> Self {
         Account {
-            public_key: pre.public_key,
-            balance: pre.balance,
             nonce: Nonce(pre.nonce.0 + 1),
             delegate,
+            ..pre
         }
     }
 
     pub fn from_failed_transaction(pre: Self, nonce: u32) -> Self {
         Account {
-            public_key: pre.public_key,
-            balance: pre.balance,
             nonce: Nonce(nonce + 1),
-            delegate: pre.delegate,
+            ..pre
         }
+    }
+}
+
+impl std::default::Default for Username {
+    fn default() -> Self {
+        Self("Unknown".to_string())
     }
 }
 
@@ -111,6 +129,7 @@ impl From<GenesisBlock> for Account {
             balance: Amount(1000_u64),
             delegate: block_creator,
             nonce: Nonce::default(),
+            username: None,
         }
     }
 }

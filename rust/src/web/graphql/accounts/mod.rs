@@ -1,7 +1,8 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    ledger::{account::Account as LAccount, store::LedgerStore},
+    chain_id::store::ChainIdStore,
+    ledger::{account, store::LedgerStore},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
@@ -52,15 +53,17 @@ impl AccountQueryRoot {
         let db = db(ctx);
         let state_hash = match db.get_best_block_hash() {
             Ok(Some(state_hash)) => state_hash,
-            Ok(None) => return Ok(None),
-            Err(_) => {
+            Ok(None) | Err(_) => {
                 return Ok(None);
             }
         };
-        let ledger = match db.get_ledger_state_hash("mainnet", &state_hash, true) {
+        let network = db
+            .get_current_network()
+            .map(|n| n.0)
+            .unwrap_or("mainnet".to_string());
+        let ledger = match db.get_ledger_state_hash(&network, &state_hash, true) {
             Ok(Some(ledger)) => ledger,
-            Ok(None) => return Ok(None),
-            Err(_) => {
+            Ok(None) | Err(_) => {
                 return Ok(None);
             }
         };
@@ -112,15 +115,15 @@ impl AccountQueryRoot {
     }
 }
 
-impl From<LAccount> for Account {
-    fn from(ledger: LAccount) -> Self {
+impl From<account::Account> for Account {
+    fn from(ledger: account::Account) -> Self {
         Account {
             public_key: ledger.public_key.0,
             delegate: ledger.delegate.0,
             nonce: ledger.nonce.0,
             balance: ledger.balance.0,
-            username: None,
             time_locked: false,
+            username: ledger.username.map(|u| u.0),
         }
     }
 }
