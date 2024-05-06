@@ -232,18 +232,18 @@ impl BlocksQueryRoot {
                         ..
                     } = block_query_input;
                     (
-                        // min = max of the gt(e) heights or 1
+                        // min = max of the gt(e) slots or 0
                         global_slot_gt
-                            .map(|h| h.max(global_slot_gte.unwrap_or_default()))
-                            .unwrap_or(1),
-                        // max = max of the lt(e) heights or best tip height
+                            .map(|g| g.max(global_slot_gte.unwrap_or_default()))
+                            .unwrap_or_default(),
+                        // max = max of the lt(e) global slots or best tip global slot
                         global_slot_lt
-                            .map(|h| h.max(global_slot_lte.unwrap_or_default()))
-                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
+                            .map(|g| g.max(global_slot_lte.unwrap_or_default()))
+                            .unwrap_or(db.get_best_block()?.unwrap().global_slot_since_genesis())
                             .min(db.get_best_block()?.unwrap().global_slot_since_genesis()),
                     )
                 }
-                None => (1, db.get_best_block()?.unwrap().global_slot_since_genesis()),
+                None => (0, db.get_best_block()?.unwrap().global_slot_since_genesis()),
             };
 
             let mut block_slots: Vec<u32> = (min..=max).collect();
