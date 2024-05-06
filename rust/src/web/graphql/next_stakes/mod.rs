@@ -114,7 +114,7 @@ impl NextStakesQueryRoot {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
                     account: NextStakesLedgerAccount::from(account),
-                    delegation_totals: NextStakesDelegationTotals {
+                    next_delegation_totals: NextStakesDelegationTotals {
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
@@ -146,7 +146,7 @@ pub struct NextStakesLedgerAccountWithMeta {
     /// Value next ledger hash
     ledger_hash: String,
     /// Value delegation totals
-    delegation_totals: NextStakesDelegationTotals,
+    next_delegation_totals: NextStakesDelegationTotals,
     /// Value accounts
     #[graphql(flatten)]
     account: NextStakesLedgerAccount,
