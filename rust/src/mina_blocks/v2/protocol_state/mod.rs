@@ -37,8 +37,8 @@ pub struct GenesisConstants {
     #[serde(deserialize_with = "from_str")]
     pub delta: u32,
 
-    #[serde(deserialize_with = "from_str")]
-    pub grace_period_slots: u32,
+    #[serde(deserialize_with = "from_str_opt")]
+    pub grace_period_slots: Option<u32>,
 
     #[serde(deserialize_with = "from_str")]
     pub genesis_state_timestamp: u64,

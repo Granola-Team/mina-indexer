@@ -9,10 +9,14 @@ use crate::{
     command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
     constants::{berkeley::*, *},
     ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
-    mina_blocks::{common::from_str, v2},
+    mina_blocks::{
+        common::from_str,
+        v2::{self, protocol_state::GenesisConstants},
+    },
     protocol::serialization_types::{
         blockchain_state::BlockchainState,
         consensus_state as mina_consensus,
+        protocol_constants::ProtocolConstants,
         protocol_state::{ProtocolState, ProtocolStateJson},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
@@ -176,6 +180,30 @@ impl PrecomputedBlock {
             version,
         )?;
         Ok(precomputed_block)
+    }
+
+    pub fn genesis_constants(&self) -> GenesisConstants {
+        match self {
+            Self::V1(pcb1) => {
+                let ProtocolConstants {
+                    k,
+                    slots_per_epoch,
+                    slots_per_sub_window,
+                    delta,
+                    genesis_state_timestamp,
+                    grace_period_slots: _,
+                } = pcb1.protocol_state.body.t.t.constants.t.t.clone();
+                GenesisConstants {
+                    k: k.t.t,
+                    slots_per_epoch: slots_per_epoch.t.t,
+                    slots_per_sub_window: slots_per_sub_window.t.t,
+                    delta: delta.t.t,
+                    grace_period_slots: None,
+                    genesis_state_timestamp: genesis_state_timestamp.t.t,
+                }
+            }
+            Self::V2(pcb2) => pcb2.protocol_state.body.constants.clone(),
+        }
     }
 
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
