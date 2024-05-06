@@ -52,6 +52,6 @@ pub struct ProtocolConstantsJson {
     /// Timestamp of genesis block in unixtime
     pub genesis_state_timestamp: U64Json,
 
-    /// TODO Grace period slots
+    /// Grace period slots
     pub grace_period_slots: Option<U32Json>,
 }

@@ -53,9 +53,7 @@ impl AccountQueryRoot {
         let db = db(ctx);
         let state_hash = match db.get_best_block_hash() {
             Ok(Some(state_hash)) => state_hash,
-            Ok(None) | Err(_) => {
-                return Ok(None);
-            }
+            Ok(None) | Err(_) => return Ok(None),
         };
         let network = db
             .get_current_network()
@@ -63,9 +61,7 @@ impl AccountQueryRoot {
             .unwrap_or("mainnet".to_string());
         let ledger = match db.get_ledger_state_hash(&network, &state_hash, true) {
             Ok(Some(ledger)) => ledger,
-            Ok(None) | Err(_) => {
-                return Ok(None);
-            }
+            Ok(None) | Err(_) => return Ok(None),
         };
 
         let mut accounts: Vec<Account> = ledger
@@ -73,25 +69,34 @@ impl AccountQueryRoot {
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    if let Some(public_key) = &query.public_key {
+                    let AccountQueryInput {
+                        public_key,
+                        balance,
+                        balance_gt,
+                        balance_gte,
+                        balance_lt,
+                        balance_lte,
+                        balance_ne,
+                    } = query;
+                    if let Some(public_key) = public_key {
                         return *public_key == account.public_key.0;
                     }
-                    if let Some(balance) = &query.balance {
+                    if let Some(balance) = balance {
                         return *balance == account.balance.0;
                     }
-                    if let Some(balance_gt) = &query.balance_gt {
+                    if let Some(balance_gt) = balance_gt {
                         return *balance_gt < account.balance.0;
                     }
-                    if let Some(balance_gte) = &query.balance_gte {
+                    if let Some(balance_gte) = balance_gte {
                         return *balance_gte <= account.balance.0;
                     }
-                    if let Some(balance_lt) = &query.balance_lt {
+                    if let Some(balance_lt) = balance_lt {
                         return *balance_lt > account.balance.0;
                     }
-                    if let Some(balance_lte) = &query.balance_lte {
+                    if let Some(balance_lte) = balance_lte {
                         return *balance_lte >= account.balance.0;
                     }
-                    if let Some(balance_ne) = &query.balance_ne {
+                    if let Some(balance_ne) = balance_ne {
                         return *balance_ne != account.balance.0;
                     }
                 }
