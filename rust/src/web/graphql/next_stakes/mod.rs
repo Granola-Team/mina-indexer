@@ -1,9 +1,10 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::{chain_id, store::ChainIdStore},
+    chain_id::store::ChainIdStore,
     constants::*,
-    ledger::{staking::StakingAccount, store::LedgerStore},
+    ledger::store::LedgerStore,
+    web::graphql::stakes::{StakesDelegationTotals, StakesLedgerAccount, StakesTiming},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -102,7 +103,7 @@ impl NextStakesQueryRoot {
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
 
-                let timing = account.timing.as_ref().map(|timing| NextStakesTiming {
+                let timing = account.timing.as_ref().map(|timing| StakesTiming {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
                     initial_minimum_balance: Some(timing.initial_minimum_balance),
@@ -113,8 +114,8 @@ impl NextStakesQueryRoot {
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: NextStakesLedgerAccount::from(account),
-                    next_delegation_totals: NextStakesDelegationTotals {
+                    account: StakesLedgerAccount::from(account),
+                    next_delegation_totals: StakesDelegationTotals {
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
@@ -146,96 +147,10 @@ pub struct NextStakesLedgerAccountWithMeta {
     /// Value next ledger hash
     ledger_hash: String,
     /// Value delegation totals
-    next_delegation_totals: NextStakesDelegationTotals,
+    next_delegation_totals: StakesDelegationTotals,
     /// Value accounts
     #[graphql(flatten)]
-    account: NextStakesLedgerAccount,
+    account: StakesLedgerAccount,
     /// Value timing
-    timing: Option<NextStakesTiming>,
-}
-
-#[derive(SimpleObject)]
-pub struct NextStakesLedgerAccount {
-    /// Value chainId
-    chain_id: String,
-    /// Value balance
-    balance: f64,
-    /// Value nonce
-    nonce: u32,
-    /// Value delegate
-    delegate: String,
-    /// Value epoch
-    pk: String,
-    /// Value public key
-    #[graphql(name = "public_key")]
-    public_key: String,
-    /// Value token
-    token: u32,
-    /// Value receipt chain hash
-    #[graphql(name = "receipt_chain_hash")]
-    receipt_chain_hash: String,
-    /// Value voting for
-    #[graphql(name = "voting_for")]
-    voting_for: String,
-    /// Value balance nanomina
-    balance_nanomina: u64,
-}
-
-#[derive(SimpleObject)]
-pub struct NextStakesDelegationTotals {
-    /// Value total delegated
-    total_delegated: f64,
-    /// Value total delegated in nanomina
-    total_delegated_nanomina: u64,
-    /// Value count delegates
-    count_delegates: u32,
-}
-
-#[derive(SimpleObject)]
-struct NextStakesTiming {
-    #[graphql(name = "cliff_amount")]
-    pub cliff_amount: Option<u64>,
-    #[graphql(name = "cliff_time")]
-    pub cliff_time: Option<u64>,
-    #[graphql(name = "initial_minimum_balance")]
-    pub initial_minimum_balance: Option<u64>,
-    #[graphql(name = "vesting_increment")]
-    pub vesting_increment: Option<u64>,
-    #[graphql(name = "vesting_period")]
-    pub vesting_period: Option<u64>,
-}
-
-impl From<StakingAccount> for NextStakesLedgerAccount {
-    fn from(acc: StakingAccount) -> Self {
-        let balance_nanomina = acc.balance;
-        let mut decimal = Decimal::from(balance_nanomina);
-        decimal.set_scale(9).ok();
-
-        let balance = decimal.to_f64().unwrap_or_default();
-        let nonce = acc.nonce.unwrap_or_default();
-        let delegate = acc.delegate.0;
-        let pk = acc.pk.0;
-        let public_key = pk.clone();
-        let token = acc.token;
-        let receipt_chain_hash = acc.receipt_chain_hash.0;
-        let voting_for = acc.voting_for.0;
-        Self {
-            chain_id: chain_id(
-                MAINNET_GENESIS_HASH,
-                MAINNET_GENESIS_CONSTANTS,
-                MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
-            )
-            .0[..6]
-                .to_string(),
-            balance,
-            nonce,
-            delegate,
-            pk,
-            public_key,
-            token,
-            receipt_chain_hash,
-            voting_for,
-            balance_nanomina,
-        }
-    }
+    timing: Option<StakesTiming>,
 }
