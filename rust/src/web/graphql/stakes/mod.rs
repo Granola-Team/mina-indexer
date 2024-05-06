@@ -148,42 +148,42 @@ pub struct StakesLedgerAccountWithMeta {
 #[derive(SimpleObject)]
 pub struct StakesLedgerAccount {
     /// Value chainId
-    chain_id: String,
+    pub chain_id: String,
     /// Value balance
-    balance: f64,
+    pub balance: f64,
     /// Value nonce
-    nonce: u32,
+    pub nonce: u32,
     /// Value delegate
-    delegate: String,
+    pub delegate: String,
     /// Value epoch
-    pk: String,
+    pub pk: String,
     /// Value public key
     #[graphql(name = "public_key")]
-    public_key: String,
+    pub public_key: String,
     /// Value token
-    token: u32,
+    pub token: u32,
     /// Value receipt chain hash
     #[graphql(name = "receipt_chain_hash")]
-    receipt_chain_hash: String,
+    pub receipt_chain_hash: String,
     /// Value voting for
     #[graphql(name = "voting_for")]
-    voting_for: String,
+    pub voting_for: String,
     /// Value balance nanomina
-    balance_nanomina: u64,
+    pub balance_nanomina: u64,
 }
 
 #[derive(SimpleObject)]
 pub struct StakesDelegationTotals {
     /// Value total delegated
-    total_delegated: f64,
+    pub total_delegated: f64,
     /// Value total delegated in nanomina
-    total_delegated_nanomina: u64,
+    pub total_delegated_nanomina: u64,
     /// Value count delegates
-    count_delegates: u32,
+    pub count_delegates: u32,
 }
 
 #[derive(SimpleObject)]
-struct StakesTiming {
+pub struct StakesTiming {
     #[graphql(name = "cliff_amount")]
     pub cliff_amount: Option<u64>,
     #[graphql(name = "cliff_time")]
