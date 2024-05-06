@@ -4,6 +4,7 @@ pub mod feetransfers;
 pub mod gen;
 pub mod next_stakes;
 pub mod snarks;
+pub mod staged_ledgers;
 pub mod stakes;
 pub mod transactions;
 
@@ -28,6 +29,7 @@ pub struct Root(
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
     snarks::SnarkQueryRoot,
+    staged_ledgers::StagedLedgerQueryRoot,
 );
 
 /// Build schema for all endpoints
