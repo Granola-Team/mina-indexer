@@ -9,7 +9,7 @@ use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
-pub struct StakesQueryInput {
+pub struct NextStakesQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
@@ -19,33 +19,36 @@ pub struct StakesQueryInput {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum StakesSortByInput {
+pub enum NextStakesSortByInput {
+    #[graphql(name = "BALANCE_ASC")]
+    BalanceAsc,
+    #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
 }
 
 #[derive(Default)]
-pub struct StakesQueryRoot;
+pub struct NextStakesQueryRoot;
 
 #[Object]
-impl StakesQueryRoot {
+impl NextStakesQueryRoot {
     // Cache for 1 day
     #[graphql(cache_control(max_age = 86400))]
-    async fn stakes<'ctx>(
+    async fn next_stakes<'ctx>(
         &self,
         ctx: &Context<'ctx>,
-        query: Option<StakesQueryInput>,
-        sort_by: Option<StakesSortByInput>,
+        query: Option<NextStakesQueryInput>,
+        sort_by: Option<NextStakesSortByInput>,
         #[graphql(default = 100)] limit: usize,
-    ) -> Result<Option<Vec<StakesLedgerAccountWithMeta>>> {
+    ) -> Result<Option<Vec<NextStakesLedgerAccountWithMeta>>> {
         let db = db(ctx);
 
-        // default to current epoch
-        let curr_epoch = db.get_best_block()?.map_or(0, |block| {
+        // default to next epoch
+        let next_epoch = 1 + db.get_best_block()?.map_or(0, |block| {
             block.global_slot_since_genesis() / MAINNET_EPOCH_SLOT_COUNT
         });
         let epoch = match query {
-            Some(ref query) => query.epoch.unwrap_or(curr_epoch),
-            None => curr_epoch,
+            Some(ref query) => query.epoch.map_or(next_epoch, |e| e + 1),
+            None => next_epoch,
         };
         let network = db
             .get_current_network()
@@ -60,12 +63,12 @@ impl StakesQueryRoot {
         let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
 
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
-        let mut accounts: Vec<StakesLedgerAccountWithMeta> = staking_ledger
+        let mut accounts: Vec<NextStakesLedgerAccountWithMeta> = staking_ledger
             .staking_ledger
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    let StakesQueryInput {
+                    let NextStakesQueryInput {
                         delegate,
                         public_key,
                         epoch: query_epoch,
@@ -74,7 +77,7 @@ impl StakesQueryRoot {
                     if let Some(public_key) = public_key {
                         return *public_key == account.pk.0;
                     }
-                    if let Some(delegate) = delegate {
+                    if let Some(delegate) = &query.delegate {
                         return *delegate == account.delegate.0;
                     }
                     if let Some(query_ledger_hash) = query_ledger_hash {
@@ -99,7 +102,7 @@ impl StakesQueryRoot {
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
 
-                let timing = account.timing.as_ref().map(|timing| StakesTiming {
+                let timing = account.timing.as_ref().map(|timing| NextStakesTiming {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
                     initial_minimum_balance: Some(timing.initial_minimum_balance),
@@ -107,11 +110,11 @@ impl StakesQueryRoot {
                     vesting_period: Some(timing.vesting_period),
                 });
 
-                StakesLedgerAccountWithMeta {
+                NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from(account),
-                    delegation_totals: StakesDelegationTotals {
+                    account: NextStakesLedgerAccount::from(account),
+                    delegation_totals: NextStakesDelegationTotals {
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
@@ -121,8 +124,14 @@ impl StakesQueryRoot {
             })
             .collect();
 
-        if let Some(StakesSortByInput::BalanceDesc) = sort_by {
-            accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina));
+        match sort_by {
+            Some(NextStakesSortByInput::BalanceAsc) => {
+                accounts.sort_by(|b, a| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
+            }
+            Some(NextStakesSortByInput::BalanceDesc) => {
+                accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
+            }
+            None => (),
         }
 
         accounts.truncate(limit);
@@ -131,22 +140,22 @@ impl StakesQueryRoot {
 }
 
 #[derive(SimpleObject)]
-pub struct StakesLedgerAccountWithMeta {
-    /// Value current epoch
+pub struct NextStakesLedgerAccountWithMeta {
+    /// Value next epoch
     epoch: u32,
-    /// Value current ledger hash
+    /// Value next ledger hash
     ledger_hash: String,
     /// Value delegation totals
-    delegation_totals: StakesDelegationTotals,
+    delegation_totals: NextStakesDelegationTotals,
     /// Value accounts
     #[graphql(flatten)]
-    account: StakesLedgerAccount,
+    account: NextStakesLedgerAccount,
     /// Value timing
-    timing: Option<StakesTiming>,
+    timing: Option<NextStakesTiming>,
 }
 
 #[derive(SimpleObject)]
-pub struct StakesLedgerAccount {
+pub struct NextStakesLedgerAccount {
     /// Value chainId
     chain_id: String,
     /// Value balance
@@ -173,7 +182,7 @@ pub struct StakesLedgerAccount {
 }
 
 #[derive(SimpleObject)]
-pub struct StakesDelegationTotals {
+pub struct NextStakesDelegationTotals {
     /// Value total delegated
     total_delegated: f64,
     /// Value total delegated in nanomina
@@ -183,7 +192,7 @@ pub struct StakesDelegationTotals {
 }
 
 #[derive(SimpleObject)]
-struct StakesTiming {
+struct NextStakesTiming {
     #[graphql(name = "cliff_amount")]
     pub cliff_amount: Option<u64>,
     #[graphql(name = "cliff_time")]
@@ -196,7 +205,7 @@ struct StakesTiming {
     pub vesting_period: Option<u64>,
 }
 
-impl From<StakingAccount> for StakesLedgerAccount {
+impl From<StakingAccount> for NextStakesLedgerAccount {
     fn from(acc: StakingAccount) -> Self {
         let balance_nanomina = acc.balance;
         let mut decimal = Decimal::from(balance_nanomina);

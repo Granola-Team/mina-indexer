@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod blocks;
 pub mod feetransfers;
 pub mod gen;
+pub mod next_stakes;
 pub mod snarks;
 pub mod stakes;
 pub mod transactions;
@@ -21,7 +22,8 @@ const MINA_SCALE: u32 = 9;
 #[derive(MergedObject, Default)]
 pub struct Root(
     blocks::BlocksQueryRoot,
-    stakes::StakeQueryRoot,
+    stakes::StakesQueryRoot,
+    next_stakes::NextStakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
