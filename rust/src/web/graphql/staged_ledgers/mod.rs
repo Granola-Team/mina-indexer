@@ -1,8 +1,5 @@
 use super::db;
-use crate::{
-    chain_id::store::ChainIdStore,
-    ledger::{account::Account, store::LedgerStore},
-};
+use crate::ledger::{account::Account, store::LedgerStore};
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
@@ -39,15 +36,11 @@ impl StagedLedgerQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<StagedLedgerAccount>>> {
         let db = db(ctx);
-        let network = db
-            .get_current_network()
-            .map(|n| n.0)
-            .unwrap_or("mainnet".to_string());
 
         // ledger hash query
         if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
             let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger(&network, &ledger_hash.into())?
+                .get_ledger(&ledger_hash.into())?
                 .map_or(vec![], |ledger| {
                     ledger
                         .accounts
@@ -64,7 +57,7 @@ impl StagedLedgerQueryRoot {
         // state hash query
         if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
             let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_state_hash(&network, &state_hash.into(), true)?
+                .get_ledger_state_hash(&state_hash.into(), true)?
                 .map_or(vec![], |ledger| {
                     ledger
                         .accounts
@@ -81,7 +74,7 @@ impl StagedLedgerQueryRoot {
         // blockchain length query
         if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
             let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_at_height(&network, blockchain_length, true)?
+                .get_ledger_at_height(blockchain_length, true)?
                 .map_or(vec![], |ledger| {
                     ledger
                         .accounts
