@@ -12,7 +12,7 @@ query NextStakesQuery($limit: Int, $sort_by: NextStakesSortByInput!, $query: Nex
     public_key
     token
     voting_for
-    delegationTotals {
+    nextDelegationTotals {
       countDelegates
       totalDelegated
     }
@@ -41,5 +41,5 @@ jsonpath "$.data.nextStakes[0].pk" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 jsonpath "$.data.nextStakes[0].public_key" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.nextStakes[0].token" == 1
 jsonpath "$.data.nextStakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
-jsonpath "$.data.nextStakes[0].delegationTotals.countDelegates" == 1
-jsonpath "$.data.nextStakes[0].delegationTotals.totalDelegated" == 2498323.273015384
+jsonpath "$.data.nextStakes[0].nextDelegationTotals.countDelegates" == 1
+jsonpath "$.data.nextStakes[0].nextDelegationTotals.totalDelegated" == 2498323.273015384
