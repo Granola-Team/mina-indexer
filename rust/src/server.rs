@@ -367,10 +367,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 debug!("Valid precomputed block file: {}", path.display());
 
                 // TODO how to handle stop txn & chain slots & final ledger?
-                //   - when we get the Berkeley genesis ledger & block (after the stop txn
-                //     slot), flush the witness tree & root at this genesis block & ledger
-                // Can we generate the new ledger & load the new network's config from a
-                // specific block?
+                //   - when we get the Berkeley genesis ledger/block (after the stop txn slot),
+                //     flush the witness tree & root at this genesis block & ledger
 
                 let mut version = state.read().await.version.clone();
                 match PrecomputedBlock::parse_file(&path, version.version.clone()) {

@@ -127,10 +127,32 @@ impl NextStakesQueryRoot {
 
         match sort_by {
             Some(NextStakesSortByInput::BalanceAsc) => {
-                accounts.sort_by(|b, a| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
+                accounts.sort_by(|a, b| {
+                    (
+                        a.account.balance_nanomina,
+                        a.account.nonce,
+                        a.account.pk.clone(),
+                    )
+                        .cmp(&(
+                            b.account.balance_nanomina,
+                            b.account.nonce,
+                            b.account.pk.clone(),
+                        ))
+                });
             }
             Some(NextStakesSortByInput::BalanceDesc) => {
-                accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
+                accounts.sort_by(|a, b| {
+                    (
+                        b.account.balance_nanomina,
+                        b.account.nonce,
+                        b.account.pk.clone(),
+                    )
+                        .cmp(&(
+                            a.account.balance_nanomina,
+                            a.account.nonce,
+                            a.account.pk.clone(),
+                        ))
+                });
             }
             None => (),
         }

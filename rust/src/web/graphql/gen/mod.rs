@@ -15,6 +15,7 @@ pub struct TransactionSourceQueryInput {
     pub public_key_gte: Option<String>,
     pub public_key_lt: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct TransactionFromAccountQueryInput {
     pub token_nin: Option<Vec<Option<i64>>>,
@@ -29,6 +30,7 @@ pub struct TransactionFromAccountQueryInput {
     pub and: Option<Vec<TransactionFromAccountQueryInput>>,
     pub token_exists: Option<bool>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandReceiverQueryInput {
     pub public_key_lte: Option<String>,
@@ -43,6 +45,7 @@ pub struct BlockTransactionUserCommandReceiverQueryInput {
     pub public_key_gt: Option<String>,
     pub public_key_gte: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionFeeTransferQueryInput {
     pub type_ne: Option<String>,
@@ -75,6 +78,7 @@ pub struct BlockTransactionFeeTransferQueryInput {
     pub recipient_exists: Option<bool>,
     pub and: Option<Vec<BlockTransactionFeeTransferQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandQueryInput {
     pub id_lte: Option<String>,
@@ -228,6 +232,7 @@ pub struct BlockTransactionUserCommandQueryInput {
     pub hash_in: Option<Vec<Option<String>>>,
     pub failure_reason_lt: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionQueryInput {
     pub user_commands_exists: Option<bool>,
@@ -252,6 +257,7 @@ pub struct BlockTransactionQueryInput {
     pub fee_transfer_nin: Option<Vec<Option<BlockTransactionFeeTransferQueryInput>>>,
     pub or: Option<Vec<BlockTransactionQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockWinnerAccountBalanceQueryInput {
     pub block_height_in: Option<Vec<Option<i64>>>,
@@ -311,6 +317,7 @@ pub struct BlockWinnerAccountBalanceQueryInput {
     pub total: Option<Long>,
     pub unknown_exists: Option<bool>,
 }
+
 #[derive(InputObject)]
 pub struct TransactionReceiverQueryInput {
     pub public_key_lte: Option<String>,
@@ -325,6 +332,7 @@ pub struct TransactionReceiverQueryInput {
     pub public_key_ne: Option<String>,
     pub and: Option<Vec<TransactionReceiverQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandFromAccountQueryInput {
     pub token_in: Option<Vec<Option<i64>>>,
@@ -339,6 +347,7 @@ pub struct BlockTransactionUserCommandFromAccountQueryInput {
     pub token_gte: Option<i64>,
     pub and: Option<Vec<BlockTransactionUserCommandFromAccountQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateBlockchainStateQueryInput {
     pub staged_ledger_hash: Option<String>,
@@ -380,6 +389,7 @@ pub struct BlockProtocolStateBlockchainStateQueryInput {
     pub utc_date_lt: Option<Long>,
     pub utc_date_in: Option<Vec<Option<Long>>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateConsensusStateStakingEpochDatumQueryInput {
     pub start_checkpoint_gt: Option<String>,
@@ -423,6 +433,7 @@ pub struct BlockProtocolStateConsensusStateStakingEpochDatumQueryInput {
     pub seed_ne: Option<String>,
     pub start_checkpoint_nin: Option<Vec<Option<String>>>,
 }
+
 #[derive(InputObject)]
 pub struct TransactionQueryInput {
     pub fee_in: Option<Vec<Option<f64>>>,
@@ -562,6 +573,7 @@ pub struct TransactionQueryInput {
     pub to_lt: Option<String>,
     pub to: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandToAccountQueryInput {
     pub token_in: Option<Vec<Option<i64>>>,
@@ -636,6 +648,7 @@ pub struct BlockProtocolStateConsensusStateNextEpochDatumQueryInput {
     pub epoch_length_nin: Option<Vec<Option<i64>>>,
     pub epoch_length_in: Option<Vec<Option<i64>>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateConsensusStateNextEpochDatumLedgerQueryInput {
     pub hash_gt: Option<String>,
@@ -659,6 +672,7 @@ pub struct BlockProtocolStateConsensusStateNextEpochDatumLedgerQueryInput {
     pub hash_nin: Option<Vec<Option<String>>>,
     pub total_currency: Option<f64>,
 }
+
 #[derive(InputObject)]
 pub struct BlockSnarkJobQueryInput {
     pub prover: Option<String>,
@@ -713,6 +727,7 @@ pub struct BlockSnarkJobQueryInput {
     pub fee_gte: Option<i64>,
     pub block_height_nin: Option<Vec<Option<i64>>>,
 }
+
 #[derive(InputObject, Clone)]
 pub struct BlockQueryInput {
     pub creator_account: Option<BlockCreatorAccountQueryInput>,
@@ -752,6 +767,7 @@ pub struct BlockQueryInput {
     #[graphql(name = "global_slot_lte")]
     pub global_slot_lte: Option<u32>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateQueryInput {
     pub previous_state_hash_exists: Option<bool>,
@@ -770,6 +786,7 @@ pub struct BlockProtocolStateQueryInput {
     pub and: Option<Vec<BlockProtocolStateQueryInput>>,
     pub previous_state_hash: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateConsensusStateStakingEpochDatumLedgerQueryInput {
     pub hash_in: Option<Vec<Option<String>>>,
@@ -793,6 +810,7 @@ pub struct BlockProtocolStateConsensusStateStakingEpochDatumLedgerQueryInput {
     pub hash_lt: Option<String>,
     pub total_currency_lte: Option<f64>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandSourceQueryInput {
     pub public_key_gte: Option<String>,
@@ -807,6 +825,7 @@ pub struct BlockTransactionUserCommandSourceQueryInput {
     pub public_key_gt: Option<String>,
     pub public_key_ne: Option<String>,
 }
+
 #[derive(InputObject)]
 pub struct BlockWinnerAccountQueryInput {
     pub balance: Option<BlockWinnerAccountBalanceQueryInput>,
@@ -823,6 +842,7 @@ pub struct BlockWinnerAccountQueryInput {
     pub public_key: Option<String>,
     pub balance_exists: Option<bool>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionUserCommandFeePayerQueryInput {
     pub token_lt: Option<i64>,
@@ -837,6 +857,7 @@ pub struct BlockTransactionUserCommandFeePayerQueryInput {
     pub and: Option<Vec<BlockTransactionUserCommandFeePayerQueryInput>>,
     pub or: Option<Vec<BlockTransactionUserCommandFeePayerQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockTransactionCoinbaseReceiverAccountQueryInput {
     pub public_key_gt: Option<String>,
@@ -851,6 +872,7 @@ pub struct BlockTransactionCoinbaseReceiverAccountQueryInput {
     pub public_key_lt: Option<String>,
     pub and: Option<Vec<BlockTransactionCoinbaseReceiverAccountQueryInput>>,
 }
+
 #[derive(InputObject)]
 pub struct TransactionToAccountQueryInput {
     pub or: Option<Vec<TransactionToAccountQueryInput>>,
@@ -865,6 +887,7 @@ pub struct TransactionToAccountQueryInput {
     pub token_exists: Option<bool>,
     pub token_ne: Option<i64>,
 }
+
 #[derive(InputObject)]
 pub struct TransactionFeePayerQueryInput {
     pub token_exists: Option<bool>,
@@ -879,6 +902,7 @@ pub struct TransactionFeePayerQueryInput {
     pub token_gte: Option<i64>,
     pub token_in: Option<Vec<Option<i64>>>,
 }
+
 #[derive(InputObject)]
 pub struct BlockProtocolStateConsensusStateQueryInput {
     pub slot_ne: Option<i64>,
@@ -971,4 +995,13 @@ pub struct BlockProtocolStateConsensusStateQueryInput {
     pub epoch_lte: Option<i64>,
     pub last_vrf_output_lt: Option<String>,
     pub total_currency: Option<f64>,
+}
+
+#[derive(InputObject)]
+pub struct StagedLedgerQueryInput {
+    pub ledger_hash: Option<String>,
+    pub state_hash: Option<String>,
+
+    #[graphql(name = "blockchain_length")]
+    pub blockchain_length: Option<u32>,
 }

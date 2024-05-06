@@ -1,19 +1,10 @@
-use super::db;
+use super::{db, gen::StagedLedgerQueryInput};
 use crate::{
     chain_id::store::ChainIdStore,
     ledger::{account::Account, store::LedgerStore},
 };
-use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-
-#[derive(InputObject)]
-pub struct StagedLedgerQueryInput {
-    ledger_hash: Option<String>,
-    state_hash: Option<String>,
-
-    #[graphql(name = "blockchain_length")]
-    blockchain_length: Option<u32>,
-}
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StagedLedgerSortByInput {

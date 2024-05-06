@@ -122,7 +122,19 @@ impl StakesQueryRoot {
             .collect();
 
         if let Some(StakesSortByInput::BalanceDesc) = sort_by {
-            accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina));
+            accounts.sort_by(|a, b| {
+                (
+                    b.account.balance_nanomina,
+                    b.account.nonce,
+                    b.account.pk.clone(),
+                )
+                    .cmp(&(
+                        a.account.balance_nanomina,
+                        a.account.nonce,
+                        a.account.pk.clone(),
+                    ))
+            });
+            accounts.reverse();
         }
 
         accounts.truncate(limit);
