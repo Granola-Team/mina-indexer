@@ -2,7 +2,7 @@
 
 use crate::{
     block::BlockHash,
-    chain_id::Network,
+    chain::Network,
     ledger::{
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
         Ledger, LedgerHash,

@@ -5,7 +5,7 @@ use crate::{
         extract_block_height, extract_network, extract_state_hash, Block, BlockHash, VrfOutput,
     },
     canonicity::Canonicity,
-    chain_id::Network,
+    chain::Network,
     command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
     constants::{berkeley::*, *},
     ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},

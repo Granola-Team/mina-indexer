@@ -2,7 +2,7 @@ extern crate core;
 
 pub mod block;
 pub mod canonicity;
-pub mod chain_id;
+pub mod chain;
 pub mod client;
 pub mod command;
 pub mod constants;

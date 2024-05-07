@@ -1,4 +1,4 @@
-use crate::{chain_id::Network, ledger::LedgerHash};
+use crate::{chain::Network, ledger::LedgerHash};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    chain_id::Network,
+    chain::Network,
     event::{
         db::{DbEvent, DbLedgerEvent},
         store::EventStore,

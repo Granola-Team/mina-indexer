@@ -10,7 +10,7 @@ use crate::{
         Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain_id::{store::ChainIdStore, Network},
+    chain::{store::ChainIdStore, Network},
     command::store::CommandStore,
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},

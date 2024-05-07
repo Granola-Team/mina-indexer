@@ -1,4 +1,4 @@
-use crate::{block::BlockHash, chain_id::Network};
+use crate::{block::BlockHash, chain::Network};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

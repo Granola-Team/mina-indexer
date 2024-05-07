@@ -1,5 +1,5 @@
 use mina_indexer::{
-    chain_id::Network,
+    chain::Network,
     ledger::{
         genesis::{self, GenesisLedger},
         Ledger,

@@ -2,7 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    chain_id::Network,
+    chain::Network,
     ledger::{diff::LedgerDiff, genesis::GenesisRoot, public_key::PublicKey, store::LedgerStore},
     server::IndexerVersion,
     state::IndexerState,

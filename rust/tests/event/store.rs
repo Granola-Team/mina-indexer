@@ -1,7 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{vrf_output::VrfOutput, Block, BlockHash},
-    chain_id::Network,
+    chain::Network,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
     ledger::LedgerHash,
     store::IndexerStore,

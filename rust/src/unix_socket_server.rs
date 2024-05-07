@@ -4,7 +4,7 @@ use crate::{
         BlockWithoutHeight,
     },
     canonicity::store::CanonicityStore,
-    chain_id::Network,
+    chain::Network,
     client::*,
     command::{signed, store::CommandStore, Command},
     ledger::{

@@ -10,7 +10,7 @@ use self::vrf_output::VrfOutput;
 use crate::{
     block::precomputed::PrecomputedBlock,
     canonicity::Canonicity,
-    chain_id::Network,
+    chain::Network,
     protocol::serialization_types::{
         common::{Base58EncodableVersionedType, HashV1},
         version_bytes,

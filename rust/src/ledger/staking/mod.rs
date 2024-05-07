@@ -2,7 +2,7 @@ pub mod parser;
 
 use crate::{
     block::{precomputed::PcbVersion, BlockHash},
-    chain_id::Network,
+    chain::Network,
     ledger::{public_key::PublicKey, LedgerHash},
 };
 use log::trace;
@@ -297,7 +297,7 @@ impl std::str::FromStr for ReceiptChainHash {
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
     use crate::{
-        block::precomputed::PcbVersion, chain_id::Network,
+        block::precomputed::PcbVersion, chain::Network,
         ledger::staking::AggregatedEpochStakeDelegations,
     };
     use std::path::PathBuf;

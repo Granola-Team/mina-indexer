@@ -5,7 +5,7 @@ use crate::{
         precomputed::{PcbVersion, PrecomputedBlock},
         BlockHash,
     },
-    chain_id::{chain_id, ChainId, Network},
+    chain::{chain_id, ChainId, Network},
     constants::*,
     ledger::{
         genesis::{GenesisConstants, GenesisLedger},

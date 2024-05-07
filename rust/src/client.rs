@@ -1,4 +1,4 @@
-use crate::{chain_id::Network, constants::MAINNET_GENESIS_HASH};
+use crate::{chain::Network, constants::MAINNET_GENESIS_HASH};
 use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
 use std::{

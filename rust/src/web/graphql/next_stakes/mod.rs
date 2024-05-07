@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::{store::ChainIdStore, Network},
+    chain::{store::ChainIdStore, Network},
     constants::*,
     ledger::store::LedgerStore,
     web::graphql::stakes::{StakesDelegationTotals, StakesLedgerAccount, StakesTiming},

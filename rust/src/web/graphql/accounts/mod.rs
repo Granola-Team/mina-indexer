@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::{store::ChainIdStore, Network},
+    chain::{store::ChainIdStore, Network},
     ledger::{account, store::LedgerStore},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};

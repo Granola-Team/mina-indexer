@@ -8,7 +8,7 @@ use crate::{
         BlockHash,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain_id::{store::ChainIdStore, ChainId, Network},
+    chain::{store::ChainIdStore, ChainId, Network},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},

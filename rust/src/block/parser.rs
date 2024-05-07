@@ -312,7 +312,7 @@ mod tests {
             blockchain_length::BlockchainLength, get_blockchain_length, is_valid_block_file,
             length_from_path, BlockHash,
         },
-        chain_id::Network,
+        chain::Network,
     };
     use quickcheck::{Arbitrary, Gen};
     use quickcheck_macros::quickcheck;
