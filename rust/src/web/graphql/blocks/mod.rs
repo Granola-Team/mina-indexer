@@ -753,6 +753,7 @@ impl BlockQueryInput {
             global_slot_gte,
             global_slot_lt,
             global_slot_lte,
+            protocol_state,
             ..
         } = self;
 
@@ -792,6 +793,15 @@ impl BlockQueryInput {
         if let Some(global_slot) = global_slot_lte {
             matches &= block.block.global_slot_since_genesis <= *global_slot;
         }
+
+        // slot
+        matches &= protocol_state
+            .as_ref()
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.slot)
+            .map_or(matches, |slot| {
+                block.block.protocol_state.consensus_state.slot as i64 == slot
+            });
 
         // creator account
         if let Some(creator_account) = creator_account {
