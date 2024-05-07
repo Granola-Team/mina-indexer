@@ -112,9 +112,9 @@ impl BlocksQueryRoot {
         }
 
         // block height query
-        if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
+        if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
             let mut blocks: Vec<BlockWithCanonicity> = db
-                .get_blocks_at_height(blockchain_length)?
+                .get_blocks_at_height(block_height)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
@@ -743,7 +743,7 @@ impl BlockQueryInput {
             or,
             and,
             state_hash,
-            blockchain_length,
+            block_height: blockchain_length,
             global_slot_since_genesis,
             block_height_gt,
             block_height_gte,
@@ -753,6 +753,7 @@ impl BlockQueryInput {
             global_slot_gte,
             global_slot_lt,
             global_slot_lte,
+            ..
         } = self;
 
         check_option(&mut matches, canonical, &block.canonical);

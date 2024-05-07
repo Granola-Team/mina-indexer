@@ -715,7 +715,6 @@ pub struct BlockSnarkJobQueryInput {
 }
 #[derive(InputObject)]
 pub struct BlockQueryInput {
-    pub block_height: Option<u32>,
     pub creator_account: Option<BlockCreatorAccountQueryInput>,
     pub coinbase_receiver: Option<BlockCoinbaseReceiverQueryInput>,
     pub protocol_state: Option<BlockProtocolStateQueryInput>,
@@ -723,9 +722,7 @@ pub struct BlockQueryInput {
     pub or: Option<Vec<BlockQueryInput>>,
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
-
-    #[graphql(name = "blockchain_length")]
-    pub blockchain_length: Option<u32>,
+    pub block_height: Option<u32>,
 
     #[graphql(name = "global_slot_since_genesis")]
     pub global_slot_since_genesis: Option<u32>,
