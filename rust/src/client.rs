@@ -1,4 +1,4 @@
-use crate::constants::MAINNET_GENESIS_HASH;
+use crate::{chain_id::Network, constants::MAINNET_GENESIS_HASH};
 use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
 use std::{
@@ -217,8 +217,8 @@ pub enum StakingLedgers {
         #[arg(long)]
         hash: String,
         /// Network
-        #[arg(long, default_value = "mainnet")]
-        network: String,
+        #[arg(long, default_value = Network::Mainnet)]
+        network: Network,
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
@@ -229,8 +229,8 @@ pub enum StakingLedgers {
         #[arg(long)]
         epoch: u32,
         /// Network
-        #[arg(long, default_value = "mainnet")]
-        network: String,
+        #[arg(long, default_value = Network::Mainnet)]
+        network: Network,
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
@@ -241,8 +241,8 @@ pub enum StakingLedgers {
         #[arg(long)]
         epoch: u32,
         /// Network for the staking ledger
-        #[arg(long, default_value = "mainnet")]
-        network: String,
+        #[arg(long, default_value = Network::Mainnet)]
+        network: Network,
         /// Path to write the aggregate delegations
         #[arg(long)]
         path: Option<PathBuf>,
@@ -253,8 +253,8 @@ pub enum StakingLedgers {
         #[arg(long)]
         epoch: u32,
         /// Network for the staking ledger
-        #[arg(long, default_value = "mainnet")]
-        network: String,
+        #[arg(long, default_value = Network::Mainnet)]
+        network: Network,
         /// Account to aggregate staking delegations
         #[arg(long)]
         public_key: String,

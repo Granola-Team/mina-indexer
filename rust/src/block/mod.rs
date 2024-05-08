@@ -10,6 +10,7 @@ use self::vrf_output::VrfOutput;
 use crate::{
     block::precomputed::PrecomputedBlock,
     canonicity::Canonicity,
+    chain_id::Network,
     protocol::serialization_types::{
         common::{Base58EncodableVersionedType, HashV1},
         version_bytes,
@@ -18,9 +19,6 @@ use crate::{
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Network(pub String);
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -356,11 +354,11 @@ pub fn extract_state_hash(path: &Path) -> String {
     state_hash.to_owned()
 }
 
-pub fn extract_network(path: &Path) -> String {
+pub fn extract_network(path: &Path) -> Network {
     let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
     let dash_pos = name.find('-').unwrap();
-    let state_hash = &name[..dash_pos];
-    state_hash.to_owned()
+    let network = &name[..dash_pos];
+    Network::from(network)
 }
 
 #[cfg(test)]

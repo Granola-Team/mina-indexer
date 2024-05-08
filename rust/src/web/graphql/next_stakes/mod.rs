@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::store::ChainIdStore,
+    chain_id::{store::ChainIdStore, Network},
     constants::*,
     ledger::store::LedgerStore,
     web::graphql::stakes::{StakesDelegationTotals, StakesLedgerAccount, StakesTiming},
@@ -51,10 +51,7 @@ impl NextStakesQueryRoot {
             Some(ref query) => query.epoch.map_or(next_epoch, |e| e + 1),
             None => next_epoch,
         };
-        let network = db
-            .get_current_network()
-            .map(|n| n.0)
-            .unwrap_or("mainnet".to_string());
+        let network = db.get_current_network().unwrap_or(Network::Mainnet);
         let staking_ledger = match db.get_staking_ledger_at_epoch(&network, epoch)? {
             Some(staking_ledger) => staking_ledger,
             None => return Ok(None),

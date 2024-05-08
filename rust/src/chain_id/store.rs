@@ -1,5 +1,4 @@
-use super::ChainId;
-use crate::block::Network;
+use super::{ChainId, Network};
 
 pub trait ChainIdStore {
     /// Persists a (chain id, network) pair

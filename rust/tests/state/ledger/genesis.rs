@@ -1,6 +1,9 @@
-use mina_indexer::ledger::{
-    genesis::{self, GenesisLedger},
-    Ledger,
+use mina_indexer::{
+    chain_id::Network,
+    ledger::{
+        genesis::{self, GenesisLedger},
+        Ledger,
+    },
 };
 #[test]
 fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
@@ -14,7 +17,11 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         .values()
         .fold(0u64, |acc, account| acc + account.balance.0);
 
-    assert_eq!("mainnet", genesis_root.ledger.name, "Network name");
+    assert_eq!(
+        Network::Mainnet.to_string(),
+        genesis_root.ledger.name,
+        "Network name"
+    );
     assert_eq!(
         "2021-03-17T00:00:00Z", genesis_root.genesis.genesis_state_timestamp,
         "Genesis timestamp"
