@@ -156,6 +156,23 @@ impl BlocksQueryRoot {
             return Ok(blocks);
         }
 
+        // creator account query
+        if let Some(creator_account) = query.as_ref().and_then(|q| {
+            q.creator_account
+                .as_ref()
+                .and_then(|cb| cb.public_key.clone())
+        }) {
+            let mut blocks: Vec<BlockWithCanonicity> = db
+                .get_blocks_at_public_key(&creator_account.into())?
+                .into_iter()
+                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .collect();
+
+            reorder_asc(&mut blocks, sort_by);
+            blocks.truncate(limit);
+            return Ok(blocks);
+        }
+
         // block height bounded query
         if query
             .as_ref()
