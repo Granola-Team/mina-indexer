@@ -84,7 +84,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {creatorAccount: {public_key: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
+  blocks(query: {creatorAccount: {publicKey: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
     stateHash
     blockHeight
     winnerAccount {
@@ -150,7 +150,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {blockchain_length: 6}) {
+  blocks(query: {blockHeight: 6}) {
     stateHash
     canonical
     blockHeight

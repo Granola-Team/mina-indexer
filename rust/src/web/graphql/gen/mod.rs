@@ -581,7 +581,6 @@ pub struct BlockTransactionUserCommandToAccountQueryInput {
 pub struct BlockCreatorAccountQueryInput {
     pub or: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub and: Option<Vec<BlockCreatorAccountQueryInput>>,
-    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
 }
 
