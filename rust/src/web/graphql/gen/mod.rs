@@ -577,15 +577,14 @@ pub struct BlockTransactionUserCommandToAccountQueryInput {
     pub token_nin: Option<Vec<Option<i64>>>,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockCreatorAccountQueryInput {
     pub or: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub and: Option<Vec<BlockCreatorAccountQueryInput>>,
-    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockCoinbaseReceiverQueryInput {
     pub or: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
     pub and: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
@@ -713,17 +712,16 @@ pub struct BlockSnarkJobQueryInput {
     pub fee_gte: Option<i64>,
     pub block_height_nin: Option<Vec<Option<i64>>>,
 }
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockQueryInput {
     pub creator_account: Option<BlockCreatorAccountQueryInput>,
     pub coinbase_receiver: Option<BlockCoinbaseReceiverQueryInput>,
+    pub protocol_state: Option<BlockProtocolStateQueryInput>,
     pub canonical: Option<bool>,
     pub or: Option<Vec<BlockQueryInput>>,
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
-
-    #[graphql(name = "blockchain_length")]
-    pub blockchain_length: Option<u32>,
+    pub block_height: Option<u32>,
 
     #[graphql(name = "global_slot_since_genesis")]
     pub global_slot_since_genesis: Option<u32>,

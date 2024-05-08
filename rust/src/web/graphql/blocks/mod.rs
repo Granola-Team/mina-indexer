@@ -49,7 +49,7 @@ impl BlocksQueryRoot {
         }
 
         // Use constant time access if we have state hash
-        if let Some(state_hash) = query.clone().and_then(|input| input.state_hash) {
+        if let Some(state_hash) = query.as_ref().and_then(|input| input.state_hash.clone()) {
             if !is_valid_state_hash(&state_hash) {
                 return Ok(None);
             }
@@ -112,9 +112,9 @@ impl BlocksQueryRoot {
         }
 
         // block height query
-        if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
+        if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
             let mut blocks: Vec<BlockWithCanonicity> = db
-                .get_blocks_at_height(blockchain_length)?
+                .get_blocks_at_height(block_height)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
@@ -140,10 +140,11 @@ impl BlocksQueryRoot {
         }
 
         // coinbase receiver query
-        if let Some(coinbase_receiver) = query
-            .as_ref()
-            .and_then(|q| q.coinbase_receiver.clone().and_then(|cb| cb.public_key))
-        {
+        if let Some(coinbase_receiver) = query.as_ref().and_then(|q| {
+            q.coinbase_receiver
+                .as_ref()
+                .and_then(|cb| cb.public_key.clone())
+        }) {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
@@ -742,7 +743,7 @@ impl BlockQueryInput {
             or,
             and,
             state_hash,
-            blockchain_length,
+            block_height: blockchain_length,
             global_slot_since_genesis,
             block_height_gt,
             block_height_gte,
@@ -752,6 +753,8 @@ impl BlockQueryInput {
             global_slot_gte,
             global_slot_lt,
             global_slot_lte,
+            protocol_state,
+            ..
         } = self;
 
         check_option(&mut matches, canonical, &block.canonical);
@@ -790,6 +793,15 @@ impl BlockQueryInput {
         if let Some(global_slot) = global_slot_lte {
             matches &= block.block.global_slot_since_genesis <= *global_slot;
         }
+
+        // slot
+        matches &= protocol_state
+            .as_ref()
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.slot)
+            .map_or(matches, |slot| {
+                block.block.protocol_state.consensus_state.slot as i64 == slot
+            });
 
         // creator account
         if let Some(creator_account) = creator_account {
