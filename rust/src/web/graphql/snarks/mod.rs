@@ -112,6 +112,7 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
+        let mut capacity_reached = false;
         for entry in blocks_global_slot_idx_iterator(db, mode) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let block = db
@@ -125,7 +126,7 @@ impl SnarkQueryRoot {
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
                         pcb: block.clone(),
-                        snark: (snark, state_hash).into(),
+                        snark: (snark, state_hash.clone()).into(),
                     })
                     .collect()
             });
@@ -136,11 +137,14 @@ impl SnarkQueryRoot {
                 }
 
                 if snarks.len() == limit {
+                    capacity_reached = true;
                     break;
                 }
             }
+            if capacity_reached {
+                break;
+            }
         }
-
         Ok(snarks)
     }
 }
