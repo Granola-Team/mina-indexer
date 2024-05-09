@@ -9,7 +9,7 @@ use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
-pub struct StakesQueryInput {
+pub struct StakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
@@ -19,22 +19,22 @@ pub struct StakesQueryInput {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum StakesSortByInput {
+pub enum StakeSortByInput {
     BalanceDesc,
 }
 
 #[derive(Default)]
-pub struct StakesQueryRoot;
+pub struct StakeQueryRoot;
 
 #[Object]
-impl StakesQueryRoot {
+impl StakeQueryRoot {
     // Cache for 1 day
     #[graphql(cache_control(max_age = 86400))]
     async fn stakes<'ctx>(
         &self,
         ctx: &Context<'ctx>,
-        query: Option<StakesQueryInput>,
-        sort_by: Option<StakesSortByInput>,
+        query: Option<StakeQueryInput>,
+        sort_by: Option<StakeSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<StakesLedgerAccountWithMeta>>> {
         let db = db(ctx);
@@ -65,7 +65,7 @@ impl StakesQueryRoot {
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    let StakesQueryInput {
+                    let StakeQueryInput {
                         delegate,
                         public_key,
                         epoch: query_epoch,
@@ -121,7 +121,7 @@ impl StakesQueryRoot {
             })
             .collect();
 
-        if let Some(StakesSortByInput::BalanceDesc) = sort_by {
+        if let Some(StakeSortByInput::BalanceDesc) = sort_by {
             accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina));
         }
 

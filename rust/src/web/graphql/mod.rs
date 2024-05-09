@@ -22,7 +22,7 @@ const MINA_SCALE: u32 = 9;
 #[derive(MergedObject, Default)]
 pub struct Root(
     blocks::BlocksQueryRoot,
-    stakes::StakesQueryRoot,
+    stakes::StakeQueryRoot,
     next_stakes::NextStakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
