@@ -1,4 +1,4 @@
-use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64, PK};
+use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
     block::store::BlockStore,
     command::{
@@ -166,11 +166,11 @@ impl Transaction {
                 let memo = decode_memo(common.memo.t.0).expect("decoded memo");
 
                 Self {
-                    amount: nanomina_to_mina_f64(amount),
+                    amount,
                     block_height: cmd.blockchain_length as i64,
                     canonical,
                     failure_reason,
-                    fee: nanomina_to_mina_f64(fee),
+                    fee,
                     from: PublicKey::from(sender).0,
                     hash: cmd.tx_hash,
                     kind: kind.to_string(),
@@ -243,11 +243,11 @@ pub enum TransactionSortByInput {
 
 #[derive(Clone, Debug, SimpleObject)]
 pub struct Transaction {
-    amount: f64,
+    amount: u64,
     block_height: i64,
     canonical: bool,
     failure_reason: String,
-    fee: f64,
+    fee: u64,
     from: String,
     hash: String,
     kind: String,
