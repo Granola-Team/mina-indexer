@@ -1,5 +1,6 @@
 use super::{date_time_to_scalar, db, get_block_canonicity, nanomina_to_mina_f64, PK};
 use crate::{
+    block::store::BlockStore,
     command::{
         signed::{self, SignedCommand, SignedCommandWithData},
         store::CommandStore,
@@ -59,6 +60,20 @@ impl TransactionsQueryRoot {
             }
         };
 
+        // block height query
+        if let Some(block_height) = query.block_height {
+            let mut transactions: Vec<TransactionWithBlock> = db
+                .get_blocks_at_height(block_height as u32)?
+                .into_iter()
+                .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                .map(|cmd| TransactionWithBlock::new(cmd, db))
+                .filter_map(|txn| if query.matches(&txn) { Some(txn) } else { None })
+                .collect();
+            reorder_asc(&mut transactions, sort_by);
+            transactions.truncate(limit);
+            return Ok(transactions);
+        }
+
         // TODO bound query search space if given any inputs
 
         for entry in user_commands_iterator(db, mode) {
@@ -80,6 +95,15 @@ impl TransactionsQueryRoot {
         }
 
         Ok(transactions)
+    }
+}
+
+fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
+    match sort_by {
+        TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
+            values.reverse()
+        }
+        TransactionSortByInput::BlockheightDesc | TransactionSortByInput::DatetimeDesc => (),
     }
 }
 
