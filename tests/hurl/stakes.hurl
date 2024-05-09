@@ -1,6 +1,6 @@
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $sort_by: StakesSortByInput!, $query: StakesQueryInput!) {
+query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
   stakes(limit: $limit, sortBy: $sort_by, query: $query) {
     balance
     chainId
@@ -46,7 +46,7 @@ jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $sort_by: StakesSortByInput!, $query: StakesQueryInput!) {
+query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
   stakes(limit: $limit, sortBy: $sort_by, query: $query) {
     pk
     balance
