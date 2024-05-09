@@ -86,3 +86,4 @@ jsonpath "$.data.transactions[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY
 jsonpath "$.data.transactions[0].amount" == 1000000000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
+duration < 1000
