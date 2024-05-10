@@ -204,7 +204,7 @@ impl From<StakingAccount> for StakesLedgerAccount {
         let delegate = acc.delegate.0;
         let pk = acc.pk.0;
         let public_key = pk.clone();
-        let token = acc.token;
+        let token = acc.token.unwrap_or_default();
         let receipt_chain_hash = acc.receipt_chain_hash.0;
         let voting_for = acc.voting_for.0;
         Self {

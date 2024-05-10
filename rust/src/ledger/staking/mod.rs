@@ -3,7 +3,11 @@ pub mod parser;
 use crate::{
     block::{precomputed::PcbVersion, BlockHash},
     chain::Network,
-    ledger::{public_key::PublicKey, LedgerHash},
+    ledger::{
+        account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
+        public_key::PublicKey,
+        LedgerHash,
+    },
 };
 use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -24,47 +28,15 @@ pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,
     pub delegate: PublicKey,
-    pub token: u32,
+    pub token: Option<u32>,
     pub token_permissions: TokenPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
     pub permissions: Permissions,
     pub nonce: Option<u32>,
     pub timing: Option<Timing>,
+    pub zkapp: Option<String>,
 }
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Permissions {
-    stake: bool,
-    edit_state: Permission,
-    send: Permission,
-    set_delegate: Permission,
-    set_permissions: Permission,
-    set_verification_key: Permission,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Permission {
-    #[serde(rename = "signature")]
-    Signature,
-    #[serde(rename = "proof")]
-    Proof,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Timing {
-    pub initial_minimum_balance: u64,
-    pub cliff_time: u64,
-    pub cliff_amount: u64,
-    pub vesting_period: u64,
-    pub vesting_increment: u64,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TokenPermissions {}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReceiptChainHash(pub String);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccountJson {
@@ -117,7 +89,7 @@ pub struct AggregatedEpochStakeDelegation {
 
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
-        let token = value.token.parse().expect("token is u32");
+        let token = Some(value.token.parse().expect("token is u32"));
         let nonce = value
             .nonce
             .map(|nonce| nonce.parse().expect("nonce is u32"));
@@ -157,6 +129,7 @@ impl From<StakingAccountJson> for StakingAccount {
             permissions: value.permissions,
             token_permissions: value.token_permissions,
             receipt_chain_hash: value.receipt_chain_hash,
+            zkapp: None,
         }
     }
 }

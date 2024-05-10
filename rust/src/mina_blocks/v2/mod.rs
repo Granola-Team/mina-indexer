@@ -4,7 +4,10 @@ pub mod staged_ledger_diff;
 
 use crate::{
     block::BlockHash,
-    ledger::{public_key::PublicKey, staking::ReceiptChainHash},
+    ledger::{
+        account::{ReceiptChainHash, Timing},
+        public_key::PublicKey,
+    },
     mina_blocks::common::*,
 };
 use protocol_state::ProtocolState;
@@ -31,7 +34,7 @@ pub struct PrecomputedBlockDataV2 {
     pub accounts_accessed: Vec<(u64, AccountAccessed)>,
 
     #[serde(skip_deserializing)]
-    pub delta_transition_chain_proof: serde_json::Value,
+    pub delta_transition_chain_proof: (String, [String; 0]),
 
     #[serde(skip_deserializing)]
     pub protocol_state_proof: serde_json::Value,
@@ -62,29 +65,8 @@ pub struct AccountAccessed {
     pub permissions: Permissions,
     pub timing: (Timing,),
 
-    // TODO
+    // TODO ZkappAccount?
     pub zkapp: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Timing {
-    Untimed,
-    Timed {
-        #[serde(deserialize_with = "from_str")]
-        initial_minimum_balance: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        cliff_time: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        cliff_amount: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        vesting_period: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        vesting_increment: u64,
-    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,18 +96,13 @@ pub struct Permission(pub [String; 1]);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PermissionKind {
-    None,
+    #[serde(rename = "None_given")]
+    NoneGiven,
+
     Either,
     Proof,
     Signature,
     Impossible,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum DeltaTransitionChainProof {
-    Array(Vec<BlockHash>),
-    BlockHash(BlockHash),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

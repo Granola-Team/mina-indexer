@@ -1,5 +1,7 @@
+pub mod command;
 pub mod completed_work;
 
+use super::protocol_state::SupplyAdjustment;
 use crate::{ledger::public_key::PublicKey, mina_blocks::common::*};
 use completed_work::CompletedWork;
 use serde::{Deserialize, Serialize};
@@ -34,9 +36,9 @@ pub enum Coinbase {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CoinbaseKind {
-    Zero,
-    One,
     Two,
+    One,
+    Zero,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -65,25 +67,37 @@ pub enum Status {
 pub enum CommandKind {
     #[serde(rename = "Signed_command")]
     SignedCommand,
+
+    #[serde(rename = "Zkapp_command")]
+    ZkappCommand,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CommandData {
+#[serde(untagged)]
+pub enum CommandData {
+    UserCommandData(UserCommandData),
+    ZkappCommandData(ZkappCommandData),
+}
+
+/// User command
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UserCommandData {
     #[serde(deserialize_with = "from_str")]
     pub signer: PublicKey,
 
-    pub payload: Payload,
+    pub payload: UserCommandPayload,
     pub signature: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Payload {
-    pub common: PayloadCommon,
-    pub body: (PayloadKind, PayloadBody),
+pub struct UserCommandPayload {
+    pub common: UserCommandPayloadCommon,
+    pub body: (UserCommandPayloadKind, UserCommandPayloadBody),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum PayloadKind {
+pub enum UserCommandPayloadKind {
     Payment,
 
     #[serde(rename = "Stake_delegation")]
@@ -92,7 +106,7 @@ pub enum PayloadKind {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum PayloadBody {
+pub enum UserCommandPayloadBody {
     Payment(PaymentPayload),
     StakeDelegation(StakeDelegationPayload),
 }
@@ -112,8 +126,190 @@ pub struct StakeDelegationPayload {
     pub new_delegate: PublicKey,
 }
 
+/// Zkapp command
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PayloadCommon {
+pub struct ZkappCommandData {
+    pub fee_payer: FeePayer,
+    pub account_updates: Vec<AccountUpdates>,
+
+    // base58 encoded memo
+    pub memo: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FeePayer {
+    pub body: FeePayerBody,
+    pub authorization: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FeePayerBody {
+    #[serde(deserialize_with = "from_str")]
+    pub public_key: PublicKey,
+
+    #[serde(deserialize_with = "from_decimal_str")]
+    pub fee: u64,
+
+    #[serde(deserialize_with = "from_str_opt")]
+    pub valid_until: Option<u64>,
+
+    #[serde(deserialize_with = "from_str")]
+    pub nonce: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountUpdates {
+    pub elt: Elt,
+    pub stack_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Elt {
+    pub account_update: AccountUpdate,
+    pub account_update_digest: String,
+    pub calls: Vec<Call>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountUpdate {
+    pub body: AccountUpdateBody,
+    pub authorization: Authorization,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AuthorizationKind {
+    #[serde(rename = "None_given")]
+    NoneGiven,
+
+    Either,
+    Proof,
+    Signature,
+    Impossible,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Authorization {
+    #[serde(rename = "None_given")]
+    NoneGiven,
+
+    Proof((AuthorizationKind, String)),
+    Signature((AuthorizationKind, String)),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountUpdateBody {
+    #[serde(deserialize_with = "from_str")]
+    pub public_key: PublicKey,
+
+    pub token_id: String,
+    pub update: Update,
+    pub balance_change: SupplyAdjustment,
+    pub increment_nonce: bool,
+    pub events: (ZkappEvents,),
+    pub actions: (ZkappActions,),
+    pub call_data: String,
+    pub preconditions: Preconditions,
+    pub use_full_commitment: bool,
+    pub implicit_account_creation_fee: bool,
+    pub may_use_token: (MayUseToken,),
+    pub authorization_kind: (AuthorizationKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MayUseToken {
+    No,
+    Yes,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ZkappActions(pub Vec<String>);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ZkappEvents(pub Vec<String>);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Update {
+    // one for each app state field element
+    pub app_state: [(UpdateKind,); 8],
+
+    pub delegate: (UpdateKind,),
+    pub verification_key: (UpdateKind,),
+    pub permissions: (UpdateKind,),
+    pub zkapp_uri: (UpdateKind,),
+    pub token_symbol: (UpdateKind,),
+    pub timing: (UpdateKind,),
+    pub voting_for: (UpdateKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateKind {
+    Keep,
+    Set(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Preconditions {
+    pub network: NetworkPreconditions,
+    pub account: AccountPreconditions,
+    pub valid_while: (PreconditionKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NetworkPreconditions {
+    pub snarked_ledger_hash: (PreconditionKind,),
+    pub blockchain_length: (PreconditionKind,),
+    pub min_window_density: (PreconditionKind,),
+    pub total_currency: (PreconditionKind,),
+    pub global_slot_since_genesis: (PreconditionKind,),
+    pub staking_epoch_data: StakingEpochDataPreconditions,
+    pub next_epoch_data: StakingEpochDataPreconditions,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StakingEpochDataPreconditions {
+    pub ledger: LedgerPreconditions,
+    pub seed: (PreconditionKind,),
+    pub start_checkpoint: (PreconditionKind,),
+    pub lock_checkpoint: (PreconditionKind,),
+    pub epoch_length: (PreconditionKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LedgerPreconditions {
+    pub hash: (PreconditionKind,),
+    pub total_currency: (PreconditionKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountPreconditions {
+    pub balance: (PreconditionKind,),
+    pub nonce: (PreconditionKind,),
+    pub receipt_chain_hash: (PreconditionKind,),
+    pub delegate: (PreconditionKind,),
+    pub state: Vec<(PreconditionKind,)>,
+    pub action_state: (PreconditionKind,),
+    pub proved_state: (PreconditionKind,),
+    pub is_new: (PreconditionKind,),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PreconditionKind {
+    Ignore,
+    Check(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Call {
+    pub elt: Box<Elt>,
+    pub stack_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UserCommandPayloadCommon {
     #[serde(deserialize_with = "from_decimal_str")]
     pub fee: u64,
 
