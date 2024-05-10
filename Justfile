@@ -21,7 +21,6 @@ prereqs:
   jq --version
   check-jsonschema --version
   hurl --version
-  docker --version
   shellcheck --version
 
 build:
@@ -62,5 +61,6 @@ lint: && audit disallow-unused-cargo-deps
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 images:
+  docker --version
   nix build .#dockerImage
   docker load < ./result
