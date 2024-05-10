@@ -1,5 +1,5 @@
 use crate::{
-    block::genesis::GenesisBlock,
+    block::{genesis::GenesisBlock, BlockHash},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
 };
@@ -18,17 +18,61 @@ impl ToString for Amount {
     }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Nonce(pub u32);
 
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
-    pub delegate: PublicKey,
     pub balance: Amount,
     pub nonce: Nonce,
+    pub delegate: PublicKey,
+
+    // optional
+    pub token: Option<u32>,
+    pub token_permissions: Option<TokenPermissions>,
+    pub receipt_chain_hash: Option<ReceiptChainHash>,
+    pub voting_for: Option<BlockHash>,
+    pub permissions: Option<Permissions>,
+    pub timing: Option<Timing>,
+    pub zkapp: Option<String>,
+
+    // for mina search
     pub username: Option<Username>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Permissions {
+    stake: bool,
+    edit_state: Permission,
+    send: Permission,
+    set_delegate: Permission,
+    set_permissions: Permission,
+    set_verification_key: Permission,
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Permission {
+    #[default]
+    Signature,
+    Proof,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Timing {
+    pub initial_minimum_balance: u64,
+    pub cliff_time: u64,
+    pub cliff_amount: u64,
+    pub vesting_period: u64,
+    pub vesting_increment: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TokenPermissions {}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiptChainHash(pub String);
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Username(pub String);
@@ -41,6 +85,13 @@ impl Account {
             nonce: Nonce::default(),
             delegate: public_key,
             username: None,
+            token: None,
+            token_permissions: None,
+            receipt_chain_hash: None,
+            voting_for: None,
+            permissions: None,
+            timing: None,
+            zkapp: None,
         }
     }
 
@@ -130,6 +181,13 @@ impl From<GenesisBlock> for Account {
             delegate: block_creator,
             nonce: Nonce::default(),
             username: None,
+            token: None,
+            token_permissions: None,
+            receipt_chain_hash: None,
+            voting_for: None,
+            permissions: None,
+            timing: None,
+            zkapp: None,
         }
     }
 }
@@ -172,6 +230,7 @@ impl std::fmt::Display for Account {
     }
 }
 
+/// Same as display
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")

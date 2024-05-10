@@ -119,7 +119,7 @@ impl From<account::Account> for Account {
             delegate: ledger.delegate.0,
             nonce: ledger.nonce.0,
             balance: ledger.balance.0,
-            time_locked: false,
+            time_locked: ledger.timing.is_some(),
             username: ledger.username.map(|u| u.0),
         }
     }

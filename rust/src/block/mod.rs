@@ -1,3 +1,5 @@
+//! Indexer internal block representation used in the witness tree
+
 pub mod blockchain_length;
 pub mod genesis;
 pub mod parser;
