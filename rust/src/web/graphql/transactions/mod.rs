@@ -60,6 +60,24 @@ impl TransactionsQueryRoot {
             }
         };
 
+        // use index when from or to are set
+        if query.from.is_some() || query.to.is_some() {
+            // at least one is guaranteed to be set.
+            let pk = query.from.clone().or(query.to.clone()).unwrap();
+            println!("public key index for: {}", pk);
+            let mut transactions: Vec<TransactionWithBlock> = db
+                .get_blocks_at_public_key(&pk.into())
+                .into_iter()
+                .flatten()
+                .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                .map(|cmd| TransactionWithBlock::new(cmd, db))
+                .filter_map(|txn| if query.matches(&txn) { Some(txn) } else { None })
+                .collect();
+            reorder_asc(&mut transactions, sort_by);
+            transactions.truncate(limit);
+            return Ok(transactions);
+        }
+
         // block height query
         if let Some(block_height) = query.block_height {
             let mut transactions: Vec<TransactionWithBlock> = db
