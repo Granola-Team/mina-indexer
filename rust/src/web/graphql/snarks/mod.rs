@@ -15,6 +15,12 @@ use std::sync::Arc;
 pub struct Snark {
     pub fee: u64,
     pub prover: String,
+    pub block: SnarkBlock,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct SnarkBlock {
+    pub state_hash: String,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -24,7 +30,7 @@ pub struct SnarkWithCanonicity {
     pub canonical: bool,
     /// Value optional block
     #[graphql(skip)]
-    pub block: PrecomputedBlock,
+    pub pcb: PrecomputedBlock,
     /// Value snark
     #[graphql(flatten)]
     pub snark: Snark,
@@ -34,15 +40,15 @@ pub struct SnarkWithCanonicity {
 impl SnarkWithCanonicity {
     /// Value state hash
     async fn state_hash(&self) -> String {
-        self.block.state_hash().0.to_owned()
+        self.pcb.state_hash().0.to_owned()
     }
     /// Value block height
     async fn block_height(&self) -> u32 {
-        self.block.blockchain_length()
+        self.pcb.blockchain_length()
     }
     /// Value date time
     async fn date_time(&self) -> String {
-        millis_to_iso_date_string(self.block.timestamp() as i64)
+        millis_to_iso_date_string(self.pcb.timestamp() as i64)
     }
 }
 
@@ -106,6 +112,7 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
+        let mut capacity_reached = false;
         for entry in blocks_global_slot_idx_iterator(db, mode) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let block = db
@@ -118,8 +125,8 @@ impl SnarkQueryRoot {
                     .into_iter()
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
-                        block: block.clone(),
-                        snark: snark.into(),
+                        pcb: block.clone(),
+                        snark: (snark, state_hash.clone()).into(),
                     })
                     .collect()
             });
@@ -130,11 +137,14 @@ impl SnarkQueryRoot {
                 }
 
                 if snarks.len() == limit {
+                    capacity_reached = true;
                     break;
                 }
             }
+            if capacity_reached {
+                break;
+            }
         }
-
         Ok(snarks)
     }
 }
@@ -149,7 +159,7 @@ fn snark_summary_matches_query(
         .get_block(&snark.state_hash.clone().into())?
         .and_then(|block| {
             let snark_with_canonicity = SnarkWithCanonicity {
-                block,
+                pcb: block,
                 canonical,
                 snark: snark.into(),
             };
@@ -164,11 +174,14 @@ fn snark_summary_matches_query(
         }))
 }
 
-impl From<SnarkWorkSummary> for Snark {
-    fn from(snark: SnarkWorkSummary) -> Self {
+impl From<(SnarkWorkSummary, String)> for Snark {
+    fn from(snark: (SnarkWorkSummary, String)) -> Self {
         Snark {
-            fee: snark.fee,
-            prover: snark.prover.0,
+            fee: snark.0.fee,
+            prover: snark.0.prover.0,
+            block: SnarkBlock {
+                state_hash: snark.1,
+            },
         }
     }
 }
@@ -178,6 +191,9 @@ impl From<SnarkWorkSummaryWithStateHash> for Snark {
         Snark {
             fee: snark.fee,
             prover: snark.prover.0,
+            block: SnarkBlock {
+                state_hash: snark.state_hash.clone(),
+            },
         }
     }
 }
@@ -194,11 +210,11 @@ impl SnarkQueryInput {
         } = self;
 
         if let Some(state_hash) = state_hash {
-            matches &= snark.block.state_hash().0 == *state_hash;
+            matches &= snark.pcb.state_hash().0 == *state_hash;
         }
         if let Some(prover) = prover {
             matches &= snark
-                .block
+                .pcb
                 .prover_keys()
                 .contains(&<String as Into<PublicKey>>::into(prover.clone()));
         }
