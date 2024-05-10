@@ -18,6 +18,7 @@ steps:
     mina-log-storage: true
     docker: true
   command: |
+    docker --version
     nix develop --command just build
     nix develop --command tests/regression test_many_blocks
     # TODO: why is this not working?
@@ -33,6 +34,7 @@ steps:
   agents:
     docker: true
   command: |
+    docker --version
     nix build .#dockerImage
     docker load < ./result
     docker run --rm -it \
