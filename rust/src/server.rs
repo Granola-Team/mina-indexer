@@ -3,9 +3,9 @@ use crate::{
         self,
         parser::BlockParser,
         precomputed::{PcbVersion, PrecomputedBlock},
-        BlockHash, Network,
+        BlockHash,
     },
-    chain_id::{chain_id, ChainId},
+    chain::{chain_id, ChainId, Network},
     constants::*,
     ledger::{
         genesis::{GenesisConstants, GenesisLedger},
@@ -184,7 +184,7 @@ pub fn initialize(
         genesis_hash,
         indexer_store: store,
         genesis_ledger: genesis_ledger.clone(),
-        version: IndexerVersion::new("mainnet", &chain_id),
+        version: IndexerVersion::new(&Network::Mainnet, &chain_id),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
         canonical_update_threshold,
@@ -449,7 +449,7 @@ async fn recover_missing_blocks(
     batch_recovery: bool,
 ) {
     let state = state.read().await;
-    let network = state.version.network.0.clone();
+    let network = state.version.network.clone();
     let missing_parent_lengths: HashSet<u32> = state
         .dangling_branches
         .iter()
@@ -463,7 +463,7 @@ async fn recover_missing_blocks(
         let mut c =
             std::process::Command::new(missing_block_recovery_exe.as_ref().display().to_string());
         let cmd = c.args([
-            &network,
+            &network.to_string(),
             &blockchain_length.to_string(),
             &block_watch_dir.as_ref().display().to_string(),
         ]);
@@ -502,17 +502,17 @@ async fn recover_missing_blocks(
 }
 
 impl IndexerVersion {
-    pub fn new(network: &str, chain_id: &ChainId) -> Self {
+    pub fn new(network: &Network, chain_id: &ChainId) -> Self {
         Self {
             chain_id: chain_id.clone(),
             version: PcbVersion::V1,
-            network: Network(network.into()),
+            network: network.clone(),
             history: HashMap::from([(chain_id.clone(), PcbVersion::V1)]),
         }
     }
 
     pub fn new_testing() -> Self {
-        Self::new("mainnet", &ChainId("TESTING".into()))
+        Self::new(&Network::Mainnet, &ChainId("TESTING".into()))
     }
 }
 

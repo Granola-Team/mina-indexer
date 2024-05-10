@@ -1,6 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
+    chain::Network,
     event::{
         db::{DbEvent, DbLedgerEvent},
         store::EventStore,
@@ -30,7 +31,7 @@ async fn test() -> anyhow::Result<()> {
 
     // add all blocks & get store handle
     state.add_blocks(&mut block_parser)?;
-    let network = "mainnet".to_string();
+    let network = Network::Mainnet;
     let indexer_store = state.indexer_store.as_ref().unwrap();
 
     // memoize via state hash query

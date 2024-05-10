@@ -4,6 +4,7 @@ use crate::{
         BlockWithoutHeight,
     },
     canonicity::store::CanonicityStore,
+    chain::Network,
     client::*,
     command::{signed, store::CommandStore, Command},
     ledger::{
@@ -643,7 +644,7 @@ async fn handle_conn(
                     trace!("{hash} is a state hash");
 
                     if let Some(ledger) =
-                        db.get_ledger_state_hash("mainnet", &hash.clone().into(), true)?
+                        db.get_ledger_state_hash(&Network::Mainnet, &hash.clone().into(), true)?
                     {
                         let ledger = ledger.to_string_pretty();
                         if path.is_none() {
@@ -670,7 +671,9 @@ async fn handle_conn(
                 } else if ledger::is_valid_ledger_hash(&hash) {
                     trace!("{hash} is a ledger hash");
 
-                    if let Some(ledger) = db.get_ledger("mainnet", &LedgerHash(hash.clone()))? {
+                    if let Some(ledger) =
+                        db.get_ledger(&Network::Mainnet, &LedgerHash(hash.clone()))?
+                    {
                         let ledger = ledger.to_string_pretty();
                         if path.is_none() {
                             debug!("Writing ledger at hash {hash} to stdout");
@@ -723,7 +726,7 @@ async fn handle_conn(
                                 }
 
                                 if let Some(ledger) = db.get_ledger_state_hash(
-                                    "mainnet", // TODO lookup from chain id
+                                    &Network::Mainnet, // TODO lookup from chain id
                                     &curr_block.state_hash(),
                                     true,
                                 )? {
@@ -735,7 +738,7 @@ async fn handle_conn(
                                 best_tip_missing_from_db().unwrap()
                             }
                         } else if let Some(ledger) =
-                            db.get_ledger_at_height("mainnet", height, true)?
+                            db.get_ledger_at_height(&Network::Mainnet, height, true)?
                         {
                             ledger.to_string_pretty()
                         } else {

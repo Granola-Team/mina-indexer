@@ -1,6 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{vrf_output::VrfOutput, Block, BlockHash},
+    chain::Network,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, *},
     ledger::LedgerHash,
     store::IndexerStore,
@@ -13,28 +14,28 @@ fn add_and_get_events() {
 
     let event0 = IndexerEvent::BlockWatcher(BlockWatcherEvent::SawBlock {
         blockchain_length: 19,
-        network: "network0".into(),
+        network: Network::Testworld,
         state_hash: BlockHash::default(),
     });
     let event1 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
         blockchain_length: 23,
-        network: "network1".into(),
+        network: Network::Devnet,
         state_hash: BlockHash::default(),
     }));
     let event2 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
-        network: "network2".into(),
+        network: Network::Berkeley,
         ledger_hash: LedgerHash::default(),
         state_hash: BlockHash::default(),
         blockchain_length: 42,
     }));
     let event3 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
-        network: "network3".into(),
+        network: Network::Mainnet,
         state_hash: BlockHash::default(),
     }));
     let event4 = IndexerEvent::StakingLedgerWatcher(StakingLedgerWatcherEvent::NewStakingLedger {
         epoch: 0,
-        network: "mainnet".into(),
+        network: Network::Mainnet,
         ledger_hash: LedgerHash("jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".into()),
     });
     let block = Block {

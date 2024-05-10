@@ -5,10 +5,10 @@ use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
-        BlockHash, Network,
+        BlockHash,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain_id::{store::ChainIdStore, ChainId},
+    chain::{store::ChainIdStore, ChainId, Network},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
@@ -580,7 +580,7 @@ impl CanonicityStore for IndexerStore {
         // record new canonical block event
         self.add_event(&IndexerEvent::Db(DbEvent::Canonicity(
             DbCanonicityEvent::NewCanonicalBlock {
-                network: "mainnet".into(),
+                network: self.get_current_network().unwrap_or(Network::Mainnet),
                 blockchain_length: height,
                 state_hash: state_hash.0.clone().into(),
             },
@@ -683,7 +683,7 @@ impl CanonicityStore for IndexerStore {
 impl LedgerStore for IndexerStore {
     fn add_ledger(
         &self,
-        network: &str,
+        network: &Network,
         ledger_hash: &LedgerHash,
         state_hash: &BlockHash,
     ) -> anyhow::Result<()> {
@@ -704,7 +704,7 @@ impl LedgerStore for IndexerStore {
 
     fn add_ledger_state_hash(
         &self,
-        network: &str,
+        network: &Network,
         state_hash: &BlockHash,
         ledger: Ledger,
     ) -> anyhow::Result<()> {
@@ -731,7 +731,7 @@ impl LedgerStore for IndexerStore {
             self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                 DbLedgerEvent::NewLedger {
                     blockchain_length: 0,
-                    network: network.to_string(),
+                    network: network.clone(),
                     state_hash: state_hash.clone(),
                     ledger_hash: LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
                 },
@@ -758,7 +758,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger_state_hash(
         &self,
-        network: &str,
+        network: &Network,
         state_hash: &BlockHash,
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
@@ -841,7 +841,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger(
         &self,
-        network: &str,
+        network: &Network,
         ledger_hash: &LedgerHash,
     ) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting staged ledger {} hash {}", network, ledger_hash.0);
@@ -869,7 +869,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_ledger_at_height(
         &self,
-        network: &str,
+        network: &Network,
         height: u32,
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
@@ -883,7 +883,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_staking_ledger_at_epoch(
         &self,
-        network: &str,
+        network: &Network,
         epoch: u32,
     ) -> anyhow::Result<Option<StakingLedger>> {
         trace!("Getting staking ledger {} epoch {}", network, epoch);
@@ -905,7 +905,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_staking_ledger_hash(
         &self,
-        network: &str,
+        network: &Network,
         ledger_hash: &LedgerHash,
     ) -> anyhow::Result<Option<StakingLedger>> {
         trace!("Getting staking ledger {} hash {}", network, ledger_hash.0);
@@ -967,7 +967,7 @@ impl LedgerStore for IndexerStore {
         // add new aggregated delegation event
         self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
             DbStakingLedgerEvent::AggregateDelegations {
-                network: network.to_string(),
+                network,
                 epoch: staking_ledger.epoch,
             },
         )))?;
@@ -976,7 +976,7 @@ impl LedgerStore for IndexerStore {
 
     fn get_delegations_epoch(
         &self,
-        network: &str,
+        network: &Network,
         epoch: u32,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
         trace!("Getting staking delegations for epoch {}", epoch);
@@ -1680,29 +1680,30 @@ impl ChainIdStore for IndexerStore {
         trace!(
             "Setting chain id '{}' for network '{}'",
             chain_id.0,
-            network.0
+            network
         );
+
+        let chain_bytes = chain_id.0.as_bytes();
 
         // add the new pair
         self.database.put_cf(
             self.chain_id_to_network_cf(),
-            chain_id.0.as_bytes(),
-            network.0.as_bytes(),
+            chain_bytes,
+            network.to_string().as_bytes(),
         )?;
 
         // update current chain_id
-        self.database
-            .put(Self::CHAIN_ID_KEY, chain_id.0.as_bytes())?;
+        self.database.put(Self::CHAIN_ID_KEY, chain_bytes)?;
         Ok(())
     }
 
     fn get_network(&self, chain_id: &ChainId) -> anyhow::Result<Network> {
         trace!("Getting network for chain id: {}", chain_id.0);
-        Ok(Network(String::from_utf8(
+        Ok(Network::from(
             self.database
                 .get_cf(self.chain_id_to_network_cf(), chain_id.0.as_bytes())?
-                .expect("network is present"),
-        )?))
+                .expect("network should exist in database"),
+        ))
     }
 
     fn get_current_network(&self) -> anyhow::Result<Network> {
@@ -1715,7 +1716,7 @@ impl ChainIdStore for IndexerStore {
         Ok(ChainId(String::from_utf8(
             self.database
                 .get(Self::CHAIN_ID_KEY)?
-                .expect("chain id set"),
+                .expect("chain id should exist in database"),
         )?))
     }
 }

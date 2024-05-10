@@ -1,11 +1,11 @@
-use crate::ledger::LedgerHash;
+use crate::{chain::Network, ledger::LedgerHash};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum StakingLedgerWatcherEvent {
     NewStakingLedger {
         epoch: u32,
-        network: String,
+        network: Network,
         ledger_hash: LedgerHash,
     },
 }

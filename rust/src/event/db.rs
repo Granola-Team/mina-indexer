@@ -1,4 +1,4 @@
-use crate::{block::BlockHash, ledger::LedgerHash};
+use crate::{block::BlockHash, chain::Network, ledger::LedgerHash};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -12,12 +12,12 @@ pub enum DbEvent {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbBlockEvent {
     NewBlock {
-        network: String,
+        network: Network,
         state_hash: BlockHash,
         blockchain_length: u32,
     },
     NewBestTip {
-        network: String,
+        network: Network,
         state_hash: BlockHash,
         blockchain_length: u32,
     },
@@ -26,7 +26,7 @@ pub enum DbBlockEvent {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbLedgerEvent {
     NewLedger {
-        network: String,
+        network: Network,
         state_hash: BlockHash,
         blockchain_length: u32,
         ledger_hash: LedgerHash,
@@ -36,12 +36,12 @@ pub enum DbLedgerEvent {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbStakingLedgerEvent {
     NewStakingLedger {
-        network: String,
+        network: Network,
         epoch: u32,
         ledger_hash: LedgerHash,
     },
     AggregateDelegations {
-        network: String,
+        network: Network,
         epoch: u32,
     },
 }
@@ -49,7 +49,7 @@ pub enum DbStakingLedgerEvent {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DbCanonicityEvent {
     NewCanonicalBlock {
-        network: String,
+        network: Network,
         state_hash: BlockHash,
         blockchain_length: u32,
     },

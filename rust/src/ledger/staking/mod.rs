@@ -2,6 +2,7 @@ pub mod parser;
 
 use crate::{
     block::{precomputed::PcbVersion, BlockHash},
+    chain::Network,
     ledger::{public_key::PublicKey, LedgerHash},
 };
 use log::trace;
@@ -13,7 +14,7 @@ use std::{collections::HashMap, path::Path};
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub ledger_hash: LedgerHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
@@ -91,7 +92,7 @@ pub struct TimingJson {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregatedEpochStakeDelegations {
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub ledger_hash: LedgerHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
     pub total_delegations: u64,
@@ -104,11 +105,11 @@ pub struct EpochStakeDelegation {
     pub total_delegated: Option<u64>,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregatedEpochStakeDelegation {
     pub pk: PublicKey,
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub total_stake: u64,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
@@ -164,7 +165,7 @@ pub fn is_valid_ledger_file(path: &Path) -> bool {
     crate::block::is_valid_file_name(path, &super::is_valid_ledger_hash)
 }
 
-pub fn split_ledger_path(path: &Path) -> (String, u32, LedgerHash) {
+pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
     let parts: Vec<&str> = path
         .file_stem()
         .unwrap()
@@ -295,7 +296,10 @@ impl std::str::FromStr for ReceiptChainHash {
 #[cfg(test)]
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
-    use crate::{block::precomputed::PcbVersion, ledger::staking::AggregatedEpochStakeDelegations};
+    use crate::{
+        block::precomputed::PcbVersion, chain::Network,
+        ledger::staking::AggregatedEpochStakeDelegations,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -304,7 +308,7 @@ mod tests {
         let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
 
         assert_eq!(staking_ledger.epoch, 0);
-        assert_eq!(staking_ledger.network, "mainnet".to_string());
+        assert_eq!(staking_ledger.network, Network::Mainnet);
         assert_eq!(
             staking_ledger.ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
@@ -328,7 +332,7 @@ mod tests {
         let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
 
         assert_eq!(epoch, 0);
-        assert_eq!(network, "mainnet".to_string());
+        assert_eq!(network, Network::Mainnet);
         assert_eq!(
             ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
