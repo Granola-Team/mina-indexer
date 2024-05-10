@@ -22,6 +22,7 @@ variables {
 ```
 HTTP 200
 [Asserts]
+jsonpath "$.data.snarks" count == 10
 jsonpath "$.data.snarks[0].dateTime" == "2021-03-17T08:06:00.000Z"
 jsonpath "$.data.snarks[0].canonical" == true
 jsonpath "$.data.snarks[0].blockHeight" == 111
