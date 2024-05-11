@@ -63,10 +63,20 @@ pub struct AccountAccessed {
     pub token_id: String,
     pub token_symbol: String,
     pub permissions: Permissions,
-    pub timing: (Timing,),
+    pub timing: AccountAccessedTiming,
+    pub zkapp: Option<ZkappAccount>,
+}
 
-    // TODO ZkappAccount?
-    pub zkapp: Option<serde_json::Value>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AccountAccessedTiming {
+    Untimed((TimingKind,)),
+    Timed((TimingKind, Timing)),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TimingKind {
+    Timed,
+    Untimed,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,19 +100,38 @@ pub struct Permissions {
 pub struct SetVerificationKey(pub u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Permission(pub [String; 1]);
+pub struct Permission(pub (PermissionKind,));
 
 /// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/permissions.mli
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PermissionKind {
-    #[serde(rename = "None_given")]
-    NoneGiven,
-
+    None,
     Either,
     Proof,
     Signature,
     Impossible,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZkappAccount {
+    pub app_state: [String; 8],    // 64 hex digits
+    pub action_state: [String; 5], // 64 hex digits
+    pub verification_key: VerificationKey,
+    pub proved_state: bool,
+    pub zkapp_uri: String,
+
+    #[serde(deserialize_with = "from_str")]
+    pub zkapp_version: u32,
+
+    #[serde(deserialize_with = "from_str")]
+    pub last_action_slot: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationKey {
+    pub data: String,
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

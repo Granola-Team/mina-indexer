@@ -178,14 +178,9 @@ pub struct AccountUpdate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum AuthorizationKind {
-    #[serde(rename = "None_given")]
-    NoneGiven,
-
-    Either,
+pub enum ProofOrSignature {
     Proof,
     Signature,
-    Impossible,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,8 +189,12 @@ pub enum Authorization {
     #[serde(rename = "None_given")]
     NoneGiven,
 
-    Proof((AuthorizationKind, String)),
-    Signature((AuthorizationKind, String)),
+    Either,
+    Proof,
+    Proof_((ProofOrSignature, String)),
+    Signature,
+    Signature_((ProofOrSignature, String)),
+    Impossible,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -207,14 +206,14 @@ pub struct AccountUpdateBody {
     pub update: Update,
     pub balance_change: SupplyAdjustment,
     pub increment_nonce: bool,
-    pub events: (ZkappEvents,),
-    pub actions: (ZkappActions,),
+    pub events: Vec<ZkappEvents>,
+    pub actions: Vec<ZkappActions>,
     pub call_data: String,
     pub preconditions: Preconditions,
     pub use_full_commitment: bool,
     pub implicit_account_creation_fee: bool,
     pub may_use_token: (MayUseToken,),
-    pub authorization_kind: (AuthorizationKind,),
+    pub authorization_kind: Authorization,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

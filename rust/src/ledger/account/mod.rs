@@ -2,6 +2,7 @@ use crate::{
     block::{genesis::GenesisBlock, BlockHash},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
+    mina_blocks::v2::ZkappAccount,
 };
 use anyhow::bail;
 use rust_decimal::Decimal;
@@ -35,7 +36,9 @@ pub struct Account {
     pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
-    pub zkapp: Option<String>,
+
+    // for zkapp accounts
+    pub zkapp: Option<ZkappAccount>,
 
     // for mina search
     pub username: Option<Username>,
