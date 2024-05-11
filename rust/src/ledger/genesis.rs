@@ -3,7 +3,7 @@ use super::{
     public_key::PublicKey,
     Ledger,
 };
-use crate::{block::genesis::GenesisBlock, constants::*};
+use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub struct GenesisAccount {
     pub voting_for: Option<String>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
-    pub zkapp: Option<String>,
+    pub zkapp: Option<ZkappAccount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
