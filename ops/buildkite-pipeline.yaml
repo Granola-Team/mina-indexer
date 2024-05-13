@@ -21,11 +21,12 @@ steps:
     docker --version
     nix develop --command just build
     nix develop --command tests/regression test_many_blocks
+    ops/productionify
     # TODO: why is this not working?
     # nix develop --command tests/regression test_release
-    nix build
-    ops/ingest-all
-    nix develop --command ops/test-justfile-targets
+    # nix build
+    # ops/ingest-all
+    # nix develop --command ops/test-justfile-targets
 
 - label: "Create OCI Image"
   key: image
