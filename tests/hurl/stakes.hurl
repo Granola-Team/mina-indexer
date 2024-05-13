@@ -78,3 +78,18 @@ jsonpath "$.data.stakes[0].timing.cliff_time" == 345600
 jsonpath "$.data.stakes[0].timing.initial_minimum_balance" == 1000000000
 jsonpath "$.data.stakes[0].timing.vesting_increment" == 0
 jsonpath "$.data.stakes[0].timing.vesting_period" == 1
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {epoch: 42, public_key: "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"} limit: 1) {
+    delegationTotals {
+      totalStakePercentage
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+duration < 1000
+jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56%"
