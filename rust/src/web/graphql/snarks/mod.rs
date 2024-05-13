@@ -57,6 +57,7 @@ pub struct SnarkQueryInput {
     state_hash: Option<String>,
     canonical: Option<bool>,
     prover: Option<String>,
+    block_height: Option<u32>,
     and: Option<Vec<SnarkQueryInput>>,
     or: Option<Vec<SnarkQueryInput>>,
 }
@@ -84,6 +85,28 @@ impl SnarkQueryRoot {
         let db = db(ctx);
         let mut snarks = Vec::with_capacity(limit);
         let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
+
+        // block height
+        if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
+            let mut snarks: Vec<SnarkWithCanonicity> = db
+                .get_blocks_at_height(block_height)?
+                .into_iter()
+                .flat_map(|block| {
+                    SnarkWorkSummaryWithStateHash::from_precomputed(&block)
+                        .into_iter()
+                        .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
+                        .collect::<Vec<SnarkWithCanonicity>>()
+                })
+                .collect();
+
+            match sort_by {
+                SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
+                SnarkSortByInput::BlockHeightDesc => (),
+            }
+
+            snarks.truncate(limit);
+            return Ok(snarks);
+        }
 
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
@@ -205,12 +228,16 @@ impl SnarkQueryInput {
             state_hash,
             canonical,
             prover,
+            block_height,
             and,
             or,
         } = self;
 
         if let Some(state_hash) = state_hash {
             matches &= snark.pcb.state_hash().0 == *state_hash;
+        }
+        if let Some(block_height) = block_height {
+            matches &= snark.pcb.blockchain_length() == *block_height;
         }
         if let Some(prover) = prover {
             matches &= snark
