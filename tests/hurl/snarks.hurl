@@ -31,3 +31,42 @@ jsonpath "$.data.snarks[0].fee" == 0
 jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
 
 duration < 1000
+
+POST {{url}}
+```graphql
+{
+  snarks(query: {canonical: true, blockHeight: 111}, limit: 1000) {
+    blockHeight
+    canonical
+    dateTime
+    fee
+    prover
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.snarks" count == 64
+jsonpath "$.data.snarks[0].dateTime" == "2021-03-17T08:06:00.000Z"
+jsonpath "$.data.snarks[0].canonical" == true
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.snarks[0].fee" == 0
+
+POST {{url}}
+```graphql
+{
+  snarks(query: {canonical: true, block: {stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"}}) {
+		blockHeight
+    block {
+      stateHash
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+
+duration < 1000

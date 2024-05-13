@@ -36,7 +36,6 @@ async fn test() {
         .filter_map(|event| match event {
             IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBestTip {
                 state_hash,
-                network: _,
                 blockchain_length: _,
             })) => Some(state_hash.clone()),
             _ => None,
@@ -53,7 +52,6 @@ async fn test() {
         .iter()
         .filter_map(|event| match event {
             IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
-                network: _,
                 state_hash,
                 blockchain_length,
             })) => Some((*blockchain_length, &state_hash.0[..])),

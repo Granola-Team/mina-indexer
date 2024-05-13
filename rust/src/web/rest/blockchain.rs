@@ -10,7 +10,7 @@ use crate::{
 };
 use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
 use chrono::DateTime;
-use log::debug;
+use log::trace;
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -142,19 +142,13 @@ pub async fn get_blockchain_summary(
 ) -> HttpResponse {
     let db = store.as_ref();
     if let Ok(Some(best_tip)) = db.get_best_block() {
-        debug!("Found best tip: {}", best_tip.summary());
-        if let Ok(Some(best_ledger)) =
-            db.get_ledger_state_hash(&best_tip.network(), &best_tip.state_hash(), true)
-        {
-            let global_slot = best_tip
-                .consensus_state()
-                .global_slot_since_genesis
-                .inner()
-                .inner();
+        trace!("Found best tip: {}", best_tip.summary());
+        if let Ok(Some(best_ledger)) = db.get_ledger_state_hash(&best_tip.state_hash(), true) {
+            let global_slot = best_tip.global_slot_since_genesis();
             let locked_amount = locked_balances.get_locked_amount(global_slot);
-            debug!("Found ledger for best tip");
+            trace!("Found ledger for best tip");
             if let Some(ref summary) = calculate_summary(&best_tip, &best_ledger, locked_amount) {
-                debug!("Blockchain summary for the best_tip: {:?}", summary);
+                trace!("Blockchain summary for the best_tip: {:?}", summary);
                 let body = serde_json::to_string_pretty(summary).unwrap();
                 return HttpResponse::Ok()
                     .content_type(ContentType::json())
