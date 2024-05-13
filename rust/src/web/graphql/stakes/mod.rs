@@ -5,7 +5,7 @@ use crate::{
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
 };
-use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
@@ -52,10 +52,10 @@ impl StakeQueryRoot {
             Some(staking_ledger) => staking_ledger,
             None => return Ok(None),
         };
-
         // Delegations will be present if the staking ledger is
         let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
 
+        let total_currency = staking_ledger.total_currency;
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let mut accounts: Vec<StakesLedgerAccountWithMeta> = staking_ledger
             .staking_ledger
@@ -109,6 +109,7 @@ impl StakeQueryRoot {
                     ledger_hash: ledger_hash.clone(),
                     account: StakesLedgerAccount::from(account),
                     delegation_totals: StakesDelegationTotals {
+                        total_currency,
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
@@ -170,13 +171,32 @@ pub struct StakesLedgerAccount {
 }
 
 #[derive(SimpleObject)]
+#[graphql(complex)]
 pub struct StakesDelegationTotals {
+    /// Value total currency
+    pub total_currency: u64,
     /// Value total delegated
     pub total_delegated: f64,
     /// Value total delegated in nanomina
     pub total_delegated_nanomina: u64,
     /// Value count delegates
     pub count_delegates: u32,
+}
+
+#[ComplexObject]
+impl StakesDelegationTotals {
+    /// Value total stake percentage
+    async fn total_stake_percentage(&self) -> String {
+        let total_currency_decimal = Decimal::from(self.total_currency);
+        let total_delegated_decimal = Decimal::from(self.total_delegated_nanomina);
+        let ratio = if !total_currency_decimal.is_zero() {
+            (total_delegated_decimal / total_currency_decimal) * Decimal::from(100)
+        } else {
+            Decimal::ZERO
+        };
+        let rounded_ratio = ratio.round_dp(2);
+        format!("{:.2}%", rounded_ratio)
+    }
 }
 
 #[derive(SimpleObject)]

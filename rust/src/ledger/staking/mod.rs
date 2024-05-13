@@ -20,6 +20,7 @@ pub struct StakingLedger {
     pub epoch: u32,
     pub network: Network,
     pub ledger_hash: LedgerHash,
+    pub total_currency: u64,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
@@ -159,15 +160,18 @@ impl StakingLedger {
 
         let bytes = std::fs::read(path)?;
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
-        let staking_ledger = staking_ledger
+        let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
             .map(|acct| (acct.pk.clone(), acct.into()))
             .collect();
         let (network, epoch, ledger_hash) = split_ledger_path(path);
 
+        let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
+
         Ok(Self {
             epoch,
             network,
+            total_currency,
             ledger_hash,
             staking_ledger,
         })

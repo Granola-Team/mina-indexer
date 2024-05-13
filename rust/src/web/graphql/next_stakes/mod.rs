@@ -59,7 +59,7 @@ impl NextStakesQueryRoot {
 
         // Delegations will be present if the staking ledger is
         let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
-
+        let total_currency = staking_ledger.total_currency;
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let mut accounts: Vec<NextStakesLedgerAccountWithMeta> = staking_ledger
             .staking_ledger
@@ -113,6 +113,7 @@ impl NextStakesQueryRoot {
                     ledger_hash: ledger_hash.clone(),
                     account: StakesLedgerAccount::from(account),
                     next_delegation_totals: StakesDelegationTotals {
+                        total_currency,
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
