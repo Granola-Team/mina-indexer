@@ -32,7 +32,7 @@ DB_DIR="$PROD"/database
 TESTING_DB_DIR=/mnt/mina-log-storage/"$VER"-database
 if [ ! -e "$TESTING_DB_DIR" ]; then
     # Set a backup DB_DIR, mostly for testing this script.
-    TESTING_DB_DIR=/mnt/mina-log-storage/f9cef6f-database
+    TESTING_DB_DIR=/mnt/mina-log-storage/f9cef6f2-database
 fi
 rm -f "$DB_DIR"
 ln -s "$TESTING_DB_DIR" "$DB_DIR"
