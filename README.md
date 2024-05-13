@@ -58,7 +58,8 @@ tools, removing the need for a separate host Rust installation.
 ### Building the Project
 
 Run `nix build` to compile the project. This will
-compile the `mina-indexer` binary and place it in `./result/bin`.
+compile the `mina-indexer` binary. See the ops folder for 
+working examples with the binary.
 
 ### Running Tests
 
