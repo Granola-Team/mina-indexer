@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain::{chain_id, store::ChainIdStore, Network},
+    chain::chain_id,
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
 };
@@ -47,13 +47,12 @@ impl StakeQueryRoot {
             Some(ref query) => query.epoch.unwrap_or(curr_epoch),
             None => curr_epoch,
         };
-        let network = db.get_current_network().unwrap_or(Network::Mainnet);
-        let staking_ledger = match db.get_staking_ledger_at_epoch(&network, epoch)? {
+        let staking_ledger = match db.get_staking_ledger_at_epoch(epoch, &None)? {
             Some(staking_ledger) => staking_ledger,
             None => return Ok(None),
         };
         // Delegations will be present if the staking ledger is
-        let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
+        let delegations = db.get_delegations_epoch(epoch, &None)?.unwrap();
 
         let total_currency = staking_ledger.total_currency;
         let ledger_hash = staking_ledger.ledger_hash.clone().0;

@@ -19,23 +19,19 @@ fn add_and_get_events() {
     });
     let event1 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
         blockchain_length: 23,
-        network: Network::Devnet,
         state_hash: BlockHash::default(),
     }));
     let event2 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
-        network: Network::Berkeley,
         ledger_hash: LedgerHash::default(),
         state_hash: BlockHash::default(),
         blockchain_length: 42,
     }));
     let event3 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
-        network: Network::Mainnet,
         state_hash: BlockHash::default(),
     }));
     let event4 = IndexerEvent::StakingLedgerWatcher(StakingLedgerWatcherEvent::NewStakingLedger {
         epoch: 0,
-        network: Network::Mainnet,
         ledger_hash: LedgerHash("jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".into()),
     });
     let block = Block {

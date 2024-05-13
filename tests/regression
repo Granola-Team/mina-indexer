@@ -1476,7 +1476,8 @@ test_start_from_config() {
       \"canonical_update_threshold\": 2,
       \"locked_supply_csv\": \"./locked.csv\",
       \"web_hostname\": \"localhost\",
-      \"web_port\": ${port}
+      \"web_port\": ${port},
+      \"network\": \"mainnet\"
     }" > $file
     idxr_server start-via-config -p $file
     wait_for_socket
