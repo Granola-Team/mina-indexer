@@ -2,12 +2,7 @@ steps:
 
 - label: "Developer Environment Build and Test"
   key: "build"
-  command: |
-    echo HOME=$HOME
-    echo PATH=$PATH
-    nix develop --command just
-    nix develop --command just prereqs
-    nix develop --command just test
+  command: "./ops/build-and-test"
 
 - label: "Tier 2 Testing"
   key: "tier2"
@@ -18,15 +13,8 @@ steps:
     mina-log-storage: true
     docker: true
   command: |
-    docker --version
-    nix develop --command just build
-    nix develop --command tests/regression test_many_blocks
-    ops/productionify
-    # TODO: why is this not working?
-    # nix develop --command tests/regression test_release
-    # nix build
-    # ops/ingest-all
-    # nix develop --command ops/test-justfile-targets
+    ./ops/tier2-test
+    ./ops/productionify
 
 - label: "Create OCI Image"
   key: image
