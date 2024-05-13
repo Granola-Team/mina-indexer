@@ -1,4 +1,4 @@
-use crate::{chain::Network, constants::MAINNET_GENESIS_HASH};
+use crate::constants::MAINNET_GENESIS_HASH;
 use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
 use std::{
@@ -216,9 +216,6 @@ pub enum StakingLedgers {
         /// Ledger hash corresponding to the staking ledger
         #[arg(long)]
         hash: String,
-        /// Network
-        #[arg(long, default_value = Network::Mainnet)]
-        network: Network,
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
@@ -228,9 +225,9 @@ pub enum StakingLedgers {
         /// Epoch number of the staking ledger
         #[arg(long)]
         epoch: u32,
-        /// Network
-        #[arg(long, default_value = Network::Mainnet)]
-        network: Network,
+        /// Genesis state hash
+        #[arg(long, default_value = MAINNET_GENESIS_HASH)]
+        genesis_state_hash: String,
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
@@ -240,9 +237,9 @@ pub enum StakingLedgers {
         /// Epoch to aggregate total delegations
         #[arg(long)]
         epoch: u32,
-        /// Network for the staking ledger
-        #[arg(long, default_value = Network::Mainnet)]
-        network: Network,
+        /// Genesis state hash
+        #[arg(long, default_value = MAINNET_GENESIS_HASH)]
+        genesis_state_hash: String,
         /// Path to write the aggregate delegations
         #[arg(long)]
         path: Option<PathBuf>,
@@ -252,9 +249,9 @@ pub enum StakingLedgers {
         /// Epoch to aggregate staking delegations
         #[arg(long)]
         epoch: u32,
-        /// Network for the staking ledger
-        #[arg(long, default_value = Network::Mainnet)]
-        network: Network,
+        /// Genesis state hash
+        #[arg(long, default_value = MAINNET_GENESIS_HASH)]
+        genesis_state_hash: String,
         /// Account to aggregate staking delegations
         #[arg(long)]
         public_key: String,

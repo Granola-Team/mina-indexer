@@ -458,6 +458,15 @@ impl PrecomputedBlock {
         public_keys
     }
 
+    pub fn genesis_state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => {
+                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.clone())
+            }
+            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.clone(),
+        }
+    }
+
     pub fn global_slot_since_genesis(&self) -> u32 {
         match self {
             Self::V1(v1) => {

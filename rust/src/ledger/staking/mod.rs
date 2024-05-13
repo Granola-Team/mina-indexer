@@ -1,7 +1,7 @@
 pub mod parser;
 
 use crate::{
-    block::{precomputed::PcbVersion, BlockHash},
+    block::BlockHash,
     chain::Network,
     ledger::{
         account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
@@ -21,6 +21,7 @@ pub struct StakingLedger {
     pub network: Network,
     pub ledger_hash: LedgerHash,
     pub total_currency: u64,
+    pub genesis_state_hash: BlockHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
@@ -67,6 +68,7 @@ pub struct AggregatedEpochStakeDelegations {
     pub epoch: u32,
     pub network: Network,
     pub ledger_hash: LedgerHash,
+    pub genesis_state_hash: BlockHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
     pub total_delegations: u64,
 }
@@ -155,8 +157,8 @@ pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
 }
 
 impl StakingLedger {
-    pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<StakingLedger> {
-        trace!("Parsing {} staking ledger", version);
+    pub fn parse_file(path: &Path, genesis_state_hash: BlockHash) -> anyhow::Result<StakingLedger> {
+        trace!("Parsing staking ledger");
 
         let bytes = std::fs::read(path)?;
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
@@ -174,6 +176,7 @@ impl StakingLedger {
             total_currency,
             ledger_hash,
             staking_ledger,
+            genesis_state_hash,
         })
     }
 
@@ -237,7 +240,8 @@ impl StakingLedger {
                 });
             }
         });
-        let delegations = delegations
+
+        let delegations: HashMap<PublicKey, EpochStakeDelegation> = delegations
             .into_iter()
             .map(|(pk, del)| (pk, del.unwrap_or_default()))
             .collect();
@@ -247,6 +251,7 @@ impl StakingLedger {
             epoch: self.epoch,
             network: self.network.clone(),
             ledger_hash: self.ledger_hash.clone(),
+            genesis_state_hash: self.genesis_state_hash.clone(),
         })
     }
 
@@ -274,7 +279,7 @@ impl std::str::FromStr for ReceiptChainHash {
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
     use crate::{
-        block::precomputed::PcbVersion, chain::Network,
+        chain::Network, constants::MAINNET_GENESIS_HASH,
         ledger::staking::AggregatedEpochStakeDelegations,
     };
     use std::path::PathBuf;
@@ -282,7 +287,7 @@ mod tests {
     #[test]
     fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, Network::Mainnet);
@@ -298,11 +303,12 @@ mod tests {
         use crate::ledger::public_key::PublicKey;
 
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
             ledger_hash,
+            genesis_state_hash,
             delegations,
             total_delegations,
         } = staking_ledger.aggregate_delegations()?;
@@ -323,6 +329,7 @@ mod tests {
             })
         );
         assert_eq!(total_delegations, 794268782956784283);
+        assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
         Ok(())
     }
 }

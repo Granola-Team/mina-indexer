@@ -1,5 +1,5 @@
 use super::{is_valid_ledger_file, StakingLedger};
-use crate::block::precomputed::PcbVersion;
+use crate::constants::MAINNET_GENESIS_HASH;
 use glob::glob;
 use std::{
     path::{Path, PathBuf},
@@ -29,7 +29,7 @@ impl StakingLedgerParser {
 
     pub fn next_ledger(&mut self) -> anyhow::Result<Option<StakingLedger>> {
         if let Some(next_path) = self.ledger_paths.next() {
-            return StakingLedger::parse_file(&next_path, PcbVersion::V1).map(Some);
+            return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into()).map(Some);
         }
         Ok(None)
     }
