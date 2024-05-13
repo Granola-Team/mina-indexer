@@ -1,7 +1,6 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, BlockHash},
-    chain::Network,
     event::{
         db::{DbEvent, DbLedgerEvent},
         store::EventStore,
@@ -31,7 +30,7 @@ async fn test() -> anyhow::Result<()> {
 
     // add all blocks & get store handle
     state.add_blocks(&mut block_parser)?;
-    let network = Network::Mainnet;
+
     let indexer_store = state.indexer_store.as_ref().unwrap();
 
     // memoize via state hash query
@@ -40,7 +39,7 @@ async fn test() -> anyhow::Result<()> {
     let state_hash = BlockHash("3NLGcwFVQF1p1PrZpusw2fZwBe5HKXGtrGy1Vc4aPkeBtT8nMNUc".into());
     let ledger_hash = LedgerHash("jwFtwfnhd2PDb15c23uVgNqjS3PNVWP4HpZzYSVGQAv64Y2bdV5".into());
     assert!(indexer_store
-        .get_ledger_state_hash(&network, &state_hash, true)?
+        .get_ledger_state_hash(&state_hash, true)?
         .is_some());
 
     // don't memoize via state hash query
@@ -49,14 +48,13 @@ async fn test() -> anyhow::Result<()> {
     let state_hash_no = BlockHash("3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v".into());
     let ledger_hash_no = LedgerHash("jxqrHaBcJzZAPW2rSa84chAxEHW7ot2GbqmRsWuNhwctZ8TFA2K".into());
     assert!(indexer_store
-        .get_ledger_state_hash(&network, &state_hash_no, false)?
+        .get_ledger_state_hash(&state_hash_no, false)?
         .is_some());
 
     // check the event log for new ledger event
     let event_log = indexer_store.get_event_log()?;
     assert!(event_log.contains(&IndexerEvent::Db(DbEvent::Ledger(
         DbLedgerEvent::NewLedger {
-            network: network.clone(),
             state_hash,
             ledger_hash,
             blockchain_length,
@@ -65,7 +63,6 @@ async fn test() -> anyhow::Result<()> {
     // check the event log does not contain new ledger event
     assert!(!event_log.contains(&IndexerEvent::Db(DbEvent::Ledger(
         DbLedgerEvent::NewLedger {
-            network: network.clone(),
             state_hash: state_hash_no,
             ledger_hash: ledger_hash_no,
             blockchain_length: blockchain_length_no,
@@ -78,7 +75,7 @@ async fn test() -> anyhow::Result<()> {
     let state_hash = BlockHash("3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG".into());
     let ledger_hash = LedgerHash("jxw3wNhAUhyVT4AK4dGxtn4Kpx6pvk3AXVoi2A6BAEQweyV8Uwe".into());
     assert!(indexer_store
-        .get_ledger_at_height(&network, blockchain_length, true)?
+        .get_ledger_at_height(blockchain_length, true)?
         .is_some());
 
     // don't memoize via height query
@@ -87,14 +84,13 @@ async fn test() -> anyhow::Result<()> {
     let state_hash_no = BlockHash("3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into());
     let ledger_hash_no = LedgerHash("jxZVWjsyuQkPVSj7ZbqC8PPx8FXzHQjxUYA3bhvdnQQZ15jn7mR".into());
     assert!(indexer_store
-        .get_ledger_at_height(&network, blockchain_length_no, false)?
+        .get_ledger_at_height(blockchain_length_no, false)?
         .is_some());
 
     // check the event log for new ledger event
     let event_log = indexer_store.get_event_log()?;
     assert!(event_log.contains(&IndexerEvent::Db(DbEvent::Ledger(
         DbLedgerEvent::NewLedger {
-            network: network.clone(),
             state_hash,
             ledger_hash,
             blockchain_length,
@@ -103,7 +99,6 @@ async fn test() -> anyhow::Result<()> {
     // check the event log does not contain new ledger event
     assert!(!event_log.contains(&IndexerEvent::Db(DbEvent::Ledger(
         DbLedgerEvent::NewLedger {
-            network,
             state_hash: state_hash_no,
             ledger_hash: ledger_hash_no,
             blockchain_length: blockchain_length_no,

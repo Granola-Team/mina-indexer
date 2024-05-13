@@ -1,7 +1,6 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain::{store::ChainIdStore, Network},
     constants::*,
     ledger::store::LedgerStore,
     web::graphql::stakes::{StakesDelegationTotals, StakesLedgerAccount, StakesTiming},
@@ -51,16 +50,17 @@ impl NextStakesQueryRoot {
             Some(ref query) => query.epoch.map_or(next_epoch, |e| e + 1),
             None => next_epoch,
         };
-        let network = db.get_current_network().unwrap_or(Network::Mainnet);
-        let staking_ledger = match db.get_staking_ledger_at_epoch(&network, epoch)? {
+        let staking_ledger = match db.get_staking_ledger_at_epoch(epoch, &None)? {
             Some(staking_ledger) => staking_ledger,
             None => return Ok(None),
         };
-
-        // Delegations will be present if the staking ledger is
-        let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
         let total_currency = staking_ledger.total_currency;
+        let delegations = db
+            .get_delegations_epoch(epoch, &None)?
+            .expect("delegations are present if staking ledger is");
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
+
+        // collect the results
         let mut accounts: Vec<NextStakesLedgerAccountWithMeta> = staking_ledger
             .staking_ledger
             .into_values()
@@ -99,7 +99,6 @@ impl NextStakesQueryRoot {
                 decimal.set_scale(9).ok();
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
-
                 let timing = account.timing.as_ref().map(|timing| StakesTiming {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
@@ -107,7 +106,6 @@ impl NextStakesQueryRoot {
                     vesting_increment: Some(timing.vesting_increment),
                     vesting_period: Some(timing.vesting_period),
                 });
-
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),

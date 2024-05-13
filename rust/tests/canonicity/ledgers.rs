@@ -2,7 +2,6 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    chain::Network,
     ledger::{diff::LedgerDiff, genesis::GenesisRoot, public_key::PublicKey, store::LedgerStore},
     server::IndexerVersion,
     state::IndexerState,
@@ -27,17 +26,14 @@ async fn test() -> anyhow::Result<()> {
 
     state.add_blocks(&mut block_parser)?;
 
-    let network = Network::Mainnet;
     let indexer_store = state.indexer_store.as_ref().unwrap();
-    let mut ledger_diff = indexer_store
-        .get_ledger_at_height(&network, 1, false)?
-        .unwrap();
+    let mut ledger_diff = indexer_store.get_ledger_at_height(1, false)?.unwrap();
 
     for n in 1..=3 {
         let state_hash = indexer_store.get_canonical_hash_at_height(n)?.unwrap();
         let block = indexer_store.get_block(&state_hash)?.unwrap();
         let ledger = indexer_store
-            .get_ledger_state_hash(&network, &state_hash, false)?
+            .get_ledger_state_hash(&state_hash, false)?
             .unwrap();
 
         ledger_diff
