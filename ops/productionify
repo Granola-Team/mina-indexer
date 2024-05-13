@@ -42,7 +42,7 @@ ln -s "$TESTING_DB_DIR" "$DB_DIR"
 LOG="$PROD"/log
 mkdir -p "$LOG"
 
-./rust/target/release/mina-indexer \
+exec ./rust/target/release/mina-indexer \
   --domain-socket-path "$SOCKET" \
   server start \
     --log-level DEBUG \
@@ -52,7 +52,4 @@ mkdir -p "$LOG"
     --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
     --database-dir "$DB_DIR" \
     >> "$LOG"/out \
-    2>> "$LOG"/err \
-    &
-PID=$!
-echo "$PID" > "$PROD"/.pid
+    2>> "$LOG"/err
