@@ -29,3 +29,20 @@ jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[0].canonical" == true
 jsonpath "$.data.feetransfers[0].dateTime" == "2021-03-17T08:39:00.000Z"
 duration < 1000
+
+POST {{url}}
+```graphql
+{
+  feetransfers(sortBy: BLOCKHEIGHT_DESC, query: {recipient: "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4", stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS", canonical: true}) {
+    recipient
+    stateHash
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.feetransfers" count == 1
+jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
+jsonpath "$.data.feetransfers[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+
+duration < 1000
