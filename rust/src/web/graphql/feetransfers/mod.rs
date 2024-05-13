@@ -184,6 +184,7 @@ fn get_fee_transfers_for_state_hash(
                     feetransfer: Feetransfer::from(ft),
                     block: Some(pcb.clone()),
                 })
+                .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
 
             if let Some(sort_by) = sort_by {
