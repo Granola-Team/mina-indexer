@@ -14,7 +14,7 @@ steps:
     docker: true
   command: |
     ./ops/tier2-test
-    ./ops/productionify
+    ./ops/productionize
 
 - label: "Create OCI Image"
   key: image
