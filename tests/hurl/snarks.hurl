@@ -32,7 +32,6 @@ jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4
 
 duration < 1000
 
-
 POST {{url}}
 ```graphql
 {
@@ -54,3 +53,20 @@ jsonpath "$.data.snarks[0].blockHeight" == 111
 jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.snarks[0].fee" == 0
 
+POST {{url}}
+```graphql
+{
+  snarks(query: {canonical: true, block: {stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"}}) {
+		blockHeight
+    block {
+      stateHash
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+
+duration < 1000
