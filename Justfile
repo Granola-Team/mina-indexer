@@ -56,6 +56,9 @@ audit:
 lint: && audit disallow-unused-cargo-deps
   shellcheck tests/regression
   shellcheck tests/stage-*
+  shellcheck ops/tier2-test
+  shellcheck ops/build-and-test
+  shellcheck ops/productionize
   cd rust && cargo {{nightly_if_required}} fmt --all --check
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
