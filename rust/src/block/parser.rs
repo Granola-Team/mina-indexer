@@ -307,9 +307,12 @@ impl From<ParsedBlock> for PrecomputedBlock {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{
-        blockchain_length::BlockchainLength, get_blockchain_length, is_valid_block_file,
-        length_from_path, BlockHash,
+    use crate::{
+        block::{
+            blockchain_length::BlockchainLength, get_blockchain_length, is_valid_block_file,
+            length_from_path, BlockHash,
+        },
+        chain::Network,
     };
     use quickcheck::{Arbitrary, Gen};
     use quickcheck_macros::quickcheck;
@@ -442,39 +445,6 @@ mod tests {
 
     #[derive(Debug, Clone)]
     struct BlockFileName(PathBuf);
-
-    #[derive(Debug, Clone)]
-    enum Network {
-        Mainnet,
-        Devnet,
-        Testworld,
-        Berkeley,
-    }
-
-    impl Arbitrary for Network {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let idx = usize::arbitrary(g) % 4;
-            match idx {
-                0 => Network::Mainnet,
-                1 => Network::Devnet,
-                2 => Network::Testworld,
-                3 => Network::Berkeley,
-                _ => panic!("should never happen"),
-            }
-        }
-    }
-
-    impl std::fmt::Display for Network {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let network = match self {
-                Network::Mainnet => "mainnet",
-                Network::Devnet => "devnet",
-                Network::Testworld => "testworld",
-                Network::Berkeley => "berkeley",
-            };
-            write!(f, "{}", network)
-        }
-    }
 
     impl Arbitrary for BlockHash {
         fn arbitrary(g: &mut Gen) -> Self {

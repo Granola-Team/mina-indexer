@@ -57,6 +57,7 @@ impl FeetransferWithMeta {
 pub struct FeetransferQueryInput {
     state_hash: Option<String>,
     canonical: Option<bool>,
+    recipient: Option<String>,
     and: Option<Vec<FeetransferQueryInput>>,
     or: Option<Vec<FeetransferQueryInput>>,
 }
@@ -96,6 +97,26 @@ impl FeetransferQueryRoot {
                 sort_by,
                 limit,
             ));
+        }
+
+        // recipient
+        if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
+            let mut fee_transfers: Vec<FeetransferWithMeta> = db
+                .get_internal_commands_public_key(&recipient.into())?
+                .into_iter()
+                .map(|internal_command| {
+                    let ft = Feetransfer::from(internal_command);
+                    let state_hash = ft.state_hash.clone();
+                    FeetransferWithMeta {
+                        canonical: get_block_canonicity(db, &state_hash),
+                        feetransfer: ft,
+                        block: None,
+                    }
+                })
+                .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
+                .collect();
+            fee_transfers.truncate(limit);
+            return Ok(fee_transfers);
         }
         get_fee_transfers(db, query, sort_by, limit)
     }
@@ -163,6 +184,7 @@ fn get_fee_transfers_for_state_hash(
                     feetransfer: Feetransfer::from(ft),
                     block: Some(pcb.clone()),
                 })
+                .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
 
             if let Some(sort_by) = sort_by {

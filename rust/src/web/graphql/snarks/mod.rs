@@ -1,3 +1,4 @@
+use super::gen::BlockQueryInput;
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
@@ -15,6 +16,12 @@ use std::sync::Arc;
 pub struct Snark {
     pub fee: u64,
     pub prover: String,
+    pub block: SnarkBlock,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct SnarkBlock {
+    pub state_hash: String,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -24,7 +31,7 @@ pub struct SnarkWithCanonicity {
     pub canonical: bool,
     /// Value optional block
     #[graphql(skip)]
-    pub block: PrecomputedBlock,
+    pub pcb: PrecomputedBlock,
     /// Value snark
     #[graphql(flatten)]
     pub snark: Snark,
@@ -34,23 +41,24 @@ pub struct SnarkWithCanonicity {
 impl SnarkWithCanonicity {
     /// Value state hash
     async fn state_hash(&self) -> String {
-        self.block.state_hash().0.to_owned()
+        self.pcb.state_hash().0.to_owned()
     }
     /// Value block height
     async fn block_height(&self) -> u32 {
-        self.block.blockchain_length()
+        self.pcb.blockchain_length()
     }
     /// Value date time
     async fn date_time(&self) -> String {
-        millis_to_iso_date_string(self.block.timestamp() as i64)
+        millis_to_iso_date_string(self.pcb.timestamp() as i64)
     }
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct SnarkQueryInput {
-    state_hash: Option<String>,
     canonical: Option<bool>,
     prover: Option<String>,
+    block_height: Option<u32>,
+    block: Option<BlockQueryInput>,
     and: Option<Vec<SnarkQueryInput>>,
     or: Option<Vec<SnarkQueryInput>>,
 }
@@ -79,6 +87,54 @@ impl SnarkQueryRoot {
         let mut snarks = Vec::with_capacity(limit);
         let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
 
+        // state hash
+        if let Some(state_hash) = query
+            .as_ref()
+            .and_then(|q| q.block.as_ref())
+            .and_then(|block| block.state_hash.clone())
+        {
+            let mut snarks: Vec<SnarkWithCanonicity> = db
+                .get_block(&state_hash.into())?
+                .into_iter()
+                .flat_map(|block| {
+                    SnarkWorkSummaryWithStateHash::from_precomputed(&block)
+                        .into_iter()
+                        .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
+                        .collect::<Vec<SnarkWithCanonicity>>()
+                })
+                .collect();
+
+            match sort_by {
+                SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
+                SnarkSortByInput::BlockHeightDesc => (),
+            }
+
+            snarks.truncate(limit);
+            return Ok(snarks);
+        }
+
+        // block height
+        if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
+            let mut snarks: Vec<SnarkWithCanonicity> = db
+                .get_blocks_at_height(block_height)?
+                .into_iter()
+                .flat_map(|block| {
+                    SnarkWorkSummaryWithStateHash::from_precomputed(&block)
+                        .into_iter()
+                        .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
+                        .collect::<Vec<SnarkWithCanonicity>>()
+                })
+                .collect();
+
+            match sort_by {
+                SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
+                SnarkSortByInput::BlockHeightDesc => (),
+            }
+
+            snarks.truncate(limit);
+            return Ok(snarks);
+        }
+
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
             let mut snarks =
@@ -106,6 +162,7 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
+        let mut capacity_reached = false;
         for entry in blocks_global_slot_idx_iterator(db, mode) {
             let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
             let block = db
@@ -118,8 +175,8 @@ impl SnarkQueryRoot {
                     .into_iter()
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
-                        block: block.clone(),
-                        snark: snark.into(),
+                        pcb: block.clone(),
+                        snark: (snark, state_hash.clone()).into(),
                     })
                     .collect()
             });
@@ -130,11 +187,14 @@ impl SnarkQueryRoot {
                 }
 
                 if snarks.len() == limit {
+                    capacity_reached = true;
                     break;
                 }
             }
+            if capacity_reached {
+                break;
+            }
         }
-
         Ok(snarks)
     }
 }
@@ -149,7 +209,7 @@ fn snark_summary_matches_query(
         .get_block(&snark.state_hash.clone().into())?
         .and_then(|block| {
             let snark_with_canonicity = SnarkWithCanonicity {
-                block,
+                pcb: block,
                 canonical,
                 snark: snark.into(),
             };
@@ -164,11 +224,14 @@ fn snark_summary_matches_query(
         }))
 }
 
-impl From<SnarkWorkSummary> for Snark {
-    fn from(snark: SnarkWorkSummary) -> Self {
+impl From<(SnarkWorkSummary, String)> for Snark {
+    fn from(snark: (SnarkWorkSummary, String)) -> Self {
         Snark {
-            fee: snark.fee,
-            prover: snark.prover.0,
+            fee: snark.0.fee,
+            prover: snark.0.prover.0,
+            block: SnarkBlock {
+                state_hash: snark.1,
+            },
         }
     }
 }
@@ -178,6 +241,9 @@ impl From<SnarkWorkSummaryWithStateHash> for Snark {
         Snark {
             fee: snark.fee,
             prover: snark.prover.0,
+            block: SnarkBlock {
+                state_hash: snark.state_hash.clone(),
+            },
         }
     }
 }
@@ -186,19 +252,25 @@ impl SnarkQueryInput {
     pub fn matches(&self, snark: &SnarkWithCanonicity) -> bool {
         let mut matches = true;
         let Self {
-            state_hash,
+            block,
             canonical,
             prover,
+            block_height,
             and,
             or,
         } = self;
 
-        if let Some(state_hash) = state_hash {
-            matches &= snark.block.state_hash().0 == *state_hash;
+        if let Some(block_query_input) = block {
+            if let Some(state_hash) = &block_query_input.state_hash {
+                matches &= snark.pcb.state_hash().0 == *state_hash;
+            }
+        }
+        if let Some(block_height) = block_height {
+            matches &= snark.pcb.blockchain_length() == *block_height;
         }
         if let Some(prover) = prover {
             matches &= snark
-                .block
+                .pcb
                 .prover_keys()
                 .contains(&<String as Into<PublicKey>>::into(prover.clone()));
         }

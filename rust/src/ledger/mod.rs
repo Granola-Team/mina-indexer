@@ -174,6 +174,13 @@ impl Ledger {
                     username: None,
                     balance: balance.into(),
                     nonce: Nonce(nonce.unwrap_or_default()),
+                    token: None,
+                    token_permissions: None,
+                    receipt_chain_hash: None,
+                    voting_for: None,
+                    permissions: None,
+                    timing: None,
+                    zkapp: None,
                 },
             );
         }

@@ -1,10 +1,10 @@
-use crate::block::BlockHash;
+use crate::{block::BlockHash, chain::Network};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum BlockWatcherEvent {
     SawBlock {
-        network: String,
+        network: Network,
         state_hash: BlockHash,
         blockchain_length: u32,
     },

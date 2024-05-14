@@ -15,15 +15,12 @@ use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
     InputValueResult, MergedObject, Scalar, ScalarType, Schema, SimpleObject, Value,
 };
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::sync::Arc;
-
-const MINA_SCALE: u32 = 9;
 
 #[derive(MergedObject, Default)]
 pub struct Root(
     blocks::BlocksQueryRoot,
-    stakes::StakesQueryRoot,
+    stakes::StakeQueryRoot,
     next_stakes::NextStakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
@@ -95,13 +92,6 @@ pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> 
     db.get_block_canonicity(&state_hash.to_owned().into())
         .map(|status| matches!(status, Some(Canonicity::Canonical)))
         .unwrap_or(false)
-}
-
-pub(crate) fn nanomina_to_mina_f64(num: u64) -> f64 {
-    let mut dec = Decimal::from(num);
-    dec.set_scale(MINA_SCALE).unwrap();
-
-    dec.to_f64().expect("converted to f64")
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject)]

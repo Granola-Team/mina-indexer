@@ -1,8 +1,13 @@
 pub mod parser;
 
 use crate::{
-    block::{precomputed::PcbVersion, BlockHash},
-    ledger::{public_key::PublicKey, LedgerHash},
+    block::BlockHash,
+    chain::Network,
+    ledger::{
+        account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
+        public_key::PublicKey,
+        LedgerHash,
+    },
 };
 use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -13,8 +18,10 @@ use std::{collections::HashMap, path::Path};
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub ledger_hash: LedgerHash,
+    pub total_currency: u64,
+    pub genesis_state_hash: BlockHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
@@ -23,47 +30,15 @@ pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,
     pub delegate: PublicKey,
-    pub token: u32,
+    pub token: Option<u32>,
     pub token_permissions: TokenPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
     pub permissions: Permissions,
     pub nonce: Option<u32>,
     pub timing: Option<Timing>,
+    pub zkapp: Option<String>,
 }
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Permissions {
-    stake: bool,
-    edit_state: Permission,
-    send: Permission,
-    set_delegate: Permission,
-    set_permissions: Permission,
-    set_verification_key: Permission,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Permission {
-    #[serde(rename = "signature")]
-    Signature,
-    #[serde(rename = "proof")]
-    Proof,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Timing {
-    pub initial_minimum_balance: u64,
-    pub cliff_time: u64,
-    pub cliff_amount: u64,
-    pub vesting_period: u64,
-    pub vesting_increment: u64,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TokenPermissions {}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReceiptChainHash(pub String);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccountJson {
@@ -91,8 +66,9 @@ pub struct TimingJson {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregatedEpochStakeDelegations {
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub ledger_hash: LedgerHash,
+    pub genesis_state_hash: BlockHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
     pub total_delegations: u64,
 }
@@ -104,11 +80,11 @@ pub struct EpochStakeDelegation {
     pub total_delegated: Option<u64>,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregatedEpochStakeDelegation {
     pub pk: PublicKey,
     pub epoch: u32,
-    pub network: String,
+    pub network: Network,
     pub total_stake: u64,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
@@ -116,7 +92,7 @@ pub struct AggregatedEpochStakeDelegation {
 
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
-        let token = value.token.parse().expect("token is u32");
+        let token = Some(value.token.parse().expect("token is u32"));
         let nonce = value
             .nonce
             .map(|nonce| nonce.parse().expect("nonce is u32"));
@@ -156,6 +132,7 @@ impl From<StakingAccountJson> for StakingAccount {
             permissions: value.permissions,
             token_permissions: value.token_permissions,
             receipt_chain_hash: value.receipt_chain_hash,
+            zkapp: None,
         }
     }
 }
@@ -164,7 +141,7 @@ pub fn is_valid_ledger_file(path: &Path) -> bool {
     crate::block::is_valid_file_name(path, &super::is_valid_ledger_hash)
 }
 
-pub fn split_ledger_path(path: &Path) -> (String, u32, LedgerHash) {
+pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
     let parts: Vec<&str> = path
         .file_stem()
         .unwrap()
@@ -180,22 +157,26 @@ pub fn split_ledger_path(path: &Path) -> (String, u32, LedgerHash) {
 }
 
 impl StakingLedger {
-    pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<StakingLedger> {
-        trace!("Parsing {} staking ledger", version);
+    pub fn parse_file(path: &Path, genesis_state_hash: BlockHash) -> anyhow::Result<StakingLedger> {
+        trace!("Parsing staking ledger");
 
         let bytes = std::fs::read(path)?;
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
-        let staking_ledger = staking_ledger
+        let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
             .map(|acct| (acct.pk.clone(), acct.into()))
             .collect();
         let (network, epoch, ledger_hash) = split_ledger_path(path);
 
+        let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
+
         Ok(Self {
             epoch,
             network,
+            total_currency,
             ledger_hash,
             staking_ledger,
+            genesis_state_hash,
         })
     }
 
@@ -259,7 +240,8 @@ impl StakingLedger {
                 });
             }
         });
-        let delegations = delegations
+
+        let delegations: HashMap<PublicKey, EpochStakeDelegation> = delegations
             .into_iter()
             .map(|(pk, del)| (pk, del.unwrap_or_default()))
             .collect();
@@ -269,6 +251,7 @@ impl StakingLedger {
             epoch: self.epoch,
             network: self.network.clone(),
             ledger_hash: self.ledger_hash.clone(),
+            genesis_state_hash: self.genesis_state_hash.clone(),
         })
     }
 
@@ -295,16 +278,19 @@ impl std::str::FromStr for ReceiptChainHash {
 #[cfg(test)]
 mod tests {
     use super::{EpochStakeDelegation, StakingLedger};
-    use crate::{block::precomputed::PcbVersion, ledger::staking::AggregatedEpochStakeDelegations};
+    use crate::{
+        chain::Network, constants::MAINNET_GENESIS_HASH,
+        ledger::staking::AggregatedEpochStakeDelegations,
+    };
     use std::path::PathBuf;
 
     #[test]
     fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
 
         assert_eq!(staking_ledger.epoch, 0);
-        assert_eq!(staking_ledger.network, "mainnet".to_string());
+        assert_eq!(staking_ledger.network, Network::Mainnet);
         assert_eq!(
             staking_ledger.ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
@@ -317,18 +303,19 @@ mod tests {
         use crate::ledger::public_key::PublicKey;
 
         let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, PcbVersion::V1)?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
             ledger_hash,
+            genesis_state_hash,
             delegations,
             total_delegations,
         } = staking_ledger.aggregate_delegations()?;
         let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
 
         assert_eq!(epoch, 0);
-        assert_eq!(network, "mainnet".to_string());
+        assert_eq!(network, Network::Mainnet);
         assert_eq!(
             ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
@@ -342,6 +329,7 @@ mod tests {
             })
         );
         assert_eq!(total_delegations, 794268782956784283);
+        assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
         Ok(())
     }
 }

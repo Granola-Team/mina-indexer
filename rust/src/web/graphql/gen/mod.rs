@@ -436,12 +436,12 @@ pub struct BlockProtocolStateConsensusStateStakingEpochDatumQueryInput {
 
 #[derive(InputObject)]
 pub struct TransactionQueryInput {
-    pub fee_in: Option<Vec<Option<f64>>>,
+    pub fee_in: Option<Vec<Option<u64>>>,
     pub canonical_exists: Option<bool>,
     pub memo_lt: Option<String>,
     pub from_account: Option<TransactionFromAccountQueryInput>,
     pub memo_gte: Option<String>,
-    pub fee_gt: Option<f64>,
+    pub fee_gt: Option<u64>,
     pub to_account_exists: Option<bool>,
     pub kind_lte: Option<String>,
     pub fee_token_in: Option<Vec<Option<i64>>>,
@@ -461,7 +461,7 @@ pub struct TransactionQueryInput {
     pub fee_payer: Option<TransactionFeePayerQueryInput>,
     pub date_time_ne: Option<DateTime>,
     pub kind_gt: Option<String>,
-    pub amount_ne: Option<f64>,
+    pub amount_ne: Option<u64>,
     pub to_gte: Option<String>,
     pub fee_payer_exists: Option<bool>,
     pub kind_lt: Option<String>,
@@ -471,32 +471,32 @@ pub struct TransactionQueryInput {
     pub date_time_nin: Option<Vec<Option<DateTime>>>,
     pub block_height_exists: Option<bool>,
     pub nonce_lte: Option<i64>,
-    pub fee_token_nin: Option<Vec<Option<i64>>>,
+    pub fee_token_nin: Option<Vec<Option<u64>>>,
     pub fee_token: Option<i64>,
     pub to_account: Option<TransactionToAccountQueryInput>,
     pub block_height_lte: Option<i64>,
     pub and: Option<Vec<TransactionQueryInput>>,
-    pub amount: Option<f64>,
-    pub fee: Option<f64>,
+    pub amount: Option<u64>,
+    pub fee: Option<u64>,
     pub fee_token_lt: Option<i64>,
     pub nonce_gt: Option<i64>,
-    pub amount_gt: Option<f64>,
+    pub amount_gt: Option<u64>,
     pub receiver: Option<TransactionReceiverQueryInput>,
     pub hash_gte: Option<String>,
     pub token_ne: Option<i64>,
     pub to_exists: Option<bool>,
     pub source: Option<TransactionSourceQueryInput>,
-    pub fee_lt: Option<f64>,
-    pub fee_gte: Option<f64>,
+    pub fee_lt: Option<u64>,
+    pub fee_gte: Option<u64>,
     pub hash_lt: Option<String>,
-    pub amount_gte: Option<f64>,
+    pub amount_gte: Option<u64>,
     pub hash_exists: Option<bool>,
     pub from: Option<String>,
     pub id_gte: Option<String>,
     pub kind_exists: Option<bool>,
     pub block_height_gte: Option<i64>,
-    pub fee_ne: Option<f64>,
-    pub amount_lte: Option<f64>,
+    pub fee_ne: Option<u64>,
+    pub amount_lte: Option<u64>,
     pub from_lte: Option<String>,
     pub memo_ne: Option<String>,
     pub hash: Option<String>,
@@ -504,7 +504,7 @@ pub struct TransactionQueryInput {
     pub from_in: Option<Vec<Option<String>>>,
     pub block_height_nin: Option<Vec<Option<i64>>>,
     pub id_ne: Option<String>,
-    pub amount_nin: Option<Vec<Option<f64>>>,
+    pub amount_nin: Option<Vec<Option<u64>>>,
     pub kind_gte: Option<String>,
     pub from_gte: Option<String>,
     pub from_nin: Option<Vec<Option<String>>>,
@@ -537,10 +537,10 @@ pub struct TransactionQueryInput {
     pub memo: Option<String>,
     pub from_gt: Option<String>,
     pub token_gt: Option<i64>,
-    pub fee_nin: Option<Vec<Option<f64>>>,
+    pub fee_nin: Option<Vec<Option<u64>>>,
     pub kind_in: Option<Vec<Option<String>>>,
     pub canonical: Option<bool>,
-    pub fee_lte: Option<f64>,
+    pub fee_lte: Option<u64>,
     pub or: Option<Vec<TransactionQueryInput>>,
     pub kind: Option<String>,
     pub memo_exists: Option<bool>,
@@ -551,9 +551,9 @@ pub struct TransactionQueryInput {
     pub id_lte: Option<String>,
     pub hash_in: Option<Vec<Option<String>>>,
     pub block_height_gt: Option<i64>,
-    pub amount_lt: Option<f64>,
+    pub amount_lt: Option<u64>,
     pub block_height_lt: Option<i64>,
-    pub amount_in: Option<Vec<Option<f64>>>,
+    pub amount_in: Option<Vec<Option<u64>>>,
     pub memo_nin: Option<Vec<Option<String>>>,
     pub nonce_exists: Option<bool>,
     pub fee_token_lte: Option<i64>,
@@ -589,15 +589,14 @@ pub struct BlockTransactionUserCommandToAccountQueryInput {
     pub token_nin: Option<Vec<Option<i64>>>,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockCreatorAccountQueryInput {
     pub or: Option<Vec<BlockCreatorAccountQueryInput>>,
     pub and: Option<Vec<BlockCreatorAccountQueryInput>>,
-    #[graphql(name = "public_key")]
     pub public_key: Option<String>,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockCoinbaseReceiverQueryInput {
     pub or: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
     pub and: Option<Vec<BlockCoinbaseReceiverQueryInput>>,
@@ -728,17 +727,16 @@ pub struct BlockSnarkJobQueryInput {
     pub block_height_nin: Option<Vec<Option<i64>>>,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BlockQueryInput {
     pub creator_account: Option<BlockCreatorAccountQueryInput>,
     pub coinbase_receiver: Option<BlockCoinbaseReceiverQueryInput>,
+    pub protocol_state: Option<BlockProtocolStateQueryInput>,
     pub canonical: Option<bool>,
     pub or: Option<Vec<BlockQueryInput>>,
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
-
-    #[graphql(name = "blockchain_length")]
-    pub blockchain_length: Option<u32>,
+    pub block_height: Option<u32>,
 
     #[graphql(name = "global_slot_since_genesis")]
     pub global_slot_since_genesis: Option<u32>,

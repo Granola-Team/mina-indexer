@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use log::{error, info, trace, LevelFilter};
 use mina_indexer::{
     block::precomputed::PcbVersion,
+    chain::Network,
     client,
     constants::*,
     ledger::{
@@ -139,6 +140,10 @@ pub struct ServerArgs {
     /// Recover all blocks at all missing heights
     #[arg(long)]
     missing_block_recovery_batch: Option<bool>,
+
+    /// Network name
+    #[arg(long, default_value = Network::Mainnet)]
+    network: Network,
 
     /// Domain socket path
     domain_socket_path: Option<PathBuf>,
@@ -421,6 +426,7 @@ struct ServerArgsJson {
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_batch: Option<bool>,
+    network: String,
 }
 
 impl From<ServerArgs> for ServerArgsJson {
@@ -468,6 +474,7 @@ impl From<ServerArgs> for ServerArgsJson {
                 .missing_block_recovery_exe
                 .map(|p| p.display().to_string()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
+            network: format!("{}", value.network),
         }
     }
 }
@@ -498,6 +505,7 @@ impl From<ServerArgsJson> for ServerArgs {
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
+            network: (&value.network as &str).into(),
         }
     }
 }

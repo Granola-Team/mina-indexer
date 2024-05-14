@@ -1,9 +1,9 @@
 use super::{
-    account::{Account, Amount, Nonce},
+    account::{Account, Amount, Nonce, Permissions, ReceiptChainHash, Timing, TokenPermissions},
     public_key::PublicKey,
     Ledger,
 };
-use crate::{block::genesis::GenesisBlock, constants::*};
+use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -24,8 +24,15 @@ pub struct GenesisRoot {
 pub struct GenesisAccount {
     pub pk: String,
     pub balance: String,
+    pub nonce: Option<u32>,
     pub delegate: Option<String>,
+    pub token: Option<u32>,
+    pub token_permissions: Option<TokenPermissions>,
+    pub receipt_chain_hash: Option<ReceiptChainHash>,
+    pub voting_for: Option<String>,
+    pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
+    pub zkapp: Option<ZkappAccount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,6 +144,13 @@ impl GenesisLedger {
                         .delegate
                         .map(PublicKey)
                         .unwrap_or(public_key),
+                    token: genesis_account.token,
+                    token_permissions: genesis_account.token_permissions,
+                    receipt_chain_hash: genesis_account.receipt_chain_hash,
+                    voting_for: genesis_account.voting_for.map(|v| v.into()),
+                    permissions: genesis_account.permissions,
+                    timing: genesis_account.timing.map(|t| t.into()),
+                    zkapp: genesis_account.zkapp,
                 },
             );
         }
@@ -149,6 +163,33 @@ impl GenesisLedger {
 pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
     let data = std::fs::read(filename)?;
     Ok(serde_json::from_slice(&data)?)
+}
+
+impl From<GenesisAccountTiming> for Timing {
+    fn from(value: GenesisAccountTiming) -> Self {
+        Self {
+            initial_minimum_balance: match value.initial_minimum_balance.parse::<Decimal>() {
+                Ok(amt) => (amt * dec!(1_000_000_000))
+                    .to_u64()
+                    .expect("genesis initial minimum balance is u64"),
+                Err(_) => panic!("Unable to parse genesis initial minimum balance"),
+            },
+            cliff_time: value.cliff_time.parse().expect("cliff time is u64"),
+            cliff_amount: match value.cliff_amount.parse::<Decimal>() {
+                Ok(amt) => (amt * dec!(1_000_000_000))
+                    .to_u64()
+                    .expect("genesis cliff amount is u64"),
+                Err(_) => panic!("Unable to parse genesis cliff amount"),
+            },
+            vesting_period: value.vesting_period.parse().expect("vesting period is u64"),
+            vesting_increment: match value.vesting_increment.parse::<Decimal>() {
+                Ok(amt) => (amt * dec!(1_000_000_000))
+                    .to_u64()
+                    .expect("genesis vesting increment is u64"),
+                Err(_) => panic!("Unable to parse genesis vesting increment"),
+            },
+        }
+    }
 }
 
 #[cfg(test)]

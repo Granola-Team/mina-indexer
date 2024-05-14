@@ -132,11 +132,7 @@ async fn handle_conn(
                 info!("Received account command for {pk}");
 
                 if let Some(best_tip) = db.get_best_block()? {
-                    if let Some(ledger) = db.get_ledger_state_hash(
-                        &best_tip.network(),
-                        &best_tip.state_hash(),
-                        false,
-                    )? {
+                    if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash(), false)? {
                         if !public_key::is_valid_public_key(&pk) {
                             invalid_public_key(&pk)
                         } else {
@@ -603,11 +599,7 @@ async fn handle_conn(
                 info!("Received best-ledger command");
 
                 if let Some(best_tip) = db.get_best_block()? {
-                    if let Some(ledger) = db.get_ledger_state_hash(
-                        &best_tip.network(),
-                        &best_tip.state_hash(),
-                        false,
-                    )? {
+                    if let Some(ledger) = db.get_ledger_state_hash(&best_tip.state_hash(), false)? {
                         let ledger = ledger.to_string_pretty();
 
                         if path.is_none() {
@@ -642,9 +634,7 @@ async fn handle_conn(
                 if block::is_valid_state_hash(&hash) {
                     trace!("{hash} is a state hash");
 
-                    if let Some(ledger) =
-                        db.get_ledger_state_hash("mainnet", &hash.clone().into(), true)?
-                    {
+                    if let Some(ledger) = db.get_ledger_state_hash(&hash.clone().into(), true)? {
                         let ledger = ledger.to_string_pretty();
                         if path.is_none() {
                             debug!("Writing ledger at state hash {hash} to stdout");
@@ -670,7 +660,7 @@ async fn handle_conn(
                 } else if ledger::is_valid_ledger_hash(&hash) {
                     trace!("{hash} is a ledger hash");
 
-                    if let Some(ledger) = db.get_ledger("mainnet", &LedgerHash(hash.clone()))? {
+                    if let Some(ledger) = db.get_ledger(&LedgerHash(hash.clone()))? {
                         let ledger = ledger.to_string_pretty();
                         if path.is_none() {
                             debug!("Writing ledger at hash {hash} to stdout");
@@ -722,11 +712,9 @@ async fn handle_conn(
                                     }
                                 }
 
-                                if let Some(ledger) = db.get_ledger_state_hash(
-                                    "mainnet", // TODO lookup from chain id
-                                    &curr_block.state_hash(),
-                                    true,
-                                )? {
+                                if let Some(ledger) =
+                                    db.get_ledger_state_hash(&curr_block.state_hash(), true)?
+                                {
                                     ledger.to_string_pretty()
                                 } else {
                                     block_missing_from_db(&curr_block.state_hash().0)
@@ -734,9 +722,7 @@ async fn handle_conn(
                             } else {
                                 best_tip_missing_from_db().unwrap()
                             }
-                        } else if let Some(ledger) =
-                            db.get_ledger_at_height("mainnet", height, true)?
-                        {
+                        } else if let Some(ledger) = db.get_ledger_at_height(height, true)? {
                             ledger.to_string_pretty()
                         } else {
                             error!("Invalid ledger query. Ledger at height {height} not available");
@@ -767,18 +753,14 @@ async fn handle_conn(
             }
         },
         ClientCli::StakingLedgers(__) => match __ {
-            StakingLedgers::Hash {
-                hash,
-                network,
-                path,
-            } => {
+            StakingLedgers::Hash { hash, path } => {
                 info!("Received staking-ledgers-hash command for {hash}");
 
                 if ledger::is_valid_ledger_hash(&hash) {
                     trace!("{hash} is a ledger hash");
 
                     if let Some(staking_ledger) =
-                        db.get_staking_ledger_hash(&network, &hash.clone().into())?
+                        db.get_staking_ledger_hash(&hash.clone().into())?
                     {
                         let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                         if path.is_none() {
@@ -809,12 +791,16 @@ async fn handle_conn(
             }
             StakingLedgers::Epoch {
                 epoch,
-                network,
+                genesis_state_hash,
                 path,
             } => {
                 info!("Received staking-ledgers-epoch {epoch} command");
 
-                if let Some(staking_ledger) = db.get_staking_ledger_at_epoch(&network, epoch)? {
+                if !block::is_valid_state_hash(&genesis_state_hash) {
+                    invalid_state_hash(&genesis_state_hash)
+                } else if let Some(staking_ledger) =
+                    db.get_staking_ledger_at_epoch(epoch, &Some(genesis_state_hash.into()))?
+                {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                     if path.is_none() {
                         debug!("Writing staking ledger at epoch {epoch} to stdout");
@@ -843,18 +829,20 @@ async fn handle_conn(
             }
             StakingLedgers::PublicKey {
                 epoch,
-                network,
+                genesis_state_hash,
                 public_key: pk,
             } => {
                 info!(
-                    "Received staking-delegations command for {} pk {} epoch {}",
-                    network, pk, epoch,
+                    "Received staking-delegations command for pk {} epoch {}",
+                    pk, epoch,
                 );
 
-                if !public_key::is_valid_public_key(&pk) {
+                if !block::is_valid_state_hash(&genesis_state_hash) {
+                    invalid_state_hash(&genesis_state_hash)
+                } else if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else if let Some(aggegated_delegations) =
-                    db.get_delegations_epoch(&network, epoch)?
+                    db.get_delegations_epoch(epoch, &Some(genesis_state_hash.into()))?
                 {
                     let pk: PublicKey = pk.into();
                     let epoch = aggegated_delegations.epoch;
@@ -880,49 +868,45 @@ async fn handle_conn(
                     )?)
                 } else {
                     error!(
-                        "Public key {} is missing from staking ledger {} epoch {}",
-                        pk, network, epoch
+                        "Public key {} is missing from staking ledger epoch {}",
+                        pk, epoch
                     );
                     Some(format!(
-                        "Public key {} is missing from staking ledger {} epoch {}",
-                        pk, network, epoch
+                        "Public key {} is missing from staking ledger epoch {}",
+                        pk, epoch
                     ))
                 }
             }
             StakingLedgers::Delegations {
                 epoch,
-                network,
+                genesis_state_hash,
                 path,
             } => {
-                info!(
-                    "Received staking-delegations command for {} epoch {}",
-                    network, epoch
-                );
+                info!("Received staking-delegations command for epoch {}", epoch);
 
-                let aggregated_delegations = db.get_delegations_epoch(&network, epoch)?;
+                let aggregated_delegations =
+                    db.get_delegations_epoch(epoch, &Some(genesis_state_hash.into()))?;
                 if let Some(agg_del_str) = aggregated_delegations
                     .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
                 {
                     if path.is_none() {
                         debug!(
-                            "Writing aggregated staking delegations {} epoch {} to stdout",
-                            network, epoch
+                            "Writing aggregated staking delegations epoch {} to stdout",
+                            epoch
                         );
                         Some(agg_del_str)
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
                             debug!(
-                                "Writing aggregated staking delegations {} epoch {} to {}",
-                                network,
+                                "Writing aggregated staking delegations epoch {} to {}",
                                 epoch,
                                 path.display()
                             );
 
                             std::fs::write(&path, agg_del_str)?;
                             Some(format!(
-                                "Aggregated staking delegations {} epoch {} written to {}",
-                                network,
+                                "Aggregated staking delegations epoch {} written to {}",
                                 epoch,
                                 path.display()
                             ))
@@ -931,13 +915,10 @@ async fn handle_conn(
                         }
                     }
                 } else {
-                    error!(
-                        "Unable to aggregate staking delegations {} epoch {}",
-                        network, epoch
-                    );
+                    error!("Unable to aggregate staking delegations epoch {}", epoch);
                     Some(format!(
-                        "Unable to aggregate staking delegations {} epoch {}",
-                        network, epoch
+                        "Unable to aggregate staking delegations epoch {}",
+                        epoch
                     ))
                 }
             }

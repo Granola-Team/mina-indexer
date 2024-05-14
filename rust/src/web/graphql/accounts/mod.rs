@@ -1,7 +1,6 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::store::ChainIdStore,
     ledger::{account, store::LedgerStore},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -55,11 +54,7 @@ impl AccountQueryRoot {
             Ok(Some(state_hash)) => state_hash,
             Ok(None) | Err(_) => return Ok(None),
         };
-        let network = db
-            .get_current_network()
-            .map(|n| n.0)
-            .unwrap_or("mainnet".to_string());
-        let ledger = match db.get_ledger_state_hash(&network, &state_hash, true) {
+        let ledger = match db.get_ledger_state_hash(&state_hash, true) {
             Ok(Some(ledger)) => ledger,
             Ok(None) | Err(_) => return Ok(None),
         };
@@ -127,7 +122,7 @@ impl From<account::Account> for Account {
             delegate: ledger.delegate.0,
             nonce: ledger.nonce.0,
             balance: ledger.balance.0,
-            time_locked: false,
+            time_locked: ledger.timing.is_some(),
             username: ledger.username.map(|u| u.0),
         }
     }

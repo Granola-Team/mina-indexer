@@ -3,9 +3,9 @@ use crate::{
         self,
         parser::BlockParser,
         precomputed::{PcbVersion, PrecomputedBlock},
-        BlockHash, Network,
+        BlockHash,
     },
-    chain_id::{chain_id, ChainId},
+    chain::{chain_id, ChainId, Network},
     constants::*,
     ledger::{
         genesis::{GenesisConstants, GenesisLedger},
@@ -19,7 +19,7 @@ use crate::{
 use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -33,9 +33,9 @@ use tokio::{
 #[derive(Clone, Debug)]
 pub struct IndexerVersion {
     pub network: Network,
-    pub chain_id: ChainId,
     pub version: PcbVersion,
-    pub history: HashMap<ChainId, PcbVersion>,
+    pub chain_id: ChainId,
+    pub genesis_state_hash: BlockHash,
 }
 
 #[derive(Clone, Debug)]
@@ -180,11 +180,12 @@ pub fn initialize(
             .collect::<Vec<&str>>()
             .as_slice(),
     );
+    let indexer_version = IndexerVersion::new(&Network::Mainnet, &chain_id, &genesis_hash);
     let state_config = IndexerStateConfig {
         genesis_hash,
         indexer_store: store,
+        version: indexer_version,
         genesis_ledger: genesis_ledger.clone(),
-        version: IndexerVersion::new("mainnet", &chain_id),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
         canonical_update_threshold,
@@ -395,12 +396,12 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                         }
 
                         // check for block parser version update
-                        if state.version.chain_id.0 != *MAINNET_GENESIS_HASH {
+                        if state.version.genesis_state_hash.0 != *MAINNET_GENESIS_HASH {
                             trace!("Changing block parser from {}", version.version);
                             version.version.update()?;
 
                             trace!("Block parser changed to {}", version.version);
-                            version.chain_id = state.version.chain_id.clone();
+                            version.genesis_state_hash = state.version.genesis_state_hash.clone();
                         }
                     }
                     Err(e) => error!("Error parsing precomputed block: {}", e),
@@ -411,13 +412,16 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let mut state = state.write().await;
 
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match StakingLedger::parse_file(&path, version.version.clone()) {
+                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()) {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();
                             let ledger_summary = staking_ledger.summary();
 
-                            match store.add_staking_ledger(staking_ledger) {
+                            match store.add_staking_ledger(
+                                staking_ledger,
+                                &state.version.genesis_state_hash,
+                            ) {
                                 Ok(_) => {
                                     state.staking_ledgers.insert(epoch, ledger_hash);
                                     info!("Added staking ledger {}", ledger_summary);
@@ -449,7 +453,7 @@ async fn recover_missing_blocks(
     batch_recovery: bool,
 ) {
     let state = state.read().await;
-    let network = state.version.network.0.clone();
+    let network = state.version.network.clone();
     let missing_parent_lengths: HashSet<u32> = state
         .dangling_branches
         .iter()
@@ -463,7 +467,7 @@ async fn recover_missing_blocks(
         let mut c =
             std::process::Command::new(missing_block_recovery_exe.as_ref().display().to_string());
         let cmd = c.args([
-            &network,
+            &network.to_string(),
             &blockchain_length.to_string(),
             &block_watch_dir.as_ref().display().to_string(),
         ]);
@@ -502,17 +506,22 @@ async fn recover_missing_blocks(
 }
 
 impl IndexerVersion {
-    pub fn new(network: &str, chain_id: &ChainId) -> Self {
+    pub fn new(network: &Network, chain_id: &ChainId, genesis_state_hash: &BlockHash) -> Self {
         Self {
-            chain_id: chain_id.clone(),
             version: PcbVersion::V1,
-            network: Network(network.into()),
-            history: HashMap::from([(chain_id.clone(), PcbVersion::V1)]),
+            network: network.clone(),
+            chain_id: chain_id.clone(),
+            genesis_state_hash: genesis_state_hash.clone(),
         }
     }
 
     pub fn new_testing() -> Self {
-        Self::new("mainnet", &ChainId("TESTING".into()))
+        let chain_id = chain_id(
+            MAINNET_GENESIS_HASH,
+            MAINNET_GENESIS_CONSTANTS,
+            MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+        );
+        Self::new(&Network::Mainnet, &chain_id, &MAINNET_GENESIS_HASH.into())
     }
 }
 

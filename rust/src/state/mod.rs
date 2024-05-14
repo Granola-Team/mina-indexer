@@ -10,7 +10,7 @@ use crate::{
         Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain_id::store::ChainIdStore,
+    chain::store::ChainIdStore,
     command::store::CommandStore,
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
@@ -182,11 +182,13 @@ impl IndexerState {
 
     /// Creates a new indexer state from the genesis ledger
     pub fn new_from_config(config: IndexerStateConfig) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
+        // set chain id
+        config
+            .indexer_store
+            .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
         // add genesis block and ledger to indexer store
         config.indexer_store.add_ledger_state_hash(
-            &config.version.network.0,
             &MAINNET_GENESIS_PREV_STATE_HASH.into(),
             config.genesis_ledger.clone().into(),
         )?;
@@ -212,11 +214,7 @@ impl IndexerState {
             .indexer_store
             .add_canonical_block(1, &config.genesis_hash)?;
 
-        // set chain id
-        config
-            .indexer_store
-            .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
-
+        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -294,7 +292,7 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
-                    .add_ledger_state_hash("mainnet", &root_block.state_hash(), ledger)
+                    .add_ledger_state_hash(&root_block.state_hash(), ledger)
                     .expect("ledger add succeeds");
                 store
                     .set_best_block(&root_block.state_hash())
@@ -383,11 +381,7 @@ impl IndexerState {
                     if self.blocks_processed % self.ledger_cadence == 0 {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
-                        indexer_store.add_ledger_state_hash(
-                            &self.version.network.0,
-                            &state_hash,
-                            self.ledger.clone(),
-                        )?;
+                        indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
                     if self.blocks_processed == block_parser.num_deep_canonical_blocks + 1 {
@@ -860,7 +854,8 @@ impl IndexerState {
                     .insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
 
                 let summary = staking_ledger.summary();
-                indexer_store.add_staking_ledger(staking_ledger)?;
+                indexer_store
+                    .add_staking_ledger(staking_ledger, &self.version.genesis_state_hash)?;
                 info!("Added staking ledger {}", summary);
             }
         }
@@ -906,7 +901,6 @@ impl IndexerState {
 
             if let Some(IndexerEvent::Db(DbEvent::Canonicity(
                 DbCanonicityEvent::NewCanonicalBlock {
-                    network: _,
                     blockchain_length: canonical_length,
                     state_hash,
                 },
@@ -934,7 +928,6 @@ impl IndexerState {
 
                     for state_hash in event_log.iter().filter_map(|e| match e {
                         IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
-                            network: _,
                             state_hash,
                             blockchain_length,
                         })) => {
@@ -1014,37 +1007,33 @@ impl IndexerState {
     fn replay_event(&mut self, event: &IndexerEvent) -> anyhow::Result<()> {
         match event {
             IndexerEvent::BlockWatcher(BlockWatcherEvent::SawBlock {
-                network,
+                network: _,
                 state_hash,
                 blockchain_length,
-            }) => self.replay_precomputed_block(network, state_hash, blockchain_length),
+            }) => self.replay_precomputed_block(state_hash, blockchain_length),
             IndexerEvent::StakingLedgerWatcher(StakingLedgerWatcherEvent::NewStakingLedger {
-                network,
                 epoch,
                 ledger_hash,
-            }) => self.replay_staking_ledger(network, epoch, ledger_hash),
+            }) => self.replay_staking_ledger(epoch, ledger_hash),
             IndexerEvent::Db(db_event) => match db_event {
                 DbEvent::Block(db_block_event) => match db_block_event {
                     DbBlockEvent::NewBestTip {
-                        network,
                         state_hash,
                         blockchain_length,
                     } => {
                         let indexer_store = self.indexer_store_or_panic();
                         let block_summary =
                             format!("(length {}): {}", blockchain_length, state_hash);
-                        info!("Replay new {} best tip {}", network, block_summary);
+                        info!("Replay new best tip {}", block_summary);
 
                         if let Some(block) = indexer_store.get_block(state_hash)? {
-                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             return Ok(());
                         }
-                        panic!("Fatal: {} block not in store {}", network, block_summary);
+                        panic!("Fatal: block not in store {}", block_summary);
                     }
                     DbBlockEvent::NewBlock {
-                        network,
                         blockchain_length,
                         state_hash,
                     } => {
@@ -1052,38 +1041,31 @@ impl IndexerState {
                         let indexer_store = self.indexer_store_or_panic();
                         let block_summary =
                             format!("(length {}): {}", blockchain_length, state_hash);
-                        info!("Replaying db new {} block {}", network, block_summary);
+                        info!("Replaying db new block {}", block_summary);
 
                         if let Ok(Some(block)) = indexer_store.get_block(state_hash) {
-                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             self.add_block_to_witness_tree(&block)?;
                             return Ok(());
                         }
-                        panic!(
-                            "Fatal: {} block missing from store {}",
-                            network, block_summary
-                        )
+                        panic!("Fatal: block missing from store {}", block_summary)
                     }
                 },
                 DbEvent::Ledger(DbLedgerEvent::NewLedger {
-                    network,
                     state_hash,
                     blockchain_length,
                     ledger_hash,
                 }) => {
                     let block_summary = format!("(length {}): {}", blockchain_length, state_hash.0);
                     info!(
-                        "Replaying new {} staged ledger {} {}",
-                        network, ledger_hash.0, block_summary
+                        "Replaying new staged ledger {} {}",
+                        ledger_hash.0, block_summary
                     );
 
                     // check ledger & block are in the store
                     let indexer_store = self.indexer_store_or_panic();
-                    if let Some(_ledger) =
-                        indexer_store.get_ledger_state_hash(network, state_hash, false)?
-                    {
+                    if let Some(_ledger) = indexer_store.get_ledger_state_hash(state_hash, false)? {
                         if let Some(block) = indexer_store.get_block(state_hash)? {
                             assert_eq!(block.state_hash(), *state_hash);
                             return Ok(());
@@ -1091,38 +1073,33 @@ impl IndexerState {
                         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
                             return Ok(());
                         } else {
-                            panic!(
-                                "Fatal: {} block missing from store {}",
-                                network, block_summary
-                            );
+                            panic!("Fatal: block missing from store {}", block_summary);
                         }
                     }
                     panic!(
-                        "Fatal: {} staged ledger missing from store {} for block {}",
-                        network, ledger_hash.0, block_summary
+                        "Fatal: staged ledger missing from store {} for block {}",
+                        ledger_hash.0, block_summary
                     );
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::NewStakingLedger {
                     epoch,
-                    network,
+                    genesis_state_hash: _,
                     ledger_hash,
-                }) => self.replay_staking_ledger(network, epoch, ledger_hash),
+                }) => self.replay_staking_ledger(epoch, ledger_hash),
                 DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
-                    network,
                     epoch,
+                    genesis_state_hash,
                 }) => {
-                    info!(
-                        "Replaying {} aggregate delegations epoch {}",
-                        network, epoch
-                    );
+                    info!("Replaying aggregate delegations epoch {}", epoch);
 
                     let indexer_store = self.indexer_store_or_panic();
-                    if let Some(aggregated_delegations) =
-                        indexer_store.get_delegations_epoch(network, *epoch)?
+                    if let Some(aggregated_delegations) = indexer_store
+                        .get_delegations_epoch(*epoch, &Some(genesis_state_hash.to_owned()))?
                     {
-                        if let Some(staking_ledger) =
-                            indexer_store.get_staking_ledger_at_epoch(network, *epoch)?
-                        {
+                        if let Some(staking_ledger) = indexer_store.get_staking_ledger_at_epoch(
+                            *epoch,
+                            &Some(genesis_state_hash.to_owned()),
+                        )? {
                             // check delegation calculations
                             assert_eq!(
                                 aggregated_delegations,
@@ -1130,18 +1107,17 @@ impl IndexerState {
                             );
                             return Ok(());
                         }
-                        panic!("Fatal: no {} staking ledger epoch {}", network, epoch);
+                        panic!("Fatal: no staking ledger epoch {}", epoch);
                     }
-                    panic!("Fatal: {} aggregate delegations epoch {}", network, epoch);
+                    panic!("Fatal: aggregate delegations epoch {}", epoch);
                 }
                 DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
-                    network,
                     state_hash,
                     blockchain_length,
                 }) => {
                     let indexer_store = self.indexer_store_or_panic();
                     let block_summary = format!("(length {}): {}", blockchain_length, state_hash);
-                    info!("Replay new {} canonical block {}", network, block_summary);
+                    info!("Replay new canonical block {}", block_summary);
 
                     // check canonicity & block store
                     if let Some(canonical_hash) =
@@ -1149,17 +1125,13 @@ impl IndexerState {
                     {
                         assert_eq!(canonical_hash, *state_hash);
                         if let Some(block) = indexer_store.get_block(state_hash)? {
-                            assert_eq!(block.network(), *network);
                             assert_eq!(block.state_hash(), *state_hash);
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             return Ok(());
                         }
-                        panic!("Fatal: {} block not in store {}", network, block_summary);
+                        panic!("Fatal: block not in store {}", block_summary);
                     }
-                    panic!(
-                        "Fatal: {} canonical block not in store {}",
-                        network, block_summary
-                    );
+                    panic!("Fatal: canonical block not in store {}", block_summary);
                 }
             },
             IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip {
@@ -1203,18 +1175,16 @@ impl IndexerState {
     /// Check that all relevant data & indices exist and are consistent
     fn replay_precomputed_block(
         &mut self,
-        network: &str,
         state_hash: &BlockHash,
         blockchain_length: &u32,
     ) -> anyhow::Result<()> {
         use crate::command::{internal::InternalCommandWithData, UserCommandWithStatus};
 
         let block_summary = format!("(length {}): {}", blockchain_length, state_hash);
-        info!("Replaying {} block {}", network, block_summary);
+        info!("Replaying block {}", block_summary);
 
         let indexer_store = self.indexer_store_or_panic();
         if let Some(block) = indexer_store.get_block(state_hash)? {
-            assert_eq!(block.network(), *network);
             assert_eq!(block.state_hash(), *state_hash);
             assert_eq!(block.blockchain_length(), *blockchain_length);
 
@@ -1290,38 +1260,27 @@ impl IndexerState {
             self.blocks_processed += 1;
             return Ok(());
         }
-        panic!(
-            "Fatal: no {} block found in store {}",
-            network, block_summary
-        );
+        panic!("Fatal: no block found in store {}", block_summary);
     }
 
-    fn replay_staking_ledger(
-        &self,
-        network: &str,
-        epoch: &u32,
-        ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<()> {
+    fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> anyhow::Result<()> {
         let ledger_summary = format!("(epoch {}): {}", epoch, ledger_hash.0);
-        info!("Replaying {} staking ledger {}", network, ledger_summary);
+        info!("Replaying staking ledger {}", ledger_summary);
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
-        if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger_hash(network, ledger_hash)?
-        {
+        if let Some(staking_ledger_hash) = indexer_store.get_staking_ledger_hash(ledger_hash)? {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
-            assert_eq!(staking_ledger_hash.network, *network, "Invalid network");
             assert_eq!(
                 staking_ledger_hash.ledger_hash, *ledger_hash,
                 "Invalid ledger hash"
             );
 
-            if let Some(staking_ledger_epoch) =
-                indexer_store.get_staking_ledger_at_epoch(network, *epoch)?
-            {
+            if let Some(staking_ledger_epoch) = indexer_store.get_staking_ledger_at_epoch(
+                *epoch,
+                &Some(staking_ledger_hash.genesis_state_hash.clone()),
+            )? {
                 assert_eq!(staking_ledger_epoch.epoch, *epoch, "Invalid epoch");
-                assert_eq!(staking_ledger_epoch.network, *network, "Invalid network");
                 assert_eq!(
                     staking_ledger_epoch.ledger_hash, *ledger_hash,
                     "Invalid ledger hash"
@@ -1331,14 +1290,11 @@ impl IndexerState {
                 assert_eq!(staking_ledger_epoch, staking_ledger_hash);
                 return Ok(());
             }
-            panic!(
-                "Fatal: no {} staking ledger at epoch {} in store",
-                network, epoch
-            );
+            panic!("Fatal: no staking ledger at epoch {} in store", epoch);
         }
         panic!(
-            "Fatal: no {} staking ledger with hash {} in store",
-            network, ledger_hash.0
+            "Fatal: no staking ledger with hash {} in store",
+            ledger_hash.0
         );
     }
 
@@ -1409,11 +1365,8 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             for canonical_block in canonical_blocks {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
-                    indexer_store.add_ledger_state_hash(
-                        &self.version.network.0,
-                        &canonical_block.state_hash,
-                        self.ledger.clone(),
-                    )?;
+                    indexer_store
+                        .add_ledger_state_hash(&canonical_block.state_hash, self.ledger.clone())?;
                 }
             }
         }

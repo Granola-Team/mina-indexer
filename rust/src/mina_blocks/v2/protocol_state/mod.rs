@@ -81,6 +81,7 @@ pub struct FeeExcess {
 pub struct SupplyAdjustment {
     #[serde(deserialize_with = "from_str")]
     pub magnitude: u64,
+
     pub sgn: (SupplyAdjustmentSign,),
 }
 

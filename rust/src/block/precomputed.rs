@@ -1,11 +1,11 @@
 //! Indexer internal precomputed block representation
 
-use super::Network;
 use crate::{
     block::{
         extract_block_height, extract_network, extract_state_hash, Block, BlockHash, VrfOutput,
     },
     canonicity::Canonicity,
+    chain::Network,
     command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
     constants::{berkeley::*, *},
     ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
@@ -75,7 +75,7 @@ pub enum PrecomputedBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV1 {
-    pub network: String,
+    pub network: Network,
     pub state_hash: BlockHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
@@ -85,7 +85,7 @@ pub struct PrecomputedBlockV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV2 {
-    pub network: String,
+    pub network: Network,
     pub state_hash: BlockHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
@@ -103,7 +103,7 @@ pub enum PrecomputedBlockWithCanonicity {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockWithCanonicityV1 {
     pub canonicity: Option<Canonicity>,
-    pub network: String,
+    pub network: Network,
     pub state_hash: BlockHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
@@ -114,7 +114,7 @@ pub struct PrecomputedBlockWithCanonicityV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockWithCanonicityV2 {
     pub canonicity: Option<Canonicity>,
-    pub network: String,
+    pub network: Network,
     pub state_hash: BlockHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
@@ -141,7 +141,7 @@ impl PrecomputedBlock {
                     state_hash,
                     scheduled_time,
                     blockchain_length,
-                    network: block_file_contents.network.0,
+                    network: block_file_contents.network,
                     protocol_state: protocol_state.to_owned().into(),
                     staged_ledger_diff: staged_ledger_diff.to_owned().into(),
                 })))
@@ -156,7 +156,7 @@ impl PrecomputedBlock {
                     state_hash,
                     scheduled_time,
                     blockchain_length,
-                    network: block_file_contents.network.0,
+                    network: block_file_contents.network,
                     protocol_state: protocol_state.to_owned(),
                     staged_ledger_diff: staged_ledger_diff.to_owned(),
                 }))
@@ -174,7 +174,7 @@ impl PrecomputedBlock {
             BlockFileContents {
                 contents,
                 blockchain_length,
-                network: Network(network),
+                network,
                 state_hash: state_hash.into(),
             },
             version,
@@ -486,6 +486,15 @@ impl PrecomputedBlock {
         public_keys
     }
 
+    pub fn genesis_state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => {
+                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.clone())
+            }
+            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.clone(),
+        }
+    }
+
     pub fn global_slot_since_genesis(&self) -> u32 {
         match self {
             Self::V1(v1) => {
@@ -613,7 +622,7 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn network(&self) -> String {
+    pub fn network(&self) -> Network {
         match self {
             PrecomputedBlock::V1(v1) => v1.network.to_owned(),
             PrecomputedBlock::V2(v2) => v2.network.to_owned(),

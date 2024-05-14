@@ -54,6 +54,7 @@ mod tests {
 
     #[test]
     fn parse_berkeley_blocks() -> anyhow::Result<()> {
+        // sequential blocks
         glob::glob("./tests/data/berkeley/sequential_blocks/berkeley-*-*.json")?.for_each(|path| {
             if let Ok(ref path) = path {
                 if let Err(e) = parse_file(path) {
@@ -65,6 +66,20 @@ mod tests {
                 }
             }
         });
+        // non-sequential blocks
+        glob::glob("./tests/data/berkeley/non_sequential_blocks/berkeley-*-*.json")?.for_each(
+            |path| {
+                if let Ok(ref path) = path {
+                    if let Err(e) = parse_file(path) {
+                        panic!(
+                            "Error parsing block {}: {}",
+                            path.file_name().unwrap().to_str().unwrap(),
+                            e
+                        )
+                    }
+                }
+            },
+        );
         Ok(())
     }
 }

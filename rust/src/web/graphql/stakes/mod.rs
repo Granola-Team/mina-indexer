@@ -1,15 +1,15 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain_id::{chain_id, store::ChainIdStore},
+    chain::chain_id,
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
 };
-use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
-pub struct StakesQueryInput {
+pub struct StakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
@@ -19,22 +19,22 @@ pub struct StakesQueryInput {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum StakesSortByInput {
+pub enum StakeSortByInput {
     BalanceDesc,
 }
 
 #[derive(Default)]
-pub struct StakesQueryRoot;
+pub struct StakeQueryRoot;
 
 #[Object]
-impl StakesQueryRoot {
+impl StakeQueryRoot {
     // Cache for 1 day
     #[graphql(cache_control(max_age = 86400))]
     async fn stakes<'ctx>(
         &self,
         ctx: &Context<'ctx>,
-        query: Option<StakesQueryInput>,
-        sort_by: Option<StakesSortByInput>,
+        query: Option<StakeQueryInput>,
+        sort_by: Option<StakeSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<StakesLedgerAccountWithMeta>>> {
         let db = db(ctx);
@@ -47,25 +47,21 @@ impl StakesQueryRoot {
             Some(ref query) => query.epoch.unwrap_or(curr_epoch),
             None => curr_epoch,
         };
-        let network = db
-            .get_current_network()
-            .map(|n| n.0)
-            .unwrap_or("mainnet".to_string());
-        let staking_ledger = match db.get_staking_ledger_at_epoch(&network, epoch)? {
+        let staking_ledger = match db.get_staking_ledger_at_epoch(epoch, &None)? {
             Some(staking_ledger) => staking_ledger,
             None => return Ok(None),
         };
-
         // Delegations will be present if the staking ledger is
-        let delegations = db.get_delegations_epoch(&network, epoch)?.unwrap();
+        let delegations = db.get_delegations_epoch(epoch, &None)?.unwrap();
 
+        let total_currency = staking_ledger.total_currency;
         let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let mut accounts: Vec<StakesLedgerAccountWithMeta> = staking_ledger
             .staking_ledger
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    let StakesQueryInput {
+                    let StakeQueryInput {
                         delegate,
                         public_key,
                         epoch: query_epoch,
@@ -112,6 +108,7 @@ impl StakesQueryRoot {
                     ledger_hash: ledger_hash.clone(),
                     account: StakesLedgerAccount::from(account),
                     delegation_totals: StakesDelegationTotals {
+                        total_currency,
                         total_delegated,
                         total_delegated_nanomina,
                         count_delegates,
@@ -185,13 +182,32 @@ pub struct StakesLedgerAccount {
 }
 
 #[derive(SimpleObject)]
+#[graphql(complex)]
 pub struct StakesDelegationTotals {
+    /// Value total currency
+    pub total_currency: u64,
     /// Value total delegated
     pub total_delegated: f64,
     /// Value total delegated in nanomina
     pub total_delegated_nanomina: u64,
     /// Value count delegates
     pub count_delegates: u32,
+}
+
+#[ComplexObject]
+impl StakesDelegationTotals {
+    /// Value total stake percentage
+    async fn total_stake_percentage(&self) -> String {
+        let total_currency_decimal = Decimal::from(self.total_currency);
+        let total_delegated_decimal = Decimal::from(self.total_delegated_nanomina);
+        let ratio = if !total_currency_decimal.is_zero() {
+            (total_delegated_decimal / total_currency_decimal) * Decimal::from(100)
+        } else {
+            Decimal::ZERO
+        };
+        let rounded_ratio = ratio.round_dp(2);
+        format!("{:.2}%", rounded_ratio)
+    }
 }
 
 #[derive(SimpleObject)]
@@ -219,7 +235,7 @@ impl From<StakingAccount> for StakesLedgerAccount {
         let delegate = acc.delegate.0;
         let pk = acc.pk.0;
         let public_key = pk.clone();
-        let token = acc.token;
+        let token = acc.token.unwrap_or_default();
         let receipt_chain_hash = acc.receipt_chain_hash.0;
         let voting_for = acc.voting_for.0;
         Self {

@@ -84,7 +84,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {creatorAccount: {public_key: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
+  blocks(query: {creatorAccount: {publicKey: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
     stateHash
     blockHeight
     winnerAccount {
@@ -150,7 +150,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {blockchain_length: 6}) {
+  blocks(query: {blockHeight: 6}) {
     stateHash
     canonical
     blockHeight
@@ -260,8 +260,8 @@ jsonpath "$.data.blocks[0].transactions.userCommands" count == 4
 jsonpath "$.data.blocks[0].transactions.userCommands[0].kind" == "PAYMENT"
 jsonpath "$.data.blocks[0].transactions.userCommands[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.blocks[0].transactions.userCommands[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
-jsonpath "$.data.blocks[0].transactions.userCommands[0].amount" == 0.000001
-jsonpath "$.data.blocks[0].transactions.userCommands[0].fee" == 0.01
+jsonpath "$.data.blocks[0].transactions.userCommands[0].amount" == 1000
+jsonpath "$.data.blocks[0].transactions.userCommands[0].fee" == 10000000
 jsonpath "$.data.blocks[0].transactions.userCommands[0].blockHeight" == 3
 
 duration < 1000

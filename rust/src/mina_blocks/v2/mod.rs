@@ -4,7 +4,10 @@ pub mod staged_ledger_diff;
 
 use crate::{
     block::BlockHash,
-    ledger::{public_key::PublicKey, staking::ReceiptChainHash},
+    ledger::{
+        account::{ReceiptChainHash, Timing},
+        public_key::PublicKey,
+    },
     mina_blocks::common::*,
 };
 use protocol_state::ProtocolState;
@@ -31,7 +34,7 @@ pub struct PrecomputedBlockDataV2 {
     pub accounts_accessed: Vec<(u64, AccountAccessed)>,
 
     #[serde(skip_deserializing)]
-    pub delta_transition_chain_proof: serde_json::Value,
+    pub delta_transition_chain_proof: (String, [String; 0]),
 
     #[serde(skip_deserializing)]
     pub protocol_state_proof: serde_json::Value,
@@ -60,31 +63,20 @@ pub struct AccountAccessed {
     pub token_id: String,
     pub token_symbol: String,
     pub permissions: Permissions,
-    pub timing: (Timing,),
-
-    // TODO
-    pub zkapp: Option<serde_json::Value>,
+    pub timing: AccountAccessedTiming,
+    pub zkapp: Option<ZkappAccount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Timing {
+pub enum AccountAccessedTiming {
+    Untimed((TimingKind,)),
+    Timed((TimingKind, Timing)),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TimingKind {
+    Timed,
     Untimed,
-    Timed {
-        #[serde(deserialize_with = "from_str")]
-        initial_minimum_balance: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        cliff_time: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        cliff_amount: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        vesting_period: u64,
-
-        #[serde(deserialize_with = "from_str")]
-        vesting_increment: u64,
-    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,7 +100,7 @@ pub struct Permissions {
 pub struct SetVerificationKey(pub u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Permission(pub [String; 1]);
+pub struct Permission(pub (PermissionKind,));
 
 /// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/permissions.mli
 
@@ -121,11 +113,25 @@ pub enum PermissionKind {
     Impossible,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum DeltaTransitionChainProof {
-    Array(Vec<BlockHash>),
-    BlockHash(BlockHash),
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZkappAccount {
+    pub app_state: [String; 8],    // 64 hex digits
+    pub action_state: [String; 5], // 64 hex digits
+    pub verification_key: VerificationKey,
+    pub proved_state: bool,
+    pub zkapp_uri: String,
+
+    #[serde(deserialize_with = "from_str")]
+    pub zkapp_version: u32,
+
+    #[serde(deserialize_with = "from_str")]
+    pub last_action_slot: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationKey {
+    pub data: String,
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
