@@ -46,18 +46,18 @@ mkdir -p "$LOG"
 # does not terminate when this script terminates.
 #
 setsid \
-  ./rust/target/release/mina-indexer \
-    --domain-socket-path "$SOCKET" \
-    server start \
-      --log-level DEBUG \
-      --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
-      --locked-supply-csv "$SRC"/data/locked.csv \
-      --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
-      --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
-      --database-dir "$DB_DIR" \
-  0< /dev/null \
-  1>> "$LOG"/out \
-  2>> "$LOG"/err \
+  sh -c \
+    "$* 0< /dev/null 1>> $LOG/out 2>> $LOG/err &" \
+    -- \
+    ./rust/target/release/mina-indexer \
+      --domain-socket-path "$SOCKET" \
+      server start \
+        --log-level DEBUG \
+        --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
+        --locked-supply-csv "$SRC"/data/locked.csv \
+        --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
+        --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
+        --database-dir "$DB_DIR" \
   &
 
 # Wait for the above to return, otherwise the above fork'd process may not
