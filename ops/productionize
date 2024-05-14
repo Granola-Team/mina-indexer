@@ -1,0 +1,71 @@
+#! /usr/bin/env bash
+
+set -eux
+set -o pipefail
+
+PROD=/mnt/mina-log-storage/production
+VER="$(git rev-parse --short HEAD)"
+SRC="$(pwd)"
+mkdir -p "$PROD"
+
+# Assert that the socket created during tier 2 testing no longer exists.
+#
+SOCKET="$SRC"/mina-indexer.sock
+if [ -e "$SOCKET" ]; then
+    echo "Failure: $SOCKET still exists. Exiting" 2>&1
+    exit 1
+fi
+
+# Terminate the prior production instance. This will not work if we change the
+# on-wire comms protocol for the shutdown command, note.
+#
+SOCKET="$PROD"/mina-indexer.sock
+if [ -e "$SOCKET" ]; then
+    ./rust/target/release/mina-indexer --domain-socket-path "$SOCKET" shutdown
+fi
+
+# Now that we know the tier 2 testing instance and the production instance are
+# not running, we can safely use the database directory of the tier 2 testing
+# instance as the new production database.
+#
+DB_DIR="$PROD"/database
+TESTING_DB_DIR=/mnt/mina-log-storage/"$VER"-database
+if [ ! -e "$TESTING_DB_DIR" ]; then
+    # Set a backup DB_DIR, mostly for testing this script.
+    TESTING_DB_DIR=/mnt/mina-log-storage/f9cef6f2-database
+fi
+rm -f "$DB_DIR"
+ln -s "$TESTING_DB_DIR" "$DB_DIR"
+
+# Configure the log.
+#
+LOG="$PROD"/log
+mkdir -p "$LOG"
+
+# We must daemonize. This requires forking a child in a new session. This is
+# done with 'setsid'. The child must itself create a grandchild that is the
+# mina-indexer. We use a shell invocation with a terminal '&' to fork that
+# second time. Do not attempt to "simplify" this unless you really know what
+# you are doing.
+#
+setsid \
+  sh -c \
+    '"$@" 0< /dev/null 1>> '"$LOG"'/out 2>> '"$LOG"'/err &' \
+    -- \
+    ./rust/target/release/mina-indexer \
+      --domain-socket-path "$SOCKET" \
+      server start \
+        --log-level DEBUG \
+        --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
+        --locked-supply-csv "$SRC"/data/locked.csv \
+        --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
+        --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
+        --database-dir "$DB_DIR" \
+  &
+
+# Wait for the above to return, otherwise the above fork'd process may not
+# fully launch.
+#
+wait $!
+
+echo "Productionized!"
