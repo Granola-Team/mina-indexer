@@ -7,7 +7,7 @@ steps:
 - label: "Tier 2 Testing"
   key: "tier2"
   depends_on: "build"
-  if: build.branch == "robinbb-automated-prod-deploy"
+  if: build.branch == "main" && build.env('GRANOLA_NIGHTLY_BUILD') == "true"
   timeout_in_minutes: 2880
   agents:
     mina-log-storage: true

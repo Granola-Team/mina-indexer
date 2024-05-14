@@ -5,11 +5,11 @@ set -eu
 
 docker --version
 nix develop --command just build
-# nix develop --command tests/regression test_many_blocks
+nix develop --command tests/regression test_many_blocks
 
 # TODO: why is this not working?
 # nix develop --command tests/regression test_release
 
-# nix build
-# ops/ingest-all
-# nix develop --command ops/test-justfile-targets
+nix build
+ops/ingest-all
+nix develop --command ops/test-justfile-targets
