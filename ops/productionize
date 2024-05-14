@@ -60,4 +60,9 @@ setsid \
   2>> "$LOG"/err \
   &
 
+# Wait for the above to return, otherwise the above fork'd process may not
+# fully launch.
+#
+wait $!
+
 echo "Productionized!"
