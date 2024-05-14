@@ -42,14 +42,22 @@ ln -s "$TESTING_DB_DIR" "$DB_DIR"
 LOG="$PROD"/log
 mkdir -p "$LOG"
 
-exec ./rust/target/release/mina-indexer \
-  --domain-socket-path "$SOCKET" \
-  server start \
-    --log-level DEBUG \
-    --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
-    --locked-supply-csv "$SRC"/data/locked.csv \
-    --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
-    --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
-    --database-dir "$DB_DIR" \
-    >> "$LOG"/out \
-    2>> "$LOG"/err
+# Create the mina-indexer instance in a new session with 'setsid', so that it
+# does not terminate when this script terminates.
+#
+setsid \
+  ./rust/target/release/mina-indexer \
+    --domain-socket-path "$SOCKET" \
+    server start \
+      --log-level DEBUG \
+      --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
+      --locked-supply-csv "$SRC"/data/locked.csv \
+      --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
+      --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
+      --database-dir "$DB_DIR" \
+  0< /dev/null \
+  1>> "$LOG"/out \
+  2>> "$LOG"/err \
+  &
+
+echo "Productionized!"
