@@ -47,7 +47,7 @@ mkdir -p "$LOG"
 #
 setsid \
   sh -c \
-    "$* 0< /dev/null 1>> $LOG/out 2>> $LOG/err &" \
+    "\"$@\" 0< /dev/null 1>> $LOG/out 2>> $LOG/err &" \
     -- \
     ./rust/target/release/mina-indexer \
       --domain-socket-path "$SOCKET" \
