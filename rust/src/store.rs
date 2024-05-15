@@ -46,7 +46,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 16] = [
+    const COLUMN_FAMILIES: [&'static str; 17] = [
         "blocks-state-hash",
         "blocks-version",
         "blocks-global-slot-idx",
@@ -62,6 +62,7 @@ impl IndexerStore {
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
+        "snark-work-fees",     // [snark_work_fees_cf]
         "chain-id-to-network", // [chain_id_to_network_cf]
     ];
 
@@ -197,6 +198,13 @@ impl IndexerStore {
         self.database
             .cf_handle("snark-work-top-producers-sort")
             .expect("snark-work-top-producers-sort column family exists")
+    }
+
+    /// CF for storing/sorting SNARK work fees
+    fn snark_work_fees_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snark-work-fees")
+            .expect("snark-work-fees column family exists")
     }
 
     /// CF for storing chain_id -> network
@@ -1450,14 +1458,38 @@ pub fn top_snarkers_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DB
         .iterator_cf(db.snark_top_producers_sort_cf(), mode)
 }
 
-/// The first 8 bytes are total fees in big endian.
-fn total_fee_prefix(total_fee: u64) -> Vec<u8> {
-    total_fee.to_be_bytes().to_vec()
+/// [DBIterator] for snark work fees
+pub fn snark_fees_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DBIterator<'a> {
+    db.database.iterator_cf(db.snark_work_fees_cf(), mode)
 }
 
-fn total_fee_prefix_key(total_fee: u64, suffix: &str) -> Vec<u8> {
-    let mut bytes = total_fee_prefix(total_fee);
+fn fee_prefix(fee: u64) -> Vec<u8> {
+    fee.to_be_bytes().to_vec()
+}
+
+/// The first 8 bytes are fees in big endian.
+fn fee_prefix_key(fee: u64, suffix: &str) -> Vec<u8> {
+    let mut bytes = fee_prefix(fee);
     bytes.append(&mut suffix.as_bytes().to_vec());
+    bytes
+}
+
+/// Key format `{fee}{slot}{pk}{state_hash}{num}`
+/// - fee:  8 BE bytes
+/// - slot: 4 BE bytes
+/// - num:  4 BE bytes
+fn snark_fee_prefix_key(
+    fee: u64,
+    global_slot: u32,
+    pk: PublicKey,
+    state_hash: BlockHash,
+    num: u32,
+) -> Vec<u8> {
+    let mut bytes = fee.to_be_bytes().to_vec();
+    bytes.append(&mut global_slot.to_be_bytes().to_vec());
+    bytes.append(&mut pk.0.as_bytes().to_vec());
+    bytes.append(&mut state_hash.0.as_bytes().to_vec());
+    bytes.append(&mut num.to_be_bytes().to_vec());
     bytes
 }
 
@@ -1468,11 +1500,35 @@ impl SnarkStore for IndexerStore {
         let completed_works = SnarkWorkSummary::from_precomputed(block);
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
-        // add: state hash -> snark work
+        // add: state hash -> snark works
         let state_hash = block.state_hash().0;
         let key = state_hash.as_bytes();
         let value = serde_json::to_vec(&completed_works)?;
         self.database.put_cf(self.snarks_cf(), key, value)?;
+
+        // store fee info
+        let mut num_prover_works: HashMap<PublicKey, u32> = HashMap::new();
+        for snark in completed_works {
+            let num = num_prover_works.get(&snark.prover).copied().unwrap_or(0);
+            self.database.put_cf(
+                self.snark_work_fees_cf(),
+                snark_fee_prefix_key(
+                    snark.fee,
+                    block.global_slot_since_genesis(),
+                    snark.prover.clone(),
+                    block.state_hash(),
+                    num,
+                ),
+                b"",
+            )?;
+
+            // build the block's fee table
+            if num_prover_works.get(&snark.prover).is_some() {
+                *num_prover_works.get_mut(&snark.prover).unwrap() += 1;
+            } else {
+                num_prover_works.insert(snark.prover.clone(), 1);
+            }
+        }
 
         // add: "pk -> linked list of SNARK work summaries with state hash"
         for pk in block.prover_keys() {
@@ -1584,7 +1640,7 @@ impl SnarkStore for IndexerStore {
                 // delete the stale data
                 self.database.delete_cf(
                     self.snark_top_producers_sort_cf(),
-                    total_fee_prefix_key(old_total, &snark.prover.0),
+                    fee_prefix_key(old_total, &snark.prover.0),
                 )?
             }
         }
@@ -1592,7 +1648,7 @@ impl SnarkStore for IndexerStore {
         // replace stale data with updated
         for (prover, (old_total, new_fees)) in prover_fees.iter() {
             let total_fees = old_total + new_fees;
-            let key = total_fee_prefix_key(total_fees, &prover.0);
+            let key = fee_prefix_key(total_fees, &prover.0);
             self.database
                 .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
         }
