@@ -8,6 +8,7 @@ use crate::{
         public_key::PublicKey,
         LedgerHash,
     },
+    mina_blocks::v2::ZkappAccount,
 };
 use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -30,28 +31,28 @@ pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,
     pub delegate: PublicKey,
-    pub token: Option<u32>,
+    pub token: Option<u64>,
     pub token_permissions: TokenPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
     pub permissions: Permissions,
     pub nonce: Option<u32>,
     pub timing: Option<Timing>,
-    pub zkapp: Option<String>,
+    pub zkapp: Option<ZkappAccount>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccountJson {
-    pk: PublicKey,
-    balance: String,
-    delegate: PublicKey,
-    token: String,
-    token_permissions: TokenPermissions,
-    receipt_chain_hash: ReceiptChainHash,
-    voting_for: BlockHash,
-    permissions: Permissions,
-    nonce: Option<String>,
-    timing: Option<TimingJson>,
+    pub pk: PublicKey,
+    pub balance: String,
+    pub delegate: PublicKey,
+    pub token: String,
+    pub token_permissions: TokenPermissions,
+    pub receipt_chain_hash: ReceiptChainHash,
+    pub voting_for: BlockHash,
+    pub permissions: Permissions,
+    pub nonce: Option<String>,
+    pub timing: Option<TimingJson>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,10 +167,9 @@ impl StakingLedger {
             .into_iter()
             .map(|acct| (acct.pk.clone(), acct.into()))
             .collect();
+
         let (network, epoch, ledger_hash) = split_ledger_path(path);
-
         let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
-
         Ok(Self {
             epoch,
             network,

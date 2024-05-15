@@ -26,7 +26,7 @@ pub struct GenesisAccount {
     pub balance: String,
     pub nonce: Option<u32>,
     pub delegate: Option<String>,
-    pub token: Option<u32>,
+    pub token: Option<u64>,
     pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
     pub voting_for: Option<String>,
