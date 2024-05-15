@@ -4,6 +4,7 @@ use crate::{
     chain::chain_id,
     constants::*,
     ledger::{staking::StakingAccount, store::LedgerStore},
+    web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -95,7 +96,7 @@ impl StakeQueryRoot {
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
 
-                let timing = account.timing.as_ref().map(|timing| StakesTiming {
+                let timing = account.timing.as_ref().map(|timing| Timing {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
                     initial_minimum_balance: Some(timing.initial_minimum_balance),
@@ -139,32 +140,41 @@ pub struct StakesLedgerAccountWithMeta {
     #[graphql(flatten)]
     account: StakesLedgerAccount,
     /// Value timing
-    timing: Option<StakesTiming>,
+    timing: Option<Timing>,
 }
 
 #[derive(SimpleObject)]
 pub struct StakesLedgerAccount {
     /// Value chainId
     pub chain_id: String,
+
     /// Value balance
     pub balance: f64,
+
     /// Value nonce
     pub nonce: u32,
+
     /// Value delegate
     pub delegate: String,
+
     /// Value epoch
     pub pk: String,
+
     /// Value public key
     #[graphql(name = "public_key")]
     pub public_key: String,
+
     /// Value token
-    pub token: u32,
+    pub token: u64,
+
     /// Value receipt chain hash
     #[graphql(name = "receipt_chain_hash")]
     pub receipt_chain_hash: String,
+
     /// Value voting for
     #[graphql(name = "voting_for")]
     pub voting_for: String,
+
     /// Value balance nanomina
     pub balance_nanomina: u64,
 }
@@ -174,10 +184,13 @@ pub struct StakesLedgerAccount {
 pub struct StakesDelegationTotals {
     /// Value total currency
     pub total_currency: u64,
+
     /// Value total delegated
     pub total_delegated: f64,
+
     /// Value total delegated in nanomina
     pub total_delegated_nanomina: u64,
+
     /// Value count delegates
     pub count_delegates: u32,
 }
@@ -196,20 +209,6 @@ impl StakesDelegationTotals {
         let rounded_ratio = ratio.round_dp(2);
         format!("{:.2}%", rounded_ratio)
     }
-}
-
-#[derive(SimpleObject)]
-pub struct StakesTiming {
-    #[graphql(name = "cliff_amount")]
-    pub cliff_amount: Option<u64>,
-    #[graphql(name = "cliff_time")]
-    pub cliff_time: Option<u64>,
-    #[graphql(name = "initial_minimum_balance")]
-    pub initial_minimum_balance: Option<u64>,
-    #[graphql(name = "vesting_increment")]
-    pub vesting_increment: Option<u64>,
-    #[graphql(name = "vesting_period")]
-    pub vesting_period: Option<u64>,
 }
 
 impl From<StakingAccount> for StakesLedgerAccount {

@@ -3,7 +3,10 @@ use crate::{
     block::store::BlockStore,
     constants::*,
     ledger::store::LedgerStore,
-    web::graphql::stakes::{StakesDelegationTotals, StakesLedgerAccount, StakesTiming},
+    web::graphql::{
+        stakes::{StakesDelegationTotals, StakesLedgerAccount},
+        Timing,
+    },
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -99,7 +102,7 @@ impl NextStakesQueryRoot {
                 decimal.set_scale(9).ok();
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
-                let timing = account.timing.as_ref().map(|timing| StakesTiming {
+                let timing = account.timing.as_ref().map(|timing| Timing {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
                     initial_minimum_balance: Some(timing.initial_minimum_balance),
@@ -140,13 +143,17 @@ impl NextStakesQueryRoot {
 pub struct NextStakesLedgerAccountWithMeta {
     /// Value next epoch
     epoch: u32,
+
     /// Value next ledger hash
     ledger_hash: String,
+
     /// Value delegation totals
     next_delegation_totals: StakesDelegationTotals,
+
     /// Value accounts
     #[graphql(flatten)]
     account: StakesLedgerAccount,
+
     /// Value timing
-    timing: Option<StakesTiming>,
+    timing: Option<Timing>,
 }
