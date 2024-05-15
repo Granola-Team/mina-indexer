@@ -8,7 +8,7 @@ use crate::{
         BlockHash,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain::{store::ChainIdStore, ChainId, Network},
+    chain::{store::ChainStore, ChainId, Network},
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
@@ -1621,7 +1621,7 @@ impl SnarkStore for IndexerStore {
     }
 }
 
-impl ChainIdStore for IndexerStore {
+impl ChainStore for IndexerStore {
     fn set_chain_id_for_network(
         &self,
         chain_id: &ChainId,

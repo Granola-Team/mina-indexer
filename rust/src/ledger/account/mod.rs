@@ -19,6 +19,14 @@ impl ToString for Amount {
     }
 }
 
+impl std::ops::Add<Amount> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Amount) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Nonce(pub u32);
 
@@ -30,7 +38,7 @@ pub struct Account {
     pub delegate: PublicKey,
 
     // optional
-    pub token: Option<u32>,
+    pub token: Option<u64>,
     pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
     pub voting_for: Option<BlockHash>,
@@ -62,12 +70,12 @@ pub enum Permission {
     Proof,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Timing {
     pub initial_minimum_balance: u64,
-    pub cliff_time: u64,
+    pub cliff_time: u32,
     pub cliff_amount: u64,
-    pub vesting_period: u64,
+    pub vesting_period: u32,
     pub vesting_increment: u64,
 }
 
@@ -81,6 +89,20 @@ pub struct ReceiptChainHash(pub String);
 pub struct Username(pub String);
 
 impl Account {
+    /// Time-locked balance (subtracted from circulating supply)
+    pub fn current_minimum_balance(&self, curr_global_slot: u32) -> u64 {
+        self.timing.as_ref().map_or(0, |t| {
+            if curr_global_slot < t.cliff_time {
+                t.initial_minimum_balance
+            } else {
+                t.initial_minimum_balance.saturating_sub(
+                    ((curr_global_slot - t.cliff_time) / t.vesting_period) as u64
+                        * t.vesting_increment,
+                )
+            }
+        })
+    }
+
     pub fn empty(public_key: PublicKey) -> Self {
         Account {
             public_key: public_key.clone(),

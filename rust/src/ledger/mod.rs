@@ -160,6 +160,19 @@ impl Ledger {
         Ok(())
     }
 
+    pub fn time_locked_amount(&self, curr_global_slot: u32) -> Amount {
+        Amount(
+            self.accounts
+                .values()
+                .filter_map(|acct| {
+                    acct.timing
+                        .as_ref()
+                        .map(|_| acct.current_minimum_balance(curr_global_slot))
+                })
+                .sum(),
+        )
+    }
+
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> anyhow::Result<Self> {
         let mut ledger = Ledger::new();
         for (pubkey, balance, nonce, delgation) in value {

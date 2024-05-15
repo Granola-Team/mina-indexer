@@ -1,9 +1,10 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
+    chain::store::ChainStore,
     ledger::{
         account::{nanomina_to_mina, Amount},
         store::LedgerStore,
-        Ledger, LedgerHash,
+        LedgerHash,
     },
     store::IndexerStore,
     web::rest::locked_balances::LockedBalances,
@@ -43,24 +44,15 @@ fn millis_to_date_string(millis: i64) -> String {
 }
 
 fn calculate_summary(
+    chain_id: String,
     best_tip: &PrecomputedBlock,
-    _best_ledger: &Ledger,
     locked_balance: Option<Amount>,
 ) -> Option<BlockchainSummary> {
     let blockchain_length = best_tip.blockchain_length();
-    let chain_id = "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1".to_owned();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
     let epoch = best_tip.consensus_state().epoch_count.inner().inner();
-    let global_slot = best_tip
-        .consensus_state()
-        .global_slot_since_genesis
-        .inner()
-        .inner();
-    let min_window_density = best_tip
-        .consensus_state()
-        .min_window_density
-        .inner()
-        .inner();
+    let global_slot = best_tip.global_slot_since_genesis();
+    let min_window_density = best_tip.consensus_state().min_window_density.t.t;
     let next_epoch_ledger_hash = LedgerHash::from_hashv1(
         best_tip
             .consensus_state()
@@ -144,12 +136,24 @@ pub async fn get_blockchain_summary(
     if let Ok(Some(best_tip)) = db.get_best_block() {
         trace!("Found best tip: {}", best_tip.summary());
         if let Ok(Some(best_ledger)) = db.get_ledger_state_hash(&best_tip.state_hash(), true) {
-            let global_slot = best_tip.global_slot_since_genesis();
-            let locked_amount = locked_balances.get_locked_amount(global_slot);
             trace!("Found ledger for best tip");
-            if let Some(ref summary) = calculate_summary(&best_tip, &best_ledger, locked_amount) {
-                trace!("Blockchain summary for the best_tip: {:?}", summary);
-                let body = serde_json::to_string_pretty(summary).unwrap();
+
+            let chain_id = store.get_chain_id().expect("chain id").0;
+            let global_slot = best_tip.global_slot_since_genesis();
+
+            // aggregated on-chain & off-chain time-locked tokens
+            let locked_amount = locked_balances.get_locked_amount(global_slot).map(|amt| {
+                trace!("off-chain locked amount: {}", amt.0);
+
+                let on_chain_locked_amount = best_ledger.time_locked_amount(global_slot);
+                trace!("on-chain locked amount:  {}", on_chain_locked_amount.0);
+
+                amt + on_chain_locked_amount
+            });
+
+            if let Some(ref summary) = calculate_summary(chain_id, &best_tip, locked_amount) {
+                trace!("Blockchain summary: {:?}", summary);
+                let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
                 return HttpResponse::Ok()
                     .content_type(ContentType::json())
                     .body(body);

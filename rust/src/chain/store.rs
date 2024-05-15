@@ -1,6 +1,6 @@
 use super::{ChainId, Network};
 
-pub trait ChainIdStore {
+pub trait ChainStore {
     /// Persists a (chain id, network) pair
     ///
     /// Error propogates from db
