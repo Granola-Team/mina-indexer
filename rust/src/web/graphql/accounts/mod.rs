@@ -20,7 +20,7 @@ pub struct Account {
 #[derive(InputObject)]
 pub struct AccountQueryInput {
     public_key: Option<String>,
-    // username: Option<String>,
+
     balance: Option<u64>,
 
     #[graphql(name = "balance_gt")]
@@ -160,7 +160,9 @@ impl From<account::Account> for Account {
             balance: account.balance.0,
             time_locked: account.timing.is_some(),
             timing: account.timing.map(|t| t.into()),
-            username: account.username.map(|u| u.0),
+            username: account
+                .username
+                .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
         }
     }
 }
