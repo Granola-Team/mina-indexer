@@ -1,3 +1,7 @@
+#
+# Stakes epoch public query
+#
+
 POST {{url}}
 ```graphql
 query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
@@ -18,6 +22,7 @@ query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryIn
     }
   }
 }
+
 variables {
   "limit": 2,
   "sort_by": "BALANCE_DESC",
@@ -29,8 +34,11 @@ variables {
 ```
 HTTP 200
 [Asserts]
-duration < 1000
+
+# total data count
 jsonpath "$.data.stakes" count == 1
+
+# only datum
 jsonpath "$.data.stakes[0].balance" == 2498323.273015384
 jsonpath "$.data.stakes[0].chainId" == "5f704c"
 jsonpath "$.data.stakes[0].delegate" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
@@ -43,6 +51,12 @@ jsonpath "$.data.stakes[0].token" == 1
 jsonpath "$.data.stakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
 jsonpath "$.data.stakes[0].delegationTotals.countDelegates" == 1
 jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
+
+duration < 1000
+
+#
+# Stakes ledger hash delegate query
+#
 
 POST {{url}}
 ```graphql
@@ -60,6 +74,7 @@ query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryIn
     }
   }
 }
+
 variables {
   "limit": 2,
   "sort_by": "BALANCE_DESC",
@@ -71,13 +86,25 @@ variables {
 ```
 HTTP 200
 [Asserts]
-duration < 1000
+
+# total data count
 jsonpath "$.data.stakes" count == 2
+
+# first datum
 jsonpath "$.data.stakes[0].timing.cliff_amount" == 1000000000
 jsonpath "$.data.stakes[0].timing.cliff_time" == 345600
 jsonpath "$.data.stakes[0].timing.initial_minimum_balance" == 1000000000
 jsonpath "$.data.stakes[0].timing.vesting_increment" == 0
 jsonpath "$.data.stakes[0].timing.vesting_period" == 1
+
+# last datum
+jsonpath "$.data.stakes[1].timing" == null
+
+duration < 100
+
+#
+# Stakes delegation total stake percentage query
+#
 
 POST {{url}}
 ```graphql
@@ -91,5 +118,11 @@ POST {{url}}
 ```
 HTTP 200
 [Asserts]
-duration < 1000
+
+# total data count
+jsonpath "$.data.stakes" count == 1
+
+# only datum
 jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56%"
+
+duration < 800
