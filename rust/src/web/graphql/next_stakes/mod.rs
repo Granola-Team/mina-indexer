@@ -11,7 +11,7 @@ use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
-pub struct NextStakesQueryInput {
+pub struct NextstakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
@@ -21,7 +21,7 @@ pub struct NextStakesQueryInput {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum NextStakesSortByInput {
+pub enum NextstakeSortByInput {
     #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
 
@@ -30,17 +30,17 @@ pub enum NextStakesSortByInput {
 }
 
 #[derive(Default)]
-pub struct NextStakesQueryRoot;
+pub struct NextstakeQueryRoot;
 
 #[Object]
-impl NextStakesQueryRoot {
+impl NextstakeQueryRoot {
     // Cache for 1 day
     #[graphql(cache_control(max_age = 86400))]
-    async fn next_stakes<'ctx>(
+    async fn nextstakes<'ctx>(
         &self,
         ctx: &Context<'ctx>,
-        query: Option<NextStakesQueryInput>,
-        sort_by: Option<NextStakesSortByInput>,
+        query: Option<NextstakeQueryInput>,
+        sort_by: Option<NextstakeSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<NextStakesLedgerAccountWithMeta>>> {
         let db = db(ctx);
@@ -67,7 +67,7 @@ impl NextStakesQueryRoot {
             .into_values()
             .filter(|account| {
                 if let Some(ref query) = query {
-                    let NextStakesQueryInput {
+                    let NextstakeQueryInput {
                         delegate,
                         public_key,
                         epoch: query_epoch,
@@ -134,10 +134,10 @@ impl NextStakesQueryRoot {
             .collect();
 
         match sort_by {
-            Some(NextStakesSortByInput::BalanceAsc) => {
+            Some(NextstakeSortByInput::BalanceAsc) => {
                 accounts.sort_by(|b, a| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
             }
-            Some(NextStakesSortByInput::BalanceDesc) => {
+            Some(NextstakeSortByInput::BalanceDesc) => {
                 accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
             }
             None => (),
