@@ -125,11 +125,14 @@ impl BlocksQueryRoot {
         }
 
         // global slot query
-        if let Some(global_slot_since_genesis) =
-            query.as_ref().and_then(|q| q.global_slot_since_genesis)
+        if let Some(global_slot_since_genesis) = query
+            .as_ref()
+            .and_then(|q| q.protocol_state.as_ref())
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.slot)
         {
             let mut blocks: Vec<BlockWithCanonicity> = db
-                .get_blocks_at_slot(global_slot_since_genesis)?
+                .get_blocks_at_slot(global_slot_since_genesis as u32)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b))
                 .collect();
