@@ -18,7 +18,7 @@ use crate::{
         version_bytes,
     },
 };
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
@@ -45,15 +45,25 @@ pub struct BlockWithoutHeight {
 pub struct BlockHash(pub String);
 
 impl BlockHash {
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let block_hash = unsafe { String::from_utf8_unchecked(Vec::from(bytes)) };
-        Self(block_hash)
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        let res = String::from_utf8(bytes.to_vec())?;
+        if is_valid_state_hash(&res) {
+            return Ok(Self(res));
+        }
+        bail!("Invalid state hash from bytes")
     }
 
-    pub fn from_hashv1(hashv1: HashV1) -> Self {
+    pub fn from_hashv1(hashv1: HashV1) -> anyhow::Result<Self> {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
-        Self(versioned.to_base58_string().unwrap())
+        versioned
+            .to_base58_string()
+            .map(Self)
+            .map_err(|e| anyhow!("Error converting from hashv1: {e}"))
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
     }
 }
 
@@ -435,6 +445,16 @@ mod tests {
         let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion::V1)?.into();
 
         assert!(block0 < block1);
+        Ok(())
+    }
+
+    #[test]
+    fn block_hash_roundtrip() -> anyhow::Result<()> {
+        let input = BlockHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
+        let bytes = input.0.as_bytes().to_vec();
+
+        assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
+        assert_eq!(input, BlockHash::from_bytes(&bytes)?, "from_bytes");
         Ok(())
     }
 }
