@@ -115,32 +115,33 @@ impl Ledger {
         for diff in ledger_diff.account_diffs {
             match self.accounts.remove(&diff.public_key()) {
                 Some(account_before) => {
-                    let account_after = match &diff {
-                        AccountDiff::Payment(payment_diff) => {
-                            Account::from_payment(account_before, payment_diff)
-                        }
-                        AccountDiff::Delegation(delegation_diff) => {
-                            assert_eq!(account_before.public_key, delegation_diff.delegator);
-                            Account::from_delegation(
-                                account_before.clone(),
-                                delegation_diff.delegate.clone(),
-                            )
-                        }
-                        AccountDiff::Coinbase(coinbase_diff) => {
-                            Account::from_coinbase(account_before, coinbase_diff.amount)
-                        }
-                        AccountDiff::FeeTransfer(fee_transfer_diff) => {
-                            Account::from_payment(account_before, fee_transfer_diff)
-                        }
-                        AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                            Account::from_payment(account_before, fee_transfer_diff)
-                        }
-                        AccountDiff::FailedTransactionNonce(failed_diff) => {
-                            Account::from_failed_transaction(account_before, failed_diff.nonce)
-                        }
-                    };
-
-                    self.accounts.insert(diff.public_key(), account_after);
+                    self.accounts.insert(
+                        diff.public_key(),
+                        match &diff {
+                            AccountDiff::Payment(payment_diff) => {
+                                Account::from_payment(account_before, payment_diff)
+                            }
+                            AccountDiff::Delegation(delegation_diff) => {
+                                assert_eq!(account_before.public_key, delegation_diff.delegator);
+                                Account::from_delegation(
+                                    account_before.clone(),
+                                    delegation_diff.delegate.clone(),
+                                )
+                            }
+                            AccountDiff::Coinbase(coinbase_diff) => {
+                                Account::from_coinbase(account_before, coinbase_diff.amount)
+                            }
+                            AccountDiff::FeeTransfer(fee_transfer_diff) => {
+                                Account::from_payment(account_before, fee_transfer_diff)
+                            }
+                            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
+                                Account::from_payment(account_before, fee_transfer_diff)
+                            }
+                            AccountDiff::FailedTransactionNonce(failed_diff) => {
+                                Account::from_failed_transaction(account_before, failed_diff.nonce)
+                            }
+                        },
+                    );
                 }
                 None => {
                     return match diff {

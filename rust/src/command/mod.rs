@@ -142,7 +142,11 @@ pub trait UserCommandWithStatusT {
 
     fn sender(&self) -> PublicKey;
 
+    fn receiver(&self) -> PublicKey;
+
     fn nonce(&self) -> u32;
+
+    fn amount(&self) -> u64;
 }
 
 impl UserCommandWithStatusT for UserCommandWithStatus {
@@ -223,8 +227,32 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         }
     }
 
+    fn receiver(&self) -> PublicKey {
+        match self.data() {
+            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
+                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
+                    let mina_rs::PaymentPayload { receiver_pk, .. } =
+                        payment_payload_v1.clone().inner().inner();
+                    receiver_pk.into()
+                }
+                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
+                    let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } =
+                        stake_delegation_v1.clone().inner();
+                    new_delegate.into()
+                }
+            },
+        }
+    }
+
     fn nonce(&self) -> u32 {
         self.to_command().nonce()
+    }
+
+    fn amount(&self) -> u64 {
+        match self.to_command() {
+            Command::Delegation(_) => 0,
+            Command::Payment(payment) => payment.amount.0,
+        }
     }
 }
 
