@@ -1,5 +1,5 @@
 # 
-# Blocks canonical ascending
+# Blocks canonical height ascending query
 # 
 
 POST {{url}}
@@ -27,6 +27,11 @@ variables {
 ```
 HTTP 200
 [Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 120
+
+# first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
 jsonpath "$.data.blocks[0].blockHeight" == 1
 jsonpath "$.data.blocks[0].txFees" == "0"
@@ -36,6 +41,7 @@ jsonpath "$.data.blocks[0].dateTime" == "2021-03-17T00:00:00.000Z"
 jsonpath "$.data.blocks[0].receivedTime" == "2021-03-17T00:00:00.000Z"
 jsonpath "$.data.blocks[0].snarkFees" == "0"
 
+# last datum
 jsonpath "$.data.blocks[119].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 jsonpath "$.data.blocks[119].txFees" == "10000000"
 jsonpath "$.data.blocks[119].blockHeight" == 120
@@ -45,10 +51,10 @@ jsonpath "$.data.blocks[119].dateTime" == "2021-03-17T08:39:00.000Z"
 jsonpath "$.data.blocks[119].receivedTime" == "2021-03-17T08:39:40.591Z"
 jsonpath "$.data.blocks[119].snarkFees" == "0"
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks non-canonical descending
+# Blocks non-canonical height descending query
 # 
 
 POST {{url}}
@@ -75,10 +81,10 @@ jsonpath "$.data.blocks[0].canonical" == false
 jsonpath "$.data.blocks[83].blockHeight" == 6
 jsonpath "$.data.blocks[83].canonical" == false
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks creator account (default sort_by: BLOCKHEIGHT_DESC)
+# Blocks creator account  query (default sort_by: BLOCKHEIGHT_DESC)
 # 
 
 POST {{url}}
@@ -102,15 +108,17 @@ jsonpath "$.data.blocks" count == 3
 # Block data
 jsonpath "$.data.blocks[0].stateHash" == "3NKGUXQYm1nF1hdEDEzwuLRWZjBTdSeKqHfqS3JPCzJ2i31mrovV"
 jsonpath "$.data.blocks[0].blockHeight" == 109
+
 jsonpath "$.data.blocks[1].stateHash" == "3NLgPYVDSV6y7ZKSQrjowedjZn9RuLwdx311vheWZEy3mBjKDbmj"
 jsonpath "$.data.blocks[1].blockHeight" == 97
+
 jsonpath "$.data.blocks[2].stateHash" == "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
 jsonpath "$.data.blocks[2].blockHeight" == 5
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks coinbase receiver ascending
+# Blocks coinbase receiver height ascending query
 # 
 
 POST {{url}}
@@ -124,27 +132,31 @@ POST {{url}}
 ```
 HTTP 200
 [Asserts]
+
+# total data count
 jsonpath "$.data.blocks" count == 5
 
-jsonpath "$.data.blocks[4].stateHash" == "3NLftXM1dfzGJwLef5NCk974CXq8oXtAaQAkkhpJZxpaBwLFiemo"
-jsonpath "$.data.blocks[4].blockHeight" == 84
-
-jsonpath "$.data.blocks[3].stateHash" == "3NKF3gkPkEAa6Nozz3bB4fekkrMi1nXmECioJ9SjrcbF5BKK7jDh"
-jsonpath "$.data.blocks[3].blockHeight" == 72
-
-jsonpath "$.data.blocks[2].stateHash" == "3NLLW8wvytn913FtfqvqETPfJWW9GEGqEYTqYKSriAKGXUFqqnDi"
-jsonpath "$.data.blocks[2].blockHeight" == 70
+# data values
+jsonpath "$.data.blocks[0].stateHash" == "3NLVZQz4FwFbvW4hejfyRpw5NyP8XvQjhj4wSsCjCKdHNBjwWsPG"
+jsonpath "$.data.blocks[0].blockHeight" == 8
 
 jsonpath "$.data.blocks[1].stateHash" == "3NKBupxvxcso3xiWQr3f4fzPJQhSh9efLJMoA49aqKbrjC3saRsv"
 jsonpath "$.data.blocks[1].blockHeight" == 62
 
-jsonpath "$.data.blocks[0].stateHash" == "3NLVZQz4FwFbvW4hejfyRpw5NyP8XvQjhj4wSsCjCKdHNBjwWsPG"
-jsonpath "$.data.blocks[0].blockHeight" == 8
+jsonpath "$.data.blocks[2].stateHash" == "3NLLW8wvytn913FtfqvqETPfJWW9GEGqEYTqYKSriAKGXUFqqnDi"
+jsonpath "$.data.blocks[2].blockHeight" == 70
 
-duration < 1000
+jsonpath "$.data.blocks[3].stateHash" == "3NKF3gkPkEAa6Nozz3bB4fekkrMi1nXmECioJ9SjrcbF5BKK7jDh"
+jsonpath "$.data.blocks[3].blockHeight" == 72
+
+jsonpath "$.data.blocks[4].stateHash" == "3NLftXM1dfzGJwLef5NCk974CXq8oXtAaQAkkhpJZxpaBwLFiemo"
+jsonpath "$.data.blocks[4].blockHeight" == 84
+
+
+duration < 200
 
 # 
-# Blocks at height
+# Blocks specific height query
 # 
 
 POST {{url}}
@@ -160,23 +172,23 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
-# Total blocks at blockchain_length
+# total blocks height 6
 jsonpath "$.data.blocks" count == 4
 
-# First block
+# first block height 6
 jsonpath "$.data.blocks[0].stateHash" == "3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v"
 jsonpath "$.data.blocks[0].blockHeight" == 6
 jsonpath "$.data.blocks[0].canonical" == true
 
-# Last block
+# last block height 6
 jsonpath "$.data.blocks[3].stateHash" == "3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45"
 jsonpath "$.data.blocks[3].blockHeight" == 6
 jsonpath "$.data.blocks[3].canonical" == false
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks at global slot
+# Blocks global slot query
 # 
 
 POST {{url}}
@@ -192,10 +204,10 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
-# Total blocks at blockchain_length
+# total data count
 jsonpath "$.data.blocks" count == 3
 
-# The blocks
+# data values
 jsonpath "$.data.blocks[0].stateHash" == "3NKpj5NkT4zrqAy1XPjWLe6BJuyprKEbu89kbxXxFYexabtEGKu1"
 jsonpath "$.data.blocks[0].blockHeight" == 117
 jsonpath "$.data.blocks[0].canonical" == true
@@ -208,10 +220,10 @@ jsonpath "$.data.blocks[2].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexv
 jsonpath "$.data.blocks[2].blockHeight" == 117
 jsonpath "$.data.blocks[2].canonical" == false
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks state hash transactions
+# Blocks state hash transactions, fee transfers, user commands query
 # 
 
 POST {{url}}
@@ -249,14 +261,23 @@ HTTP 200
 # Unique block at state hash
 jsonpath "$.data.blocks" count == 1
 
+# state hash
 jsonpath "$.data.blocks[0].stateHash" == "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R"
+
+# txns
+# - coinbase
 jsonpath "$.data.blocks[0].transactions.coinbase" == "720000000000"
 jsonpath "$.data.blocks[0].transactions.coinbaseReceiverAccount.publicKey" == "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1"
+
+# - fee transfer(s)
 jsonpath "$.data.blocks[0].transactions.feeTransfer" count == 1
 jsonpath "$.data.blocks[0].transactions.feeTransfer[0].type" == "Fee_transfer"
 jsonpath "$.data.blocks[0].transactions.feeTransfer[0].recipient" == "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1"
 jsonpath "$.data.blocks[0].transactions.feeTransfer[0].fee" == "120000000"
+
+# - user commands
 jsonpath "$.data.blocks[0].transactions.userCommands" count == 4
+
 jsonpath "$.data.blocks[0].transactions.userCommands[0].kind" == "PAYMENT"
 jsonpath "$.data.blocks[0].transactions.userCommands[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.blocks[0].transactions.userCommands[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
@@ -264,10 +285,31 @@ jsonpath "$.data.blocks[0].transactions.userCommands[0].amount" == 1000
 jsonpath "$.data.blocks[0].transactions.userCommands[0].fee" == 10000000
 jsonpath "$.data.blocks[0].transactions.userCommands[0].blockHeight" == 3
 
-duration < 1000
+jsonpath "$.data.blocks[0].transactions.userCommands[1].kind" == "PAYMENT"
+jsonpath "$.data.blocks[0].transactions.userCommands[1].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.blocks[0].transactions.userCommands[1].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.blocks[0].transactions.userCommands[1].amount" == 10000
+jsonpath "$.data.blocks[0].transactions.userCommands[1].fee" == 50000000
+jsonpath "$.data.blocks[0].transactions.userCommands[1].blockHeight" == 3
+
+jsonpath "$.data.blocks[0].transactions.userCommands[2].kind" == "PAYMENT"
+jsonpath "$.data.blocks[0].transactions.userCommands[2].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.blocks[0].transactions.userCommands[2].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.blocks[0].transactions.userCommands[2].amount" == 1000
+jsonpath "$.data.blocks[0].transactions.userCommands[2].fee" == 10000000
+jsonpath "$.data.blocks[0].transactions.userCommands[2].blockHeight" == 3
+
+jsonpath "$.data.blocks[0].transactions.userCommands[3].kind" == "PAYMENT"
+jsonpath "$.data.blocks[0].transactions.userCommands[3].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.blocks[0].transactions.userCommands[3].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.blocks[0].transactions.userCommands[3].amount" == 10000
+jsonpath "$.data.blocks[0].transactions.userCommands[3].fee" == 50000000
+jsonpath "$.data.blocks[0].transactions.userCommands[3].blockHeight" == 3
+
+duration < 200
 
 # 
-# Blocks state hash SNARK jobs
+# Blocks state hash SNARK jobs query
 # 
 
 POST {{url}}
@@ -293,20 +335,24 @@ jsonpath "$.data.blocks" count == 1
 # Total SNARKs
 jsonpath "$.data.blocks[0].snarkJobs" count == 64
 
+# first SNARK
 jsonpath "$.data.blocks[0].snarkJobs[0].blockHeight" == 111
 jsonpath "$.data.blocks[0].snarkJobs[0].blockStateHash" == "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm"
 jsonpath "$.data.blocks[0].snarkJobs[0].dateTime" == "2021-03-17T08:06:00.000Z"
 jsonpath "$.data.blocks[0].snarkJobs[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.blocks[0].snarkJobs[0].fee" == 0
 
+# last SNARK
 jsonpath "$.data.blocks[0].snarkJobs[63].blockHeight" == 111
 jsonpath "$.data.blocks[0].snarkJobs[63].blockStateHash" == "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm"
 jsonpath "$.data.blocks[0].snarkJobs[63].dateTime" == "2021-03-17T08:06:00.000Z"
 jsonpath "$.data.blocks[0].snarkJobs[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.blocks[0].snarkJobs[63].fee" == 0
 
+duration < 200
+
 # 
-# Blocks canonical block height bounded ascending
+# Blocks canonical block height bounded ascending query
 # 
 
 POST {{url}}
@@ -332,20 +378,23 @@ variables {
 HTTP 200
 [Asserts]
 
+# total data count
 jsonpath "$.data.blocks" count == 40
 
+# first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA"
 jsonpath "$.data.blocks[0].blockHeight" == 11
 jsonpath "$.data.blocks[0].canonical" == true
 
+# last datum
 jsonpath "$.data.blocks[39].stateHash" == "3NLJeP3pBr2UFgLZpNgwKEw37UeYEsyuP63U9A3Q8D8ATBStWw6Y"
 jsonpath "$.data.blocks[39].blockHeight" == 50
 jsonpath "$.data.blocks[39].canonical" == true
 
-duration < 1000
+duration < 200
 
 # 
-# Blocks canonical global slot bounded
+# Blocks canonical global slot bounded query
 # 
 
 POST {{url}}
@@ -370,14 +419,17 @@ variables {
 HTTP 200
 [Asserts]
 
+# total data count
 jsonpath "$.data.blocks" count == 62
 
+# first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA"
 jsonpath "$.data.blocks[0].blockHeight" == 11
 jsonpath "$.data.blocks[0].canonical" == true
 
+# last datum
 jsonpath "$.data.blocks[61].stateHash" == "3NLjEUEg2888QNjKyKgphTtAdwLV2tmgMycFP3nPFHmy7q9uEwmk"
 jsonpath "$.data.blocks[61].blockHeight" == 72
 jsonpath "$.data.blocks[61].canonical" == true
 
-duration < 1000
+duration < 200

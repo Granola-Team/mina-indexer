@@ -1,3 +1,7 @@
+#
+# Transaction hash query
+#
+
 POST {{url}}
 ```graphql
 query TransactionQuery {
@@ -10,5 +14,7 @@ query TransactionQuery {
 ```
 HTTP 200
 [Asserts]
+
 jsonpath "$.data.transaction.block.stateHash" == "3NLgPYVDSV6y7ZKSQrjowedjZn9RuLwdx311vheWZEy3mBjKDbmj"
-duration < 1000
+
+duration < 10

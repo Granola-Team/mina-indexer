@@ -1,3 +1,7 @@
+#
+# Next stakes epoch public key query
+#
+
 POST {{url}}
 ```graphql
 query NextStakesQuery($limit: Int, $sort_by: NextStakesSortByInput!, $query: NextStakesQueryInput!) {
@@ -18,8 +22,9 @@ query NextStakesQuery($limit: Int, $sort_by: NextStakesSortByInput!, $query: Nex
     }
   }
 }
+
 variables {
-  "limit": 2,
+  "limit": 1,
   "sort_by": "BALANCE_DESC",
   "query": {
     "epoch": 41,
@@ -29,8 +34,11 @@ variables {
 ```
 HTTP 200
 [Asserts]
-duration < 1000
+
+# total data count
 jsonpath "$.data.nextStakes" count == 1
+
+# only datum
 jsonpath "$.data.nextStakes[0].balance" == 2498323.273015384
 jsonpath "$.data.nextStakes[0].chainId" == "5f704c"
 jsonpath "$.data.nextStakes[0].delegate" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
@@ -43,3 +51,5 @@ jsonpath "$.data.nextStakes[0].token" == 1
 jsonpath "$.data.nextStakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.countDelegates" == 1
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.totalDelegated" == 2498323.273015384
+
+duration < 1000
