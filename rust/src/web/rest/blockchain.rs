@@ -134,7 +134,6 @@ pub async fn get_blockchain_summary(
     let db = store.as_ref();
     if let Ok(Some(best_tip)) = db.get_best_block() {
         trace!("Found best tip: {}", best_tip.summary());
-
         // aggregated on-chain & off-chain time-locked tokens
         let chain_id = store.get_chain_id().expect("chain id").0;
         let global_slot = best_tip.global_slot_since_genesis();
