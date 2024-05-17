@@ -478,10 +478,11 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     Value::Object(payload_obj)
 }
 
+pub const TXN_HASH_LEN: usize = 53;
 pub const TXN_HASH_START: &str = "Ckp";
 
 pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with(TXN_HASH_START) && input.len() == 53
+    input.starts_with(TXN_HASH_START) && input.len() == TXN_HASH_LEN
 }
 
 #[cfg(test)]

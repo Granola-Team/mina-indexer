@@ -45,6 +45,9 @@ pub struct BlockWithoutHeight {
 pub struct BlockHash(pub String);
 
 impl BlockHash {
+    pub const LEN: usize = 52;
+    pub const PREFIX: &'static str = "3N";
+
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
         let res = String::from_utf8(bytes.to_vec())?;
         if is_valid_state_hash(&res) {
@@ -279,7 +282,7 @@ impl std::fmt::Display for BlockHash {
 pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
     let last_part = file_name.to_str()?.split('-').last()?.to_string();
     let state_hash = last_part.split('.').next()?;
-    if state_hash.starts_with("3N") {
+    if state_hash.starts_with(BlockHash::PREFIX) {
         return Some(state_hash.to_string());
     }
     None
@@ -297,7 +300,7 @@ pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
 }
 
 pub fn is_valid_state_hash(input: &str) -> bool {
-    input.starts_with("3N") && input.len() == 52
+    input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
 }
 
 pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {

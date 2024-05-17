@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 pub struct PublicKey(pub String);
 
 impl PublicKey {
+    pub const LEN: usize = 55;
+    pub const PREFIX: &'static str = "B62q";
+
     pub fn new<S: Into<String>>(key: S) -> Self {
         Self(key.into())
     }
@@ -17,12 +20,12 @@ impl PublicKey {
         self.0.to_owned()
     }
 
-    /// Convert to bytes (length 55)
+    /// Convert to bytes (length [Self::LEN])
     pub fn to_bytes(self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
 
-    /// Convert from bytes (length 55)
+    /// Convert from bytes (length [Self::LEN])
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
         let res = String::from_utf8(bytes.to_vec())?;
         if is_valid_public_key(&res) {
@@ -101,7 +104,7 @@ impl From<PublicKey> for PubKey {
 }
 
 pub fn is_valid_public_key(pk: &str) -> bool {
-    pk.starts_with("B62q") && pk.len() == 55
+    pk.starts_with(PublicKey::PREFIX) && pk.len() == PublicKey::LEN
 }
 
 #[cfg(test)]
