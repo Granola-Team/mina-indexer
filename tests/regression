@@ -1094,7 +1094,7 @@ test_rest_endpoints() {
     assert '5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1' $chain_id
 
     circulating_supply=$(cat output.json | jq -r .circulatingSupply)
-    assert '18320777783.342609316' $circulating_supply
+    assert '89031537.840039233' $circulating_supply
 
     # date_time=$(cat output.json | jq -r .dateTime)
     # assert 'Wed, 17 Mar 2021 07:15:00 GMT' $date_time
@@ -1106,7 +1106,7 @@ test_rest_endpoints() {
     assert '145' $global_slot
 
     locked_supply=$(cat output.json | jq -r .lockedSupply)
-    assert '931351983.206981533' $locked_supply
+    assert '716354155' $locked_supply
 
     min_window_density=$(cat output.json | jq -r .minWindowDensity)
     assert '77' $min_window_density

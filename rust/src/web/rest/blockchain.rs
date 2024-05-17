@@ -3,7 +3,6 @@ use crate::{
     chain::store::ChainStore,
     ledger::{
         account::{nanomina_to_mina, Amount},
-        store::LedgerStore,
         LedgerHash,
     },
     store::IndexerStore,
@@ -135,29 +134,18 @@ pub async fn get_blockchain_summary(
     let db = store.as_ref();
     if let Ok(Some(best_tip)) = db.get_best_block() {
         trace!("Found best tip: {}", best_tip.summary());
-        if let Ok(Some(best_ledger)) = db.get_ledger_state_hash(&best_tip.state_hash(), true) {
-            trace!("Found ledger for best tip");
 
-            let chain_id = store.get_chain_id().expect("chain id").0;
-            let global_slot = best_tip.global_slot_since_genesis();
+        // aggregated on-chain & off-chain time-locked tokens
+        let chain_id = store.get_chain_id().expect("chain id").0;
+        let global_slot = best_tip.global_slot_since_genesis();
+        let locked_amount = locked_balances.get_locked_amount(global_slot);
 
-            // aggregated on-chain & off-chain time-locked tokens
-            let locked_amount = locked_balances.get_locked_amount(global_slot).map(|amt| {
-                trace!("off-chain locked amount: {}", amt.0);
-
-                let on_chain_locked_amount = best_ledger.time_locked_amount(global_slot);
-                trace!("on-chain locked amount:  {}", on_chain_locked_amount.0);
-
-                amt + on_chain_locked_amount
-            });
-
-            if let Some(ref summary) = calculate_summary(chain_id, &best_tip, locked_amount) {
-                trace!("Blockchain summary: {:?}", summary);
-                let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
-                return HttpResponse::Ok()
-                    .content_type(ContentType::json())
-                    .body(body);
-            }
+        if let Some(ref summary) = calculate_summary(chain_id, &best_tip, locked_amount) {
+            trace!("Blockchain summary: {:?}", summary);
+            let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
+            return HttpResponse::Ok()
+                .content_type(ContentType::json())
+                .body(body);
         }
     }
     HttpResponse::NotFound().finish()
