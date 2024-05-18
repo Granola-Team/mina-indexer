@@ -270,7 +270,6 @@ impl std::str::FromStr for ReceiptChainHash {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO validate receipt chain hash?
         Ok(Self(s.to_string()))
     }
 }

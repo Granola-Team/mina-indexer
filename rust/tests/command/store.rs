@@ -84,23 +84,19 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     // iterate over transactions
     let mut curr_slot = 0;
-    for entry in user_commands_iterator(&indexer_store, IteratorMode::End) {
+    for (key, value) in user_commands_iterator(&indexer_store, IteratorMode::End).flatten() {
+        let signed_cmd = user_commands_iterator_signed_command(&value)?;
+
         // txn hashes should match
-        assert_eq!(
-            user_commands_iterator_signed_command(&entry)?.tx_hash,
-            user_commands_iterator_txn_hash(&entry)?,
-        );
+        assert_eq!(user_commands_iterator_txn_hash(&key)?, signed_cmd.tx_hash);
 
         // global slot numbers should match
-        let cmd_slot = user_commands_iterator_global_slot(&entry);
+        let cmd_slot = user_commands_iterator_global_slot(&key);
         assert!(curr_slot <= cmd_slot);
-        assert_eq!(
-            cmd_slot,
-            user_commands_iterator_signed_command(&entry)?.global_slot_since_genesis,
-        );
+        assert_eq!(cmd_slot, signed_cmd.global_slot_since_genesis,);
 
         // blocks should be present
-        let state_hash = user_commands_iterator_signed_command(&entry)?.state_hash;
+        let state_hash = signed_cmd.state_hash;
         assert!(indexer_store.get_block(&state_hash)?.is_some());
 
         curr_slot = cmd_slot;

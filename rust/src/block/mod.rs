@@ -18,7 +18,7 @@ use crate::{
         version_bytes,
     },
 };
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 use std::{ffi::OsStr, path::Path};
 
@@ -45,15 +45,28 @@ pub struct BlockWithoutHeight {
 pub struct BlockHash(pub String);
 
 impl BlockHash {
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let block_hash = unsafe { String::from_utf8_unchecked(Vec::from(bytes)) };
-        Self(block_hash)
+    pub const LEN: usize = 52;
+    pub const PREFIX: &'static str = "3N";
+
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        let res = String::from_utf8(bytes.to_vec())?;
+        if is_valid_state_hash(&res) {
+            return Ok(Self(res));
+        }
+        bail!("Invalid state hash from bytes")
     }
 
-    pub fn from_hashv1(hashv1: HashV1) -> Self {
+    pub fn from_hashv1(hashv1: HashV1) -> anyhow::Result<Self> {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
-        Self(versioned.to_base58_string().unwrap())
+        versioned
+            .to_base58_string()
+            .map(Self)
+            .map_err(|e| anyhow!("Error converting from hashv1: {e}"))
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
     }
 }
 
@@ -269,7 +282,7 @@ impl std::fmt::Display for BlockHash {
 pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
     let last_part = file_name.to_str()?.split('-').last()?.to_string();
     let state_hash = last_part.split('.').next()?;
-    if state_hash.starts_with("3N") {
+    if state_hash.starts_with(BlockHash::PREFIX) {
         return Some(state_hash.to_string());
     }
     None
@@ -287,7 +300,7 @@ pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
 }
 
 pub fn is_valid_state_hash(input: &str) -> bool {
-    input.starts_with("3N") && input.len() == 52
+    input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
 }
 
 pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {
@@ -435,6 +448,16 @@ mod tests {
         let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion::V1)?.into();
 
         assert!(block0 < block1);
+        Ok(())
+    }
+
+    #[test]
+    fn block_hash_roundtrip() -> anyhow::Result<()> {
+        let input = BlockHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
+        let bytes = input.0.as_bytes().to_vec();
+
+        assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
+        assert_eq!(input, BlockHash::from_bytes(&bytes)?, "from_bytes");
         Ok(())
     }
 }

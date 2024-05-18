@@ -2,7 +2,10 @@ use super::precomputed::PcbVersion;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
-    ledger::public_key::PublicKey,
+    ledger::{
+        diff::{account::PaymentDiff, LedgerBalanceUpdate},
+        public_key::PublicKey,
+    },
 };
 
 pub trait BlockStore {
@@ -44,6 +47,19 @@ pub trait BlockStore {
     /// Add a block at the given global slot since genesis
     fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
 
+    /// Set block height <-> global slot
+    fn set_height_global_slot(&self, blockchain_length: u32, slot: u32) -> anyhow::Result<()>;
+
+    /// Get the global slot since genesis corresponding to the given block
+    /// height
+    fn get_globl_slot_from_height(&self, blockchain_length: u32) -> anyhow::Result<Option<u32>>;
+
+    /// Get the block height corresponding to the global slot since genesis
+    fn get_height_from_global_slot(
+        &self,
+        global_slot_since_genesis: u32,
+    ) -> anyhow::Result<Option<u32>>;
+
     /// Get number of blocks for the given public key
     fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
@@ -57,9 +73,33 @@ pub trait BlockStore {
     /// Get children of a block
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
 
-    /// TODO
+    /// Set block version
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
 
-    /// TODO
+    /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
+
+    /// Set a sorted account balance
+    fn set_account_balance(&self, pk: &PublicKey, balance: u64) -> anyhow::Result<()>;
+
+    /// Generate account balance updates when the best tip changes
+    fn common_ancestor_account_balance_updates(
+        &self,
+        old_best_tip: &BlockHash,
+        new_best_tip: &BlockHash,
+    ) -> anyhow::Result<LedgerBalanceUpdate>;
+
+    /// Set the balance updates for a block
+    fn set_block_balance_updates(
+        &self,
+        state_hash: &BlockHash,
+        balance_updates: Vec<PaymentDiff>,
+    ) -> anyhow::Result<()>;
+
+    /// Get a block's balance updates
+    fn get_block_balance_updates(&self, state_hash: &BlockHash)
+        -> anyhow::Result<Vec<PaymentDiff>>;
+
+    /// Updates stored account balances
+    fn update_account_balances(&self, update: LedgerBalanceUpdate) -> anyhow::Result<()>;
 }

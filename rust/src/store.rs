@@ -18,6 +18,7 @@ use crate::{
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
+        diff::{account::PaymentDiff, LedgerBalanceUpdate},
         public_key::PublicKey,
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
         store::LedgerStore,
@@ -46,12 +47,17 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 16] = [
+    const COLUMN_FAMILIES: [&'static str; 24] = [
+        "account-balance",
+        "account-balance-sort",
+        "account-balance-updates",
         "blocks-state-hash",
         "blocks-version",
         "blocks-global-slot-idx",
         "blocks-at-length",
         "blocks-at-slot",
+        "block-height-to-slot", // [block_height_to_global_slot_cf]
+        "block-slot-to-height", // []
         "canonicity",
         "commands",
         "mainnet-commands-slot",
@@ -62,7 +68,10 @@ impl IndexerStore {
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
+        "snark-work-fees",     // [snark_work_fees_cf]
         "chain-id-to-network", // [chain_id_to_network_cf]
+        "txn-from",            // [txn_from_cf]
+        "txn-to",              // [txn_to_cf]
     ];
 
     /// Creates a new _primary_ indexer store
@@ -105,32 +114,83 @@ impl IndexerStore {
 
     // Column family helpers
 
-    /// CF for storing all blocks: state hash -> versioned pcb
+    /// CF for storing account balances (best ledger):
+    /// `pk -> balance`
+    fn account_balance_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("account-balance")
+            .expect("account-balance column family exists")
+    }
+
+    /// CF for sorting account's by balance
+    /// `{balance}{pk} -> _`
+    ///
+    /// - `balance`: 8 BE bytes
+    fn account_balance_sort_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("account-balance-sort")
+            .expect("account-balance-sort column family exists")
+    }
+
+    /// CF for storing account balance updates:
+    /// `state hash -> balance updates`
+    fn account_balance_updates_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("account-balance-updates")
+            .expect("account-balance-updates column family exists")
+    }
+
+    /// CF for storing all blocks
     fn blocks_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks-state-hash")
             .expect("blocks-state-hash column family exists")
     }
 
-    /// CF for storing state hash ->
+    /// CF for storing block versions:
+    /// `state hash -> pcb version`
     fn blocks_version_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks-version")
             .expect("blocks-version column family exists")
     }
 
+    /// CF for sorting blocks by global slot
+    /// `{global_slot}{state_hash} -> _`
     fn blocks_global_slot_idx_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks-global-slot-idx")
-            .expect("blocks column family exists")
+            .expect("blocks-global-slot-idx column family exists")
     }
 
+    /// CF for storing: height -> global slot
+    fn block_height_to_global_slot_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("block-height-to-slot")
+            .expect("block-height-to-slot column family exists")
+    }
+
+    /// CF for storing: global slot -> height
+    fn block_global_slot_to_height_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("block-slot-to-height")
+            .expect("block-slot-to-height column family exists")
+    }
+
+    /// CF for storing blocks at a fixed height:
+    /// `height -> list of blocks at height`
+    ///
+    /// - `list of blocks at height`: sorted from best to worst
     fn lengths_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks-at-length")
             .expect("blocks-at-length column family exists")
     }
 
+    /// CF for storing blocks at a fixed global slot:
+    /// `global slot -> list of blocks at slot`
+    ///
+    /// - `list of blocks at slot`: sorted from best to worst
     fn slots_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("blocks-at-slot")
@@ -152,15 +212,21 @@ impl IndexerStore {
     fn internal_commands_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("mainnet-internal-commands")
-            .expect("mainnet-internal commands column family exists")
+            .expect("mainnet-internal-commands column family exists")
     }
 
+    /// CF for sorting user commands: `{global_slot}{txn_hash} -> data`
+    ///
+    /// - `global_slot`: 4 BE bytes
     fn commands_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("mainnet-commands-slot")
             .expect("mainnet-commands-slot column family exists")
     }
 
+    /// CF for storing: `txn_hash -> global_slot`
+    ///
+    /// - `global_slot`: 4 BE bytes
     fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("mainnet-cmds-txn-global-slot")
@@ -199,19 +265,40 @@ impl IndexerStore {
             .expect("snark-work-top-producers-sort column family exists")
     }
 
+    /// CF for storing/sorting SNARK work fees
+    fn snark_work_fees_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("snark-work-fees")
+            .expect("snark-work-fees column family exists")
+    }
+
     /// CF for storing chain_id -> network
     fn chain_id_to_network_cf(&self) -> &speedb::ColumnFamily {
         self.database
             .cf_handle("chain-id-to-network")
             .expect("chain-id-to-network column family exists")
     }
+
+    /// CF for sorting user commands by sender public key
+    fn txn_from_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("txn-from")
+            .expect("txn-from column family exists")
+    }
+
+    /// CF for sorting user commands by receiver public key in [CommandStore]
+    fn txn_to_cf(&self) -> &speedb::ColumnFamily {
+        self.database
+            .cf_handle("txn-to")
+            .expect("txn-to column family exists")
+    }
 }
 
 /// [BlockStore] implementation
 
 fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
-    let mut res = global_slot_prefix(block.global_slot_since_genesis());
-    res.append(&mut block.state_hash().0.as_bytes().to_vec());
+    let mut res = to_be_bytes(block.global_slot_since_genesis());
+    res.append(&mut block.state_hash().to_bytes());
     res
 }
 
@@ -246,6 +333,9 @@ impl BlockStore for IndexerStore {
         for pk in block.all_public_keys() {
             self.add_block_at_public_key(&pk, &block.state_hash())?;
         }
+
+        // add height <-> global slot
+        self.set_height_global_slot(block.blockchain_length(), block.global_slot_since_genesis())?;
 
         // add block to height list
         self.add_block_at_height(&block.state_hash(), block.blockchain_length())?;
@@ -306,6 +396,14 @@ impl BlockStore for IndexerStore {
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Setting best block");
 
+        if let Some(old) = self.get_best_block_hash()? {
+            if old != *state_hash {
+                let balance_updates =
+                    self.common_ancestor_account_balance_updates(&old, state_hash)?;
+                self.update_account_balances(balance_updates)?;
+            }
+        }
+
         // set new best tip
         self.database.put_cf(
             self.blocks_cf(),
@@ -325,6 +423,129 @@ impl BlockStore for IndexerStore {
             }
             None => error!("Block missing from store: {}", state_hash.0),
         }
+        Ok(())
+    }
+
+    // TODO make modular over different account updates
+    fn common_ancestor_account_balance_updates(
+        &self,
+        old_best_tip: &BlockHash,
+        new_best_tip: &BlockHash,
+    ) -> anyhow::Result<LedgerBalanceUpdate> {
+        trace!(
+            "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
+            old_best_tip.0,
+            new_best_tip.0
+        );
+
+        // follows the old best tip back to the common ancestor
+        let mut a = self.get_block(old_best_tip)?.expect("old best block");
+        let mut unapply = LedgerBalanceUpdate::from_precomputed(&a);
+
+        // follows the new best tip back to the common ancestor
+        let mut b = self.get_block(new_best_tip)?.expect("new best block");
+        let mut apply = LedgerBalanceUpdate::from_precomputed(&b);
+
+        // b is better than a
+        assert!(b < a, "\nb: {}\na: {}", b.summary(), a.summary());
+
+        // bring b back to the same height as a
+        let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
+        for _ in 0..(b.blockchain_length() - a.blockchain_length()) {
+            let prev = b.previous_state_hash();
+
+            // check if there's a previous block
+            if genesis_state_hashes.contains(&b.state_hash()) {
+                break;
+            }
+
+            b = self.get_block(&prev)?.expect("previous block");
+            apply.append(&mut LedgerBalanceUpdate::from_precomputed(&b));
+        }
+        assert_eq!(a.blockchain_length(), b.blockchain_length());
+
+        while a.previous_state_hash() != b.previous_state_hash()
+            && genesis_state_hashes.contains(&a.previous_state_hash())
+        {
+            let a_prev = self
+                .get_block(&a.previous_state_hash())?
+                .expect("a prev block");
+            let b_prev = self
+                .get_block(&b.previous_state_hash())?
+                .expect("b prev block");
+
+            unapply.append(&mut LedgerBalanceUpdate::from_precomputed(&a_prev));
+            apply.append(&mut LedgerBalanceUpdate::from_precomputed(&b_prev));
+
+            a = a_prev;
+            b = b_prev;
+        }
+
+        apply.reverse();
+        Ok(LedgerBalanceUpdate { apply, unapply })
+    }
+
+    fn get_block_balance_updates(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Vec<PaymentDiff>> {
+        trace!("Getting block balance updates for {}", state_hash.0);
+        Ok(self
+            .database
+            .get_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
+            .map_or(vec![], |bytes| {
+                serde_json::from_slice::<Vec<PaymentDiff>>(&bytes).expect("balance updates")
+            }))
+    }
+
+    fn update_account_balances(&self, update: LedgerBalanceUpdate) -> anyhow::Result<()> {
+        trace!("Updating account balances");
+
+        let mut update = update;
+        let balance_updates = update.balance_updates();
+        for (pk, amount) in balance_updates {
+            let key = pk.0.as_bytes();
+            let balance = self
+                .database
+                .get_cf(self.account_balance_cf(), key)?
+                .map_or(0, |bytes| {
+                    String::from_utf8(bytes).unwrap().parse::<u64>().unwrap()
+                });
+
+            // delete stale data
+            self.database.delete_cf(self.account_balance_cf(), key)?;
+
+            // write new data
+            self.database.put_cf(
+                self.account_balance_cf(),
+                key,
+                ((balance as i64 + amount) as u64).to_string().as_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn set_account_balance(&self, pk: &PublicKey, balance: u64) -> anyhow::Result<()> {
+        trace!("Setting account balance: {} -> {balance}", pk.0);
+        self.database.put_cf(
+            self.account_balance_cf(),
+            pk.0.as_bytes(),
+            balance.to_string().as_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn set_block_balance_updates(
+        &self,
+        state_hash: &BlockHash,
+        balance_updates: Vec<PaymentDiff>,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block balance updates for {}", state_hash.0);
+        self.database.put_cf(
+            self.account_balance_updates_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(&balance_updates)?,
+        )?;
         Ok(())
     }
 
@@ -549,6 +770,54 @@ impl BlockStore for IndexerStore {
         let value = serde_json::to_vec(&version)?;
         Ok(self.database.put_cf(self.blocks_version_cf(), key, value)?)
     }
+
+    fn set_height_global_slot(&self, blockchain_length: u32, slot: u32) -> anyhow::Result<()> {
+        trace!("Setting height {} <-> slot {}", blockchain_length, slot);
+
+        // add: slot -> height
+        self.database.put_cf(
+            self.block_global_slot_to_height_cf(),
+            to_be_bytes(blockchain_length),
+            to_be_bytes(slot),
+        )?;
+
+        // add: height -> slot
+        self.database.put_cf(
+            self.block_height_to_global_slot_cf(),
+            to_be_bytes(slot),
+            to_be_bytes(blockchain_length),
+        )?;
+
+        Ok(())
+    }
+
+    fn get_globl_slot_from_height(&self, blockchain_length: u32) -> anyhow::Result<Option<u32>> {
+        trace!("Getting global slot for height {}", blockchain_length);
+        Ok(self
+            .database
+            .get_cf(
+                self.block_global_slot_to_height_cf(),
+                to_be_bytes(blockchain_length),
+            )?
+            .map(from_be_bytes))
+    }
+
+    fn get_height_from_global_slot(
+        &self,
+        global_slot_since_genesis: u32,
+    ) -> anyhow::Result<Option<u32>> {
+        trace!(
+            "Getting height for global slot {}",
+            global_slot_since_genesis
+        );
+        Ok(self
+            .database
+            .get_cf(
+                self.block_height_to_global_slot_cf(),
+                to_be_bytes(global_slot_since_genesis),
+            )?
+            .map(from_be_bytes))
+    }
 }
 
 /// [CanonicityStore] implementation
@@ -562,10 +831,11 @@ impl CanonicityStore for IndexerStore {
         );
 
         // height -> state hash
-        let key = height.to_be_bytes();
-        let value = serde_json::to_vec(state_hash)?;
-        let canonicity_cf = self.canonicity_cf();
-        self.database.put_cf(&canonicity_cf, key, value)?;
+        self.database.put_cf(
+            self.canonicity_cf(),
+            height.to_be_bytes(),
+            serde_json::to_vec(state_hash)?,
+        )?;
 
         // update canonical chain length
         self.set_max_canonical_blockchain_length(height)?;
@@ -573,6 +843,28 @@ impl CanonicityStore for IndexerStore {
         // update top snarkers based on the incoming canonical block
         if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
             self.update_top_snarkers(completed_works)?;
+        }
+
+        // record new genesis state hash
+        if height == 1 {
+            if let Some(mut genesis_state_hashes) = self
+                .database
+                .get_cf(self.canonicity_cf(), Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
+                .map(|bytes| {
+                    serde_json::from_slice::<Vec<BlockHash>>(&bytes).expect("genesis state hashes")
+                })
+                .clone()
+            {
+                // check if hash is present, then add it
+                if !genesis_state_hashes.contains(state_hash) {
+                    genesis_state_hashes.push(state_hash.clone());
+                    self.database.put_cf(
+                        self.canonicity_cf(),
+                        Self::KNOWN_GENESIS_STATE_HASHES_KEY,
+                        serde_json::to_vec(&genesis_state_hashes)?,
+                    )?;
+                }
+            }
         }
 
         // record new canonical block event
@@ -583,6 +875,16 @@ impl CanonicityStore for IndexerStore {
             },
         )))?;
         Ok(())
+    }
+
+    fn get_known_genesis_state_hashes(&self) -> anyhow::Result<Vec<BlockHash>> {
+        trace!("Getting known genesis state hashes");
+        Ok(self
+            .database
+            .get_cf(self.canonicity_cf(), Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
+            .map_or(vec![], |bytes| {
+                serde_json::from_slice(&bytes).expect("genesis state hashes")
+            }))
     }
 
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>> {
@@ -676,6 +978,16 @@ impl CanonicityStore for IndexerStore {
 }
 
 /// [LedgerStore] implementation
+
+/// [DBIterator] for balance-sorted accounts
+/// - key: `{balance BE bytes}{pk bytes}`
+/// - value: empty byte
+pub fn account_balance_iterator<'a>(
+    db: &'a Arc<IndexerStore>,
+    mode: IteratorMode,
+) -> DBIterator<'a> {
+    db.database.iterator_cf(db.account_balance_sort_cf(), mode)
+}
 
 impl LedgerStore for IndexerStore {
     fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<()> {
@@ -940,6 +1252,15 @@ impl LedgerStore for IndexerStore {
         }
         Ok(None)
     }
+
+    fn store_ledger_balances(&self, ledger: &Ledger) -> anyhow::Result<()> {
+        trace!("Storing ledger account balances");
+
+        for (pk, acct) in &ledger.accounts {
+            self.set_account_balance(pk, acct.balance.0)?;
+        }
+        Ok(())
+    }
 }
 
 /// [EventStore] implementation
@@ -1008,8 +1329,6 @@ impl EventStore for IndexerStore {
 
 /// [CommandStore] implementation
 
-type KvIteratorEntry<'a> = &'a Result<(Box<[u8]>, Box<[u8]>), speedb::Error>;
-
 const COMMAND_KEY_PREFIX: &str = "user-";
 
 /// Creates a new user command (transaction) database key from a &String
@@ -1046,7 +1365,7 @@ pub fn convert_user_command_db_key_to_block_hash(db_key: &[u8]) -> anyhow::Resul
 /// - key: `{global slot BE bytes}{state hash bytes}`
 /// - value: empty byte
 ///
-/// Use [blocks_global_slot_idx_state_hash_from_entry] to extract state hash
+/// Use [blocks_global_slot_idx_state_hash_from_key] to extract state hash
 pub fn blocks_global_slot_idx_iterator<'a>(
     db: &'a Arc<IndexerStore>,
     mode: IteratorMode,
@@ -1056,11 +1375,8 @@ pub fn blocks_global_slot_idx_iterator<'a>(
 }
 
 /// Extracts state hash from the iterator entry (key)
-pub fn blocks_global_slot_idx_state_hash_from_entry(
-    entry: KvIteratorEntry,
-) -> anyhow::Result<String> {
-    let key = entry.to_owned()?.0;
-    Ok(String::from_utf8(key[4..].to_vec()).expect("state hash"))
+pub fn blocks_global_slot_idx_state_hash_from_key(key: &[u8]) -> anyhow::Result<String> {
+    Ok(String::from_utf8(key[4..].to_vec())?)
 }
 
 /// [DBIterator] for user commands (transactions)
@@ -1068,36 +1384,81 @@ pub fn user_commands_iterator<'a>(db: &'a Arc<IndexerStore>, mode: IteratorMode)
     db.database.iterator_cf(db.commands_slot_mainnet_cf(), mode)
 }
 
-/// Global slot number from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_global_slot(entry: KvIteratorEntry) -> u32 {
-    let bytes = entry.to_owned().unwrap().0;
-    u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+/// [DBIterator] for user commands by sender
+pub fn txn_from_iterator<'a>(db: &'a Arc<IndexerStore>, mode: IteratorMode) -> DBIterator<'a> {
+    db.database.iterator_cf(db.txn_from_cf(), mode)
 }
 
-/// Transaction hash from `entry` in [user_commands_iterator]
-pub fn user_commands_iterator_txn_hash(entry: KvIteratorEntry) -> anyhow::Result<String> {
-    String::from_utf8(entry.to_owned().unwrap().0[4..].to_vec())
-        .map_err(|e| anyhow!("Error reading txn hash: {}", e))
+/// [DBIterator] for user commands by receiver
+pub fn txn_to_iterator<'a>(db: &'a Arc<IndexerStore>, mode: IteratorMode) -> DBIterator<'a> {
+    db.database.iterator_cf(db.txn_to_cf(), mode)
+}
+
+/// Global slot number from `key` in [user_commands_iterator]
+/// - keep the first 4 bytes
+pub fn user_commands_iterator_global_slot(key: &[u8]) -> u32 {
+    from_be_bytes(key[0..4].to_vec())
+}
+
+/// Transaction hash from `key` in [user_commands_iterator]
+/// - discard the first 4 bytes
+pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
+    String::from_utf8(key[4..].to_vec()).map_err(|e| anyhow!("Error reading txn hash: {}", e))
 }
 
 /// [SignedCommandWithData] from `entry` in [user_commands_iterator]
 pub fn user_commands_iterator_signed_command(
-    entry: KvIteratorEntry,
+    value: &[u8],
 ) -> anyhow::Result<SignedCommandWithData> {
-    Ok(serde_json::from_slice::<SignedCommandWithData>(
-        &entry.to_owned().unwrap().1,
-    )?)
+    Ok(serde_json::from_slice::<SignedCommandWithData>(value)?)
+}
+
+pub fn to_be_bytes(value: u32) -> Vec<u8> {
+    value.to_be_bytes().to_vec()
+}
+
+pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
+    const SIZE: usize = 4;
+    let mut be_bytes = [0; SIZE];
+
+    be_bytes[..SIZE].copy_from_slice(&bytes[..SIZE]);
+    u32::from_be_bytes(be_bytes)
 }
 
 /// The first 4 bytes are global slot in big endian.
-fn global_slot_prefix(global_slot: u32) -> Vec<u8> {
-    global_slot.to_be_bytes().to_vec()
-}
-
 fn global_slot_prefix_key(global_slot: u32, txn_hash: &str) -> Vec<u8> {
-    let mut bytes = global_slot_prefix(global_slot);
+    let mut bytes = to_be_bytes(global_slot);
     bytes.append(&mut txn_hash.as_bytes().to_vec());
     bytes
+}
+
+/// Key format for sorting txns by sender/receiver: `{pk}{slot}{hash}`
+/// - pk:   55 bytes (public key)
+/// - slot: 4 BE bytes
+/// - hash: rem bytes (txn hash)
+pub fn txn_sort_key(public_key: PublicKey, global_slot: u32, txn_hash: &str) -> Vec<u8> {
+    let mut bytes = public_key.to_bytes();
+    bytes.append(&mut to_be_bytes(global_slot));
+    bytes.append(&mut txn_hash.as_bytes().to_vec());
+    bytes
+}
+
+pub fn txn_sort_key_prefix(public_key: PublicKey, global_slot: u32) -> Vec<u8> {
+    let mut bytes = public_key.to_bytes();
+    bytes.append(&mut to_be_bytes(global_slot));
+    bytes
+}
+
+pub fn txn_sort_key_pk(key: &[u8]) -> PublicKey {
+    PublicKey::from_bytes(&key[..PublicKey::LEN]).expect("public key")
+}
+
+pub fn txn_sort_key_global_slot(key: &[u8]) -> u32 {
+    from_be_bytes(key[PublicKey::LEN..(PublicKey::LEN + 4)].to_vec())
+}
+
+pub fn txn_sort_key_txn_hash(key: &[u8]) -> String {
+    String::from_utf8(key[(PublicKey::LEN + 4)..].to_vec()).expect("txn hash")
 }
 
 impl CommandStore for IndexerStore {
@@ -1105,34 +1466,56 @@ impl CommandStore for IndexerStore {
         trace!("Adding user commands from block {}", block.summary());
 
         let user_commands = block.commands();
-
-        // add: key `{global_slot}{txn_hash}` -> signed command with data
-        // global_slot is written in big endian so lexicographic ordering corresponds to
-        // slot ordering
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
             let txn_hash = signed.hash_signed_command()?;
             trace!("Adding user command hash {} {}", txn_hash, block.summary());
 
-            let key = global_slot_prefix_key(block.global_slot_since_genesis(), &txn_hash);
-            let value = serde_json::to_vec(&SignedCommandWithData::from(
-                command,
-                &block.state_hash().0,
-                block.blockchain_length(),
-                block.timestamp(),
-                block.global_slot_since_genesis(),
-            ))?;
-            self.database
-                .put_cf(self.commands_slot_mainnet_cf(), key, value)?;
+            // add: key `{global_slot}{txn_hash}` -> signed command with data
+            // global_slot is written in big endian so lexicographic ordering corresponds to
+            // slot ordering
+            self.database.put_cf(
+                self.commands_slot_mainnet_cf(),
+                global_slot_prefix_key(block.global_slot_since_genesis(), &txn_hash),
+                serde_json::to_vec(&SignedCommandWithData::from(
+                    command,
+                    &block.state_hash().0,
+                    block.blockchain_length(),
+                    block.timestamp(),
+                    block.global_slot_since_genesis(),
+                ))?,
+            )?;
 
             // add: key (txn hash) -> value (global slot) so we can
             // reconstruct the key
-            let key = txn_hash.as_bytes();
-            let value = block.global_slot_since_genesis().to_be_bytes();
             self.database.put_cf(
                 self.commands_txn_hash_to_global_slot_mainnet_cf(),
-                key,
-                value,
+                txn_hash.as_bytes(),
+                block.global_slot_since_genesis().to_be_bytes(),
+            )?;
+
+            // add sender index
+            // `{sender}{global_slot BE}{txn_hash} -> amount BE`
+            self.database.put_cf(
+                self.txn_from_cf(),
+                txn_sort_key(
+                    command.sender(),
+                    block.global_slot_since_genesis(),
+                    &txn_hash,
+                ),
+                command.amount().to_be_bytes(),
+            )?;
+
+            // add receiver index
+            // `{receiver}{global_slot BE}{txn_hash} -> amount BE`
+            self.database.put_cf(
+                self.txn_to_cf(),
+                txn_sort_key(
+                    command.receiver(),
+                    block.global_slot_since_genesis(),
+                    &txn_hash,
+                ),
+                command.amount().to_be_bytes(),
             )?;
         }
 
@@ -1325,7 +1708,7 @@ impl CommandStore for IndexerStore {
             .collect();
 
         fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = global_slot_prefix(global_slot);
+            let mut bytes = to_be_bytes(global_slot);
             bytes.append(&mut state_hash.as_bytes().to_vec());
             bytes.append(&mut index.to_be_bytes().to_vec());
             bytes
@@ -1450,14 +1833,38 @@ pub fn top_snarkers_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DB
         .iterator_cf(db.snark_top_producers_sort_cf(), mode)
 }
 
-/// The first 8 bytes are total fees in big endian.
-fn total_fee_prefix(total_fee: u64) -> Vec<u8> {
-    total_fee.to_be_bytes().to_vec()
+/// [DBIterator] for snark work fees
+pub fn snark_fees_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DBIterator<'a> {
+    db.database.iterator_cf(db.snark_work_fees_cf(), mode)
 }
 
-fn total_fee_prefix_key(total_fee: u64, suffix: &str) -> Vec<u8> {
-    let mut bytes = total_fee_prefix(total_fee);
+fn fee_prefix(fee: u64) -> Vec<u8> {
+    fee.to_be_bytes().to_vec()
+}
+
+/// The first 8 bytes are fees in big endian.
+fn fee_prefix_key(fee: u64, suffix: &str) -> Vec<u8> {
+    let mut bytes = fee_prefix(fee);
     bytes.append(&mut suffix.as_bytes().to_vec());
+    bytes
+}
+
+/// Key format `{fee}{slot}{pk}{state_hash}{num}`
+/// - fee:  8 BE bytes
+/// - slot: 4 BE bytes
+/// - num:  4 BE bytes
+fn snark_fee_prefix_key(
+    fee: u64,
+    global_slot: u32,
+    pk: PublicKey,
+    state_hash: BlockHash,
+    num: u32,
+) -> Vec<u8> {
+    let mut bytes = fee.to_be_bytes().to_vec();
+    bytes.append(&mut global_slot.to_be_bytes().to_vec());
+    bytes.append(&mut pk.0.as_bytes().to_vec());
+    bytes.append(&mut state_hash.0.as_bytes().to_vec());
+    bytes.append(&mut num.to_be_bytes().to_vec());
     bytes
 }
 
@@ -1468,11 +1875,35 @@ impl SnarkStore for IndexerStore {
         let completed_works = SnarkWorkSummary::from_precomputed(block);
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
-        // add: state hash -> snark work
+        // add: state hash -> snark works
         let state_hash = block.state_hash().0;
         let key = state_hash.as_bytes();
         let value = serde_json::to_vec(&completed_works)?;
         self.database.put_cf(self.snarks_cf(), key, value)?;
+
+        // store fee info
+        let mut num_prover_works: HashMap<PublicKey, u32> = HashMap::new();
+        for snark in completed_works {
+            let num = num_prover_works.get(&snark.prover).copied().unwrap_or(0);
+            self.database.put_cf(
+                self.snark_work_fees_cf(),
+                snark_fee_prefix_key(
+                    snark.fee,
+                    block.global_slot_since_genesis(),
+                    snark.prover.clone(),
+                    block.state_hash(),
+                    num,
+                ),
+                b"",
+            )?;
+
+            // build the block's fee table
+            if num_prover_works.get(&snark.prover).is_some() {
+                *num_prover_works.get_mut(&snark.prover).unwrap() += 1;
+            } else {
+                num_prover_works.insert(snark.prover.clone(), 1);
+            }
+        }
 
         // add: "pk -> linked list of SNARK work summaries with state hash"
         for pk in block.prover_keys() {
@@ -1584,7 +2015,7 @@ impl SnarkStore for IndexerStore {
                 // delete the stale data
                 self.database.delete_cf(
                     self.snark_top_producers_sort_cf(),
-                    total_fee_prefix_key(old_total, &snark.prover.0),
+                    fee_prefix_key(old_total, &snark.prover.0),
                 )?
             }
         }
@@ -1592,7 +2023,7 @@ impl SnarkStore for IndexerStore {
         // replace stale data with updated
         for (prover, (old_total, new_fees)) in prover_fees.iter() {
             let total_fees = old_total + new_fees;
-            let key = total_fee_prefix_key(total_fees, &prover.0);
+            let key = fee_prefix_key(total_fees, &prover.0);
             self.database
                 .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
         }
@@ -1676,6 +2107,7 @@ impl IndexerStore {
     const BEST_TIP_BLOCK_KEY: &'static [u8] = "best_tip_block".as_bytes();
     const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();
+    const KNOWN_GENESIS_STATE_HASHES_KEY: &'static [u8] = "known_genesis_state_hashes".as_bytes();
 
     pub fn db_stats(&self) -> String {
         self.database

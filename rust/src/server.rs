@@ -367,10 +367,6 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
             if block::is_valid_block_file(&path) {
                 debug!("Valid precomputed block file: {}", path.display());
 
-                // TODO how to handle stop slots/blocks & final ledger?
-                // Can we generate the new ledger & load the new network's config from a
-                // specific block?
-
                 let mut version = state.read().await.version.clone();
                 match PrecomputedBlock::parse_file(&path, version.version.clone()) {
                     Ok(block) => {

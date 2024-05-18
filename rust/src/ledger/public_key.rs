@@ -9,12 +9,29 @@ use serde::{Deserialize, Serialize};
 pub struct PublicKey(pub String);
 
 impl PublicKey {
+    pub const LEN: usize = 55;
+    pub const PREFIX: &'static str = "B62q";
+
     pub fn new<S: Into<String>>(key: S) -> Self {
         Self(key.into())
     }
 
     pub fn to_address(&self) -> String {
         self.0.to_owned()
+    }
+
+    /// Convert to bytes (length [Self::LEN])
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
+    }
+
+    /// Convert from bytes (length [Self::LEN])
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        let res = String::from_utf8(bytes.to_vec())?;
+        if is_valid_public_key(&res) {
+            return Ok(Self(res));
+        }
+        bail!("Invalid public key from bytes")
     }
 }
 
@@ -44,7 +61,7 @@ impl From<&str> for PublicKey {
 
 impl From<String> for PublicKey {
     fn from(value: String) -> Self {
-        Self(value.to_owned())
+        Self(value)
     }
 }
 
@@ -87,7 +104,7 @@ impl From<PublicKey> for PubKey {
 }
 
 pub fn is_valid_public_key(pk: &str) -> bool {
-    pk.starts_with("B62q") && pk.len() == 55
+    pk.starts_with(PublicKey::PREFIX) && pk.len() == PublicKey::LEN
 }
 
 #[cfg(test)]
@@ -95,7 +112,7 @@ mod test {
     use super::PublicKey;
 
     #[test]
-    fn parse_public_keys() {
+    fn parse_public_keys() -> anyhow::Result<()> {
         // public keys from
         // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
         let pks = [
@@ -107,7 +124,15 @@ mod test {
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
         ];
         for pk in pks {
-            assert_eq!(PublicKey(pk.to_owned()).to_address(), pk);
+            let bytes = pk.as_bytes().to_vec();
+
+            assert_eq!(PublicKey(pk.to_owned()).to_bytes(), bytes, "to_bytes");
+            assert_eq!(
+                PublicKey(pk.to_owned()),
+                PublicKey::from_bytes(&bytes)?,
+                "from_bytes"
+            );
         }
+        Ok(())
     }
 }

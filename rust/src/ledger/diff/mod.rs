@@ -1,15 +1,15 @@
 pub mod account;
 
+use self::account::{
+    AccountDiff, AccountDiffType, FailedTransactionNonceDiff, PaymentDiff, UpdateType,
+};
 use crate::{
     block::precomputed::PrecomputedBlock,
-    command::UserCommandWithStatusT,
-    ledger::{
-        coinbase::Coinbase,
-        diff::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff},
-        PublicKey,
-    },
+    command::{internal::InternalCommand, Command, Payment, UserCommandWithStatusT},
+    ledger::{coinbase::Coinbase, PublicKey},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
@@ -17,11 +17,101 @@ pub struct LedgerDiff {
     pub account_diffs: Vec<AccountDiff>,
 }
 
+/// Only used in the indexer store for balance sorting
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LedgerBalanceUpdate {
+    pub apply: Vec<PaymentDiff>,
+    pub unapply: Vec<PaymentDiff>,
+}
+
+impl LedgerBalanceUpdate {
+    pub fn balance_updates(&mut self) -> HashMap<PublicKey, i64> {
+        let mut diffs: Vec<PaymentDiff> = self
+            .unapply
+            .clone()
+            .into_iter()
+            .map(|diff| diff.unapply())
+            .collect();
+        diffs.append(&mut self.apply);
+
+        let mut res = HashMap::new();
+        for diff in diffs {
+            let acc = res.remove(&diff.public_key).unwrap_or(0);
+            res.insert(
+                diff.public_key,
+                match diff.update_type {
+                    UpdateType::Credit => acc + diff.amount.0 as i64,
+                    UpdateType::Debit(_) => acc - diff.amount.0 as i64,
+                },
+            );
+        }
+        res
+    }
+
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<PaymentDiff> {
+        [
+            Command::from_precomputed(block)
+                .into_iter()
+                .flat_map(|cmd| match cmd {
+                    Command::Payment(Payment {
+                        source,
+                        amount,
+                        receiver,
+                        nonce: _,
+                    }) => vec![
+                        PaymentDiff {
+                            update_type: UpdateType::Debit(None),
+                            public_key: source.clone(),
+                            amount,
+                        },
+                        PaymentDiff {
+                            update_type: UpdateType::Credit,
+                            public_key: receiver.clone(),
+                            amount,
+                        },
+                    ],
+                    Command::Delegation(_) => vec![],
+                })
+                .collect::<Vec<PaymentDiff>>(),
+            InternalCommand::from_precomputed(block)
+                .iter()
+                .flat_map(|cmd| match cmd {
+                    InternalCommand::Coinbase { receiver, amount } => vec![PaymentDiff {
+                        update_type: UpdateType::Credit,
+                        public_key: receiver.clone(),
+                        amount: (*amount).into(),
+                    }],
+                    InternalCommand::FeeTransfer {
+                        sender,
+                        receiver,
+                        amount,
+                    }
+                    | InternalCommand::FeeTransferViaCoinbase {
+                        sender,
+                        receiver,
+                        amount,
+                    } => vec![
+                        PaymentDiff {
+                            update_type: UpdateType::Debit(None),
+                            public_key: sender.clone(),
+                            amount: (*amount).into(),
+                        },
+                        PaymentDiff {
+                            update_type: UpdateType::Credit,
+                            public_key: receiver.clone(),
+                            amount: (*amount).into(),
+                        },
+                    ],
+                })
+                .collect(),
+        ]
+        .concat()
+    }
+}
+
 impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        use crate::command::{Command, Payment};
-
         let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
         // applied user commands
         let mut account_diff_txns: Vec<Command> = precomputed_block

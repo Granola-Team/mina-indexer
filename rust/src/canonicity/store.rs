@@ -15,4 +15,7 @@ pub trait CanonicityStore {
 
     /// Get block canonicity
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>>;
+
+    /// Get the list of all known genesis state hashes
+    fn get_known_genesis_state_hashes(&self) -> anyhow::Result<Vec<BlockHash>>;
 }

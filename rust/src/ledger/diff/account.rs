@@ -263,6 +263,27 @@ impl AccountDiff {
     }
 }
 
+impl PaymentDiff {
+    pub fn unapply(self) -> Self {
+        let PaymentDiff {
+            update_type,
+            public_key,
+            amount,
+        } = self;
+
+        // change update type: debit <-> credit
+        let update_type = match update_type {
+            UpdateType::Credit => UpdateType::Debit(None),
+            UpdateType::Debit(_) => UpdateType::Credit,
+        };
+        PaymentDiff {
+            update_type,
+            public_key,
+            amount,
+        }
+    }
+}
+
 impl std::fmt::Debug for PaymentDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
