@@ -12,12 +12,14 @@ use crate::{
         version_bytes,
     },
     store::{
-        user_commands_iterator, user_commands_iterator_signed_command,
-        user_commands_iterator_txn_hash, IndexerStore,
+        to_be_bytes, txn_from_iterator, txn_sort_key_pk, txn_sort_key_prefix,
+        txn_sort_key_txn_hash, txn_to_iterator, user_commands_iterator,
+        user_commands_iterator_signed_command, user_commands_iterator_txn_hash, IndexerStore,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -50,48 +52,96 @@ impl TransactionsQueryRoot {
         sort_by: TransactionSortByInput,
     ) -> Result<Vec<TransactionWithBlock>> {
         let db = db(ctx);
-        let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
-        let mode = match sort_by {
-            TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
-                speedb::IteratorMode::Start
-            }
-            TransactionSortByInput::BlockheightDesc | TransactionSortByInput::DatetimeDesc => {
-                speedb::IteratorMode::End
-            }
-        };
 
         // block height query
         if let Some(block_height) = query.block_height {
             let mut transactions: Vec<TransactionWithBlock> = db
-                .get_blocks_at_height(block_height as u32)?
+                .get_blocks_at_height(block_height)?
                 .into_iter()
                 .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
                 .map(|cmd| TransactionWithBlock::new(cmd, db))
-                .filter_map(|txn| if query.matches(&txn) { Some(txn) } else { None })
+                .filter(|txn| query.matches(txn))
                 .collect();
             reorder_asc(&mut transactions, sort_by);
             transactions.truncate(limit);
             return Ok(transactions);
         }
 
+        // iterator mode & direction determined by desired sorting
+        let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
+        let (start_slot, direction) = match sort_by {
+            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
+                (0, Direction::Forward)
+            }
+            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
+                (u32::MAX, Direction::Reverse)
+            }
+        };
+
+        // from/to account (sender/receiver) query
+        if query.from.as_ref().or(query.to.as_ref()).is_some() {
+            let pk = query.from.as_ref().or(query.to.as_ref()).unwrap();
+            let start = txn_sort_key_prefix((pk as &str).into(), start_slot);
+            let mode = IteratorMode::From(&start, direction);
+            let txn_iter = if query.from.is_some() {
+                txn_from_iterator(db, mode).flatten()
+            } else {
+                txn_to_iterator(db, mode).flatten()
+            };
+
+            for (key, _) in txn_iter {
+                // public key bytes
+                let txn_pk = txn_sort_key_pk(&key);
+                if txn_pk.0 != *pk {
+                    break;
+                }
+
+                // txn hash bytes
+                let txn_hash = txn_sort_key_txn_hash(&key);
+                let cmd = db
+                    .get_command_by_hash(&txn_hash)?
+                    .expect("command at txn hash");
+                let txn = TransactionWithBlock::new(cmd, db);
+
+                // include matching txns
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() == limit {
+                        break;
+                    }
+                };
+            }
+            return Ok(transactions);
+        }
+
         // TODO bound query search space if given any inputs
 
-        for entry in user_commands_iterator(db, mode) {
-            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&entry).ok() {
+        let (start, direction) = match sort_by {
+            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
+                (to_be_bytes(0), Direction::Forward)
+            }
+            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
+                (to_be_bytes(u32::MAX), Direction::Reverse)
+            }
+        };
+        for entry in user_commands_iterator(db, IteratorMode::From(&start, direction)).flatten() {
+            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&entry.0).ok()
+            {
                 continue;
             }
 
             // Only add transactions that satisfy the input query
-            let cmd = user_commands_iterator_signed_command(&entry)?;
-            let transaction = TransactionWithBlock::new(cmd, db);
+            let cmd = user_commands_iterator_signed_command(&entry.1)?;
+            let txn = TransactionWithBlock::new(cmd, db);
 
-            if query.matches(&transaction) {
-                transactions.push(transaction);
+            if query.matches(&txn) {
+                transactions.push(txn);
+
+                if transactions.len() == limit {
+                    break;
+                }
             };
-
-            if transactions.len() == limit {
-                break;
-            }
         }
 
         Ok(transactions)
@@ -100,10 +150,10 @@ impl TransactionsQueryRoot {
 
 fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
     match sort_by {
-        TransactionSortByInput::BlockheightAsc | TransactionSortByInput::DatetimeAsc => {
+        TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
             values.reverse()
         }
-        TransactionSortByInput::BlockheightDesc | TransactionSortByInput::DatetimeDesc => (),
+        TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => (),
     }
 }
 
@@ -141,7 +191,7 @@ impl Transaction {
                 let payload = signed_cmd.t.t.payload;
                 let common = payload.t.t.common.t.t.t;
                 let token = common.fee_token.t.t.t;
-                let nonce = common.nonce.t.t;
+                let nonce = common.nonce.t.t as u32;
                 let fee = common.fee.t.t;
                 let (sender, receiver, kind, token_id, amount) = {
                     match payload.t.t.body.t.t {
@@ -167,7 +217,7 @@ impl Transaction {
 
                 Self {
                     amount,
-                    block_height: cmd.blockchain_length as i64,
+                    block_height: cmd.blockchain_length,
                     canonical,
                     failure_reason,
                     fee,
@@ -175,12 +225,12 @@ impl Transaction {
                     hash: cmd.tx_hash,
                     kind: kind.to_string(),
                     memo,
-                    nonce: nonce as i64,
+                    nonce,
                     receiver: PK {
                         public_key: receiver.to_owned(),
                     },
                     to: receiver,
-                    token: Some(token_id as i64),
+                    token: Some(token_id),
                 }
             }
         }
@@ -191,60 +241,187 @@ impl TransactionQueryInput {
     fn matches(&self, transaction_with_block: &TransactionWithBlock) -> bool {
         let mut matches = true;
         let transaction = transaction_with_block.transaction.clone();
-        if let Some(hash) = &self.hash {
-            matches = matches && &transaction.hash == hash;
+        let TransactionQueryInput {
+            hash,
+            canonical,
+            kind,
+            memo,
+            from,
+            to,
+            fee,
+            fee_gt,
+            fee_gte,
+            fee_lt,
+            fee_lte,
+            fee_token,
+            amount,
+            amount_gt,
+            amount_gte,
+            amount_lte,
+            amount_lt,
+            block_height,
+            block_height_gt,
+            block_height_gte,
+            block_height_lt,
+            block_height_lte,
+            date_time,
+            date_time_gt,
+            date_time_gte,
+            date_time_lt,
+            date_time_lte,
+            nonce,
+            nonce_lte,
+            nonce_gt,
+            nonce_lt,
+            nonce_gte,
+            and,
+            or,
+            // TODO
+            block: _,
+            fee_payer: _,
+            source: _,
+            from_account: _,
+            receiver: _,
+            to_account: _,
+            token: _,
+            is_delegation: _,
+        } = self;
+        if let Some(hash) = hash {
+            matches &= transaction.hash == *hash;
         }
-        if let Some(fee) = self.fee {
-            matches = matches && transaction.fee == fee;
+        if let Some(kind) = kind {
+            matches &= transaction.kind == *kind;
         }
-        if let Some(ref kind) = &self.kind {
-            matches = matches && &transaction.kind == kind;
+        if let Some(canonical) = canonical {
+            matches &= transaction.canonical == *canonical;
         }
-        if let Some(canonical) = self.canonical {
-            matches = matches && transaction.canonical == canonical;
+        if let Some(from) = from {
+            matches &= transaction.from == *from;
         }
-        if let Some(ref from) = self.from {
-            matches = matches && &transaction.from == from;
+        if let Some(to) = to {
+            matches &= transaction.to == *to;
         }
-        if let Some(to) = &self.to {
-            matches = matches && &transaction.to == to;
+        if let Some(memo) = memo {
+            matches &= transaction.memo == *memo;
         }
-        if let Some(memo) = &self.memo {
-            matches = matches && &transaction.memo == memo;
+        if let Some(fee_token) = fee_token {
+            matches &= transaction.token == Some(*fee_token);
         }
-        if let Some(query) = &self.and {
-            matches = matches && query.iter().all(|and| and.matches(transaction_with_block));
+        if let Some(query) = and {
+            matches &= query.iter().all(|and| and.matches(transaction_with_block));
         }
-        if let Some(query) = &self.or {
+        if let Some(query) = or {
             if !query.is_empty() {
-                matches = matches && query.iter().any(|or| or.matches(transaction_with_block));
+                matches &= query.iter().any(|or| or.matches(transaction_with_block));
             }
         }
-        if let Some(__) = &self.date_time_gte {
-            matches = matches && transaction_with_block.block.date_time >= *__;
+
+        // amount
+        if let Some(amount) = amount {
+            matches &= transaction_with_block.transaction.amount == *amount;
         }
-        if let Some(__) = &self.date_time_lte {
-            matches = matches && transaction_with_block.block.date_time <= *__;
+        if let Some(amount_gt) = amount_gt {
+            matches &= transaction_with_block.transaction.amount == *amount_gt;
+        }
+        if let Some(amount_gte) = amount_gte {
+            matches &= transaction_with_block.transaction.amount == *amount_gte;
+        }
+        if let Some(amount_lt) = amount_lt {
+            matches &= transaction_with_block.transaction.amount == *amount_lt;
+        }
+        if let Some(amount_lte) = amount_lte {
+            matches &= transaction_with_block.transaction.amount == *amount_lte;
         }
 
-        // TODO: implement matches for all the other optional vars
+        // fee
+        if let Some(fee) = fee {
+            matches &= transaction.fee == *fee;
+        }
+        if let Some(fee_gt) = fee_gt {
+            matches &= transaction_with_block.transaction.fee == *fee_gt;
+        }
+        if let Some(fee_gte) = fee_gte {
+            matches &= transaction_with_block.transaction.fee == *fee_gte;
+        }
+        if let Some(fee_lt) = fee_lt {
+            matches &= transaction_with_block.transaction.fee == *fee_lt;
+        }
+        if let Some(fee_lte) = fee_lte {
+            matches &= transaction_with_block.transaction.fee == *fee_lte;
+        }
+
+        // block height
+        if let Some(block_height) = block_height {
+            matches &= transaction_with_block.transaction.block_height == *block_height;
+        }
+        if let Some(block_height_gt) = block_height_gt {
+            matches &= transaction_with_block.transaction.block_height == *block_height_gt;
+        }
+        if let Some(block_height_gte) = block_height_gte {
+            matches &= transaction_with_block.transaction.block_height == *block_height_gte;
+        }
+        if let Some(block_height_lt) = block_height_lt {
+            matches &= transaction_with_block.transaction.block_height == *block_height_lt;
+        }
+        if let Some(block_height_lte) = block_height_lte {
+            matches &= transaction_with_block.transaction.block_height == *block_height_lte;
+        }
+
+        // date time
+        if let Some(date_time) = date_time {
+            matches &= transaction_with_block.block.date_time == *date_time;
+        }
+        if let Some(date_time_gt) = date_time_gt {
+            matches &= transaction_with_block.block.date_time >= *date_time_gt;
+        }
+        if let Some(date_time_gte) = date_time_gte {
+            matches &= transaction_with_block.block.date_time <= *date_time_gte;
+        }
+        if let Some(date_time_lt) = date_time_lt {
+            matches &= transaction_with_block.block.date_time >= *date_time_lt;
+        }
+        if let Some(date_time_lte) = date_time_lte {
+            matches &= transaction_with_block.block.date_time <= *date_time_lte;
+        }
+
+        // nonce
+        if let Some(nonce) = nonce {
+            matches &= transaction_with_block.transaction.nonce == *nonce;
+        }
+        if let Some(nonce_gt) = nonce_gt {
+            matches &= transaction_with_block.transaction.nonce == *nonce_gt;
+        }
+        if let Some(nonce_gte) = nonce_gte {
+            matches &= transaction_with_block.transaction.nonce == *nonce_gte;
+        }
+        if let Some(nonce_lt) = nonce_lt {
+            matches &= transaction_with_block.transaction.nonce == *nonce_lt;
+        }
+        if let Some(nonce_lte) = nonce_lte {
+            matches &= transaction_with_block.transaction.nonce == *nonce_lte;
+        }
+
         matches
     }
 }
 
 #[derive(Clone, Copy, Debug, Enum, Eq, PartialEq)]
-#[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
 pub enum TransactionSortByInput {
-    BlockheightAsc,
-    BlockheightDesc,
-    DatetimeAsc,
-    DatetimeDesc,
+    #[graphql(name = "BLOCKHEIGHT_ASC")]
+    BlockHeightAsc,
+    #[graphql(name = "BLOCKHEIGHT_DESC")]
+    BlockHeightDesc,
+
+    #[graphql(name = "DATETIME_ASC")]
+    DateTimeAsc,
+    #[graphql(name = "DATETIME_DESC")]
+    DateTimeDesc,
 }
 
 #[derive(Clone, Debug, SimpleObject)]
 pub struct Transaction {
     amount: u64,
-    block_height: i64,
+    block_height: u32,
     canonical: bool,
     failure_reason: String,
     fee: u64,
@@ -252,11 +429,11 @@ pub struct Transaction {
     hash: String,
     kind: String,
     memo: String,
-    nonce: i64,
+    nonce: u32,
     /// The receiver's public key
     receiver: PK,
     to: String,
-    token: Option<i64>,
+    token: Option<u64>,
 }
 
 #[derive(Clone, Debug, SimpleObject)]

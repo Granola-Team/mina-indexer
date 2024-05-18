@@ -5,7 +5,7 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry, IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, IndexerStore,
     },
     web::graphql::{db, get_block_canonicity},
 };
@@ -29,9 +29,11 @@ pub struct SnarkBlock {
 pub struct SnarkWithCanonicity {
     /// Value canonicity
     pub canonical: bool,
+
     /// Value optional block
     #[graphql(skip)]
     pub pcb: PrecomputedBlock,
+
     /// Value snark
     #[graphql(flatten)]
     pub snark: Snark,
@@ -43,10 +45,12 @@ impl SnarkWithCanonicity {
     async fn state_hash(&self) -> String {
         self.pcb.state_hash().0.to_owned()
     }
+
     /// Value block height
     async fn block_height(&self) -> u32 {
         self.pcb.blockchain_length()
     }
+
     /// Value date time
     async fn date_time(&self) -> String {
         millis_to_iso_date_string(self.pcb.timestamp() as i64)
@@ -67,6 +71,7 @@ pub struct SnarkQueryInput {
 pub enum SnarkSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
+
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
@@ -162,9 +167,8 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
-        let mut capacity_reached = false;
-        for entry in blocks_global_slot_idx_iterator(db, mode) {
-            let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
+        for entry in blocks_global_slot_idx_iterator(db, mode).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
             let block = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
@@ -187,14 +191,11 @@ impl SnarkQueryRoot {
                 }
 
                 if snarks.len() == limit {
-                    capacity_reached = true;
                     break;
                 }
             }
-            if capacity_reached {
-                break;
-            }
         }
+
         Ok(snarks)
     }
 }

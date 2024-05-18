@@ -16,7 +16,7 @@ use crate::{
     },
     snark_work::SnarkWorkSummary,
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_entry, IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -70,10 +70,10 @@ impl BlocksQueryRoot {
             return Ok(None);
         }
 
-        // else iterate from the end
+        // else iterate from the beginning
         // TODO bound query search space if given any inputs
-        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End) {
-            let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
+        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::Start).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
@@ -152,7 +152,7 @@ impl BlocksQueryRoot {
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
+            blocks.truncate(limit); // TODO exit earlier
             return Ok(blocks);
         }
 
@@ -169,7 +169,7 @@ impl BlocksQueryRoot {
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
+            blocks.truncate(limit); // TODO exit earlier
             return Ok(blocks);
         }
 
@@ -290,8 +290,8 @@ impl BlocksQueryRoot {
             BlockSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             BlockSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
-        for entry in blocks_global_slot_idx_iterator(db, mode) {
-            let state_hash = blocks_global_slot_idx_state_hash_from_entry(&entry)?;
+        for entry in blocks_global_slot_idx_iterator(db, mode).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");

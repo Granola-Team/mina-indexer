@@ -55,4 +55,7 @@ pub trait LedgerStore {
         epoch: u32,
         genesis_state_hash: &Option<BlockHash>,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>>;
+
+    /// Persist ledger account balances
+    fn store_ledger_balances(&self, ledger: &Ledger) -> anyhow::Result<()>;
 }
