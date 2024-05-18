@@ -367,7 +367,7 @@ query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryIn
 
 variables {
   "limit": 100,
-  "sort_by": "BLOCKHEIGHT_ASC",
+  "sort_by": "BLOCKHEIGHT_DESC",
   "query": {
     "canonical": true,
     "block_height_lte": 50,
@@ -433,3 +433,5 @@ jsonpath "$.data.blocks[61].blockHeight" == 72
 jsonpath "$.data.blocks[61].canonical" == true
 
 duration < 200
+
+# TODO date time bounded query
