@@ -80,7 +80,7 @@ impl AccountQueryRoot {
                 .map(|acct| vec![Account::from(acct.clone())]));
         }
 
-        // TODO default query handler sort balance-sorted accounts
+        // TODO default query handler use balance-sorted accounts
         let mut accounts: Vec<Account> = if let Some(query) = query {
             ledger
                 .accounts

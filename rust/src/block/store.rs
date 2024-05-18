@@ -47,7 +47,7 @@ pub trait BlockStore {
     /// Add a block at the given global slot since genesis
     fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
 
-    /// TODO
+    /// Set block height <-> global slot
     fn set_height_global_slot(&self, blockchain_length: u32, slot: u32) -> anyhow::Result<()>;
 
     /// Get the global slot since genesis corresponding to the given block
@@ -73,13 +73,13 @@ pub trait BlockStore {
     /// Get children of a block
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
 
-    /// TODO
+    /// Set block version
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
 
-    /// TODO
+    /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 
-    /// TODO
+    /// Set a sorted account balance
     fn set_account_balance(&self, pk: &PublicKey, balance: u64) -> anyhow::Result<()>;
 
     /// Generate account balance updates when the best tip changes
@@ -89,14 +89,14 @@ pub trait BlockStore {
         new_best_tip: &BlockHash,
     ) -> anyhow::Result<LedgerBalanceUpdate>;
 
-    /// TODO
+    /// Set the balance updates for a block
     fn set_block_balance_updates(
         &self,
         state_hash: &BlockHash,
         balance_updates: Vec<PaymentDiff>,
     ) -> anyhow::Result<()>;
 
-    /// TODO
+    /// Get a block's balance updates
     fn get_block_balance_updates(&self, state_hash: &BlockHash)
         -> anyhow::Result<Vec<PaymentDiff>>;
 
