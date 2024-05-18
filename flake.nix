@@ -123,7 +123,7 @@
             name = "mina-indexer";
             created = "now";
             # This is equivalent to `git rev-parse --short HEAD`
-            tag = builtins.substring 0 9 (self.rev or "dev");
+            tag = builtins.substring 0 8 (self.rev or "dev");
             copyToRoot = pkgs.buildEnv {
               paths = with pkgs; [ mina-indexer openssl zstd bash self ];
               name = "mina-indexer-root";
