@@ -15,6 +15,13 @@ pub trait LedgerStore {
     /// Add a ledger associated with a canonical block
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()>;
 
+    /// Add a new genesis ledger
+    fn add_genesis_ledger(
+        &self,
+        state_hash: &BlockHash,
+        genesis_ledger: Ledger,
+    ) -> anyhow::Result<()>;
+
     /// Get a ledger associated with ledger hash
     fn get_ledger(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<Ledger>>;
 

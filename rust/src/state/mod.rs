@@ -188,7 +188,7 @@ impl IndexerState {
             .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
         // add genesis block and ledger to indexer store
-        config.indexer_store.add_ledger_state_hash(
+        config.indexer_store.add_genesis_ledger(
             &MAINNET_GENESIS_PREV_STATE_HASH.into(),
             config.genesis_ledger.clone().into(),
         )?;

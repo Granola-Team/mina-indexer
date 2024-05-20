@@ -897,8 +897,8 @@ impl CanonicityStore for IndexerStore {
 /// [LedgerStore] implementation
 
 /// [DBIterator] for balance-sorted accounts
-/// - key: `{balance BE bytes}{pk bytes}`
-/// - value: empty byte
+/// - `{balance BE bytes}{pk bytes} -> _`
+/// - `balance`: 8 bytes
 pub fn account_balance_iterator<'a>(
     db: &'a Arc<IndexerStore>,
     mode: IteratorMode,
@@ -956,6 +956,33 @@ impl LedgerStore for IndexerStore {
                 None => error!("Block missing from store {}", state_hash.0),
             }
         }
+        Ok(())
+    }
+
+    fn add_genesis_ledger(
+        &self,
+        state_hash: &BlockHash,
+        genesis_ledger: Ledger,
+    ) -> anyhow::Result<()> {
+        trace!("Adding genesis ledger {}", state_hash);
+
+        // initialize account balances for sorting
+        for (pk, acct) in &genesis_ledger.accounts {
+            let pk = pk.0.as_bytes();
+            self.database.put_cf(
+                self.account_balance_cf(),
+                pk,
+                acct.balance.0.to_string().as_bytes(),
+            )?;
+
+            let mut key = acct.balance.0.to_be_bytes().to_vec();
+            key.append(&mut pk.to_vec());
+            self.database
+                .put_cf(self.account_balance_sort_cf(), key, b"")?;
+        }
+
+        // add the ledger to the db
+        self.add_ledger_state_hash(state_hash, genesis_ledger)?;
         Ok(())
     }
 
