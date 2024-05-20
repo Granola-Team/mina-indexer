@@ -1,0 +1,11 @@
+#! /bin/sh
+
+set -eux
+
+docker --version
+nix build .#dockerImage
+docker load < ./result
+docker run --rm -it \
+  mina-indexer:"$(git rev-parse --short HEAD)" \
+  mina-indexer server start --help
+docker image rm mina-indexer:"$(git rev-parse --short HEAD)"
