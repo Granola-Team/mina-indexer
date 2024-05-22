@@ -2,8 +2,9 @@
 //! [IndexerStore]
 
 mod column_families;
+mod fixed_keys;
 
-use self::column_families::ColumnFamilyHelpers;
+use self::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
@@ -32,7 +33,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail};
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 use speedb::{
     ColumnFamily, ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB,
 };
@@ -83,6 +84,7 @@ impl IndexerStore {
 
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
+        // check that all column families are included
         assert_eq!(Self::COLUMN_FAMILIES.len(), Self::NUM_COLUMN_FAMILIES);
 
         let mut cf_opts = speedb::Options::default();
@@ -149,6 +151,9 @@ impl BlockStore for IndexerStore {
         }
         self.database
             .put_cf(self.blocks_cf(), state_hash.as_bytes(), value)?;
+
+        // increment block production counts
+        self.increment_block_production_count(block)?;
 
         // add to global slots block index
         self.database.put_cf(
@@ -645,6 +650,79 @@ impl BlockStore for IndexerStore {
                 to_be_bytes(global_slot_since_genesis),
             )?
             .map(from_be_bytes))
+    }
+
+    fn get_current_epoch(&self) -> anyhow::Result<u32> {
+        trace!("Getting current epoch");
+        Ok(self.get_best_block()?.map_or(0, |b| b.epoch_count()))
+    }
+
+    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+        trace!("Incrementing block production count {}", block.summary());
+
+        let creator = block.block_creator();
+        let epoch = block.epoch_count();
+        debug!(
+            "*INCREMENT*\n  pk: {creator}\n  epoch: {epoch}\n  block: {}",
+            block.summary()
+        );
+
+        // increment pk count
+        let acc = self.get_block_production_pk_count(&creator, Some(epoch))?;
+        debug!("PK {creator}: {acc} -> {}", acc + 1);
+        self.database.put_cf(
+            self.block_production_pk_cf(),
+            u32_prefix_key(epoch, &creator.0),
+            to_be_bytes(acc + 1),
+        )?;
+
+        // increment epoch count
+        let acc = self.get_block_production_epoch_count(epoch)?;
+        debug!("EPOCH {epoch}: {acc} -> {}", acc + 1);
+        self.database.put_cf(
+            self.block_production_epoch_cf(),
+            to_be_bytes(epoch),
+            to_be_bytes(acc + 1),
+        )?;
+
+        // increment total count
+        let acc = self.get_block_production_total_count()?;
+        debug!("TOTAL {acc} -> {}", acc + 1);
+        self.database
+            .put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1))?;
+
+        Ok(())
+    }
+
+    fn get_block_production_pk_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting pk block production count (epoch {epoch}) {pk}");
+
+        let key = u32_prefix_key(epoch, &pk.0);
+        Ok(self
+            .database
+            .get_cf(self.block_production_pk_cf(), key)?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_epoch_count(&self, epoch: u32) -> anyhow::Result<u32> {
+        trace!("Getting epoch block production count {epoch}");
+        Ok(self
+            .database
+            .get_cf(self.block_production_epoch_cf(), to_be_bytes(epoch))?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total block production count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_BLOCKS_KEY)?
+            .map_or(0, from_be_bytes))
     }
 }
 
@@ -1253,10 +1331,12 @@ pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
     u32::from_be_bytes(be_bytes)
 }
 
-/// The first 4 bytes are global slot in big endian.
-fn global_slot_prefix_key(global_slot: u32, txn_hash: &str) -> Vec<u8> {
-    let mut bytes = to_be_bytes(global_slot);
-    bytes.append(&mut txn_hash.as_bytes().to_vec());
+/// The first 4 bytes are `prefix` in big endian
+/// - `prefix`: global slot, epoch number, etc
+/// - `suffix`: txn hash, public key, etc
+fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
+    let mut bytes = to_be_bytes(prefix);
+    bytes.append(&mut suffix.as_bytes().to_vec());
     bytes
 }
 
@@ -1304,7 +1384,7 @@ impl CommandStore for IndexerStore {
             // slot ordering
             self.database.put_cf(
                 self.commands_slot_mainnet_cf(),
-                global_slot_prefix_key(block.global_slot_since_genesis(), &txn_hash),
+                u32_prefix_key(block.global_slot_since_genesis(), &txn_hash),
                 serde_json::to_vec(&SignedCommandWithData::from(
                     command,
                     &block.state_hash().0,
@@ -1930,13 +2010,9 @@ impl ChainStore for IndexerStore {
     }
 }
 
-impl IndexerStore {
-    const CHAIN_ID_KEY: &'static [u8] = "current_chain_id".as_bytes();
-    const BEST_TIP_BLOCK_KEY: &'static [u8] = "best_tip_block".as_bytes();
-    const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
-    const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();
-    const KNOWN_GENESIS_STATE_HASHES_KEY: &'static [u8] = "known_genesis_state_hashes".as_bytes();
+impl FixedKeys for IndexerStore {}
 
+impl IndexerStore {
     pub fn db_stats(&self) -> String {
         self.database
             .property_value(speedb::properties::DBSTATS)
