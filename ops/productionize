@@ -3,18 +3,26 @@
 set -eux
 set -o pipefail
 
-PROD=/mnt/mina-log-storage/production
-VER="$(git rev-parse --short HEAD)"
-SRC="$(pwd)"
-mkdir -p "$PROD"
-
-# Assert that the socket created during tier 2 testing no longer exists.
+# The first argument is the short commit hash of the production database.
 #
-SOCKET="$SRC"/mina-indexer.sock
-if [ -e "$SOCKET" ]; then
-    echo "Failure: $SOCKET still exists. Exiting" 2>&1
+VER="${1:-$(git rev-parse --short HEAD)}"
+
+# Ensure the database directory exists.
+#
+VERSIONED_DB_DIR=/mnt/mina-log-storage/"$VER"-database
+if [ ! -e "$VERSIONED_DB_DIR" ]; then
+    echo "$VERSIONED_DB_DIR does not exist. Exiting." 1>&2
     exit 1
 fi
+
+# Ensure that we are within the source tree.
+#
+SRC="$(git rev-parse --show-toplevel)"
+
+# This is the directory that we intend to configure for production use.
+#
+PROD=/mnt/mina-log-storage/production
+mkdir -p "$PROD"
 
 # Terminate the prior production instance. This will not work if we change the
 # on-wire comms protocol for the shutdown command, note.
@@ -24,20 +32,14 @@ if [ -e "$SOCKET" ]; then
     ./rust/target/release/mina-indexer --domain-socket-path "$SOCKET" shutdown
 fi
 
-# Now that we know the tier 2 testing instance and the production instance are
-# not running, we can safely use the database directory of the tier 2 testing
-# instance as the new production database.
+# Now we know that the production instance is not running, so we can safely use
+# the database directory.
 #
 DB_DIR="$PROD"/database
-TESTING_DB_DIR=/mnt/mina-log-storage/"$VER"-database
-if [ ! -e "$TESTING_DB_DIR" ]; then
-    # Set a backup DB_DIR, mostly for testing this script.
-    TESTING_DB_DIR=/mnt/mina-log-storage/f9cef6f2-database
-fi
 rm -f "$DB_DIR"
-ln -s "$TESTING_DB_DIR" "$DB_DIR"
+ln -s "$VERSIONED_DB_DIR" "$DB_DIR"
 
-# Configure the log.
+# Ensure that the log directory exists.
 #
 LOG="$PROD"/log
 mkdir -p "$LOG"
