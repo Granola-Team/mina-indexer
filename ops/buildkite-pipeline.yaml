@@ -1,13 +1,13 @@
 steps:
 
-- label: "Developer Environment Build and Test"
+- label: "Developer Environment Build and Tier 1 Test"
   key: "build"
-  command: "./ops/build-and-test"
+  command: "./ops/tier1-test"
 
 - label: "Tier 2 Testing"
   key: "tier2"
   depends_on: "build"
-  if: build.branch == "main" && build.env('GRANOLA_NIGHTLY_BUILD') == "true"
+  if: build.env('GRANOLA_TIER2') == "true"
   timeout_in_minutes: 2880
   agents:
     mina-log-storage: true
@@ -18,8 +18,8 @@ steps:
 
 - label: "Create OCI Image"
   key: image
-  depends_on: "tier2"
-  if: build.branch == "main" && build.env('GRANOLA_NIGHTLY_BUILD') == "true"
+  depends_on: "build"
+  if: build.branch == "main"
   agents:
     docker: true
   command: "./ops/build-oci-image"
