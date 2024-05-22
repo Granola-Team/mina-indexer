@@ -102,4 +102,23 @@ pub trait BlockStore {
 
     /// Updates stored account balances
     fn update_account_balances(&self, update: LedgerBalanceUpdate) -> anyhow::Result<()>;
+
+    /// Get the epoch count of the best block
+    fn get_current_epoch(&self) -> anyhow::Result<u32>;
+
+    /// Increment the epoch & pk block production counts
+    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+
+    /// Get the block production count for `pk` in `epoch`
+    fn get_block_production_pk_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
+
+    /// Get the total block production count for `epoch`
+    fn get_block_production_epoch_count(&self, epoch: u32) -> anyhow::Result<u32>;
+
+    /// Get the total block production count
+    fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
 }

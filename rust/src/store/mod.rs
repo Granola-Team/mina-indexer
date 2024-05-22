@@ -1,6 +1,9 @@
 //! This module contains the implementations of all store traits for the
 //! [IndexerStore]
 
+mod column_families;
+
+use self::column_families::ColumnFamilyHelpers;
 use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
@@ -30,7 +33,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use log::{error, trace, warn};
-use speedb::{ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB};
+use speedb::{
+    ColumnFamily, ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB,
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -46,18 +51,20 @@ pub struct IndexerStore {
 }
 
 impl IndexerStore {
-    /// Check these match with the cf helpers below
-    const COLUMN_FAMILIES: [&'static str; 24] = [
+    /// Add the corresponding CF helper to [ColumnFamilyHelpers]
+    const COLUMN_FAMILIES: [&'static str; 26] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
+        "block-production-pk",    // [block_production_pk_cf]
+        "block-production-epoch", // [block_production_epoch_cf]
         "blocks-state-hash",
         "blocks-version",
         "blocks-global-slot-idx",
         "blocks-at-length",
         "blocks-at-slot",
         "block-height-to-slot", // [block_height_to_global_slot_cf]
-        "block-slot-to-height", // []
+        "block-slot-to-height", // [block_global_slot_to_height_cf]
         "canonicity",
         "commands",
         "mainnet-commands-slot",
@@ -76,6 +83,8 @@ impl IndexerStore {
 
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
+        assert_eq!(Self::COLUMN_FAMILIES.len(), Self::NUM_COLUMN_FAMILIES);
+
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         cf_opts.set_compression_type(DBCompressionType::Zstd);
@@ -110,187 +119,6 @@ impl IndexerStore {
 
     pub fn db_path(&self) -> &Path {
         &self.db_path
-    }
-
-    // Column family helpers
-
-    /// CF for storing account balances (best ledger):
-    /// `pk -> balance`
-    fn account_balance_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("account-balance")
-            .expect("account-balance column family exists")
-    }
-
-    /// CF for sorting account's by balance
-    /// `{balance}{pk} -> _`
-    ///
-    /// - `balance`: 8 BE bytes
-    fn account_balance_sort_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("account-balance-sort")
-            .expect("account-balance-sort column family exists")
-    }
-
-    /// CF for storing account balance updates:
-    /// `state hash -> balance updates`
-    fn account_balance_updates_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("account-balance-updates")
-            .expect("account-balance-updates column family exists")
-    }
-
-    /// CF for storing all blocks
-    fn blocks_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("blocks-state-hash")
-            .expect("blocks-state-hash column family exists")
-    }
-
-    /// CF for storing block versions:
-    /// `state hash -> pcb version`
-    fn blocks_version_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("blocks-version")
-            .expect("blocks-version column family exists")
-    }
-
-    /// CF for sorting blocks by global slot
-    /// `{global_slot}{state_hash} -> _`
-    fn blocks_global_slot_idx_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("blocks-global-slot-idx")
-            .expect("blocks-global-slot-idx column family exists")
-    }
-
-    /// CF for storing: height -> global slot
-    fn block_height_to_global_slot_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("block-height-to-slot")
-            .expect("block-height-to-slot column family exists")
-    }
-
-    /// CF for storing: global slot -> height
-    fn block_global_slot_to_height_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("block-slot-to-height")
-            .expect("block-slot-to-height column family exists")
-    }
-
-    /// CF for storing blocks at a fixed height:
-    /// `height -> list of blocks at height`
-    ///
-    /// - `list of blocks at height`: sorted from best to worst
-    fn lengths_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("blocks-at-length")
-            .expect("blocks-at-length column family exists")
-    }
-
-    /// CF for storing blocks at a fixed global slot:
-    /// `global slot -> list of blocks at slot`
-    ///
-    /// - `list of blocks at slot`: sorted from best to worst
-    fn slots_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("blocks-at-slot")
-            .expect("blocks-at-slot column family exists")
-    }
-
-    fn canonicity_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("canonicity")
-            .expect("canonicity column family exists")
-    }
-
-    fn commands_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("commands")
-            .expect("commands column family exists")
-    }
-
-    fn internal_commands_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("mainnet-internal-commands")
-            .expect("mainnet-internal-commands column family exists")
-    }
-
-    /// CF for sorting user commands: `{global_slot}{txn_hash} -> data`
-    ///
-    /// - `global_slot`: 4 BE bytes
-    fn commands_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("mainnet-commands-slot")
-            .expect("mainnet-commands-slot column family exists")
-    }
-
-    /// CF for storing: `txn_hash -> global_slot`
-    ///
-    /// - `global_slot`: 4 BE bytes
-    fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("mainnet-cmds-txn-global-slot")
-            .expect("mainnet-cmds-txn-global-slot column family exists")
-    }
-
-    fn ledgers_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("ledgers")
-            .expect("ledgers column family exists")
-    }
-
-    fn events_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("events")
-            .expect("events column family exists")
-    }
-
-    fn snarks_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("snarks")
-            .expect("snarks column family exists")
-    }
-
-    /// CF for storing all snark work fee totals
-    fn snark_top_producers_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("snark-work-top-producers")
-            .expect("snark-work-top-producers column family exists")
-    }
-
-    /// CF for sorting all snark work fee totals
-    fn snark_top_producers_sort_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("snark-work-top-producers-sort")
-            .expect("snark-work-top-producers-sort column family exists")
-    }
-
-    /// CF for storing/sorting SNARK work fees
-    fn snark_work_fees_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("snark-work-fees")
-            .expect("snark-work-fees column family exists")
-    }
-
-    /// CF for storing chain_id -> network
-    fn chain_id_to_network_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("chain-id-to-network")
-            .expect("chain-id-to-network column family exists")
-    }
-
-    /// CF for sorting user commands by sender public key
-    fn txn_from_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("txn-from")
-            .expect("txn-from column family exists")
-    }
-
-    /// CF for sorting user commands by receiver public key in [CommandStore]
-    fn txn_to_cf(&self) -> &speedb::ColumnFamily {
-        self.database
-            .cf_handle("txn-to")
-            .expect("txn-to column family exists")
     }
 }
 
@@ -2142,5 +1970,204 @@ impl IndexerStore {
             .property_int_value(speedb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
+    }
+}
+
+impl ColumnFamilyHelpers for IndexerStore {
+    /// CF for storing account balances (best ledger):
+    /// `pk -> balance`
+    fn account_balance_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("account-balance")
+            .expect("account-balance column family exists")
+    }
+
+    /// CF for sorting account's by balance
+    /// `{balance}{pk} -> _`
+    ///
+    /// - `balance`: 8 BE bytes
+    fn account_balance_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("account-balance-sort")
+            .expect("account-balance-sort column family exists")
+    }
+
+    /// CF for storing account balance updates:
+    /// `state hash -> balance updates`
+    fn account_balance_updates_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("account-balance-updates")
+            .expect("account-balance-updates column family exists")
+    }
+
+    /// CF for storing all blocks
+    fn blocks_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-state-hash")
+            .expect("blocks-state-hash column family exists")
+    }
+
+    /// CF for storing block versions:
+    /// `state hash -> pcb version`
+    fn blocks_version_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-version")
+            .expect("blocks-version column family exists")
+    }
+
+    /// CF for sorting blocks by global slot
+    /// `{global_slot}{state_hash} -> _`
+    fn blocks_global_slot_idx_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-global-slot-idx")
+            .expect("blocks-global-slot-idx column family exists")
+    }
+
+    /// CF for storing: height -> global slot
+    fn block_height_to_global_slot_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-height-to-slot")
+            .expect("block-height-to-slot column family exists")
+    }
+
+    /// CF for storing: global slot -> height
+    fn block_global_slot_to_height_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-slot-to-height")
+            .expect("block-slot-to-height column family exists")
+    }
+
+    /// CF for storing blocks at a fixed height:
+    /// `height -> list of blocks at height`
+    ///
+    /// - `list of blocks at height`: sorted from best to worst
+    fn lengths_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-at-length")
+            .expect("blocks-at-length column family exists")
+    }
+
+    /// CF for storing blocks at a fixed global slot:
+    /// `global slot -> list of blocks at slot`
+    ///
+    /// - `list of blocks at slot`: sorted from best to worst
+    fn slots_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-at-slot")
+            .expect("blocks-at-slot column family exists")
+    }
+
+    fn canonicity_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("canonicity")
+            .expect("canonicity column family exists")
+    }
+
+    fn commands_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("commands")
+            .expect("commands column family exists")
+    }
+
+    fn internal_commands_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("mainnet-internal-commands")
+            .expect("mainnet-internal-commands column family exists")
+    }
+
+    /// CF for sorting user commands: `{global_slot}{txn_hash} -> data`
+    ///
+    /// - `global_slot`: 4 BE bytes
+    fn commands_slot_mainnet_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("mainnet-commands-slot")
+            .expect("mainnet-commands-slot column family exists")
+    }
+
+    /// CF for storing: `txn_hash -> global_slot`
+    ///
+    /// - `global_slot`: 4 BE bytes
+    fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("mainnet-cmds-txn-global-slot")
+            .expect("mainnet-cmds-txn-global-slot column family exists")
+    }
+
+    fn ledgers_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("ledgers")
+            .expect("ledgers column family exists")
+    }
+
+    fn events_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("events")
+            .expect("events column family exists")
+    }
+
+    fn snarks_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snarks")
+            .expect("snarks column family exists")
+    }
+
+    /// CF for storing all snark work fee totals
+    fn snark_top_producers_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-top-producers")
+            .expect("snark-work-top-producers column family exists")
+    }
+
+    /// CF for sorting all snark work fee totals
+    fn snark_top_producers_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-top-producers-sort")
+            .expect("snark-work-top-producers-sort column family exists")
+    }
+
+    /// CF for storing/sorting SNARK work fees
+    fn snark_work_fees_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-fees")
+            .expect("snark-work-fees column family exists")
+    }
+
+    /// CF for storing chain_id -> network
+    fn chain_id_to_network_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("chain-id-to-network")
+            .expect("chain-id-to-network column family exists")
+    }
+
+    /// CF for sorting user commands by sender public key
+    fn txn_from_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("txn-from")
+            .expect("txn-from column family exists")
+    }
+
+    /// CF for sorting user commands by receiver public key in [CommandStore]
+    fn txn_to_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("txn-to")
+            .expect("txn-to column family exists")
+    }
+
+    /// CF for per epoch per account block prodution info
+    /// - key: `{epoch BE bytes}{pk}`
+    /// - value: number of blocks produced by `pk` in `epoch`
+    fn block_production_pk_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk")
+            .expect("block-production-pk column family exists")
+    }
+
+    /// CF for per epoch block production totals
+    /// - key: `epoch`
+    /// - value: number of blocks produced in `epoch`
+    fn block_production_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-epoch")
+            .expect("block-production-epoch column family exists")
     }
 }
