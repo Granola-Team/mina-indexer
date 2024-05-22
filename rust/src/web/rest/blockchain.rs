@@ -49,7 +49,7 @@ fn calculate_summary(
 ) -> Option<BlockchainSummary> {
     let blockchain_length = best_tip.blockchain_length();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
-    let epoch = best_tip.consensus_state().epoch_count.inner().inner();
+    let epoch = best_tip.epoch_count();
     let global_slot = best_tip.global_slot_since_genesis();
     let min_window_density = best_tip.consensus_state().min_window_density.t.t;
     let next_epoch_ledger_hash = LedgerHash::from_hashv1(

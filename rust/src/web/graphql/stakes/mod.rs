@@ -42,9 +42,7 @@ impl StakeQueryRoot {
         let db = db(ctx);
 
         // default to current epoch
-        let curr_epoch = db.get_best_block()?.map_or(0, |block| {
-            block.global_slot_since_genesis() / MAINNET_EPOCH_SLOT_COUNT
-        });
+        let curr_epoch = db.get_best_block()?.unwrap().epoch_count();
         let epoch = match query {
             Some(ref query) => query.epoch.unwrap_or(curr_epoch),
             None => curr_epoch,

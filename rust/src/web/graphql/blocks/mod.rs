@@ -544,7 +544,7 @@ impl Block {
         let total_currency = consensus_state.total_currency.t.t;
         let blockchain_length = block.blockchain_length();
         let block_height = blockchain_length;
-        let epoch_count = consensus_state.epoch_count.t.t;
+        let epoch_count = block.epoch_count();
         let epoch = epoch_count;
         let has_ancestor_in_same_checkpoint_window =
             consensus_state.has_ancestor_in_same_checkpoint_window;
