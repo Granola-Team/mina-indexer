@@ -5,21 +5,25 @@ steps:
   command: "./ops/tier1-test"
 
 - label: "Tier 2 Testing"
+  if: build.env('GRANOLA_TIER2') == "true"
   key: "tier2"
   depends_on: "build"
-  if: build.env('GRANOLA_TIER2') == "true"
   timeout_in_minutes: 2880
   agents:
     mina-log-storage: true
-    docker: true
-  command: |
-    ./ops/tier2-test
-    ./ops/productionize
+  command: "./ops/tier2-test"
 
 - label: "Create OCI Image"
+  if: build.branch == "main"
   key: image
   depends_on: "build"
-  if: build.branch == "main"
   agents:
     docker: true
   command: "./ops/build-oci-image"
+
+- label: "Productionize"
+  if: build.branch == "prod"
+  key: deploy
+  agents:
+    mina-log-storage: true
+  command: "./ops/productionize"

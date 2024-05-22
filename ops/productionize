@@ -3,21 +3,22 @@
 set -eux
 set -o pipefail
 
-# The first argument is the short commit hash of the production database.
+# Ensure that we are within the source tree.
 #
-VER="${1:-$(git rev-parse --short HEAD)}"
+SRC="$(git rev-parse --show-toplevel)"
+
+# The commit (rev) of the database directory that we want to use for production
+# is specified in the 'ops/production-rev' file.
+#
+REV="$(cat "$SRC"/ops/production-rev)"
 
 # Ensure the database directory exists.
 #
-VERSIONED_DB_DIR=/mnt/mina-log-storage/"$VER"-database
+VERSIONED_DB_DIR=/mnt/mina-log-storage/"$REV"-database
 if [ ! -e "$VERSIONED_DB_DIR" ]; then
     echo "$VERSIONED_DB_DIR does not exist. Exiting." 1>&2
     exit 1
 fi
-
-# Ensure that we are within the source tree.
-#
-SRC="$(git rev-parse --show-toplevel)"
 
 # This is the directory that we intend to configure for production use.
 #
