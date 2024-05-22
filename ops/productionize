@@ -56,6 +56,7 @@ setsid \
       --domain-socket-path "$SOCKET" \
       server start \
         --log-level DEBUG \
+        --web-hostname 0.0.0.0 \
         --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
         --locked-supply-csv "$SRC"/data/locked.csv \
         --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
