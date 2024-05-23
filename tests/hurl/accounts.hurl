@@ -83,7 +83,8 @@ POST {{url}}
 query Accounts {
   accounts(query: {publicKey: "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"}) {
     publicKey
-    pkEpochNumBlocks
+    pk_epoch_num_blocks
+    pk_total_num_blocks
   }
 }
 ```
@@ -95,6 +96,7 @@ jsonpath "$.data.accounts" count == 1
 
 # block production info
 jsonpath "$.data.accounts[0].publicKey" == "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"
-jsonpath "$.data.accounts[0].pkEpochNumBlocks" == 5
+jsonpath "$.data.accounts[0].pk_epoch_num_blocks" == 5
+jsonpath "$.data.accounts[0].pk_total_num_blocks" == 5
 
 duration < 200
