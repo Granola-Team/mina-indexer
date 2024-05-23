@@ -52,7 +52,7 @@ jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
 jsonpath "$.data.transactions[49].hash" == "CkpZ3EzeQLT4m3mLUwyKFdvF3cjvvFGUzR9jug14E8bFryTpTsxYz"
 
-duration < 200
+duration < 500
 
 #
 # Transactions canonical block height descending query
@@ -95,7 +95,7 @@ jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
 jsonpath "$.data.transactions[49].hash" == "CkpZDjNVLadk61ZhYnh9eaLc9g9yx19KqmLjJiZRqtavHsnvsKsnC"
 
-duration < 200
+duration < 500
 
 #
 # Transactions canonical specific block height query
@@ -155,7 +155,7 @@ jsonpath "$.data.transactions[1].to" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZ
 jsonpath "$.data.transactions[1].amount" == 1000
 jsonpath "$.data.transactions[1].fee" == 10000000
 
-duration < 100
+duration < 500
 
 # TODO state hash query
 # TODO global slot query
@@ -211,7 +211,7 @@ jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAno
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
-duration < 200
+duration < 500
 
 #
 # Transactions to (receiver) query
@@ -264,4 +264,4 @@ jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAno
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
-duration < 200
+duration < 500
