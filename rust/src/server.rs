@@ -356,6 +356,11 @@ pub async fn run(
     }
 
     info!("Ingestion cleanly shutdown");
+    let state = state.write().await;
+    state
+        .indexer_store
+        .iter()
+        .for_each(|store| store.database.cancel_all_background_work(true));
     Ok(())
 }
 
