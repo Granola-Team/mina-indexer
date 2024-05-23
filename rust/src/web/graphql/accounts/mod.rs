@@ -6,6 +6,12 @@ use crate::{
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
+// #[derive(SimpleObject)]
+// pub struct EpochNumBlocks {
+//     epoch: u32,
+//     epoch_num_blocks: u32,
+// }
+
 #[derive(SimpleObject)]
 pub struct Account {
     public_key: String,
@@ -15,6 +21,7 @@ pub struct Account {
     nonce: u32,
     time_locked: bool,
     timing: Option<Timing>,
+    pk_epoch_num_blocks: u32,
 }
 
 #[derive(InputObject)]
@@ -77,7 +84,13 @@ impl AccountQueryRoot {
                 .accounts
                 .get(&public_key.into())
                 .filter(|acct| query.unwrap().matches(acct))
-                .map(|acct| vec![Account::from(acct.clone())]));
+                .map(|acct| {
+                    vec![Account::from((
+                        acct.clone(),
+                        db.get_block_production_pk_count(&acct.public_key, None)
+                            .expect("pk epoch block count"),
+                    ))]
+                }));
         }
 
         // TODO default query handler use balance-sorted accounts
@@ -86,10 +99,28 @@ impl AccountQueryRoot {
                 .accounts
                 .into_values()
                 .filter(|account| query.matches(account))
-                .map(Account::from)
+                .map(|acct| {
+                    let pk = acct.public_key.clone();
+                    Account::from((
+                        acct,
+                        db.get_block_production_pk_count(&pk, None)
+                            .expect("pk epoch block count"),
+                    ))
+                })
                 .collect()
         } else {
-            ledger.accounts.into_values().map(Account::from).collect()
+            ledger
+                .accounts
+                .into_values()
+                .map(|acct| {
+                    let pk = acct.public_key.clone();
+                    Account::from((
+                        acct,
+                        db.get_block_production_pk_count(&pk, None)
+                            .expect("pk epoch block count"),
+                    ))
+                })
+                .collect()
         };
 
         if let Some(sort_by) = sort_by {
@@ -123,6 +154,7 @@ impl AccountQueryInput {
         if let Some(public_key) = public_key {
             return *public_key == account.public_key.0;
         }
+        // TODO
         // if let Some(username) = username {
         //     return account
         //         .username
@@ -151,18 +183,20 @@ impl AccountQueryInput {
     }
 }
 
-impl From<account::Account> for Account {
-    fn from(account: account::Account) -> Self {
+impl From<(account::Account, u32)> for Account {
+    fn from(account: (account::Account, u32)) -> Self {
         Self {
-            public_key: account.public_key.0,
-            delegate: account.delegate.0,
-            nonce: account.nonce.0,
-            balance: account.balance.0,
-            time_locked: account.timing.is_some(),
-            timing: account.timing.map(|t| t.into()),
+            public_key: account.0.public_key.0,
+            delegate: account.0.delegate.0,
+            nonce: account.0.nonce.0,
+            balance: account.0.balance.0,
+            time_locked: account.0.timing.is_some(),
+            timing: account.0.timing.map(|t| t.into()),
             username: account
+                .0
                 .username
                 .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
+            pk_epoch_num_blocks: account.1,
         }
     }
 }
