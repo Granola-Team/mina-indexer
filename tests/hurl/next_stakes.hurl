@@ -20,6 +20,10 @@ query NextStakesQuery($limit: Int, $sort_by: NextStakesSortByInput!, $query: Nex
       countDelegates
       totalDelegated
     }
+    pk_epoch_num_blocks
+    pk_total_num_blocks
+    epoch_num_blocks
+    total_num_blocks
   }
 }
 
@@ -51,5 +55,11 @@ jsonpath "$.data.nextStakes[0].token" == 1
 jsonpath "$.data.nextStakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.countDelegates" == 1
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.totalDelegated" == 2498323.273015384
+
+# block production info
+jsonpath "$.data.nextStakes[0].pk_epoch_num_blocks" == 0 # no blocks have been produced in the next epoch
+jsonpath "$.data.nextStakes[0].pk_total_num_blocks" == 0 # no blocks have been produced in the next epoch
+jsonpath "$.data.nextStakes[0].epoch_num_blocks" == 0    # no blocks have been produced in the next epoch
+jsonpath "$.data.nextStakes[0].total_num_blocks" == 204
 
 duration < 2000

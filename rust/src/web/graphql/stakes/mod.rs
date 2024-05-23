@@ -102,13 +102,20 @@ impl StakeQueryRoot {
                     vesting_period: Some(timing.vesting_period),
                 });
                 let pk_epoch_num_blocks = db
-                    .get_block_production_pk_count(&pk, Some(epoch))
+                    .get_block_production_pk_epoch_count(&pk, Some(epoch))
                     .expect("pk epoch num blocks");
+                let pk_total_num_blocks = db
+                    .get_block_production_pk_total_count(&pk)
+                    .expect("pk total num blocks");
 
                 StakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from((account, pk_epoch_num_blocks)),
+                    account: StakesLedgerAccount::from((
+                        account,
+                        pk_epoch_num_blocks,
+                        pk_total_num_blocks,
+                    )),
                     delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,
@@ -116,9 +123,12 @@ impl StakeQueryRoot {
                         count_delegates,
                     },
                     timing,
-                    epoch_total_blocks: db
+                    epoch_num_blocks: db
                         .get_block_production_epoch_count(epoch)
                         .expect("epoch block count"),
+                    total_num_blocks: db
+                        .get_block_production_total_count()
+                        .expect("total block count"),
                 }
             })
             .collect();
@@ -157,8 +167,13 @@ pub struct StakesLedgerAccountWithMeta {
     /// Value timing
     timing: Option<Timing>,
 
-    /// Value epoch total blocks
-    epoch_total_blocks: u32,
+    /// Value epoch num blocks
+    #[graphql(name = "epoch_num_blocks")]
+    epoch_num_blocks: u32,
+
+    /// Value total num blocks
+    #[graphql(name = "total_num_blocks")]
+    total_num_blocks: u32,
 }
 
 #[derive(SimpleObject)]
@@ -177,8 +192,10 @@ pub struct StakesLedgerAccount {
 
     /// Value epoch
     pub pk: String,
+
     /// Value username
     pub username: Option<String>,
+
     /// Value public key
     #[graphql(name = "public_key")]
     pub public_key: String,
@@ -198,7 +215,12 @@ pub struct StakesLedgerAccount {
     pub balance_nanomina: u64,
 
     /// Value pk epoch num blocks
+    #[graphql(name = "pk_epoch_num_blocks")]
     pub pk_epoch_num_blocks: u32,
+
+    /// Value pk total num blocks
+    #[graphql(name = "pk_total_num_blocks")]
+    pub pk_total_num_blocks: u32,
 }
 
 #[derive(SimpleObject)]
@@ -233,8 +255,8 @@ impl StakesDelegationTotals {
     }
 }
 
-impl From<(StakingAccount, u32)> for StakesLedgerAccount {
-    fn from(acc: (StakingAccount, u32)) -> Self {
+impl From<(StakingAccount, u32, u32)> for StakesLedgerAccount {
+    fn from(acc: (StakingAccount, u32, u32)) -> Self {
         let balance_nanomina = acc.0.balance;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
@@ -266,6 +288,7 @@ impl From<(StakingAccount, u32)> for StakesLedgerAccount {
             balance_nanomina,
             username: None,
             pk_epoch_num_blocks: acc.1,
+            pk_total_num_blocks: acc.2,
         }
     }
 }

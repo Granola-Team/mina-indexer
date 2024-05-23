@@ -24,6 +24,7 @@ pub struct NextStakesQueryInput {
 pub enum NextStakesSortByInput {
     #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
+
     #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
 }
@@ -106,11 +107,15 @@ impl NextStakesQueryRoot {
                     vesting_increment: Some(timing.vesting_increment),
                     vesting_period: Some(timing.vesting_period),
                 });
+                let pk_total_num_blocks = db
+                    .get_block_production_pk_total_count(&pk)
+                    .expect("pk total num blocks");
+
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
                     // no blocks have been produced for the next epoch
-                    account: StakesLedgerAccount::from((account, 0)),
+                    account: StakesLedgerAccount::from((account, 0, pk_total_num_blocks)),
                     next_delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,
@@ -118,6 +123,12 @@ impl NextStakesQueryRoot {
                         count_delegates,
                     },
                     timing,
+                    epoch_num_blocks: db
+                        .get_block_production_epoch_count(epoch)
+                        .expect("epoch block count"),
+                    total_num_blocks: db
+                        .get_block_production_total_count()
+                        .expect("total block count"),
                 }
             })
             .collect();
@@ -154,4 +165,12 @@ pub struct NextStakesLedgerAccountWithMeta {
 
     /// Value timing
     timing: Option<Timing>,
+
+    /// Value epoch num blocks
+    #[graphql(name = "epoch_num_blocks")]
+    epoch_num_blocks: u32,
+
+    /// Value total num blocks
+    #[graphql(name = "total_num_blocks")]
+    total_num_blocks: u32,
 }

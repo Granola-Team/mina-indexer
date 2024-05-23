@@ -53,12 +53,13 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 26] = [
+    const COLUMN_FAMILIES: [&'static str; 27] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
-        "block-production-pk",    // [block_production_pk_cf]
-        "block-production-epoch", // [block_production_epoch_cf]
+        "block-production-pk-epoch", // [block_production_pk_epoch_cf]
+        "block-production-pk-total", // [block_production_pk_total_cf]
+        "block-production-epoch",    // [block_production_epoch_cf]
         "blocks-state-hash",
         "blocks-version",
         "blocks-global-slot-idx",
@@ -663,11 +664,19 @@ impl BlockStore for IndexerStore {
         let creator = block.block_creator();
         let epoch = block.epoch_count();
 
-        // increment pk count
-        let acc = self.get_block_production_pk_count(&creator, Some(epoch))?;
+        // increment pk epoch count
+        let acc = self.get_block_production_pk_epoch_count(&creator, Some(epoch))?;
         self.database.put_cf(
-            self.block_production_pk_cf(),
+            self.block_production_pk_epoch_cf(),
             u32_prefix_key(epoch, &creator.0),
+            to_be_bytes(acc + 1),
+        )?;
+
+        // increment pk total count
+        let acc = self.get_block_production_pk_total_count(&creator)?;
+        self.database.put_cf(
+            self.block_production_pk_total_cf(),
+            creator.to_bytes(),
             to_be_bytes(acc + 1),
         )?;
 
@@ -687,18 +696,27 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_production_pk_count(
+    fn get_block_production_pk_epoch_count(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
     ) -> anyhow::Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
-        trace!("Getting pk block production count (epoch {epoch}) {pk}");
-
-        let key = u32_prefix_key(epoch, &pk.0);
+        trace!("Getting pk epoch {epoch} block production count {pk}");
         Ok(self
             .database
-            .get_cf(self.block_production_pk_cf(), key)?
+            .get_cf(
+                self.block_production_pk_epoch_cf(),
+                u32_prefix_key(epoch, &pk.0),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+        trace!("Getting pk total block production count {pk}");
+        Ok(self
+            .database
+            .get_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
             .map_or(0, from_be_bytes))
     }
 
@@ -2225,10 +2243,19 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for per epoch per account block prodution info
     /// - key: `{epoch BE bytes}{pk}`
     /// - value: number of blocks produced by `pk` in `epoch`
-    fn block_production_pk_cf(&self) -> &ColumnFamily {
+    fn block_production_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("block-production-pk")
-            .expect("block-production-pk column family exists")
+            .cf_handle("block-production-pk-epoch")
+            .expect("block-production-pk-epoch column family exists")
+    }
+
+    /// CF for per account total block prodution info
+    /// - key: `pk`
+    /// - value: total number of blocks produced by `pk`
+    fn block_production_pk_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-total")
+            .expect("block-production-pk-total column family exists")
     }
 
     /// CF for per epoch block production totals
