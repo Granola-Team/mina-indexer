@@ -57,7 +57,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  feetransfers(sortBy: BLOCKHEIGHT_DESC, query: {stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS", canonical: true}) {
+  feetransfers(sortBy: BLOCKHEIGHT_DESC, query: {blockStateHash: {stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"}, canonical: true}) {
     recipient
     stateHash
   }

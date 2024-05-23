@@ -1,5 +1,6 @@
 use super::{
     blocks::{Block, BlockWithCanonicity},
+    gen::BlockQueryInput,
     get_block_canonicity,
 };
 use crate::{
@@ -53,9 +54,10 @@ impl FeetransferWithMeta {
     }
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct FeetransferQueryInput {
-    state_hash: Option<String>,
+    block_height: Option<u32>,
+    block_state_hash: Option<BlockQueryInput>,
     canonical: Option<bool>,
     recipient: Option<String>,
     and: Option<Vec<FeetransferQueryInput>>,
@@ -83,11 +85,15 @@ impl FeetransferQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<FeetransferWithMeta>> {
         let db = db(ctx);
-        let has_state_hash = query.as_ref().map_or(false, |q| q.state_hash.is_some());
+        let has_state_hash = query
+            .as_ref()
+            .and_then(|f| f.block_state_hash.as_ref())
+            .map_or(false, |q| q.state_hash.is_some());
 
         if has_state_hash {
             let state_hash = query
                 .as_ref()
+                .and_then(|b| b.block_state_hash.as_ref())
                 .and_then(|q| q.state_hash.as_ref())
                 .map_or(MAINNET_GENESIS_HASH, |s| s);
             let state_hash = BlockHash::from(state_hash);
@@ -98,7 +104,6 @@ impl FeetransferQueryRoot {
                 limit,
             ));
         }
-
         // recipient
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
             let mut fee_transfers: Vec<FeetransferWithMeta> = db
@@ -107,10 +112,15 @@ impl FeetransferQueryRoot {
                 .map(|internal_command| {
                     let ft = Feetransfer::from(internal_command);
                     let state_hash = ft.state_hash.clone();
+                    let pcb = db
+                        .get_block(&BlockHash::from(state_hash.clone()))
+                        .unwrap()
+                        .unwrap();
+                    let canonical = get_block_canonicity(db, &state_hash);
                     FeetransferWithMeta {
-                        canonical: get_block_canonicity(db, &state_hash),
+                        canonical,
                         feetransfer: ft,
-                        block: None,
+                        block: Some(pcb),
                     }
                 })
                 .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
@@ -140,10 +150,15 @@ fn get_fee_transfers(
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from(internal_command);
         let state_hash = ft.state_hash.clone();
+        let canonical = get_block_canonicity(db, &state_hash);
+        let pcb = db
+            .get_block(&BlockHash::from(state_hash.clone()))
+            .unwrap()
+            .unwrap();
         let feetransfer_with_meta = FeetransferWithMeta {
-            canonical: get_block_canonicity(db, &state_hash),
+            canonical,
             feetransfer: ft,
-            block: None,
+            block: Some(pcb),
         };
 
         if query
@@ -174,7 +189,6 @@ fn get_fee_transfers_for_state_hash(
         Ok(Some(canonicity)) => matches!(canonicity, Canonicity::Canonical),
         _ => false,
     };
-
     match db.get_internal_commands(state_hash) {
         Ok(internal_commands) => {
             let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
@@ -251,8 +265,10 @@ impl FeetransferQueryInput {
     pub fn matches(&self, ft: &FeetransferWithMeta) -> bool {
         let mut matches = true;
 
-        if let Some(state_hash) = &self.state_hash {
-            matches = matches && &ft.feetransfer.state_hash == state_hash;
+        if let Some(block_query_input) = &self.block_state_hash {
+            if let Some(state_hash) = &block_query_input.state_hash {
+                matches &= &ft.feetransfer.state_hash == state_hash;
+            }
         }
 
         if let Some(canonical) = &self.canonical {
