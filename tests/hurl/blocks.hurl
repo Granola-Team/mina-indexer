@@ -434,4 +434,24 @@ jsonpath "$.data.blocks[61].canonical" == true
 
 duration < 200
 
+#
+# Simple blocks query - https://github.com/Granola-Team/mina-indexer/issues/928
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(limit: 10) {
+    stateHash
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 10
+
+duration < 200
+
 # TODO date time bounded query
