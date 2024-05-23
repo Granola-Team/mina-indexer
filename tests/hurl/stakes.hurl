@@ -164,8 +164,10 @@ POST {{url}}
 ```graphql
 {
   stakes(query: {public_key: "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"} limit: 1) {
-    pkEpochNumBlocks
-    epochTotalBlocks
+    pk_epoch_num_blocks
+    pk_total_num_blocks
+    epoch_num_blocks
+    total_num_blocks
   }
 }
 ```
@@ -175,7 +177,9 @@ HTTP 200
 jsonpath "$.data.stakes" count == 1
 
 # only datum
-jsonpath "$.data.stakes[0].pkEpochNumBlocks" == 5
-jsonpath "$.data.stakes[0].epochTotalBlocks" == 204
+jsonpath "$.data.stakes[0].pk_epoch_num_blocks" == 5
+jsonpath "$.data.stakes[0].pk_total_num_blocks" == 5
+jsonpath "$.data.stakes[0].epoch_num_blocks" == 204
+jsonpath "$.data.stakes[0].total_num_blocks" == 204
 
 duration < 1000

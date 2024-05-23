@@ -111,11 +111,14 @@ pub trait BlockStore {
 
     /// Get the block production count for `pk` in `epoch`
     /// (default: current epoch)
-    fn get_block_production_pk_count(
+    fn get_block_production_pk_epoch_count(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
     ) -> anyhow::Result<u32>;
+
+    /// Get the total block production count for `pk`
+    fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Get the total block production count for `epoch`
     fn get_block_production_epoch_count(&self, epoch: u32) -> anyhow::Result<u32>;

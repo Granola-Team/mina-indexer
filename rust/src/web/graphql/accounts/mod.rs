@@ -15,7 +15,12 @@ pub struct Account {
     nonce: u32,
     time_locked: bool,
     timing: Option<Timing>,
+
+    #[graphql(name = "pk_epoch_num_blocks")]
     pk_epoch_num_blocks: u32,
+
+    #[graphql(name = "pk_total_num_blocks")]
+    pk_total_num_blocks: u32,
 }
 
 #[derive(InputObject)]
@@ -79,10 +84,13 @@ impl AccountQueryRoot {
                 .get(&public_key.into())
                 .filter(|acct| query.unwrap().matches(acct))
                 .map(|acct| {
+                    let pk = acct.public_key.clone();
                     vec![Account::from((
                         acct.clone(),
-                        db.get_block_production_pk_count(&acct.public_key, None)
+                        db.get_block_production_pk_epoch_count(&pk, None)
                             .expect("pk epoch block count"),
+                        db.get_block_production_pk_total_count(&pk)
+                            .expect("pk total block count"),
                     ))]
                 }));
         }
@@ -97,8 +105,10 @@ impl AccountQueryRoot {
                     let pk = acct.public_key.clone();
                     Account::from((
                         acct,
-                        db.get_block_production_pk_count(&pk, None)
+                        db.get_block_production_pk_epoch_count(&pk, None)
                             .expect("pk epoch block count"),
+                        db.get_block_production_pk_total_count(&pk)
+                            .expect("pk total block count"),
                     ))
                 })
                 .collect()
@@ -110,8 +120,10 @@ impl AccountQueryRoot {
                     let pk = acct.public_key.clone();
                     Account::from((
                         acct,
-                        db.get_block_production_pk_count(&pk, None)
+                        db.get_block_production_pk_epoch_count(&pk, None)
                             .expect("pk epoch block count"),
+                        db.get_block_production_pk_total_count(&pk)
+                            .expect("pk total block count"),
                     ))
                 })
                 .collect()
@@ -177,8 +189,8 @@ impl AccountQueryInput {
     }
 }
 
-impl From<(account::Account, u32)> for Account {
-    fn from(account: (account::Account, u32)) -> Self {
+impl From<(account::Account, u32, u32)> for Account {
+    fn from(account: (account::Account, u32, u32)) -> Self {
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
@@ -191,6 +203,7 @@ impl From<(account::Account, u32)> for Account {
                 .username
                 .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
             pk_epoch_num_blocks: account.1,
+            pk_total_num_blocks: account.2,
         }
     }
 }
