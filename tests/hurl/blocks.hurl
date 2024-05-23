@@ -198,7 +198,7 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  blocks(query: {global_slot_since_genesis: 169}) {
+  blocks(query: {global_slot_since_genesis: 169}, sortBy: BLOCKHEIGHT_ASC) {
     stateHash
     canonical
     blockHeight
@@ -216,11 +216,11 @@ jsonpath "$.data.blocks[0].stateHash" == "3NKpj5NkT4zrqAy1XPjWLe6BJuyprKEbu89kbx
 jsonpath "$.data.blocks[0].blockHeight" == 117
 jsonpath "$.data.blocks[0].canonical" == true
 
-jsonpath "$.data.blocks[1].stateHash" == "3NLgbVt67xbbKxJYrvhAmQbQeKcdf8fhwkJZjoAWsB6mS67V5gmB"
+jsonpath "$.data.blocks[1].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexvSLe7xgeVZA21Pp"
 jsonpath "$.data.blocks[1].blockHeight" == 117
 jsonpath "$.data.blocks[1].canonical" == false
 
-jsonpath "$.data.blocks[2].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexvSLe7xgeVZA21Pp"
+jsonpath "$.data.blocks[2].stateHash" == "3NLgbVt67xbbKxJYrvhAmQbQeKcdf8fhwkJZjoAWsB6mS67V5gmB"
 jsonpath "$.data.blocks[2].blockHeight" == 117
 jsonpath "$.data.blocks[2].canonical" == false
 
