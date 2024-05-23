@@ -94,7 +94,6 @@ impl StakeQueryRoot {
                 decimal.set_scale(9).ok();
 
                 let total_delegated = decimal.to_f64().unwrap_or_default();
-
                 let timing = account.timing.as_ref().map(|timing| Timing {
                     cliff_amount: Some(timing.cliff_amount),
                     cliff_time: Some(timing.cliff_time),
@@ -102,11 +101,14 @@ impl StakeQueryRoot {
                     vesting_increment: Some(timing.vesting_increment),
                     vesting_period: Some(timing.vesting_period),
                 });
+                let pk_epoch_num_blocks = db
+                    .get_block_production_pk_count(&pk, Some(epoch))
+                    .expect("pk epoch num blocks");
 
                 StakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from(account),
+                    account: StakesLedgerAccount::from((account, pk_epoch_num_blocks)),
                     delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,
@@ -114,6 +116,9 @@ impl StakeQueryRoot {
                         count_delegates,
                     },
                     timing,
+                    epoch_total_blocks: db
+                        .get_block_production_epoch_count(epoch)
+                        .expect("epoch block count"),
                 }
             })
             .collect();
@@ -138,15 +143,22 @@ impl StakeQueryRoot {
 pub struct StakesLedgerAccountWithMeta {
     /// Value current epoch
     epoch: u32,
+
     /// Value current ledger hash
     ledger_hash: String,
+
     /// Value delegation totals
     delegation_totals: StakesDelegationTotals,
+
     /// Value accounts
     #[graphql(flatten)]
     account: StakesLedgerAccount,
+
     /// Value timing
     timing: Option<Timing>,
+
+    /// Value epoch total blocks
+    epoch_total_blocks: u32,
 }
 
 #[derive(SimpleObject)]
@@ -184,6 +196,9 @@ pub struct StakesLedgerAccount {
 
     /// Value balance nanomina
     pub balance_nanomina: u64,
+
+    /// Value pk epoch num blocks
+    pub pk_epoch_num_blocks: u32,
 }
 
 #[derive(SimpleObject)]
@@ -218,20 +233,20 @@ impl StakesDelegationTotals {
     }
 }
 
-impl From<StakingAccount> for StakesLedgerAccount {
-    fn from(acc: StakingAccount) -> Self {
-        let balance_nanomina = acc.balance;
+impl From<(StakingAccount, u32)> for StakesLedgerAccount {
+    fn from(acc: (StakingAccount, u32)) -> Self {
+        let balance_nanomina = acc.0.balance;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
 
         let balance = decimal.to_f64().unwrap_or_default();
-        let nonce = acc.nonce.unwrap_or_default();
-        let delegate = acc.delegate.0;
-        let pk = acc.pk.0;
+        let nonce = acc.0.nonce.unwrap_or_default();
+        let delegate = acc.0.delegate.0;
+        let pk = acc.0.pk.0;
         let public_key = pk.clone();
-        let token = acc.token.unwrap_or_default();
-        let receipt_chain_hash = acc.receipt_chain_hash.0;
-        let voting_for = acc.voting_for.0;
+        let token = acc.0.token.unwrap_or_default();
+        let receipt_chain_hash = acc.0.receipt_chain_hash.0;
+        let voting_for = acc.0.voting_for.0;
         Self {
             chain_id: chain_id(
                 MAINNET_GENESIS_HASH,
@@ -250,6 +265,7 @@ impl From<StakingAccount> for StakesLedgerAccount {
             voting_for,
             balance_nanomina,
             username: None,
+            pk_epoch_num_blocks: acc.1,
         }
     }
 }

@@ -109,7 +109,8 @@ impl NextStakesQueryRoot {
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from(account),
+                    // no blocks have been produced for the next epoch
+                    account: StakesLedgerAccount::from((account, 0)),
                     next_delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,
