@@ -495,12 +495,16 @@ struct ConsensusState {
 struct StakingEpochData {
     /// Value seed
     seed: String,
+
     /// Value epoch length
     epoch_length: u32,
+
     /// Value start checkpoint
     start_checkpoint: String,
+
     /// Value lock checkpoint
     lock_checkpoint: String,
+
     /// Value staking ledger
     ledger: StakingEpochDataLedger,
 }
@@ -509,12 +513,16 @@ struct StakingEpochData {
 struct NextEpochData {
     /// Value seed
     seed: String,
+
     /// Value epoch length
     epoch_length: u32,
+
     /// Value start checkpoint
     start_checkpoint: String,
+
     /// Value lock checkpoint
     lock_checkpoint: String,
+
     /// Value next ledger
     ledger: NextEpochDataLedger,
 }
@@ -523,6 +531,7 @@ struct NextEpochData {
 struct NextEpochDataLedger {
     /// Value hash
     hash: String,
+
     /// Value total currency
     total_currency: u64,
 }
@@ -531,6 +540,7 @@ struct NextEpochDataLedger {
 struct StakingEpochDataLedger {
     /// Value hash
     hash: String,
+
     /// Value total currency
     total_currency: u64,
 }
@@ -539,10 +549,13 @@ struct StakingEpochDataLedger {
 struct BlockchainState {
     /// Value utc_date as numeric string
     utc_date: String,
+
     /// Value date as numeric string
     date: String,
+
     /// Value snarked ledger hash
     snarked_ledger_hash: String,
+
     /// Value staged ledger hash
     staged_ledger_hash: String,
 }
@@ -551,8 +564,10 @@ struct BlockchainState {
 struct ProtocolState {
     /// Value parent state hash
     previous_state_hash: String,
+
     /// Value blockchain state
     blockchain_state: BlockchainState,
+
     /// Value consensus state
     consensus_state: ConsensusState,
 }
