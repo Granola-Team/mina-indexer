@@ -122,7 +122,7 @@
           dockerImage = pkgs.dockerTools.buildImage {
             name = "mina-indexer";
             created = "now";
-            # This is equivalent to `git rev-parse --short HEAD`
+            # This is equivalent to `git rev-parse --short=8 HEAD`
             tag = builtins.substring 0 8 (self.rev or "dev");
             copyToRoot = pkgs.buildEnv {
               paths = with pkgs; [ mina-indexer openssl zstd bash self ];

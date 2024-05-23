@@ -2,10 +2,11 @@
 
 set -eux
 
+REV="$(git rev-parse --short=8 HEAD)"
+IMAGE=mina-indexer:"$REV"
 docker --version
 nix build .#dockerImage
 docker load < ./result
-docker run --rm -it \
-  mina-indexer:"$(git rev-parse --short HEAD)" \
+docker run --rm -it "$IMAGE" \
   mina-indexer server start --help
-docker image rm mina-indexer:"$(git rev-parse --short HEAD)"
+docker image rm "$IMAGE"

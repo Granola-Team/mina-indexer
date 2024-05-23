@@ -3,7 +3,7 @@
 set -eux
 set -o pipefail
 
-VER="$(git rev-parse --short HEAD)"
+VER="$(git rev-parse --short=8 HEAD)"
 LOG=/mnt/mina-log-storage/"$VER"-log
 src="$(pwd)"
 socket="$src"/mina-indexer.sock
