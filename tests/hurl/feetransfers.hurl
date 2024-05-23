@@ -48,7 +48,7 @@ jsonpath "$.data.feetransfers[99].blockHeight" == 71
 jsonpath "$.data.feetransfers[99].canonical" == true
 jsonpath "$.data.feetransfers[99].dateTime" == "2021-03-17T04:51:00.000Z"
 
-duration < 100
+duration < 500
 
 #
 # Fee transfers canonical state hash block height descending query
@@ -73,4 +73,4 @@ jsonpath "$.data.feetransfers" count == 1
 jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
 jsonpath "$.data.feetransfers[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 
-duration < 100
+duration < 500

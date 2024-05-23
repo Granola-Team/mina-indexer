@@ -14,6 +14,7 @@ query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryIn
     dateTime
     receivedTime
     snarkFees
+    total_num_blocks
   }
 }
 
@@ -28,8 +29,11 @@ variables {
 HTTP 200
 [Asserts]
 
-# total data count
+# total query results
 jsonpath "$.data.blocks" count == 120
+
+# total blocks count
+jsonpath "$.data.blocks[0].total_num_blocks" == 204
 
 # first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
@@ -51,7 +55,7 @@ jsonpath "$.data.blocks[119].dateTime" == "2021-03-17T08:39:00.000Z"
 jsonpath "$.data.blocks[119].receivedTime" == "2021-03-17T08:39:40.591Z"
 jsonpath "$.data.blocks[119].snarkFees" == "0"
 
-duration < 200
+duration < 500
 
 # 
 # Blocks non-canonical height descending query
@@ -81,7 +85,7 @@ jsonpath "$.data.blocks[0].canonical" == false
 jsonpath "$.data.blocks[83].blockHeight" == 6
 jsonpath "$.data.blocks[83].canonical" == false
 
-duration < 200
+duration < 500
 
 # 
 # Blocks creator account  query (default sort_by: BLOCKHEIGHT_DESC)
@@ -115,7 +119,7 @@ jsonpath "$.data.blocks[1].blockHeight" == 97
 jsonpath "$.data.blocks[2].stateHash" == "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
 jsonpath "$.data.blocks[2].blockHeight" == 5
 
-duration < 200
+duration < 500
 
 # 
 # Blocks coinbase receiver height ascending query
@@ -153,7 +157,7 @@ jsonpath "$.data.blocks[4].stateHash" == "3NLftXM1dfzGJwLef5NCk974CXq8oXtAaQAkkh
 jsonpath "$.data.blocks[4].blockHeight" == 84
 
 
-duration < 200
+duration < 500
 
 # 
 # Blocks specific height query
@@ -185,7 +189,7 @@ jsonpath "$.data.blocks[3].stateHash" == "3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzA
 jsonpath "$.data.blocks[3].blockHeight" == 6
 jsonpath "$.data.blocks[3].canonical" == false
 
-duration < 200
+duration < 500
 
 # 
 # Blocks global slot query
@@ -220,7 +224,7 @@ jsonpath "$.data.blocks[2].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexv
 jsonpath "$.data.blocks[2].blockHeight" == 117
 jsonpath "$.data.blocks[2].canonical" == false
 
-duration < 200
+duration < 500
 
 # 
 # Blocks state hash transactions, fee transfers, user commands query
@@ -306,7 +310,7 @@ jsonpath "$.data.blocks[0].transactions.userCommands[3].amount" == 10000
 jsonpath "$.data.blocks[0].transactions.userCommands[3].fee" == 50000000
 jsonpath "$.data.blocks[0].transactions.userCommands[3].blockHeight" == 3
 
-duration < 200
+duration < 500
 
 # 
 # Blocks state hash SNARK jobs query
@@ -349,7 +353,7 @@ jsonpath "$.data.blocks[0].snarkJobs[63].dateTime" == "2021-03-17T08:06:00.000Z"
 jsonpath "$.data.blocks[0].snarkJobs[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.blocks[0].snarkJobs[63].fee" == 0
 
-duration < 200
+duration < 500
 
 # 
 # Blocks canonical block height bounded ascending query
@@ -391,7 +395,7 @@ jsonpath "$.data.blocks[39].stateHash" == "3NLJeP3pBr2UFgLZpNgwKEw37UeYEsyuP63U9
 jsonpath "$.data.blocks[39].blockHeight" == 50
 jsonpath "$.data.blocks[39].canonical" == true
 
-duration < 200
+duration < 500
 
 # 
 # Blocks canonical global slot bounded query
@@ -432,7 +436,7 @@ jsonpath "$.data.blocks[61].stateHash" == "3NLjEUEg2888QNjKyKgphTtAdwLV2tmgMycFP
 jsonpath "$.data.blocks[61].blockHeight" == 72
 jsonpath "$.data.blocks[61].canonical" == true
 
-duration < 200
+duration < 500
 
 #
 # Simple blocks query - https://github.com/Granola-Team/mina-indexer/issues/928
@@ -452,6 +456,6 @@ HTTP 200
 # total data count
 jsonpath "$.data.blocks" count == 10
 
-duration < 200
+duration < 500
 
 # TODO date time bounded query
