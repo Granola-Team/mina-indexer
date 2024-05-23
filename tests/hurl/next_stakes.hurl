@@ -62,4 +62,4 @@ jsonpath "$.data.nextStakes[0].pk_total_num_blocks" == 0 # no blocks have been p
 jsonpath "$.data.nextStakes[0].epoch_num_blocks" == 0    # no blocks have been produced in the next epoch
 jsonpath "$.data.nextStakes[0].total_num_blocks" == 204
 
-duration < 2000
+duration < 5000

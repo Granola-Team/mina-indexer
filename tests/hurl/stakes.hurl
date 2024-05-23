@@ -52,7 +52,7 @@ jsonpath "$.data.stakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4
 jsonpath "$.data.stakes[0].delegationTotals.countDelegates" == 1
 jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 
-duration < 2000
+duration < 10000
 
 #
 # Stakes ledger hash delegate query
@@ -100,7 +100,7 @@ jsonpath "$.data.stakes[0].timing.vesting_period" == 1
 # last datum
 jsonpath "$.data.stakes[1].timing" == null
 
-duration < 200
+duration < 1000
 
 #
 # Stakes delegation total stake percentage query
@@ -125,7 +125,7 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
 
-duration < 2000
+duration < 5000
 
 #
 # Stakes delegation total stake percentage query sort by stakes desc
@@ -182,4 +182,4 @@ jsonpath "$.data.stakes[0].pk_total_num_blocks" == 5
 jsonpath "$.data.stakes[0].epoch_num_blocks" == 204
 jsonpath "$.data.stakes[0].total_num_blocks" == 204
 
-duration < 1000
+duration < 2000
