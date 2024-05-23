@@ -110,6 +110,7 @@ pub trait BlockStore {
     fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
     /// Get the block production count for `pk` in `epoch`
+    /// (default: current epoch)
     fn get_block_production_pk_count(
         &self,
         pk: &PublicKey,

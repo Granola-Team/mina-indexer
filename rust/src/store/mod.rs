@@ -33,7 +33,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail};
-use log::{debug, error, trace, warn};
+use log::{error, trace, warn};
 use speedb::{
     ColumnFamily, ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB,
 };
@@ -662,14 +662,9 @@ impl BlockStore for IndexerStore {
 
         let creator = block.block_creator();
         let epoch = block.epoch_count();
-        debug!(
-            "*INCREMENT*\n  pk: {creator}\n  epoch: {epoch}\n  block: {}",
-            block.summary()
-        );
 
         // increment pk count
         let acc = self.get_block_production_pk_count(&creator, Some(epoch))?;
-        debug!("PK {creator}: {acc} -> {}", acc + 1);
         self.database.put_cf(
             self.block_production_pk_cf(),
             u32_prefix_key(epoch, &creator.0),
@@ -678,7 +673,6 @@ impl BlockStore for IndexerStore {
 
         // increment epoch count
         let acc = self.get_block_production_epoch_count(epoch)?;
-        debug!("EPOCH {epoch}: {acc} -> {}", acc + 1);
         self.database.put_cf(
             self.block_production_epoch_cf(),
             to_be_bytes(epoch),
@@ -687,7 +681,6 @@ impl BlockStore for IndexerStore {
 
         // increment total count
         let acc = self.get_block_production_total_count()?;
-        debug!("TOTAL {acc} -> {}", acc + 1);
         self.database
             .put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1))?;
 

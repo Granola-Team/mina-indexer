@@ -6,12 +6,6 @@ use crate::{
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
-// #[derive(SimpleObject)]
-// pub struct EpochNumBlocks {
-//     epoch: u32,
-//     epoch_num_blocks: u32,
-// }
-
 #[derive(SimpleObject)]
 pub struct Account {
     public_key: String,
