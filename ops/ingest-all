@@ -51,5 +51,6 @@ port="$(ephemeral_port)"
     &
 PID=$!
 wait_for_socket
+./rust/target/release/mina-indexer --domain-socket-path "$socket" checkpoints create --path /mnt/mina-log-storage/"$VER"-snapshot
 ./rust/target/release/mina-indexer --domain-socket-path "$socket" shutdown
 wait "$PID"

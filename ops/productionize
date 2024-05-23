@@ -7,14 +7,14 @@ set -o pipefail
 #
 SRC="$(git rev-parse --show-toplevel)"
 
-# The commit (rev) of the database directory that we want to use for production
-# is specified in the 'ops/production-rev' file.
+# The commit (rev) of the database snapshot (checkpoint) directory that we want
+# to use for production is specified in the 'ops/production-rev' file.
 #
 REV="$(cat "$SRC"/ops/production-rev)"
 
-# Ensure the database directory exists.
+# Ensure the database snapshot directory exists.
 #
-VERSIONED_DB_DIR=/mnt/mina-log-storage/"$REV"-database
+VERSIONED_DB_DIR=/mnt/mina-log-storage/"$REV"-snapshot
 if [ ! -e "$VERSIONED_DB_DIR" ]; then
     echo "$VERSIONED_DB_DIR does not exist. Exiting." 1>&2
     exit 1
