@@ -458,4 +458,27 @@ jsonpath "$.data.blocks" count == 10
 
 duration < 500
 
+POST {{url}}
+```graphql
+{
+  blocks(query: {canonical: true, protocolState: { consensusState: {slotSinceGenesis : 173}}}) {
+    stateHash
+    canonical
+    protocolState {
+      consensusState {
+        slotSinceGenesis
+      }
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.blocks[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.blocks[0].protocolState.consensusState.slotSinceGenesis" == 173
+jsonpath "$.data.blocks[0].canonical" == true
+
+duration < 200
+
 # TODO date time bounded query
