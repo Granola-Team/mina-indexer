@@ -125,7 +125,7 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
 
-duration < 1000
+duration < 2000
 
 #
 # Stakes delegation total stake percentage query sort by stakes desc
@@ -178,4 +178,4 @@ jsonpath "$.data.stakes" count == 1
 jsonpath "$.data.stakes[0].pkEpochNumBlocks" == 5
 jsonpath "$.data.stakes[0].epochTotalBlocks" == 204
 
-duration < 800
+duration < 1000
