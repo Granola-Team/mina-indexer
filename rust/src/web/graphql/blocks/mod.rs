@@ -174,16 +174,12 @@ impl BlocksQueryRoot {
         }
 
         // block height bounded query
-        if query
-            .as_ref()
-            .map(|q| {
-                q.block_height_gt.is_some()
-                    || q.block_height_gte.is_some()
-                    || q.block_height_lt.is_some()
-                    || q.block_height_lte.is_some()
-            })
-            .unwrap()
-        {
+        if query.as_ref().map_or(false, |q| {
+            q.block_height_gt.is_some()
+                || q.block_height_gte.is_some()
+                || q.block_height_lt.is_some()
+                || q.block_height_lte.is_some()
+        }) {
             let (min, max) = match query.as_ref() {
                 Some(block_query_input) => {
                     let BlockQueryInput {
@@ -230,16 +226,12 @@ impl BlocksQueryRoot {
         }
 
         // global slot bounded query
-        if query
-            .as_ref()
-            .map(|q| {
-                q.global_slot_gt.is_some()
-                    || q.global_slot_gte.is_some()
-                    || q.global_slot_lt.is_some()
-                    || q.global_slot_lte.is_some()
-            })
-            .unwrap()
-        {
+        if query.as_ref().map_or(false, |q| {
+            q.global_slot_gt.is_some()
+                || q.global_slot_gte.is_some()
+                || q.global_slot_lt.is_some()
+                || q.global_slot_lte.is_some()
+        }) {
             let (min, max) = match query.as_ref() {
                 Some(block_query_input) => {
                     let BlockQueryInput {
