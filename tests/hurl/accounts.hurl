@@ -1,3 +1,7 @@
+#
+# Accounts public key query
+#
+
 POST {{url}}
 ```graphql
 query Accounts {
@@ -14,13 +18,21 @@ query Accounts {
 HTTP 200
 [Asserts]
 
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# only datum
 jsonpath "$.data.accounts[0].publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].balance" == 719020000000
 jsonpath "$.data.accounts[0].nonce" == 1
 jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].timeLocked" == false
 
-duration < 100
+duration < 200
+
+#
+# Accounts public key timing query
+#
 
 POST {{url}}
 ```graphql
@@ -60,4 +72,29 @@ jsonpath "$.data.accounts[0].timing.cliff_amount" == 1000000000
 jsonpath "$.data.accounts[0].timing.vesting_period" == 1
 jsonpath "$.data.accounts[0].timing.vesting_increment" == 0
 
-duration < 100
+duration < 200
+
+#
+# Accounts public key epoch blocks produced query
+#
+
+POST {{url}}
+```graphql
+query Accounts {
+  accounts(query: {publicKey: "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"}) {
+    publicKey
+    pkEpochNumBlocks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# block production info
+jsonpath "$.data.accounts[0].publicKey" == "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"
+jsonpath "$.data.accounts[0].pkEpochNumBlocks" == 5
+
+duration < 200

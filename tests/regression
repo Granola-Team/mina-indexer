@@ -1135,6 +1135,11 @@ test_rest_endpoints() {
     total_currency=$(cat output.json | jq -r .totalCurrency)
     assert '805385692.840039233' $total_currency
 
+    # block counts
+    count=$(find ./blocks | wc -l) # leave the +1 for genesis block
+    assert $count $(cat output.json | jq -r .epochNumBlocks)
+    assert $count $(cat output.json | jq -r .totalNumBlocks)
+
     check-jsonschema --schemafile "$SUMMARY_SCHEMA" output.json
 
     teardown

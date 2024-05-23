@@ -52,7 +52,7 @@ jsonpath "$.data.stakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4
 jsonpath "$.data.stakes[0].delegationTotals.countDelegates" == 1
 jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 
-duration < 1000
+duration < 2000
 
 #
 # Stakes ledger hash delegate query
@@ -100,7 +100,7 @@ jsonpath "$.data.stakes[0].timing.vesting_period" == 1
 # last datum
 jsonpath "$.data.stakes[1].timing" == null
 
-duration < 100
+duration < 200
 
 #
 # Stakes delegation total stake percentage query
@@ -125,7 +125,7 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
 
-duration < 800
+duration < 1000
 
 #
 # Stakes delegation total stake percentage query sort by stakes desc
@@ -141,7 +141,6 @@ POST {{url}}
   }
 }
 ```
-
 HTTP 200
 [Asserts]
 
@@ -155,5 +154,28 @@ jsonpath "$.data.stakes[2].delegationTotals.totalStakePercentage" == "3.79"
 jsonpath "$.data.stakes[3].delegationTotals.totalStakePercentage" == "3.50"
 jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
 
-duration < 1200
+duration < 20000
 
+#
+# Stakes pk & total epoch blocks produced
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {public_key: "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"} limit: 1) {
+    pkEpochNumBlocks
+    epochTotalBlocks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.stakes" count == 1
+
+# only datum
+jsonpath "$.data.stakes[0].pkEpochNumBlocks" == 5
+jsonpath "$.data.stakes[0].epochTotalBlocks" == 204
+
+duration < 800

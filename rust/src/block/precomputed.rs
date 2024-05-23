@@ -492,6 +492,24 @@ impl PrecomputedBlock {
         }
     }
 
+    pub fn epoch_count(&self) -> u32 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .epoch_count
+                    .t
+                    .t
+            }
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.epoch_count,
+        }
+    }
+
     pub fn timestamp(&self) -> u64 {
         match self {
             Self::V1(v1) => {

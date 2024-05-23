@@ -34,6 +34,7 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
+        let total_num_blocks = db.get_block_production_total_count()?;
 
         // no query filters => get the best block
         if query.is_none() {
@@ -42,6 +43,7 @@ impl BlocksQueryRoot {
                     let canonical = get_block_canonicity(db, &pcb.state_hash().0);
                     BlockWithCanonicity {
                         canonical,
+                        total_num_blocks,
                         block: Block::new(pcb, canonical),
                     }
                 })
@@ -61,6 +63,7 @@ impl BlocksQueryRoot {
             let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
                 canonical,
+                total_num_blocks,
                 block: Block::new(pcb, canonical),
             };
 
@@ -80,6 +83,7 @@ impl BlocksQueryRoot {
             let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
                 canonical,
+                total_num_blocks,
                 block: Block::new(pcb, canonical),
             };
 
@@ -99,6 +103,8 @@ impl BlocksQueryRoot {
         sort_by: Option<BlockSortByInput>,
     ) -> Result<Vec<BlockWithCanonicity>> {
         let db = db(ctx);
+        let total_num_blocks = db.get_block_production_total_count()?;
+
         let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
         let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
 
@@ -107,7 +113,7 @@ impl BlocksQueryRoot {
             let block = db.get_block(&state_hash.clone().into())?;
             return Ok(block
                 .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .filter_map(|b| precomputed_matches_query(db, &query, b, total_num_blocks))
                 .collect());
         }
 
@@ -116,7 +122,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .filter_map(|b| precomputed_matches_query(db, &query, b, total_num_blocks))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -131,7 +137,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_slot(global_slot_since_genesis)?
                 .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .filter_map(|b| precomputed_matches_query(db, &query, b, total_num_blocks))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -148,7 +154,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .filter_map(|b| precomputed_matches_query(db, &query, b, total_num_blocks))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -165,7 +171,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<BlockWithCanonicity> = db
                 .get_blocks_at_public_key(&creator_account.into())?
                 .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b))
+                .filter_map(|b| precomputed_matches_query(db, &query, b, total_num_blocks))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -210,7 +216,7 @@ impl BlocksQueryRoot {
             for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     if let Some(block_with_canonicity) =
-                        precomputed_matches_query(db, &query, block)
+                        precomputed_matches_query(db, &query, block, total_num_blocks)
                     {
                         blocks.push(block_with_canonicity);
 
@@ -262,7 +268,7 @@ impl BlocksQueryRoot {
             for global_slot in block_slots {
                 for block in db.get_blocks_at_slot(global_slot)? {
                     if let Some(block_with_canonicity) =
-                        precomputed_matches_query(db, &query, block)
+                        precomputed_matches_query(db, &query, block, total_num_blocks)
                     {
                         blocks.push(block_with_canonicity);
 
@@ -288,7 +294,7 @@ impl BlocksQueryRoot {
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
             let canonical = get_block_canonicity(db, &state_hash);
-            let block = BlockWithCanonicity::from_precomputed(pcb, canonical);
+            let block = BlockWithCanonicity::from_precomputed(pcb, total_num_blocks, canonical);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
@@ -321,9 +327,11 @@ fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
     block: PrecomputedBlock,
+    total_num_blocks: u32,
 ) -> Option<BlockWithCanonicity> {
     let canonical = get_block_canonicity(db, &block.state_hash().0);
-    let block_with_canonicity = BlockWithCanonicity::from_precomputed(block, canonical);
+    let block_with_canonicity =
+        BlockWithCanonicity::from_precomputed(block, total_num_blocks, canonical);
     if query
         .as_ref()
         .map_or(true, |q| q.matches(&block_with_canonicity))
@@ -338,6 +346,7 @@ fn precomputed_matches_query(
 pub enum BlockSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
+
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
@@ -346,6 +355,11 @@ pub enum BlockSortByInput {
 pub struct BlockWithCanonicity {
     /// Value canonical
     pub canonical: bool,
+
+    /// Value total_num_blocks
+    #[graphql(name = "total_num_blocks")]
+    pub total_num_blocks: u32,
+
     /// Value block
     #[graphql(flatten)]
     pub block: Block,
@@ -355,30 +369,43 @@ pub struct BlockWithCanonicity {
 pub struct Block {
     /// Value state_hash
     state_hash: String,
+
     /// Value block_height
     block_height: u32,
+
     /// Value global_slot_since_genesis
     global_slot_since_genesis: u32,
+
     /// The public_key for the winner account
     winner_account: PK,
+
     /// Value date_time as ISO 8601 string
     date_time: String,
+
     /// Value received_time as ISO 8601 string
     received_time: String,
+
     /// The public_key for the creator account
     creator_account: PK,
+
     /// The public_key for the coinbase_receiver
     coinbase_receiver: PK,
+
     /// Value creator public key
     creator: String,
+
     /// Value protocol state
     protocol_state: ProtocolState,
+
     /// Value transaction fees
     tx_fees: String,
+
     /// Value SNARK fees
     snark_fees: String,
+
     /// Value transactions
     transactions: Transactions,
+
     /// Value snark jobs
     snark_jobs: Vec<SnarkJob>,
 }
@@ -388,12 +415,16 @@ pub struct Block {
 struct SnarkJob {
     /// Value block state hash
     block_state_hash: String,
+
     /// Valuable block height
     block_height: u32,
+
     /// Value date time
     date_time: String,
+
     /// Value fee
     fee: u64,
+
     /// Value prover
     prover: String,
 }
@@ -402,10 +433,13 @@ struct SnarkJob {
 struct Transactions {
     /// Value coinbase
     coinbase: String,
+
     /// The public key for the coinbase receiver account
     coinbase_receiver_account: PK,
+
     /// Value fee transfer
     fee_transfer: Vec<BlockFeetransfer>,
+
     /// Value user commands
     user_commands: Vec<Transaction>,
 }
@@ -422,26 +456,37 @@ struct BlockFeetransfer {
 struct ConsensusState {
     /// Value total currency
     total_currency: u64,
+
     /// Value block height
     blockchain_length: u32,
+
     /// Value block height
     block_height: u32,
+
     /// Value epoch count
     epoch_count: u32,
+
     /// Value epoch count
     epoch: u32,
+
     /// Value has ancestors the same checkpoint window
     has_ancestor_in_same_checkpoint_window: bool,
+
     /// Value last VRF output
     last_vrf_output: String,
+
     /// Value minimum window density
     min_window_density: u32,
+
     /// Value current slot
     slot: u32,
+
     /// Value global slot
     slot_since_genesis: u32,
+
     /// Value next epoch data
     next_epoch_data: NextEpochData,
+
     /// Value next epoch data
     staking_epoch_data: StakingEpochData,
 }
@@ -544,7 +589,7 @@ impl Block {
         let total_currency = consensus_state.total_currency.t.t;
         let blockchain_length = block.blockchain_length();
         let block_height = blockchain_length;
-        let epoch_count = consensus_state.epoch_count.t.t;
+        let epoch_count = block.epoch_count();
         let epoch = epoch_count;
         let has_ancestor_in_same_checkpoint_window =
             consensus_state.has_ancestor_in_same_checkpoint_window;
@@ -842,9 +887,14 @@ impl BlockQueryInput {
 }
 
 impl BlockWithCanonicity {
-    pub fn from_precomputed(block: PrecomputedBlock, canonical: bool) -> Self {
+    pub fn from_precomputed(
+        block: PrecomputedBlock,
+        total_num_blocks: u32,
+        canonical: bool,
+    ) -> Self {
         Self {
             canonical,
+            total_num_blocks,
             block: Block::new(block, canonical),
         }
     }

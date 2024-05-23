@@ -49,6 +49,12 @@
     },
     "totalCurrency": {
       "type": "string"
+    },
+    "epochNumBlocks": {
+      "type": "integer"
+    },
+    "totalNumBlocks": {
+      "type": "integer"
     }
   },
   "required": [
@@ -67,6 +73,8 @@
     "stagedLedgerHash",
     "stakingEpochLedgerHash",
     "stateHash",
-    "totalCurrency"
+    "totalCurrency",
+    "epochNumBlocks",
+    "totalNumBlocks"
   ]
 }

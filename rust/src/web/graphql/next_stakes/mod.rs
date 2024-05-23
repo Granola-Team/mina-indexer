@@ -1,7 +1,6 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    constants::*,
     ledger::store::LedgerStore,
     web::graphql::{
         stakes::{StakesDelegationTotals, StakesLedgerAccount},
@@ -46,9 +45,7 @@ impl NextStakesQueryRoot {
         let db = db(ctx);
 
         // default to next epoch
-        let next_epoch = 1 + db.get_best_block()?.map_or(0, |block| {
-            block.global_slot_since_genesis() / MAINNET_EPOCH_SLOT_COUNT
-        });
+        let next_epoch = 1 + db.get_best_block()?.unwrap().epoch_count();
         let epoch = match query {
             Some(ref query) => query.epoch.map_or(next_epoch, |e| e + 1),
             None => next_epoch,
@@ -112,7 +109,8 @@ impl NextStakesQueryRoot {
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from(account),
+                    // no blocks have been produced for the next epoch
+                    account: StakesLedgerAccount::from((account, 0)),
                     next_delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,

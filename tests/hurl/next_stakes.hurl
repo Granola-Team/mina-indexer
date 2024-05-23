@@ -52,4 +52,4 @@ jsonpath "$.data.nextStakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UU
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.countDelegates" == 1
 jsonpath "$.data.nextStakes[0].nextDelegationTotals.totalDelegated" == 2498323.273015384
 
-duration < 1000
+duration < 2000

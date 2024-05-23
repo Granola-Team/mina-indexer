@@ -34,6 +34,8 @@ pub struct BlockchainSummary {
     staking_epoch_ledger_hash: String,
     state_hash: String,
     total_currency: String,
+    epoch_num_blocks: u32,
+    total_num_blocks: u32,
 }
 
 fn millis_to_date_string(millis: i64) -> String {
@@ -46,10 +48,12 @@ fn calculate_summary(
     chain_id: String,
     best_tip: &PrecomputedBlock,
     locked_balance: Option<Amount>,
+    epoch_num_blocks: u32,
+    total_num_blocks: u32,
 ) -> Option<BlockchainSummary> {
     let blockchain_length = best_tip.blockchain_length();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
-    let epoch = best_tip.consensus_state().epoch_count.inner().inner();
+    let epoch = best_tip.epoch_count();
     let global_slot = best_tip.global_slot_since_genesis();
     let min_window_density = best_tip.consensus_state().min_window_density.t.t;
     let next_epoch_ledger_hash = LedgerHash::from_hashv1(
@@ -123,6 +127,8 @@ fn calculate_summary(
         staking_epoch_ledger_hash,
         state_hash,
         total_currency,
+        epoch_num_blocks,
+        total_num_blocks,
     })
 }
 
@@ -140,7 +146,22 @@ pub async fn get_blockchain_summary(
         let global_slot = best_tip.global_slot_since_genesis();
         let locked_amount = locked_balances.get_locked_amount(global_slot);
 
-        if let Some(ref summary) = calculate_summary(chain_id, &best_tip, locked_amount) {
+        // get epoch info
+        let epoch = store.get_current_epoch().expect("current epoch");
+        let epoch_num_blocks = store
+            .get_block_production_epoch_count(epoch)
+            .expect("epoch blocks count");
+        let total_num_blocks = store
+            .get_block_production_total_count()
+            .expect("total blocks count");
+
+        if let Some(ref summary) = calculate_summary(
+            chain_id,
+            &best_tip,
+            locked_amount,
+            epoch_num_blocks,
+            total_num_blocks,
+        ) {
             trace!("Blockchain summary: {:?}", summary);
             let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
             return HttpResponse::Ok()
