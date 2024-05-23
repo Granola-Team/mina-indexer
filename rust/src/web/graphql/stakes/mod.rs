@@ -22,6 +22,7 @@ pub struct StakeQueryInput {
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StakeSortByInput {
     BalanceDesc,
+    StakeDesc,
 }
 
 #[derive(Default)]
@@ -122,6 +123,13 @@ impl StakeQueryRoot {
         if let Some(StakeSortByInput::BalanceDesc) = sort_by {
             accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina));
         }
+        if let Some(StakeSortByInput::StakeDesc) = sort_by {
+            accounts.sort_by(|a, b| {
+                b.delegation_totals
+                    .total_delegated_nanomina
+                    .cmp(&a.delegation_totals.total_delegated_nanomina)
+            });
+        }
 
         accounts.truncate(limit);
         Ok(Some(accounts))
@@ -159,7 +167,8 @@ pub struct StakesLedgerAccount {
 
     /// Value epoch
     pub pk: String,
-
+    /// Value username
+    pub username: Option<String>,
     /// Value public key
     #[graphql(name = "public_key")]
     pub public_key: String,
@@ -207,7 +216,7 @@ impl StakesDelegationTotals {
             Decimal::ZERO
         };
         let rounded_ratio = ratio.round_dp(2);
-        format!("{:.2}%", rounded_ratio)
+        format!("{:.2}", rounded_ratio)
     }
 }
 
@@ -242,6 +251,7 @@ impl From<StakingAccount> for StakesLedgerAccount {
             receipt_chain_hash,
             voting_for,
             balance_nanomina,
+            username: None,
         }
     }
 }

@@ -123,6 +123,37 @@ HTTP 200
 jsonpath "$.data.stakes" count == 1
 
 # only datum
-jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56%"
+jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
 
 duration < 800
+
+#
+# Stakes delegation total stake percentage query sort by stakes desc
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {epoch: 42}, sortBy: STAKE_DESC, limit: 5) {
+    delegationTotals {
+      totalStakePercentage
+    }
+  }
+}
+```
+
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.stakes" count == 5
+
+# only datum
+jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
+jsonpath "$.data.stakes[1].delegationTotals.totalStakePercentage" == "5.06"
+jsonpath "$.data.stakes[2].delegationTotals.totalStakePercentage" == "3.79"
+jsonpath "$.data.stakes[3].delegationTotals.totalStakePercentage" == "3.50"
+jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
+
+duration < 1200
+
