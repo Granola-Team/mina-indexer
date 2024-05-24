@@ -213,8 +213,7 @@ impl BlocksQueryRoot {
                 None => (1, db.get_best_block()?.unwrap().blockchain_length()),
             };
 
-            let mut block_heights: Vec<u32> = (min..=max).collect();
-            reorder_desc(&mut block_heights, sort_by);
+            let block_heights: Vec<u32> = (min..=max).collect();
 
             for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {

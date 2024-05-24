@@ -570,16 +570,16 @@ pub struct BlockQueryInput {
     #[graphql(name = "global_slot_since_genesis")]
     pub global_slot_since_genesis: Option<u32>,
 
-    #[graphql(name = "block_height_gt")]
+    #[graphql(name = "blockHeight_gt")]
     pub block_height_gt: Option<u32>,
 
-    #[graphql(name = "block_height_gte")]
+    #[graphql(name = "blockHeight_gte")]
     pub block_height_gte: Option<u32>,
 
-    #[graphql(name = "block_height_lt")]
+    #[graphql(name = "blockHeight_lt")]
     pub block_height_lt: Option<u32>,
 
-    #[graphql(name = "block_height_lte")]
+    #[graphql(name = "blockHeight_lte")]
     pub block_height_lte: Option<u32>,
 
     #[graphql(name = "global_slot_gt")]
