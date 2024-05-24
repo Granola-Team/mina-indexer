@@ -403,8 +403,12 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query Blocks($limit: Int = 10, $query: BlockQueryInput!) {
-  blocks(limit: $limit, query: $query ) {
+query Blocks(
+  $query: BlockQueryInput!
+  $limit: Int = 10
+  $sort_by: BlockSortByInput!
+) {
+  blocks(limit: $limit, query: $query, sortBy: $sort_by ) {
     stateHash
     blockHeight
     canonical
@@ -413,6 +417,7 @@ query Blocks($limit: Int = 10, $query: BlockQueryInput!) {
 
 variables {
   "limit": 100,
+  "sort_by": "BLOCKHEIGHT_ASC",
   "query": {
     "canonical": true,
     "protocolState": {
