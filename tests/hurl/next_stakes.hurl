@@ -57,9 +57,9 @@ jsonpath "$.data.nextstakes[0].nextDelegationTotals.countDelegates" == 1
 jsonpath "$.data.nextstakes[0].nextDelegationTotals.totalDelegated" == 2498323.273015384
 
 # block production info
-jsonpath "$.data.nextStakes[0].pk_epoch_num_blocks" == 0 # no blocks have been produced in the next epoch
-jsonpath "$.data.nextStakes[0].pk_total_num_blocks" == 0 # no blocks have been produced in the next epoch
-jsonpath "$.data.nextStakes[0].epoch_num_blocks" == 0    # no blocks have been produced in the next epoch
-jsonpath "$.data.nextStakes[0].total_num_blocks" == 204
+jsonpath "$.data.nextstakes[0].pk_epoch_num_blocks" == 0 # no blocks have been produced in the next epoch
+jsonpath "$.data.nextstakes[0].pk_total_num_blocks" == 0 # no blocks have been produced in the next epoch
+jsonpath "$.data.nextstakes[0].epoch_num_blocks" == 0    # no blocks have been produced in the next epoch
+jsonpath "$.data.nextstakes[0].total_num_blocks" == 204
 
 duration < 5000
