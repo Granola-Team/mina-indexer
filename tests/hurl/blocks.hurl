@@ -374,8 +374,8 @@ variables {
   "sort_by": "BLOCKHEIGHT_DESC",
   "query": {
     "canonical": true,
-    "block_height_lte": 50,
-    "block_height_gt": 10
+    "blockHeight_lte": 50,
+    "blockHeight_gt": 10
   }
 }
 ```
