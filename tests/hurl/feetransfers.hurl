@@ -59,7 +59,10 @@ POST {{url}}
 {
   feetransfers(sortBy: BLOCKHEIGHT_DESC, query: {blockStateHash: {stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"}, canonical: true}) {
     recipient
-    stateHash
+    blockStateHash {
+      stateHash
+      total_num_blocks
+    }
   }
 }
 ```
@@ -71,6 +74,7 @@ jsonpath "$.data.feetransfers" count == 1
 
 # only datum
 jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
-jsonpath "$.data.feetransfers[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.feetransfers[0].blockStateHash.total_num_blocks" == 204
 
 duration < 500
