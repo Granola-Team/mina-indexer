@@ -7,43 +7,57 @@ set -o pipefail
 #
 SRC="$(git rev-parse --show-toplevel)"
 
-# The commit (rev) of the database snapshot (checkpoint) directory that we want
-# to use for production is specified in the 'ops/production-rev' file.
-#
-REV="$(cat "$SRC"/ops/production-rev)"
+# We must configure:
+# 1. A directory to store files related to the mina-indexer, $PROD.
+# 2. The filesystem name of a socket to use for comms, $SOCKET.
+# 3. A directory from which to read the blocks.
+# 4. A directory from which to read the staking ledgers.
+# 5. A directory that contains the "$SRC"/data directory for initialization.
+# 6. A directory in which to store the database.
+# 7. A directory in which to store the logs.
 
-# Ensure the database snapshot directory exists.
+# 1. This is the directory that we intend to configure for production use.
 #
-VERSIONED_DB_DIR=/mnt/mina-log-storage/"$REV"-snapshot
-if [ ! -e "$VERSIONED_DB_DIR" ]; then
-    echo "$VERSIONED_DB_DIR does not exist. Exiting." 1>&2
-    exit 1
-fi
-
-# This is the directory that we intend to configure for production use.
-#
-PROD=/mnt/mina-log-storage/production
+PROD="$HOME"/mina-indexer
 mkdir -p "$PROD"
+cd "$PROD"
 
-# Terminate the prior production instance. This will not work if we change the
-# on-wire comms protocol for the shutdown command, note.
+# 2. Configure the socket. Terminate the prior production instance using the
+# socket, if any. This will not work if we change the on-wire comms protocol
+# for the shutdown command, note.
 #
-SOCKET="$PROD"/mina-indexer.sock
+SOCKET=./mina-indexer.sock
 if [ -e "$SOCKET" ]; then
-    ./rust/target/release/mina-indexer --domain-socket-path "$SOCKET" shutdown
+    if "$SRC"/rust/target/release/mina-indexer \
+           --domain-socket-path "$SOCKET" \
+           shutdown
+    then
+        :
+    fi
+    rm -f "$SOCKET"
 fi
 
-# Now we know that the production instance is not running, so we can safely use
-# the database directory.
-#
-DB_DIR="$PROD"/database
-rm -f "$DB_DIR"
-ln -s "$VERSIONED_DB_DIR" "$DB_DIR"
+# 3. Read the blocks from the './blocks' directory.
 
-# Ensure that the log directory exists.
+cp -r "$SRC"/tests/data/initial-blocks ./blocks
+
+# 4. Read the staging ledgers from the './staking-ledgers' directory.
 #
-LOG="$PROD"/log
-mkdir -p "$LOG"
+cp -r "$SRC"/tests/data/staking_ledgers ./staking-ledgers
+
+# 5. Configure the data directory with a hard link.
+#
+rm -fr ./data
+cp -r "$SRC"/data .
+
+# 6. Create an empty database directory.
+#
+rm -fr ./database
+mkdir ./database
+
+# 7. Ensure that the log directory exists.
+#
+mkdir -p ./log
 
 # We must daemonize. This requires forking a child in a new session. This is
 # done with 'setsid'. The child must itself create a grandchild that is the
@@ -53,18 +67,18 @@ mkdir -p "$LOG"
 #
 setsid \
   sh -c \
-    '"$@" 0< /dev/null 1>> '"$LOG"'/out 2>> '"$LOG"'/err &' \
+    '"$@" 0< /dev/null 1>> ./log/out 2>> ./log/err &' \
     -- \
-    ./rust/target/release/mina-indexer \
+    "$SRC"/rust/target/release/mina-indexer \
       --domain-socket-path "$SOCKET" \
       server start \
         --log-level DEBUG \
         --web-hostname 0.0.0.0 \
-        --genesis-ledger "$SRC"/data/genesis_ledgers/mainnet.json \
-        --locked-supply-csv "$SRC"/data/locked.csv \
-        --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
-        --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
-        --database-dir "$DB_DIR" \
+        --blocks-dir ./blocks \
+        --staking-ledgers-dir ./staking-ledgers \
+        --genesis-ledger ./data/genesis_ledgers/mainnet.json \
+        --locked-supply-csv ./data/locked.csv \
+        --database-dir ./database \
   &
 
 # Wait for the above to return, otherwise the above fork'd process may not
