@@ -46,12 +46,17 @@ impl FeetransferWithMeta {
         &self.feetransfer
     }
 
-    async fn block_state_hash(&self, total_num_blocks: u32) -> Option<BlockWithCanonicity> {
-        self.block.clone().map(|block| BlockWithCanonicity {
+    async fn block_state_hash<'ctx>(
+        &self,
+        ctx: &Context<'ctx>,
+    ) -> Result<Option<BlockWithCanonicity>> {
+        let db = db(ctx);
+        let total_num_blocks = db.get_block_production_total_count()?;
+        Ok(self.block.clone().map(|block| BlockWithCanonicity {
             block: Block::new(block, self.canonical),
             canonical: self.canonical,
             total_num_blocks,
-        })
+        }))
     }
 }
 
