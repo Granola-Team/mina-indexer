@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub struct Root(
     blocks::BlocksQueryRoot,
     stakes::StakeQueryRoot,
-    next_stakes::NextStakesQueryRoot,
+    next_stakes::NextstakeQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
