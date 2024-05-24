@@ -415,8 +415,12 @@ variables {
   "limit": 100,
   "query": {
     "canonical": true,
-    "global_slot_lte": 100,
-    "global_slot_gt": 9
+    "protocolState": {
+      "consensusState": {
+        "slotSinceGenesis_lte": 100,
+        "slotSinceGenesis_gt": 9
+      }
+    }
   }
 }
 ```

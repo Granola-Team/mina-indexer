@@ -581,18 +581,6 @@ pub struct BlockQueryInput {
 
     #[graphql(name = "blockHeight_lte")]
     pub block_height_lte: Option<u32>,
-
-    #[graphql(name = "global_slot_gt")]
-    pub global_slot_gt: Option<u32>,
-
-    #[graphql(name = "global_slot_gte")]
-    pub global_slot_gte: Option<u32>,
-
-    #[graphql(name = "global_slot_lt")]
-    pub global_slot_lt: Option<u32>,
-
-    #[graphql(name = "global_slot_lte")]
-    pub global_slot_lte: Option<u32>,
 }
 
 #[derive(InputObject)]
@@ -706,7 +694,6 @@ pub struct BlockProtocolStateConsensusStateQueryInput {
     pub block_height_nin: Option<Vec<Option<i64>>>,
     pub min_window_density_gt: Option<i64>,
     pub block_height_in: Option<Vec<Option<i64>>>,
-    pub slot_since_genesis_gte: Option<i64>,
     pub epoch_count_ne: Option<i64>,
     pub slot_lt: Option<i64>,
     pub epoch_exists: Option<bool>,
@@ -714,7 +701,6 @@ pub struct BlockProtocolStateConsensusStateQueryInput {
     pub blockchain_length_gt: Option<i64>,
     pub min_window_density_ne: Option<i64>,
     pub total_currency_ne: Option<f64>,
-    pub slot_since_genesis_lte: Option<i64>,
     pub slot_exists: Option<bool>,
     pub next_epoch_data: Option<BlockProtocolStateConsensusStateNextEpochDatumQueryInput>,
     pub block_height: Option<i64>,
@@ -759,7 +745,16 @@ pub struct BlockProtocolStateConsensusStateQueryInput {
     pub min_window_density_lte: Option<i64>,
     pub epoch_count_lte: Option<i64>,
     pub slot_gt: Option<i64>,
-    pub slot_since_genesis_gt: Option<i64>,
+
+    #[graphql(name = "slotSinceGenesis_gte")]
+    pub slot_since_genesis_gte: Option<u32>,
+    #[graphql(name = "slotSinceGenesis_gt")]
+    pub slot_since_genesis_gt: Option<u32>,
+    #[graphql(name = "slotSinceGenesis_lte")]
+    pub slot_since_genesis_lte: Option<u32>,
+    #[graphql(name = "slotSinceGenesis_lt")]
+    pub slot_since_genesis_lt: Option<u32>,
+
     pub has_ancestor_in_same_checkpoint_window_ne: Option<bool>,
     pub min_window_density_in: Option<Vec<Option<i64>>>,
     pub total_currency_in: Option<Vec<Option<f64>>>,
@@ -780,7 +775,7 @@ pub struct BlockProtocolStateConsensusStateQueryInput {
     pub epoch_count_in: Option<Vec<Option<i64>>>,
     pub last_vrf_output_ne: Option<String>,
     pub block_height_lt: Option<i64>,
-    pub slot_since_genesis_lt: Option<i64>,
+
     pub epoch_in: Option<Vec<Option<i64>>>,
     pub block_height_ne: Option<i64>,
     pub last_vrf_output: Option<String>,

@@ -1,6 +1,6 @@
 use super::{
-    db, get_block_canonicity, millis_to_iso_date_string, transactions::Transaction,
-    MAINNET_COINBASE_REWARD, PK,
+    db, gen::BlockProtocolStateConsensusStateQueryInput, get_block_canonicity,
+    millis_to_iso_date_string, transactions::Transaction, MAINNET_COINBASE_REWARD, PK,
 };
 use crate::{
     block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
@@ -234,29 +234,33 @@ impl BlocksQueryRoot {
         }
 
         // global slot bounded query
-        if query.as_ref().map_or(false, |q| {
-            q.global_slot_gt.is_some()
-                || q.global_slot_gte.is_some()
-                || q.global_slot_lt.is_some()
-                || q.global_slot_lte.is_some()
+        let consensus_state = query
+            .as_ref()
+            .and_then(|f| f.protocol_state.as_ref())
+            .and_then(|f| f.consensus_state.as_ref());
+        if consensus_state.map_or(false, |q| {
+            q.slot_since_genesis_gt.is_some()
+                || q.slot_since_genesis_gte.is_some()
+                || q.slot_since_genesis_lt.is_some()
+                || q.slot_since_genesis_lte.is_some()
         }) {
-            let (min, max) = match query.as_ref() {
+            let (min, max) = match consensus_state {
                 Some(block_query_input) => {
-                    let BlockQueryInput {
-                        global_slot_gt,
-                        global_slot_gte,
-                        global_slot_lt,
-                        global_slot_lte,
+                    let BlockProtocolStateConsensusStateQueryInput {
+                        slot_since_genesis_lte,
+                        slot_since_genesis_lt,
+                        slot_since_genesis_gte,
+                        slot_since_genesis_gt,
                         ..
                     } = block_query_input;
                     (
                         // min = max of the gt(e) heights or 1
-                        global_slot_gt
-                            .map(|h| h.max(global_slot_gte.unwrap_or_default()))
+                        slot_since_genesis_gt
+                            .map(|h| h.max(slot_since_genesis_gte.unwrap_or_default()))
                             .unwrap_or(1),
                         // max = max of the lt(e) heights or best tip height
-                        global_slot_lt
-                            .map(|h| h.max(global_slot_lte.unwrap_or_default()))
+                        slot_since_genesis_lt
+                            .map(|h| h.max(slot_since_genesis_lte.unwrap_or_default()))
                             .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
                             .min(db.get_best_block()?.unwrap().global_slot_since_genesis()),
                     )
@@ -264,8 +268,7 @@ impl BlocksQueryRoot {
                 None => (1, db.get_best_block()?.unwrap().global_slot_since_genesis()),
             };
 
-            let mut block_slots: Vec<u32> = (min..=max).collect();
-            reorder_desc(&mut block_slots, sort_by);
+            let block_slots: Vec<u32> = (min..=max).collect();
 
             for global_slot in block_slots {
                 for block in db.get_blocks_at_slot(global_slot)? {
@@ -820,10 +823,6 @@ impl BlockQueryInput {
             block_height_gte,
             block_height_lt,
             block_height_lte,
-            global_slot_gt,
-            global_slot_gte,
-            global_slot_lt,
-            global_slot_lte,
             protocol_state,
             ..
         } = self;
@@ -852,17 +851,33 @@ impl BlockQueryInput {
         }
 
         // global_slot_gt(e) & global_slot_lt(e)
-        if let Some(global_slot) = global_slot_gt {
-            matches &= block.block.global_slot_since_genesis > *global_slot;
+        if let Some(global_slot) = protocol_state
+            .as_ref()
+            .and_then(|f| f.consensus_state.as_ref())
+            .and_then(|f| f.slot_since_genesis_gt)
+        {
+            matches &= block.block.global_slot_since_genesis > global_slot;
         }
-        if let Some(global_slot) = global_slot_gte {
-            matches &= block.block.global_slot_since_genesis >= *global_slot;
+        if let Some(global_slot) = protocol_state
+            .as_ref()
+            .and_then(|f| f.consensus_state.as_ref())
+            .and_then(|f| f.slot_since_genesis_gte)
+        {
+            matches &= block.block.global_slot_since_genesis >= global_slot;
         }
-        if let Some(global_slot) = global_slot_lt {
-            matches &= block.block.global_slot_since_genesis < *global_slot;
+        if let Some(global_slot) = protocol_state
+            .as_ref()
+            .and_then(|f| f.consensus_state.as_ref())
+            .and_then(|f| f.slot_since_genesis_lt)
+        {
+            matches &= block.block.global_slot_since_genesis < global_slot;
         }
-        if let Some(global_slot) = global_slot_lte {
-            matches &= block.block.global_slot_since_genesis <= *global_slot;
+        if let Some(global_slot) = protocol_state
+            .as_ref()
+            .and_then(|f| f.consensus_state.as_ref())
+            .and_then(|f| f.slot_since_genesis_lte)
+        {
+            matches &= block.block.global_slot_since_genesis <= global_slot;
         }
 
         // slot
