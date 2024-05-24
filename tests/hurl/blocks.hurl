@@ -386,13 +386,13 @@ HTTP 200
 jsonpath "$.data.blocks" count == 40
 
 # first datum
-jsonpath "$.data.blocks[0].stateHash" == "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA"
-jsonpath "$.data.blocks[0].blockHeight" == 11
+jsonpath "$.data.blocks[0].stateHash" == "3NLJeP3pBr2UFgLZpNgwKEw37UeYEsyuP63U9A3Q8D8ATBStWw6Y"
+jsonpath "$.data.blocks[0].blockHeight" == 50
 jsonpath "$.data.blocks[0].canonical" == true
 
 # last datum
-jsonpath "$.data.blocks[39].stateHash" == "3NLJeP3pBr2UFgLZpNgwKEw37UeYEsyuP63U9A3Q8D8ATBStWw6Y"
-jsonpath "$.data.blocks[39].blockHeight" == 50
+jsonpath "$.data.blocks[39].stateHash" == "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA"
+jsonpath "$.data.blocks[39].blockHeight" == 11
 jsonpath "$.data.blocks[39].canonical" == true
 
 duration < 1000
