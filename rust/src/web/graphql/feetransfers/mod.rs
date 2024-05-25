@@ -91,25 +91,21 @@ impl FeetransferQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<FeetransferWithMeta>> {
         let db = db(ctx);
-        let has_state_hash = query
+
+        //state_hash
+        if let Some(state_hash) = query
             .as_ref()
             .and_then(|f| f.block_state_hash.as_ref())
-            .map_or(false, |q| q.state_hash.is_some());
-
-        if has_state_hash {
-            let state_hash = query
-                .as_ref()
-                .and_then(|b| b.block_state_hash.as_ref())
-                .and_then(|q| q.state_hash.as_ref())
-                .map_or(MAINNET_GENESIS_HASH, |s| s);
-            let state_hash = BlockHash::from(state_hash);
+            .and_then(|f| f.state_hash.clone())
+        {
             return Ok(get_fee_transfers_for_state_hash(
                 db,
-                &state_hash,
+                &state_hash.into(),
                 sort_by,
                 limit,
             ));
         }
+
         // recipient
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
             let mut fee_transfers: Vec<FeetransferWithMeta> = db
