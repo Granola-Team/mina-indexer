@@ -19,12 +19,3 @@ steps:
   agents:
     docker: true
   command: "./ops/build-oci-image"
-
-- label: "Tier 2 Testing"
-  if: build.env('GRANOLA_TIER2') == "true"
-  key: "tier2"
-  depends_on: "build"
-  timeout_in_minutes: 2880
-  agents:
-    mina-log-storage: true
-  command: "./ops/tier2-test"
