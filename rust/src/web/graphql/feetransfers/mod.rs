@@ -62,11 +62,29 @@ impl FeetransferWithMeta {
 
 #[derive(InputObject)]
 pub struct FeetransferQueryInput {
+    /// Value block height
     block_height: Option<u32>,
+    /// Value block state hash
     block_state_hash: Option<BlockQueryInput>,
+    /// Value canonical
     canonical: Option<bool>,
+    ///Value recipient
     recipient: Option<String>,
+    /// Value block height greater than
+    #[graphql(name = "blockHeight_gt")]
+    pub block_height_gt: Option<u32>,
+    /// Value block height greater than or equal to
+    #[graphql(name = "blockHeight_gte")]
+    pub block_height_gte: Option<u32>,
+    /// Value block height less than
+    #[graphql(name = "blockHeight_lt")]
+    pub block_height_lt: Option<u32>,
+    /// Value block height less than or equal to
+    #[graphql(name = "blockHeight_lte")]
+    pub block_height_lte: Option<u32>,
+    /// Value and
     and: Option<Vec<FeetransferQueryInput>>,
+    /// Value or
     or: Option<Vec<FeetransferQueryInput>>,
 }
 
@@ -104,6 +122,67 @@ impl FeetransferQueryRoot {
                 sort_by,
                 limit,
             ));
+        }
+        // block height bounded query
+        if query.as_ref().map_or(false, |q| {
+            q.block_height_gt.is_some()
+                || q.block_height_gte.is_some()
+                || q.block_height_lt.is_some()
+                || q.block_height_lte.is_some()
+        }) {
+            let mut feetransfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
+            let (min, max) = match query.as_ref() {
+                Some(feetranser_query_input) => {
+                    let FeetransferQueryInput {
+                        block_height_gt,
+                        block_height_gte,
+                        block_height_lt,
+                        block_height_lte,
+                        ..
+                    } = feetranser_query_input;
+                    (
+                        // min = max of the gt(e) heights or 1
+                        block_height_gt
+                            .map(|h| h.max(block_height_gte.unwrap_or_default()))
+                            .unwrap_or(1),
+                        // max = max of the lt(e) heights or best tip height
+                        block_height_lt
+                            .map(|h| h.max(block_height_lte.unwrap_or_default()))
+                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
+                            .min(db.get_best_block()?.unwrap().blockchain_length()),
+                    )
+                }
+                None => (1, db.get_best_block()?.unwrap().blockchain_length()),
+            };
+
+            let block_heights: Vec<u32> = (min..=max).collect();
+            for height in block_heights {
+                for block in db.get_blocks_at_height(height)? {
+                    let canonical = get_block_canonicity(db, &block.state_hash().0);
+                    let internal_cmds = InternalCommandWithData::from_precomputed(&block);
+                    for internal_cmd in internal_cmds {
+                        let ft = Feetransfer::from(internal_cmd);
+                        let feetransfer_with_meta = FeetransferWithMeta {
+                            canonical,
+                            feetransfer: ft,
+                            block: Some(block.clone()),
+                        };
+                        if query
+                            .as_ref()
+                            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+                        {
+                            feetransfers.push(feetransfer_with_meta);
+                        }
+                    }
+                }
+            }
+            let sort_by = sort_by.unwrap_or(FeetransferSortByInput::BlockHeightDesc);
+            if sort_by == FeetransferSortByInput::BlockHeightDesc {
+                feetransfers.reverse()
+            }
+
+            feetransfers.truncate(limit);
+            return Ok(feetransfers);
         }
 
         // recipient
@@ -265,7 +344,29 @@ impl From<InternalCommandWithData> for Feetransfer {
 
 impl FeetransferQueryInput {
     pub fn matches(&self, ft: &FeetransferWithMeta) -> bool {
+        let Self {
+            block_height_gt,
+            block_height_gte,
+            block_height_lt,
+            block_height_lte,
+            ..
+        } = self;
+        let pcb = ft.block.as_ref().unwrap();
+        let blockchain_length = pcb.blockchain_length();
         let mut matches = true;
+        // block_height_gt(e) & block_height_lt(e)
+        if let Some(height) = block_height_gt {
+            matches &= blockchain_length > *height;
+        }
+        if let Some(height) = block_height_gte {
+            matches &= blockchain_length >= *height;
+        }
+        if let Some(height) = block_height_lt {
+            matches &= blockchain_length < *height;
+        }
+        if let Some(height) = block_height_lte {
+            matches &= blockchain_length <= *height;
+        }
 
         if let Some(block_query_input) = &self.block_state_hash {
             if let Some(state_hash) = &block_query_input.state_hash {

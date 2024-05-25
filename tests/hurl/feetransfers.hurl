@@ -78,3 +78,40 @@ jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLNyQC4XgQX2Q9H7
 jsonpath "$.data.feetransfers[0].blockStateHash.total_num_blocks" == 204
 
 duration < 500
+
+POST {{url}}
+```graphql
+query InternalCommandsQuery(
+  $sort_by: FeetransferSortByInput!
+  $limit: Int = 10
+  $query: FeetransferQueryInput!
+) {
+  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
+    blockHeight
+    blockStateHash {
+      stateHash
+    }
+    fee
+    recipient
+    type
+    dateTime
+    canonical
+  }
+}
+
+variables {
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "limit": 100,
+  "query": {
+    "canonical": true,
+    "blockHeight_lte": 120
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.feetransfers" count == 100
+
+jsonpath "$.data.feetransfers[0].blockHeight" == 120
+jsonpath "$.data.feetransfers[99].blockHeight" == 71
