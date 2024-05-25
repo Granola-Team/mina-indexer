@@ -2,6 +2,8 @@ steps:
 - label: "Tier 2 Testing"
   if: build.branch == "main"
   key: "tier2"
+  concurrency: 1
+  concurrency_group: "tier2"
   timeout_in_minutes: 2880
   agents:
     mina-log-storage: true
