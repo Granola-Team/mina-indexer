@@ -2,7 +2,7 @@ use speedb::ColumnFamily;
 
 /// Indexer store column family helper trait
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 27;
+    const NUM_COLUMN_FAMILIES: usize = 30;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -27,6 +27,15 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for storing height by global slot
     fn block_global_slot_to_height_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing previous state hashes
+    fn block_parent_hash_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing blockchain lengths
+    fn blockchain_length_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing coinbase receivers
+    fn coinbase_receiver_cf(&self) -> &ColumnFamily;
 
     /// CF for storing blocks at a fixed height
     fn lengths_cf(&self) -> &ColumnFamily;

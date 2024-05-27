@@ -1,5 +1,6 @@
 //! Store of staged ledgers, staking ledgers, and staking delegations
 
+use super::public_key::PublicKey;
 use crate::{
     block::BlockHash,
     ledger::{
@@ -24,6 +25,9 @@ pub trait LedgerStore {
 
     /// Get a ledger associated with ledger hash
     fn get_ledger(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<Ledger>>;
+
+    /// Get the best ledger (associated with the best block)
+    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
 
     /// Get a ledger associated with an arbitrary block
     fn get_ledger_state_hash(
@@ -63,6 +67,6 @@ pub trait LedgerStore {
         genesis_state_hash: &Option<BlockHash>,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>>;
 
-    /// Persist ledger account balances
-    fn store_ledger_balances(&self, ledger: &Ledger) -> anyhow::Result<()>;
+    /// Get pk's account balance from the balance-sorted ledger
+    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
 }

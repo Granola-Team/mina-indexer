@@ -74,7 +74,8 @@ impl BlockParser {
         )
     }
 
-    /// Returns a new ccd block parser with paths filtered by max length
+    /// Returns a new [Self::new_with_canonical_chain_discovery] block parser
+    /// with paths additionally filtered by max length `block_length`
     pub fn new_with_canonical_chain_discovery_filtered(
         blocks_dir: &Path,
         version: PcbVersion,

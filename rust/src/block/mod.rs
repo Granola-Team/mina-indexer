@@ -28,6 +28,7 @@ pub struct Block {
     pub state_hash: BlockHash,
     pub height: u32,
     pub blockchain_length: u32,
+    pub genesis_state_hash: BlockHash,
     pub global_slot_since_genesis: u32,
     pub hash_last_vrf_output: VrfOutput,
 }
@@ -81,6 +82,7 @@ impl Block {
             blockchain_length: precomputed_block.blockchain_length(),
             hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
             global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
+            genesis_state_hash: precomputed_block.genesis_state_hash(),
         }
     }
 
@@ -103,18 +105,12 @@ impl From<Block> for BlockWithoutHeight {
 
 impl BlockWithoutHeight {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let parent_hash = precomputed_block.previous_state_hash();
-        let state_hash = precomputed_block.state_hash();
         Self {
-            parent_hash,
-            state_hash,
             canonicity: None,
-            global_slot_since_genesis: precomputed_block
-                .consensus_state()
-                .global_slot_since_genesis
-                .t
-                .t,
+            state_hash: precomputed_block.state_hash(),
+            parent_hash: precomputed_block.previous_state_hash(),
             blockchain_length: precomputed_block.blockchain_length(),
+            global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
         }
     }
 
@@ -142,6 +138,7 @@ impl From<PrecomputedBlock> for Block {
             blockchain_length: value.blockchain_length(),
             state_hash: value.state_hash(),
             hash_last_vrf_output: value.hash_last_vrf_output(),
+            genesis_state_hash: value.genesis_state_hash(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
         }
     }
@@ -155,6 +152,7 @@ impl From<&PrecomputedBlock> for Block {
             blockchain_length: value.blockchain_length(),
             state_hash: value.state_hash(),
             hash_last_vrf_output: value.hash_last_vrf_output(),
+            genesis_state_hash: value.genesis_state_hash(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
         }
     }

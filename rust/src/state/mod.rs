@@ -70,7 +70,7 @@ pub struct IndexerState {
     /// needed for the possibility of missing blocks
     pub dangling_branches: Vec<Branch>,
 
-    /// Block database
+    /// Underlying database
     pub indexer_store: Option<Arc<IndexerStore>>,
 
     /// Staking ledger epochs and ledger hashes
@@ -210,11 +210,15 @@ impl IndexerState {
         config
             .indexer_store
             .set_max_canonical_blockchain_length(1)?;
-        config
-            .indexer_store
-            .add_canonical_block(1, &config.genesis_hash)?;
+        config.indexer_store.add_canonical_block(
+            1,
+            &config.genesis_hash,
+            &config.genesis_hash,
+            Some(&MAINNET_GENESIS_PREV_STATE_HASH.into()),
+        )?;
 
-        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
+        let root_branch =
+            Branch::new_genesis(config.genesis_hash, MAINNET_GENESIS_PREV_STATE_HASH.into())?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -249,7 +253,8 @@ impl IndexerState {
 
     /// Creates a new indexer state without genesis events
     pub fn new_without_genesis_events(config: IndexerStateConfig) -> anyhow::Result<Self> {
-        let root_branch = Branch::new_genesis(&config.genesis_hash)?;
+        let root_branch =
+            Branch::new_genesis(config.genesis_hash, MAINNET_GENESIS_PREV_STATE_HASH.into())?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -373,8 +378,12 @@ impl IndexerState {
 
                     indexer_store.add_block(&block)?;
                     indexer_store.set_best_block(&block.state_hash())?;
-                    indexer_store
-                        .add_canonical_block(block.blockchain_length(), &block.state_hash())?;
+                    indexer_store.add_canonical_block(
+                        block.blockchain_length(),
+                        &block.state_hash(),
+                        &block.genesis_state_hash(),
+                        None,
+                    )?;
                     indexer_store.set_max_canonical_blockchain_length(block.blockchain_length())?;
 
                     // compute and store ledger at specified cadence
@@ -502,9 +511,10 @@ impl IndexerState {
             };
 
             self.update_best_block_in_store(&best_tip.state_hash)?;
-            new_canonical_blocks
-                .iter()
-                .for_each(|block| self.add_canonical_block_to_store(block).unwrap());
+            new_canonical_blocks.iter().for_each(|block| {
+                self.add_canonical_block_to_store(block, &block.genesis_state_hash, None)
+                    .unwrap()
+            });
         }
 
         Ok(true)
@@ -802,9 +812,33 @@ impl IndexerState {
         Ok(None)
     }
 
+    /// Returns the best chain back to the root of the witness tree
+    pub fn best_chain(&self) -> Vec<Block> {
+        let mut best_chain = vec![self.best_tip_block().clone()];
+        for b in self
+            .root_branch
+            .branches
+            .ancestors(&self.best_tip.node_id)
+            .unwrap()
+        {
+            best_chain.push(b.data().clone());
+        }
+        best_chain
+    }
+
     /// Returns the ledger corresponding to the best tip
     pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
-        Ok(Some(self.ledger.clone()))
+        let best_ledger = self.ledger.clone();
+        let mut best_chain = self.best_chain();
+        best_chain.reverse();
+
+        let diffs: Vec<LedgerDiff> = best_chain
+            .iter()
+            .map(|b| self.diffs_map.get(&b.state_hash).unwrap().clone())
+            .collect();
+        best_ledger
+            .apply_diff(&LedgerDiff::append_vec(diffs))
+            .map(Some)
     }
 
     /// Get the canonical block at the given height
@@ -870,9 +904,19 @@ impl IndexerState {
         Ok(None)
     }
 
-    fn add_canonical_block_to_store(&self, block: &Block) -> anyhow::Result<()> {
+    fn add_canonical_block_to_store(
+        &self,
+        block: &Block,
+        genesis_state_hash: &BlockHash,
+        genesis_prev_state_hash: Option<&BlockHash>,
+    ) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            indexer_store.add_canonical_block(block.blockchain_length, &block.state_hash)?;
+            indexer_store.add_canonical_block(
+                block.blockchain_length,
+                &block.state_hash,
+                genesis_state_hash,
+                genesis_prev_state_hash,
+            )?;
         }
         Ok(())
     }
@@ -1382,7 +1426,9 @@ impl IndexerState {
             .traverse_level_order_ids(old_canonical_root_id)
             .unwrap()
         {
-            if self.get_block_from_id(&node_id).height <= self.canonical_root_block().height {
+            if self.get_block_from_id(&node_id) != self.canonical_root_block()
+                && self.get_block_from_id(&node_id).height <= self.canonical_root_block().height
+            {
                 self.diffs_map
                     .remove(&self.get_block_from_id(&node_id).state_hash.clone());
             }

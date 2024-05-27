@@ -45,6 +45,10 @@ pub fn discovery(
             paths.retain(|p| extract_block_height_or_max(p) >= blockchain_length);
         }
 
+        if paths.is_empty() {
+            return Ok((vec![], vec![], vec![]));
+        }
+
         // keep track of:
         // - diffs between blocks of recent lengths (to find gaps)
         // - starting index for each collection of blocks of a fixed length
