@@ -38,7 +38,7 @@ use speedb::{
     ColumnFamily, ColumnFamilyDescriptor, DBCompressionType, DBIterator, IteratorMode, DB,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -53,7 +53,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 27] = [
+    const COLUMN_FAMILIES: [&'static str; 30] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -67,6 +67,9 @@ impl IndexerStore {
         "blocks-at-slot",
         "block-height-to-slot", // [block_height_to_global_slot_cf]
         "block-slot-to-height", // [block_global_slot_to_height_cf]
+        "block-parent-hash",    // [block_parent_hash_cf]
+        "blockchain-length",    // [blockchain_length_cf]
+        "coinbase-receivers",   // [coinbase_receiver_cf]
         "canonicity",
         "commands",
         "mainnet-commands-slot",
@@ -156,6 +159,22 @@ impl BlockStore for IndexerStore {
         // increment block production counts
         self.increment_block_production_count(block)?;
 
+        // add to coinbase receiver index
+        self.set_coinbase_receiver(&block.state_hash(), &block.coinbase_receiver())?;
+
+        // add to blockchain length index
+        self.set_blockchain_length(&block.state_hash(), block.blockchain_length())?;
+
+        // add to parent hash index
+        self.set_block_parent_hash(&block.state_hash(), &block.previous_state_hash())?;
+
+        // add to balance update index
+        self.set_block_balance_updates(
+            &block.state_hash(),
+            block.coinbase_receiver(),
+            LedgerBalanceUpdate::from_precomputed(block),
+        )?;
+
         // add to global slots block index
         self.database.put_cf(
             self.blocks_global_slot_idx_cf(),
@@ -231,11 +250,13 @@ impl BlockStore for IndexerStore {
         trace!("Setting best block");
 
         if let Some(old) = self.get_best_block_hash()? {
-            if old != *state_hash {
-                let balance_updates =
-                    self.common_ancestor_account_balance_updates(&old, state_hash)?;
-                self.update_account_balances(balance_updates)?;
+            if old == *state_hash {
+                return Ok(());
             }
+
+            let (balance_updates, coinbase_receivers) =
+                self.common_ancestor_account_balance_updates(&old, state_hash)?;
+            self.update_account_balances(state_hash, balance_updates, coinbase_receivers)?;
         }
 
         // set new best tip
@@ -260,111 +281,220 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    // TODO make modular over different account updates
+    fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>> {
+        trace!("Getting block's parent hash {state_hash}");
+
+        Ok(self
+            .database
+            .get_cf(self.block_parent_hash_cf(), state_hash.0.as_bytes())
+            .map(|o| o.map(|bytes| BlockHash::from_bytes(&bytes).expect("parent state hash")))?)
+    }
+
+    fn set_block_parent_hash(
+        &self,
+        state_hash: &BlockHash,
+        previous_state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting block parent hash {} -> {}",
+            state_hash,
+            previous_state_hash
+        );
+
+        Ok(self.database.put_cf(
+            self.block_parent_hash_cf(),
+            state_hash.0.as_bytes(),
+            previous_state_hash.0.as_bytes(),
+        )?)
+    }
+
+    fn get_blockchain_length(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting blockchain length {state_hash}");
+        Ok(self
+            .database
+            .get_cf(self.blockchain_length_cf(), state_hash.0.as_bytes())?
+            .map(from_be_bytes))
+    }
+
+    fn set_blockchain_length(
+        &self,
+        state_hash: &BlockHash,
+        blockchain_length: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting blockchain length {blockchain_length}: {state_hash}");
+        Ok(self.database.put_cf(
+            self.blockchain_length_cf(),
+            state_hash.0.as_bytes(),
+            to_be_bytes(blockchain_length),
+        )?)
+    }
+
+    fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
+        trace!("Getting coinbase receiver for {state_hash}");
+        Ok(self
+            .database
+            .get_cf(self.coinbase_receiver_cf(), state_hash.0.as_bytes())
+            .map_or(None, |bytes| {
+                bytes.map(|b| PublicKey::from_bytes(&b).unwrap())
+            }))
+    }
+
+    fn set_coinbase_receiver(
+        &self,
+        state_hash: &BlockHash,
+        coinbase_receiver: &PublicKey,
+    ) -> anyhow::Result<()> {
+        trace!("Setting coinbase receiver: {state_hash} -> {coinbase_receiver}");
+        Ok(self.database.put_cf(
+            self.coinbase_receiver_cf(),
+            state_hash.0.as_bytes(),
+            coinbase_receiver.0.as_bytes(),
+        )?)
+    }
+
+    // TODO make modular over different updates
     fn common_ancestor_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<LedgerBalanceUpdate> {
+    ) -> anyhow::Result<(Vec<PaymentDiff>, HashSet<PublicKey>)> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
             old_best_tip.0,
             new_best_tip.0
         );
+        let mut coinbase_receivers = HashSet::new();
 
         // follows the old best tip back to the common ancestor
-        let mut a = self.get_block(old_best_tip)?.expect("old best block");
-        let mut unapply = LedgerBalanceUpdate::from_precomputed(&a);
+        let mut a = old_best_tip.clone();
+        let mut unapply = vec![];
 
         // follows the new best tip back to the common ancestor
-        let mut b = self.get_block(new_best_tip)?.expect("new best block");
-        let mut apply = LedgerBalanceUpdate::from_precomputed(&b);
+        let mut b = new_best_tip.clone();
+        let mut apply = vec![];
 
-        // b is better than a
-        assert!(b < a, "\nb: {}\na: {}", b.summary(), a.summary());
+        let a_length = self.get_blockchain_length(&a)?.expect("a has a length");
+        let b_length = self.get_blockchain_length(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
         let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
-        for _ in 0..(b.blockchain_length() - a.blockchain_length()) {
-            let prev = b.previous_state_hash();
-
+        for _ in 0..(b_length - a_length) {
             // check if there's a previous block
-            if genesis_state_hashes.contains(&b.state_hash()) {
+            if genesis_state_hashes.contains(&b) {
                 break;
             }
 
-            b = self.get_block(&prev)?.expect("previous block");
-            apply.append(&mut LedgerBalanceUpdate::from_precomputed(&b));
+            coinbase_receivers.insert(self.get_coinbase_receiver(&b)?.expect("b has a coinbase"));
+            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap().1);
+            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
-        assert_eq!(a.blockchain_length(), b.blockchain_length());
 
-        while a.previous_state_hash() != b.previous_state_hash()
-            && genesis_state_hashes.contains(&a.previous_state_hash())
-        {
-            let a_prev = self
-                .get_block(&a.previous_state_hash())?
-                .expect("a prev block");
-            let b_prev = self
-                .get_block(&b.previous_state_hash())?
-                .expect("b prev block");
+        // find the common ancestor
+        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
+        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-            unapply.append(&mut LedgerBalanceUpdate::from_precomputed(&a_prev));
-            apply.append(&mut LedgerBalanceUpdate::from_precomputed(&b_prev));
+        while a != b && !genesis_state_hashes.contains(&a) {
+            // retain coinbase receivers
+            coinbase_receivers.insert(self.get_coinbase_receiver(&a)?.expect("a has a coinbase"));
+            coinbase_receivers.insert(self.get_coinbase_receiver(&b)?.expect("b has a coinbase"));
 
+            // add blocks to appropriate collection
+            unapply.append(&mut self.get_block_balance_updates(&a)?.unwrap().1);
+            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap().1);
+
+            // descend
             a = a_prev;
             b = b_prev;
+
+            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
+            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
+        // balance updates don't require this reverse, but other updates may
         apply.reverse();
-        Ok(LedgerBalanceUpdate { apply, unapply })
+        Ok((
+            LedgerBalanceUpdate { apply, unapply }.to_diff_vec(),
+            coinbase_receivers,
+        ))
     }
 
     fn get_block_balance_updates(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<PaymentDiff>> {
+    ) -> anyhow::Result<Option<(PublicKey, Vec<PaymentDiff>)>> {
         trace!("Getting block balance updates for {}", state_hash.0);
         Ok(self
             .database
             .get_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
-            .map_or(vec![], |bytes| {
-                serde_json::from_slice::<Vec<PaymentDiff>>(&bytes).expect("balance updates")
-            }))
+            .map(|bytes| serde_json::from_slice(&bytes).expect("balance updates")))
     }
 
-    fn update_account_balances(&self, update: LedgerBalanceUpdate) -> anyhow::Result<()> {
-        trace!("Updating account balances");
+    fn update_account_balances(
+        &self,
+        state_hash: &BlockHash,
+        updates: Vec<PaymentDiff>,
+        coinbase_receivers: HashSet<PublicKey>,
+    ) -> anyhow::Result<()> {
+        trace!("Updating account balances {state_hash}");
 
-        let mut update = update;
-        let balance_updates = update.balance_updates();
-        for (pk, amount) in balance_updates {
-            let key = pk.0.as_bytes();
-            let balance = self
-                .database
-                .get_cf(self.account_balance_cf(), key)?
-                .map_or(0, |bytes| {
-                    String::from_utf8(bytes).unwrap().parse::<u64>().unwrap()
-                });
+        // update balances
+        for (pk, amount) in LedgerBalanceUpdate::balance_updates(updates) {
+            if amount != 0 {
+                let pk = pk.into();
+                let balance = self.get_account_balance(&pk)?.unwrap_or(0);
+                let balance = if coinbase_receivers.contains(&pk) && balance == 0 && amount > 0 {
+                    (balance + amount.unsigned_abs()).saturating_sub(MAINNET_ACCOUNT_CREATION_FEE.0)
+                } else if amount > 0 {
+                    balance + amount.unsigned_abs()
+                } else {
+                    balance.saturating_sub(amount.unsigned_abs())
+                };
 
-            // delete stale data
-            self.database.delete_cf(self.account_balance_cf(), key)?;
-
-            // write new data
-            self.database.put_cf(
-                self.account_balance_cf(),
-                key,
-                ((balance as i64 + amount) as u64).to_string().as_bytes(),
-            )?;
+                // coinbase receivers may need to be removed
+                self.update_account_balance(
+                    &pk,
+                    if coinbase_receivers.contains(&pk) && balance == 0 {
+                        None
+                    } else {
+                        Some(balance)
+                    },
+                )?;
+            }
         }
         Ok(())
     }
 
-    fn set_account_balance(&self, pk: &PublicKey, balance: u64) -> anyhow::Result<()> {
-        trace!("Setting account balance: {} -> {balance}", pk.0);
+    fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()> {
+        trace!("Updating account balance {pk} -> {balance:?}");
+
+        // update balance info
+        if balance.is_none() {
+            // delete stale data
+            let b = self.get_account_balance(pk)?.unwrap_or(0);
+            self.database
+                .delete_cf(self.account_balance_cf(), pk.0.as_bytes())?;
+            self.database
+                .delete_cf(self.account_balance_sort_cf(), u64_prefix_key(b, &pk.0))?;
+            return Ok(());
+        }
+
+        let balance = balance.unwrap();
+        if let Some(old) = self.get_account_balance(pk)? {
+            // delete stale balance sorting data
+            self.database
+                .delete_cf(self.account_balance_sort_cf(), u64_prefix_key(old, &pk.0))?;
+        }
         self.database.put_cf(
             self.account_balance_cf(),
             pk.0.as_bytes(),
-            balance.to_string().as_bytes(),
+            balance.to_be_bytes(),
+        )?;
+
+        // add: {balance}{pk} -> _
+        self.database.put_cf(
+            self.account_balance_sort_cf(),
+            u64_prefix_key(balance, &pk.0),
+            b"",
         )?;
         Ok(())
     }
@@ -372,13 +502,14 @@ impl BlockStore for IndexerStore {
     fn set_block_balance_updates(
         &self,
         state_hash: &BlockHash,
+        coinbase_receiver: PublicKey,
         balance_updates: Vec<PaymentDiff>,
     ) -> anyhow::Result<()> {
-        trace!("Setting block balance updates for {}", state_hash.0);
+        trace!("Setting block balance updates for {state_hash}");
         self.database.put_cf(
             self.account_balance_updates_cf(),
             state_hash.0.as_bytes(),
-            serde_json::to_vec(&balance_updates)?,
+            serde_json::to_vec(&(coinbase_receiver, balance_updates))?,
         )?;
         Ok(())
     }
@@ -740,12 +871,18 @@ impl BlockStore for IndexerStore {
 /// [CanonicityStore] implementation
 
 impl CanonicityStore for IndexerStore {
-    fn add_canonical_block(&self, height: u32, state_hash: &BlockHash) -> anyhow::Result<()> {
-        trace!(
-            "Adding canonical block (length {}): {}",
-            state_hash.0,
-            height
-        );
+    fn add_canonical_block(
+        &self,
+        height: u32,
+        state_hash: &BlockHash,
+        genesis_state_hash: &BlockHash,
+        genesis_prev_state_hash: Option<&BlockHash>,
+    ) -> anyhow::Result<()> {
+        if state_hash == genesis_state_hash && genesis_prev_state_hash.is_some() {
+            trace!("Adding new genesis block (length {height}): {state_hash}");
+        } else {
+            trace!("Adding canonical block (length {height}): {state_hash}");
+        }
 
         // height -> state hash
         self.database.put_cf(
@@ -762,25 +899,29 @@ impl CanonicityStore for IndexerStore {
             self.update_top_snarkers(completed_works)?;
         }
 
-        // record new genesis state hash
-        if height == 1 {
-            if let Some(mut genesis_state_hashes) = self
-                .database
-                .get_cf(self.canonicity_cf(), Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
-                .map(|bytes| {
-                    serde_json::from_slice::<Vec<BlockHash>>(&bytes).expect("genesis state hashes")
-                })
-                .clone()
-            {
-                // check if hash is present, then add it
-                if !genesis_state_hashes.contains(state_hash) {
-                    genesis_state_hashes.push(state_hash.clone());
-                    self.database.put_cf(
-                        self.canonicity_cf(),
-                        Self::KNOWN_GENESIS_STATE_HASHES_KEY,
-                        serde_json::to_vec(&genesis_state_hashes)?,
-                    )?;
-                }
+        // record new genesis/prev state hashes
+        if let Some(genesis_prev_state_hash) = genesis_prev_state_hash {
+            let (mut genesis_state_hashes, mut genesis_prev_state_hashes) = (
+                self.get_known_genesis_state_hashes()?,
+                self.get_known_genesis_prev_state_hashes()?,
+            );
+
+            // check if genesis hash is present
+            if !genesis_state_hashes.contains(genesis_state_hash) {
+                // if not
+                // add genesis state hash
+                genesis_state_hashes.push(genesis_state_hash.clone());
+                self.database.put(
+                    Self::KNOWN_GENESIS_STATE_HASHES_KEY,
+                    serde_json::to_vec(&genesis_state_hashes)?,
+                )?;
+
+                // add genesis prev state hash
+                genesis_prev_state_hashes.push(genesis_prev_state_hash.clone());
+                self.database.put(
+                    Self::KNOWN_GENESIS_PREV_STATE_HASHES_KEY,
+                    serde_json::to_vec(&genesis_prev_state_hashes)?,
+                )?;
             }
         }
 
@@ -798,9 +939,19 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting known genesis state hashes");
         Ok(self
             .database
-            .get_cf(self.canonicity_cf(), Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
+            .get(Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
             .map_or(vec![], |bytes| {
-                serde_json::from_slice(&bytes).expect("genesis state hashes")
+                serde_json::from_slice(&bytes).expect("known genesis state hashes")
+            }))
+    }
+
+    fn get_known_genesis_prev_state_hashes(&self) -> anyhow::Result<Vec<BlockHash>> {
+        trace!("Getting known genesis prev state hashes");
+        Ok(self
+            .database
+            .get(Self::KNOWN_GENESIS_PREV_STATE_HASHES_KEY)?
+            .map_or(vec![], |bytes| {
+                serde_json::from_slice(&bytes).expect("known genesis prev state hashes")
             }))
     }
 
@@ -921,6 +1072,11 @@ impl LedgerStore for IndexerStore {
         Ok(())
     }
 
+    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting best ledger");
+        self.get_ledger_state_hash(&self.get_best_block_hash()?.expect("best block"), true)
+    }
+
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
         trace!("Adding staged ledger state hash {}", state_hash.0);
 
@@ -931,7 +1087,7 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
         // index on state hash & add new ledger event
-        if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
+        if self.get_known_genesis_state_hashes()?.contains(state_hash) {
             self.add_ledger(&LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()), state_hash)?;
             self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                 DbLedgerEvent::NewLedger {
@@ -964,21 +1120,9 @@ impl LedgerStore for IndexerStore {
         state_hash: &BlockHash,
         genesis_ledger: Ledger,
     ) -> anyhow::Result<()> {
-        trace!("Adding genesis ledger {}", state_hash);
-
         // initialize account balances for sorting
         for (pk, acct) in &genesis_ledger.accounts {
-            let pk = pk.0.as_bytes();
-            self.database.put_cf(
-                self.account_balance_cf(),
-                pk,
-                acct.balance.0.to_string().as_bytes(),
-            )?;
-
-            let mut key = acct.balance.0.to_be_bytes().to_vec();
-            key.append(&mut pk.to_vec());
-            self.database
-                .put_cf(self.account_balance_sort_cf(), key, b"")?;
+            self.update_account_balance(pk, Some(acct.balance.0))?;
         }
 
         // add the ledger to the db
@@ -1197,13 +1341,17 @@ impl LedgerStore for IndexerStore {
         Ok(None)
     }
 
-    fn store_ledger_balances(&self, ledger: &Ledger) -> anyhow::Result<()> {
-        trace!("Storing ledger account balances");
+    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+        trace!("Getting account balance {pk}");
 
-        for (pk, acct) in &ledger.accounts {
-            self.set_account_balance(pk, acct.balance.0)?;
-        }
-        Ok(())
+        Ok(self
+            .database
+            .get_cf(self.account_balance_cf(), pk.0.as_bytes())?
+            .map(|bytes| {
+                let mut be_bytes = [0; 8];
+                be_bytes.copy_from_slice(&bytes[..8]);
+                u64::from_be_bytes(be_bytes)
+            }))
     }
 }
 
@@ -1374,6 +1522,15 @@ pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
 /// - `suffix`: txn hash, public key, etc
 fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
     let mut bytes = to_be_bytes(prefix);
+    bytes.append(&mut suffix.as_bytes().to_vec());
+    bytes
+}
+
+/// The first 8 bytes are `prefix` in big endian
+/// - `prefix`: balance, etc
+/// - `suffix`: txn hash, public key, etc
+fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
+    let mut bytes = prefix.to_be_bytes().to_vec();
     bytes.append(&mut suffix.as_bytes().to_vec());
     bytes
 }
@@ -1983,14 +2140,13 @@ impl SnarkStore for IndexerStore {
         Ok(top_snarkers_iterator(self, IteratorMode::End)
             .take(n)
             .map(|res| {
-                res.map(|(bytes, _)| SnarkWorkTotal {
-                    prover: String::from_utf8(bytes[8..].to_vec())
-                        .expect("public key bytes")
-                        .into(),
-                    total_fees: u64::from_be_bytes([
-                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
-                        bytes[7],
-                    ]),
+                res.map(|(bytes, _)| {
+                    let mut total_fees_bytes = [0; 8];
+                    total_fees_bytes.copy_from_slice(&bytes[..8]);
+                    SnarkWorkTotal {
+                        prover: PublicKey::from_bytes(&bytes[8..]).expect("public key"),
+                        total_fees: u64::from_be_bytes(total_fees_bytes),
+                    }
                 })
                 .expect("snark work iterator")
             })
@@ -2149,6 +2305,24 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-slot-to-height")
             .expect("block-slot-to-height column family exists")
+    }
+
+    fn block_parent_hash_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-parent-hash")
+            .expect("block-parent-hash column family exists")
+    }
+
+    fn blockchain_length_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blockchain-length")
+            .expect("blockchain-length column family exists")
+    }
+
+    fn coinbase_receiver_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("coinbase-receivers")
+            .expect("coinbase-receivers column family exists")
     }
 
     /// CF for storing blocks at a fixed height:
