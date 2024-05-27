@@ -88,7 +88,12 @@ async fn test() {
                     new_canonical_blocks.iter().for_each(|block| {
                         if let Some(store) = state1.indexer_store.as_ref() {
                             store
-                                .add_canonical_block(block.blockchain_length, &block.state_hash)
+                                .add_canonical_block(
+                                    block.blockchain_length,
+                                    &block.state_hash,
+                                    &block.genesis_state_hash,
+                                    None,
+                                )
                                 .unwrap()
                         }
                     });

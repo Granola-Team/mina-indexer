@@ -2,11 +2,9 @@ use super::precomputed::PcbVersion;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
-    ledger::{
-        diff::{account::PaymentDiff, LedgerBalanceUpdate},
-        public_key::PublicKey,
-    },
+    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
 };
+use std::collections::HashSet;
 
 pub trait BlockStore {
     /// Add block to the store
@@ -21,8 +19,28 @@ pub trait BlockStore {
     /// Get best block from the store
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
 
-    /// Get block hash from the store
+    /// Get best block hash from the store
     fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>>;
+
+    /// Set a block's previous state hash
+    fn set_block_parent_hash(
+        &self,
+        state_hash: &BlockHash,
+        previous_state_hash: &BlockHash,
+    ) -> anyhow::Result<()>;
+
+    /// Get a block's parent hash
+    fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
+
+    /// Set a block's blockchain length
+    fn set_blockchain_length(
+        &self,
+        state_hash: &BlockHash,
+        blockchain_length: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get a block's blockchain length
+    fn get_blockchain_length(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Get number of blocks at the given blockchain length
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32>;
@@ -79,29 +97,38 @@ pub trait BlockStore {
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 
-    /// Set a sorted account balance
-    fn set_account_balance(&self, pk: &PublicKey, balance: u64) -> anyhow::Result<()>;
+    /// Update pk's balance-sorted account balance
+    fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()>;
 
-    /// Generate account balance updates when the best tip changes
+    /// Generate account balance updates when the best tip changes.
+    /// Return with set of coinbase receivers.
     fn common_ancestor_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<LedgerBalanceUpdate>;
+    ) -> anyhow::Result<(Vec<PaymentDiff>, HashSet<PublicKey>)>;
 
     /// Set the balance updates for a block
     fn set_block_balance_updates(
         &self,
         state_hash: &BlockHash,
+        coinbase_receiver: PublicKey,
         balance_updates: Vec<PaymentDiff>,
     ) -> anyhow::Result<()>;
 
     /// Get a block's balance updates
-    fn get_block_balance_updates(&self, state_hash: &BlockHash)
-        -> anyhow::Result<Vec<PaymentDiff>>;
+    fn get_block_balance_updates(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<(PublicKey, Vec<PaymentDiff>)>>;
 
     /// Updates stored account balances
-    fn update_account_balances(&self, update: LedgerBalanceUpdate) -> anyhow::Result<()>;
+    fn update_account_balances(
+        &self,
+        state_hash: &BlockHash,
+        updates: Vec<PaymentDiff>,
+        coinbase_receivers: HashSet<PublicKey>,
+    ) -> anyhow::Result<()>;
 
     /// Get the epoch count of the best block
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
@@ -125,4 +152,12 @@ pub trait BlockStore {
 
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
+
+    fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
+
+    fn set_coinbase_receiver(
+        &self,
+        state_hash: &BlockHash,
+        coinbase_receiver: &PublicKey,
+    ) -> anyhow::Result<()>;
 }

@@ -29,10 +29,11 @@ impl Branch {
     }
 
     /// Creates a new `Branch` from a genesis hash
-    pub fn new_genesis(root_hash: &BlockHash) -> anyhow::Result<Self> {
+    pub fn new_genesis(root_hash: BlockHash, root_prev_hash: BlockHash) -> anyhow::Result<Self> {
         let genesis_block = Block {
             state_hash: root_hash.clone(),
-            parent_hash: root_hash.clone(),
+            genesis_state_hash: root_hash.clone(),
+            parent_hash: root_prev_hash,
             height: 0,
             blockchain_length: 1,
             global_slot_since_genesis: 0,

@@ -4,5 +4,7 @@ pub trait FixedKeys {
     const NEXT_EVENT_SEQ_NUM_KEY: &'static [u8] = "next_event_seq_num".as_bytes();
     const MAX_CANONICAL_KEY: &'static [u8] = "max_canonical_blockchain_length".as_bytes();
     const TOTAL_NUM_BLOCKS_KEY: &'static [u8] = "total_num_blocks".as_bytes();
-    const KNOWN_GENESIS_STATE_HASHES_KEY: &'static [u8] = "known_genesis_state_hashes".as_bytes();
+    const KNOWN_GENESIS_STATE_HASHES_KEY: &'static [u8] = "genesis_state_hashes".as_bytes();
+    const KNOWN_GENESIS_PREV_STATE_HASHES_KEY: &'static [u8] =
+        "genesis_prev_state_hashes".as_bytes();
 }

@@ -27,6 +27,14 @@ impl std::ops::Add<Amount> for Amount {
     }
 }
 
+impl std::ops::Sub<Amount> for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: Amount) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Nonce(pub u32);
 
@@ -90,6 +98,7 @@ pub struct Username(pub String);
 
 impl Account {
     /// Time-locked balance (subtracted from circulating supply)
+    /// as per https://docs.minaprotocol.com/mina-protocol/time-locked-accounts
     pub fn current_minimum_balance(&self, curr_global_slot: u32) -> u64 {
         self.timing.as_ref().map_or(0, |t| {
             if curr_global_slot < t.cliff_time {
@@ -133,14 +142,12 @@ impl Account {
     }
 
     pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
-        Account {
-            balance: if pre.balance.0 == 0 {
-                amount.sub(&MAINNET_ACCOUNT_CREATION_FEE)
-            } else {
-                pre.balance.add(&amount)
-            },
-            ..pre
-        }
+        let balance = if pre.balance.0 == 0 {
+            amount - MAINNET_ACCOUNT_CREATION_FEE
+        } else {
+            pre.balance + amount
+        };
+        Account { balance, ..pre }
     }
 
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
@@ -159,7 +166,7 @@ impl Account {
             None
         } else {
             Some(Account {
-                balance: pre.balance.sub(&amount),
+                balance: pre.balance - amount,
                 nonce: Nonce(nonce.unwrap_or(pre.nonce.0)),
                 ..pre
             })
@@ -169,7 +176,7 @@ impl Account {
     fn from_credit(pre: Self, amount: Amount) -> Self {
         Account {
             public_key: pre.public_key.clone(),
-            balance: pre.balance.add(&amount),
+            balance: pre.balance + amount,
             nonce: Nonce(pre.nonce.0 + 1),
             ..pre
         }
@@ -191,14 +198,9 @@ impl Account {
     }
 }
 
-impl std::default::Default for Username {
-    fn default() -> Self {
-        Self("Unknown".to_string())
-    }
-}
-
 impl From<GenesisBlock> for Account {
     fn from(value: GenesisBlock) -> Self {
+        // magic mina
         let block_creator = value.0.block_creator();
         Account {
             public_key: block_creator.clone(),
@@ -219,13 +221,18 @@ impl From<GenesisBlock> for Account {
 
 impl PartialOrd for Account {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.public_key.cmp(&other.public_key))
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Account {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.public_key.cmp(&other.public_key)
+        let balance_cmp = self.balance.cmp(&other.balance);
+        if balance_cmp == std::cmp::Ordering::Equal {
+            self.public_key.cmp(&other.public_key)
+        } else {
+            balance_cmp
+        }
     }
 }
 
@@ -244,6 +251,18 @@ pub fn nanomina_to_mina(num: u64) -> String {
         }
     }
     dec_str
+}
+
+impl std::default::Default for Username {
+    fn default() -> Self {
+        Self("Unknown".to_string())
+    }
+}
+
+impl std::fmt::Display for Username {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 impl std::fmt::Display for Account {

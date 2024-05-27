@@ -1,10 +1,12 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    ledger::{account, store::LedgerStore},
+    ledger::{account, public_key::PublicKey, store::LedgerStore},
+    store::account_balance_iterator,
     web::graphql::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use speedb::IteratorMode;
 
 #[derive(SimpleObject)]
 pub struct Account {
@@ -96,51 +98,37 @@ impl AccountQueryRoot {
         }
 
         // TODO default query handler use balance-sorted accounts
-        let mut accounts: Vec<Account> = if let Some(query) = query {
-            ledger
-                .accounts
-                .into_values()
-                .filter(|account| query.matches(account))
-                .map(|acct| {
-                    let pk = acct.public_key.clone();
-                    Account::from((
-                        acct,
-                        db.get_block_production_pk_epoch_count(&pk, None)
-                            .expect("pk epoch block count"),
-                        db.get_block_production_pk_total_count(&pk)
-                            .expect("pk total block count"),
-                    ))
-                })
-                .collect()
-        } else {
-            ledger
-                .accounts
-                .into_values()
-                .map(|acct| {
-                    let pk = acct.public_key.clone();
-                    Account::from((
-                        acct,
-                        db.get_block_production_pk_epoch_count(&pk, None)
-                            .expect("pk epoch block count"),
-                        db.get_block_production_pk_total_count(&pk)
-                            .expect("pk total block count"),
-                    ))
-                })
-                .collect()
+        let mut accounts: Vec<Account> = vec![];
+        let best_block = db.get_best_block_hash()?.expect("best block");
+        let best_ledger = db
+            .get_ledger_state_hash(&best_block, false)?
+            .expect("best ledger");
+        let mode = match sort_by {
+            Some(AccountSortByInput::BalanceAsc) => IteratorMode::Start,
+            Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
         };
 
-        if let Some(sort_by) = sort_by {
-            match sort_by {
-                AccountSortByInput::BalanceDesc => {
-                    accounts.sort_by(|a, b| b.balance.cmp(&a.balance));
-                }
-                AccountSortByInput::BalanceAsc => {
-                    accounts.sort_by(|a, b| a.balance.cmp(&b.balance));
+        for (key, _) in account_balance_iterator(db, mode).flatten() {
+            let pk = PublicKey::from_bytes(&key[8..])?;
+            let account = best_ledger.accounts.get(&pk).expect("account in ledger");
+
+            if query.as_ref().map_or(true, |q| q.matches(account)) {
+                let account = (
+                    account.clone(),
+                    db.get_block_production_pk_epoch_count(&pk, None)
+                        .expect("pk epoch block count"),
+                    db.get_block_production_pk_total_count(&pk)
+                        .expect("pk total block count"),
+                )
+                    .into();
+                accounts.push(account);
+
+                if accounts.len() == limit {
+                    break;
                 }
             }
         }
 
-        accounts.truncate(limit);
         Ok(Some(accounts))
     }
 }

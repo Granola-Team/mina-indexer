@@ -86,16 +86,14 @@ impl CoinbaseKind {
 
 impl Coinbase {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let consensus_state = precomputed_block.consensus_state();
-        let receiver: PublicKey = consensus_state.coinbase_receiver.into();
-        let supercharge = consensus_state.supercharge_coinbase;
+        let receiver: PublicKey = precomputed_block.consensus_state().coinbase_receiver.into();
+        let supercharge = precomputed_block.consensus_state().supercharge_coinbase;
         let kind = CoinbaseKind::from_precomputed(precomputed_block);
         let kind = if kind.len() < 2 {
             kind[0].clone()
         } else {
             kind[1].clone()
         };
-
         Self {
             kind,
             receiver,

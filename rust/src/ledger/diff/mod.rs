@@ -3,9 +3,11 @@ pub mod account;
 use self::account::{
     AccountDiff, AccountDiffType, FailedTransactionNonceDiff, PaymentDiff, UpdateType,
 };
+use super::account::Amount;
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{internal::InternalCommand, Command, Payment, UserCommandWithStatusT},
+    constants::MAINNET_GENESIS_HASH,
     ledger::{coinbase::Coinbase, PublicKey},
 };
 use serde::{Deserialize, Serialize};
@@ -18,27 +20,20 @@ pub struct LedgerDiff {
 }
 
 /// Only used in the indexer store for balance sorting
-#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LedgerBalanceUpdate {
     pub apply: Vec<PaymentDiff>,
     pub unapply: Vec<PaymentDiff>,
 }
 
 impl LedgerBalanceUpdate {
-    pub fn balance_updates(&mut self) -> HashMap<PublicKey, i64> {
-        let mut diffs: Vec<PaymentDiff> = self
-            .unapply
-            .clone()
-            .into_iter()
-            .map(|diff| diff.unapply())
-            .collect();
-        diffs.append(&mut self.apply);
-
+    pub fn balance_updates(diffs: Vec<PaymentDiff>) -> HashMap<String, i64> {
         let mut res = HashMap::new();
         for diff in diffs {
-            let acc = res.remove(&diff.public_key).unwrap_or(0);
+            let pk = diff.public_key.0;
+            let acc = res.remove(&pk).unwrap_or(0);
             res.insert(
-                diff.public_key,
+                pk,
                 match diff.update_type {
                     UpdateType::Credit => acc + diff.amount.0 as i64,
                     UpdateType::Debit(_) => acc - diff.amount.0 as i64,
@@ -48,7 +43,29 @@ impl LedgerBalanceUpdate {
         res
     }
 
+    /// Unapply `self.unapply` & apply `self.apply` diffs
+    pub fn to_diff_vec(self) -> Vec<PaymentDiff> {
+        [
+            self.unapply
+                .into_iter()
+                .map(|diff| diff.unapply())
+                .collect(),
+            self.apply,
+        ]
+        .concat()
+    }
+
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<PaymentDiff> {
+        // magic mina
+        if block.state_hash().0 == MAINNET_GENESIS_HASH {
+            return vec![PaymentDiff {
+                update_type: UpdateType::Credit,
+                public_key: block.block_creator(),
+                amount: Amount(1000_u64),
+            }];
+        }
+
+        // otherwise
         [
             Command::from_precomputed(block)
                 .into_iter()
@@ -197,6 +214,12 @@ impl LedgerDiff {
         });
     }
 
+    pub fn append_vec(diffs: Vec<Self>) -> Self {
+        let mut acc = Self::default();
+        diffs.iter().for_each(|diff| acc.append(diff.clone()));
+        acc
+    }
+
     pub fn from(value: &[(&str, &str, AccountDiffType, u64)]) -> Vec<AccountDiff> {
         value
             .iter()
@@ -212,6 +235,16 @@ impl std::fmt::Debug for LedgerDiff {
             writeln!(f, "{account_diff:?}")?;
         }
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for LedgerBalanceUpdate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "apply: {:#?}\n  unapply: {:#?}",
+            self.apply, self.unapply
+        )
     }
 }
 

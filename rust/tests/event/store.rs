@@ -37,6 +37,7 @@ fn add_and_get_events() {
     let block = Block {
         parent_hash: "parent_hash".into(),
         state_hash: "state_hash".into(),
+        genesis_state_hash: "genesis_hash".into(),
         height: 0,
         blockchain_length: 1,
         global_slot_since_genesis: 0,

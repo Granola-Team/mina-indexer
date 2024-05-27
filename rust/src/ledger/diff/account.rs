@@ -282,6 +282,20 @@ impl PaymentDiff {
             amount,
         }
     }
+
+    pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
+        match diff {
+            AccountDiff::Payment(diff)
+            | AccountDiff::FeeTransfer(diff)
+            | AccountDiff::FeeTransferViaCoinbase(diff) => Some(diff),
+            AccountDiff::Coinbase(cb_diff) => Some(Self {
+                update_type: UpdateType::Credit,
+                public_key: cb_diff.public_key,
+                amount: cb_diff.amount,
+            }),
+            AccountDiff::Delegation(_) | AccountDiff::FailedTransactionNonce(_) => None,
+        }
+    }
 }
 
 impl std::fmt::Debug for PaymentDiff {
