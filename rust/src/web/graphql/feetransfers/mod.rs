@@ -52,8 +52,15 @@ impl FeetransferWithMeta {
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
         let total_num_blocks = db.get_block_production_total_count()?;
+        let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
+        let total_num_user_commands = db.get_user_commands_total_count()?;
         Ok(self.block.clone().map(|block| BlockWithCanonicity {
-            block: Block::new(block, self.canonical),
+            block: Block::new(
+                block,
+                self.canonical,
+                epoch_num_user_commands,
+                total_num_user_commands,
+            ),
             canonical: self.canonical,
             total_num_blocks,
         }))
@@ -64,26 +71,35 @@ impl FeetransferWithMeta {
 pub struct FeetransferQueryInput {
     /// Value block height
     block_height: Option<u32>,
+
     /// Value block state hash
     block_state_hash: Option<BlockQueryInput>,
+
     /// Value canonical
     canonical: Option<bool>,
+
     ///Value recipient
     recipient: Option<String>,
+
     /// Value block height greater than
     #[graphql(name = "blockHeight_gt")]
     pub block_height_gt: Option<u32>,
+
     /// Value block height greater than or equal to
     #[graphql(name = "blockHeight_gte")]
     pub block_height_gte: Option<u32>,
+
     /// Value block height less than
     #[graphql(name = "blockHeight_lt")]
     pub block_height_lt: Option<u32>,
+
     /// Value block height less than or equal to
     #[graphql(name = "blockHeight_lte")]
     pub block_height_lte: Option<u32>,
+
     /// Value and
     and: Option<Vec<FeetransferQueryInput>>,
+
     /// Value or
     or: Option<Vec<FeetransferQueryInput>>,
 }

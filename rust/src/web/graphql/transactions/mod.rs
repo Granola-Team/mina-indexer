@@ -33,11 +33,19 @@ impl TransactionsQueryRoot {
         query: TransactionQueryInput,
     ) -> Result<Option<TransactionWithBlock>> {
         let db = db(ctx);
+        let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
+        let total_num_user_commands = db.get_user_commands_total_count()?;
+
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
-                return Ok(db
-                    .get_command_by_hash(&hash)?
-                    .map(|cmd| TransactionWithBlock::new(cmd, db)));
+                return Ok(db.get_command_by_hash(&hash)?.map(|cmd| {
+                    TransactionWithBlock::new(
+                        cmd,
+                        db,
+                        epoch_num_user_commands,
+                        total_num_user_commands,
+                    )
+                }));
             }
         }
 
@@ -52,6 +60,8 @@ impl TransactionsQueryRoot {
         sort_by: TransactionSortByInput,
     ) -> Result<Vec<TransactionWithBlock>> {
         let db = db(ctx);
+        let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
+        let total_num_user_commands = db.get_user_commands_total_count()?;
 
         // block height query
         if let Some(block_height) = query.block_height {
@@ -59,7 +69,14 @@ impl TransactionsQueryRoot {
                 .get_blocks_at_height(block_height)?
                 .into_iter()
                 .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
-                .map(|cmd| TransactionWithBlock::new(cmd, db))
+                .map(|cmd| {
+                    TransactionWithBlock::new(
+                        cmd,
+                        db,
+                        epoch_num_user_commands,
+                        total_num_user_commands,
+                    )
+                })
                 .filter(|txn| query.matches(txn))
                 .collect();
             reorder_asc(&mut transactions, sort_by);
@@ -101,7 +118,12 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_command_by_hash(&txn_hash)?
                     .expect("command at txn hash");
-                let txn = TransactionWithBlock::new(cmd, db);
+                let txn = TransactionWithBlock::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                );
 
                 // include matching txns
                 if query.matches(&txn) {
@@ -133,7 +155,12 @@ impl TransactionsQueryRoot {
 
             // Only add transactions that satisfy the input query
             let cmd = user_commands_iterator_signed_command(&entry.1)?;
-            let txn = TransactionWithBlock::new(cmd, db);
+            let txn = TransactionWithBlock::new(
+                cmd,
+                db,
+                epoch_num_user_commands,
+                total_num_user_commands,
+            );
 
             if query.matches(&txn) {
                 transactions.push(txn);
@@ -158,11 +185,21 @@ fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
 }
 
 impl TransactionWithBlock {
-    fn new(cmd: SignedCommandWithData, db: &Arc<IndexerStore>) -> TransactionWithBlock {
+    fn new(
+        cmd: SignedCommandWithData,
+        db: &Arc<IndexerStore>,
+        epoch_num_user_commands: u32,
+        total_num_user_commands: u32,
+    ) -> TransactionWithBlock {
         let block_state_hash = cmd.state_hash.to_owned();
         let block_date_time = date_time_to_scalar(cmd.date_time as i64);
         TransactionWithBlock {
-            transaction: Transaction::new(cmd, get_block_canonicity(db, &block_state_hash.0)),
+            transaction: Transaction::new(
+                cmd,
+                get_block_canonicity(db, &block_state_hash.0),
+                epoch_num_user_commands,
+                total_num_user_commands,
+            ),
             block: TransactionBlock {
                 date_time: block_date_time,
                 state_hash: block_state_hash.0.to_owned(),
@@ -179,7 +216,12 @@ pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
 }
 
 impl Transaction {
-    pub fn new(cmd: SignedCommandWithData, canonical: bool) -> Self {
+    pub fn new(
+        cmd: SignedCommandWithData,
+        canonical: bool,
+        epoch_num_user_commands: u32,
+        total_num_user_commands: u32,
+    ) -> Self {
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => "".to_owned(),
             CommandStatusData::Failed(failed_types, _) => failed_types
@@ -231,6 +273,8 @@ impl Transaction {
                     },
                     to: receiver,
                     token: Some(token_id),
+                    epoch_num_user_commands,
+                    total_num_user_commands,
                 }
             }
         }
@@ -434,6 +478,12 @@ pub struct Transaction {
     receiver: PK,
     to: String,
     token: Option<u64>,
+
+    #[graphql(name = "epoch_num_user_commands")]
+    epoch_num_user_commands: u32,
+
+    #[graphql(name = "total_num_user_commands")]
+    total_num_user_commands: u32,
 }
 
 #[derive(Clone, Debug, SimpleObject)]

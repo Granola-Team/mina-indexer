@@ -1,6 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
+    command::store::CommandStore,
     ledger::{account, public_key::PublicKey, store::LedgerStore},
     store::account_balance_iterator,
     web::graphql::Timing,
@@ -23,6 +24,12 @@ pub struct Account {
 
     #[graphql(name = "pk_total_num_blocks")]
     pk_total_num_blocks: u32,
+
+    #[graphql(name = "pk_epoch_num_user_commands")]
+    pk_epoch_num_user_commands: u32,
+
+    #[graphql(name = "pk_total_num_user_commands")]
+    pk_total_num_user_commands: u32,
 }
 
 #[derive(InputObject)]
@@ -93,16 +100,17 @@ impl AccountQueryRoot {
                             .expect("pk epoch block count"),
                         db.get_block_production_pk_total_count(&pk)
                             .expect("pk total block count"),
+                        db.get_user_commands_pk_epoch_count(&pk, None)
+                            .expect("pk epoch user commands count"),
+                        db.get_user_commands_pk_total_count(&pk)
+                            .expect("pk total user commands count"),
                     ))]
                 }));
         }
 
         // TODO default query handler use balance-sorted accounts
-        let mut accounts: Vec<Account> = vec![];
-        let best_block = db.get_best_block_hash()?.expect("best block");
-        let best_ledger = db
-            .get_ledger_state_hash(&best_block, false)?
-            .expect("best ledger");
+        let mut accounts: Vec<Account> = Vec::with_capacity(limit);
+        let best_ledger = db.get_best_ledger()?.expect("best ledger");
         let mode = match sort_by {
             Some(AccountSortByInput::BalanceAsc) => IteratorMode::Start,
             Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
@@ -119,6 +127,10 @@ impl AccountQueryRoot {
                         .expect("pk epoch block count"),
                     db.get_block_production_pk_total_count(&pk)
                         .expect("pk total block count"),
+                    db.get_user_commands_pk_epoch_count(&pk, None)
+                        .expect("pk epoch user command count"),
+                    db.get_user_commands_pk_total_count(&pk)
+                        .expect("pk total user command count"),
                 )
                     .into();
                 accounts.push(account);
@@ -177,8 +189,8 @@ impl AccountQueryInput {
     }
 }
 
-impl From<(account::Account, u32, u32)> for Account {
-    fn from(account: (account::Account, u32, u32)) -> Self {
+impl From<(account::Account, u32, u32, u32, u32)> for Account {
+    fn from(account: (account::Account, u32, u32, u32, u32)) -> Self {
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
@@ -192,6 +204,8 @@ impl From<(account::Account, u32, u32)> for Account {
                 .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
             pk_epoch_num_blocks: account.1,
             pk_total_num_blocks: account.2,
+            pk_epoch_num_user_commands: account.3,
+            pk_total_num_user_commands: account.4,
         }
     }
 }
