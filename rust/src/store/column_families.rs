@@ -1,8 +1,8 @@
+/// Indexer store column family helper trait
 use speedb::ColumnFamily;
 
-/// Indexer store column family helper trait
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 33;
+    const NUM_COLUMN_FAMILIES: usize = 36;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -96,4 +96,13 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per acccount user command totals
     fn user_commands_pk_total_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch snark totals
+    fn snarks_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch per acccount snark totals
+    fn snarks_pk_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for per acccount snark totals
+    fn snarks_pk_total_cf(&self) -> &ColumnFamily;
 }
