@@ -64,4 +64,43 @@ pub trait CommandStore {
 
     /// Get internal commands interator starting from
     fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_>;
+
+    /// Increment user commands per epoch count
+    fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;
+
+    /// Get user commands per epoch count
+    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
+
+    /// Increment user commands total count
+    fn increment_user_commands_total_count(&self) -> anyhow::Result<()>;
+
+    /// Get user commands total count
+    fn get_user_commands_total_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment user commands per epoch per account count
+    fn increment_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get user commands per epoch per account count
+    fn get_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
+
+    /// Increment user commands per account total
+    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()>;
+
+    /// Get user commands per account total
+    fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
+
+    /// Increment user commands counts given `command` in `epoch`
+    fn increment_user_commands_counts(
+        &self,
+        command: &UserCommandWithStatus,
+        epoch: u32,
+    ) -> anyhow::Result<()>;
 }
