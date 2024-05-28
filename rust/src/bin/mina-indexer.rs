@@ -15,8 +15,10 @@ use mina_indexer::{
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use stderrlog::{ColorChoice, Timestamp};
 
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("GIT_COMMIT_HASH"));
+
 #[derive(Parser, Debug)]
-#[command(name = "mina-indexer", author, version, about, long_about = Some("Mina Indexer\n\n\
+#[command(name = "mina-indexer", author, version = VERSION, about, long_about = Some("Mina Indexer\n\n\
 Efficiently index and query the Mina blockchain"))]
 struct Cli {
     #[command(subcommand)]
