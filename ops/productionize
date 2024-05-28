@@ -7,6 +7,11 @@ set -o pipefail
 #
 SRC="$(git rev-parse --show-toplevel)"
 
+# Confirm that the binary is present and working.
+#
+BIN="$SRC"/rust/target/release/mina-indexer
+"$BIN" --help
+
 # We must configure:
 # 1. A directory to store files related to the mina-indexer, $PROD.
 # 2. The filesystem name of a socket to use for comms, $SOCKET.

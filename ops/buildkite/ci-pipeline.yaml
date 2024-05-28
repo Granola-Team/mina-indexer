@@ -10,7 +10,9 @@ steps:
   depends_on: "build"
   agents:
     production: true
-  command: "./ops/productionize"
+  command: |
+    nix develop --command just build
+    ./ops/productionize
 
 - label: "Create OCI Image"
   if: build.branch == "main"
