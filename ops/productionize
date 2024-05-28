@@ -90,5 +90,3 @@ setsid \
 # fully launch.
 #
 wait $!
-
-echo "Productionized!"
