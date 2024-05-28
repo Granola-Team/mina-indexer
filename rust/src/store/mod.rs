@@ -53,7 +53,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 30] = [
+    const COLUMN_FAMILIES: [&'static str; 33] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -80,10 +80,13 @@ impl IndexerStore {
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
-        "snark-work-fees",     // [snark_work_fees_cf]
-        "chain-id-to-network", // [chain_id_to_network_cf]
-        "txn-from",            // [txn_from_cf]
-        "txn-to",              // [txn_to_cf]
+        "snark-work-fees",        // [snark_work_fees_cf]
+        "chain-id-to-network",    // [chain_id_to_network_cf]
+        "txn-from",               // [txn_from_cf]
+        "txn-to",                 // [txn_to_cf]
+        "user-commands-epoch",    // [user_commands_epoch_cf]
+        "user-commands-pk-epoch", // [user_commands_pk_epoch_cf]
+        "user-commands-pk-total", // [user_commands_pk_total_cf]
     ];
 
     /// Creates a new _primary_ indexer store
@@ -1568,6 +1571,7 @@ impl CommandStore for IndexerStore {
     fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
+        let epoch = block.epoch_count();
         let user_commands = block.commands();
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
@@ -1591,6 +1595,18 @@ impl CommandStore for IndexerStore {
 
             // add: key (txn hash) -> value (global slot) so we can
             // reconstruct the key
+            if self
+                .database
+                .get_cf(
+                    self.commands_txn_hash_to_global_slot_mainnet_cf(),
+                    txn_hash.as_bytes(),
+                )?
+                .is_none()
+            {
+                // if not present already, increment counts
+                self.increment_user_commands_counts(command, epoch)?;
+            }
+
             self.database.put_cf(
                 self.commands_txn_hash_to_global_slot_mainnet_cf(),
                 txn_hash.as_bytes(),
@@ -1925,6 +1941,119 @@ impl CommandStore for IndexerStore {
 
     fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.internal_commands_cf(), mode)
+    }
+
+    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting user command epoch {epoch}");
+        Ok(self
+            .database
+            .get_cf(self.user_commands_epoch_cf(), to_be_bytes(epoch))?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
+        trace!("Incrementing user command epoch {epoch}");
+        let old = self.get_user_commands_epoch_count(Some(epoch))?;
+        Ok(self.database.put_cf(
+            self.user_commands_epoch_cf(),
+            to_be_bytes(epoch),
+            to_be_bytes(old + 1),
+        )?)
+    }
+
+    fn get_user_commands_total_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting user command total");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn increment_user_commands_total_count(&self) -> anyhow::Result<()> {
+        trace!("Incrementing user command total");
+
+        let old = self.get_user_commands_total_count()?;
+        Ok(self
+            .database
+            .put(Self::TOTAL_NUM_USER_COMMANDS_KEY, to_be_bytes(old + 1))?)
+    }
+
+    fn get_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting user command epoch {epoch} num {pk}");
+        Ok(self
+            .database
+            .get_cf(
+                self.user_commands_pk_epoch_cf(),
+                u32_prefix_key(epoch, &pk.0),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn increment_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Incrementing pk epoch {epoch} user commands count {pk}");
+
+        let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
+        Ok(self.database.put_cf(
+            self.user_commands_pk_epoch_cf(),
+            u32_prefix_key(epoch, &pk.0),
+            to_be_bytes(old + 1),
+        )?)
+    }
+
+    fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+        trace!("Getting pk total user commands count {pk}");
+        Ok(self
+            .database
+            .get_cf(self.user_commands_pk_total_cf(), pk.0.as_bytes())?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
+        trace!("Incrementing user command pk total num {pk}");
+
+        let old = self.get_user_commands_pk_total_count(pk)?;
+        Ok(self.database.put_cf(
+            self.user_commands_pk_total_cf(),
+            pk.0.as_bytes(),
+            to_be_bytes(old + 1),
+        )?)
+    }
+
+    fn increment_user_commands_counts(
+        &self,
+        command: &UserCommandWithStatus,
+        epoch: u32,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Incrementing user commands counts {:?}",
+            command.to_command()
+        );
+
+        // sender epoch & total
+        let sender = command.sender();
+        self.increment_user_commands_pk_epoch_count(&sender, epoch)?;
+        self.increment_user_commands_pk_total_count(&sender)?;
+
+        // receiver epoch & total
+        let receiver = command.receiver();
+        if sender != receiver {
+            self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
+            self.increment_user_commands_pk_total_count(&receiver)?;
+        }
+
+        // epoch & total counts
+        self.increment_user_commands_epoch_count(epoch)?;
+        self.increment_user_commands_total_count()
     }
 }
 
@@ -2466,5 +2595,32 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-production-epoch")
             .expect("block-production-epoch column family exists")
+    }
+
+    /// CF for per epoch per account user commands
+    /// - key: `{epoch BE bytes}{pk}`
+    /// - value: number of `pk` user commands in `epoch`
+    fn user_commands_pk_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-pk-epoch")
+            .expect("user-commands-pk-epoch column family exists")
+    }
+
+    /// CF for per account total user commands
+    /// - key: `pk`
+    /// - value: total number of `pk` user commands
+    fn user_commands_pk_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-pk-total")
+            .expect("user-commands-pk-total column family exists")
+    }
+
+    /// CF for per epoch total user commands
+    /// - key: `epoch`
+    /// - value: number of user commands in `epoch`
+    fn user_commands_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-epoch")
+            .expect("user-commands-epoch column family exists")
     }
 }

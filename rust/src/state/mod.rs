@@ -822,6 +822,9 @@ impl IndexerState {
             .unwrap()
         {
             best_chain.push(b.data().clone());
+            if b.data() == self.canonical_root_block() {
+                break;
+            }
         }
         best_chain
     }
@@ -834,7 +837,13 @@ impl IndexerState {
 
         let diffs: Vec<LedgerDiff> = best_chain
             .iter()
-            .map(|b| self.diffs_map.get(&b.state_hash).unwrap().clone())
+            .map(|b| {
+                self.diffs_map
+                    .get(&b.state_hash)
+                    .with_context(|| format!("(length {}) {}", b.height, b.state_hash.0))
+                    .unwrap()
+                    .clone()
+            })
             .collect();
         best_ledger
             .apply_diff(&LedgerDiff::append_vec(diffs))
@@ -1426,11 +1435,11 @@ impl IndexerState {
             .traverse_level_order_ids(old_canonical_root_id)
             .unwrap()
         {
-            if self.get_block_from_id(&node_id) != self.canonical_root_block()
-                && self.get_block_from_id(&node_id).height <= self.canonical_root_block().height
+            let block = self.get_block_from_id(&node_id);
+            if block != self.canonical_root_block()
+                && block.height <= self.canonical_root_block().height
             {
-                self.diffs_map
-                    .remove(&self.get_block_from_id(&node_id).state_hash.clone());
+                self.diffs_map.remove(&block.state_hash.clone());
             }
         }
         Ok(())
