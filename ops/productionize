@@ -10,7 +10,7 @@ SRC="$(git rev-parse --show-toplevel)"
 # Confirm that the binary is present and working.
 #
 BIN="$SRC"/rust/target/release/mina-indexer
-"$BIN" --help
+"$BIN" --version
 
 # We must configure:
 # 1. A directory to store files related to the mina-indexer, $PROD.
