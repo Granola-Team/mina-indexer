@@ -13,11 +13,3 @@ steps:
   command: |
     nix develop --command just build
     ./ops/productionize
-
-- label: "Create OCI Image"
-  if: build.branch == "main"
-  key: image
-  depends_on: "build"
-  agents:
-    docker: true
-  command: "./ops/build-oci-image"
