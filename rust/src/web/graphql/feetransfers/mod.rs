@@ -134,11 +134,13 @@ impl FeetransferQueryRoot {
         {
             return Ok(get_fee_transfers_for_state_hash(
                 db,
+                &query,
                 &state_hash.into(),
                 sort_by,
                 limit,
             ));
         }
+
         // block height bounded query
         if query.as_ref().map_or(false, |q| {
             q.block_height_gt.is_some()
@@ -147,35 +149,43 @@ impl FeetransferQueryRoot {
                 || q.block_height_lte.is_some()
         }) {
             let mut feetransfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
-            let (min, max) = match query.as_ref() {
-                Some(feetranser_query_input) => {
-                    let FeetransferQueryInput {
-                        block_height_gt,
-                        block_height_gte,
-                        block_height_lt,
-                        block_height_lte,
-                        ..
-                    } = feetranser_query_input;
-                    (
-                        // min = max of the gt(e) heights or 1
-                        block_height_gt
-                            .map(|h| h.max(block_height_gte.unwrap_or_default()))
-                            .unwrap_or(1),
-                        // max = max of the lt(e) heights or best tip height
-                        block_height_lt
-                            .map(|h| h.max(block_height_lte.unwrap_or_default()))
-                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
-                            .min(db.get_best_block()?.unwrap().blockchain_length()),
-                    )
-                }
-                None => (1, db.get_best_block()?.unwrap().blockchain_length()),
+            let (min, max) = {
+                let FeetransferQueryInput {
+                    block_height_gt,
+                    block_height_gte,
+                    block_height_lt,
+                    block_height_lte,
+                    ..
+                } = query.as_ref().expect("query will contain a value");
+                let min_bound = match (*block_height_gte, *block_height_gt) {
+                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+
+                let max_bound = match (*block_height_lte, *block_height_lt) {
+                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                };
+                (min_bound, max_bound)
             };
 
-            let block_heights: Vec<u32> = (min..=max).collect();
+            let mut block_heights: Vec<u32> = (min..=max).collect();
+            let sort_by = sort_by.unwrap_or(FeetransferSortByInput::BlockHeightDesc);
+            if sort_by == FeetransferSortByInput::BlockHeightDesc {
+                block_heights.reverse()
+            }
+            let mut early_exit = false;
             for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     let canonical = get_block_canonicity(db, &block.state_hash().0);
-                    let internal_cmds = InternalCommandWithData::from_precomputed(&block);
+                    let mut internal_cmds = InternalCommandWithData::from_precomputed(&block);
+                    if sort_by == FeetransferSortByInput::BlockHeightDesc {
+                        internal_cmds.reverse()
+                    }
                     for internal_cmd in internal_cmds {
                         let ft = Feetransfer::from(internal_cmd);
                         let feetransfer_with_meta = FeetransferWithMeta {
@@ -189,15 +199,19 @@ impl FeetransferQueryRoot {
                         {
                             feetransfers.push(feetransfer_with_meta);
                         }
+                        if feetransfers.len() == limit {
+                            early_exit = true;
+                            break;
+                        }
+                    }
+                    if early_exit {
+                        break;
                     }
                 }
+                if early_exit {
+                    break;
+                }
             }
-            let sort_by = sort_by.unwrap_or(FeetransferSortByInput::BlockHeightDesc);
-            if sort_by == FeetransferSortByInput::BlockHeightDesc {
-                feetransfers.reverse()
-            }
-
-            feetransfers.truncate(limit);
             return Ok(feetransfers);
         }
 
@@ -220,6 +234,7 @@ impl FeetransferQueryRoot {
                         block: Some(pcb),
                     }
                 })
+                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
                 .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
             fee_transfers.truncate(limit);
@@ -274,6 +289,7 @@ fn get_fee_transfers(
 
 fn get_fee_transfers_for_state_hash(
     db: &Arc<IndexerStore>,
+    query: &Option<FeetransferQueryInput>,
     state_hash: &BlockHash,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
@@ -295,6 +311,7 @@ fn get_fee_transfers_for_state_hash(
                     feetransfer: Feetransfer::from(ft),
                     block: Some(pcb.clone()),
                 })
+                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
                 .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
 
@@ -367,42 +384,57 @@ impl FeetransferQueryInput {
             block_height_lte,
             ..
         } = self;
-        let pcb = ft.block.as_ref().unwrap();
+
+        if let Some(canonical) = &self.canonical {
+            if &ft.canonical != canonical {
+                return false;
+            }
+        }
+
+        let pcb = ft.block.as_ref().expect("block will exist");
         let blockchain_length = pcb.blockchain_length();
-        let mut matches = true;
+
         // block_height_gt(e) & block_height_lt(e)
         if let Some(height) = block_height_gt {
-            matches &= blockchain_length > *height;
+            if blockchain_length <= *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_gte {
-            matches &= blockchain_length >= *height;
+            if blockchain_length < *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_lt {
-            matches &= blockchain_length < *height;
+            if blockchain_length >= *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_lte {
-            matches &= blockchain_length <= *height;
+            if blockchain_length > *height {
+                return false;
+            }
         }
 
         if let Some(block_query_input) = &self.block_state_hash {
             if let Some(state_hash) = &block_query_input.state_hash {
-                matches &= &ft.feetransfer.state_hash == state_hash;
+                if &ft.feetransfer.state_hash != state_hash {
+                    return false;
+                }
             }
-        }
-
-        if let Some(canonical) = &self.canonical {
-            matches = matches && &ft.canonical == canonical;
         }
 
         if let Some(query) = &self.and {
-            matches = matches && query.iter().all(|and| and.matches(ft));
+            if !(query.iter().all(|and| and.matches(ft))) {
+                return false;
+            }
         }
 
         if let Some(query) = &self.or {
-            if !query.is_empty() {
-                matches = matches && query.iter().any(|or| or.matches(ft));
+            if !query.is_empty() && !(query.iter().any(|or| or.matches(ft))) {
+                return false;
             }
         }
-        matches
+        true
     }
 }

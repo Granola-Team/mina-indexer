@@ -115,3 +115,78 @@ jsonpath "$.data.feetransfers" count == 100
 
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[99].blockHeight" == 71
+
+POST {{url}}
+```graphql
+query InternalCommandsQuery(
+  $sort_by: FeetransferSortByInput!
+  $limit: Int = 10
+  $query: FeetransferQueryInput!
+) {
+  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
+    blockHeight
+    blockStateHash {
+      stateHash
+    }
+    fee
+    recipient
+    type
+    dateTime
+    canonical
+  }
+}
+
+variables {
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "limit": 100,
+  "query": {
+    "canonical": true,
+    "blockHeight_lte": 120
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.feetransfers" count == 100
+
+jsonpath "$.data.feetransfers[0].blockHeight" == 120
+jsonpath "$.data.feetransfers[99].blockHeight" == 71
+
+
+POST {{url}}
+```graphql
+query InternalCommandsQuery(
+  $sort_by: FeetransferSortByInput!
+  $limit: Int = 10
+  $query: FeetransferQueryInput!
+) {
+  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
+    blockHeight
+    blockStateHash {
+      stateHash
+    }
+    fee
+    recipient
+    type
+    dateTime
+    canonical
+  }
+}
+
+variables {
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "limit": 100,
+  "query": {
+    "canonical": true,
+    "blockHeight_lte": 100,
+    "blockStateHash": {
+      "stateHash": "3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66"
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.feetransfers" count == 0
