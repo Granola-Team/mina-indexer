@@ -99,6 +99,8 @@ POST {{url}}
     block {
       stateHash
     }
+    epoch_num_snarks
+    total_num_snarks
   }
 }
 ```
@@ -111,6 +113,8 @@ jsonpath "$.data.snarks" count == 64
 # first datum
 jsonpath "$.data.snarks[0].blockHeight" == 111
 jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+jsonpath "$.data.snarks[0].epoch_num_snarks" == 128
+jsonpath "$.data.snarks[0].total_num_snarks" == 128
 
 # last datum
 jsonpath "$.data.snarks[63].blockHeight" == 111

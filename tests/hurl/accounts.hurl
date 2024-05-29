@@ -109,6 +109,33 @@ jsonpath "$.data.accounts[0].pk_total_num_blocks" == 5
 duration < 500
 
 #
+# Accounts public key epoch & total snarks query
+#
+
+POST {{url}}
+```graphql
+query Accounts {
+  accounts(query: {publicKey: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"}) {
+    publicKey
+    pk_epoch_num_snarks
+    pk_total_num_snarks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# block production info
+jsonpath "$.data.accounts[0].publicKey" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.accounts[0].pk_epoch_num_snarks" == 128
+jsonpath "$.data.accounts[0].pk_total_num_snarks" == 128
+
+duration < 500
+
+#
 # Accounts public key epoch & total user commands query
 #
 
