@@ -28,4 +28,31 @@ pub trait SnarkStore {
 
     /// Get top snark work producers
     fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
+
+    /// Increment snarks per epoch count
+    fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;
+
+    /// Get snarks per epoch count
+    fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
+
+    /// Increment snarks total count
+    fn increment_snarks_total_count(&self) -> anyhow::Result<()>;
+
+    /// Get snarks total count
+    fn get_snarks_total_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment snarks per epoch per account count
+    fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()>;
+
+    /// Get snarks per epoch per account count
+    fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> anyhow::Result<u32>;
+
+    /// Increment snarks per account total
+    fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()>;
+
+    /// Get snarks per account total
+    fn get_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
+
+    /// Increment snarks counts given `snark` in `epoch`
+    fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> anyhow::Result<()>;
 }
