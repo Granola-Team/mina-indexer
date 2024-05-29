@@ -84,6 +84,76 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
 
+        // block height bounded query
+        if query.block_height_gt.is_some()
+            || query.block_height_gte.is_some()
+            || query.block_height_lt.is_some()
+            || query.block_height_lte.is_some()
+        {
+            let (min, max) = {
+                let TransactionQueryInput {
+                    block_height_gt,
+                    block_height_gte,
+                    block_height_lt,
+                    block_height_lte,
+                    ..
+                } = query;
+                let min_bound = match (block_height_gte, block_height_gt) {
+                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+
+                let max_bound = match (block_height_lte, block_height_lt) {
+                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                };
+                (min_bound, max_bound)
+            };
+
+            let mut block_heights: Vec<u32> = (min..=max).collect();
+            if sort_by == TransactionSortByInput::BlockHeightDesc {
+                block_heights.reverse();
+            }
+            let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
+            let mut early_exit = false;
+            for height in block_heights {
+                for block in db.get_blocks_at_height(height)? {
+                    let mut signed_cmds = SignedCommandWithData::from_precomputed(&block);
+                    if sort_by == TransactionSortByInput::BlockHeightDesc {
+                        signed_cmds.reverse();
+                    }
+                    for cmd in signed_cmds {
+                        let txn = TransactionWithBlock::new(
+                            cmd,
+                            db,
+                            epoch_num_user_commands,
+                            total_num_user_commands,
+                        );
+
+                        if query.matches(&txn) {
+                            transactions.push(txn);
+                        }
+                        if transactions.len() == limit {
+                            early_exit = true;
+                            break;
+                        }
+                    }
+                    if early_exit {
+                        break;
+                    }
+                }
+                if early_exit {
+                    break;
+                }
+            }
+            // reorder_asc(&mut transactions, sort_by);
+            transactions.truncate(limit);
+            return Ok(transactions);
+        }
         // iterator mode & direction determined by desired sorting
         let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
         let (start_slot, direction) = match sort_by {
@@ -177,10 +247,10 @@ impl TransactionsQueryRoot {
 
 fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
     match sort_by {
-        TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
+        TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => (),
+        TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
             values.reverse()
         }
-        TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => (),
     }
 }
 
@@ -399,16 +469,16 @@ impl TransactionQueryInput {
             matches &= transaction_with_block.transaction.block_height == *block_height;
         }
         if let Some(block_height_gt) = block_height_gt {
-            matches &= transaction_with_block.transaction.block_height == *block_height_gt;
+            matches &= transaction_with_block.transaction.block_height > *block_height_gt;
         }
         if let Some(block_height_gte) = block_height_gte {
-            matches &= transaction_with_block.transaction.block_height == *block_height_gte;
+            matches &= transaction_with_block.transaction.block_height >= *block_height_gte;
         }
         if let Some(block_height_lt) = block_height_lt {
-            matches &= transaction_with_block.transaction.block_height == *block_height_lt;
+            matches &= transaction_with_block.transaction.block_height < *block_height_lt;
         }
         if let Some(block_height_lte) = block_height_lte {
-            matches &= transaction_with_block.transaction.block_height == *block_height_lte;
+            matches &= transaction_with_block.transaction.block_height <= *block_height_lte;
         }
 
         // date time
