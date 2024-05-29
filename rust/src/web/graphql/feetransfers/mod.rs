@@ -22,18 +22,27 @@ pub struct Feetransfer {
     pub state_hash: String,
     pub fee: u64,
     pub recipient: String,
-    #[graphql(name = "type")]
-    pub feetransfer_kind: String,
     pub block_height: u32,
     pub date_time: String,
+
+    #[graphql(name = "type")]
+    pub feetransfer_kind: String,
+
+    #[graphql(name = "epoch_num_internal_commands")]
+    epoch_num_internal_commands: u32,
+
+    #[graphql(name = "total_num_internal_commands")]
+    total_num_internal_commands: u32,
 }
 
 #[derive(Debug)]
 pub struct FeetransferWithMeta {
     /// Value canonicity
     pub canonical: bool,
+
     /// Value optional block
     pub block: Option<PrecomputedBlock>,
+
     /// Value feetranser
     pub feetransfer: Feetransfer,
 }
@@ -111,6 +120,7 @@ pub struct FeetransferQueryInput {
 pub enum FeetransferSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
+
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
@@ -128,6 +138,8 @@ impl FeetransferQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<FeetransferWithMeta>> {
         let db = db(ctx);
+        let epoch_num_internal_commands = db.get_internal_commands_epoch_count(None)?;
+        let total_num_internal_commands = db.get_internal_commands_total_count()?;
 
         //state_hash
         if let Some(state_hash) = query
@@ -141,6 +153,8 @@ impl FeetransferQueryRoot {
                 &state_hash.into(),
                 sort_by,
                 limit,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
             ));
         }
 
@@ -190,7 +204,11 @@ impl FeetransferQueryRoot {
                         internal_cmds.reverse()
                     }
                     for internal_cmd in internal_cmds {
-                        let ft = Feetransfer::from(internal_cmd);
+                        let ft = Feetransfer::from((
+                            internal_cmd,
+                            epoch_num_internal_commands,
+                            total_num_internal_commands,
+                        ));
                         let feetransfer_with_meta = FeetransferWithMeta {
                             canonical,
                             feetransfer: ft,
@@ -224,7 +242,11 @@ impl FeetransferQueryRoot {
                 .get_internal_commands_public_key(&recipient.into())?
                 .into_iter()
                 .map(|internal_command| {
-                    let ft = Feetransfer::from(internal_command);
+                    let ft = Feetransfer::from((
+                        internal_command,
+                        epoch_num_internal_commands,
+                        total_num_internal_commands,
+                    ));
                     let state_hash = ft.state_hash.clone();
                     let pcb = db
                         .get_block(&BlockHash::from(state_hash.clone()))
@@ -243,7 +265,14 @@ impl FeetransferQueryRoot {
             fee_transfers.truncate(limit);
             return Ok(fee_transfers);
         }
-        get_fee_transfers(db, query, sort_by, limit)
+        get_fee_transfers(
+            db,
+            query,
+            sort_by,
+            limit,
+            epoch_num_internal_commands,
+            total_num_internal_commands,
+        )
     }
 }
 
@@ -252,6 +281,8 @@ fn get_fee_transfers(
     query: Option<FeetransferQueryInput>,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
 ) -> Result<Vec<FeetransferWithMeta>> {
     let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
     let mode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
@@ -260,10 +291,13 @@ fn get_fee_transfers(
         speedb::IteratorMode::End
     };
 
-    for entry in db.get_internal_commands_interator(mode) {
-        let (_, value) = entry?;
+    for (_, value) in db.internal_commands_global_slot_interator(mode).flatten() {
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
-        let ft = Feetransfer::from(internal_command);
+        let ft = Feetransfer::from((
+            internal_command,
+            epoch_num_internal_commands,
+            total_num_internal_commands,
+        ));
         let state_hash = ft.state_hash.clone();
         let canonical = get_block_canonicity(db, &state_hash);
         let pcb = db
@@ -296,6 +330,8 @@ fn get_fee_transfers_for_state_hash(
     state_hash: &BlockHash,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
 ) -> Vec<FeetransferWithMeta> {
     let pcb = match db.get_block(state_hash) {
         Ok(Some(pcb)) => pcb,
@@ -311,7 +347,11 @@ fn get_fee_transfers_for_state_hash(
                 .into_iter()
                 .map(|ft| FeetransferWithMeta {
                     canonical,
-                    feetransfer: Feetransfer::from(ft),
+                    feetransfer: Feetransfer::from((
+                        ft,
+                        epoch_num_internal_commands,
+                        total_num_internal_commands,
+                    )),
                     block: Some(pcb.clone()),
                 })
                 .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
@@ -340,9 +380,9 @@ fn get_fee_transfers_for_state_hash(
     }
 }
 
-impl From<InternalCommandWithData> for Feetransfer {
-    fn from(int_cmd: InternalCommandWithData) -> Self {
-        match int_cmd {
+impl From<(InternalCommandWithData, u32, u32)> for Feetransfer {
+    fn from(int_cmd: (InternalCommandWithData, u32, u32)) -> Self {
+        match int_cmd.0 {
             InternalCommandWithData::FeeTransfer {
                 receiver,
                 amount,
@@ -358,6 +398,8 @@ impl From<InternalCommandWithData> for Feetransfer {
                 feetransfer_kind: kind.to_string(),
                 block_height,
                 date_time: millis_to_iso_date_string(date_time),
+                epoch_num_internal_commands: int_cmd.1,
+                total_num_internal_commands: int_cmd.2,
             },
             InternalCommandWithData::Coinbase {
                 receiver,
@@ -373,6 +415,8 @@ impl From<InternalCommandWithData> for Feetransfer {
                 feetransfer_kind: kind.to_string(),
                 block_height,
                 date_time: millis_to_iso_date_string(date_time),
+                epoch_num_internal_commands: int_cmd.1,
+                total_num_internal_commands: int_cmd.2,
             },
         }
     }
