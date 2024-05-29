@@ -6,5 +6,7 @@ steps:
   concurrency_group: "tier2"
   timeout_in_minutes: 2880
   agents:
+    nix: true
+    production: false
     mina-log-storage: true
   command: "./ops/tier2-test"
