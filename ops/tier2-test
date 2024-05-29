@@ -20,4 +20,4 @@ nix develop --command tests/regression test_many_blocks
 #
 nix develop --command ops/test-justfile-targets
 
-ops/ingest-all
+nix develop --command ops/ingest-all
