@@ -6,11 +6,12 @@ mod canonicity_store_impl;
 mod chain_store_impl;
 mod column_families;
 mod column_families_impl;
-mod command_store_impl;
 mod event_store_impl;
 mod fixed_keys;
+mod internal_command_store_impl;
 mod ledger_store_impl;
 mod snark_store_impl;
+mod user_command_store_impl;
 
 use self::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
@@ -34,7 +35,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 36] = [
+    const COLUMN_FAMILIES: [&'static str; 40] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -52,25 +53,29 @@ impl IndexerStore {
         "blockchain-length",    // [blockchain_length_cf]
         "coinbase-receivers",   // [coinbase_receiver_cf]
         "canonicity",
-        "commands",
+        "user-commands",
         "mainnet-commands-slot",
         "mainnet-cmds-txn-global-slot",
         "mainnet-internal-commands",
+        "internal-commands-global-slot-idx", // []
         "events",
         "ledgers",
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
-        "snark-work-fees",        // [snark_work_fees_cf]
-        "chain-id-to-network",    // [chain_id_to_network_cf]
-        "txn-from",               // [txn_from_cf]
-        "txn-to",                 // [txn_to_cf]
-        "user-commands-epoch",    // [user_commands_epoch_cf]
-        "user-commands-pk-epoch", // [user_commands_pk_epoch_cf]
-        "user-commands-pk-total", // [user_commands_pk_total_cf]
-        "snarks-epoch",           // [snarks_epoch_cf]
-        "snarks-pk-epoch",        // [snarks_pk_epoch_cf]
-        "snarks-pk-total",        // [snarks_pk_total_cf]
+        "snark-work-fees",            // [snark_work_fees_cf]
+        "chain-id-to-network",        // [chain_id_to_network_cf]
+        "txn-from",                   // [txn_from_cf]
+        "txn-to",                     // [txn_to_cf]
+        "user-commands-epoch",        // [user_commands_epoch_cf]
+        "user-commands-pk-epoch",     // [user_commands_pk_epoch_cf]
+        "user-commands-pk-total",     // [user_commands_pk_total_cf]
+        "internal-commands-epoch",    // [internal_commands_epoch_cf]
+        "internal-commands-pk-epoch", // [internal_commands_pk_epoch_cf]
+        "internal-commands-pk-total", // [internal_commands_pk_total_cf]
+        "snarks-epoch",               // [snarks_epoch_cf]
+        "snarks-pk-epoch",            // [snarks_pk_epoch_cf]
+        "snarks-pk-total",            // [snarks_pk_total_cf]
     ];
 
     /// Creates a new _primary_ indexer store

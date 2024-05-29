@@ -2,7 +2,7 @@
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 39;
+    const NUM_COLUMN_FAMILIES: usize = 40;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -51,6 +51,9 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for sorting user commands by global slot
     fn commands_slot_mainnet_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting internal commands by global slot
+    fn internal_commands_slot_cf(&self) -> &ColumnFamily;
 
     /// CF for storing global slot by txn hash
     fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &ColumnFamily;

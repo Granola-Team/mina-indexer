@@ -109,16 +109,22 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("canonicity column family exists")
     }
 
-    fn commands_cf(&self) -> &ColumnFamily {
+    fn user_commands_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("commands")
-            .expect("commands column family exists")
+            .cf_handle("user-commands")
+            .expect("user-commands column family exists")
     }
 
     fn internal_commands_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("mainnet-internal-commands")
             .expect("mainnet-internal-commands column family exists")
+    }
+
+    fn internal_commands_slot_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-global-slot-idx")
+            .expect("internal-commands-global-slot-idx column family exists")
     }
 
     /// CF for sorting user commands: `{global_slot}{txn_hash} -> data`
@@ -251,6 +257,33 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("user-commands-epoch")
             .expect("user-commands-epoch column family exists")
+    }
+
+    /// CF for per epoch per account internal commands
+    /// - key: `{epoch BE bytes}{pk}`
+    /// - value: number of `pk` internal commands in `epoch`
+    fn internal_commands_pk_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk-epoch")
+            .expect("internal-commands-pk-epoch column family exists")
+    }
+
+    /// CF for per account total internal commands
+    /// - key: `pk`
+    /// - value: total number of `pk` internal commands
+    fn internal_commands_pk_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk-total")
+            .expect("internal-commands-pk-total column family exists")
+    }
+
+    /// CF for per epoch total internal commands
+    /// - key: `epoch`
+    /// - value: number of internal commands in `epoch`
+    fn internal_commands_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-epoch")
+            .expect("internal-commands-epoch column family exists")
     }
 
     /// CF for per epoch per account SNARKs
