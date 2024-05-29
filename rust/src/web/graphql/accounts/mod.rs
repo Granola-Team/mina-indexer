@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    command::store::CommandStore,
+    command::store::UserCommandStore,
     ledger::{account, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
     store::account_balance_iterator,

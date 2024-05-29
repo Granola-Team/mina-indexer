@@ -5,7 +5,7 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     client::*,
-    command::{signed, store::CommandStore, Command},
+    command::{internal::store::InternalCommandStore, signed, store::UserCommandStore, Command},
     ledger::{
         self,
         public_key::{self, PublicKey},
@@ -1073,7 +1073,7 @@ async fn handle_conn(
                 } else if !block::is_valid_state_hash(&end_state_hash.0) {
                     invalid_state_hash(&end_state_hash.0)
                 } else {
-                    let transactions = db.get_commands_for_public_key(&pk.clone().into())?;
+                    let transactions = db.get_user_commands_for_public_key(&pk.clone().into())?;
                     let transaction_str = if verbose {
                         format_vec_jq_compatible(&transactions)
                     } else {
@@ -1106,7 +1106,7 @@ async fn handle_conn(
                 if !signed::is_valid_tx_hash(&hash) {
                     invalid_tx_hash(&hash)
                 } else {
-                    db.get_command_by_hash(&hash)?.map(|cmd| {
+                    db.get_user_command_by_hash(&hash)?.map(|cmd| {
                         if verbose {
                             format!("{cmd:?}")
                         } else {
@@ -1126,7 +1126,7 @@ async fn handle_conn(
                     invalid_state_hash(&state_hash)
                 } else {
                     let block_hash = BlockHash(state_hash.to_owned());
-                    Some(db.get_commands_in_block(&block_hash).map(|cmds| {
+                    Some(db.get_user_commands_in_block(&block_hash).map(|cmds| {
                         let transaction_str = if verbose {
                             format_vec_jq_compatible(&cmds)
                         } else {

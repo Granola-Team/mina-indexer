@@ -6,7 +6,10 @@ use super::{
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
-    command::{internal::InternalCommandWithData, store::CommandStore},
+    command::{
+        internal::{store::InternalCommandStore, InternalCommandWithData},
+        store::UserCommandStore,
+    },
     constants::*,
     store::IndexerStore,
     web::graphql::db,

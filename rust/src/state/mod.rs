@@ -11,7 +11,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     chain::store::ChainStore,
-    command::store::CommandStore,
+    command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
@@ -1259,13 +1259,13 @@ impl IndexerState {
 
             // check user commands
             let block_user_cmds: Vec<UserCommandWithStatus> = indexer_store
-                .get_commands_in_block(&block.state_hash())?
+                .get_user_commands_in_block(&block.state_hash())?
                 .into_iter()
                 .collect();
             assert_eq!(block_user_cmds, block.commands());
 
             for cmd_hash in block.command_hashes() {
-                if let Some(signed_cmd) = indexer_store.get_command_by_hash(&cmd_hash)? {
+                if let Some(signed_cmd) = indexer_store.get_user_command_by_hash(&cmd_hash)? {
                     assert_eq!(signed_cmd.tx_hash, cmd_hash);
                     assert_eq!(signed_cmd.state_hash, *state_hash);
                     assert_eq!(signed_cmd.blockchain_length, *blockchain_length);

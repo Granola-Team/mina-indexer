@@ -7,7 +7,7 @@ use crate::{
     command::{
         internal::{InternalCommand, InternalCommandWithData},
         signed::SignedCommandWithData,
-        store::CommandStore,
+        store::UserCommandStore,
     },
     ledger::LedgerHash,
     proof_systems::signer::pubkey::CompressedPubKey,

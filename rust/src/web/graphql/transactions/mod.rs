@@ -3,7 +3,7 @@ use crate::{
     block::store::BlockStore,
     command::{
         signed::{self, SignedCommand, SignedCommandWithData},
-        store::CommandStore,
+        store::UserCommandStore,
         CommandStatusData,
     },
     ledger::public_key::PublicKey,
@@ -38,7 +38,7 @@ impl TransactionsQueryRoot {
 
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
-                return Ok(db.get_command_by_hash(&hash)?.map(|cmd| {
+                return Ok(db.get_user_command_by_hash(&hash)?.map(|cmd| {
                     TransactionWithBlock::new(
                         cmd,
                         db,
@@ -186,7 +186,7 @@ impl TransactionsQueryRoot {
                 // txn hash bytes
                 let txn_hash = txn_sort_key_txn_hash(&key);
                 let cmd = db
-                    .get_command_by_hash(&txn_hash)?
+                    .get_user_command_by_hash(&txn_hash)?
                     .expect("command at txn hash");
                 let txn = TransactionWithBlock::new(
                     cmd,

@@ -2,7 +2,7 @@
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 36;
+    const NUM_COLUMN_FAMILIES: usize = 39;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -45,7 +45,7 @@ pub trait ColumnFamilyHelpers {
 
     fn canonicity_cf(&self) -> &ColumnFamily;
 
-    fn commands_cf(&self) -> &ColumnFamily;
+    fn user_commands_cf(&self) -> &ColumnFamily;
 
     fn internal_commands_cf(&self) -> &ColumnFamily;
 
@@ -96,6 +96,15 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per acccount user command totals
     fn user_commands_pk_total_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch internal command totals
+    fn internal_commands_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch per acccount internal command totals
+    fn internal_commands_pk_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for per acccount internal command totals
+    fn internal_commands_pk_total_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch snark totals
     fn snarks_epoch_cf(&self) -> &ColumnFamily;

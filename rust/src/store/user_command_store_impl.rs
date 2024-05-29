@@ -2,9 +2,8 @@ use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::{
-        internal::{InternalCommand, InternalCommandWithData},
         signed::{SignedCommand, SignedCommandWithData},
-        store::CommandStore,
+        store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
     ledger::public_key::PublicKey,
@@ -14,10 +13,11 @@ use crate::{
     },
 };
 use log::{trace, warn};
-use speedb::DBIterator;
 
-impl CommandStore for IndexerStore {
-    fn add_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+// TODO add iterators
+
+impl UserCommandStore for IndexerStore {
+    fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
         let epoch = block.epoch_count();
@@ -90,14 +90,14 @@ impl CommandStore for IndexerStore {
         // add: key (state hash) -> user commands with status
         let key = user_command_db_key(&block.state_hash().0);
         let value = serde_json::to_vec(&block.commands())?;
-        self.database.put_cf(self.commands_cf(), key, value)?;
+        self.database.put_cf(self.user_commands_cf(), key, value)?;
 
         // add: "pk -> linked list of signed commands with state hash"
         for pk in block.all_command_public_keys() {
             trace!("Adding user command for public key {}", pk.0);
 
             // get pk num commands
-            let n = self.get_pk_num_commands(&pk.0)?.unwrap_or(0);
+            let n = self.get_pk_num_user_commands(&pk.0)?.unwrap_or(0);
             let block_pk_commands: Vec<SignedCommandWithData> = user_commands
                 .iter()
                 .filter(|cmd| cmd.contains_public_key(&pk))
@@ -116,19 +116,19 @@ impl CommandStore for IndexerStore {
                 // write these commands to the next key for pk
                 let key = user_command_db_key_pk(&pk.0, n);
                 let value = serde_json::to_vec(&block_pk_commands)?;
-                self.database.put_cf(self.commands_cf(), key, value)?;
+                self.database.put_cf(self.user_commands_cf(), key, value)?;
 
                 // update pk's num commands
                 let key = user_command_db_key(&pk.0);
                 let next_n = (n + 1).to_string();
                 self.database
-                    .put_cf(self.commands_cf(), key, next_n.as_bytes())?;
+                    .put_cf(self.user_commands_cf(), key, next_n.as_bytes())?;
             }
         }
         Ok(())
     }
 
-    fn get_command_by_hash(
+    fn get_user_command_by_hash(
         &self,
         command_hash: &str,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
@@ -149,7 +149,7 @@ impl CommandStore for IndexerStore {
         Ok(None)
     }
 
-    fn get_commands_in_block(
+    fn get_user_commands_in_block(
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<UserCommandWithStatus>> {
@@ -157,25 +157,25 @@ impl CommandStore for IndexerStore {
         trace!("Getting user commands in block {}", state_hash);
 
         let key = user_command_db_key(state_hash);
-        if let Some(commands_bytes) = self.database.get_pinned_cf(self.commands_cf(), key)? {
+        if let Some(commands_bytes) = self.database.get_pinned_cf(self.user_commands_cf(), key)? {
             return Ok(serde_json::from_slice(&commands_bytes)?);
         }
         Ok(vec![])
     }
 
-    fn get_commands_for_public_key(
+    fn get_user_commands_for_public_key(
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<SignedCommandWithData>> {
         trace!("Getting user commands for public key {}", pk.0);
 
-        let commands_cf = self.commands_cf();
+        let commands_cf = self.user_commands_cf();
         let mut commands = vec![];
         fn key_n(pk: &str, n: u32) -> Vec<u8> {
             user_command_db_key_pk(&pk.to_string(), n).to_vec()
         }
 
-        if let Some(n) = self.get_pk_num_commands(&pk.0)? {
+        if let Some(n) = self.get_pk_num_user_commands(&pk.0)? {
             for m in 0..n {
                 if let Some(mut block_m_commands) = self
                     .database
@@ -195,7 +195,7 @@ impl CommandStore for IndexerStore {
         Ok(commands)
     }
 
-    fn get_commands_with_bounds(
+    fn get_user_commands_with_bounds(
         &self,
         pk: &PublicKey,
         start_state_hash: &BlockHash,
@@ -232,7 +232,7 @@ impl CommandStore for IndexerStore {
             }
 
             return Ok(self
-                .get_commands_for_public_key(pk)?
+                .get_user_commands_for_public_key(pk)?
                 .into_iter()
                 .filter(|c| state_hashes.contains(&c.state_hash))
                 .collect());
@@ -240,156 +240,18 @@ impl CommandStore for IndexerStore {
         Ok(vec![])
     }
 
-    /// Number of blocks containing `pk` commands
-    fn get_pk_num_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
+    fn get_pk_num_user_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
         trace!("Getting number of internal commands for {}", pk);
 
         let key = user_command_db_key(&pk.to_string());
         Ok(self
             .database
-            .get_pinned_cf(self.commands_cf(), key)?
+            .get_pinned_cf(self.user_commands_cf(), key)?
             .and_then(|bytes| {
                 String::from_utf8(bytes.to_vec())
                     .ok()
                     .and_then(|s| s.parse().ok())
             }))
-    }
-
-    /// Index internal commands on public keys & state hash
-    fn add_internal_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        trace!("Adding internal commands for block {}", block.summary());
-
-        // add cmds to state hash
-        let key = format!("internal-{}", block.state_hash().0);
-        let internal_cmds = InternalCommand::from_precomputed(block);
-        self.database.put_cf(
-            self.commands_cf(),
-            key.as_bytes(),
-            serde_json::to_vec(&internal_cmds)?,
-        )?;
-
-        // add cmds with data to public keys
-        let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
-            .clone()
-            .into_iter()
-            .map(|c| InternalCommandWithData::from_internal_cmd(c, block))
-            .collect();
-
-        fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = to_be_bytes(global_slot);
-            bytes.append(&mut state_hash.as_bytes().to_vec());
-            bytes.append(&mut index.to_be_bytes().to_vec());
-            bytes
-        }
-
-        for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
-            let key =
-                internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash().0, i);
-            self.database.put_cf(
-                self.internal_commands_cf(),
-                key,
-                serde_json::to_vec(&int_cmd)?,
-            )?;
-        }
-
-        for pk in block.all_public_keys() {
-            trace!("Writing internal commands for {}", pk.0);
-
-            let n = self.get_pk_num_internal_commands(&pk.0)?.unwrap_or(0);
-            let key = format!("internal-{}-{}", pk.0, n);
-            let pk_internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds_with_data
-                .iter()
-                .filter_map(|cmd| {
-                    if cmd.contains_pk(&pk) {
-                        Some(cmd.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            self.database.put_cf(
-                self.commands_cf(),
-                key.as_bytes(),
-                serde_json::to_vec(&pk_internal_cmds_with_data)?,
-            )?;
-
-            // update pk's number of internal cmds
-            let key = format!("internal-{}", pk.0);
-            let next_n = (n + 1).to_string();
-            self.database
-                .put_cf(self.commands_cf(), key.as_bytes(), next_n.as_bytes())?;
-        }
-        Ok(())
-    }
-
-    fn get_internal_commands(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
-        trace!("Getting internal commands in block {}", state_hash.0);
-        let block = self.get_block(state_hash)?.expect("block to exist");
-
-        let key = format!("internal-{}", state_hash.0);
-        if let Some(commands_bytes) = self
-            .database
-            .get_pinned_cf(self.commands_cf(), key.as_bytes())?
-        {
-            let res: Vec<InternalCommand> = serde_json::from_slice(&commands_bytes)?;
-            return Ok(res
-                .into_iter()
-                .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
-                .collect());
-        }
-        Ok(vec![])
-    }
-
-    fn get_internal_commands_public_key(
-        &self,
-        pk: &PublicKey,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
-        trace!("Getting internal commands for public key {}", pk.0);
-
-        let commands_cf = self.commands_cf();
-        let mut internal_cmds = vec![];
-        fn key_n(pk: String, n: u32) -> Vec<u8> {
-            format!("internal-{}-{}", pk, n).as_bytes().to_vec()
-        }
-
-        if let Some(n) = self.get_pk_num_internal_commands(&pk.0)? {
-            for m in 0..n {
-                if let Some(mut block_m_internal_cmds) = self
-                    .database
-                    .get_pinned_cf(commands_cf, key_n(pk.0.clone(), m))?
-                    .map(|bytes| {
-                        serde_json::from_slice::<Vec<InternalCommandWithData>>(&bytes)
-                            .expect("internal commands with data")
-                    })
-                {
-                    internal_cmds.append(&mut block_m_internal_cmds);
-                } else {
-                    internal_cmds.clear();
-                    break;
-                }
-            }
-        }
-        Ok(internal_cmds)
-    }
-
-    /// Number of blocks containing `pk` internal commands
-    fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
-        let key = format!("internal-{}", pk);
-        Ok(self
-            .database
-            .get_pinned_cf(self.commands_cf(), key.as_bytes())?
-            .and_then(|bytes| {
-                String::from_utf8(bytes.to_vec())
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-            }))
-    }
-
-    fn get_internal_commands_interator(&self, mode: speedb::IteratorMode) -> DBIterator<'_> {
-        self.database.iterator_cf(self.internal_commands_cf(), mode)
     }
 
     fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
