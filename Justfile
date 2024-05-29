@@ -64,6 +64,4 @@ lint: && audit disallow-unused-cargo-deps
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 images:
-  docker --version
-  nix build .#dockerImage
-  docker load < ./result
+  ops/build-oci-image
