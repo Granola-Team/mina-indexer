@@ -6,6 +6,7 @@ pub mod next_stakes;
 pub mod snarks;
 pub mod stakes;
 pub mod transactions;
+pub mod version;
 
 use super::ENDPOINT_GRAPHQL;
 use crate::{constants::*, store::IndexerStore};
@@ -25,6 +26,7 @@ pub struct Root(
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
     snarks::SnarkQueryRoot,
+    version::VersionQueryRoot,
 );
 
 #[derive(SimpleObject)]
