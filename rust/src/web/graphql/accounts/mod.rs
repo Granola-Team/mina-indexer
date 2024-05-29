@@ -3,6 +3,7 @@ use crate::{
     block::store::BlockStore,
     command::store::CommandStore,
     ledger::{account, public_key::PublicKey, store::LedgerStore},
+    snark_work::store::SnarkStore,
     store::account_balance_iterator,
     web::graphql::Timing,
 };
@@ -24,6 +25,12 @@ pub struct Account {
 
     #[graphql(name = "pk_total_num_blocks")]
     pk_total_num_blocks: u32,
+
+    #[graphql(name = "pk_epoch_num_snarks")]
+    pk_epoch_num_snarks: u32,
+
+    #[graphql(name = "pk_total_num_snarks")]
+    pk_total_num_snarks: u32,
 
     #[graphql(name = "pk_epoch_num_user_commands")]
     pk_epoch_num_user_commands: u32,
@@ -100,6 +107,10 @@ impl AccountQueryRoot {
                             .expect("pk epoch block count"),
                         db.get_block_production_pk_total_count(&pk)
                             .expect("pk total block count"),
+                        db.get_snarks_pk_epoch_count(&pk, None)
+                            .expect("pk epoch snark count"),
+                        db.get_snarks_pk_total_count(&pk)
+                            .expect("pk total snark count"),
                         db.get_user_commands_pk_epoch_count(&pk, None)
                             .expect("pk epoch user commands count"),
                         db.get_user_commands_pk_total_count(&pk)
@@ -127,6 +138,10 @@ impl AccountQueryRoot {
                         .expect("pk epoch block count"),
                     db.get_block_production_pk_total_count(&pk)
                         .expect("pk total block count"),
+                    db.get_snarks_pk_epoch_count(&pk, None)
+                        .expect("pk epoch snark count"),
+                    db.get_snarks_pk_total_count(&pk)
+                        .expect("pk total snark count"),
                     db.get_user_commands_pk_epoch_count(&pk, None)
                         .expect("pk epoch user command count"),
                     db.get_user_commands_pk_total_count(&pk)
@@ -189,8 +204,8 @@ impl AccountQueryInput {
     }
 }
 
-impl From<(account::Account, u32, u32, u32, u32)> for Account {
-    fn from(account: (account::Account, u32, u32, u32, u32)) -> Self {
+impl From<(account::Account, u32, u32, u32, u32, u32, u32)> for Account {
+    fn from(account: (account::Account, u32, u32, u32, u32, u32, u32)) -> Self {
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
@@ -204,8 +219,10 @@ impl From<(account::Account, u32, u32, u32, u32)> for Account {
                 .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
             pk_epoch_num_blocks: account.1,
             pk_total_num_blocks: account.2,
-            pk_epoch_num_user_commands: account.3,
-            pk_total_num_user_commands: account.4,
+            pk_epoch_num_snarks: account.3,
+            pk_total_num_snarks: account.4,
+            pk_epoch_num_user_commands: account.5,
+            pk_total_num_user_commands: account.6,
         }
     }
 }

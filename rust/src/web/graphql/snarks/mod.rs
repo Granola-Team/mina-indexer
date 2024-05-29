@@ -17,6 +17,12 @@ pub struct Snark {
     pub fee: u64,
     pub prover: String,
     pub block: SnarkBlock,
+
+    #[graphql(name = "epoch_num_snarks")]
+    epoch_num_snarks: u32,
+
+    #[graphql(name = "total_num_snarks")]
+    total_num_snarks: u32,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -180,7 +186,13 @@ impl SnarkQueryRoot {
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
                         pcb: block.clone(),
-                        snark: (snark, state_hash.clone()).into(),
+                        snark: (
+                            snark,
+                            state_hash.clone(),
+                            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                            db.get_snarks_total_count().expect("total snarks count"),
+                        )
+                            .into(),
                     })
                     .collect()
             });
@@ -212,7 +224,12 @@ fn snark_summary_matches_query(
             let snark_with_canonicity = SnarkWithCanonicity {
                 pcb: block,
                 canonical,
-                snark: snark.into(),
+                snark: (
+                    snark,
+                    db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                    db.get_snarks_total_count().expect("total snarks count"),
+                )
+                    .into(),
             };
             if query
                 .as_ref()
@@ -225,26 +242,30 @@ fn snark_summary_matches_query(
         }))
 }
 
-impl From<(SnarkWorkSummary, String)> for Snark {
-    fn from(snark: (SnarkWorkSummary, String)) -> Self {
+impl From<(SnarkWorkSummary, String, u32, u32)> for Snark {
+    fn from(snark: (SnarkWorkSummary, String, u32, u32)) -> Self {
         Snark {
             fee: snark.0.fee,
             prover: snark.0.prover.0,
             block: SnarkBlock {
                 state_hash: snark.1,
             },
+            epoch_num_snarks: snark.2,
+            total_num_snarks: snark.3,
         }
     }
 }
 
-impl From<SnarkWorkSummaryWithStateHash> for Snark {
-    fn from(snark: SnarkWorkSummaryWithStateHash) -> Self {
+impl From<(SnarkWorkSummaryWithStateHash, u32, u32)> for Snark {
+    fn from(snark: (SnarkWorkSummaryWithStateHash, u32, u32)) -> Self {
         Snark {
-            fee: snark.fee,
-            prover: snark.prover.0,
+            fee: snark.0.fee,
+            prover: snark.0.prover.0,
             block: SnarkBlock {
-                state_hash: snark.state_hash.clone(),
+                state_hash: snark.0.state_hash.clone(),
             },
+            epoch_num_snarks: snark.1,
+            total_num_snarks: snark.2,
         }
     }
 }
