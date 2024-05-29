@@ -141,18 +141,18 @@ jsonpath "$.data.transactions" count == 2
 
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 11
-jsonpath "$.data.transactions[0].hash" == "CkpZE6rHwLM8iJwBU1ssm1tdMzx9rdyDEhpGU8aCAionzF1k82d5N"
+jsonpath "$.data.transactions[0].hash" == "CkpZwTdKUDFM8Nsq6noJ4pP6esqP7FeJaHiisGrXSqHYvidfvukDA"
 jsonpath "$.data.transactions[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
-jsonpath "$.data.transactions[0].amount" == 1000000000
+jsonpath "$.data.transactions[0].to" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
 jsonpath "$.data.transactions[1].blockHeight" == 11
-jsonpath "$.data.transactions[1].hash" == "CkpZwTdKUDFM8Nsq6noJ4pP6esqP7FeJaHiisGrXSqHYvidfvukDA"
+jsonpath "$.data.transactions[1].hash" == "CkpZE6rHwLM8iJwBU1ssm1tdMzx9rdyDEhpGU8aCAionzF1k82d5N"
 jsonpath "$.data.transactions[1].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[1].to" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[1].amount" == 1000
+jsonpath "$.data.transactions[1].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[1].amount" == 1000000000
 jsonpath "$.data.transactions[1].fee" == 10000000
 
 duration < 500
@@ -265,3 +265,47 @@ jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
 duration < 500
+
+POST {{url}}
+```graphql
+query TransactionsQuery(
+  $limit: Int = 10
+  $sort_by: TransactionSortByInput!
+  $query: TransactionQueryInput!
+) {
+  transactions(limit: $limit, sortBy: $sort_by, query: $query) {
+    blockHeight
+    failureReason
+    canonical
+    amount
+    fee
+    kind
+    to
+    from
+    nonce
+    memo
+    hash
+    block {
+      dateTime
+      stateHash
+    }
+    receiver {
+      publicKey
+    }
+  }
+}
+
+variables {
+  "limit": 100,
+  "sort_by": "BLOCKHEIGHT_ASC",
+  "query": {
+    "blockHeight_lte": 100,
+    "canonical": true
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 100
