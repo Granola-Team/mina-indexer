@@ -1,6 +1,10 @@
 use crate::ledger::account::Amount;
 use chrono::{DateTime, SecondsFormat, Utc};
 
+// version
+
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("GIT_COMMIT_HASH"));
+
 // indexer constants
 
 pub const BLOCK_REPORTING_FREQ_NUM: u32 = 1000;
