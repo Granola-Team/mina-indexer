@@ -27,9 +27,9 @@ pub const MAINNET_TRANSITION_FRONTIER_K: u32 = 290;
 pub const MAINNET_ACCOUNT_CREATION_FEE: Amount = Amount(1e9 as u64);
 pub const MAINNET_COINBASE_REWARD: u64 = 720000000000;
 
-// genesis constants
+// protocol constants
 
-pub const MAINNET_GENESIS_CONSTANTS: &[u32] = &[
+pub const MAINNET_PROTOCOL_CONSTANTS: &[u32] = &[
     MAINNET_TRANSITION_FRONTIER_K,
     MAINNET_EPOCH_SLOT_COUNT,
     MAINNET_SLOTS_PER_SUB_WINDOW,
@@ -51,6 +51,13 @@ pub const MAINNET_CONSTRAINT_SYSTEM_DIGESTS: &[&str] = &[
 pub const MAINNET_DIGEST_TXN_MERGE: &str = "d0f8e5c3889f0f84acac613f5c1c29b1";
 pub const MAINNET_DIGEST_TXN_BASE: &str = "922bd415f24f0958d610607fc40ef227";
 pub const MAINNET_DIGEST_BLOCKCHAIN_STEP: &str = "06d85d220ad13e03d51ef357d2c9d536";
+
+// Name service constants
+pub const MINA_EXPLORER_NAME_SERVICE_ADDRESS: &str =
+    "B62qjzJvc59DdG9ahht9rwxkEz7GedKuUMsnaVTuXFUeANKqfBeWpRE";
+pub const MINA_SEARCH_NAME_SERVICE_ADDRESS: &str =
+    "B62qjMINASEARCHMINASEARCHMINASEARCHMINASEARCHMINASEARCH"; // TODO change to actual address
+pub const NAME_SERVICE_MEMO_PREFIX: &str = "Name: ";
 
 /// Convert epoch milliseconds to an ISO 8601 formatted date
 pub fn millis_to_iso_date_string(millis: i64) -> String {

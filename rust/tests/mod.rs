@@ -7,6 +7,7 @@ mod ledger;
 mod protocol;
 mod snark_work;
 mod state;
+mod usernames;
 
 pub mod helpers {
     /// Sets up a new temp dir, deleted when it goes out of scope

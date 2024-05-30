@@ -6,10 +6,11 @@ use crate::{
         store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
+    constants::*,
     ledger::public_key::PublicKey,
     store::{
         from_be_bytes, to_be_bytes, txn_sort_key, u32_prefix_key, user_command_db_key,
-        user_command_db_key_pk, IndexerStore,
+        user_command_db_key_pk, username::UsernameStore, IndexerStore,
     },
 };
 use log::{trace, warn};
@@ -85,6 +86,18 @@ impl UserCommandStore for IndexerStore {
                 ),
                 command.amount().to_be_bytes(),
             )?;
+
+            // check for the special name service txns
+            let sender = command.sender();
+            let receiver = command.receiver();
+            let memo = command.memo();
+            if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                    || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+            {
+                let username = memo[NAME_SERVICE_MEMO_PREFIX.len()..].trim_end_matches('\0');
+                self.set_username(&sender, username.to_string())?;
+            }
         }
 
         // add: key (state hash) -> user commands with status
