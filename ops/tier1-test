@@ -1,9 +1,0 @@
-#! /bin/sh
-
-set -eu
-
-echo HOME="$HOME"
-echo PATH="$PATH"
-nix develop --command just
-nix develop --command just prereqs
-nix develop --command just test

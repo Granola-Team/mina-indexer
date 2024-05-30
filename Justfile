@@ -12,6 +12,7 @@ nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" 
 default:
   @just --list --justfile {{justfile()}}
 
+# Check for presence of dev dependencies.
 prereqs:
   cd rust && cargo --version
   cd rust && cargo nextest --version
@@ -28,7 +29,7 @@ build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result
+  rm -rf result database mina-indexer.sock
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -56,12 +57,50 @@ audit:
 lint: && audit disallow-unused-cargo-deps
   shellcheck tests/regression
   shellcheck tests/stage-*
-  shellcheck ops/tier1-test
-  shellcheck ops/tier2-test
   shellcheck ops/productionize
+  shellcheck ops/ingest-all
   cd rust && cargo {{nightly_if_required}} fmt --all --check
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
-images:
-  ops/build-oci-image
+# Build OCI images.
+build-image:
+  #REV="$(git rev-parse --short=8 HEAD)"
+  #IMAGE=mina-indexer:"$REV"
+  #docker --version
+  #nix build .#dockerImage
+  #docker load < ./result
+  #docker run --rm -it "$IMAGE" \
+  #  mina-indexer server start --help
+  #docker image rm "$IMAGE"
+
+# Start a server in the current directory.
+start-server: build
+  RUST_BACKTRACE=1 \
+  ./rust/target/release/mina-indexer \
+    --domain-socket-path ./mina-indexer.sock \
+    server start \
+      --log-level TRACE \
+      --blocks-dir ./tests/data/initial-blocks \
+      --staking-ledgers-dir ./tests/data/staking_ledgers \
+      --database-dir ./database
+
+# Delete the database created by 'start-server'.
+delete-database:
+  rm -fr ./database
+
+# Run a server as if in production.
+productionize: build
+  ./ops/productionize
+
+# Run the 1st tier of tests.
+tier1-test: prereqs test
+
+# Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
+tier2-test: build
+  tests/regression test_many_blocks
+  # TODO: investigate failures in the following.
+  # tests/regression test_many_blocks
+  # TODO: re-enable once Nix build is working
+  # nix build
+  ops/ingest-all
