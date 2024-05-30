@@ -519,7 +519,7 @@ impl IndexerVersion {
     pub fn new_testing() -> Self {
         let chain_id = chain_id(
             MAINNET_GENESIS_HASH,
-            MAINNET_GENESIS_CONSTANTS,
+            MAINNET_PROTOCOL_CONSTANTS,
             MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
         );
         Self::new(&Network::Mainnet, &chain_id, &MAINNET_GENESIS_HASH.into())

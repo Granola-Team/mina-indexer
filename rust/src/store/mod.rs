@@ -14,6 +14,8 @@ mod internal_command_store_impl;
 mod ledger_store_impl;
 mod snark_store_impl;
 mod user_command_store_impl;
+mod username;
+mod username_store_impl;
 
 use self::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
@@ -37,7 +39,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 40] = [
+    const COLUMN_FAMILIES: [&'static str; 41] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -78,6 +80,7 @@ impl IndexerStore {
         "snarks-epoch",               // [snarks_epoch_cf]
         "snarks-pk-epoch",            // [snarks_pk_epoch_cf]
         "snarks-pk-total",            // [snarks_pk_total_cf]
+        "usernames",                  // [username_cf]
     ];
 
     /// Creates a new _primary_ indexer store

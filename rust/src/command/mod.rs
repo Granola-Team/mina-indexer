@@ -147,6 +147,8 @@ pub trait UserCommandWithStatusT {
     fn nonce(&self) -> u32;
 
     fn amount(&self) -> u64;
+
+    fn memo(&self) -> String;
 }
 
 impl UserCommandWithStatusT for UserCommandWithStatus {
@@ -253,6 +255,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
             Command::Delegation(_) => 0,
             Command::Payment(payment) => payment.amount.0,
         }
+    }
+
+    fn memo(&self) -> String {
+        let mina_rs::UserCommand::SignedCommand(cmd) = self.data();
+        String::from_utf8(cmd.t.t.payload.t.t.common.t.t.t.memo.t.0).expect("decoded memo")
     }
 }
 

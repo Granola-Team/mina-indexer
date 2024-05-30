@@ -137,7 +137,7 @@ mod tests {
             "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1",
             chain_id(
                 MAINNET_GENESIS_HASH,
-                MAINNET_GENESIS_CONSTANTS,
+                MAINNET_PROTOCOL_CONSTANTS,
                 MAINNET_CONSTRAINT_SYSTEM_DIGESTS
             )
             .0

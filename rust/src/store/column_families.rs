@@ -2,7 +2,7 @@
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 40;
+    const NUM_COLUMN_FAMILIES: usize = 41;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -117,4 +117,7 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per acccount snark totals
     fn snarks_pk_total_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing usernames
+    fn username_cf(&self) -> &ColumnFamily;
 }

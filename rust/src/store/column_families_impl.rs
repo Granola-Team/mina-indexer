@@ -312,4 +312,11 @@ impl ColumnFamilyHelpers for IndexerStore {
             .cf_handle("snarks-epoch")
             .expect("snarks-epoch column family exists")
     }
+
+    /// CF for storing usernames
+    fn username_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("usernames")
+            .expect("usernames column family exists")
+    }
 }

@@ -272,7 +272,7 @@ impl From<(StakingAccount, u32, u32)> for StakesLedgerAccount {
         Self {
             chain_id: chain_id(
                 MAINNET_GENESIS_HASH,
-                MAINNET_GENESIS_CONSTANTS,
+                MAINNET_PROTOCOL_CONSTANTS,
                 MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
             )
             .0[..6]
