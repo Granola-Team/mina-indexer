@@ -86,10 +86,7 @@ start-server: build
 productionize: build
   ./ops/productionize
 
-tier1-test:
-  just
-  just prereqs
-  just test
+tier1-test: prereqs test
 
 tier2-test: build
   tests/regression test_many_blocks
