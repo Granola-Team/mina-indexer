@@ -28,7 +28,7 @@ build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result database blocks staking-ledgers
+  rm -rf result database blocks staking-ledgers mina-indexer.sock
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
