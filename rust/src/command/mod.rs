@@ -259,7 +259,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn memo(&self) -> String {
         let mina_rs::UserCommand::SignedCommand(cmd) = self.data();
-        String::from_utf8(cmd.t.t.payload.t.t.common.t.t.t.memo.t.0).expect("decoded memo")
+        // drop version bytes
+        let s = &String::from_utf8(cmd.t.t.payload.t.t.common.t.t.t.memo.t.0)
+            .expect("decoded memo")[2..];
+        // drop right padding
+        s.trim_end_matches('\0').to_string()
     }
 }
 
