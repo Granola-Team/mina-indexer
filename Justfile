@@ -28,7 +28,7 @@ build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result
+  rm -rf result database blocks staking-ledgers
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -72,6 +72,17 @@ build-image:
   #docker run --rm -it "$IMAGE" \
   #  mina-indexer server start --help
   #docker image rm "$IMAGE"
+
+# Start a server in the current directory.
+start-server: build
+  RUST_BACKTRACE=1 \
+  ./rust/target/release/mina-indexer \
+    --domain-socket-path ./mina-indexer.sock \
+    server start \
+      --log-level TRACE \
+      --blocks-dir ./blocks \
+      --staking-ledgers-dir ./staking-ledgers \
+      --database-dir ./database
 
 productionize: build
   ./ops/productionize

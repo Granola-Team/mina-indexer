@@ -8,3 +8,8 @@ result
 .*.swp
 build.log
 /.vscode
+
+# Running server locally
+/database
+/blocks
+/staking-ledgers
