@@ -44,22 +44,14 @@ optimized for the Mina ecosystem.
 
 ### Prerequisites
 
-This project utilizes Nix Flakes for development and building. Install
-Nix [here](https://nixos.org/download.html) and enable Flakes using
-the guide [here](https://nixos.wiki/wiki/Flakes). No additional
-dependencies are needed.
-
-### Development Setup
-
-Use `nix develop` to prepare your development environment. It
-configures your current shell with all necessary dependencies and
-tools, removing the need for a separate host Rust installation.
+1. Install Nix [here](https://nixos.org/download.html).
+2. Enable Flakes using [this guide](https://nixos.wiki/wiki/Flakes).
+3. Install [Direnv](https://direnv.net).
 
 ### Building the Project
 
-Run `nix build` to compile the project. This will
-compile the `mina-indexer` binary. See the `./scripts`
-folder for examples.
+Run `just build` to compile the project. This will compile the `mina-indexer`
+binary. See the `./scripts` folder for examples.
 
 ### Running Tests
 
@@ -88,10 +80,7 @@ otherwise you'll need to cross-compile.
 Issue the following command to build the image and load it into Docker.
 
 ```bash
-nix build .#dockerImage
-docker load < result
-
-docker run --rm -it mina-indexer:<sha> mina-indexer server start --help
+just build-images
 ```
 
 ## License
