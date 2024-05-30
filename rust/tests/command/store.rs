@@ -5,7 +5,7 @@ use mina_indexer::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
     },
-    command::{signed::SignedCommand, store::CommandStore},
+    command::{signed::SignedCommand, store::UserCommandStore},
     constants::*,
     ledger::genesis::parse_file,
     server::IndexerVersion,
@@ -53,7 +53,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     // check state hash key
     let result_cmds = indexer_store
         .as_ref()
-        .get_commands_in_block(&state_hash.into())?;
+        .get_user_commands_in_block(&state_hash.into())?;
     assert_eq!(result_cmds, block_cmds);
 
     // check each pk key
@@ -66,7 +66,7 @@ async fn add_and_get() -> anyhow::Result<()> {
             .collect();
         let result_pk_cmds: Vec<SignedCommand> = indexer_store
             .as_ref()
-            .get_commands_for_public_key(&pk)?
+            .get_user_commands_for_public_key(&pk)?
             .into_iter()
             .map(SignedCommand::from)
             .collect();
@@ -76,7 +76,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     // check transaction hash key
     for cmd in SignedCommand::from_precomputed(&block) {
         let result_cmd: SignedCommand = indexer_store
-            .get_command_by_hash(&cmd.hash_signed_command()?)?
+            .get_user_command_by_hash(&cmd.hash_signed_command()?)?
             .unwrap()
             .into();
         assert_eq!(result_cmd, cmd);

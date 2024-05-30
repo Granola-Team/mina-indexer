@@ -163,6 +163,33 @@ jsonpath "$.data.accounts[0].pk_total_num_user_commands" == 177
 duration < 500
 
 #
+# Accounts public key epoch & total internal commands query
+#
+
+POST {{url}}
+```graphql
+query Accounts {
+  accounts(query: {publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}) {
+    publicKey
+    pk_epoch_num_internal_commands
+    pk_total_num_internal_commands
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# block production info
+jsonpath "$.data.accounts[0].publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.accounts[0].pk_epoch_num_internal_commands" == 198
+jsonpath "$.data.accounts[0].pk_total_num_internal_commands" == 198
+
+duration < 500
+
+#
 # Account default (balance descending) query
 #
 

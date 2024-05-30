@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    command::store::CommandStore,
+    command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::{account, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
     store::account_balance_iterator,
@@ -37,6 +37,12 @@ pub struct Account {
 
     #[graphql(name = "pk_total_num_user_commands")]
     pk_total_num_user_commands: u32,
+
+    #[graphql(name = "pk_epoch_num_internal_commands")]
+    pk_epoch_num_internal_commands: u32,
+
+    #[graphql(name = "pk_total_num_internal_commands")]
+    pk_total_num_internal_commands: u32,
 }
 
 #[derive(InputObject)]
@@ -112,9 +118,13 @@ impl AccountQueryRoot {
                         db.get_snarks_pk_total_count(&pk)
                             .expect("pk total snark count"),
                         db.get_user_commands_pk_epoch_count(&pk, None)
-                            .expect("pk epoch user commands count"),
+                            .expect("pk epoch user command count"),
                         db.get_user_commands_pk_total_count(&pk)
-                            .expect("pk total user commands count"),
+                            .expect("pk total user command count"),
+                        db.get_internal_commands_pk_epoch_count(&pk, None)
+                            .expect("pk epoch internal command count"),
+                        db.get_internal_commands_pk_total_count(&pk)
+                            .expect("pk total internal command count"),
                     ))]
                 }));
         }
@@ -132,7 +142,7 @@ impl AccountQueryRoot {
             let account = best_ledger.accounts.get(&pk).expect("account in ledger");
 
             if query.as_ref().map_or(true, |q| q.matches(account)) {
-                let account = (
+                let account = Account::from((
                     account.clone(),
                     db.get_block_production_pk_epoch_count(&pk, None)
                         .expect("pk epoch block count"),
@@ -146,10 +156,13 @@ impl AccountQueryRoot {
                         .expect("pk epoch user command count"),
                     db.get_user_commands_pk_total_count(&pk)
                         .expect("pk total user command count"),
-                )
-                    .into();
-                accounts.push(account);
+                    db.get_internal_commands_pk_epoch_count(&pk, None)
+                        .expect("pk epoch internal command count"),
+                    db.get_internal_commands_pk_total_count(&pk)
+                        .expect("pk total internal command count"),
+                ));
 
+                accounts.push(account);
                 if accounts.len() == limit {
                     break;
                 }
@@ -204,8 +217,8 @@ impl AccountQueryInput {
     }
 }
 
-impl From<(account::Account, u32, u32, u32, u32, u32, u32)> for Account {
-    fn from(account: (account::Account, u32, u32, u32, u32, u32, u32)) -> Self {
+impl From<(account::Account, u32, u32, u32, u32, u32, u32, u32, u32)> for Account {
+    fn from(account: (account::Account, u32, u32, u32, u32, u32, u32, u32, u32)) -> Self {
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
@@ -223,6 +236,8 @@ impl From<(account::Account, u32, u32, u32, u32, u32, u32)> for Account {
             pk_total_num_snarks: account.4,
             pk_epoch_num_user_commands: account.5,
             pk_total_num_user_commands: account.6,
+            pk_epoch_num_internal_commands: account.7,
+            pk_total_num_internal_commands: account.8,
         }
     }
 }

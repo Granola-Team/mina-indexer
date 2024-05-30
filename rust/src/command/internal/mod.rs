@@ -1,3 +1,5 @@
+pub mod store;
+
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},

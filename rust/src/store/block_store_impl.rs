@@ -6,7 +6,7 @@ use crate::{
         BlockHash,
     },
     canonicity::store::CanonicityStore,
-    command::store::CommandStore,
+    command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
@@ -85,7 +85,7 @@ impl BlockStore for IndexerStore {
         self.add_block_at_slot(&block.state_hash(), block.global_slot_since_genesis())?;
 
         // add block user commands
-        self.add_commands(block)?;
+        self.add_user_commands(block)?;
 
         // add block internal commands
         self.add_internal_commands(block)?;

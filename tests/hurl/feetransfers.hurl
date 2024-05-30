@@ -79,42 +79,9 @@ jsonpath "$.data.feetransfers[0].blockStateHash.total_num_blocks" == 204
 
 duration < 500
 
-POST {{url}}
-```graphql
-query InternalCommandsQuery(
-  $sort_by: FeetransferSortByInput!
-  $limit: Int = 10
-  $query: FeetransferQueryInput!
-) {
-  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
-    blockHeight
-    blockStateHash {
-      stateHash
-    }
-    fee
-    recipient
-    type
-    dateTime
-    canonical
-  }
-}
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 100,
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 120
-  }
-}
-```
-HTTP 200
-[Asserts]
-
-jsonpath "$.data.feetransfers" count == 100
-
-jsonpath "$.data.feetransfers[0].blockHeight" == 120
-jsonpath "$.data.feetransfers[99].blockHeight" == 71
+#
+# Fee transfer block height LTE query
+#
 
 POST {{url}}
 ```graphql
@@ -153,6 +120,42 @@ jsonpath "$.data.feetransfers" count == 100
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[99].blockHeight" == 71
 
+duration < 500
+
+#
+# Fee transfer epoch & total internal commands query
+#
+
+POST {{url}}
+```graphql
+{
+  feetransfers(sortBy: "BLOCKHEIGHT_ASC", limit: 100) {
+    blockHeight
+    blockStateHash {
+      stateHash
+    }
+    epoch_num_internal_commands
+    total_num_internal_commands
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.feetransfers" count == 100
+
+# first datum
+jsonpath "$.data.feetransfers[0].blockHeight" == 2
+jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH"
+jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 207
+jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 207
+
+duration < 500
+
+#
+# Fee transfer block state hash & block height LTE query
+#
 
 POST {{url}}
 ```graphql
