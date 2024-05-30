@@ -73,11 +73,18 @@ build-image:
   #  mina-indexer server start --help
   #docker image rm "$IMAGE"
 
+productionize: build
+  ./ops/productionize
+
 tier1-test:
   just
   just prereqs
   just test
 
-productionize: build
-  ./ops/productionize
-
+tier2-test: build
+  tests/regression test_many_blocks
+  # TODO: investigate failures in the following.
+  # tests/regression test_many_blocks
+  # TODO: re-enable once Nix build is working
+  # nix build
+  ops/ingest-all
