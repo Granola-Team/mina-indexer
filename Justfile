@@ -63,5 +63,13 @@ lint: && audit disallow-unused-cargo-deps
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
+# Build OCI images.
 images:
-  ops/build-oci-image
+  #REV="$(git rev-parse --short=8 HEAD)"
+  #IMAGE=mina-indexer:"$REV"
+  #docker --version
+  #nix build .#dockerImage
+  #docker load < ./result
+  #docker run --rm -it "$IMAGE" \
+  #  mina-indexer server start --help
+  #docker image rm "$IMAGE"
