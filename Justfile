@@ -83,6 +83,9 @@ start-server: build
       --staking-ledgers-dir ./tests/data/staking_ledgers \
       --database-dir ./database
 
+delete-database:
+  rm -fr ./database
+
 productionize: build
   ./ops/productionize
 
