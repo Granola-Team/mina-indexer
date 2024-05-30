@@ -28,7 +28,7 @@ build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result database blocks staking-ledgers mina-indexer.sock
+  rm -rf result database mina-indexer.sock
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -79,8 +79,8 @@ start-server: build
     --domain-socket-path ./mina-indexer.sock \
     server start \
       --log-level TRACE \
-      --blocks-dir ./blocks \
-      --staking-ledgers-dir ./staking-ledgers \
+      --blocks-dir ./tests/data/initial-blocks \
+      --staking-ledgers-dir ./tests/data/staking_ledgers \
       --database-dir ./database
 
 productionize: build

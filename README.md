@@ -51,7 +51,7 @@ optimized for the Mina ecosystem.
 ### Building the Project
 
 Run `just build` to compile the project. This will compile the `mina-indexer`
-binary. See the `./scripts` folder for examples.
+binary. Run `just start-server` to start an instance.
 
 ### Running Tests
 
