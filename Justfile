@@ -64,7 +64,7 @@ lint: && audit disallow-unused-cargo-deps
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 # Build OCI images.
-images:
+build-image:
   #REV="$(git rev-parse --short=8 HEAD)"
   #IMAGE=mina-indexer:"$REV"
   #docker --version
@@ -74,7 +74,11 @@ images:
   #  mina-indexer server start --help
   #docker image rm "$IMAGE"
 
-tier1:
+tier1-test:
   just
   just prereqs
   just test
+
+productionize: build
+  ./ops/productionize
+

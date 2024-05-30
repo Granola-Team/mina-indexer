@@ -8,7 +8,7 @@ expected='Available recipes:
     default
     disallow-unused-cargo-deps
     format
-    images
+    build-images
     lint
     prereqs
     test
@@ -36,5 +36,6 @@ just test-unit
 just test-unit-mina-rs
 just test-regression
 just test
+just tier1-test
 # just test-release
-just images
+just build-images
