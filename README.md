@@ -74,13 +74,13 @@ just test-regression
 
 ## Generating OCI Images With Nix
 
-Building OCI (Docker) images from Nix must happen from `x86-64-linux` machine
-otherwise you'll need to cross-compile.
+Building the OCI (Docker) image from Nix must happen from an `x86-64-linux`
+machine.
 
 Issue the following command to build the image and load it into Docker.
 
 ```bash
-just build-images
+just build-image
 ```
 
 ## License
