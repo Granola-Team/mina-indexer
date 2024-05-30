@@ -10,7 +10,7 @@ use crate::{
         store::LedgerStore,
         Ledger, LedgerHash,
     },
-    store::IndexerStore,
+    store::{account::AccountStore, IndexerStore},
 };
 use log::{error, trace};
 use std::str::FromStr;

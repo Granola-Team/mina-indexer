@@ -1,6 +1,8 @@
 //! This module contains the implementations of all store traits for the
 //! [IndexerStore]
 
+mod account;
+mod account_store_impl;
 mod block_store_impl;
 mod canonicity_store_impl;
 mod chain_store_impl;

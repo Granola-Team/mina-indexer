@@ -2,9 +2,8 @@ use super::precomputed::PcbVersion;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
-    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
+    ledger::public_key::PublicKey,
 };
-use std::collections::HashSet;
 
 pub trait BlockStore {
     /// Add block to the store
@@ -97,39 +96,6 @@ pub trait BlockStore {
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 
-    /// Update pk's balance-sorted account balance
-    fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()>;
-
-    /// Generate account balance updates when the best tip changes.
-    /// Return with set of coinbase receivers.
-    fn common_ancestor_account_balance_updates(
-        &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<(Vec<PaymentDiff>, HashSet<PublicKey>)>;
-
-    /// Set the balance updates for a block
-    fn set_block_balance_updates(
-        &self,
-        state_hash: &BlockHash,
-        coinbase_receiver: PublicKey,
-        balance_updates: Vec<PaymentDiff>,
-    ) -> anyhow::Result<()>;
-
-    /// Get a block's balance updates
-    fn get_block_balance_updates(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<(PublicKey, Vec<PaymentDiff>)>>;
-
-    /// Updates stored account balances
-    fn update_account_balances(
-        &self,
-        state_hash: &BlockHash,
-        updates: Vec<PaymentDiff>,
-        coinbase_receivers: HashSet<PublicKey>,
-    ) -> anyhow::Result<()>;
-
     /// Get the epoch count of the best block
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
 
@@ -153,8 +119,10 @@ pub trait BlockStore {
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
 
+    /// Get the indexed coinbase receiver for the given block
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
+    /// Set the coinbase receiver for the given block
     fn set_coinbase_receiver(
         &self,
         state_hash: &BlockHash,
