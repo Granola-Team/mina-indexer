@@ -73,3 +73,8 @@ images:
   #docker run --rm -it "$IMAGE" \
   #  mina-indexer server start --help
   #docker image rm "$IMAGE"
+
+tier1:
+  just
+  just prereqs
+  just test
