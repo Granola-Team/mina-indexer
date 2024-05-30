@@ -50,10 +50,11 @@
             cargo-audit
             git # Needed but not declared by Nix's 'stdenv' build.
             just
+            s3cmd
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
-            rust
+            rus
             shellcheck
           ] ++ buildDependencies;
 
