@@ -12,6 +12,7 @@ nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" 
 default:
   @just --list --justfile {{justfile()}}
 
+# Check for presence of dev dependencies.
 prereqs:
   cd rust && cargo --version
   cd rust && cargo nextest --version
@@ -57,6 +58,7 @@ lint: && audit disallow-unused-cargo-deps
   shellcheck tests/regression
   shellcheck tests/stage-*
   shellcheck ops/productionize
+  shellcheck ops/ingest-all
   cd rust && cargo {{nightly_if_required}} fmt --all --check
   cd rust && cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
@@ -83,14 +85,18 @@ start-server: build
       --staking-ledgers-dir ./tests/data/staking_ledgers \
       --database-dir ./database
 
+# Delete the database created by 'start-server'.
 delete-database:
   rm -fr ./database
 
+# Run a server as if in production.
 productionize: build
   ./ops/productionize
 
+# Run the 1st tier of tests.
 tier1-test: prereqs test
 
+# Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
 tier2-test: build
   tests/regression test_many_blocks
   # TODO: investigate failures in the following.
