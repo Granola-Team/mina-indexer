@@ -326,32 +326,36 @@ impl BlocksQueryRoot {
                 || q.slot_since_genesis_lt.is_some()
                 || q.slot_since_genesis_lte.is_some()
         }) {
-            let (min, max) = match consensus_state {
-                Some(block_query_input) => {
-                    let BlockProtocolStateConsensusStateQueryInput {
-                        slot_since_genesis_lte,
-                        slot_since_genesis_lt,
-                        slot_since_genesis_gte,
-                        slot_since_genesis_gt,
-                        ..
-                    } = block_query_input;
-                    (
-                        // min = max of the gt(e) heights or 1
-                        slot_since_genesis_gt
-                            .map(|h| h.max(slot_since_genesis_gte.unwrap_or_default()))
-                            .unwrap_or(1),
-                        // max = max of the lt(e) heights or best tip height
-                        slot_since_genesis_lt
-                            .map(|h| h.max(slot_since_genesis_lte.unwrap_or_default()))
-                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
-                            .min(db.get_best_block()?.unwrap().global_slot_since_genesis()),
-                    )
-                }
-                None => (1, db.get_best_block()?.unwrap().global_slot_since_genesis()),
+            let (min, max) = {
+                let BlockProtocolStateConsensusStateQueryInput {
+                    slot_since_genesis_lte,
+                    slot_since_genesis_lt,
+                    slot_since_genesis_gte,
+                    slot_since_genesis_gt,
+                    ..
+                } = consensus_state
+                    .as_ref()
+                    .expect("consensus will have a value");
+                let min_bound = match (*slot_since_genesis_gte, *slot_since_genesis_gt) {
+                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+
+                let max_bound = match (*slot_since_genesis_lte, *slot_since_genesis_lt) {
+                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                };
+                (min_bound, max_bound)
             };
-
-            let block_slots: Vec<u32> = (min..=max).collect();
-
+            let mut block_slots: Vec<u32> = (min..=max).collect();
+            if sort_by == BlockSortByInput::BlockHeightDesc {
+                block_slots.reverse()
+            }
+            let mut early_exit = false;
             for global_slot in block_slots {
                 for block in db.get_blocks_at_slot(global_slot)? {
                     if let Some(block_with_canonicity) = precomputed_matches_query(
@@ -363,15 +367,16 @@ impl BlocksQueryRoot {
                         total_num_user_commands,
                     ) {
                         blocks.push(block_with_canonicity);
-
                         if blocks.len() == limit {
+                            early_exit = true;
                             break;
                         }
                     }
                 }
+                if early_exit {
+                    break;
+                }
             }
-
-            reorder_desc(&mut blocks, sort_by);
             return Ok(blocks);
         }
 
@@ -411,13 +416,6 @@ fn reorder_asc<T>(values: &mut [T], sort_by: BlockSortByInput) {
     match sort_by {
         BlockSortByInput::BlockHeightAsc => values.reverse(),
         BlockSortByInput::BlockHeightDesc => (),
-    }
-}
-
-fn reorder_desc<T>(values: &mut [T], sort_by: BlockSortByInput) {
-    match sort_by {
-        BlockSortByInput::BlockHeightAsc => (),
-        BlockSortByInput::BlockHeightDesc => values.reverse(),
     }
 }
 
