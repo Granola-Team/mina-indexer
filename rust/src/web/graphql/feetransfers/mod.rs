@@ -63,6 +63,7 @@ impl FeetransferWithMeta {
         ctx: &Context<'ctx>,
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
+        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
@@ -74,6 +75,7 @@ impl FeetransferWithMeta {
                 total_num_user_commands,
             ),
             canonical: self.canonical,
+            epoch_num_blocks,
             total_num_blocks,
         }))
     }

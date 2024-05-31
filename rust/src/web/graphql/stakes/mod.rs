@@ -198,7 +198,7 @@ impl StakeQueryRoot {
                     },
                     timing,
                     epoch_num_blocks: db
-                        .get_block_production_epoch_count(epoch)
+                        .get_block_production_epoch_count(Some(epoch))
                         .expect("epoch block count"),
                     total_num_blocks: db
                         .get_block_production_total_count()

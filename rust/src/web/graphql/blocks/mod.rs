@@ -35,6 +35,7 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
     ) -> Result<Option<BlockWithCanonicity>> {
         let db = db(ctx);
+        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_user_commands = db
             .get_user_commands_epoch_count(None)
@@ -50,6 +51,7 @@ impl BlocksQueryRoot {
                     let canonical = get_block_canonicity(db, &pcb.state_hash().0);
                     BlockWithCanonicity {
                         canonical,
+                        epoch_num_blocks,
                         total_num_blocks,
                         block: Block::new(
                             pcb,
@@ -75,6 +77,7 @@ impl BlocksQueryRoot {
             let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
                 canonical,
+                epoch_num_blocks,
                 total_num_blocks,
                 block: Block::new(
                     pcb,
@@ -90,9 +93,9 @@ impl BlocksQueryRoot {
             return Ok(None);
         }
 
-        // else iterate from the beginning
+        // else iterate from the most recent block
         // TODO bound query search space if given any inputs
-        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::Start).flatten() {
+        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End).flatten() {
             let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
@@ -100,6 +103,7 @@ impl BlocksQueryRoot {
             let canonical = get_block_canonicity(db, &state_hash);
             let block = BlockWithCanonicity {
                 canonical,
+                epoch_num_blocks,
                 total_num_blocks,
                 block: Block::new(
                     pcb,
@@ -125,6 +129,7 @@ impl BlocksQueryRoot {
         sort_by: Option<BlockSortByInput>,
     ) -> Result<Vec<BlockWithCanonicity>> {
         let db = db(ctx);
+        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_user_commands = db
             .get_user_commands_epoch_count(None)
@@ -146,6 +151,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         b,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -164,6 +170,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         b,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -191,6 +198,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         b,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -217,6 +225,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         b,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -243,6 +252,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         b,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -296,6 +306,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         block,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -362,6 +373,7 @@ impl BlocksQueryRoot {
                         db,
                         &query,
                         block,
+                        epoch_num_blocks,
                         total_num_blocks,
                         epoch_num_user_commands,
                         total_num_user_commands,
@@ -394,6 +406,7 @@ impl BlocksQueryRoot {
             let block = BlockWithCanonicity::from_precomputed(
                 pcb,
                 canonical,
+                epoch_num_blocks,
                 total_num_blocks,
                 epoch_num_user_commands,
                 total_num_user_commands,
@@ -423,6 +436,7 @@ fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
     block: PrecomputedBlock,
+    epoch_num_blocks: u32,
     total_num_blocks: u32,
     epoch_num_user_commands: u32,
     total_num_user_commands: u32,
@@ -431,6 +445,7 @@ fn precomputed_matches_query(
     let block_with_canonicity = BlockWithCanonicity::from_precomputed(
         block,
         canonical,
+        epoch_num_blocks,
         total_num_blocks,
         epoch_num_user_commands,
         total_num_user_commands,
@@ -459,7 +474,11 @@ pub struct BlockWithCanonicity {
     /// Value canonical
     pub canonical: bool,
 
-    /// Value total_num_blocks
+    /// Value epoch num blocks
+    #[graphql(name = "epoch_num_blocks")]
+    pub epoch_num_blocks: u32,
+
+    /// Value total num blocks
     #[graphql(name = "total_num_blocks")]
     pub total_num_blocks: u32,
 
@@ -1032,12 +1051,14 @@ impl BlockWithCanonicity {
     pub fn from_precomputed(
         block: PrecomputedBlock,
         canonical: bool,
+        epoch_num_blocks: u32,
         total_num_blocks: u32,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
     ) -> Self {
         Self {
             canonical,
+            epoch_num_blocks,
             total_num_blocks,
             block: Block::new(
                 block,

@@ -531,7 +531,7 @@ impl BlockStore for IndexerStore {
         )?;
 
         // increment epoch count
-        let acc = self.get_block_production_epoch_count(epoch)?;
+        let acc = self.get_block_production_epoch_count(Some(epoch))?;
         self.database.put_cf(
             self.block_production_epoch_cf(),
             to_be_bytes(epoch),
@@ -570,7 +570,8 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_epoch_count(&self, epoch: u32) -> anyhow::Result<u32> {
+    fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch block production count {epoch}");
         Ok(self
             .database
