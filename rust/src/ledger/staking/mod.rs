@@ -74,7 +74,7 @@ pub struct AggregatedEpochStakeDelegations {
     pub total_delegations: u64,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EpochStakeDelegation {
     pub pk: PublicKey,
     pub count_delegates: Option<u32>,
