@@ -42,7 +42,8 @@ if [ -e "$SOCKET" ]; then
     rm -f "$SOCKET"
 fi
 
-# 3. Read the blocks from the './blocks' directory.
+# 3. Configure the './blocks' directory, downloading blocks from the
+# granola-mina-blocks Linode bucket if need be.
 #
 "$SRC"/ops/download-mina-blocks 4 ./blocks
 
