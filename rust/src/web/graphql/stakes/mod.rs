@@ -59,6 +59,20 @@ impl StakeQueryRoot {
             None => curr_epoch,
         };
 
+        // short-circuited epoch number query
+        if limit == 0 {
+            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
+                return match db.get_epoch(&ledger_hash.clone().into())? {
+                    Some(epoch) => Ok(Some(vec![StakesLedgerAccountWithMeta {
+                        epoch,
+                        ledger_hash,
+                        ..Default::default()
+                    }])),
+                    None => Ok(None),
+                };
+            }
+        }
+
         // if ledger hash is provided as a query input, use it
         // else, use the epoch number
         let staking_ledger = {
@@ -237,7 +251,7 @@ impl StakeQueryRoot {
     }
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccountWithMeta {
     /// Value current epoch
     epoch: u32,
@@ -288,7 +302,7 @@ pub struct StakesLedgerAccountWithMeta {
     total_num_internal_commands: u32,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
     /// Value chainId
     pub chain_id: String,
@@ -359,7 +373,7 @@ pub struct StakesLedgerAccount {
     pk_total_num_internal_commands: u32,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Default)]
 #[graphql(complex)]
 pub struct StakesDelegationTotals {
     /// Value total currency
