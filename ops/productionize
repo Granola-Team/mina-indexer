@@ -43,8 +43,8 @@ if [ -e "$SOCKET" ]; then
 fi
 
 # 3. Read the blocks from the './blocks' directory.
-
-cp -r "$SRC"/tests/data/initial-blocks ./blocks
+#
+"$SRC"/ops/download-mina-blocks 4 ./blocks
 
 # 4. Read the staging ledgers from the './staking-ledgers' directory.
 #

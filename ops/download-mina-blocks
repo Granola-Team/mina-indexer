@@ -3,15 +3,16 @@
 set -x
 set -eu
 
-RESULT='Failure'
+RESULT='Failure.'
 exit_handler() {
-  echo "${RESULT}. Exiting." >&2
+  echo "${RESULT} Exiting." >&2
 }
 trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
 # Wrap s3cmd.
+#
 s3c() {
   time \
     s3cmd \
@@ -21,13 +22,28 @@ s3c() {
     "$@"
 }
 
-# Verify that we can connect.
-s3c ls
-
 # Download the Mina blocks logs from the Granola bucket. Note that "$1" is the
 # order of magnitude of the block count. So, "3" gets blocks of height up to
 # 99, and "5" gets blocks of height up to 99,999. "$2" is the destination
 # directory.
-s3c sync --rexclude 'mainnet-\d{'"$1"',}-.*' s3://granola-mina-blocks "$2"
+#
+if [ -d "$2" ]; then
+  # The directory exists already. Search it for blocks.
+  NINES="$( expr $1 - 1 )"
+  if [ -n "$(find "$2" -regextype posix-egrep -regex '.*/mainnet-9{'"${NINES}"',}-.*')" ]; then
+    RESULT='The blocks are already present. Skipping download.'
+    DO_SYNC=
+  else
+    DO_SYNC=1
+  fi
+else
+  DO_SYNC=1
+fi
+if [ '1' = "$DO_SYNC" ]; then
+  # Verify that we can connect.
+  s3c ls
 
-RESULT='Success'
+  # Perform the download.
+  s3c sync --rexclude 'mainnet-\d{'"$1"',}-.*' s3://granola-mina-blocks "$2"
+  RESULT='Blocks downloaded.'
+fi
