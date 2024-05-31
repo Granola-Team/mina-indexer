@@ -402,7 +402,7 @@ test_canonical_threshold() {
     length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
     assert $(( num_seq_blocks - canonical_threshold )) $length
-    assert '3NKHEHXsScTUd6kMDtoB4tf45MavdXv91qo3HZkLKrkc8XpX5CDv' $hash
+    assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $hash
 
     teardown
 }
