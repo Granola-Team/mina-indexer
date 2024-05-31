@@ -1,10 +1,12 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     chain::store::ChainStore,
+    command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::{
         account::{nanomina_to_mina, Amount},
         LedgerHash,
     },
+    snark_work::store::SnarkStore,
     store::IndexerStore,
     web::rest::locked_balances::LockedBalances,
 };
@@ -36,6 +38,12 @@ pub struct BlockchainSummary {
     total_currency: String,
     epoch_num_blocks: u32,
     total_num_blocks: u32,
+    epoch_num_snarks: u32,
+    total_num_snarks: u32,
+    epoch_num_user_commands: u32,
+    total_num_user_commands: u32,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
 }
 
 fn millis_to_date_string(millis: i64) -> String {
@@ -44,13 +52,34 @@ fn millis_to_date_string(millis: i64) -> String {
     date_time.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
-fn calculate_summary(
+struct SummaryInput {
     chain_id: String,
-    best_tip: &PrecomputedBlock,
+    best_tip: PrecomputedBlock,
     locked_balance: Option<Amount>,
     epoch_num_blocks: u32,
     total_num_blocks: u32,
-) -> Option<BlockchainSummary> {
+    epoch_num_snarks: u32,
+    total_num_snarks: u32,
+    epoch_num_user_commands: u32,
+    total_num_user_commands: u32,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+}
+
+fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
+    let SummaryInput {
+        chain_id,
+        best_tip,
+        locked_balance,
+        epoch_num_blocks,
+        total_num_blocks,
+        epoch_num_snarks,
+        total_num_snarks,
+        epoch_num_user_commands,
+        total_num_user_commands,
+        epoch_num_internal_commands,
+        total_num_internal_commands,
+    } = input;
     let blockchain_length = best_tip.blockchain_length();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
     let epoch = best_tip.epoch_count();
@@ -129,6 +158,12 @@ fn calculate_summary(
         total_currency,
         epoch_num_blocks,
         total_num_blocks,
+        epoch_num_snarks,
+        total_num_snarks,
+        epoch_num_user_commands,
+        total_num_user_commands,
+        epoch_num_internal_commands,
+        total_num_internal_commands,
     })
 }
 
@@ -144,24 +179,45 @@ pub async fn get_blockchain_summary(
         // aggregated on-chain & off-chain time-locked tokens
         let chain_id = store.get_chain_id().expect("chain id").0;
         let global_slot = best_tip.global_slot_since_genesis();
-        let locked_amount = locked_balances.get_locked_amount(global_slot);
+        let locked_balance = locked_balances.get_locked_amount(global_slot);
 
-        // get epoch info
-        let epoch = store.get_current_epoch().expect("current epoch");
+        // get epoch & total info
         let epoch_num_blocks = store
-            .get_block_production_epoch_count(epoch)
+            .get_block_production_epoch_count(None)
             .expect("epoch blocks count");
         let total_num_blocks = store
             .get_block_production_total_count()
             .expect("total blocks count");
+        let epoch_num_snarks = store
+            .get_snarks_epoch_count(None)
+            .expect("epoch snarks count");
+        let total_num_snarks = store.get_snarks_total_count().expect("total snarks count");
+        let epoch_num_user_commands = store
+            .get_user_commands_epoch_count(None)
+            .expect("epoch user commands count");
+        let total_num_user_commands = store
+            .get_user_commands_total_count()
+            .expect("total user commands count");
+        let epoch_num_internal_commands = store
+            .get_internal_commands_epoch_count(None)
+            .expect("epoch internal commands count");
+        let total_num_internal_commands = store
+            .get_internal_commands_total_count()
+            .expect("total internal commands count");
 
-        if let Some(ref summary) = calculate_summary(
+        if let Some(ref summary) = calculate_summary(SummaryInput {
             chain_id,
-            &best_tip,
-            locked_amount,
+            best_tip,
+            locked_balance,
             epoch_num_blocks,
             total_num_blocks,
-        ) {
+            epoch_num_snarks,
+            total_num_snarks,
+            epoch_num_user_commands,
+            total_num_user_commands,
+            epoch_num_internal_commands,
+            total_num_internal_commands,
+        }) {
             trace!("Blockchain summary: {:?}", summary);
             let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
             return HttpResponse::Ok()
