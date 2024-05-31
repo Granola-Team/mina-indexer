@@ -515,4 +515,33 @@ HTTP 200
 # total data count
 jsonpath "$.data.blocks" count == 100
 
+# Test for early exit condition when filtering use blockHeight_lte
+
+POST {{url}}
+```graphql
+query BlocksQuery(
+  $query: BlockQueryInput!
+  $limit: Int = 10
+  $sort_by: BlockSortByInput!
+) {
+  blocks(query: $query, limit: $limit, sortBy: $sort_by) {
+    stateHash
+  }
+}
+
+variables {
+  "limit": 50,
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "query": {
+    "canonical": true,
+    "blockHeight_lte": 100
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 50
+
 # TODO date time bounded query
