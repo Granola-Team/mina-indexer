@@ -7,6 +7,7 @@ POST {{url}}
 query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
   stakes(limit: $limit, sortBy: $sort_by, query: $query) {
     balance
+    balanceNanomina
     chainId
     delegate
     epoch
@@ -40,6 +41,7 @@ jsonpath "$.data.stakes" count == 1
 
 # only datum
 jsonpath "$.data.stakes[0].balance" == 2498323.273015384
+jsonpath "$.data.stakes[0].balanceNanomina" == 2498323273015384
 jsonpath "$.data.stakes[0].chainId" == "5f704c"
 jsonpath "$.data.stakes[0].delegate" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].epoch" == 42
@@ -55,16 +57,53 @@ jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 duration < 10000
 
 #
-# Stakes ledger hash delegate query
+# Stakes ledger hash query
+#
+
+POST {{url}}
+```graphql
+query StakesQuery($limit: Int, $query: StakeQueryInput!) {
+  stakes(limit: $limit, query: $query) {
+    pk
+    balance
+    balanceNanomina
+    username
+  }
+}
+
+variables {
+  "limit": 10,
+  "query": {
+    "ledgerHash": "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.stakes" count == 10
+
+# first datum
+jsonpath "$.data.stakes[0].pk" == "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"
+jsonpath "$.data.stakes[0].balance" == 83482371.13484836
+jsonpath "$.data.stakes[0].balanceNanomina" == 83482371134848360
+jsonpath "$.data.stakes[0].username" == null
+
+# last datum
+jsonpath "$.data.stakes[9].pk" == "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
+jsonpath "$.data.stakes[9].balance" == 1104.686899999
+jsonpath "$.data.stakes[9].balanceNanomina" == 1104686899999
+jsonpath "$.data.stakes[9].username" == null
+
+#
+# Stakes ledger hash delegate timing info query
 #
 
 POST {{url}}
 ```graphql
 query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
   stakes(limit: $limit, sortBy: $sort_by, query: $query) {
-    pk
-    balance
-    delegate
     timing {
       cliff_amount
       cliff_time
@@ -79,7 +118,7 @@ variables {
   "limit": 2,
   "sort_by": "BALANCE_DESC",
   "query": {
-    "ledgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+    "ledgerHash": "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH",
     "delegate": "B62qrxNgwAdhGYZv1BXQRt2HgopUceFyrtXZMikwsuaHu5FigRJjhwY"
   }
 }
@@ -158,17 +197,29 @@ jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
 # duration < 20000
 
 #
-# Stakes pk & total epoch blocks produced
+# Stakes pk & total/epoch counts
 #
 
 POST {{url}}
 ```graphql
 {
-  stakes(query: {public_key: "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sHkZaowxSLosZvLudt3kW"} limit: 1) {
+  stakes(query: {public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"} limit: 1) {
     pk_epoch_num_blocks
     pk_total_num_blocks
+    pk_epoch_num_snarks
+    pk_total_num_snarks
+    pk_epoch_num_user_commands
+    pk_total_num_user_commands
+    pk_epoch_num_internal_commands
+    pk_total_num_internal_commands
     epoch_num_blocks
     total_num_blocks
+    epoch_num_snarks
+    total_num_snarks
+    epoch_num_user_commands
+    total_num_user_commands
+    epoch_num_internal_commands
+    total_num_internal_commands
   }
 }
 ```
@@ -178,9 +229,21 @@ HTTP 200
 jsonpath "$.data.stakes" count == 1
 
 # only datum
-jsonpath "$.data.stakes[0].pk_epoch_num_blocks" == 5
-jsonpath "$.data.stakes[0].pk_total_num_blocks" == 5
+jsonpath "$.data.stakes[0].pk_epoch_num_blocks" == 0
+jsonpath "$.data.stakes[0].pk_total_num_blocks" == 0
+jsonpath "$.data.stakes[0].pk_epoch_num_snarks" == 0
+jsonpath "$.data.stakes[0].pk_total_num_snarks" == 0
+jsonpath "$.data.stakes[0].pk_epoch_num_user_commands" == 177
+jsonpath "$.data.stakes[0].pk_total_num_user_commands" == 177
+jsonpath "$.data.stakes[0].pk_epoch_num_internal_commands" == 198
+jsonpath "$.data.stakes[0].pk_total_num_internal_commands" == 198
 jsonpath "$.data.stakes[0].epoch_num_blocks" == 204
 jsonpath "$.data.stakes[0].total_num_blocks" == 204
+jsonpath "$.data.stakes[0].epoch_num_snarks" == 128
+jsonpath "$.data.stakes[0].total_num_snarks" == 128
+jsonpath "$.data.stakes[0].epoch_num_user_commands" == 180
+jsonpath "$.data.stakes[0].total_num_user_commands" == 180
+jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 207
+jsonpath "$.data.stakes[0].total_num_internal_commands" == 207
 
 duration < 2000
