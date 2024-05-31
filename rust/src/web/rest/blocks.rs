@@ -1,5 +1,8 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore},
+    block::{
+        is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockWithoutHeight,
+    },
+    canonicity::store::CanonicityStore,
     store::IndexerStore,
 };
 use actix_web::{
@@ -17,7 +20,11 @@ struct Params {
 }
 
 fn get_limit(limit: Option<u32>) -> u32 {
-    limit.map(|value| value.min(10)).unwrap_or(1)
+    limit.map(|value| value.min(100)).unwrap_or(10)
+}
+
+fn format_blocks(blocks: Vec<BlockWithoutHeight>) -> String {
+    format!("{blocks:#?}").replace(",\n]", "\n]")
 }
 
 #[get("/blocks")]
@@ -33,6 +40,10 @@ pub async fn get_blocks(
         let mut parent_state_hash = best_tip.previous_state_hash();
 
         loop {
+            if best_chain.len() == limit as usize {
+                break;
+            }
+
             if let Ok(Some(block)) = db.get_block(&parent_state_hash) {
                 parent_state_hash = block.previous_state_hash();
                 best_chain.push(block);
@@ -40,30 +51,82 @@ pub async fn get_blocks(
                 // No parent
                 break;
             }
-            if best_chain.len() == limit as usize {
-                break;
-            }
         }
 
-        let body = serde_json::to_string(&best_chain).unwrap();
+        let best_chain: Vec<BlockWithoutHeight> = best_chain
+            .iter()
+            .flat_map(|block| {
+                if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
+                    Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                } else {
+                    None
+                }
+            })
+            .collect();
         return HttpResponse::Ok()
             .content_type(ContentType::json())
-            .body(body);
+            .body(format_blocks(best_chain));
     }
     HttpResponse::NotFound().finish()
 }
 
-#[get("/blocks/{state_hash}")]
-pub async fn get_block(
-    store: Data<Arc<IndexerStore>>,
-    state_hash: web::Path<String>,
-) -> HttpResponse {
+#[get("/blocks/{input}")]
+pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>) -> HttpResponse {
     let db = store.as_ref();
-    if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
-        let body = serde_json::to_string(block).unwrap();
-        return HttpResponse::Ok()
-            .content_type(ContentType::json())
-            .body(body);
+
+    // via state hash
+    if is_valid_state_hash(&input) {
+        if let Ok(Some(ref block)) = db.get_block(&input.clone().into()) {
+            let block: BlockWithoutHeight = block.into();
+            return HttpResponse::Ok()
+                .content_type(ContentType::json())
+                .body(format!("{block:?}"));
+        }
     }
+
+    // via blockchain length
+    let height_prefix = "height=";
+    if (*input).starts_with(height_prefix) {
+        if let Ok(height) = input[height_prefix.len()..].parse::<u32>() {
+            if let Ok(blocks) = db.get_blocks_at_height(height) {
+                let blocks: Vec<BlockWithoutHeight> = blocks
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
+                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                return HttpResponse::Ok()
+                    .content_type(ContentType::json())
+                    .body(format_blocks(blocks));
+            }
+        }
+    }
+
+    // via global slot
+    let slot_prefix = "slot=";
+    if (*input).starts_with(slot_prefix) {
+        if let Ok(slot) = input[slot_prefix.len()..].parse::<u32>() {
+            if let Ok(blocks) = db.get_blocks_at_slot(slot) {
+                let blocks: Vec<BlockWithoutHeight> = blocks
+                    .iter()
+                    .flat_map(|block| {
+                        if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
+                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                return HttpResponse::Ok()
+                    .content_type(ContentType::json())
+                    .body(format_blocks(blocks));
+            }
+        }
+    }
+
     HttpResponse::NotFound().finish()
 }
