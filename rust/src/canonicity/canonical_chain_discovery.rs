@@ -259,6 +259,7 @@ fn find_witness_tree_root(
     if length_start_indices_and_diffs.len() <= canonical_threshold as usize {
         None
     } else {
+        let mut offset = 0;
         let mut curr_path = &paths[curr_length_idx];
 
         for n in 1..=canonical_threshold {
@@ -269,7 +270,10 @@ fn find_witness_tree_root(
                 0
             };
 
-            for path in paths[prev_length_start_idx..curr_length_idx].iter() {
+            for (idx, path) in paths[prev_length_start_idx..curr_length_idx]
+                .iter()
+                .enumerate()
+            {
                 // if the parent is found, check that it has a parent, etc
                 if is_parent(path, curr_path) {
                     debug!(
@@ -284,6 +288,7 @@ fn find_witness_tree_root(
                             .to_str()
                             .unwrap_or_default(),
                     );
+                    offset = idx;
                     curr_path = path;
                     curr_length_idx = prev_length_start_idx;
                     curr_start_idx = curr_start_idx.saturating_sub(1);
@@ -314,7 +319,7 @@ fn find_witness_tree_root(
                 break;
             }
         }
-        Some((curr_length_idx, curr_start_idx))
+        Some((curr_length_idx + offset, curr_start_idx))
     }
 }
 
