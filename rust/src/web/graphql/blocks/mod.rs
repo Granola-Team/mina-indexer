@@ -262,32 +262,34 @@ impl BlocksQueryRoot {
                 || q.block_height_lt.is_some()
                 || q.block_height_lte.is_some()
         }) {
-            let (min, max) = match query.as_ref() {
-                Some(block_query_input) => {
-                    let BlockQueryInput {
-                        block_height_gt,
-                        block_height_gte,
-                        block_height_lt,
-                        block_height_lte,
-                        ..
-                    } = block_query_input;
-                    (
-                        // min = max of the gt(e) heights or 1
-                        block_height_gt
-                            .map(|h| h.max(block_height_gte.unwrap_or_default()))
-                            .unwrap_or(1),
-                        // max = max of the lt(e) heights or best tip height
-                        block_height_lt
-                            .map(|h| h.max(block_height_lte.unwrap_or_default()))
-                            .unwrap_or(db.get_best_block()?.unwrap().blockchain_length())
-                            .min(db.get_best_block()?.unwrap().blockchain_length()),
-                    )
-                }
-                None => (1, db.get_best_block()?.unwrap().blockchain_length()),
+            let (min, max) = {
+                let BlockQueryInput {
+                    block_height_gt,
+                    block_height_gte,
+                    block_height_lt,
+                    block_height_lte,
+                    ..
+                } = query.as_ref().expect("query will contain a value");
+                let min_bound = match (*block_height_gte, *block_height_gt) {
+                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+
+                let max_bound = match (*block_height_lte, *block_height_lt) {
+                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                };
+                (min_bound, max_bound)
             };
-
-            let block_heights: Vec<u32> = (min..=max).collect();
-
+            let mut block_heights: Vec<u32> = (min..=max).collect();
+            if sort_by == BlockSortByInput::BlockHeightDesc {
+                block_heights.reverse()
+            }
+            let mut early_exit = false;
             for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     if let Some(block_with_canonicity) = precomputed_matches_query(
@@ -301,13 +303,15 @@ impl BlocksQueryRoot {
                         blocks.push(block_with_canonicity);
 
                         if blocks.len() == limit {
+                            early_exit = true;
                             break;
                         }
                     }
                 }
+                if early_exit {
+                    break;
+                }
             }
-
-            reorder_desc(&mut blocks, sort_by);
             return Ok(blocks);
         }
 
