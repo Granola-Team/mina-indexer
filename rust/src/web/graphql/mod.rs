@@ -2,7 +2,6 @@ pub mod accounts;
 pub mod blocks;
 pub mod feetransfers;
 pub mod gen;
-pub mod next_stakes;
 pub mod snarks;
 pub mod stakes;
 pub mod transactions;
@@ -21,7 +20,6 @@ use std::sync::Arc;
 pub struct Root(
     blocks::BlocksQueryRoot,
     stakes::StakeQueryRoot,
-    next_stakes::NextstakeQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
