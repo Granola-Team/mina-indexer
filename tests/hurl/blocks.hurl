@@ -490,4 +490,29 @@ jsonpath "$.data.blocks[0].canonical" == true
 
 duration < 200
 
+# Test for early exit condition when filtering use blockHeight_lte
+
+POST {{url}}
+```graphql
+query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryInput!) {
+  blocks(limit: $limit, sortBy: $sort_by, query: $query ) {
+    stateHash
+  }
+}
+
+variables {
+  "limit": 100,
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "query": {
+    "canonical": true,
+    "blockHeight_lte": 100
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 100
+
 # TODO date time bounded query
