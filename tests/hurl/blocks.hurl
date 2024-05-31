@@ -14,7 +14,6 @@ query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryIn
     dateTime
     receivedTime
     snarkFees
-    total_num_blocks
   }
 }
 
@@ -31,9 +30,6 @@ HTTP 200
 
 # total query results
 jsonpath "$.data.blocks" count == 120
-
-# total blocks count
-jsonpath "$.data.blocks[0].total_num_blocks" == 204
 
 # first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
@@ -467,6 +463,10 @@ jsonpath "$.data.blocks" count == 10
 
 duration < 1000
 
+#
+# Blocks protocol state query
+#
+
 POST {{url}}
 ```graphql
 {
@@ -490,7 +490,9 @@ jsonpath "$.data.blocks[0].canonical" == true
 
 duration < 200
 
+#
 # Test for early exit condition when filtering use blockHeight_lte
+#
 
 POST {{url}}
 ```graphql
@@ -515,7 +517,9 @@ HTTP 200
 # total data count
 jsonpath "$.data.blocks" count == 100
 
+#
 # Test for early exit condition when filtering use blockHeight_lte
+#
 
 POST {{url}}
 ```graphql
@@ -543,5 +547,30 @@ HTTP 200
 
 # total data count
 jsonpath "$.data.blocks" count == 50
+
+#
+# Blocks epoch/total counts query
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(limit: 1) {
+    epoch_num_blocks
+    total_num_blocks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 1
+
+# data counts
+jsonpath "$.data.blocks[0].epoch_num_blocks" == 204
+jsonpath "$.data.blocks[0].total_num_blocks" == 204
+
+duration < 1000
 
 # TODO date time bounded query

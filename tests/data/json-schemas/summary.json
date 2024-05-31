@@ -55,6 +55,24 @@
     },
     "totalNumBlocks": {
       "type": "integer"
+    },
+    "epochNumSnarks": {
+      "type": "integer"
+    },
+    "totalNumSnarks": {
+      "type": "integer"
+    },
+    "epochNumUserCommands": {
+      "type": "integer"
+    },
+    "totalNumUserCommands": {
+      "type": "integer"
+    },
+    "epochNumInternalCommands": {
+      "type": "integer"
+    },
+    "totalNumInternalCommands": {
+      "type": "integer"
     }
   },
   "required": [
@@ -75,6 +93,12 @@
     "stateHash",
     "totalCurrency",
     "epochNumBlocks",
-    "totalNumBlocks"
+    "totalNumBlocks",
+    "epochNumSnarks",
+    "totalNumSnarks",
+    "epochNumUserCommands",
+    "totalNumUserCommands",
+    "epochNumInternalCommands",
+    "totalNumInternalCommands"
   ]
 }

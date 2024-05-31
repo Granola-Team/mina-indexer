@@ -1064,8 +1064,8 @@ test_many_blocks() {
     teardown
 }
 
-test_rest_endpoints() {
-    test=test_rest_endpoints
+test_rest_accounts_summary() {
+    test=test_rest_accounts_summary
 
     setup
     dl_mainnet 100 ./blocks
@@ -1142,6 +1142,41 @@ test_rest_endpoints() {
 
     check-jsonschema --schemafile "$SUMMARY_SCHEMA" output.json
 
+    teardown
+}
+
+test_rest_blocks() {
+    test=test_rest_blocks
+
+    setup
+    dl_mainnet 100 ./blocks
+    port=$(ephemeral_port)
+
+    idxr_server start \
+        --blocks-dir ./blocks \
+        --staking-ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        --log-level debug \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0"
+    wait_for_socket
+
+    # /blocks endpoint
+    curl --silent http://localhost:${port}/blocks > output.json
+    assert $(idxr summary --json | jq -r .witness_tree.best_tip_hash) $(cat output.json | jq -r .[0].state_hash)
+
+    # /blocks/{state_hash} endpoint
+    curl --silent http://localhost:${port}/blocks/3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 > output.json
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .state_hash)
+
+    # /blocks/height={height} endpoint
+    curl --silent http://localhost:${port}/blocks/height=100 > output.json
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
+
+    # /blocks/slot={globl_slot} endpoint
+    curl --silent http://localhost:${port}/blocks/slot=145 > output.json
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
+    
     teardown
 }
 
@@ -1741,7 +1776,8 @@ if [ "$#" -eq 0 ]; then
     test_transactions
     test_snark_work
     test_checkpoint
-    test_rest_endpoints
+    test_rest_accounts_summary
+    test_rest_blocks
     test_genesis_block_creator
     test_txn_nonces
     test_startup_staking_ledgers
@@ -1779,7 +1815,8 @@ else
             "test_transactions") test_transactions ;;
             "test_snark_work") test_snark_work ;;
             "test_checkpoint") test_checkpoint ;;
-            "test_rest_endpoints") test_rest_endpoints ;;
+            "test_rest_accounts_summary") test_rest_accounts_summary ;;
+            "test_rest_blocks") test_rest_blocks ;;
             "test_genesis_block_creator") test_genesis_block_creator ;;
             "test_txn_nonces") test_txn_nonces ;;
             "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
@@ -1788,10 +1825,11 @@ else
             "test_internal_commands") test_internal_commands ;;
             "test_start_from_config") test_start_from_config ;;
             "test_hurl") test_hurl ;;
-            "test_hurl_tier2") test_hurl_tier2 ;;
-            "test_many_blocks") test_many_blocks ;;
             "test_clean_shutdown") test_clean_shutdown ;;
             "test_release") test_release ;;
+            # tier 2 tests (run via `just tier2-test`)
+            "test_hurl_tier2") test_hurl_tier2 ;;
+            "test_many_blocks") test_many_blocks ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done
