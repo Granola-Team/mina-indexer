@@ -1,7 +1,9 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
+    command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::store::LedgerStore,
+    snark_work::store::SnarkStore,
     web::graphql::{
         stakes::{StakesDelegationTotals, StakesLedgerAccount},
         Timing,
@@ -27,6 +29,12 @@ pub enum NextstakeSortByInput {
 
     #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
+
+    #[graphql(name = "STAKE_ASC")]
+    StakeAsc,
+
+    #[graphql(name = "STAKE_DESC")]
+    StakeDesc,
 }
 
 #[derive(Default)]
@@ -51,15 +59,27 @@ impl NextstakeQueryRoot {
             Some(ref query) => query.epoch.map_or(next_epoch, |e| e + 1),
             None => next_epoch,
         };
-        let staking_ledger = match db.get_staking_ledger_at_epoch(epoch, &None)? {
-            Some(staking_ledger) => staking_ledger,
-            None => return Ok(None),
+
+        // if ledger hash is provided as a query input, use it
+        // else, use the epoch number
+        let staking_ledger = {
+            let opt = if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone())
+            {
+                db.get_staking_ledger_hash(&ledger_hash.into())?
+            } else {
+                db.get_staking_ledger_at_epoch(epoch, &None)?
+            };
+            match opt {
+                Some(staking_ledger) => staking_ledger,
+                None => return Ok(None),
+            }
         };
+        let epoch = staking_ledger.epoch;
         let total_currency = staking_ledger.total_currency;
+        let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let delegations = db
             .get_delegations_epoch(epoch, &None)?
             .expect("delegations are present if staking ledger is");
-        let ledger_hash = staking_ledger.ledger_hash.clone().0;
 
         // collect the results
         let mut accounts: Vec<NextStakesLedgerAccountWithMeta> = staking_ledger
@@ -74,26 +94,35 @@ impl NextstakeQueryRoot {
                         ledger_hash: query_ledger_hash,
                     } = query;
                     if let Some(public_key) = public_key {
-                        return *public_key == account.pk.0;
-                    }
-                    if let Some(delegate) = &query.delegate {
-                        return *delegate == account.delegate.0;
-                    }
-                    if let Some(query_ledger_hash) = query_ledger_hash {
-                        return *query_ledger_hash == ledger_hash;
-                    }
-                    if let Some(query_epoch) = query_epoch {
-                        return *query_epoch == epoch;
+                        if *public_key != account.pk.0 {
+                            return false;
+                        }
                     }
                     if let Some(delegate) = delegate {
-                        return *delegate == account.delegate.0;
+                        if *delegate != account.delegate.0 {
+                            return false;
+                        }
+                    }
+                    if let Some(query_ledger_hash) = query_ledger_hash {
+                        if *query_ledger_hash != ledger_hash {
+                            return false;
+                        }
+                    }
+                    if let Some(query_epoch) = query_epoch {
+                        if *query_epoch + 1 != epoch {
+                            return false;
+                        }
                     }
                 }
                 true
             })
             .map(|account| {
                 let pk = account.pk.clone();
-                let result = delegations.delegations.get(&pk).unwrap();
+                let result = delegations
+                    .delegations
+                    .get(&pk)
+                    .cloned()
+                    .unwrap_or_default();
                 let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
                 let count_delegates = result.count_delegates.unwrap_or_default();
                 let mut decimal = Decimal::from(total_delegated_nanomina);
@@ -107,15 +136,40 @@ impl NextstakeQueryRoot {
                     vesting_increment: Some(timing.vesting_increment),
                     vesting_period: Some(timing.vesting_period),
                 });
+
+                // nothing has been produced in the next epoch
+                let pk_epoch_num_blocks = 0;
+                let pk_epoch_num_snarks = 0;
+                let pk_epoch_num_user_commands = 0;
+                let pk_epoch_num_internal_commands = 0;
+
                 let pk_total_num_blocks = db
                     .get_block_production_pk_total_count(&pk)
                     .expect("pk total num blocks");
+                let pk_total_num_snarks = db
+                    .get_snarks_pk_total_count(&pk)
+                    .expect("pk total num snarks");
+                let pk_total_num_user_commands = db
+                    .get_user_commands_pk_total_count(&pk)
+                    .expect("pk total num user commands");
+                let pk_total_num_internal_commands = db
+                    .get_internal_commands_pk_total_count(&pk)
+                    .expect("pk total num internal commands");
 
                 NextStakesLedgerAccountWithMeta {
                     epoch,
                     ledger_hash: ledger_hash.clone(),
-                    // no blocks have been produced for the next epoch
-                    account: StakesLedgerAccount::from((account, 0, pk_total_num_blocks)),
+                    account: StakesLedgerAccount::from((
+                        account,
+                        pk_epoch_num_blocks,
+                        pk_total_num_blocks,
+                        pk_epoch_num_snarks,
+                        pk_total_num_snarks,
+                        pk_epoch_num_user_commands,
+                        pk_total_num_user_commands,
+                        pk_epoch_num_internal_commands,
+                        pk_total_num_internal_commands,
+                    )),
                     next_delegation_totals: StakesDelegationTotals {
                         total_currency,
                         total_delegated,
@@ -129,15 +183,31 @@ impl NextstakeQueryRoot {
                     total_num_blocks: db
                         .get_block_production_total_count()
                         .expect("total block count"),
+                    epoch_num_snarks: db
+                        .get_snarks_epoch_count(Some(epoch))
+                        .expect("epoch snark count"),
+                    total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
+                    epoch_num_user_commands: db
+                        .get_user_commands_epoch_count(Some(epoch))
+                        .expect("epoch user command count"),
+                    total_num_user_commands: db
+                        .get_user_commands_total_count()
+                        .expect("total user command count"),
+                    epoch_num_internal_commands: db
+                        .get_internal_commands_epoch_count(Some(epoch))
+                        .expect("epoch internal command count"),
+                    total_num_internal_commands: db
+                        .get_internal_commands_total_count()
+                        .expect("total internal command count"),
                 }
             })
             .collect();
 
         match sort_by {
-            Some(NextstakeSortByInput::BalanceAsc) => {
+            Some(NextstakeSortByInput::BalanceAsc) | Some(NextstakeSortByInput::StakeAsc) => {
                 accounts.sort_by(|b, a| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
             }
-            Some(NextstakeSortByInput::BalanceDesc) => {
+            Some(NextstakeSortByInput::BalanceDesc) | Some(NextstakeSortByInput::StakeDesc) => {
                 accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
             }
             None => (),
@@ -173,4 +243,28 @@ pub struct NextStakesLedgerAccountWithMeta {
     /// Value total num blocks
     #[graphql(name = "total_num_blocks")]
     total_num_blocks: u32,
+
+    /// Value epoch num snarks
+    #[graphql(name = "epoch_num_snarks")]
+    epoch_num_snarks: u32,
+
+    /// Value total num snarks
+    #[graphql(name = "total_num_snarks")]
+    total_num_snarks: u32,
+
+    /// Value epoch num user commands
+    #[graphql(name = "epoch_num_user_commands")]
+    epoch_num_user_commands: u32,
+
+    /// Value total num user commands
+    #[graphql(name = "total_num_user_commands")]
+    total_num_user_commands: u32,
+
+    /// Value epoch num internal commands
+    #[graphql(name = "epoch_num_internal_commands")]
+    epoch_num_internal_commands: u32,
+
+    /// Value total num internal commands
+    #[graphql(name = "total_num_internal_commands")]
+    total_num_internal_commands: u32,
 }
