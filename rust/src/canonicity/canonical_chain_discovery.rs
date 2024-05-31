@@ -10,8 +10,8 @@ use std::{
 
 /// Separate blocks into 3 length-sorted lists:
 /// - deep canonical blocks (canonical up to root)
-/// - recent blocks (following the canonical root)
-/// - orphaned blocks (at or below canonical root)
+/// - recent blocks (following the witness tree root)
+/// - orphaned blocks (at or below witness tree root)
 pub fn discovery(
     min_len_filter: Option<u32>,
     max_len_filter: Option<u32>,
@@ -76,7 +76,7 @@ pub fn discovery(
         let last_contiguous_idx = last_contiguous_first_noncontiguous_start_idx
             .map(|i| i.1.saturating_sub(1))
             .unwrap_or(paths.len() - 1);
-        let canonical_root_opt = find_canonical_root(
+        let witness_tree_root_opt = find_witness_tree_root(
             paths.as_slice(),
             &length_start_indices_and_diffs,
             length_start_indices_and_diffs
@@ -87,7 +87,7 @@ pub fn discovery(
             canonical_threshold,
         );
 
-        if canonical_root_opt.is_none()
+        if witness_tree_root_opt.is_none()
             || max_num_canonical_blocks(&length_start_indices_and_diffs, last_contiguous_start_idx)
                 < canonical_threshold
         {
@@ -98,17 +98,17 @@ pub fn discovery(
         }
 
         // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
-        // the `last_contiguous_idx` to find the canonical root
-        let (mut curr_length_idx, mut curr_start_idx) = canonical_root_opt.unwrap();
+        // the `last_contiguous_idx` to find the witness tree root
+        let (mut curr_length_idx, mut curr_start_idx) = witness_tree_root_opt.unwrap();
         let mut curr_path = paths[curr_length_idx];
 
         info!(
-            "Found canonical root (length {}): {}",
+            "Found witness tree root (length {}): {}",
             extract_block_height(curr_path).unwrap_or(0),
             extract_state_hash(curr_path),
         );
 
-        // handle all blocks that are higher than the canonical root
+        // handle all blocks that are higher than the witness tree root
         if let Some(recent_start_idx) = next_length_start_index(paths.as_slice(), curr_length_idx) {
             if recent_start_idx
                 < length_start_indices_and_diffs
@@ -138,7 +138,7 @@ pub fn discovery(
         let time = Instant::now();
         let mut count = 1;
 
-        // descend from the canonical root to the lowest block in the dir,
+        // descend from the witness tree root to the lowest block in the dir,
         // segment by segment, searching for ancestors
         while curr_start_idx > 0 {
             if count % reporting_freq == 0 {
@@ -241,14 +241,15 @@ fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize>
     None
 }
 
-/// Finds the _canonical root_, i.e. the _highest_ block in the
+/// Finds the root of the witness tree, i.e. the _highest_ block in the
 /// _lowest contiguous chain_ with `canonical_threshold` ancestors.
 /// Unfortunately, the existence of this value does not necessarily imply
 /// the existence of a canonical chain within the collection of blocks.
 ///
-/// Returns the index of the canonical root in `paths` and the start index of
-/// the first recent block.
-fn find_canonical_root(
+/// Returns the index of the witness tree root in `paths` and
+/// the start index of the first "recent" block (these blocks are added to the
+/// witness tree, on top of the root).
+fn find_witness_tree_root(
     paths: &[&PathBuf],
     length_start_indices_and_diffs: &[(usize, u32)],
     mut curr_start_idx: usize,
@@ -271,6 +272,18 @@ fn find_canonical_root(
             for path in paths[prev_length_start_idx..curr_length_idx].iter() {
                 // if the parent is found, check that it has a parent, etc
                 if is_parent(path, curr_path) {
+                    debug!(
+                        "{} is the parent of {}",
+                        curr_path
+                            .file_stem()
+                            .unwrap_or_default()
+                            .to_str()
+                            .unwrap_or_default(),
+                        path.file_stem()
+                            .unwrap_or_default()
+                            .to_str()
+                            .unwrap_or_default(),
+                    );
                     curr_path = path;
                     curr_length_idx = prev_length_start_idx;
                     curr_start_idx = curr_start_idx.saturating_sub(1);
@@ -283,7 +296,7 @@ fn find_canonical_root(
             if !parent_found {
                 // begin the search again at the previous length
                 if curr_start_idx > canonical_threshold as usize {
-                    return find_canonical_root(
+                    return find_witness_tree_root(
                         paths,
                         length_start_indices_and_diffs,
                         curr_start_idx.saturating_sub(1),
@@ -291,12 +304,12 @@ fn find_canonical_root(
                         canonical_threshold,
                     );
                 } else {
-                    // canonical root cannot be found
+                    // root cannot be found
                     return None;
                 }
             }
 
-            // potential canonical root found
+            // potential root found
             if n == canonical_threshold && parent_found {
                 break;
             }
