@@ -53,8 +53,8 @@
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
+            rclone
             rust
-            s3cmd
             shellcheck
           ] ++ buildDependencies;
 

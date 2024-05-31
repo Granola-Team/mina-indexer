@@ -11,15 +11,17 @@ trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
-# Wrap s3cmd.
+# Wrap the command to access the S3 bucket. (s3c = "S3 Command")
 #
-s3c() {
+rc() {
   time \
-    s3cmd \
-    -c "$MY_DIR"/s3cfg \
-    --access_key="$LINODE_OBJ_ACCESS_KEY" \
-    --secret_key="$LINODE_OBJ_SECRET_KEY" \
-    "$@"
+    rclone \
+      -v -v \
+      --config "$MY_DIR"/rclone.conf \
+      --buffer-size 128Mi \
+      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
+      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
+      "$@"
 }
 
 # Download the Mina blocks logs from the Granola bucket. Note that "$1" is the
@@ -41,9 +43,14 @@ else
 fi
 if [ '1' = "$DO_SYNC" ]; then
   # Verify that we can connect.
-  s3c ls
+  rc lsd linode:
 
   # Perform the download.
-  s3c sync --rexclude 'mainnet-\d{'"$1"',}-.*' s3://granola-mina-blocks "$2"
+  rc \
+    sync \
+    linode:granola-mina-blocks \
+    --exclude '*mainnet-{{\d{'"$1"',}}}-*' \
+    --dump filters \
+    "$2"
   RESULT='Blocks downloaded.'
 fi
