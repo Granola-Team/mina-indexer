@@ -54,6 +54,7 @@
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
             rust
+            s3cmd
             shellcheck
           ] ++ buildDependencies;
 
