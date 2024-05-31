@@ -69,4 +69,10 @@ pub trait LedgerStore {
 
     /// Get pk's account balance from the balance-sorted ledger
     fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the epoch number corresponding to the given staking ledger hash
+    fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>>;
+
+    /// Set the epoch number corresponding to the given staking ledger hash
+    fn set_epoch(&self, ledger_hash: &LedgerHash, epoch: u32) -> anyhow::Result<()>;
 }

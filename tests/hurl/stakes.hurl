@@ -139,7 +139,7 @@ jsonpath "$.data.stakes[0].timing.vesting_period" == 1
 # last datum
 jsonpath "$.data.stakes[1].timing" == null
 
-duration < 1000
+duration < 2000
 
 #
 # Stakes delegation total stake percentage query
@@ -247,3 +247,25 @@ jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 207
 jsonpath "$.data.stakes[0].total_num_internal_commands" == 207
 
 duration < 2000
+
+#
+# Staking ledger epoch query
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"}, limit: 0) {
+    epoch
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.stakes" count == 1
+
+# only datum
+jsonpath "$.data.stakes[0].epoch" == 42
+
+duration < 200

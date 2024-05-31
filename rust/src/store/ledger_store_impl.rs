@@ -10,7 +10,7 @@ use crate::{
         store::LedgerStore,
         Ledger, LedgerHash,
     },
-    store::{account::AccountStore, IndexerStore},
+    store::{account::AccountStore, from_be_bytes, to_be_bytes, IndexerStore},
 };
 use log::{error, trace};
 use std::str::FromStr;
@@ -239,6 +239,9 @@ impl LedgerStore for IndexerStore {
             .is_none();
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
+        // add (ledger hash, epoch) index
+        self.set_epoch(&staking_ledger.ledger_hash, staking_ledger.epoch)?;
+
         // add (genesis state hash, epoch) index
         let key = format!("staking-{}-{}", genesis_state_hash.0, epoch);
         let value = staking_ledger.ledger_hash.0.as_bytes();
@@ -310,5 +313,22 @@ impl LedgerStore for IndexerStore {
                 be_bytes.copy_from_slice(&bytes[..8]);
                 u64::from_be_bytes(be_bytes)
             }))
+    }
+
+    fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting epoch for ledger {}", ledger_hash.0);
+        Ok(self
+            .database
+            .get_cf(self.staking_ledger_epoch_cf(), ledger_hash.0.as_bytes())?
+            .map(from_be_bytes))
+    }
+
+    fn set_epoch(&self, ledger_hash: &LedgerHash, epoch: u32) -> anyhow::Result<()> {
+        trace!("Setting epoch {epoch} for ledger {}", ledger_hash.0);
+        Ok(self.database.put_cf(
+            self.staking_ledger_epoch_cf(),
+            ledger_hash.0.as_bytes(),
+            to_be_bytes(epoch),
+        )?)
     }
 }

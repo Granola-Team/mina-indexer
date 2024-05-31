@@ -39,7 +39,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 41] = [
+    const COLUMN_FAMILIES: [&'static str; 42] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -81,6 +81,7 @@ impl IndexerStore {
         "snarks-pk-epoch",            // [snarks_pk_epoch_cf]
         "snarks-pk-total",            // [snarks_pk_total_cf]
         "usernames",                  // [username_cf]
+        "staking-ledger-epoch",       // [staking_ledger_epoch_cf]
     ];
 
     /// Creates a new _primary_ indexer store

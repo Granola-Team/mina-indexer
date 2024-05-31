@@ -319,4 +319,11 @@ impl ColumnFamilyHelpers for IndexerStore {
             .cf_handle("usernames")
             .expect("usernames column family exists")
     }
+
+    /// CF for storing staking ledger epochs
+    fn staking_ledger_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-epoch")
+            .expect("staking-ledger-epoch column family exists")
+    }
 }
