@@ -50,7 +50,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
                     .guard(guard::Get())
                     .to(indexer_graphiql),
             )
-            .wrap(Cors::default().allow_any_origin().send_wildcard())
+            .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
     .bind(addrs)?
