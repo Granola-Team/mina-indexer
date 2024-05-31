@@ -11,7 +11,7 @@ trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
-# Wrap the command to access the S3 bucket. (s3c = "S3 Command")
+# Wrap the command to access the S3 bucket (rclone).
 #
 rc() {
   time \
