@@ -2,7 +2,7 @@
 # shellcheck disable=SC2046,SC2086,SC2002
 
 # To debug, uncomment:
-#set -x
+set -x
 
 set -euo pipefail
 
@@ -23,15 +23,41 @@ idxr() {
     RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock "$@"
 }
 
-# Performs a forcible shutdown of the Indexer, possibly returning failure.
+# Performs a shutdown of the Indexer, possibly returning failure.
 #
-kill_idxr() {
+shutdown_idxr() {
     echo "Shutting down Mina Indexer."
-    idxr server shutdown
 
-    # Wait no more than 10 seconds for the process.
-    timeout 10s pwait -F ./idxr_pid ||
-        true  # Because the process may already be gone, yielding an error.
+    if [ ! -S ./mina-indexer.sock ]; then
+       echo "  Missing socket. Shutdown failed."
+       return 1
+    fi
+
+    if [ ! -e ./idxr_pid ]; then
+        echo "  Missing PID file. Shutdown failed."
+        return 1
+    fi
+
+    if ! idxr server shutdown; then
+      echo "  Server shutdown command failed."
+      return 1
+    fi
+
+    # Shutdown command succeeded, but PID may still be active.
+    if ! timeout 10s pwait -F ./idxr_pid; then
+      # Either it timed out, or that PID did not exist.
+      if ps -p "$(cat ./idxr_pid)"; then
+        # The process still exists. The pwait must have timed out.
+        echo "  The shutdown command did not kill the process. Failure."
+        return 1
+      else
+        # The process does not exist. Check for socket deletion.
+        if [ -S ./mina-indexer.sock ]; then
+          echo "  The shutdown command did not delete the socket. Failure."
+          return 1
+        fi
+      fi
+    fi
 
     echo "Deleting PID file."
     rm -f ./idxr_pid
@@ -43,7 +69,12 @@ cleanup() {
     err=$?
     if [ $err != 0 ]; then
         echo "Test failed ($test_name): $err"
-        kill_idxr || :
+        if ! shutdown_idxr; then
+          # If there is a PID file, try to kill the process forcefully.
+          if [ -e ./idxr_pid ]; then
+            kill "$(cat ./idxr_pid)"
+          fi
+        fi
     fi
     rm -rf "${TEST_DIR}"
     exit "$err"
@@ -165,7 +196,7 @@ assert_directory_exists() {
 }
 
 teardown() {
-    kill_idxr
+    shutdown_idxr
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     rm -rf ./database
@@ -738,7 +769,7 @@ test_sync() {
 
     idxr summary --verbose
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
-    kill_idxr
+    shutdown_idxr
 
     # add more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
@@ -769,7 +800,7 @@ test_replay() {
     wait_for_socket
 
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
-    kill_idxr
+    shutdown_idxr
 
     # add 8 more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
@@ -1540,30 +1571,42 @@ test_start_without_ledgers_dir() {
 test_clean_shutdown() {
     enter_test test_clean_shutdown
 
-    idxr_server_start \
-        --block-watch-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database
+    idxr_server_start_standard
     wait_for_socket
+
+    teardown  # Calls shutdown_idxr, which checks for clean shutdown.
+}
+
+test_clean_kill() {
+    enter_test test_clean_kill
+
+    idxr_server_start_standard
+    wait_for_socket
+
+    if [ ! -e ./idxr_pid ]; then
+        echo "  Missing PID file. Cannot kill. Failure."
+        return 1
+    fi
 
     echo "  Sending Mina Indexer a SIGTERM"
     PID="$(cat ./idxr_pid)"
     kill "$PID"
 
-    # Debugging: see whether the process is still present. It often is.
-    ps -p "$PID" || true
+    # We must give the process a chance to die, with 'pwait'.
+    timeout 10s pwait -F ./idxr_pid || true
 
-    # Wait for the process, but for no more than 10 seconds.
-    timeout 10s pwait -F ./idxr_pid ||
-        true
-
-    # Check the success of trying to kill the process with SIGTERM.
+    # We waited with pwait. If the process is still there, it's a fail.
     if ps -p "$PID"; then
-        echo "  PID $PID not killed."
-        exit 1
-    else
-        echo "  PID $PID no longer present."
+        echo "  The signal did not kill the process. Failure."
+        return 1
     fi
+
+    # TODO:
+    #    # Check for socket deletion.
+    #    if [ -S ./mina-indexer.sock ]; then
+    #        echo "  The signal handler did not delete the socket. Failure."
+    #        return 1
+    #    fi
 
     teardown
 }
@@ -1690,6 +1733,7 @@ if [ "$#" -eq 0 ]; then
     test_startup_dirs_get_created
     test_start_without_blocks_dir
     test_clean_shutdown
+    test_clean_kill
     test_account_balance_cli
     test_account_public_key_json
     test_canonical_root
@@ -1755,6 +1799,7 @@ else
             "test_start_from_config") test_start_from_config ;;
             "test_hurl") test_hurl ;;
             "test_clean_shutdown") test_clean_shutdown ;;
+            "test_clean_kill") test_clean_kill ;;
             "test_release") test_release ;;
             # tier 2 tests (run via `just tier2-test`)
             "test_hurl_tier2") test_hurl_tier2 ;;
