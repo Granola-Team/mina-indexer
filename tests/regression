@@ -16,7 +16,6 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
-DOMAIN_SOCKET_PATH="$TEST_DIR"/mina-indexer.sock
 cd "$TEST_DIR"
 
 # Invoke this function when exiting this script for any reason.
@@ -51,7 +50,7 @@ wait_for_socket() {
     # We retry 100 times before giving up because there is a good chance that
     # the machine is heavily loaded.
     while [ $num_retries -lt 100 ]; do
-        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+        if [ -S ./mina-indexer.sock ]; then
             return
         fi
         (( num_retries+=1 ))
@@ -61,7 +60,7 @@ wait_for_socket() {
 
 wait_forever_for_socket() {
     while true; do
-        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+        if [ -S ./mina-indexer.sock ]; then
             return
         fi
         sleep 10
@@ -69,11 +68,11 @@ wait_forever_for_socket() {
 }
 
 idxr() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" "$@"
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock "$@"
 }
 
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" server "$@" &
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock server "$@" &
     echo $! > idxr_pid
 }
 
@@ -167,7 +166,7 @@ teardown() {
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     rm -rf ./database
-    rm -f "$DOMAIN_SOCKET_PATH"
+    rm -f ./mina-indexer.sock
 }
 
 test_indexer_cli_reports() {
