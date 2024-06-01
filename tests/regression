@@ -526,8 +526,7 @@ test_block_copy() {
 
     dl_mainnet 10 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     # start without block 11
@@ -567,8 +566,7 @@ test_missing_blocks() {
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     # start out missing block 11 & 21
@@ -767,8 +765,7 @@ test_replay() {
 
     dl_mainnet 15 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
@@ -898,8 +895,7 @@ test_snark_work() {
     dl_mainnet 120 ./blocks
 
     idxr_server_start_standard \
-        --canonical-threshold 5 \
-        --log-level debug
+        --canonical-threshold 5
     wait_for_socket
 
     # pk SNARK work queries
@@ -999,8 +995,7 @@ test_many_blocks() {
     stage_mainnet_blocks 1000 ./blocks
 
     idxr_server_start_standard \
-        --ledger-cadence 100 \
-        --log-level debug
+        --ledger-cadence 100
     wait_forever_for_socket
 
     # results
@@ -1038,7 +1033,6 @@ test_rest_accounts_summary() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1118,7 +1112,6 @@ test_rest_blocks() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1148,8 +1141,7 @@ test_release() {
 
     stage_mainnet_blocks 5000 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_forever_for_socket
 
     # results
@@ -1180,8 +1172,7 @@ test_release() {
 test_genesis_block_creator() {
     enter_test test_genesis_block_creator
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
@@ -1198,8 +1189,7 @@ test_txn_nonces() {
 
     dl_mainnet 100 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     pk=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
@@ -1258,8 +1248,7 @@ test_watch_staking_ledgers() {
     enter_test test_watch_staking_ledgers
 
     idxr_server_start_standard \
-        --staking-ledger-watch-dir ./staking-ledgers \
-        --log-level debug
+        --staking-ledger-watch-dir ./staking-ledgers
     wait_for_socket
 
     # copy epoch 0 staking ledger from data to watched directory
@@ -1333,8 +1322,7 @@ test_staking_delegations() {
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
-        --database-dir ./database \
-        --log-level debug
+        --database-dir ./database
     wait_for_socket
 
     # check account
@@ -1553,7 +1541,6 @@ test_clean_shutdown() {
     enter_test test_clean_shutdown
 
     idxr_server_start \
-        --log-level TRACE \
         --block-watch-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database
@@ -1632,7 +1619,6 @@ test_hurl() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1652,7 +1638,6 @@ test_hurl_tier2() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1672,8 +1657,7 @@ test_missing_block_recovery() {
     idxr_server_start_standard \
         --missing-block-recovery-exe "$SRC"/tests/recovery.sh \
         --missing-block-recovery-delay 3 \
-        --missing-block-recovery-batch true \
-        --log-level debug
+        --missing-block-recovery-batch true
     wait_for_socket
 
     # miss blocks at heights 6, 8, 11-16, 18-20
