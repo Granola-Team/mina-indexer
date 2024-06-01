@@ -42,8 +42,8 @@ test-unit:
 test-unit-mina-rs:
   cd rust && cargo nextest run --release --features mina_rs
 
-test-regression: build
-  ./tests/regression
+test-regression subtest='': build
+  ./tests/regression {{subtest}}
 
 test-release: build
   ./tests/regression test_release
