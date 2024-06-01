@@ -8,7 +8,7 @@ steps:
   agents:
     nix: true
     production: false
-    mina-log-storage: true
+    mina-logs: true
   env:
     NO_COLOR: 1
   command: "nix develop --command just tier2-test"

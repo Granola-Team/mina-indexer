@@ -4,7 +4,7 @@ set -eux
 set -o pipefail
 
 VER="$(git rev-parse --short=8 HEAD)"
-LOG=/mnt/mina-log-storage/"$VER"-log
+LOG=/mnt/mina-logs/"$VER"-log
 src="$(pwd)"
 socket="$src"/mina-indexer.sock
 
@@ -41,9 +41,9 @@ port="$(ephemeral_port)"
     --web-port "$port" \
     --log-level DEBUG \
     --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
-    --database-dir /mnt/mina-log-storage/"$VER"-database \
-    --blocks-dir /mnt/mina-log-storage/mina_network_block_data \
-    --staking-ledgers-dir /mnt/mina-log-storage/mina_network_ledger_data \
+    --database-dir /mnt/mina-logs/"$VER"-database \
+    --blocks-dir /mnt/mina-logs/mina_network_block_data \
+    --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
     --locked-supply-csv "$src"/data/locked.csv \
     --ledger-cadence 5000 \
     > "$LOG"/out \
@@ -51,6 +51,6 @@ port="$(ephemeral_port)"
     &
 PID=$!
 wait_for_socket
-./rust/target/release/mina-indexer --domain-socket-path "$socket" checkpoints create --path /mnt/mina-log-storage/"$VER"-snapshot
+./rust/target/release/mina-indexer --domain-socket-path "$socket" checkpoints create --path /mnt/mina-logs/"$VER"-snapshot
 ./rust/target/release/mina-indexer --domain-socket-path "$socket" shutdown
 wait "$PID"
