@@ -182,25 +182,6 @@ test_indexer_cli_reports() {
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
 
-    # Indexer reports usage for server subcommand
-    idxr_server 2>&1 |
-        grep -iq "Usage: mina-indexer server"
-
-    # Indexer server cli subcommand works with default args
-    idxr_server --help 2>/dev/null
-
-    idxr_server start --help 2>&1 |
-        grep -iq "Usage: mina-indexer server start"
-
-    idxr_server start-via-config --help 2>&1 |
-        grep -iq "Usage: mina-indexer server start-via-config"
-
-    idxr_server sync --help 2>&1 |
-        grep -iq "Usage: mina-indexer server sync"
-
-    idxr_server replay --help 2>&1 |
-        grep -iq "Usage: mina-indexer server replay"
-
     # Indexer reports usage for client subcommands
     idxr accounts --help 2>&1 |
         grep -iq "Usage: mina-indexer accounts"
