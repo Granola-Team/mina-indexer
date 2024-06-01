@@ -71,8 +71,8 @@ idxr() {
 }
 
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock server "$@" &
-    echo $! > idxr_pid
+    idxr server "$@" &
+    echo $! > ./idxr_pid
 }
 
 # Performs a forcible shutdown of the Indexer, possibly returning failure.
