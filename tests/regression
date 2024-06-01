@@ -41,7 +41,7 @@ kill_idxr() {
 cleanup() {
     err=$?
     if [ $err != 0 ]; then
-        echo "Test failed ($test): $err"
+        echo "Test failed ($test_name): $err"
         kill_idxr || :
     fi
     rm -rf "${TEST_DIR}"
@@ -171,8 +171,13 @@ teardown() {
     rm -f ./mina-indexer.sock
 }
 
+enter_test() {
+  test_name="$1"
+  echo "Test: $1"
+}
+
 test_indexer_cli_reports() {
-    test=test_indexer_cli_reports
+    enter_test test_indexer_cli_reports
 
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
@@ -281,7 +286,7 @@ test_indexer_cli_reports() {
 
 # Indexer server starts up without any precomputed blocks
 test_server_startup() {
-    test=test_server_startup
+    enter_test test_server_startup
 
     idxr_server_start_standard
     wait_for_socket
@@ -294,7 +299,7 @@ test_server_startup() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-    test=test_ipc_is_available_immediately
+    enter_test test_ipc_is_available_immediately
 
     dl_mainnet 100 ./blocks
 
@@ -310,7 +315,7 @@ test_ipc_is_available_immediately() {
 
 # Indexer server starts and creates directories with minimal args
 test_startup_dirs_get_created() {
-    test=test_startup_dirs_get_created
+    enter_test test_startup_dirs_get_created
 
     idxr_server_start \
         --blocks-dir ./startup-blocks \
@@ -331,7 +336,7 @@ test_startup_dirs_get_created() {
 
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
-    test=test_account_balance_cli
+    enter_test test_account_balance_cli
 
     idxr_server_start_standard
     wait_for_socket
@@ -344,7 +349,7 @@ test_account_balance_cli() {
 
 # Indexer server returns the correct account
 test_account_public_key_json() {
-    test=test_account_public_key_json
+    enter_test test_account_public_key_json
 
     idxr_server_start_standard
     wait_for_socket
@@ -357,7 +362,7 @@ test_account_public_key_json() {
 
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
-    test=test_canonical_root
+    enter_test test_canonical_root
 
     dl_mainnet 15 ./blocks
 
@@ -375,7 +380,7 @@ test_canonical_root() {
 
 # Indexer server handles canonical threshold correctly
 test_canonical_threshold() {
-    test=test_canonical_threshold
+    enter_test test_canonical_threshold
 
     num_seq_blocks=15
     canonical_threshold=2
@@ -397,7 +402,7 @@ test_canonical_threshold() {
 
 # Indexer server returns the correct best tip
 test_best_tip() {
-    test=test_best_tip
+    enter_test test_best_tip
 
     dl_mainnet 15 ./blocks
 
@@ -424,7 +429,7 @@ test_best_tip() {
 
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
-    test=test_blocks
+    enter_test test_blocks
 
     dl_mainnet 10 ./blocks
 
@@ -532,7 +537,7 @@ test_blocks() {
 
 # Indexer handles copied blocks correctly
 test_block_copy() {
-    test=test_block_copy
+    enter_test test_block_copy
 
     dl_mainnet 10 ./blocks
 
@@ -572,7 +577,7 @@ test_block_copy() {
 
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
-    test=test_missing_blocks
+    enter_test test_missing_blocks
 
     dl_mainnet 10 ./blocks
     dl_mainnet_range 12 20 ./blocks # missing 11
@@ -635,7 +640,7 @@ test_missing_blocks() {
 
 # Indexer server returns the correct best chain
 test_best_chain() {
-    test=test_best_chain
+    enter_test test_best_chain
 
     mkdir best_chain
     dl_mainnet 12 ./blocks
@@ -683,7 +688,7 @@ test_best_chain() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
-    test=test_ledgers
+    enter_test test_ledgers
 
     mkdir ledgers
     dl_mainnet 15 ./blocks
@@ -742,7 +747,7 @@ test_ledgers() {
 
 # Indexer server syncs with existing Speedb
 test_sync() {
-    test=test_sync
+    enter_test test_sync
 
     dl_mainnet 15 ./blocks
 
@@ -774,7 +779,7 @@ test_sync() {
 
 # Indexer server replays events
 test_replay() {
-    test=test_replay
+    enter_test test_replay
 
     dl_mainnet 15 ./blocks
 
@@ -807,7 +812,7 @@ test_replay() {
 
 # Indexer server returns correct transactions
 test_transactions() {
-    test=test_transactions
+    enter_test test_transactions
 
     mkdir transactions
     dl_mainnet 13 ./blocks
@@ -903,7 +908,7 @@ test_transactions() {
 
 # Indexer server returns correct SNARK work
 test_snark_work() {
-    test=test_snark_work
+    enter_test test_snark_work
 
     mkdir snark_work
     dl_mainnet 120 ./blocks
@@ -962,7 +967,7 @@ test_snark_work() {
 
 # Indexer server correctly creates a db checkpoint
 test_checkpoint() {
-    test=test_checkpoint
+    enter_test test_checkpoint
 
     dl_mainnet 13 ./blocks
 
@@ -1005,7 +1010,7 @@ test_checkpoint() {
 
 # Indexer server starts with many blocks
 test_many_blocks() {
-    test=test_many_blocks
+    enter_test test_many_blocks
 
     stage_mainnet_blocks 1000 ./blocks
 
@@ -1040,7 +1045,7 @@ test_many_blocks() {
 }
 
 test_rest_accounts_summary() {
-    test=test_rest_accounts_summary
+    enter_test test_rest_accounts_summary
 
     dl_mainnet 100 ./blocks
     port=$(ephemeral_port)
@@ -1120,7 +1125,7 @@ test_rest_accounts_summary() {
 }
 
 test_rest_blocks() {
-    test=test_rest_blocks
+    enter_test test_rest_blocks
 
     dl_mainnet 100 ./blocks
     port=$(ephemeral_port)
@@ -1155,7 +1160,7 @@ test_rest_blocks() {
 
 # Release version is fast
 test_release() {
-    test=test_release
+    enter_test test_release
 
     stage_mainnet_blocks 5000 ./blocks
 
@@ -1189,7 +1194,7 @@ test_release() {
 }
 
 test_genesis_block_creator() {
-    test=test_genesis_block_creator
+    enter_test test_genesis_block_creator
 
     idxr_server_start_standard \
         --log-level debug
@@ -1205,7 +1210,7 @@ test_genesis_block_creator() {
 }
 
 test_txn_nonces() {
-    test=test_txn_nonces
+    enter_test test_txn_nonces
 
     dl_mainnet 100 ./blocks
 
@@ -1229,7 +1234,7 @@ test_txn_nonces() {
 }
 
 test_startup_staking_ledgers() {
-    test=test_startup_staking_ledgers
+    enter_test test_startup_staking_ledgers
 
     idxr_server_start \
         --blocks-dir ./blocks \
@@ -1266,7 +1271,7 @@ test_startup_staking_ledgers() {
 }
 
 test_watch_staking_ledgers() {
-    test=test_watch_staking_ledgers
+    enter_test test_watch_staking_ledgers
 
     idxr_server_start_standard \
         --staking-ledger-watch-dir ./staking-ledgers \
@@ -1339,7 +1344,7 @@ test_watch_staking_ledgers() {
 }
 
 test_staking_delegations() {
-    test=test_staking_delegations
+    enter_test test_staking_delegations
 
     idxr_server_start \
         --blocks-dir ./blocks \
@@ -1387,7 +1392,7 @@ test_staking_delegations() {
 }
 
 test_internal_commands() {
-    test=test_internal_commands
+    enter_test test_internal_commands
 
     dl_mainnet 11 ./blocks
 
@@ -1451,7 +1456,7 @@ test_internal_commands() {
 
 # Indexer correctly starts from config
 test_start_from_config() {
-    test=test_start_from_config
+    enter_test test_start_from_config
 
     idxr_server_start_standard
     wait_for_socket
@@ -1497,7 +1502,7 @@ test_start_from_config() {
 
 # Indexer correctly starts without blocks dir
 test_start_without_blocks_dir() {
-    test=test_start_without_blocks_dir
+    enter_test test_start_without_blocks_dir
 
     idxr_server_start \
         --block-watch-dir ./blocks \
@@ -1519,7 +1524,7 @@ test_start_without_blocks_dir() {
 
 # Indexer correctly starts without staking ledgers dir
 test_start_without_ledgers_dir() {
-    test=test_start_without_ledgers_dir
+    enter_test test_start_without_ledgers_dir
 
     idxr_server_start \
         --ledgers-watch-dir ./staking-ledgers \
@@ -1561,7 +1566,7 @@ test_start_without_ledgers_dir() {
 }
 
 test_clean_shutdown() {
-    test=test_clean_shutdown
+    enter_test test_clean_shutdown
 
     idxr_server_start \
         --log-level TRACE \
@@ -1593,7 +1598,7 @@ test_clean_shutdown() {
 }
 
 test_block_children() {
-    test=test_block_children
+    enter_test test_block_children
 
     dl_mainnet 10 ./blocks
 
@@ -1634,7 +1639,7 @@ test_block_children() {
 }
 
 test_hurl() {
-    test=test_hurl
+    enter_test test_hurl
 
     dl_mainnet 120 ./blocks
     port=$(ephemeral_port)
@@ -1654,7 +1659,7 @@ test_hurl() {
 }
 
 test_hurl_tier2() {
-    test=test_hurl_tier2
+    enter_test test_hurl_tier2
 
     dl_mainnet 120 ./blocks
     port=$(ephemeral_port)
@@ -1674,7 +1679,7 @@ test_hurl_tier2() {
 }
 
 test_missing_block_recovery() {
-    test=test_missing_block_recovery
+    enter_test test_missing_block_recovery
 
     dl_mainnet 5 ./blocks
 
