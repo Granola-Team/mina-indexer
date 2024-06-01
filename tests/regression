@@ -19,17 +19,16 @@ TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
 cd "$TEST_DIR"
 
 # Invoke this function when exiting this script for any reason.
-test_cleanup() {
+cleanup() {
     err=$?
     if [ $err != 0 ]; then
         echo "Test failed ($test): $err"
-        teardown
-        exit 1
+        kill_idxr || :
     fi
     rm -rf "${TEST_DIR}"
+    exit "$err"
 }
-
-trap test_cleanup EXIT
+trap cleanup EXIT
 
 ephemeral_port() {
     set +e
@@ -76,10 +75,11 @@ idxr_server() {
     echo $! > idxr_pid
 }
 
+# Performs a forcible shutdown of the Indexer, possibly returning failure.
+#
 kill_idxr() {
     echo "Shutting down Mina Indexer."
-    idxr server shutdown ||
-        true  # Because the mina-indexer may already be shut down.
+    idxr server shutdown
 
     # Wait no more than 10 seconds for the process.
     timeout 10s pwait -F ./idxr_pid ||
