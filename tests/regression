@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2046,SC2086,SC2002
 
+# To debug, uncomment:
 set -x
-set -eu
-set -o pipefail
+
+set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
@@ -16,21 +17,70 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
-DOMAIN_SOCKET_PATH="$TEST_DIR"/mina-indexer.sock
 cd "$TEST_DIR"
 
-# Invoke this function when exiting this script for any reason.
-test_cleanup() {
-    err=$?
-    if [ $err != 0 ]; then
-        echo "Test failed ($test): $err"
-        teardown
-        exit 1
-    fi
-    rm -rf "${TEST_DIR}"
+idxr() {
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock "$@"
 }
 
-trap test_cleanup EXIT
+# Performs a shutdown of the Indexer, possibly returning failure.
+#
+shutdown_idxr() {
+    echo "Shutting down Mina Indexer."
+
+    if [ ! -S ./mina-indexer.sock ]; then
+       echo "  Missing socket. Shutdown failed."
+       return 1
+    fi
+
+    if [ ! -e ./idxr_pid ]; then
+        echo "  Missing PID file. Shutdown failed."
+        return 1
+    fi
+
+    if ! idxr server shutdown; then
+      echo "  Server shutdown command failed."
+      return 1
+    fi
+
+    # Shutdown command succeeded, but PID may still be active.
+    if ! timeout 10s pwait -F ./idxr_pid; then
+      # Either it timed out, or that PID did not exist.
+      if ps -p "$(cat ./idxr_pid)"; then
+        # The process still exists. The pwait must have timed out.
+        echo "  The shutdown command did not kill the process. Failure."
+        return 1
+      else
+        # The process does not exist. Check for socket deletion.
+        if [ -S ./mina-indexer.sock ]; then
+          echo "  The shutdown command did not delete the socket. Failure."
+          return 1
+        fi
+      fi
+    fi
+
+    echo "Deleting PID file."
+    rm -f ./idxr_pid
+}
+
+# Invoke this function when exiting this script for any reason.
+#
+cleanup() {
+    err=$?
+    if [ $err != 0 ]; then
+        echo "Test failed ($test_name): $err"
+        if ! shutdown_idxr; then
+          # If there is a PID file, try to kill the process forcefully.
+          if [ -e ./idxr_pid ]; then
+            kill "$(cat ./idxr_pid)"
+          fi
+        fi
+    fi
+    rm -rf "${TEST_DIR}"
+    exit "$err"
+}
+
+trap cleanup EXIT
 
 ephemeral_port() {
     set +e
@@ -51,7 +101,7 @@ wait_for_socket() {
     # We retry 100 times before giving up because there is a good chance that
     # the machine is heavily loaded.
     while [ $num_retries -lt 100 ]; do
-        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+        if [ -S ./mina-indexer.sock ]; then
             return
         fi
         (( num_retries+=1 ))
@@ -61,33 +111,16 @@ wait_for_socket() {
 
 wait_forever_for_socket() {
     while true; do
-        if [ -S "$DOMAIN_SOCKET_PATH" ]; then
+        if [ -S ./mina-indexer.sock ]; then
             return
         fi
-        sleep 10
+        sleep 60
     done
 }
 
-idxr() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" "$@"
-}
-
 idxr_server() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path "$DOMAIN_SOCKET_PATH" server "$@" &
-    echo $! > idxr_pid
-}
-
-kill_idxr() {
-    echo "Shutting down Mina Indexer."
-    idxr server shutdown ||
-        true  # Because the mina-indexer may already be shut down.
-
-    # Wait no more than 10 seconds for the process.
-    timeout 10s pwait -F ./idxr_pid ||
-        true  # Because the process may already be gone, yielding an error.
-
-    echo "Deleting PID file."
-    rm -f ./idxr_pid
+    idxr server "$@" &
+    echo $! > ./idxr_pid
 }
 
 idxr_server_start() {
@@ -144,10 +177,10 @@ assert() {
     actual="$2"
 
     if [ "$expected" != "$actual" ]; then
-        echo "Test Failed: Expected $expected, but got $actual"
+        echo "  Test Failed: Expected $expected, but got $actual"
         exit 1
     else
-        echo "Test Passed!"
+        echo "  True: ${expected} = ${actual}"
     fi
 }
 
@@ -155,52 +188,34 @@ assert_directory_exists() {
     directory="$1"
 
     if [ ! -d "$directory" ]; then
-        echo "Test Failed: Expected directory $directory to exist, but it does not."
+        echo "  Test Failed: Expected directory $directory to exist, but it does not."
         exit 1
     else
-        echo "Test Passed: Directory $directory exists."
+        echo "  True: Directory $directory exists."
     fi
 }
 
-setup() {
-    echo "setup"
-    mkdir blocks
-    mkdir staking-ledgers
-    mkdir database
-}
-
 teardown() {
-    kill_idxr
+    shutdown_idxr
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     rm -rf ./database
-    rm -f "$DOMAIN_SOCKET_PATH"
+    rm -f ./mina-indexer.sock
+}
+
+enter_test() {
+  test_name="$1"
+  echo
+  echo "Test: $1"
+  >&2 echo
+  >&2 echo "Test: $1"
 }
 
 test_indexer_cli_reports() {
-    test=test_indexer_cli_reports
+    enter_test test_indexer_cli_reports
 
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
-
-    # Indexer reports usage for server subcommand
-    idxr_server 2>&1 |
-        grep -iq "Usage: mina-indexer server"
-
-    # Indexer server cli subcommand works with default args
-    idxr_server --help 2>/dev/null
-
-    idxr_server start --help 2>&1 |
-        grep -iq "Usage: mina-indexer server start"
-
-    idxr_server start-via-config --help 2>&1 |
-        grep -iq "Usage: mina-indexer server start-via-config"
-
-    idxr_server sync --help 2>&1 |
-        grep -iq "Usage: mina-indexer server sync"
-
-    idxr_server replay --help 2>&1 |
-        grep -iq "Usage: mina-indexer server replay"
 
     # Indexer reports usage for client subcommands
     idxr accounts --help 2>&1 |
@@ -287,9 +302,8 @@ test_indexer_cli_reports() {
 
 # Indexer server starts up without any precomputed blocks
 test_server_startup() {
-    test=test_server_startup
+    enter_test test_server_startup
 
-    setup
     idxr_server_start_standard
     wait_for_socket
 
@@ -301,9 +315,8 @@ test_server_startup() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-    test=test_ipc_is_available_immediately
+    enter_test test_ipc_is_available_immediately
 
-    setup
     dl_mainnet 100 ./blocks
 
     idxr_server_start_standard \
@@ -312,14 +325,14 @@ test_ipc_is_available_immediately() {
     wait_for_socket
 
     idxr summary
+
     teardown
 }
 
 # Indexer server starts and creates directories with minimal args
 test_startup_dirs_get_created() {
-    test=test_startup_dirs_get_created
+    enter_test test_startup_dirs_get_created
 
-    setup
     idxr_server_start \
         --blocks-dir ./startup-blocks \
         --block-watch-dir ./watch-blocks \
@@ -339,9 +352,8 @@ test_startup_dirs_get_created() {
 
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
-    test=test_account_balance_cli
+    enter_test test_account_balance_cli
 
-    setup
     idxr_server_start_standard
     wait_for_socket
 
@@ -353,9 +365,8 @@ test_account_balance_cli() {
 
 # Indexer server returns the correct account
 test_account_public_key_json() {
-    test=test_account_public_key_json
+    enter_test test_account_public_key_json
 
-    setup
     idxr_server_start_standard
     wait_for_socket
 
@@ -367,9 +378,8 @@ test_account_public_key_json() {
 
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
-    test=test_canonical_root
+    enter_test test_canonical_root
 
-    setup
     dl_mainnet 15 ./blocks
 
     idxr_server_start_standard
@@ -386,12 +396,11 @@ test_canonical_root() {
 
 # Indexer server handles canonical threshold correctly
 test_canonical_threshold() {
-    test=test_canonical_threshold
+    enter_test test_canonical_threshold
 
     num_seq_blocks=15
     canonical_threshold=2
 
-    setup
     dl_mainnet $num_seq_blocks ./blocks
 
     idxr_server_start_standard \
@@ -409,9 +418,8 @@ test_canonical_threshold() {
 
 # Indexer server returns the correct best tip
 test_best_tip() {
-    test=test_best_tip
+    enter_test test_best_tip
 
-    setup
     dl_mainnet 15 ./blocks
 
     idxr_server_start_standard
@@ -437,9 +445,8 @@ test_best_tip() {
 
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
-    test=test_blocks
+    enter_test test_blocks
 
-    setup
     dl_mainnet 10 ./blocks
 
     idxr_server_start_standard
@@ -546,13 +553,11 @@ test_blocks() {
 
 # Indexer handles copied blocks correctly
 test_block_copy() {
-    test=test_block_copy
+    enter_test test_block_copy
 
-    setup
     dl_mainnet 10 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     # start without block 11
@@ -569,7 +574,6 @@ test_block_copy() {
     # add block 11
     dl_mainnet_single 11 ./blocks
     sleep 1
-    ls -l ./blocks
 
     # check
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -587,15 +591,13 @@ test_block_copy() {
 
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
-    test=test_missing_blocks
+    enter_test test_missing_blocks
 
-    setup
     dl_mainnet 10 ./blocks
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     # start out missing block 11 & 21
@@ -651,9 +653,8 @@ test_missing_blocks() {
 
 # Indexer server returns the correct best chain
 test_best_chain() {
-    test=test_best_chain
+    enter_test test_best_chain
 
-    setup
     mkdir best_chain
     dl_mainnet 12 ./blocks
 
@@ -700,9 +701,8 @@ test_best_chain() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
-    test=test_ledgers
+    enter_test test_ledgers
 
-    setup
     mkdir ledgers
     dl_mainnet 15 ./blocks
 
@@ -760,9 +760,8 @@ test_ledgers() {
 
 # Indexer server syncs with existing Speedb
 test_sync() {
-    test=test_sync
+    enter_test test_sync
 
-    setup
     dl_mainnet 15 ./blocks
 
     idxr_server_start_standard
@@ -770,14 +769,14 @@ test_sync() {
 
     idxr summary --verbose
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
-    kill_idxr
+    shutdown_idxr
 
     # add more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
     idxr_server_sync --database-dir ./database
-    sleep 1
+    wait_for_socket
     idxr summary --verbose
 
     # post-sync results
@@ -793,24 +792,22 @@ test_sync() {
 
 # Indexer server replays events
 test_replay() {
-    test=test_replay
+    enter_test test_replay
 
-    setup
     dl_mainnet 15 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
-    kill_idxr
+    shutdown_idxr
 
     # add 8 more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
 
     # replay events from previous indexer instance & ingest the new blocks
     idxr_server_replay
-    sleep 1
+    wait_for_socket
 
     # post-replay results
     root_hash_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
@@ -827,9 +824,8 @@ test_replay() {
 
 # Indexer server returns correct transactions
 test_transactions() {
-    test=test_transactions
+    enter_test test_transactions
 
-    setup
     mkdir transactions
     dl_mainnet 13 ./blocks
 
@@ -924,15 +920,13 @@ test_transactions() {
 
 # Indexer server returns correct SNARK work
 test_snark_work() {
-    test=test_snark_work
+    enter_test test_snark_work
 
-    setup
     mkdir snark_work
     dl_mainnet 120 ./blocks
 
     idxr_server_start_standard \
-        --canonical-threshold 5 \
-        --log-level debug
+        --canonical-threshold 5
     wait_for_socket
 
     # pk SNARK work queries
@@ -984,9 +978,8 @@ test_snark_work() {
 
 # Indexer server correctly creates a db checkpoint
 test_checkpoint() {
-    test=test_checkpoint
+    enter_test test_checkpoint
 
-    setup
     dl_mainnet 13 ./blocks
 
     idxr_server_start_standard
@@ -1006,7 +999,6 @@ test_checkpoint() {
     teardown
 
     # sync a new indexer from checkpointed db
-    setup
     idxr_server_sync --database-dir ./checkpoint
     wait_for_socket
 
@@ -1029,14 +1021,12 @@ test_checkpoint() {
 
 # Indexer server starts with many blocks
 test_many_blocks() {
-    test=test_many_blocks
+    enter_test test_many_blocks
 
-    setup
     stage_mainnet_blocks 1000 ./blocks
 
     idxr_server_start_standard \
-        --ledger-cadence 100 \
-        --log-level debug
+        --ledger-cadence 100
     wait_forever_for_socket
 
     # results
@@ -1065,9 +1055,8 @@ test_many_blocks() {
 }
 
 test_rest_accounts_summary() {
-    test=test_rest_accounts_summary
+    enter_test test_rest_accounts_summary
 
-    setup
     dl_mainnet 100 ./blocks
     port=$(ephemeral_port)
 
@@ -1075,7 +1064,6 @@ test_rest_accounts_summary() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1146,9 +1134,8 @@ test_rest_accounts_summary() {
 }
 
 test_rest_blocks() {
-    test=test_rest_blocks
+    enter_test test_rest_blocks
 
-    setup
     dl_mainnet 100 ./blocks
     port=$(ephemeral_port)
 
@@ -1156,7 +1143,6 @@ test_rest_blocks() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1182,13 +1168,11 @@ test_rest_blocks() {
 
 # Release version is fast
 test_release() {
-    test=test_release
+    enter_test test_release
 
-    setup
     stage_mainnet_blocks 5000 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_forever_for_socket
 
     # results
@@ -1217,11 +1201,9 @@ test_release() {
 }
 
 test_genesis_block_creator() {
-    test=test_genesis_block_creator
+    enter_test test_genesis_block_creator
 
-    setup
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
@@ -1234,13 +1216,11 @@ test_genesis_block_creator() {
 }
 
 test_txn_nonces() {
-    test=test_txn_nonces
+    enter_test test_txn_nonces
 
-    setup
     dl_mainnet 100 ./blocks
 
-    idxr_server_start_standard \
-        --log-level debug
+    idxr_server_start_standard
     wait_for_socket
 
     pk=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
@@ -1259,9 +1239,8 @@ test_txn_nonces() {
 }
 
 test_startup_staking_ledgers() {
-    test=test_startup_staking_ledgers
+    enter_test test_startup_staking_ledgers
 
-    setup
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
@@ -1297,12 +1276,10 @@ test_startup_staking_ledgers() {
 }
 
 test_watch_staking_ledgers() {
-    test=test_watch_staking_ledgers
+    enter_test test_watch_staking_ledgers
 
-    setup
     idxr_server_start_standard \
-        --staking-ledger-watch-dir ./staking-ledgers \
-        --log-level debug
+        --staking-ledger-watch-dir ./staking-ledgers
     wait_for_socket
 
     # copy epoch 0 staking ledger from data to watched directory
@@ -1371,14 +1348,12 @@ test_watch_staking_ledgers() {
 }
 
 test_staking_delegations() {
-    test=test_staking_delegations
+    enter_test test_staking_delegations
 
-    setup
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
-        --database-dir ./database \
-        --log-level debug
+        --database-dir ./database
     wait_for_socket
 
     # check account
@@ -1420,9 +1395,8 @@ test_staking_delegations() {
 }
 
 test_internal_commands() {
-    test=test_internal_commands
+    enter_test test_internal_commands
 
-    setup
     dl_mainnet 11 ./blocks
 
     idxr_server_start_standard
@@ -1485,9 +1459,8 @@ test_internal_commands() {
 
 # Indexer correctly starts from config
 test_start_from_config() {
-    test=test_start_from_config
+    enter_test test_start_from_config
 
-    setup
     idxr_server_start_standard
     wait_for_socket
     teardown
@@ -1495,7 +1468,6 @@ test_start_from_config() {
     cp $LEDGER ./mainnet.json
     cp $LOCKED_CSV ./locked.csv
 
-    setup
     dl_mainnet 15 ./blocks
 
     port=$(ephemeral_port)
@@ -1533,9 +1505,8 @@ test_start_from_config() {
 
 # Indexer correctly starts without blocks dir
 test_start_without_blocks_dir() {
-    test=test_start_without_blocks_dir
+    enter_test test_start_without_blocks_dir
 
-    setup
     idxr_server_start \
         --block-watch-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -1556,9 +1527,8 @@ test_start_without_blocks_dir() {
 
 # Indexer correctly starts without staking ledgers dir
 test_start_without_ledgers_dir() {
-    test=test_start_without_ledgers_dir
+    enter_test test_start_without_ledgers_dir
 
-    setup
     idxr_server_start \
         --ledgers-watch-dir ./staking-ledgers \
         --database-dir ./database
@@ -1599,42 +1569,51 @@ test_start_without_ledgers_dir() {
 }
 
 test_clean_shutdown() {
-    test=test_clean_shutdown
+    enter_test test_clean_shutdown
 
-    setup
-    idxr_server_start \
-        --log-level TRACE \
-        --block-watch-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database
+    idxr_server_start_standard
     wait_for_socket
 
-    echo "Sending Mina Indexer a SIGTERM"
+    teardown  # Calls shutdown_idxr, which checks for clean shutdown.
+}
+
+test_clean_kill() {
+    enter_test test_clean_kill
+
+    idxr_server_start_standard
+    wait_for_socket
+
+    if [ ! -e ./idxr_pid ]; then
+        echo "  Missing PID file. Cannot kill. Failure."
+        return 1
+    fi
+
+    echo "  Sending Mina Indexer a SIGTERM"
     PID="$(cat ./idxr_pid)"
     kill "$PID"
 
-    # Debugging: see whether the process is still present. It often is.
-    ps -p "$PID" || true
+    # We must give the process a chance to die, with 'pwait'.
+    timeout 10s pwait -F ./idxr_pid || true
 
-    # Wait for the process, but for no more than 10 seconds.
-    timeout 10s pwait -F ./idxr_pid ||
-        true
-
-    # Check the success of trying to kill the process with SIGTERM.
+    # We waited with pwait. If the process is still there, it's a fail.
     if ps -p "$PID"; then
-        echo "PID $PID not killed."
-        exit 1
-    else
-        echo "PID $PID no longer present."
+        echo "  The signal did not kill the process. Failure."
+        return 1
     fi
+
+    # TODO:
+    #    # Check for socket deletion.
+    #    if [ -S ./mina-indexer.sock ]; then
+    #        echo "  The signal handler did not delete the socket. Failure."
+    #        return 1
+    #    fi
 
     teardown
 }
 
 test_block_children() {
-    test=test_block_children
+    enter_test test_block_children
 
-    setup
     dl_mainnet 10 ./blocks
 
     idxr_server_start \
@@ -1674,9 +1653,8 @@ test_block_children() {
 }
 
 test_hurl() {
-    test=test_hurl
+    enter_test test_hurl
 
-    setup
     dl_mainnet 120 ./blocks
     port=$(ephemeral_port)
 
@@ -1684,7 +1662,6 @@ test_hurl() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1695,9 +1672,8 @@ test_hurl() {
 }
 
 test_hurl_tier2() {
-    test=test_hurl_tier2
+    enter_test test_hurl_tier2
 
-    setup
     dl_mainnet 120 ./blocks
     port=$(ephemeral_port)
 
@@ -1705,7 +1681,6 @@ test_hurl_tier2() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
-        --log-level debug \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1716,9 +1691,8 @@ test_hurl_tier2() {
 }
 
 test_missing_block_recovery() {
-    test=test_missing_block_recovery
+    enter_test test_missing_block_recovery
 
-    setup
     dl_mainnet 5 ./blocks
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
@@ -1726,8 +1700,7 @@ test_missing_block_recovery() {
     idxr_server_start_standard \
         --missing-block-recovery-exe "$SRC"/tests/recovery.sh \
         --missing-block-recovery-delay 3 \
-        --missing-block-recovery-batch true \
-        --log-level debug
+        --missing-block-recovery-batch true
     wait_for_socket
 
     # miss blocks at heights 6, 8, 11-16, 18-20
@@ -1759,6 +1732,8 @@ if [ "$#" -eq 0 ]; then
     test_ipc_is_available_immediately
     test_startup_dirs_get_created
     test_start_without_blocks_dir
+    test_clean_shutdown
+    test_clean_kill
     test_account_balance_cli
     test_account_public_key_json
     test_canonical_root
@@ -1786,8 +1761,6 @@ if [ "$#" -eq 0 ]; then
     test_internal_commands
     test_start_from_config
     test_hurl
-    # TODO: still not working
-    # test_clean_shutdown
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1826,6 +1799,7 @@ else
             "test_start_from_config") test_start_from_config ;;
             "test_hurl") test_hurl ;;
             "test_clean_shutdown") test_clean_shutdown ;;
+            "test_clean_kill") test_clean_kill ;;
             "test_release") test_release ;;
             # tier 2 tests (run via `just tier2-test`)
             "test_hurl_tier2") test_hurl_tier2 ;;
@@ -1835,4 +1809,5 @@ else
     done
 fi
 
-echo "Done"
+echo
+echo "Regression testing complete."

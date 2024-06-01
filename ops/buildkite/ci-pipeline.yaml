@@ -2,6 +2,8 @@ steps:
 
 - label: "Developer Environment Build and Tier 1 Test"
   key: "build"
+  env:
+    NO_COLOR: 1
   command: "nix develop --command just tier1-test"
   agents:
     nix: true
@@ -14,4 +16,6 @@ steps:
   agents:
     nix: true
     production: true
+  env:
+    NO_COLOR: 1
   command: "nix develop --command just productionize"
