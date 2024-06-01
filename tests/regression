@@ -776,7 +776,7 @@ test_sync() {
 
     # sync from previous indexer db
     idxr_server_sync --database-dir ./database
-    sleep 1
+    wait_for_socket
     idxr summary --verbose
 
     # post-sync results
@@ -807,7 +807,7 @@ test_replay() {
 
     # replay events from previous indexer instance & ingest the new blocks
     idxr_server_replay
-    sleep 1
+    wait_for_socket
 
     # post-replay results
     root_hash_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
