@@ -18,7 +18,26 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
 cd "$TEST_DIR"
 
+idxr() {
+    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock "$@"
+}
+
+# Performs a forcible shutdown of the Indexer, possibly returning failure.
+#
+kill_idxr() {
+    echo "Shutting down Mina Indexer."
+    idxr server shutdown
+
+    # Wait no more than 10 seconds for the process.
+    timeout 10s pwait -F ./idxr_pid ||
+        true  # Because the process may already be gone, yielding an error.
+
+    echo "Deleting PID file."
+    rm -f ./idxr_pid
+}
+
 # Invoke this function when exiting this script for any reason.
+#
 cleanup() {
     err=$?
     if [ $err != 0 ]; then
@@ -28,6 +47,7 @@ cleanup() {
     rm -rf "${TEST_DIR}"
     exit "$err"
 }
+
 trap cleanup EXIT
 
 ephemeral_port() {
@@ -66,27 +86,9 @@ wait_forever_for_socket() {
     done
 }
 
-idxr() {
-    RUST_BACKTRACE=full "$IDXR" --domain-socket-path ./mina-indexer.sock "$@"
-}
-
 idxr_server() {
     idxr server "$@" &
     echo $! > ./idxr_pid
-}
-
-# Performs a forcible shutdown of the Indexer, possibly returning failure.
-#
-kill_idxr() {
-    echo "Shutting down Mina Indexer."
-    idxr server shutdown
-
-    # Wait no more than 10 seconds for the process.
-    timeout 10s pwait -F ./idxr_pid ||
-        true  # Because the process may already be gone, yielding an error.
-
-    echo "Deleting PID file."
-    rm -f ./idxr_pid
 }
 
 idxr_server_start() {
@@ -302,6 +304,7 @@ test_ipc_is_available_immediately() {
     wait_for_socket
 
     idxr summary
+
     teardown
 }
 
