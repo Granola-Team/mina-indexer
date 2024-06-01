@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2046,SC2086,SC2002
 
-set -x
-set -eu
-set -o pipefail
+# To debug, uncomment:
+#set -x
+
+set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
@@ -145,10 +146,10 @@ assert() {
     actual="$2"
 
     if [ "$expected" != "$actual" ]; then
-        echo "Test Failed: Expected $expected, but got $actual"
+        echo "  Test Failed: Expected $expected, but got $actual"
         exit 1
     else
-        echo "Test Passed!"
+        echo "  True: ${expected} = ${actual}"
     fi
 }
 
@@ -156,10 +157,10 @@ assert_directory_exists() {
     directory="$1"
 
     if [ ! -d "$directory" ]; then
-        echo "Test Failed: Expected directory $directory to exist, but it does not."
+        echo "  Test Failed: Expected directory $directory to exist, but it does not."
         exit 1
     else
-        echo "Test Passed: Directory $directory exists."
+        echo "  True: Directory $directory exists."
     fi
 }
 
@@ -173,7 +174,10 @@ teardown() {
 
 enter_test() {
   test_name="$1"
+  echo
   echo "Test: $1"
+  >&2 echo
+  >&2 echo "Test: $1"
 }
 
 test_indexer_cli_reports() {
@@ -540,7 +544,6 @@ test_block_copy() {
     # add block 11
     dl_mainnet_single 11 ./blocks
     sleep 1
-    ls -l ./blocks
 
     # check
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1556,7 +1559,7 @@ test_clean_shutdown() {
         --database-dir ./database
     wait_for_socket
 
-    echo "Sending Mina Indexer a SIGTERM"
+    echo "  Sending Mina Indexer a SIGTERM"
     PID="$(cat ./idxr_pid)"
     kill "$PID"
 
@@ -1569,10 +1572,10 @@ test_clean_shutdown() {
 
     # Check the success of trying to kill the process with SIGTERM.
     if ps -p "$PID"; then
-        echo "PID $PID not killed."
+        echo "  PID $PID not killed."
         exit 1
     else
-        echo "PID $PID no longer present."
+        echo "  PID $PID no longer present."
     fi
 
     teardown
@@ -1777,4 +1780,5 @@ else
     done
 fi
 
-echo "Done"
+echo
+echo "Regression testing complete."
