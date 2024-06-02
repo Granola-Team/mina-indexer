@@ -100,8 +100,6 @@ tier1-test: prereqs test
 tier2-test: build
   tests/regression test_hurl_tier2
   tests/regression test_many_blocks
-  # TODO: investigate failures in the following.
-  # tests/regression test_many_blocks
   # TODO: re-enable once Nix build is working
   # nix build
   ops/ingest-all

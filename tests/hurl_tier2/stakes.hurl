@@ -67,4 +67,5 @@ jsonpath "$.data.stakes[3].delegationTotals.totalStakePercentage" == "3.50"
 jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
 
 # TODO https://github.com/Granola-Team/mina-indexer/issues/934
-# duration < 20000
+# Set to 30 s so that we get some idea of upper bound of wait time.
+duration < 30000
