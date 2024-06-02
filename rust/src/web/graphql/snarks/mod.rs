@@ -5,7 +5,8 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, from_be_bytes,
+        to_be_bytes, IndexerStore,
     },
     web::graphql::{db, get_block_canonicity},
 };
@@ -148,23 +149,51 @@ impl SnarkQueryRoot {
 
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
-            let mut snarks =
-                db.get_snark_work_by_public_key(&prover.into())?
-                    .map_or(vec![], |snarks| {
-                        snarks
-                            .into_iter()
-                            .filter_map(|s| {
-                                snark_summary_matches_query(db, &query, s).ok().flatten()
-                            })
-                            .collect()
-                    });
+            let mut start = prover.as_bytes().to_vec();
+            let mode = match sort_by {
+                SnarkSortByInput::BlockHeightAsc => {
+                    speedb::IteratorMode::From(&start, speedb::Direction::Forward)
+                }
+                SnarkSortByInput::BlockHeightDesc => {
+                    let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
+                    *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
+                    start.append(&mut to_be_bytes(u32::MAX));
+                    start.append(&mut pk_prefix);
+                    speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+                }
+            };
 
-            match sort_by {
-                SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
-                SnarkSortByInput::BlockHeightDesc => (),
+            let mut snarks = Vec::with_capacity(limit);
+            for (key, snark) in db.snark_prover_iterator(mode).flatten() {
+                if key[..PublicKey::LEN] != *prover.as_bytes() {
+                    return Ok(snarks);
+                }
+
+                let global_slot = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
+                let blocks_at_slot = db.get_blocks_at_slot(global_slot)?;
+                let pcb = blocks_at_slot[0].clone();
+                let state_hash = pcb.state_hash().0;
+                let canonical = get_block_canonicity(db, &pcb.state_hash().0);
+                let snark = serde_json::from_slice(&snark)?;
+                let sw = SnarkWithCanonicity {
+                    canonical,
+                    pcb,
+                    snark: (
+                        snark,
+                        state_hash,
+                        db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                        db.get_snarks_total_count().expect("total snarks count"),
+                    )
+                        .into(),
+                };
+                if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                    snarks.push(sw);
+
+                    if snarks.len() == limit {
+                        break;
+                    }
+                }
             }
-
-            snarks.truncate(limit);
             return Ok(snarks);
         }
 
@@ -173,8 +202,8 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
-        for entry in blocks_global_slot_idx_iterator(db, mode).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
+        for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
             let block = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
@@ -272,7 +301,6 @@ impl From<(SnarkWorkSummaryWithStateHash, u32, u32)> for Snark {
 
 impl SnarkQueryInput {
     pub fn matches(&self, snark: &SnarkWithCanonicity) -> bool {
-        let mut matches = true;
         let Self {
             block,
             canonical,
@@ -284,29 +312,40 @@ impl SnarkQueryInput {
 
         if let Some(block_query_input) = block {
             if let Some(state_hash) = &block_query_input.state_hash {
-                matches &= snark.pcb.state_hash().0 == *state_hash;
+                if snark.pcb.state_hash().0 != *state_hash {
+                    return false;
+                }
             }
         }
         if let Some(block_height) = block_height {
-            matches &= snark.pcb.blockchain_length() == *block_height;
-        }
-        if let Some(prover) = prover {
-            matches &= snark
-                .pcb
-                .prover_keys()
-                .contains(&<String as Into<PublicKey>>::into(prover.clone()));
-        }
-        if let Some(canonical) = canonical {
-            matches &= snark.canonical == *canonical;
-        }
-        if let Some(query) = and {
-            matches &= query.iter().all(|and| and.matches(snark));
-        }
-        if let Some(query) = or {
-            if !query.is_empty() {
-                matches &= query.iter().any(|or| or.matches(snark));
+            if snark.pcb.blockchain_length() != *block_height {
+                return false;
             }
         }
-        matches
+        if let Some(prover) = prover {
+            if !snark
+                .pcb
+                .prover_keys()
+                .contains(&<String as Into<PublicKey>>::into(prover.clone()))
+            {
+                return false;
+            }
+        }
+        if let Some(canonical) = canonical {
+            if snark.canonical != *canonical {
+                return false;
+            }
+        }
+        if let Some(query) = and {
+            if !query.iter().all(|and| and.matches(snark)) {
+                return false;
+            }
+        }
+        if let Some(query) = or {
+            if !query.is_empty() && !query.iter().any(|or| or.matches(snark)) {
+                return false;
+            }
+        }
+        true
     }
 }

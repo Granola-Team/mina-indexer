@@ -90,6 +90,7 @@ async fn test() {
                             store
                                 .add_canonical_block(
                                     block.blockchain_length,
+                                    block.global_slot_since_genesis,
                                     &block.state_hash,
                                     &block.genesis_state_hash,
                                     None,

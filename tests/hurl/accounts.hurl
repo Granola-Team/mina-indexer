@@ -130,8 +130,8 @@ jsonpath "$.data.accounts" count == 1
 
 # block production info
 jsonpath "$.data.accounts[0].publicKey" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
-jsonpath "$.data.accounts[0].pk_epoch_num_snarks" == 128
-jsonpath "$.data.accounts[0].pk_total_num_snarks" == 128
+jsonpath "$.data.accounts[0].pk_epoch_num_snarks" == 64
+jsonpath "$.data.accounts[0].pk_total_num_snarks" == 64
 
 duration < 500
 

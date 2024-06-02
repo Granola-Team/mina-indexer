@@ -3,6 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
 };
+use speedb::{DBIterator, IteratorMode};
 
 pub trait SnarkStore {
     /// Add snark work in a precomputed block
@@ -28,6 +29,20 @@ pub trait SnarkStore {
 
     /// Get top snark work producers
     fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
+
+    /// Top snarker by fees terator
+    fn top_snarkers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Set the SNARK for the prover in `global_slot` at `index`
+    fn set_snark_by_prover(
+        &self,
+        snark: &SnarkWorkSummary,
+        global_slot: u32,
+        index: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Iterator over SNARKs by prover, sorted by global slot & index
+    fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
     /// Increment snarks per epoch count
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;
