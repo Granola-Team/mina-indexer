@@ -45,7 +45,7 @@ fi
 # 3. Configure the './blocks' directory, downloading blocks from the
 # granola-mina-blocks Linode bucket if need be.
 #
-"$SRC"/ops/download-mina-blocks 4 ./blocks
+"$SRC"/ops/download-mina-blocks 3 ./blocks  # prod has only 1000 blocks for now
 
 # 4. Read the staging ledgers from the './staking-ledgers' directory.
 #

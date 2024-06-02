@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# Downloads Mina node logs of blocks (so-called "precomputed blocks") from the Granola store.
+# $1 = order of magnitude of blocks desired (e.g. "4" downloads about 10^4 = 10,000 blocks)
+# $2 = destination path (e.g. /mnt/mina-logs/mina_network_block_data)
+
 set -x
 set -eu
 
@@ -31,8 +35,7 @@ rc() {
 #
 if [ -d "$2" ]; then
   # The directory exists already. Search it for blocks.
-  NINES="$( expr $1 - 1 )"
-  if [ -n "$(find "$2" -regextype posix-egrep -regex '.*/mainnet-9{'"${NINES}"',}-.*')" ]; then
+  if [ -n "$(find "$2" -regextype posix-egrep -regex '.*/mainnet-9{'"$1"',}-.*')" ]; then
     RESULT='The blocks are already present. Skipping download.'
     DO_SYNC=
   else
@@ -46,10 +49,11 @@ if [ '1' = "$DO_SYNC" ]; then
   rc lsd linode:
 
   # Perform the download.
+  X="$(expr $1 + 1)"
   rc \
     sync \
     linode:granola-mina-blocks \
-    --exclude '*mainnet-{{\d{'"$1"',}}}-*' \
+    --exclude '*mainnet-{{\d{'"$X"',}}}-*' \
     --dump filters \
     "$2"
   RESULT='Blocks downloaded.'
