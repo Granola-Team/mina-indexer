@@ -13,7 +13,7 @@ wait_for_socket() {
         if [ -S "$socket" ]; then
             return
         fi
-        sleep 30
+        sleep 60
     done
 }
 
