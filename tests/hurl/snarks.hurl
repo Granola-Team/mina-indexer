@@ -113,12 +113,44 @@ jsonpath "$.data.snarks" count == 64
 # first datum
 jsonpath "$.data.snarks[0].blockHeight" == 111
 jsonpath "$.data.snarks[0].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
-jsonpath "$.data.snarks[0].epoch_num_snarks" == 128
-jsonpath "$.data.snarks[0].total_num_snarks" == 128
+jsonpath "$.data.snarks[0].epoch_num_snarks" == 64
+jsonpath "$.data.snarks[0].total_num_snarks" == 64
 
 # last datum
 jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+
+duration < 500
+
+#
+# SNARKs by prover query
+#
+
+POST {{url}}
+```graphql
+{
+  snarks(query: {prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"}, limit: 100) {
+    prover
+    canonical
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.snarks" count == 64
+
+# first datum
+jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.snarks[0].canonical" == true
+jsonpath "$.data.snarks[0].blockHeight" == 111
+
+# last datum
+jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.snarks[63].canonical" == true
+jsonpath "$.data.snarks[63].blockHeight" == 111
 
 duration < 500
 
