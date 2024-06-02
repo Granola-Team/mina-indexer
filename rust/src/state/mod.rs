@@ -212,6 +212,7 @@ impl IndexerState {
             .set_max_canonical_blockchain_length(1)?;
         config.indexer_store.add_canonical_block(
             1,
+            0,
             &config.genesis_hash,
             &config.genesis_hash,
             Some(&MAINNET_GENESIS_PREV_STATE_HASH.into()),
@@ -380,6 +381,7 @@ impl IndexerState {
                     indexer_store.set_best_block(&block.state_hash())?;
                     indexer_store.add_canonical_block(
                         block.blockchain_length(),
+                        block.global_slot_since_genesis(),
                         &block.state_hash(),
                         &block.genesis_state_hash(),
                         None,
@@ -922,6 +924,7 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_canonical_block(
                 block.blockchain_length,
+                block.global_slot_since_genesis,
                 &block.state_hash,
                 genesis_state_hash,
                 genesis_prev_state_hash,

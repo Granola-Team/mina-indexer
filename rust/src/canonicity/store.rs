@@ -7,10 +7,11 @@ pub trait CanonicityStore {
     /// Set the length of the canonical chain
     fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()>;
 
-    /// Add the canonical block's height and state hash
+    /// Add the canonical block's height, global slot, and state hash
     fn add_canonical_block(
         &self,
         height: u32,
+        global_slot: u32,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
         genesis_prev_state_hash: Option<&BlockHash>,
@@ -18,6 +19,9 @@ pub trait CanonicityStore {
 
     /// Get the state hash of the canonical block at the given height
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>>;
+
+    /// Get the state hash of the canonical block at the given global slot
+    fn get_canonical_hash_at_slot(&self, global_slot: u32) -> anyhow::Result<Option<BlockHash>>;
 
     /// Get block canonicity
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>>;

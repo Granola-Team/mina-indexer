@@ -39,7 +39,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
-    const COLUMN_FAMILIES: [&'static str; 42] = [
+    const COLUMN_FAMILIES: [&'static str; 45] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -57,6 +57,8 @@ impl IndexerStore {
         "blockchain-length",    // [blockchain_length_cf]
         "coinbase-receivers",   // [coinbase_receiver_cf]
         "canonicity",
+        "canonicity-length", // [canonicity_length_cf]
+        "canonicity-slot",   // [canonicity_slot_cf]
         "user-commands",
         "mainnet-commands-slot",
         "mainnet-cmds-txn-global-slot",
@@ -68,6 +70,7 @@ impl IndexerStore {
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
         "snark-work-fees",            // [snark_work_fees_cf]
+        "snark-work-prover",          // [snark_work_prover_cf]
         "chain-id-to-network",        // [chain_id_to_network_cf]
         "txn-from",                   // [txn_from_cf]
         "txn-to",                     // [txn_to_cf]

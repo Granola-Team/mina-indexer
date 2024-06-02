@@ -12,6 +12,7 @@ impl CanonicityStore for IndexerStore {
     fn add_canonical_block(
         &self,
         height: u32,
+        global_slot: u32,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
         genesis_prev_state_hash: Option<&BlockHash>,
@@ -24,9 +25,16 @@ impl CanonicityStore for IndexerStore {
 
         // height -> state hash
         self.database.put_cf(
-            self.canonicity_cf(),
+            self.canonicity_length_cf(),
             height.to_be_bytes(),
-            serde_json::to_vec(state_hash)?,
+            state_hash.0.as_bytes(),
+        )?;
+
+        // slot -> state hash
+        self.database.put_cf(
+            self.canonicity_slot_cf(),
+            global_slot.to_be_bytes(),
+            state_hash.0.as_bytes(),
         )?;
 
         // update canonical chain length
@@ -94,18 +102,25 @@ impl CanonicityStore for IndexerStore {
     }
 
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>> {
-        trace!("Getting canonical hash at height {height}");
-
-        let key = height.to_be_bytes();
-        let canonicity_cf = self.canonicity_cf();
-        match self
+        trace!("Getting canonical state hash at height {height}");
+        Ok(self
             .database
-            .get_pinned_cf(&canonicity_cf, key)?
-            .map(|bytes| bytes.to_vec())
-        {
-            None => Ok(None),
-            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-        }
+            .get_pinned_cf(&self.canonicity_length_cf(), height.to_be_bytes())?
+            .and_then(|bytes| match BlockHash::from_bytes(&bytes) {
+                Ok(hash) => Some(hash),
+                Err(_) => None,
+            }))
+    }
+
+    fn get_canonical_hash_at_slot(&self, global_slot: u32) -> anyhow::Result<Option<BlockHash>> {
+        trace!("Getting canonical state hash at slot {global_slot}");
+        Ok(self
+            .database
+            .get_pinned_cf(&self.canonicity_slot_cf(), global_slot.to_be_bytes())?
+            .and_then(|bytes| match BlockHash::from_bytes(&bytes) {
+                Ok(hash) => Some(hash),
+                Err(_) => None,
+            }))
     }
 
     fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>> {

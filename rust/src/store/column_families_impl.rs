@@ -109,6 +109,18 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("canonicity column family exists")
     }
 
+    fn canonicity_length_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("canonicity-length")
+            .expect("canonicity-length column family exists")
+    }
+
+    fn canonicity_slot_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("canonicity-slot")
+            .expect("canonicity-slot column family exists")
+    }
+
     fn user_commands_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands")
@@ -182,6 +194,17 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("snark-work-fees")
             .expect("snark-work-fees column family exists")
+    }
+
+    /// CF for storing/sorting SNARKs by prover
+    /// `{prover}{slot}{index} -> snark`
+    /// - prover: 55 pk bytes
+    /// - slot:   4 BE bytes
+    /// - index:  4 BE bytes
+    fn snark_work_prover_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-prover")
+            .expect("snark-work-prover column family exists")
     }
 
     /// CF for storing chain_id -> network

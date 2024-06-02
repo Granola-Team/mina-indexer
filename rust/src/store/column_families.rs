@@ -2,7 +2,7 @@
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
-    const NUM_COLUMN_FAMILIES: usize = 42;
+    const NUM_COLUMN_FAMILIES: usize = 45;
 
     /// CF for storing account balances (best ledger)
     fn account_balance_cf(&self) -> &ColumnFamily;
@@ -45,6 +45,12 @@ pub trait ColumnFamilyHelpers {
 
     fn canonicity_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing canonical state hashes by blockchain length
+    fn canonicity_length_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing canonical state hashes by global slot
+    fn canonicity_slot_cf(&self) -> &ColumnFamily;
+
     fn user_commands_cf(&self) -> &ColumnFamily;
 
     fn internal_commands_cf(&self) -> &ColumnFamily;
@@ -72,6 +78,9 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for storing/sorting SNARK work fees
     fn snark_work_fees_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARKs by prover
+    fn snark_work_prover_cf(&self) -> &ColumnFamily;
 
     /// CF for storing chain_id -> network
     fn chain_id_to_network_cf(&self) -> &ColumnFamily;

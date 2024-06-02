@@ -11,12 +11,6 @@ use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashMap;
 
-/// [DBIterator] for top snark workers
-pub fn top_snarkers_iterator<'a>(db: &'a IndexerStore, mode: IteratorMode) -> DBIterator<'a> {
-    db.database
-        .iterator_cf(db.snark_top_producers_sort_cf(), mode)
-}
-
 /// Key format `{fee}{slot}{pk}{state_hash}{num}`
 /// - fee:  8 BE bytes
 /// - slot: 4 BE bytes
@@ -36,11 +30,23 @@ fn snark_fee_prefix_key(
     bytes
 }
 
+/// Key format `{prover}{slot}{index}`
+/// - prover: 55 pk bytes
+/// - slot:   4 BE bytes
+/// - index:  4 BE bytes
+fn snark_prover_prefix_key(prover: &PublicKey, global_slot: u32, index: u32) -> Vec<u8> {
+    let mut bytes = prover.0.as_bytes().to_vec();
+    bytes.append(&mut to_be_bytes(global_slot));
+    bytes.append(&mut to_be_bytes(index));
+    bytes
+}
+
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding SNARK work from block {}", block.summary());
 
         let epoch = block.epoch_count();
+        let global_slot = block.global_slot_since_genesis();
         let completed_works = SnarkWorkSummary::from_precomputed(block);
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
@@ -49,11 +55,6 @@ impl SnarkStore for IndexerStore {
         let key = state_hash.as_bytes();
         let value = serde_json::to_vec(&completed_works)?;
         self.database.put_cf(self.snarks_cf(), key, value)?;
-
-        // increment SNARKs counts
-        for snark in &completed_works {
-            self.increment_snarks_counts(snark, epoch)?;
-        }
 
         // store fee info
         let mut num_prover_works: HashMap<PublicKey, u32> = HashMap::new();
@@ -104,6 +105,22 @@ impl SnarkStore for IndexerStore {
                 let next_n = (n + 1).to_string();
                 let value = next_n.as_bytes();
                 self.database.put_cf(self.snarks_cf(), key, value)?;
+
+                // increment SNARK counts
+                for (index, snark) in block_pk_snarks.iter().enumerate() {
+                    if self
+                        .database
+                        .get_cf(
+                            self.snark_work_prover_cf(),
+                            snark_prover_prefix_key(&pk, global_slot, index as u32),
+                        )?
+                        .is_none()
+                    {
+                        let snark: SnarkWorkSummary = snark.clone().into();
+                        self.set_snark_by_prover(&snark, global_slot, index as u32)?;
+                        self.increment_snarks_counts(&snark, epoch)?;
+                    }
+                }
             }
         }
         Ok(())
@@ -208,7 +225,8 @@ impl SnarkStore for IndexerStore {
     fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
         trace!("Getting top {n} SNARK workers");
 
-        Ok(top_snarkers_iterator(self, IteratorMode::End)
+        Ok(self
+            .top_snarkers_iterator(IteratorMode::End)
             .take(n)
             .map(|res| {
                 res.map(|(bytes, _)| {
@@ -222,6 +240,37 @@ impl SnarkStore for IndexerStore {
                 .expect("snark work iterator")
             })
             .collect())
+    }
+
+    fn top_snarkers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.snark_top_producers_sort_cf(), mode)
+    }
+
+    fn set_snark_by_prover(
+        &self,
+        snark: &SnarkWorkSummary,
+        global_slot: u32,
+        index: u32,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting snark slot {global_slot} at index {index} for prover {}",
+            snark.prover
+        );
+        Ok(self.database.put_cf(
+            self.snark_work_prover_cf(),
+            snark_prover_prefix_key(&snark.prover, global_slot, index),
+            serde_json::to_vec(snark)?,
+        )?)
+    }
+
+    /// `{prover}{slot}{index} -> snark`
+    /// - prover: 55 pk bytes
+    /// - slot:   4 BE bytes
+    /// - index:  4 BE bytes
+    /// - snark:  serde_json encoded
+    fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database.iterator_cf(self.snark_work_prover_cf(), mode)
     }
 
     fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
