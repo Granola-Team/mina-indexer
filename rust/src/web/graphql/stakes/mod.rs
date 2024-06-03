@@ -1,15 +1,19 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    chain::chain_id,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::*,
-    ledger::{staking::StakingAccount, store::LedgerStore},
+    ledger::{
+        staking::{AggregatedEpochStakeDelegations, StakingAccount},
+        store::LedgerStore,
+    },
     snark_work::store::SnarkStore,
+    store::{ledger_store_impl::staking_ledger_sort_key, IndexerStore},
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
+use speedb::{Direction, IteratorMode};
+use std::sync::Arc;
 
 #[derive(InputObject)]
 pub struct StakeQueryInput {
@@ -49,7 +53,7 @@ impl StakeQueryRoot {
         query: Option<StakeQueryInput>,
         sort_by: Option<StakeSortByInput>,
         #[graphql(default = 100)] limit: usize,
-    ) -> Result<Option<Vec<StakesLedgerAccountWithMeta>>> {
+    ) -> Result<Vec<StakesLedgerAccountWithMeta>> {
         let db = db(ctx);
 
         // default to current epoch
@@ -63,18 +67,18 @@ impl StakeQueryRoot {
         if limit == 0 {
             if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
                 return match db.get_epoch(&ledger_hash.clone().into())? {
-                    Some(epoch) => Ok(Some(vec![StakesLedgerAccountWithMeta {
+                    Some(epoch) => Ok(vec![StakesLedgerAccountWithMeta {
                         epoch,
                         ledger_hash,
                         ..Default::default()
-                    }])),
-                    None => Ok(None),
+                    }]),
+                    None => Ok(vec![]),
                 };
             }
         }
 
-        // if ledger hash is provided as a query input, use it
-        // else, use the epoch number
+        // if ledger hash is provided as a query input, use it for the ledger
+        // otherwise, use the epoch number
         let staking_ledger = {
             let opt = if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone())
             {
@@ -84,170 +88,62 @@ impl StakeQueryRoot {
             };
             match opt {
                 Some(staking_ledger) => staking_ledger,
-                None => return Ok(None),
+                None => return Ok(vec![]),
             }
         };
 
         // Delegations will be present if the staking ledger is
         // (use the staking ledger's epoch)
         let epoch = staking_ledger.epoch;
+        let ledger_hash = staking_ledger.ledger_hash.clone().0;
         let delegations = db.get_delegations_epoch(epoch, &None)?.unwrap();
 
-        let total_currency = staking_ledger.total_currency;
-        let ledger_hash = staking_ledger.ledger_hash.clone().0;
-        let mut accounts: Vec<StakesLedgerAccountWithMeta> = staking_ledger
-            .staking_ledger
-            .into_values()
-            .filter(|account| {
-                if let Some(ref query) = query {
-                    let StakeQueryInput {
-                        delegate,
-                        public_key,
-                        epoch: query_epoch,
-                        ledger_hash: query_ledger_hash,
-                    } = query;
-                    if let Some(public_key) = public_key {
-                        if *public_key != account.pk.0 {
-                            return false;
-                        }
-                    }
-                    if let Some(delegate) = delegate {
-                        if *delegate != account.delegate.0 {
-                            return false;
-                        }
-                    }
-                    if let Some(query_ledger_hash) = query_ledger_hash {
-                        if *query_ledger_hash != ledger_hash {
-                            return false;
-                        }
-                    }
-                    if let Some(query_epoch) = query_epoch {
-                        if *query_epoch != epoch {
-                            return false;
-                        }
-                    }
-                }
-                true
-            })
-            .map(|account| {
-                let pk = account.pk.clone();
-                let result = delegations
-                    .delegations
-                    .get(&pk)
-                    .cloned()
-                    .unwrap_or_default();
-                let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
-                let count_delegates = result.count_delegates.unwrap_or_default();
-                let mut decimal = Decimal::from(total_delegated_nanomina);
-                decimal.set_scale(9).ok();
-
-                let total_delegated = decimal.to_f64().unwrap_or_default();
-                let timing = account.timing.as_ref().map(|timing| Timing {
-                    cliff_amount: Some(timing.cliff_amount),
-                    cliff_time: Some(timing.cliff_time),
-                    initial_minimum_balance: Some(timing.initial_minimum_balance),
-                    vesting_increment: Some(timing.vesting_increment),
-                    vesting_period: Some(timing.vesting_period),
-                });
-
-                // pk data counts
-                let pk_epoch_num_blocks = db
-                    .get_block_production_pk_epoch_count(&pk, Some(epoch))
-                    .expect("pk epoch num blocks");
-                let pk_total_num_blocks = db
-                    .get_block_production_pk_total_count(&pk)
-                    .expect("pk total num blocks");
-                let pk_epoch_num_snarks = db
-                    .get_snarks_pk_epoch_count(&pk, Some(epoch))
-                    .expect("pk epoch num snarks");
-                let pk_total_num_snarks = db
-                    .get_snarks_pk_total_count(&pk)
-                    .expect("pk total num snarks");
-                let pk_epoch_num_user_commands = db
-                    .get_user_commands_pk_epoch_count(&pk, Some(epoch))
-                    .expect("pk epoch num user commands");
-                let pk_total_num_user_commands = db
-                    .get_user_commands_pk_total_count(&pk)
-                    .expect("pk total num user commands");
-                let pk_epoch_num_internal_commands = db
-                    .get_internal_commands_pk_epoch_count(&pk, Some(epoch))
-                    .expect("pk epoch num internal commands");
-                let pk_total_num_internal_commands = db
-                    .get_internal_commands_pk_total_count(&pk)
-                    .expect("pk total num internal commands");
-
-                StakesLedgerAccountWithMeta {
-                    epoch,
-                    ledger_hash: ledger_hash.clone(),
-                    account: StakesLedgerAccount::from((
-                        account,
-                        pk_epoch_num_blocks,
-                        pk_total_num_blocks,
-                        pk_epoch_num_snarks,
-                        pk_total_num_snarks,
-                        pk_epoch_num_user_commands,
-                        pk_total_num_user_commands,
-                        pk_epoch_num_internal_commands,
-                        pk_total_num_internal_commands,
-                    )),
-                    delegation_totals: StakesDelegationTotals {
-                        total_currency,
-                        total_delegated,
-                        total_delegated_nanomina,
-                        count_delegates,
-                    },
-                    timing,
-                    epoch_num_blocks: db
-                        .get_block_production_epoch_count(Some(epoch))
-                        .expect("epoch block count"),
-                    total_num_blocks: db
-                        .get_block_production_total_count()
-                        .expect("total block count"),
-                    epoch_num_snarks: db
-                        .get_snarks_epoch_count(Some(epoch))
-                        .expect("epoch snark count"),
-                    total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
-                    epoch_num_user_commands: db
-                        .get_user_commands_epoch_count(Some(epoch))
-                        .expect("epoch user command count"),
-                    total_num_user_commands: db
-                        .get_user_commands_total_count()
-                        .expect("total user command count"),
-                    epoch_num_internal_commands: db
-                        .get_internal_commands_epoch_count(Some(epoch))
-                        .expect("epoch internal command count"),
-                    total_num_internal_commands: db
-                        .get_internal_commands_total_count()
-                        .expect("total internal command count"),
-                }
-            })
-            .collect();
-
-        match sort_by {
-            Some(StakeSortByInput::BalanceAsc) => {
-                accounts.sort_by(|a, b| a.account.balance_nanomina.cmp(&b.account.balance_nanomina))
-            }
-            Some(StakeSortByInput::BalanceDesc) => {
-                accounts.sort_by(|a, b| b.account.balance_nanomina.cmp(&a.account.balance_nanomina))
-            }
-            Some(StakeSortByInput::StakeAsc) => {
-                accounts.sort_by(|a, b| {
-                    a.delegation_totals
-                        .total_delegated_nanomina
-                        .cmp(&b.delegation_totals.total_delegated_nanomina)
-                });
-            }
+        // balance- & stake-sorted queries
+        let mut accounts = <Vec<StakesLedgerAccountWithMeta>>::with_capacity(limit);
+        let iter = match sort_by {
             Some(StakeSortByInput::StakeDesc) | None => {
-                accounts.sort_by(|a, b| {
-                    b.delegation_totals
-                        .total_delegated_nanomina
-                        .cmp(&a.delegation_totals.total_delegated_nanomina)
-                });
+                db.staking_ledger_stake_iterator(IteratorMode::From(
+                    &staking_ledger_sort_key(epoch, u64::MAX, ""),
+                    Direction::Reverse,
+                ))
+            }
+            Some(StakeSortByInput::StakeAsc) => db.staking_ledger_stake_iterator(
+                IteratorMode::From(&staking_ledger_sort_key(epoch, 0, ""), Direction::Forward),
+            ),
+            Some(StakeSortByInput::BalanceDesc) => {
+                db.staking_ledger_balance_iterator(IteratorMode::From(
+                    &staking_ledger_sort_key(epoch, u64::MAX, ""),
+                    Direction::Reverse,
+                ))
+            }
+            Some(StakeSortByInput::BalanceAsc) => db.staking_ledger_balance_iterator(
+                IteratorMode::From(&staking_ledger_sort_key(epoch, 0, ""), Direction::Forward),
+            ),
+        };
+
+        for (_, value) in iter.flatten() {
+            let account: StakingAccount = serde_json::from_slice(&value)?;
+            if StakeQueryInput::matches_staking_account(
+                query.as_ref(),
+                &account,
+                &ledger_hash,
+                epoch,
+            ) {
+                accounts.push(StakesLedgerAccountWithMeta::new(
+                    db,
+                    account,
+                    &delegations,
+                    staking_ledger.epoch,
+                    staking_ledger.ledger_hash.0.clone(),
+                    staking_ledger.total_currency,
+                ));
+
+                if accounts.len() == limit {
+                    break;
+                }
             }
         }
-
-        accounts.truncate(limit);
-        Ok(Some(accounts))
+        Ok(accounts)
     }
 }
 
@@ -420,13 +316,7 @@ impl From<(StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)> for StakesLe
         let receipt_chain_hash = acc.0.receipt_chain_hash.0;
         let voting_for = acc.0.voting_for.0;
         Self {
-            chain_id: chain_id(
-                MAINNET_GENESIS_HASH,
-                MAINNET_PROTOCOL_CONSTANTS,
-                MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
-            )
-            .0[..6]
-                .to_string(),
+            chain_id: StakingAccount::chain_id(),
             balance,
             nonce,
             delegate,
@@ -445,6 +335,147 @@ impl From<(StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)> for StakesLe
             pk_total_num_user_commands: acc.6,
             pk_epoch_num_internal_commands: acc.7,
             pk_total_num_internal_commands: acc.8,
+        }
+    }
+}
+
+impl StakeQueryInput {
+    pub fn matches_staking_account(
+        query: Option<&Self>,
+        account: &StakingAccount,
+        ledger_hash: &String,
+        epoch: u32,
+    ) -> bool {
+        if let Some(query) = query {
+            let Self {
+                delegate,
+                public_key,
+                epoch: query_epoch,
+                ledger_hash: query_ledger_hash,
+            } = query;
+            if let Some(public_key) = public_key {
+                if *public_key != account.pk.0 {
+                    return false;
+                }
+            }
+            if let Some(delegate) = delegate {
+                if *delegate != account.delegate.0 {
+                    return false;
+                }
+            }
+            if let Some(query_ledger_hash) = query_ledger_hash {
+                if query_ledger_hash != ledger_hash {
+                    return false;
+                }
+            }
+            if let Some(query_epoch) = query_epoch {
+                if *query_epoch != epoch {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl StakesLedgerAccountWithMeta {
+    pub fn new(
+        db: &Arc<IndexerStore>,
+        account: StakingAccount,
+        delegations: &AggregatedEpochStakeDelegations,
+        epoch: u32,
+        ledger_hash: String,
+        total_currency: u64,
+    ) -> Self {
+        let pk = account.pk.clone();
+        let result = delegations
+            .delegations
+            .get(&pk)
+            .cloned()
+            .unwrap_or_default();
+        let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
+        let count_delegates = result.count_delegates.unwrap_or_default();
+        let mut decimal = Decimal::from(total_delegated_nanomina);
+        decimal.set_scale(9).ok();
+
+        let total_delegated = decimal.to_f64().unwrap_or_default();
+        let timing = account.timing.as_ref().map(|timing| Timing {
+            cliff_amount: Some(timing.cliff_amount),
+            cliff_time: Some(timing.cliff_time),
+            initial_minimum_balance: Some(timing.initial_minimum_balance),
+            vesting_increment: Some(timing.vesting_increment),
+            vesting_period: Some(timing.vesting_period),
+        });
+
+        // pk data counts
+        let pk_epoch_num_blocks = db
+            .get_block_production_pk_epoch_count(&pk, Some(epoch))
+            .expect("pk epoch num blocks");
+        let pk_total_num_blocks = db
+            .get_block_production_pk_total_count(&pk)
+            .expect("pk total num blocks");
+        let pk_epoch_num_snarks = db
+            .get_snarks_pk_epoch_count(&pk, Some(epoch))
+            .expect("pk epoch num snarks");
+        let pk_total_num_snarks = db
+            .get_snarks_pk_total_count(&pk)
+            .expect("pk total num snarks");
+        let pk_epoch_num_user_commands = db
+            .get_user_commands_pk_epoch_count(&pk, Some(epoch))
+            .expect("pk epoch num user commands");
+        let pk_total_num_user_commands = db
+            .get_user_commands_pk_total_count(&pk)
+            .expect("pk total num user commands");
+        let pk_epoch_num_internal_commands = db
+            .get_internal_commands_pk_epoch_count(&pk, Some(epoch))
+            .expect("pk epoch num internal commands");
+        let pk_total_num_internal_commands = db
+            .get_internal_commands_pk_total_count(&pk)
+            .expect("pk total num internal commands");
+
+        Self {
+            epoch,
+            ledger_hash,
+            account: StakesLedgerAccount::from((
+                account,
+                pk_epoch_num_blocks,
+                pk_total_num_blocks,
+                pk_epoch_num_snarks,
+                pk_total_num_snarks,
+                pk_epoch_num_user_commands,
+                pk_total_num_user_commands,
+                pk_epoch_num_internal_commands,
+                pk_total_num_internal_commands,
+            )),
+            delegation_totals: StakesDelegationTotals {
+                count_delegates,
+                total_delegated,
+                total_delegated_nanomina,
+                total_currency,
+            },
+            timing,
+            epoch_num_blocks: db
+                .get_block_production_epoch_count(Some(epoch))
+                .expect("epoch block count"),
+            total_num_blocks: db
+                .get_block_production_total_count()
+                .expect("total block count"),
+            epoch_num_snarks: db
+                .get_snarks_epoch_count(Some(epoch))
+                .expect("epoch snark count"),
+            total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
+            epoch_num_user_commands: db
+                .get_user_commands_epoch_count(Some(epoch))
+                .expect("epoch user command count"),
+            total_num_user_commands: db
+                .get_user_commands_total_count()
+                .expect("total user command count"),
+            epoch_num_internal_commands: db
+                .get_internal_commands_epoch_count(Some(epoch))
+                .expect("epoch internal command count"),
+            total_num_internal_commands: db
+                .get_internal_commands_total_count()
+                .expect("total internal command count"),
         }
     }
 }

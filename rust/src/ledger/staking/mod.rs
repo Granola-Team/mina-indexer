@@ -3,6 +3,7 @@ pub mod parser;
 use crate::{
     block::BlockHash,
     chain::Network,
+    constants::*,
     ledger::{
         account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
         public_key::PublicKey,
@@ -155,6 +156,18 @@ pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
         parts[1].parse().unwrap(),
         LedgerHash(parts[2].into()),
     )
+}
+
+impl StakingAccount {
+    pub fn chain_id() -> String {
+        crate::chain::chain_id(
+            MAINNET_GENESIS_HASH,
+            MAINNET_PROTOCOL_CONSTANTS,
+            MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+        )
+        .0[..6]
+            .to_string()
+    }
 }
 
 impl StakingLedger {
