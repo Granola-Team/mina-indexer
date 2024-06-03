@@ -47,7 +47,7 @@ impl UserCommandStore for IndexerStore {
             // reconstruct the key
             if self
                 .database
-                .get_cf(
+                .get_pinned_cf(
                     self.commands_txn_hash_to_global_slot_mainnet_cf(),
                     txn_hash.as_bytes(),
                 )?
@@ -272,8 +272,8 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command epoch {epoch}");
         Ok(self
             .database
-            .get_cf(self.user_commands_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.user_commands_epoch_cf(), to_be_bytes(epoch))?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -312,11 +312,11 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command epoch {epoch} num {pk}");
         Ok(self
             .database
-            .get_cf(
+            .get_pinned_cf(
                 self.user_commands_pk_epoch_cf(),
                 u32_prefix_key(epoch, &pk.0),
             )?
-            .map_or(0, from_be_bytes))
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_user_commands_pk_epoch_count(
@@ -338,8 +338,8 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting pk total user commands count {pk}");
         Ok(self
             .database
-            .get_cf(self.user_commands_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.user_commands_pk_total_cf(), pk.0.as_bytes())?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {

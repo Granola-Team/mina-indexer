@@ -35,8 +35,9 @@ impl ChainStore for IndexerStore {
         trace!("Getting network for chain id: {}", chain_id.0);
         Ok(Network::from(
             self.database
-                .get_cf(self.chain_id_to_network_cf(), chain_id.0.as_bytes())?
-                .expect("network should exist in database"),
+                .get_pinned_cf(self.chain_id_to_network_cf(), chain_id.0.as_bytes())?
+                .expect("network should exist in database")
+                .to_vec(),
         ))
     }
 

@@ -167,7 +167,7 @@ impl BlockStore for IndexerStore {
 
         Ok(self
             .database
-            .get_cf(self.block_parent_hash_cf(), state_hash.0.as_bytes())
+            .get_pinned_cf(self.block_parent_hash_cf(), state_hash.0.as_bytes())
             .map(|o| o.map(|bytes| BlockHash::from_bytes(&bytes).expect("parent state hash")))?)
     }
 
@@ -193,8 +193,8 @@ impl BlockStore for IndexerStore {
         trace!("Getting blockchain length {state_hash}");
         Ok(self
             .database
-            .get_cf(self.blockchain_length_cf(), state_hash.0.as_bytes())?
-            .map(from_be_bytes))
+            .get_pinned_cf(self.blockchain_length_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn set_blockchain_length(
@@ -214,7 +214,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting coinbase receiver for {state_hash}");
         Ok(self
             .database
-            .get_cf(self.coinbase_receiver_cf(), state_hash.0.as_bytes())
+            .get_pinned_cf(self.coinbase_receiver_cf(), state_hash.0.as_bytes())
             .map_or(None, |bytes| {
                 bytes.map(|b| PublicKey::from_bytes(&b).unwrap())
             }))
@@ -443,7 +443,7 @@ impl BlockStore for IndexerStore {
         let key = state_hash.0.as_bytes();
         Ok(self
             .database
-            .get_cf(self.blocks_version_cf(), key)?
+            .get_pinned_cf(self.blocks_version_cf(), key)?
             .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
     }
 
@@ -479,11 +479,11 @@ impl BlockStore for IndexerStore {
         trace!("Getting global slot for height {}", blockchain_length);
         Ok(self
             .database
-            .get_cf(
+            .get_pinned_cf(
                 self.block_global_slot_to_height_cf(),
                 to_be_bytes(blockchain_length),
             )?
-            .map(from_be_bytes))
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn get_height_from_global_slot(
@@ -496,11 +496,11 @@ impl BlockStore for IndexerStore {
         );
         Ok(self
             .database
-            .get_cf(
+            .get_pinned_cf(
                 self.block_height_to_global_slot_cf(),
                 to_be_bytes(global_slot_since_genesis),
             )?
-            .map(from_be_bytes))
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn get_current_epoch(&self) -> anyhow::Result<u32> {
@@ -555,19 +555,19 @@ impl BlockStore for IndexerStore {
         trace!("Getting pk epoch {epoch} block production count {pk}");
         Ok(self
             .database
-            .get_cf(
+            .get_pinned_cf(
                 self.block_production_pk_epoch_cf(),
                 u32_prefix_key(epoch, &pk.0),
             )?
-            .map_or(0, from_be_bytes))
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
         trace!("Getting pk total block production count {pk}");
         Ok(self
             .database
-            .get_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
@@ -575,8 +575,8 @@ impl BlockStore for IndexerStore {
         trace!("Getting epoch block production count {epoch}");
         Ok(self
             .database
-            .get_cf(self.block_production_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.block_production_epoch_cf(), to_be_bytes(epoch))?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
