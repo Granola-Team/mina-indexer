@@ -197,8 +197,8 @@ impl FeetransferQueryRoot {
             if sort_by == FeetransferSortByInput::BlockHeightDesc {
                 block_heights.reverse()
             }
-            let mut early_exit = false;
-            for height in block_heights {
+
+            'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     let canonical = get_block_canonicity(db, &block.state_hash().0);
                     let mut internal_cmds = InternalCommandWithData::from_precomputed(&block);
@@ -221,18 +221,11 @@ impl FeetransferQueryRoot {
                             .map_or(true, |q| q.matches(&feetransfer_with_meta))
                         {
                             feetransfers.push(feetransfer_with_meta);
-                        }
-                        if feetransfers.len() == limit {
-                            early_exit = true;
-                            break;
+                            if feetransfers.len() == limit {
+                                break 'outer;
+                            }
                         }
                     }
-                    if early_exit {
-                        break;
-                    }
-                }
-                if early_exit {
-                    break;
                 }
             }
             return Ok(feetransfers);

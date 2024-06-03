@@ -84,18 +84,18 @@ impl AccountQueryRoot {
         query: Option<AccountQueryInput>,
         sort_by: Option<AccountSortByInput>,
         #[graphql(default = 100)] limit: usize,
-    ) -> Result<Option<Vec<Account>>> {
+    ) -> Result<Vec<Account>> {
         let db = db(ctx);
         let state_hash = match db.get_best_block_hash() {
             Ok(Some(state_hash)) => state_hash,
             Ok(None) | Err(_) => {
-                return Ok(None);
+                return Ok(vec![]);
             }
         };
         let ledger = match db.get_ledger_state_hash(&state_hash, true) {
             Ok(Some(ledger)) => ledger,
             Ok(None) | Err(_) => {
-                return Ok(None);
+                return Ok(vec![]);
             }
         };
 
@@ -105,7 +105,7 @@ impl AccountQueryRoot {
                 .accounts
                 .get(&public_key.into())
                 .filter(|acct| query.unwrap().matches(acct))
-                .map(|acct| {
+                .map_or(vec![], |acct| {
                     let pk = acct.public_key.clone();
                     vec![Account::from((
                         acct.clone(),
@@ -169,7 +169,7 @@ impl AccountQueryRoot {
             }
         }
 
-        Ok(Some(accounts))
+        Ok(accounts)
     }
 }
 

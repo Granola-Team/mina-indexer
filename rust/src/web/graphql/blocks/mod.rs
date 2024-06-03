@@ -295,12 +295,13 @@ impl BlocksQueryRoot {
                 };
                 (min_bound, max_bound)
             };
+
             let mut block_heights: Vec<u32> = (min..=max).collect();
             if sort_by == BlockSortByInput::BlockHeightDesc {
                 block_heights.reverse()
             }
-            let mut early_exit = false;
-            for height in block_heights {
+
+            'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     if let Some(block_with_canonicity) = precomputed_matches_query(
                         db,
@@ -314,13 +315,9 @@ impl BlocksQueryRoot {
                         blocks.push(block_with_canonicity);
 
                         if blocks.len() == limit {
-                            early_exit = true;
-                            break;
+                            break 'outer;
                         }
                     }
-                }
-                if early_exit {
-                    break;
                 }
             }
             return Ok(blocks);
@@ -362,12 +359,13 @@ impl BlocksQueryRoot {
                 };
                 (min_bound, max_bound)
             };
+
             let mut block_slots: Vec<u32> = (min..=max).collect();
             if sort_by == BlockSortByInput::BlockHeightDesc {
                 block_slots.reverse()
             }
-            let mut early_exit = false;
-            for global_slot in block_slots {
+
+            'outer: for global_slot in block_slots {
                 for block in db.get_blocks_at_slot(global_slot)? {
                     if let Some(block_with_canonicity) = precomputed_matches_query(
                         db,
@@ -380,13 +378,9 @@ impl BlocksQueryRoot {
                     ) {
                         blocks.push(block_with_canonicity);
                         if blocks.len() == limit {
-                            early_exit = true;
-                            break;
+                            break 'outer;
                         }
                     }
-                }
-                if early_exit {
-                    break;
                 }
             }
             return Ok(blocks);

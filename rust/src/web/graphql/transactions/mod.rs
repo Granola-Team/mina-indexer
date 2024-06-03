@@ -79,6 +79,7 @@ impl TransactionsQueryRoot {
                 })
                 .filter(|txn| query.matches(txn))
                 .collect();
+
             reorder_asc(&mut transactions, sort_by);
             transactions.truncate(limit);
             return Ok(transactions);
@@ -119,14 +120,10 @@ impl TransactionsQueryRoot {
                 block_heights.reverse();
             }
             let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
-            let mut early_exit = false;
-            for height in block_heights {
+
+            'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
-                    let mut signed_cmds = SignedCommandWithData::from_precomputed(&block);
-                    if sort_by == TransactionSortByInput::BlockHeightDesc {
-                        signed_cmds.reverse();
-                    }
-                    for cmd in signed_cmds {
+                    for cmd in SignedCommandWithData::from_precomputed(&block) {
                         let txn = TransactionWithBlock::new(
                             cmd,
                             db,
@@ -136,22 +133,15 @@ impl TransactionsQueryRoot {
 
                         if query.matches(&txn) {
                             transactions.push(txn);
-                        }
-                        if transactions.len() == limit {
-                            early_exit = true;
-                            break;
+
+                            if transactions.len() == limit {
+                                break 'outer;
+                            }
                         }
                     }
-                    if early_exit {
-                        break;
-                    }
-                }
-                if early_exit {
-                    break;
                 }
             }
             // reorder_asc(&mut transactions, sort_by);
-            transactions.truncate(limit);
             return Ok(transactions);
         }
         // iterator mode & direction determined by desired sorting

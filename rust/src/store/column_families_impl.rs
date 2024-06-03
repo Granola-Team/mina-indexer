@@ -349,4 +349,18 @@ impl ColumnFamilyHelpers for IndexerStore {
             .cf_handle("staking-ledger-epoch")
             .expect("staking-ledger-epoch column family exists")
     }
+
+    /// CF for sorting staking ledger accounts by balance
+    fn staking_ledger_balance_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-balance")
+            .expect("staking-ledger-balance column family exists")
+    }
+
+    /// CF for sorting staking ledger accounts by total delegations
+    fn staking_ledger_stake_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-stake")
+            .expect("staking-ledger-stake column family exists")
+    }
 }
