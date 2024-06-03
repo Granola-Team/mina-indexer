@@ -35,7 +35,7 @@ mkdir -p ./log
 # granola-mina-blocks Linode bucket if need be. Note that the prior production
 # instance may start to read these blocks, if it is running.
 #
-"$SRC"/ops/download-mina-blocks 3 ./blocks  # prod has only 1000 blocks for now
+"$SRC"/ops/download-mina-blocks 4 ./blocks
 
 # 4. Read the staging ledgers from the './staking-ledgers' directory.
 #
