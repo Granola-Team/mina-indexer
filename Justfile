@@ -5,6 +5,8 @@
 
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 
+IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
+
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
 # Non-Nix environment needs nightly toolchain installed and requires +nightly
@@ -67,14 +69,13 @@ lint: && audit disallow-unused-cargo-deps
 
 # Build OCI images.
 build-image:
-  REV="$(git rev-parse --short=8 HEAD)"
-  IMAGE=mina-indexer:"$REV"
+  echo "Building {{IMAGE}}"
   docker --version
   nix build .#dockerImage
   docker load < ./result
-  docker run --rm -it "$IMAGE" \
+  docker run --rm -it {{IMAGE}} \
     mina-indexer server start --help
-  docker image rm "$IMAGE"
+  docker image rm {{IMAGE}}
 
 # Start a server in the current directory.
 start-server: build
