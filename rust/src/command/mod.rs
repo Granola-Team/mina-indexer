@@ -259,12 +259,23 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn memo(&self) -> String {
         let mina_rs::UserCommand::SignedCommand(cmd) = self.data();
-        if let Ok(s) = String::from_utf8(cmd.t.t.payload.t.t.common.t.t.t.memo.t.0) {
-            // drop version bytes & right padding
-            s[2..].trim_end_matches('\0').to_string()
-        } else {
-            String::default()
-        }
+        let bytes = cmd.t.t.payload.t.t.common.t.t.t.memo.t.0;
+        decode_memo(&bytes)
+    }
+}
+
+/// Decode memo
+///
+/// 0th byte - tag to distinguish digests from other data
+/// 1st byte - is length, always 32 for digests
+/// bytes 2 to 33 - are data, 0-right-padded if length is less than 32
+
+fn decode_memo(decoded: &[u8]) -> String {
+    let value = &decoded[2..decoded[1] as usize + 2];
+    if let Ok(memo) = String::from_utf8(value.to_vec()) {
+        memo
+    } else {
+        String::default()
     }
 }
 
@@ -574,10 +585,23 @@ mod test {
     use super::{Command, Delegation, Payment};
     use crate::{
         block::{parser::BlockParser, precomputed::PcbVersion},
+        command::decode_memo,
         constants::*,
         ledger::account::nanomina_to_mina,
     };
     use std::path::PathBuf;
+
+    #[test]
+    fn decode_memo_test() {
+        let expected = "MIP4".to_string();
+        // encoded memo for: MIP4
+        let bytes: Vec<u8> = vec![
+            1, 4, 77, 73, 80, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 177, 160, 56, 149,
+        ];
+        let actual = decode_memo(&bytes);
+        assert_eq!(&expected, &actual);
+    }
 
     #[tokio::test]
     async fn mainnet_from_precomputed() {
