@@ -172,6 +172,9 @@ HTTP 200
 # total data count
 jsonpath "$.data.snarks" count == 64
 
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[63].blockHeight" == 111
+
 duration < 500
 
 # TODO global slot query
