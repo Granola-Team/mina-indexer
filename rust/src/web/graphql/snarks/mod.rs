@@ -225,15 +225,19 @@ impl SnarkQueryRoot {
                     })
                     .collect()
             });
-
+            let mut early_exit = false;
             for sw in snarks_with_canonicity {
                 if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                     snarks.push(sw);
                 }
 
                 if snarks.len() == limit {
+                    early_exit = true;
                     break;
                 }
+            }
+            if early_exit {
+                break;
             }
         }
 
