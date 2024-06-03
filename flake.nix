@@ -92,12 +92,17 @@
 
             env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
 
+            gitCommitHash = builtins.substring 0 8 (self.rev or "dev");
+
             postPatch = ''
               ln -s "${./rust/Cargo.lock}" Cargo.lock
               patchShebangs tests/regression
               patchShebangs tests/download_blocks
             '';
-            preBuild = "cd rust";
+            preBuild = ''
+              export GIT_COMMIT_HASH=${gitCommitHash}
+              cd rust
+            '';
             postBuild = ''
               set -ex
               mkdir -p $out/share/mina-indexer/data

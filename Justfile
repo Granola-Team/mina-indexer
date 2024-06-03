@@ -3,6 +3,10 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
+export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
+
+IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
+
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
 # Non-Nix environment needs nightly toolchain installed and requires +nightly
@@ -65,14 +69,13 @@ lint: && audit disallow-unused-cargo-deps
 
 # Build OCI images.
 build-image:
-  #REV="$(git rev-parse --short=8 HEAD)"
-  #IMAGE=mina-indexer:"$REV"
-  #docker --version
-  #nix build .#dockerImage
-  #docker load < ./result
-  #docker run --rm -it "$IMAGE" \
-  #  mina-indexer server start --help
-  #docker image rm "$IMAGE"
+  echo "Building {{IMAGE}}"
+  docker --version
+  nix build .#dockerImage
+  docker load < ./result
+  docker run --rm -it {{IMAGE}} \
+    mina-indexer server start --help
+  docker image rm {{IMAGE}}
 
 # Start a server in the current directory.
 start-server: build
@@ -100,6 +103,5 @@ tier1-test: prereqs test
 tier2-test: build
   tests/regression test_hurl_tier2
   tests/regression test_many_blocks
-  # TODO: re-enable once Nix build is working
-  # nix build
+  nix build
   ops/ingest-all
