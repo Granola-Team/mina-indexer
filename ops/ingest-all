@@ -51,6 +51,39 @@ port="$(ephemeral_port)"
     &
 PID=$!
 wait_for_socket
-./rust/target/release/mina-indexer --domain-socket-path "$socket" checkpoints create --path /mnt/mina-logs/"$VER"-snapshot
-./rust/target/release/mina-indexer --domain-socket-path "$socket" shutdown
+
+# Tell the server to take a snapshot (checkpoint).
+#
+./rust/target/release/mina-indexer \
+  --domain-socket-path "$socket" \
+  checkpoints create \
+    --path /mnt/mina-logs/"$VER"-snapshot
+
+./rust/target/release/mina-indexer \
+  --domain-socket-path "$socket" \
+  shutdown
+wait "$PID"
+
+# See if 'replay' works.
+#
+./rust/target/release/mina-indexer \
+  --domain-socket-path "$socket" \
+  server replay \
+    --web-port "$port" \
+    --log-level DEBUG \
+    --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
+    --database-dir /mnt/mina-logs/"$VER"-database \
+    --blocks-dir /mnt/mina-logs/mina_network_block_data \
+    --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
+    --locked-supply-csv "$src"/data/locked.csv \
+    --ledger-cadence 5000 \
+    >> "$LOG"/out \
+    2>> "$LOG"/err \
+    &
+PID=$!
+wait_for_socket
+
+./rust/target/release/mina-indexer \
+  --domain-socket-path "$socket" \
+  shutdown
 wait "$PID"
