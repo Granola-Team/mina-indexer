@@ -8,6 +8,7 @@ use crate::{
         Ledger, LedgerHash,
     },
 };
+use speedb::{DBIterator, IteratorMode};
 
 pub trait LedgerStore {
     /// Add a ledger with assoociated hash
@@ -75,4 +76,10 @@ pub trait LedgerStore {
 
     /// Set the epoch number corresponding to the given staking ledger hash
     fn set_epoch(&self, ledger_hash: &LedgerHash, epoch: u32) -> anyhow::Result<()>;
+
+    /// Per epoch staking ledger account iterator via balance
+    fn staking_ledger_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Per epoch staking ledger account iterator via stake (total delegations)
+    fn staking_ledger_stake_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }

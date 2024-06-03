@@ -45,7 +45,10 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
         // index on state hash & add new ledger event
-        if self.get_known_genesis_state_hashes()?.contains(state_hash) {
+        if self
+            .get_known_genesis_prev_state_hashes()?
+            .contains(state_hash)
+        {
             self.add_ledger(&LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()), state_hash)?;
             self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
                 DbLedgerEvent::NewLedger {
@@ -67,7 +70,11 @@ impl LedgerStore for IndexerStore {
                         },
                     )))?;
                 }
-                None => error!("Block missing from store {}", state_hash.0),
+                None => {
+                    if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
+                        error!("Block missing from store: {}", state_hash.0);
+                    }
+                }
             }
         }
         Ok(())
@@ -114,7 +121,9 @@ impl LedgerStore for IndexerStore {
                     block.previous_state_hash().0
                 );
             } else {
-                error!("Block missing from store: {}", state_hash.0);
+                if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
+                    error!("Block missing from store: {}", state_hash.0);
+                }
                 return Ok(None);
             }
         }
@@ -240,7 +249,7 @@ impl LedgerStore for IndexerStore {
         self.database.put_cf(self.ledgers_cf(), key, value)?;
 
         // add (ledger hash, epoch) index
-        self.set_epoch(&staking_ledger.ledger_hash, staking_ledger.epoch)?;
+        self.set_epoch(&staking_ledger.ledger_hash, epoch)?;
 
         // add (genesis state hash, epoch) index
         let key = format!("staking-{}-{}", genesis_state_hash.0, epoch);
@@ -257,6 +266,30 @@ impl LedgerStore for IndexerStore {
             key.as_bytes(),
             serde_json::to_vec(&aggregated_delegations)?,
         )?;
+
+        // add per epoch, balance-sorted & delegation-sorted
+        for (pk, account) in staking_ledger.staking_ledger.iter() {
+            // balance-sort
+            self.database.put_cf(
+                self.staking_ledger_balance_cf(),
+                staking_ledger_sort_key(epoch, account.balance, &pk.0),
+                serde_json::to_vec(account)?,
+            )?;
+
+            // stake-sort
+            let stake = aggregated_delegations
+                .delegations
+                .get(pk)
+                .cloned()
+                .unwrap_or_default()
+                .total_delegated
+                .unwrap_or_default();
+            self.database.put_cf(
+                self.staking_ledger_stake_cf(),
+                staking_ledger_sort_key(epoch, stake, &pk.0),
+                serde_json::to_vec(account)?,
+            )?;
+        }
 
         if is_new {
             // add new ledger event
@@ -278,6 +311,19 @@ impl LedgerStore for IndexerStore {
         }
 
         Ok(())
+    }
+
+    fn staking_ledger_balance_iterator(
+        &self,
+        mode: speedb::IteratorMode,
+    ) -> speedb::DBIterator<'_> {
+        self.database
+            .iterator_cf(self.staking_ledger_balance_cf(), mode)
+    }
+
+    fn staking_ledger_stake_iterator(&self, mode: speedb::IteratorMode) -> speedb::DBIterator<'_> {
+        self.database
+            .iterator_cf(self.staking_ledger_stake_cf(), mode)
     }
 
     fn get_delegations_epoch(
@@ -331,4 +377,26 @@ impl LedgerStore for IndexerStore {
             to_be_bytes(epoch),
         )?)
     }
+}
+
+pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8> {
+    let mut key = to_be_bytes(epoch);
+    key.append(&mut amount.to_be_bytes().to_vec());
+    key.append(&mut suffix.as_bytes().to_vec());
+    key
+}
+
+/// 4 bytes for epoch
+pub fn staking_ledger_sort_key_epoch(key: &[u8]) -> u32 {
+    from_be_bytes(key[..4].to_vec())
+}
+
+/// 8 bytes for amount (u64)
+pub fn staking_ledger_sort_key_amount(key: &[u8]) -> u32 {
+    from_be_bytes(key[4..12].to_vec())
+}
+
+/// Remaining bytes for public key
+pub fn staking_ledger_sort_key_pk(key: &[u8]) -> PublicKey {
+    PublicKey::from_bytes(&key[12..]).expect("public key from bytes")
 }
