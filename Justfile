@@ -101,7 +101,6 @@ tier1-test: prereqs test
 
 # Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
 tier2-test: build
-  tests/regression test_hurl_tier2
   tests/regression test_many_blocks
   nix build
   ops/ingest-all

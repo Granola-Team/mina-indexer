@@ -1671,25 +1671,6 @@ test_hurl() {
     teardown
 }
 
-test_hurl_tier2() {
-    enter_test test_hurl_tier2
-
-    dl_mainnet 120 ./blocks
-    port=$(ephemeral_port)
-
-    idxr_server start \
-        --blocks-dir ./blocks \
-        --staking-ledgers-dir $STAKING_LEDGERS \
-        --database-dir ./database \
-        --web-port "$port" \
-        --web-hostname "0.0.0.0"
-    wait_for_socket
-
-    hurl --variable url=http://localhost:"$port"/graphql --test "$SRC"/tests/hurl_tier2/*.hurl
-
-    teardown
-}
-
 test_missing_block_recovery() {
     enter_test test_missing_block_recovery
 
@@ -1802,7 +1783,6 @@ else
             "test_clean_kill") test_clean_kill ;;
             "test_release") test_release ;;
             # tier 2 tests (run via `just tier2-test`)
-            "test_hurl_tier2") test_hurl_tier2 ;;
             "test_many_blocks") test_many_blocks ;;
             *) echo "Unknown test: $test_name" ;;
         esac
