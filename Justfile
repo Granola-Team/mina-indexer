@@ -3,6 +3,8 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
+export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
+
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
 # Non-Nix environment needs nightly toolchain installed and requires +nightly
