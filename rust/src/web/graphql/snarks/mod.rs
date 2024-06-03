@@ -1,4 +1,3 @@
-use super::gen::BlockQueryInput;
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
@@ -8,7 +7,7 @@ use crate::{
         blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, from_be_bytes,
         to_be_bytes, IndexerStore,
     },
-    web::graphql::{db, get_block_canonicity},
+    web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
@@ -70,6 +69,14 @@ pub struct SnarkQueryInput {
     prover: Option<String>,
     block_height: Option<u32>,
     block: Option<BlockQueryInput>,
+    #[graphql(name = "blockHeight_gt")]
+    block_height_gt: Option<u32>,
+    #[graphql(name = "blockHeight_gte")]
+    block_height_gte: Option<u32>,
+    #[graphql(name = "blockHeight_lt")]
+    block_height_lt: Option<u32>,
+    #[graphql(name = "blockHeight_lte")]
+    block_height_lte: Option<u32>,
     and: Option<Vec<SnarkQueryInput>>,
     or: Option<Vec<SnarkQueryInput>>,
 }
@@ -197,6 +204,87 @@ impl SnarkQueryRoot {
             return Ok(snarks);
         }
 
+        // block height bounded query
+        if query.as_ref().map_or(false, |q| {
+            q.block_height_gt.is_some()
+                || q.block_height_gte.is_some()
+                || q.block_height_lt.is_some()
+                || q.block_height_lte.is_some()
+        }) {
+            let mut snarks: Vec<SnarkWithCanonicity> = Vec::with_capacity(limit);
+            let (min, max) = {
+                let SnarkQueryInput {
+                    block_height_gt,
+                    block_height_gte,
+                    block_height_lt,
+                    block_height_lte,
+                    ..
+                } = query.as_ref().expect("query will contain a value");
+                let min_bound = match (*block_height_gte, *block_height_gt) {
+                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+
+                let max_bound = match (*block_height_lte, *block_height_lt) {
+                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                };
+                (min_bound, max_bound)
+            };
+
+            let mut block_heights: Vec<u32> = (min..=max).collect();
+            if sort_by == SnarkSortByInput::BlockHeightDesc {
+                block_heights.reverse()
+            }
+            let mut early_exit = false;
+            for height in block_heights {
+                for block in db.get_blocks_at_height(height)? {
+                    let state_hash = block.state_hash().0;
+                    let canonical = get_block_canonicity(db, &state_hash);
+                    let snark_work = db.get_snark_work_in_block(&state_hash.clone().into())?;
+                    let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
+                        summaries
+                            .into_iter()
+                            .map(|snark| SnarkWithCanonicity {
+                                canonical,
+                                pcb: block.clone(),
+                                snark: (
+                                    snark,
+                                    state_hash.clone(),
+                                    db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                    db.get_snarks_total_count().expect("total snarks count"),
+                                )
+                                    .into(),
+                            })
+                            .collect()
+                    });
+
+                    for sw in snarks_with_canonicity {
+                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                            snarks.push(sw);
+                        }
+
+                        if snarks.len() == limit {
+                            early_exit = true;
+                            break;
+                        }
+                    }
+
+                    if early_exit {
+                        break;
+                    }
+                }
+                if early_exit {
+                    break;
+                }
+            }
+            return Ok(snarks);
+        }
+
         // general query
         let mode = match sort_by {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
@@ -310,9 +398,37 @@ impl SnarkQueryInput {
             canonical,
             prover,
             block_height,
+            block_height_gt,
+            block_height_lt,
+            block_height_gte,
+            block_height_lte,
             and,
             or,
         } = self;
+
+        let blockchain_length = snark.pcb.blockchain_length();
+
+        // block_height_gt(e) & block_height_lt(e)
+        if let Some(height) = block_height_gt {
+            if blockchain_length <= *height {
+                return false;
+            }
+        }
+        if let Some(height) = block_height_gte {
+            if blockchain_length < *height {
+                return false;
+            }
+        }
+        if let Some(height) = block_height_lt {
+            if blockchain_length >= *height {
+                return false;
+            }
+        }
+        if let Some(height) = block_height_lte {
+            if blockchain_length > *height {
+                return false;
+            }
+        }
 
         if let Some(block_query_input) = block {
             if let Some(state_hash) = &block_query_input.state_hash {

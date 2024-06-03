@@ -154,5 +154,25 @@ jsonpath "$.data.snarks[63].blockHeight" == 111
 
 duration < 500
 
+#
+# SNARKs canonical block height lte
+#
+
+POST {{url}}
+```graphql
+{
+  snarks(query: {canonical: true, blockHeight_lte: 120}, limit: 1000) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.snarks" count == 64
+
+duration < 500
+
 # TODO global slot query
 # TODO block height/global slot/date time bounded query
