@@ -67,14 +67,14 @@ lint: && audit disallow-unused-cargo-deps
 
 # Build OCI images.
 build-image:
-  #REV="$(git rev-parse --short=8 HEAD)"
-  #IMAGE=mina-indexer:"$REV"
-  #docker --version
-  #nix build .#dockerImage
-  #docker load < ./result
-  #docker run --rm -it "$IMAGE" \
-  #  mina-indexer server start --help
-  #docker image rm "$IMAGE"
+  REV="$(git rev-parse --short=8 HEAD)"
+  IMAGE=mina-indexer:"$REV"
+  docker --version
+  nix build .#dockerImage
+  docker load < ./result
+  docker run --rm -it "$IMAGE" \
+    mina-indexer server start --help
+  docker image rm "$IMAGE"
 
 # Start a server in the current directory.
 start-server: build
@@ -102,6 +102,5 @@ tier1-test: prereqs test
 tier2-test: build
   tests/regression test_hurl_tier2
   tests/regression test_many_blocks
-  # TODO: re-enable once Nix build is working
-  # nix build
+  nix build
   ops/ingest-all
