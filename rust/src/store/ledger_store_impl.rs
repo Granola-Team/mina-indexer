@@ -353,7 +353,7 @@ impl LedgerStore for IndexerStore {
 
         Ok(self
             .database
-            .get_cf(self.account_balance_cf(), pk.0.as_bytes())?
+            .get_pinned_cf(self.account_balance_cf(), pk.0.as_bytes())?
             .map(|bytes| {
                 let mut be_bytes = [0; 8];
                 be_bytes.copy_from_slice(&bytes[..8]);
@@ -365,8 +365,8 @@ impl LedgerStore for IndexerStore {
         trace!("Getting epoch for ledger {}", ledger_hash.0);
         Ok(self
             .database
-            .get_cf(self.staking_ledger_epoch_cf(), ledger_hash.0.as_bytes())?
-            .map(from_be_bytes))
+            .get_pinned_cf(self.staking_ledger_epoch_cf(), ledger_hash.0.as_bytes())?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn set_epoch(&self, ledger_hash: &LedgerHash, epoch: u32) -> anyhow::Result<()> {

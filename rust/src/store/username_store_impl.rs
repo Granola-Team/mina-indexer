@@ -10,8 +10,8 @@ impl UsernameStore for IndexerStore {
         trace!("Getting username for {pk}");
         Ok(self
             .database
-            .get_cf(self.username_cf(), pk.0.as_bytes())?
-            .map(|bytes| String::from_utf8(bytes).expect("username from bytes")))
+            .get_pinned_cf(self.username_cf(), pk.0.as_bytes())?
+            .map(|bytes| String::from_utf8(bytes.to_vec()).expect("username from bytes")))
     }
 
     fn set_username(

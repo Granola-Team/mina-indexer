@@ -110,7 +110,7 @@ impl SnarkStore for IndexerStore {
                 for (index, snark) in block_pk_snarks.iter().enumerate() {
                     if self
                         .database
-                        .get_cf(
+                        .get_pinned_cf(
                             self.snark_work_prover_cf(),
                             snark_prover_prefix_key(&pk, global_slot, index as u32),
                         )?
@@ -278,8 +278,8 @@ impl SnarkStore for IndexerStore {
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
-            .get_cf(self.snarks_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.snarks_epoch_cf(), to_be_bytes(epoch))?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -314,8 +314,8 @@ impl SnarkStore for IndexerStore {
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
         Ok(self
             .database
-            .get_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, &pk.0))?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, &pk.0))?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()> {
@@ -333,8 +333,8 @@ impl SnarkStore for IndexerStore {
         trace!("Getting pk total SNARKs count {pk}");
         Ok(self
             .database
-            .get_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
+            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {

@@ -87,7 +87,7 @@ impl AccountStore for IndexerStore {
         trace!("Getting block balance updates for {}", state_hash.0);
         Ok(self
             .database
-            .get_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
+            .get_pinned_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
             .map(|bytes| serde_json::from_slice(&bytes).expect("balance updates")))
     }
 
