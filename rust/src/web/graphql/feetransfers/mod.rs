@@ -1,5 +1,5 @@
 use super::{
-    blocks::{Block, BlockWithCanonicity},
+    blocks::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,
     get_block_canonicity,
 };
@@ -58,17 +58,14 @@ impl FeetransferWithMeta {
         &self.feetransfer
     }
 
-    async fn block_state_hash<'ctx>(
-        &self,
-        ctx: &Context<'ctx>,
-    ) -> Result<Option<BlockWithCanonicity>> {
+    async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
-        Ok(self.block.clone().map(|block| BlockWithCanonicity {
-            block: Block::new(
+        Ok(self.block.clone().map(|block| Block {
+            block: BlockWithoutCanonicity::new(
                 block,
                 self.canonical,
                 epoch_num_user_commands,
