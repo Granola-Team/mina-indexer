@@ -240,8 +240,8 @@ impl SnarkQueryRoot {
             if sort_by == SnarkSortByInput::BlockHeightDesc {
                 block_heights.reverse()
             }
-            let mut early_exit = false;
-            for height in block_heights {
+
+            'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     let state_hash = block.state_hash().0;
                     let canonical = get_block_canonicity(db, &state_hash);
@@ -266,20 +266,12 @@ impl SnarkQueryRoot {
                     for sw in snarks_with_canonicity {
                         if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                             snarks.push(sw);
-                        }
 
-                        if snarks.len() == limit {
-                            early_exit = true;
-                            break;
+                            if snarks.len() == limit {
+                                break 'outer;
+                            }
                         }
                     }
-
-                    if early_exit {
-                        break;
-                    }
-                }
-                if early_exit {
-                    break;
                 }
             }
             return Ok(snarks);
@@ -290,7 +282,8 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
-        for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
+
+        'outer: for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
             let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
             let block = db
                 .get_block(&state_hash.clone().into())?
@@ -313,22 +306,17 @@ impl SnarkQueryRoot {
                     })
                     .collect()
             });
-            let mut early_exit = false;
+
             for sw in snarks_with_canonicity {
                 if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                     snarks.push(sw);
-                }
 
-                if snarks.len() == limit {
-                    early_exit = true;
-                    break;
+                    if snarks.len() == limit {
+                        break 'outer;
+                    }
                 }
-            }
-            if early_exit {
-                break;
             }
         }
-
         Ok(snarks)
     }
 }

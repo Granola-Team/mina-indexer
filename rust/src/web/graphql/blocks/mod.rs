@@ -1,6 +1,6 @@
 use super::{
     db, gen::BlockProtocolStateConsensusStateQueryInput, get_block_canonicity,
-    millis_to_iso_date_string, transactions::Transaction, MAINNET_COINBASE_REWARD, PK,
+    millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD, PK,
 };
 use crate::{
     block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
@@ -17,7 +17,8 @@ use crate::{
     },
     snark_work::SnarkWorkSummary,
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, to_be_bytes,
+        IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -33,7 +34,7 @@ impl BlocksQueryRoot {
         &self,
         ctx: &Context<'ctx>,
         query: Option<BlockQueryInput>,
-    ) -> Result<Option<BlockWithCanonicity>> {
+    ) -> Result<Option<Block>> {
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
@@ -49,11 +50,11 @@ impl BlocksQueryRoot {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| {
                     let canonical = get_block_canonicity(db, &pcb.state_hash().0);
-                    BlockWithCanonicity {
+                    Block {
                         canonical,
                         epoch_num_blocks,
                         total_num_blocks,
-                        block: Block::new(
+                        block: BlockWithoutCanonicity::new(
                             pcb,
                             canonical,
                             epoch_num_user_commands,
@@ -75,11 +76,11 @@ impl BlocksQueryRoot {
                 None => return Ok(None),
             };
             let canonical = get_block_canonicity(db, &state_hash);
-            let block = BlockWithCanonicity {
+            let block = Block {
                 canonical,
                 epoch_num_blocks,
                 total_num_blocks,
-                block: Block::new(
+                block: BlockWithoutCanonicity::new(
                     pcb,
                     canonical,
                     epoch_num_user_commands,
@@ -101,11 +102,11 @@ impl BlocksQueryRoot {
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
             let canonical = get_block_canonicity(db, &state_hash);
-            let block = BlockWithCanonicity {
+            let block = Block {
                 canonical,
                 epoch_num_blocks,
                 total_num_blocks,
-                block: Block::new(
+                block: BlockWithoutCanonicity::new(
                     pcb,
                     canonical,
                     epoch_num_user_commands,
@@ -127,7 +128,7 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
-    ) -> Result<Vec<BlockWithCanonicity>> {
+    ) -> Result<Vec<Block>> {
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
@@ -138,7 +139,7 @@ impl BlocksQueryRoot {
             .get_user_commands_total_count()
             .expect("total user command count");
 
-        let mut blocks: Vec<BlockWithCanonicity> = Vec::with_capacity(limit);
+        let mut blocks: Vec<Block> = Vec::with_capacity(limit);
         let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
 
         // state hash query
@@ -162,7 +163,7 @@ impl BlocksQueryRoot {
 
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
-            let mut blocks: Vec<BlockWithCanonicity> = db
+            let mut blocks: Vec<Block> = db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
                 .filter_map(|b| {
@@ -190,7 +191,7 @@ impl BlocksQueryRoot {
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
         {
-            let mut blocks: Vec<BlockWithCanonicity> = db
+            let mut blocks: Vec<Block> = db
                 .get_blocks_at_slot(global_slot_since_genesis as u32)?
                 .into_iter()
                 .filter_map(|b| {
@@ -217,7 +218,7 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
-            let mut blocks: Vec<BlockWithCanonicity> = db
+            let mut blocks: Vec<Block> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
                 .filter_map(|b| {
@@ -244,7 +245,7 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
-            let mut blocks: Vec<BlockWithCanonicity> = db
+            let mut blocks: Vec<Block> = db
                 .get_blocks_at_public_key(&creator_account.into())?
                 .into_iter()
                 .filter_map(|b| {
@@ -387,17 +388,22 @@ impl BlocksQueryRoot {
         }
 
         // handle general search with global slot iterator
+        let start = to_be_bytes(u32::MAX);
         let mode = match sort_by {
-            BlockSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
-            BlockSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
+            BlockSortByInput::BlockHeightAsc => {
+                speedb::IteratorMode::From(&[0], speedb::Direction::Forward)
+            }
+            BlockSortByInput::BlockHeightDesc => {
+                speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+            }
         };
-        for entry in blocks_global_slot_idx_iterator(db, mode).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
+        for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
             let canonical = get_block_canonicity(db, &state_hash);
-            let block = BlockWithCanonicity::from_precomputed(
+            let block = Block::from_precomputed(
                 pcb,
                 canonical,
                 epoch_num_blocks,
@@ -408,13 +414,12 @@ impl BlocksQueryRoot {
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
-            }
 
-            if blocks.len() == limit {
-                break;
+                if blocks.len() == limit {
+                    break;
+                }
             }
         }
-
         Ok(blocks)
     }
 }
@@ -434,9 +439,9 @@ fn precomputed_matches_query(
     total_num_blocks: u32,
     epoch_num_user_commands: u32,
     total_num_user_commands: u32,
-) -> Option<BlockWithCanonicity> {
+) -> Option<Block> {
     let canonical = get_block_canonicity(db, &block.state_hash().0);
-    let block_with_canonicity = BlockWithCanonicity::from_precomputed(
+    let block_with_canonicity = Block::from_precomputed(
         block,
         canonical,
         epoch_num_blocks,
@@ -464,7 +469,7 @@ pub enum BlockSortByInput {
 }
 
 #[derive(SimpleObject)]
-pub struct BlockWithCanonicity {
+pub struct Block {
     /// Value canonical
     pub canonical: bool,
 
@@ -478,11 +483,11 @@ pub struct BlockWithCanonicity {
 
     /// Value block
     #[graphql(flatten)]
-    pub block: Block,
+    pub block: BlockWithoutCanonicity,
 }
 
 #[derive(SimpleObject)]
-pub struct Block {
+pub struct BlockWithoutCanonicity {
     /// Value state_hash
     state_hash: String,
 
@@ -557,7 +562,7 @@ struct Transactions {
     fee_transfer: Vec<BlockFeetransfer>,
 
     /// Value user commands
-    user_commands: Vec<Transaction>,
+    user_commands: Vec<TransactionWithoutBlock>,
 }
 
 #[derive(SimpleObject)]
@@ -688,7 +693,7 @@ struct ProtocolState {
     consensus_state: ConsensusState,
 }
 
-impl Block {
+impl BlockWithoutCanonicity {
     pub fn new(
         block: PrecomputedBlock,
         canonical: bool,
@@ -835,17 +840,18 @@ impl Block {
             .map(|ft| ft.into())
             .collect();
 
-        let user_commands: Vec<Transaction> = SignedCommandWithData::from_precomputed(&block)
-            .into_iter()
-            .map(|cmd| {
-                Transaction::new(
-                    cmd,
-                    canonical,
-                    epoch_num_user_commands,
-                    total_num_user_commands,
-                )
-            })
-            .collect();
+        let user_commands: Vec<TransactionWithoutBlock> =
+            SignedCommandWithData::from_precomputed(&block)
+                .into_iter()
+                .map(|cmd| {
+                    TransactionWithoutBlock::new(
+                        cmd,
+                        canonical,
+                        epoch_num_user_commands,
+                        total_num_user_commands,
+                    )
+                })
+                .collect();
 
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(&block)
             .into_iter()
@@ -931,7 +937,7 @@ fn check_option<T: PartialEq>(matches: &mut bool, opt: &Option<T>, block_value: 
 }
 
 impl BlockQueryInput {
-    pub fn matches(&self, block: &BlockWithCanonicity) -> bool {
+    pub fn matches(&self, block: &Block) -> bool {
         let mut matches = true;
         let Self {
             creator_account,
@@ -1041,7 +1047,7 @@ impl BlockQueryInput {
     }
 }
 
-impl BlockWithCanonicity {
+impl Block {
     pub fn from_precomputed(
         block: PrecomputedBlock,
         canonical: bool,
@@ -1054,7 +1060,7 @@ impl BlockWithCanonicity {
             canonical,
             epoch_num_blocks,
             total_num_blocks,
-            block: Block::new(
+            block: BlockWithoutCanonicity::new(
                 block,
                 canonical,
                 epoch_num_user_commands,

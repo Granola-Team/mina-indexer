@@ -31,7 +31,7 @@ impl TransactionsQueryRoot {
         &self,
         ctx: &Context<'_>,
         query: TransactionQueryInput,
-    ) -> Result<Option<TransactionWithBlock>> {
+    ) -> Result<Option<Transaction>> {
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
@@ -39,12 +39,7 @@ impl TransactionsQueryRoot {
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
                 return Ok(db.get_user_command_by_hash(&hash)?.map(|cmd| {
-                    TransactionWithBlock::new(
-                        cmd,
-                        db,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 }));
             }
         }
@@ -58,24 +53,19 @@ impl TransactionsQueryRoot {
         query: TransactionQueryInput,
         #[graphql(default = 100)] limit: usize,
         sort_by: TransactionSortByInput,
-    ) -> Result<Vec<TransactionWithBlock>> {
+    ) -> Result<Vec<Transaction>> {
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
         // block height query
         if let Some(block_height) = query.block_height {
-            let mut transactions: Vec<TransactionWithBlock> = db
+            let mut transactions: Vec<Transaction> = db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
                 .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
                 .map(|cmd| {
-                    TransactionWithBlock::new(
-                        cmd,
-                        db,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 })
                 .filter(|txn| query.matches(txn))
                 .collect();
@@ -119,12 +109,12 @@ impl TransactionsQueryRoot {
             if sort_by == TransactionSortByInput::BlockHeightDesc {
                 block_heights.reverse();
             }
-            let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
+            let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
 
             'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
                     for cmd in SignedCommandWithData::from_precomputed(&block) {
-                        let txn = TransactionWithBlock::new(
+                        let txn = Transaction::new(
                             cmd,
                             db,
                             epoch_num_user_commands,
@@ -145,7 +135,7 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
         // iterator mode & direction determined by desired sorting
-        let mut transactions: Vec<TransactionWithBlock> = Vec::with_capacity(limit);
+        let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
         let (start_slot, direction) = match sort_by {
             TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
                 (0, Direction::Forward)
@@ -178,12 +168,8 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_user_command_by_hash(&txn_hash)?
                     .expect("command at txn hash");
-                let txn = TransactionWithBlock::new(
-                    cmd,
-                    db,
-                    epoch_num_user_commands,
-                    total_num_user_commands,
-                );
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
 
                 // include matching txns
                 if query.matches(&txn) {
@@ -215,12 +201,7 @@ impl TransactionsQueryRoot {
 
             // Only add transactions that satisfy the input query
             let cmd = user_commands_iterator_signed_command(&entry.1)?;
-            let txn = TransactionWithBlock::new(
-                cmd,
-                db,
-                epoch_num_user_commands,
-                total_num_user_commands,
-            );
+            let txn = Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
 
             if query.matches(&txn) {
                 transactions.push(txn);
@@ -244,17 +225,17 @@ fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
     }
 }
 
-impl TransactionWithBlock {
+impl Transaction {
     fn new(
         cmd: SignedCommandWithData,
         db: &Arc<IndexerStore>,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
-    ) -> TransactionWithBlock {
+    ) -> Transaction {
         let block_state_hash = cmd.state_hash.to_owned();
         let block_date_time = date_time_to_scalar(cmd.date_time as i64);
-        TransactionWithBlock {
-            transaction: Transaction::new(
+        Transaction {
+            transaction: TransactionWithoutBlock::new(
                 cmd,
                 get_block_canonicity(db, &block_state_hash.0),
                 epoch_num_user_commands,
@@ -275,7 +256,7 @@ pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
     Ok(encoded_memo)
 }
 
-impl Transaction {
+impl TransactionWithoutBlock {
     pub fn new(
         cmd: SignedCommandWithData,
         canonical: bool,
@@ -342,7 +323,7 @@ impl Transaction {
 }
 
 impl TransactionQueryInput {
-    fn matches(&self, transaction_with_block: &TransactionWithBlock) -> bool {
+    fn matches(&self, transaction_with_block: &Transaction) -> bool {
         let mut matches = true;
         let transaction = transaction_with_block.transaction.clone();
         let TransactionQueryInput {
@@ -523,7 +504,7 @@ pub enum TransactionSortByInput {
 }
 
 #[derive(Clone, Debug, SimpleObject)]
-pub struct Transaction {
+pub struct TransactionWithoutBlock {
     amount: u64,
     block_height: u32,
     canonical: bool,
@@ -547,10 +528,11 @@ pub struct Transaction {
 }
 
 #[derive(Clone, Debug, SimpleObject)]
-pub struct TransactionWithBlock {
+pub struct Transaction {
     block: TransactionBlock,
+
     #[graphql(flatten)]
-    transaction: Transaction,
+    transaction: TransactionWithoutBlock,
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject)]

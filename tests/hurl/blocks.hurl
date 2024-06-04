@@ -573,4 +573,51 @@ jsonpath "$.data.blocks[0].total_num_blocks" == 204
 
 duration < 1000
 
+#
+# TODO
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(limit: 10, query: {canonical: false}) {
+    stateHash
+    blockHeight
+    canonical
+    
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 10
+
+# heights
+jsonpath "$.data.blocks[0].blockHeight" == 120
+jsonpath "$.data.blocks[1].blockHeight" == 118
+jsonpath "$.data.blocks[2].blockHeight" == 117
+jsonpath "$.data.blocks[3].blockHeight" == 117
+jsonpath "$.data.blocks[4].blockHeight" == 115
+jsonpath "$.data.blocks[5].blockHeight" == 115
+jsonpath "$.data.blocks[6].blockHeight" == 113
+jsonpath "$.data.blocks[7].blockHeight" == 113
+jsonpath "$.data.blocks[8].blockHeight" == 112
+jsonpath "$.data.blocks[9].blockHeight" == 111
+
+# canonicity
+jsonpath "$.data.blocks[0].canonical" == false
+jsonpath "$.data.blocks[1].canonical" == false
+jsonpath "$.data.blocks[2].canonical" == false
+jsonpath "$.data.blocks[3].canonical" == false
+jsonpath "$.data.blocks[4].canonical" == false
+jsonpath "$.data.blocks[5].canonical" == false
+jsonpath "$.data.blocks[6].canonical" == false
+jsonpath "$.data.blocks[7].canonical" == false
+jsonpath "$.data.blocks[8].canonical" == false
+jsonpath "$.data.blocks[9].canonical" == false
+
+duration < 1000
+
 # TODO date time bounded query
