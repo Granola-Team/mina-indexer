@@ -7,7 +7,11 @@ use crate::{
         store::LedgerStore,
     },
     snark_work::store::SnarkStore,
-    store::{ledger_store_impl::staking_ledger_sort_key, IndexerStore},
+    store::{
+        ledger_store_impl::{staking_ledger_sort_key, staking_ledger_sort_key_epoch},
+        username::UsernameStore,
+        IndexerStore,
+    },
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -121,7 +125,11 @@ impl StakeQueryRoot {
             ),
         };
 
-        for (_, value) in iter.flatten() {
+        for (key, value) in iter.flatten() {
+            let key_epoch = staking_ledger_sort_key_epoch(&key);
+            if key_epoch != epoch {
+                break;
+            }
             let account: StakingAccount = serde_json::from_slice(&value)?;
             if StakeQueryInput::matches_staking_account(
                 query.as_ref(),
@@ -301,8 +309,34 @@ impl StakesDelegationTotals {
     }
 }
 
-impl From<(StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)> for StakesLedgerAccount {
-    fn from(acc: (StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)) -> Self {
+impl
+    From<(
+        StakingAccount,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        Option<String>,
+    )> for StakesLedgerAccount
+{
+    fn from(
+        acc: (
+            StakingAccount,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            Option<String>,
+        ),
+    ) -> Self {
         let balance_nanomina = acc.0.balance;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
@@ -326,7 +360,6 @@ impl From<(StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)> for StakesLe
             receipt_chain_hash,
             voting_for,
             balance_nanomina,
-            username: None,
             pk_epoch_num_blocks: acc.1,
             pk_total_num_blocks: acc.2,
             pk_epoch_num_snarks: acc.3,
@@ -335,6 +368,7 @@ impl From<(StakingAccount, u32, u32, u32, u32, u32, u32, u32, u32)> for StakesLe
             pk_total_num_user_commands: acc.6,
             pk_epoch_num_internal_commands: acc.7,
             pk_total_num_internal_commands: acc.8,
+            username: acc.9,
         }
     }
 }
@@ -433,6 +467,8 @@ impl StakesLedgerAccountWithMeta {
             .get_internal_commands_pk_total_count(&pk)
             .expect("pk total num internal commands");
 
+        let username = db.get_username(&pk).unwrap_or(Some("Unknown".to_string()));
+
         Self {
             epoch,
             ledger_hash,
@@ -446,6 +482,7 @@ impl StakesLedgerAccountWithMeta {
                 pk_total_num_user_commands,
                 pk_epoch_num_internal_commands,
                 pk_total_num_internal_commands,
+                username,
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,

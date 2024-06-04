@@ -270,3 +270,24 @@ jsonpath "$.data.stakes[3].delegationTotals.totalStakePercentage" == "3.50"
 jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
 
 duration < 2000
+
+# Test for public key uniqueness per epoch
+POST {{url}}
+```graphql
+{
+  stakes(query: {epoch: 42, public_key: "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"}) {
+    public_key
+    balance
+    nonce
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.stakes" count == 1
+jsonpath "$.data.stakes[0].public_key" == "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"
+jsonpath "$.data.stakes[0].balance" == 92.929966438
+jsonpath "$.data.stakes[0].nonce" == 4
+
+duration < 2000
