@@ -17,7 +17,8 @@ use crate::{
     },
     snark_work::SnarkWorkSummary,
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, to_be_bytes,
+        IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -387,12 +388,17 @@ impl BlocksQueryRoot {
         }
 
         // handle general search with global slot iterator
+        let start = to_be_bytes(u32::MAX);
         let mode = match sort_by {
-            BlockSortByInput::BlockHeightAsc => speedb::IteratorMode::Start,
-            BlockSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
+            BlockSortByInput::BlockHeightAsc => {
+                speedb::IteratorMode::From(&[0], speedb::Direction::Forward)
+            }
+            BlockSortByInput::BlockHeightDesc => {
+                speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+            }
         };
-        for entry in blocks_global_slot_idx_iterator(db, mode).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
+        for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
@@ -408,13 +414,12 @@ impl BlocksQueryRoot {
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
-            }
 
-            if blocks.len() == limit {
-                break;
+                if blocks.len() == limit {
+                    break;
+                }
             }
         }
-
         Ok(blocks)
     }
 }
