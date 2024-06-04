@@ -1,0 +1,35 @@
+#! /bin/sh
+
+# Uploads Mina staking ledger logs to the Granola bucket.
+# $1 = source directory
+
+set -x
+set -eu
+
+RESULT='Failure.'
+exit_handler() {
+  echo "${RESULT} Exiting." >&2
+}
+trap exit_handler EXIT
+
+MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+
+# Wrap the command to access the Linode bucket (rclone).
+#
+rc() {
+  time \
+    rclone \
+      -v -v \
+      --config "$MY_DIR"/rclone.conf \
+      --buffer-size 128Mi \
+      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
+      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
+      "$@"
+}
+
+# Verify that we can connect.
+rc lsd linode:
+
+# Perform the upload.
+rc sync --metadata "$1" linode:granola-mina-staking-ledgers
+RESULT='Staking ledgers uploaded.'
