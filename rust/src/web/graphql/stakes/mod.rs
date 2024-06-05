@@ -467,7 +467,10 @@ impl StakesLedgerAccountWithMeta {
             .get_internal_commands_pk_total_count(&pk)
             .expect("pk total num internal commands");
 
-        let username = db.get_username(&pk).unwrap_or(Some("Unknown".to_string()));
+        let username = match db.get_username(&pk) {
+            Ok(None) | Err(_) => Some("Unknown".to_string()),
+            Ok(username) => username,
+        };
 
         Self {
             epoch,
