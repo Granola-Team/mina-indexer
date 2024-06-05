@@ -2,7 +2,7 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::parser::BlockParser,
     constants::*,
-    ledger::genesis::GenesisRoot,
+    ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
     state::IndexerState,
     store::{username::UsernameStore, IndexerStore},
@@ -14,8 +14,9 @@ fn set_usernames() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("usernames-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
+    let genesis_ledger =
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
+            .unwrap();
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         IndexerVersion::new_testing().version,
@@ -23,7 +24,7 @@ fn set_usernames() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
     let mut state = IndexerState::new(
-        genesis_root.clone().into(),
+        genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         store.clone(),
         MAINNET_TRANSITION_FRONTIER_K,

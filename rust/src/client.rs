@@ -19,44 +19,59 @@ pub enum ClientCli {
     /// Query accounts
     #[clap(subcommand)]
     Accounts(Accounts),
+
     /// Query blocks
     #[clap(subcommand)]
     Blocks(Blocks),
+
     /// Query the chain
     #[clap(subcommand)]
     Chain(Chain),
+
     /// Create a checkpoint of the indexer store
     #[clap(subcommand)]
     Checkpoints(Checkpoints),
+
     /// Query ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),
+
     /// Query staking ledgers
     #[command(subcommand)]
     StakingLedgers(StakingLedgers),
+
     #[clap(hide = true)]
     Shutdown,
+
     /// Query SNARKs
     #[clap(subcommand)]
     Snarks(Snarks),
+
     /// Show a summary of the state
     Summary {
         /// Path to write the summary [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Verbose output should be redirected to a file
         #[arg(long, default_value_t = false)]
         verbose: bool,
+
         /// Output JSON data
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+
     /// Query transactions
     #[clap(subcommand)]
     Transactions(Transactions),
+
     /// Query internal commands
     #[clap(subcommand)]
     InternalCommands(InternalCommands),
+
+    /// Query indexer version info
+    Version,
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]
@@ -79,9 +94,11 @@ pub enum Blocks {
         /// Retrieve the block with given state hash
         #[arg(long)]
         state_hash: String,
+
         /// Path to write the block [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
@@ -91,54 +108,67 @@ pub enum Blocks {
         /// Path to write the best tip [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query blocks by global slot number
     Slot {
         /// Retrieve the blocks in given global slot
         #[arg(long)]
         slot: String,
+
         /// Path to write the block [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query blocks by blockchain length
     Height {
         /// Retrieve the blocks with given blockchain length
         #[arg(long)]
         height: u32,
+
         /// Path to write the block [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query blocks by public key
     PublicKey {
         /// Retrieve the blocks associated with given public key
         #[arg(long)]
         public_key: String,
+
         /// Path to write the block [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query a block's children
     Children {
         /// Retrieve the children of the block with given state hash
         #[arg(long)]
         state_hash: String,
+
         /// Path to write the children [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
@@ -153,15 +183,19 @@ pub enum Chain {
         /// Number of blocks to include in this suffix
         #[arg(long, default_value_t = 10)]
         num: u32,
+
         /// Path to write the best chain [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Constrain chain query with a start state hash
         #[arg(long, default_value_t = MAINNET_GENESIS_HASH.into())]
         start_state_hash: String,
+
         /// Constrain chain query with an end state hash
         #[arg(long)]
         end_state_hash: Option<String>,
+
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
@@ -188,20 +222,24 @@ pub enum Ledgers {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+
     /// Query ledger by hash (state or ledger)
     Hash {
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// State or ledger hash corresponding to the ledger
         #[arg(long)]
         hash: String,
     },
+
     /// Query ledger by height
     Height {
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Block height of the ledger
         #[arg(long)]
         height: u32,
@@ -216,42 +254,52 @@ pub enum StakingLedgers {
         /// Ledger hash corresponding to the staking ledger
         #[arg(long)]
         hash: String,
+
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
     },
+
     /// Query staking ledger at epoch
     Epoch {
         /// Epoch number of the staking ledger
         #[arg(long)]
         epoch: u32,
+
         /// Genesis state hash
         #[arg(long, default_value = MAINNET_GENESIS_HASH)]
         genesis_state_hash: String,
+
         /// Path to write the staking ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
     },
+
     /// Query staking ledger delegations by epoch
     Delegations {
         /// Epoch to aggregate total delegations
         #[arg(long)]
         epoch: u32,
+
         /// Genesis state hash
         #[arg(long, default_value = MAINNET_GENESIS_HASH)]
         genesis_state_hash: String,
+
         /// Path to write the aggregate delegations
         #[arg(long)]
         path: Option<PathBuf>,
     },
+
     /// Query staking ledger by public key
     PublicKey {
         /// Epoch to aggregate staking delegations
         #[arg(long)]
         epoch: u32,
+
         /// Genesis state hash
         #[arg(long, default_value = MAINNET_GENESIS_HASH)]
         genesis_state_hash: String,
+
         /// Account to aggregate staking delegations
         #[arg(long)]
         public_key: String,
@@ -266,19 +314,23 @@ pub enum Snarks {
         /// Path to write the snark work [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// State hash of block to query
         #[arg(long)]
         state_hash: String,
     },
+
     /// Query SNARK work by prover public key
     PublicKey {
         /// Path to write the snark work [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// State hash of block to query
         #[arg(long)]
         public_key: String,
     },
+
     Top {
         /// Number of SNARK rovers to include in list
         #[arg(long, default_value_t = 10)]
@@ -294,36 +346,45 @@ pub enum Transactions {
         /// Hash of the transaction
         #[arg(long)]
         hash: String,
+
         /// Verbose transaction output
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query transactions by public key
     PublicKey {
         /// Path to write the transactions [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Retrieve public key's transaction info
         #[arg(long)]
         public_key: String,
+
         /// Bound the fetched transactions by a start state hash
         #[arg(long, default_value_t = MAINNET_GENESIS_HASH.into())]
         start_state_hash: String,
+
         /// Bound the fetched transactions by an end state hash
         #[arg(long)]
         end_state_hash: Option<String>,
+
         /// Verbose transaction output
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query transactions by state hash
     StateHash {
         /// Path to write the transactions [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// State hash of the containing block
         #[arg(long)]
         state_hash: String,
+
         /// Verbose transaction output
         #[arg(long, default_value_t = false)]
         verbose: bool,
@@ -338,15 +399,18 @@ pub enum InternalCommands {
         /// Path to write the internal commands [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// State hash of the containing block
         #[arg(long)]
         state_hash: String,
     },
+
     /// Query internal commands by block
     PublicKey {
         /// Path to write the internal commands [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
         /// Retrieve public key's internal command info
         #[arg(long)]
         public_key: String,

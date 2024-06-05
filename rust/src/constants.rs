@@ -3,6 +3,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 
 // version
 
+pub const GIT_COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("GIT_COMMIT_HASH"));
 
 // indexer constants

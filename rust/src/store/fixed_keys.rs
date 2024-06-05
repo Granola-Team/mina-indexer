@@ -7,6 +7,9 @@ pub trait FixedKeys {
     const KNOWN_GENESIS_PREV_STATE_HASHES_KEY: &'static [u8] =
         "genesis_prev_state_hashes".as_bytes();
 
+    // version info
+    const INDEXER_STORE_VERSION_KEY: &'static [u8] = "indexer_store_version".as_bytes();
+
     // indexed totals
     const TOTAL_NUM_BLOCKS_KEY: &'static [u8] = "total_num_blocks".as_bytes();
     const TOTAL_NUM_SNARKS_KEY: &'static [u8] = "total_num_snarks".as_bytes();

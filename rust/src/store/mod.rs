@@ -1,21 +1,26 @@
 //! This module contains the implementations of all store traits for the
 //! [IndexerStore]
 
+// traits
 pub mod account;
+pub mod column_families;
+pub mod fixed_keys;
+pub mod username;
+pub mod version;
+
+// impls
 pub mod account_store_impl;
 pub mod block_store_impl;
 pub mod canonicity_store_impl;
 pub mod chain_store_impl;
-pub mod column_families;
 pub mod column_families_impl;
 pub mod event_store_impl;
-pub mod fixed_keys;
 pub mod internal_command_store_impl;
 pub mod ledger_store_impl;
 pub mod snark_store_impl;
 pub mod user_command_store_impl;
-pub mod username;
 pub mod username_store_impl;
+pub mod version_store_impl;
 
 use self::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
@@ -29,6 +34,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use version::{IndexerStoreVersion, VersionStore};
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -39,6 +45,7 @@ pub struct IndexerStore {
 
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
+    /// Change [IndexerStoreVersion] if needed!
     const COLUMN_FAMILIES: [&'static str; 47] = [
         "account-balance",
         "account-balance-sort",
@@ -107,7 +114,7 @@ impl IndexerStore {
             .iter()
             .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
             .collect();
-        Ok(Self {
+        let primary = Self {
             is_primary: true,
             db_path: path.into(),
             database: speedb::DBWithThreadMode::open_cf_descriptors(
@@ -115,7 +122,15 @@ impl IndexerStore {
                 path,
                 column_families,
             )?,
-        })
+        };
+
+        // set db version
+        primary.set_db_version_with_git_commit(
+            IndexerStoreVersion::MAJOR,
+            IndexerStoreVersion::MINOR,
+            IndexerStoreVersion::PATCH,
+        )?;
+        Ok(primary)
     }
 
     pub fn create_checkpoint(&self, path: &Path) -> anyhow::Result<()> {

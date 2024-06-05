@@ -117,6 +117,9 @@ impl From<GenesisLedger> for Ledger {
 }
 
 impl GenesisLedger {
+    pub const MAINNET_V1_GENESIS_LEDGER_CONTENTS: &'static str =
+        include_str!("../../data/genesis_ledgers/mainnet.json");
+
     /// This is the only way to construct a genesis ledger
     pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
         let mut accounts = HashMap::new();

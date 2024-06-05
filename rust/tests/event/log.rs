@@ -8,7 +8,7 @@ use mina_indexer::{
     canonicity::store::CanonicityStore,
     constants::*,
     event::{store::EventStore, witness_tree::*},
-    ledger::genesis::GenesisRoot,
+    ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
@@ -40,18 +40,19 @@ async fn test() {
     let indexer_store0 = Arc::new(IndexerStore::new(store_dir0.path()).unwrap());
     let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path()).unwrap());
 
-    let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents).unwrap();
+    let genesis_ledger =
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
+            .unwrap();
 
     let mut state0 = IndexerState::new(
-        genesis_root.clone().into(),
+        genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store0.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
     let mut state1 = IndexerState::new(
-        genesis_root.into(),
+        genesis_ledger.into(),
         IndexerVersion::new_testing(),
         indexer_store1.clone(),
         MAINNET_TRANSITION_FRONTIER_K,
