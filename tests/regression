@@ -298,6 +298,9 @@ test_indexer_cli_reports() {
 
     idxr snarks state-hash --help 2>&1 |
         grep -iq "Usage: mina-indexer snarks state-hash"
+
+    idxr version --help 2>&1 |
+        grep -iq "Usage: mina-indexer version"
 }
 
 # Indexer server starts up without any precomputed blocks
