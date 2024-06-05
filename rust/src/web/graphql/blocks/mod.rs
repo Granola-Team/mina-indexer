@@ -737,7 +737,7 @@ impl BlockWithoutCanonicity {
         let last_vrf_output = block.last_vrf_output();
         let min_window_density = consensus_state.min_window_density.t.t;
         let slot_since_genesis = consensus_state.global_slot_since_genesis.t.t;
-        let slot = consensus_state.curr_global_slot.t.t.slot_number.t.t;
+        let slot = slot_since_genesis - (epoch_count * 7140);
 
         // NextEpochData
         let seed_hashv1 = consensus_state.next_epoch_data.t.t.seed;
