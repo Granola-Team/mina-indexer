@@ -39,7 +39,7 @@ mkdir -p ./log
 
 # 4. Read the staging ledgers from the './staking-ledgers' directory.
 #
-cp -r "$SRC"/tests/data/staking_ledgers .
+"$SRC"/ops/download-staking-ledgers ./staking-ledgers
 
 # 5. Configure the data directory.
 #
