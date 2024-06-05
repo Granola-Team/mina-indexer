@@ -99,14 +99,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
     .0;
 
     let previous_state_hash = best_tip.previous_state_hash().0;
-    let slot = best_tip
-        .consensus_state()
-        .curr_global_slot
-        .inner()
-        .inner()
-        .slot_number
-        .inner()
-        .inner();
+    let slot = global_slot - (epoch * 7140);
     let snarked_ledger_hash =
         LedgerHash::from_hashv1(best_tip.blockchain_state().snarked_ledger_hash).0;
     let staged_ledger_hash = LedgerHash::from_hashv1(
