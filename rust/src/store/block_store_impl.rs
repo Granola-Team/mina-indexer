@@ -14,7 +14,7 @@ use crate::{
         IndexerStore,
     },
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use log::{error, trace};
 
 impl BlockStore for IndexerStore {
@@ -101,12 +101,14 @@ impl BlockStore for IndexerStore {
 
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
         trace!("Getting block with hash {}", state_hash.0);
-
-        let key = state_hash.0.as_bytes();
         Ok(self
             .database
-            .get_pinned_cf(self.blocks_cf(), key)?
-            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
+            .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| {
+                serde_json::from_slice::<PrecomputedBlock>(&bytes)
+                    .with_context(|| format!("{:?}", bytes.to_vec()))
+                    .unwrap()
+            }))
     }
 
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>> {
