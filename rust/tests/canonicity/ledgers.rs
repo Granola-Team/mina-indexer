@@ -2,7 +2,12 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    ledger::{diff::LedgerDiff, genesis::GenesisRoot, public_key::PublicKey, store::LedgerStore},
+    ledger::{
+        diff::LedgerDiff,
+        genesis::{GenesisLedger, GenesisRoot},
+        public_key::PublicKey,
+        store::LedgerStore,
+    },
     server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
@@ -15,8 +20,9 @@ async fn test() -> anyhow::Result<()> {
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_testing(&log_dir)?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = serde_json::from_str::<GenesisRoot>(genesis_contents)?;
+    let genesis_ledger =
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
+            .unwrap();
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),

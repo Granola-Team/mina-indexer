@@ -2,7 +2,12 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
-    ledger::{account::Account, genesis::GenesisRoot, public_key::PublicKey, store::LedgerStore},
+    ledger::{
+        account::Account,
+        genesis::{GenesisLedger, GenesisRoot},
+        public_key::PublicKey,
+        store::LedgerStore,
+    },
     server::IndexerVersion,
     state::IndexerState,
     // store::IndexerStore,
@@ -17,10 +22,11 @@ fn check_balance() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("balance-sorted-db")?;
     let blocks_dir = &PathBuf::from("./tests/initial-blocks");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_contents = include_str!("../data/genesis_ledgers/mainnet.json");
-    let genesis_root = serde_json::from_str::<GenesisRoot>(genesis_contents)?;
+    let genesis_ledger =
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
+            .unwrap();
     let mut state = IndexerState::new(
-        genesis_root.clone().into(),
+        genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
         10,
