@@ -23,6 +23,9 @@ impl InternalCommandStore for IndexerStore {
             serde_json::to_vec(&internal_cmds)?,
         )?;
 
+        // per block internal command count
+        self.set_block_internal_commands_count(&block.state_hash(), internal_cmds.len() as u32)?;
+
         // add cmds with data to public keys
         let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
             .clone()
@@ -243,6 +246,33 @@ impl InternalCommandStore for IndexerStore {
             self.internal_commands_pk_total_cf(),
             pk.0.as_bytes(),
             to_be_bytes(old + 1),
+        )?)
+    }
+
+    fn get_block_internal_commands_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<u32>> {
+        trace!("Getting block internal command count");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.block_internal_command_counts_cf(),
+                state_hash.0.as_bytes(),
+            )?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
+    }
+
+    fn set_block_internal_commands_count(
+        &self,
+        state_hash: &BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block internal command count {state_hash} -> {count}");
+        Ok(self.database.put_cf(
+            self.block_internal_command_counts_cf(),
+            state_hash.0.as_bytes(),
+            to_be_bytes(count),
         )?)
     }
 

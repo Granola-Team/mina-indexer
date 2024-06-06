@@ -11,6 +11,7 @@ use crate::{
         store::UserCommandStore,
     },
     constants::*,
+    snark_work::store::SnarkStore,
     store::IndexerStore,
     web::graphql::db,
 };
@@ -64,17 +65,34 @@ impl FeetransferWithMeta {
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
-        Ok(self.block.clone().map(|block| Block {
-            block: BlockWithoutCanonicity::new(
-                block,
-                self.canonical,
-                epoch_num_user_commands,
-                total_num_user_commands,
-            ),
-            canonical: self.canonical,
-            epoch_num_blocks,
-            total_num_blocks,
-        }))
+
+        if let Some(block) = self.block.clone() {
+            let block_num_snarks = db
+                .get_block_snarks_count(&block.state_hash())?
+                .unwrap_or_default();
+            let block_num_user_commands = db
+                .get_block_user_commands_count(&block.state_hash())?
+                .unwrap_or_default();
+            let block_num_internal_commands = db
+                .get_block_internal_commands_count(&block.state_hash())?
+                .unwrap_or_default();
+            Ok(Some(Block {
+                block: BlockWithoutCanonicity::new(
+                    block,
+                    self.canonical,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                ),
+                canonical: self.canonical,
+                epoch_num_blocks,
+                total_num_blocks,
+                block_num_snarks,
+                block_num_user_commands,
+                block_num_internal_commands,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 

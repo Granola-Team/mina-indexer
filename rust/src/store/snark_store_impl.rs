@@ -56,6 +56,9 @@ impl SnarkStore for IndexerStore {
         let value = serde_json::to_vec(&completed_works)?;
         self.database.put_cf(self.snarks_cf(), key, value)?;
 
+        // per block SNARK count
+        self.set_block_snarks_count(&block.state_hash(), completed_works.len() as u32)?;
+
         // store fee info
         let mut num_prover_works: HashMap<PublicKey, u32> = HashMap::new();
         for snark in completed_works {
@@ -345,6 +348,23 @@ impl SnarkStore for IndexerStore {
             self.snarks_pk_total_cf(),
             pk.0.as_bytes(),
             to_be_bytes(old + 1),
+        )?)
+    }
+
+    fn get_block_snarks_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting block SNARKs count {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_snark_counts_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
+    }
+
+    fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()> {
+        trace!("Setting block SNARKs count {state_hash} -> {count}");
+        Ok(self.database.put_cf(
+            self.block_snark_counts_cf(),
+            state_hash.0.as_bytes(),
+            to_be_bytes(count),
         )?)
     }
 

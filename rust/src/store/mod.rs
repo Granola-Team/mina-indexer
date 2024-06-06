@@ -46,7 +46,7 @@ pub struct IndexerStore {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// Change [IndexerStoreVersion] if needed!
-    const COLUMN_FAMILIES: [&'static str; 47] = [
+    const COLUMN_FAMILIES: [&'static str; 51] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -76,24 +76,28 @@ impl IndexerStore {
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
-        "snark-work-fees",            // [snark_work_fees_cf]
-        "snark-work-prover",          // [snark_work_prover_cf]
-        "chain-id-to-network",        // [chain_id_to_network_cf]
-        "txn-from",                   // [txn_from_cf]
-        "txn-to",                     // [txn_to_cf]
-        "user-commands-epoch",        // [user_commands_epoch_cf]
-        "user-commands-pk-epoch",     // [user_commands_pk_epoch_cf]
-        "user-commands-pk-total",     // [user_commands_pk_total_cf]
-        "internal-commands-epoch",    // [internal_commands_epoch_cf]
-        "internal-commands-pk-epoch", // [internal_commands_pk_epoch_cf]
-        "internal-commands-pk-total", // [internal_commands_pk_total_cf]
-        "snarks-epoch",               // [snarks_epoch_cf]
-        "snarks-pk-epoch",            // [snarks_pk_epoch_cf]
-        "snarks-pk-total",            // [snarks_pk_total_cf]
-        "usernames",                  // [username_cf]
-        "staking-ledger-epoch",       // [staking_ledger_epoch_cf]
-        "staking-ledger-balance",     // [staking_ledger_balance_cf]
-        "staking-ledger-stake",       // [staking_ledger_delegation_cf]
+        "snark-work-fees",               // [snark_work_fees_cf]
+        "snark-work-prover",             // [snark_work_prover_cf]
+        "chain-id-to-network",           // [chain_id_to_network_cf]
+        "txn-from",                      // [txn_from_cf]
+        "txn-to",                        // [txn_to_cf]
+        "user-commands-epoch",           // [user_commands_epoch_cf]
+        "user-commands-pk-epoch",        // [user_commands_pk_epoch_cf]
+        "user-commands-pk-total",        // [user_commands_pk_total_cf]
+        "internal-commands-epoch",       // [internal_commands_epoch_cf]
+        "internal-commands-pk-epoch",    // [internal_commands_pk_epoch_cf]
+        "internal-commands-pk-total",    // [internal_commands_pk_total_cf]
+        "snarks-epoch",                  // [snarks_epoch_cf]
+        "snarks-pk-epoch",               // [snarks_pk_epoch_cf]
+        "snarks-pk-total",               // [snarks_pk_total_cf]
+        "block-snark-counts",            // [block_snark_counts_cf]
+        "block-user-command-counts",     // [block_usr_command_counts_cf]
+        "block-internal-command-counts", // [block_internal_command_counts_cf]
+        "usernames",                     // [usernames_cf]
+        "usernames-per-block",           // [usernames_per_block_cf]
+        "staking-ledger-epoch",          // [staking_ledger_epoch_cf]
+        "staking-ledger-balance",        // [staking_ledger_balance_cf]
+        "staking-ledger-stake",          // [staking_ledger_delegation_cf]
     ];
 
     /// Creates a new _primary_ indexer store

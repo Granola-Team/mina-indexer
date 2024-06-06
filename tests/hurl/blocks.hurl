@@ -558,6 +558,9 @@ POST {{url}}
   blocks(limit: 1) {
     epoch_num_blocks
     total_num_blocks
+    block_num_snarks
+    block_num_user_commands
+    block_num_internal_commands
   }
 }
 ```
@@ -570,11 +573,14 @@ jsonpath "$.data.blocks" count == 1
 # data counts
 jsonpath "$.data.blocks[0].epoch_num_blocks" == 204
 jsonpath "$.data.blocks[0].total_num_blocks" == 204
+jsonpath "$.data.blocks[0].block_num_snarks" == 0
+jsonpath "$.data.blocks[0].block_num_user_commands" == 1
+jsonpath "$.data.blocks[0].block_num_internal_commands" == 2
 
 duration < 1000
 
 #
-# TODO
+# Non-canonical blocks query
 #
 
 POST {{url}}
@@ -619,5 +625,3 @@ jsonpath "$.data.blocks[8].canonical" == false
 jsonpath "$.data.blocks[9].canonical" == false
 
 duration < 1000
-
-# TODO date time bounded query

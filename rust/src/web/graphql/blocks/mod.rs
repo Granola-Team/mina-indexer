@@ -5,7 +5,7 @@ use super::{
 use crate::{
     block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
     command::{
-        internal::{InternalCommand, InternalCommandWithData},
+        internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
@@ -15,14 +15,15 @@ use crate::{
         common::Base58EncodableVersionedType, staged_ledger_diff::TransactionStatusFailedType,
         version_bytes,
     },
-    snark_work::SnarkWorkSummary,
+    snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, to_be_bytes,
-        IndexerStore,
+        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, from_be_bytes,
+        to_be_bytes, IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use log::debug;
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -50,10 +51,25 @@ impl BlocksQueryRoot {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| {
                     let canonical = get_block_canonicity(db, &pcb.state_hash().0);
+                    let block_num_snarks = db
+                        .get_block_snarks_count(&pcb.state_hash())
+                        .expect("snark counts")
+                        .unwrap_or_default();
+                    let block_num_user_commands = db
+                        .get_block_user_commands_count(&pcb.state_hash())
+                        .expect("user command counts")
+                        .unwrap_or_default();
+                    let block_num_internal_commands = db
+                        .get_block_internal_commands_count(&pcb.state_hash())
+                        .expect("internal command counts")
+                        .unwrap_or_default();
                     Block {
                         canonical,
                         epoch_num_blocks,
                         total_num_blocks,
+                        block_num_snarks,
+                        block_num_user_commands,
+                        block_num_internal_commands,
                         block: BlockWithoutCanonicity::new(
                             pcb,
                             canonical,
@@ -65,7 +81,7 @@ impl BlocksQueryRoot {
             })?);
         }
 
-        // Use constant time access if we have state hash
+        // Use constant time access if we have the state hash
         if let Some(state_hash) = query.as_ref().and_then(|input| input.state_hash.clone()) {
             if !is_valid_state_hash(&state_hash) {
                 return Ok(None);
@@ -76,10 +92,25 @@ impl BlocksQueryRoot {
                 None => return Ok(None),
             };
             let canonical = get_block_canonicity(db, &state_hash);
+            let block_num_snarks = db
+                .get_block_snarks_count(&pcb.state_hash())
+                .expect("snark counts")
+                .unwrap_or_default();
+            let block_num_user_commands = db
+                .get_block_user_commands_count(&pcb.state_hash())
+                .expect("user command counts")
+                .unwrap_or_default();
+            let block_num_internal_commands = db
+                .get_block_internal_commands_count(&pcb.state_hash())
+                .expect("internal command counts")
+                .unwrap_or_default();
             let block = Block {
                 canonical,
                 epoch_num_blocks,
                 total_num_blocks,
+                block_num_snarks,
+                block_num_user_commands,
+                block_num_internal_commands,
                 block: BlockWithoutCanonicity::new(
                     pcb,
                     canonical,
@@ -94,18 +125,32 @@ impl BlocksQueryRoot {
             return Ok(None);
         }
 
-        // else iterate from the most recent block
-        // TODO bound query search space if given any inputs
+        // else iterate over global slot sorted blocks
         for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End).flatten() {
             let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
             let canonical = get_block_canonicity(db, &state_hash);
+            let block_num_snarks = db
+                .get_block_snarks_count(&pcb.state_hash())
+                .expect("snark counts")
+                .unwrap_or_default();
+            let block_num_user_commands = db
+                .get_block_user_commands_count(&pcb.state_hash())
+                .expect("user command counts")
+                .unwrap_or_default();
+            let block_num_internal_commands = db
+                .get_block_internal_commands_count(&pcb.state_hash())
+                .expect("internal command counts")
+                .unwrap_or_default();
             let block = Block {
                 canonical,
                 epoch_num_blocks,
                 total_num_blocks,
+                block_num_snarks,
+                block_num_user_commands,
+                block_num_internal_commands,
                 block: BlockWithoutCanonicity::new(
                     pcb,
                     canonical,
@@ -132,12 +177,30 @@ impl BlocksQueryRoot {
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
+        let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
+        let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
         let epoch_num_user_commands = db
             .get_user_commands_epoch_count(None)
             .expect("epoch user command count");
         let total_num_user_commands = db
             .get_user_commands_total_count()
             .expect("total user command count");
+        let epoch_num_internal_commands = db
+            .get_internal_commands_epoch_count(None)
+            .expect("epoch internal command count");
+        let total_num_internal_commands = db
+            .get_internal_commands_total_count()
+            .expect("total internal command count");
+        let counts = [
+            epoch_num_blocks,
+            total_num_blocks,
+            epoch_num_snarks,
+            total_num_snarks,
+            epoch_num_user_commands,
+            total_num_user_commands,
+            epoch_num_internal_commands,
+            total_num_internal_commands,
+        ];
 
         let mut blocks: Vec<Block> = Vec::with_capacity(limit);
         let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
@@ -147,17 +210,7 @@ impl BlocksQueryRoot {
             let block = db.get_block(&state_hash.clone().into())?;
             return Ok(block
                 .into_iter()
-                .filter_map(|b| {
-                    precomputed_matches_query(
-                        db,
-                        &query,
-                        b,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
-                })
+                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect());
         }
 
@@ -166,17 +219,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<Block> = db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
-                .filter_map(|b| {
-                    precomputed_matches_query(
-                        db,
-                        &query,
-                        b,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
-                })
+                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -194,17 +237,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<Block> = db
                 .get_blocks_at_slot(global_slot_since_genesis as u32)?
                 .into_iter()
-                .filter_map(|b| {
-                    precomputed_matches_query(
-                        db,
-                        &query,
-                        b,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
-                })
+                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -221,17 +254,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<Block> = db
                 .get_blocks_at_public_key(&coinbase_receiver.into())?
                 .into_iter()
-                .filter_map(|b| {
-                    precomputed_matches_query(
-                        db,
-                        &query,
-                        b,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
-                })
+                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -248,17 +271,7 @@ impl BlocksQueryRoot {
             let mut blocks: Vec<Block> = db
                 .get_blocks_at_public_key(&creator_account.into())?
                 .into_iter()
-                .filter_map(|b| {
-                    precomputed_matches_query(
-                        db,
-                        &query,
-                        b,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    )
-                })
+                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
@@ -304,15 +317,9 @@ impl BlocksQueryRoot {
 
             'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
-                    if let Some(block_with_canonicity) = precomputed_matches_query(
-                        db,
-                        &query,
-                        block,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    ) {
+                    if let Some(block_with_canonicity) =
+                        precomputed_matches_query(db, &query, block, counts)
+                    {
                         blocks.push(block_with_canonicity);
 
                         if blocks.len() == limit {
@@ -368,15 +375,9 @@ impl BlocksQueryRoot {
 
             'outer: for global_slot in block_slots {
                 for block in db.get_blocks_at_slot(global_slot)? {
-                    if let Some(block_with_canonicity) = precomputed_matches_query(
-                        db,
-                        &query,
-                        block,
-                        epoch_num_blocks,
-                        total_num_blocks,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                    ) {
+                    if let Some(block_with_canonicity) =
+                        precomputed_matches_query(db, &query, block, counts)
+                    {
                         blocks.push(block_with_canonicity);
                         if blocks.len() == limit {
                             break 'outer;
@@ -399,18 +400,15 @@ impl BlocksQueryRoot {
         };
         for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
             let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
+
+            // TODO
+            debug!("slot: {}", from_be_bytes(key[..4].to_vec()));
+            debug!("hash: {state_hash}");
+
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
-            let canonical = get_block_canonicity(db, &state_hash);
-            let block = Block::from_precomputed(
-                pcb,
-                canonical,
-                epoch_num_blocks,
-                total_num_blocks,
-                epoch_num_user_commands,
-                total_num_user_commands,
-            );
+            let block = Block::from_precomputed(db, pcb, counts);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
@@ -435,20 +433,9 @@ fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
     block: PrecomputedBlock,
-    epoch_num_blocks: u32,
-    total_num_blocks: u32,
-    epoch_num_user_commands: u32,
-    total_num_user_commands: u32,
+    counts: [u32; 8],
 ) -> Option<Block> {
-    let canonical = get_block_canonicity(db, &block.state_hash().0);
-    let block_with_canonicity = Block::from_precomputed(
-        block,
-        canonical,
-        epoch_num_blocks,
-        total_num_blocks,
-        epoch_num_user_commands,
-        total_num_user_commands,
-    );
+    let block_with_canonicity = Block::from_precomputed(db, block, counts);
     if query
         .as_ref()
         .map_or(true, |q| q.matches(&block_with_canonicity))
@@ -480,6 +467,18 @@ pub struct Block {
     /// Value total num blocks
     #[graphql(name = "total_num_blocks")]
     pub total_num_blocks: u32,
+
+    /// Value block num snarks
+    #[graphql(name = "block_num_snarks")]
+    pub block_num_snarks: u32,
+
+    /// Value block num user commands
+    #[graphql(name = "block_num_user_commands")]
+    pub block_num_user_commands: u32,
+
+    /// Value block num internal commands
+    #[graphql(name = "block_num_internal_commands")]
+    pub block_num_internal_commands: u32,
 
     /// Value block
     #[graphql(flatten)]
@@ -930,15 +929,8 @@ impl BlockWithoutCanonicity {
     }
 }
 
-fn check_option<T: PartialEq>(matches: &mut bool, opt: &Option<T>, block_value: &T) {
-    if let Some(value) = opt {
-        *matches &= block_value == value;
-    }
-}
-
 impl BlockQueryInput {
     pub fn matches(&self, block: &Block) -> bool {
-        let mut matches = true;
         let Self {
             creator_account,
             coinbase_receiver,
@@ -955,28 +947,47 @@ impl BlockQueryInput {
             protocol_state,
             ..
         } = self;
-
-        check_option(&mut matches, canonical, &block.canonical);
-        check_option(&mut matches, state_hash, &block.block.state_hash);
-        check_option(&mut matches, blockchain_length, &block.block.block_height);
-        check_option(
-            &mut matches,
-            global_slot_since_genesis,
-            &block.block.global_slot_since_genesis,
-        );
+        if let Some(canonical) = canonical {
+            if block.canonical != *canonical {
+                return false;
+            }
+        }
+        if let Some(state_hash) = state_hash {
+            if block.block.state_hash != *state_hash {
+                return false;
+            }
+        }
+        if let Some(blockchain_length) = blockchain_length {
+            if block.block.block_height != *blockchain_length {
+                return false;
+            }
+        }
+        if let Some(global_slot) = global_slot_since_genesis {
+            if block.block.global_slot_since_genesis != *global_slot {
+                return false;
+            }
+        }
 
         // block_height_gt(e) & block_height_lt(e)
         if let Some(height) = block_height_gt {
-            matches &= block.block.block_height > *height;
+            if block.block.block_height <= *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_gte {
-            matches &= block.block.block_height >= *height;
+            if block.block.block_height < *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_lt {
-            matches &= block.block.block_height < *height;
+            if block.block.block_height >= *height {
+                return false;
+            }
         }
         if let Some(height) = block_height_lte {
-            matches &= block.block.block_height <= *height;
+            if block.block.block_height > *height {
+                return false;
+            }
         }
 
         // global_slot_gt(e) & global_slot_lt(e)
@@ -985,81 +996,115 @@ impl BlockQueryInput {
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_gt)
         {
-            matches &= block.block.global_slot_since_genesis > global_slot;
+            if block.block.global_slot_since_genesis <= global_slot {
+                return false;
+            }
         }
         if let Some(global_slot) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_gte)
         {
-            matches &= block.block.global_slot_since_genesis >= global_slot;
+            if block.block.global_slot_since_genesis < global_slot {
+                return false;
+            }
         }
         if let Some(global_slot) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_lt)
         {
-            matches &= block.block.global_slot_since_genesis < global_slot;
+            if block.block.global_slot_since_genesis >= global_slot {
+                return false;
+            }
         }
         if let Some(global_slot) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_lte)
         {
-            matches &= block.block.global_slot_since_genesis <= global_slot;
+            if block.block.global_slot_since_genesis > global_slot {
+                return false;
+            }
         }
 
         // slot
-        matches &= protocol_state
+        if protocol_state
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot)
-            .map_or(matches, |slot| {
-                block.block.protocol_state.consensus_state.slot as i64 == slot
-            });
+            .map_or(false, |slot| {
+                block.block.protocol_state.consensus_state.slot as i64 != slot
+            })
+        {
+            return false;
+        }
 
         // creator account
         if let Some(creator_account) = creator_account {
             if let Some(public_key) = creator_account.public_key.as_ref() {
-                matches &= block.block.creator_account.public_key == *public_key;
+                if block.block.creator_account.public_key != *public_key {
+                    return false;
+                }
             }
         }
 
         // coinbase receiver
         if let Some(coinbase_receiver) = coinbase_receiver {
             if let Some(public_key) = coinbase_receiver.public_key.as_ref() {
-                matches &= block.block.coinbase_receiver.public_key == *public_key;
+                if block.block.coinbase_receiver.public_key != *public_key {
+                    return false;
+                }
             }
         }
 
         // conjunction
         if let Some(query) = and {
-            matches &= query.iter().all(|and| and.matches(block));
+            if !query.iter().all(|and| and.matches(block)) {
+                return false;
+            }
         }
 
         // disjunction
         if let Some(query) = or {
-            if !query.is_empty() {
-                matches &= query.iter().any(|or| or.matches(block));
+            if !query.is_empty() && !query.iter().any(|or| or.matches(block)) {
+                return false;
             }
         }
-        matches
+        true
     }
 }
 
 impl Block {
     pub fn from_precomputed(
+        db: &Arc<IndexerStore>,
         block: PrecomputedBlock,
-        canonical: bool,
-        epoch_num_blocks: u32,
-        total_num_blocks: u32,
-        epoch_num_user_commands: u32,
-        total_num_user_commands: u32,
+        counts: [u32; 8],
     ) -> Self {
+        let epoch_num_blocks = counts[0];
+        let total_num_blocks = counts[1];
+        let epoch_num_user_commands = counts[4];
+        let total_num_user_commands = counts[5];
+        let canonical = get_block_canonicity(db, &block.state_hash().0);
+        let block_num_snarks = db
+            .get_block_snarks_count(&block.state_hash())
+            .expect("snark counts")
+            .unwrap_or_default();
+        let block_num_user_commands = db
+            .get_block_user_commands_count(&block.state_hash())
+            .expect("user command counts")
+            .unwrap_or_default();
+        let block_num_internal_commands = db
+            .get_block_internal_commands_count(&block.state_hash())
+            .expect("internal command counts")
+            .unwrap_or_default();
         Self {
             canonical,
             epoch_num_blocks,
             total_num_blocks,
+            block_num_snarks,
+            block_num_user_commands,
+            block_num_internal_commands,
             block: BlockWithoutCanonicity::new(
                 block,
                 canonical,
