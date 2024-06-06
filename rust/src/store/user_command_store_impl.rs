@@ -50,7 +50,7 @@ impl UserCommandStore for IndexerStore {
                 .database
                 .get_pinned_cf(
                     self.commands_txn_hash_to_global_slot_mainnet_cf(),
-                    &suffix.as_bytes(),
+                    suffix.as_bytes(),
                 )?
                 .is_none()
             {
@@ -60,7 +60,7 @@ impl UserCommandStore for IndexerStore {
 
             self.database.put_cf(
                 self.commands_txn_hash_to_global_slot_mainnet_cf(),
-                &suffix.as_bytes(),
+                suffix.as_bytes(),
                 block.global_slot_since_genesis().to_be_bytes(),
             )?;
 
