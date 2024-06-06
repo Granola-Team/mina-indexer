@@ -20,20 +20,24 @@ use log::{trace, warn};
 impl UserCommandStore for IndexerStore {
     fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
-
+        let state_hash = block.state_hash().0.clone();
         let epoch = block.epoch_count();
         let user_commands = block.commands();
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
             let txn_hash = signed.hash_signed_command()?;
+            let suffix = format!("{}{}", &txn_hash, &state_hash);
             trace!("Adding user command hash {} {}", txn_hash, block.summary());
 
-            // add: key `{global_slot}{txn_hash}` -> signed command with data
+            // add: key `{global_slot}{txn_hash}{state_hash}` -> signed command with data
             // global_slot is written in big endian so lexicographic ordering corresponds to
             // slot ordering
             self.database.put_cf(
                 self.commands_slot_mainnet_cf(),
-                u32_prefix_key(block.global_slot_since_genesis(), &txn_hash),
+                u32_prefix_key(
+                    block.global_slot_since_genesis(),
+                    &suffix,
+                ),
                 serde_json::to_vec(&SignedCommandWithData::from(
                     command,
                     &block.state_hash().0,
@@ -49,7 +53,7 @@ impl UserCommandStore for IndexerStore {
                 .database
                 .get_pinned_cf(
                     self.commands_txn_hash_to_global_slot_mainnet_cf(),
-                    txn_hash.as_bytes(),
+                    &suffix.as_bytes(),
                 )?
                 .is_none()
             {
@@ -59,7 +63,7 @@ impl UserCommandStore for IndexerStore {
 
             self.database.put_cf(
                 self.commands_txn_hash_to_global_slot_mainnet_cf(),
-                txn_hash.as_bytes(),
+                &suffix.as_bytes(),
                 block.global_slot_since_genesis().to_be_bytes(),
             )?;
 
@@ -70,7 +74,7 @@ impl UserCommandStore for IndexerStore {
                 txn_sort_key(
                     command.sender(),
                     block.global_slot_since_genesis(),
-                    &txn_hash,
+                    &suffix,
                 ),
                 command.amount().to_be_bytes(),
             )?;
@@ -82,7 +86,7 @@ impl UserCommandStore for IndexerStore {
                 txn_sort_key(
                     command.receiver(),
                     block.global_slot_since_genesis(),
-                    &txn_hash,
+                    &suffix,
                 ),
                 command.amount().to_be_bytes(),
             )?;
