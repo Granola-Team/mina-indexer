@@ -269,16 +269,19 @@ pub async fn main() -> anyhow::Result<()> {
                 web_hostname,
                 web_port
             );
-            mina_indexer::web::start_web_server(
+            match mina_indexer::web::start_web_server(
                 db.clone(),
                 (web_hostname, web_port),
                 locked_supply_csv,
             )
             .await
-            .unwrap();
-            indexer.await_loop().await;
+            {
+                Ok(()) => indexer.await_loop().await,
+                Err(e) => error!("Error starting web server: {e}"),
+            }
 
-            info!("Cleanly shutting down primary rocksdb");
+            info!("Shutting down primary rocksdb instance");
+            db.database.cancel_all_background_work(true);
             drop(db);
             Ok(())
         }
