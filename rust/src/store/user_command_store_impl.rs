@@ -34,10 +34,7 @@ impl UserCommandStore for IndexerStore {
             // slot ordering
             self.database.put_cf(
                 self.commands_slot_mainnet_cf(),
-                u32_prefix_key(
-                    block.global_slot_since_genesis(),
-                    &suffix,
-                ),
+                u32_prefix_key(block.global_slot_since_genesis(), &suffix),
                 serde_json::to_vec(&SignedCommandWithData::from(
                     command,
                     &block.state_hash().0,
@@ -71,11 +68,7 @@ impl UserCommandStore for IndexerStore {
             // `{sender}{global_slot BE}{txn_hash} -> amount BE`
             self.database.put_cf(
                 self.txn_from_cf(),
-                txn_sort_key(
-                    command.sender(),
-                    block.global_slot_since_genesis(),
-                    &suffix,
-                ),
+                txn_sort_key(command.sender(), block.global_slot_since_genesis(), &suffix),
                 command.amount().to_be_bytes(),
             )?;
 
