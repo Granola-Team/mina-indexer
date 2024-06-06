@@ -1,12 +1,11 @@
 /rust/target/
-result
-.gitconfig
-.direnv/
+/result
+/.gitconfig
+/.direnv/
 
 # Editor Droppings
 .idea*
 .*.swp
-build.log
 /.vscode
 
 # Running server locally
