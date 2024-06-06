@@ -1,6 +1,0 @@
-#!/bin/sh
-
-set -eux
-
-find mina_network_block_data -regex '.*/mainnet\-[0-9][0-9][0-9][0-9][0-9][0-9]\-.*' \
-| sort | xargs -t ./upload-to-bucket

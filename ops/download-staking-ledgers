@@ -14,27 +14,14 @@ trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
-# Wrap the command to access the Linode bucket (rclone).
-#
-rc() {
-  time \
-    rclone \
-      -v -v \
-      --config "$MY_DIR"/rclone.conf \
-      --buffer-size 128Mi \
-      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
-      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
-      "$@"
-}
-
 # Download the staking ledgers from the Granola bucket. "$1" is the destination
 # directory.
 
 # Verify that we can connect.
-rc lsd linode:
+"$MY_DIR"/granola-rclone lsd linode:
 
 # Perform the download.
-rc sync --metadata linode:granola-mina-staking-ledgers "$1"
+"$MY_DIR"/granola-rclone sync --metadata linode:granola-mina-staking-ledgers "$1"
 RESULT='Blocks downloaded.'
 
 chmod -R a-wx "$1"/*

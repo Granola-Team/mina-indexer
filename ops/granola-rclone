@@ -1,0 +1,20 @@
+#! /bin/sh
+
+set -eu
+
+MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+
+# Wrap the command to access the S3 bucket (rclone).
+#
+rc() {
+  time \
+    rclone \
+      -v -v \
+      --config "$MY_DIR"/rclone.conf \
+      --buffer-size 128Mi \
+      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
+      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
+      "$@"
+}
+
+rc "$@"

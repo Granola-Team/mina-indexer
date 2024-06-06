@@ -15,30 +15,17 @@ trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
-# Wrap the command to access the S3 bucket (rclone).
-#
-rc() {
-  time \
-    rclone \
-      -v -v \
-      --config "$MY_DIR"/rclone.conf \
-      --buffer-size 128Mi \
-      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
-      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
-      "$@"
-}
-
 # Upload the Mina blocks logs to the Granola bucket. Note that "$1" is the
 # order of magnitude of the block count. So, "3" gets blocks with height up to
 # 99, and "5" gets blocks with height up to 9999. "$2" is the source directory.
 #
 
 # Verify that we can connect.
-rc lsd linode:
+"$MY_DIR"/granola-rclone lsd linode:
 
 # Perform the download.
 X="$(expr $1 + 1)"
-rc \
+"$MY_DIR"/granola-rclone \
   sync \
   "$2" \
   linode:granola-mina-blocks \
