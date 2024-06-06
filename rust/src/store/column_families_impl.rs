@@ -148,7 +148,9 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("mainnet-commands-slot column family exists")
     }
 
-    /// CF for storing: `txn_hash -> global_slot`
+    // TODO
+    /// CF for storing:
+    /// `{txn_hash}{state_hash} -> global_slot`
     ///
     /// - `global_slot`: 4 BE bytes
     fn commands_txn_hash_to_global_slot_mainnet_cf(&self) -> &ColumnFamily {
@@ -246,13 +248,40 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-total column family exists")
     }
 
-    /// CF for per epoch block production totals
+    /// CF for per epoch block production counts
     /// - key: `epoch`
     /// - value: number of blocks produced in `epoch`
     fn block_production_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-epoch")
             .expect("block-production-epoch column family exists")
+    }
+
+    /// CF for per block SNARK counts
+    /// - key: state hash
+    /// - value: number of SNARKs in block
+    fn block_snark_counts_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-snark-counts")
+            .expect("block-snark-counts column family exists")
+    }
+
+    /// CF for per block user command counts
+    /// - key: state hash
+    /// - value: number of user commands in block
+    fn block_user_command_counts_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-user-command-counts")
+            .expect("block-user-command-counts column family exists")
+    }
+
+    /// CF for per block block production counts
+    /// - key: state hash
+    /// - value: number of internal commands in block
+    fn block_internal_command_counts_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-internal-command-counts")
+            .expect("block-internal-command-counts column family exists")
     }
 
     /// CF for per epoch per account user commands
@@ -337,10 +366,17 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for storing usernames
-    fn username_cf(&self) -> &ColumnFamily {
+    fn usernames_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("usernames")
             .expect("usernames column family exists")
+    }
+
+    /// CF for storing state hash -> usernames
+    fn usernames_per_block_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("usernames-per-block")
+            .expect("usernames-per-block column family exists")
     }
 
     /// CF for storing staking ledger epochs

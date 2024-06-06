@@ -75,6 +75,16 @@ pub trait UserCommandStore {
     /// Get user commands per account total
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
+    /// Increment user commands per block
+    fn set_block_user_commands_count(
+        &self,
+        state_hash: &BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get user commands per block
+    fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+
     /// Increment user commands counts given `command` in `epoch`
     fn increment_user_commands_counts(
         &self,

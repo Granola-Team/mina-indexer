@@ -62,6 +62,19 @@ pub trait InternalCommandStore {
     /// Get internal commands per account total
     fn get_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
+    /// Set internal command count for a block
+    fn set_block_internal_commands_count(
+        &self,
+        state_hash: &BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get num internal commands in block
+    fn get_block_internal_commands_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<u32>>;
+
     /// Increment internal commands counts given `internal_command` in `epoch`
     fn increment_internal_commands_counts(
         &self,

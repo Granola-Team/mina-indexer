@@ -68,6 +68,12 @@ pub trait SnarkStore {
     /// Get snarks per account total
     fn get_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
+    /// Set SNARK count for a block
+    fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()>;
+
+    /// Get num SNARKs per block
+    fn get_block_snarks_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+
     /// Increment snarks counts given `snark` in `epoch`
     fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> anyhow::Result<()>;
 }

@@ -13,7 +13,7 @@ use crate::{
         user_command_db_key_pk, username::UsernameStore, IndexerStore,
     },
 };
-use log::{trace, warn};
+use log::{debug, trace, warn};
 
 // TODO add iterators
 
@@ -23,6 +23,11 @@ impl UserCommandStore for IndexerStore {
 
         let epoch = block.epoch_count();
         let user_commands = block.commands();
+
+        // per block user command count
+        self.set_block_user_commands_count(&block.state_hash(), user_commands.len() as u32)?;
+
+        // per command indices
         for command in &user_commands {
             let signed = SignedCommand::from(command.clone());
             let txn_hash = signed.hash_signed_command()?;
@@ -95,7 +100,11 @@ impl UserCommandStore for IndexerStore {
                 && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
                     || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
             {
-                let username = memo[NAME_SERVICE_MEMO_PREFIX.len()..].trim_end_matches('\0');
+                let username = &memo[NAME_SERVICE_MEMO_PREFIX.len()..];
+                debug!(
+                    "Set username block {}: {sender} -> {username}",
+                    block.state_hash()
+                );
                 self.set_username(&sender, username.to_string())?;
             }
         }
@@ -351,6 +360,27 @@ impl UserCommandStore for IndexerStore {
             pk.0.as_bytes(),
             to_be_bytes(old + 1),
         )?)
+    }
+
+    fn set_block_user_commands_count(
+        &self,
+        state_hash: &BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block user command count {state_hash} -> {count}");
+        Ok(self.database.put_cf(
+            self.block_user_command_counts_cf(),
+            state_hash.0.as_bytes(),
+            to_be_bytes(count),
+        )?)
+    }
+
+    fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting block user command count {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_user_command_counts_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
     fn increment_user_commands_counts(
