@@ -243,7 +243,9 @@ pub fn user_commands_iterator_global_slot(key: &[u8]) -> u32 {
 /// Transaction hash from `key` in [user_commands_iterator]
 /// - discard the first 4 bytes
 pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
-    String::from_utf8(key[4..].to_vec()).map_err(|e| anyhow!("Error reading txn hash: {}", e))
+    // This assumes the txn_hash will always be of length 53. Need to verify
+    String::from_utf8(key[4..(53 + 4)].to_vec())
+        .map_err(|e| anyhow!("Error reading txn hash: {}", e))
 }
 
 /// [SignedCommandWithData] from `entry` in [user_commands_iterator]

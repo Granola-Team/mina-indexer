@@ -193,14 +193,15 @@ impl TransactionsQueryRoot {
                 (to_be_bytes(u32::MAX), Direction::Reverse)
             }
         };
-        for entry in user_commands_iterator(db, IteratorMode::From(&start, direction)).flatten() {
-            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&entry.0).ok()
-            {
+        for (key, value) in
+            user_commands_iterator(db, IteratorMode::From(&start, direction)).flatten()
+        {
+            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&key).ok() {
                 continue;
             }
 
             // Only add transactions that satisfy the input query
-            let cmd = user_commands_iterator_signed_command(&entry.1)?;
+            let cmd = user_commands_iterator_signed_command(&value)?;
             let txn = Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
 
             if query.matches(&txn) {
