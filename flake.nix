@@ -49,6 +49,7 @@
           [
             cargo-audit
             git # Needed but not declared by Nix's 'stdenv' build.
+            google-cloud-sdk # Required only to use O1's bucket.
             just
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
