@@ -37,7 +37,7 @@ pub struct BlockchainSummary {
     staking_epoch_ledger_hash: String,
     state_hash: String,
     total_currency: String,
-    total_accounts: usize,
+    total_num_accounts: usize,
     epoch_num_blocks: u32,
     total_num_blocks: u32,
     epoch_num_snarks: u32,
@@ -66,7 +66,7 @@ struct SummaryInput {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
-    total_accounts: usize,
+    total_num_accounts: usize,
 }
 
 fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
@@ -82,7 +82,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
-        total_accounts,
+        total_num_accounts,
     } = input;
     let blockchain_length = best_tip.blockchain_length();
     let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
@@ -153,7 +153,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         staking_epoch_ledger_hash,
         state_hash,
         total_currency,
-        total_accounts,
+        total_num_accounts,
         epoch_num_blocks,
         total_num_blocks,
         epoch_num_snarks,
@@ -174,7 +174,7 @@ pub async fn get_blockchain_summary(
     if let Ok(Some(best_tip)) = db.get_best_block() {
         trace!("Found best tip: {}", best_tip.summary());
         let state_hash = &best_tip.state_hash();
-        let total_accounts = store
+        let total_num_accounts = store
             .get_ledger_state_hash(state_hash, true)
             .expect("ledger exists")
             .map(|ledger| ledger.len())
@@ -221,7 +221,7 @@ pub async fn get_blockchain_summary(
             total_num_user_commands,
             epoch_num_internal_commands,
             total_num_internal_commands,
-            total_accounts,
+            total_num_accounts,
         }) {
             trace!("Blockchain summary: {:?}", summary);
             let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
