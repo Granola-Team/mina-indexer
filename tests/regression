@@ -131,6 +131,7 @@ idxr_server_start() {
 idxr_server_start_standard() {
     idxr_server_start \
         --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
@@ -141,6 +142,7 @@ idxr_server_sync() {
     port=$(ephemeral_port)
     idxr_server sync --web-port "$port" \
         --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         "$@"
@@ -150,6 +152,7 @@ idxr_server_replay() {
     port=$(ephemeral_port)
     idxr_server replay --web-port "$port" \
         --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database
@@ -326,7 +329,6 @@ test_ipc_is_available_immediately() {
     dl_mainnet 100 ./blocks
 
     idxr_server_start_standard \
-        --genesis-ledger "$LEDGER" \
         --genesis-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
     wait_for_socket
 
@@ -339,7 +341,7 @@ test_ipc_is_available_immediately() {
 test_startup_dirs_get_created() {
     enter_test test_startup_dirs_get_created
 
-    idxr_server_start_standard \
+    idxr_server_start \
         --genesis-ledger "$LEDGER" \
         --blocks-dir ./startup-blocks \
         --block-watch-dir ./watch-blocks \
@@ -1068,6 +1070,8 @@ test_rest_accounts_summary() {
     port=$(ephemeral_port)
 
     idxr_server start \
+        --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
@@ -1161,14 +1165,8 @@ test_rest_blocks() {
     enter_test test_rest_blocks
 
     dl_mainnet 100 ./blocks
-    port=$(ephemeral_port)
 
-    idxr_server start \
-        --blocks-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database \
-        --web-port "$port" \
-        --web-hostname "0.0.0.0"
+    idxr_server_start_standard --web-hostname "0.0.0.0"
     wait_for_socket
 
     # /blocks endpoint
@@ -1265,7 +1263,11 @@ test_txn_nonces() {
 test_startup_staking_ledgers() {
     enter_test test_startup_staking_ledgers
 
-    idxr_server_start_standard \
+    idxr_server_start \
+        --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
     wait_for_socket
 
@@ -1372,7 +1374,11 @@ test_watch_staking_ledgers() {
 test_staking_delegations() {
     enter_test test_staking_delegations
 
-    idxr_server_start_standard \
+    idxr_server_start \
+        --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
     wait_for_socket
 
@@ -1674,6 +1680,8 @@ test_hurl() {
     port=$(ephemeral_port)
 
     idxr_server start \
+        --genesis-ledger "$LEDGER" \
+        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
