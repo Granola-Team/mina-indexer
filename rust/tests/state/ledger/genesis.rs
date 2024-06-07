@@ -7,7 +7,7 @@ use mina_indexer::{
 };
 #[test]
 fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
-    let genesis_root = genesis::parse_file("./tests/data/genesis_ledgers/mainnet.json")?;
+    let genesis_root = genesis::parse_file("./data/genesis_ledgers/mainnet.json")?;
     let genesis_ledger: GenesisLedger = genesis_root.clone().into();
     let ledger: Ledger = genesis_ledger.into();
 

@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn parse_file() -> anyhow::Result<()> {
-        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
+        let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
 
         assert_eq!(staking_ledger.epoch, 0);
@@ -314,7 +314,7 @@ mod tests {
     fn calculate_delegations() -> anyhow::Result<()> {
         use crate::ledger::public_key::PublicKey;
 
-        let path: PathBuf = "./tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
+        let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
         let AggregatedEpochStakeDelegations {
             epoch,

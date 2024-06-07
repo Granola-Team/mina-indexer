@@ -22,7 +22,7 @@ struct Cli {
     #[command(subcommand)]
     command: IndexerCommand,
     /// Path to the Unix domain socket file
-    #[arg(long, default_value = concat!(env!("PWD"), "/mina-indexer.sock"))]
+    #[arg(long, default_value = "./mina-indexer.sock")]
     domain_socket_path: PathBuf,
 }
 
@@ -163,12 +163,11 @@ pub struct ConfigArgs {
 impl ServerArgs {
     fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
         if self.locked_supply_csv.is_none() {
-            let path = concat!(env!("PWD"), "/data/locked.csv").into();
+            let path = "./data/locked.csv".into();
             self.locked_supply_csv = Some(path);
         }
         if self.genesis_ledger.is_none() {
-            let ledger_path =
-                concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json").into();
+            let ledger_path = "./data/genesis_ledgers/mainnet.json".into();
             self.genesis_ledger = Some(ledger_path);
         }
         self.pid = Some(pid);

@@ -13,7 +13,7 @@ use std::{path::PathBuf, sync::Arc};
 fn block_added() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("block-store-genesis")?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger_path = &PathBuf::from("./tests/data/genesis_ledgers/mainnet.json");
+    let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path)?;
 
     let indexer = IndexerState::new(
