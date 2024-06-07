@@ -6,7 +6,7 @@ set -o pipefail
 VER="$(git rev-parse --short=8 HEAD)"
 LOG=/mnt/mina-logs/"$VER"-log
 src="$(pwd)"
-IDXR="${src}/result/bin/mina-indexer"
+IDXR="${src}/rust/target/release/mina-indexer"
 socket="$src"/mina-indexer.sock
 export RUST_BACKTRACE=1
 

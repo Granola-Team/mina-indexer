@@ -1,5 +1,6 @@
 use super::precomputed::PcbVersion;
 use crate::block::precomputed::PrecomputedBlock;
+use log::info;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -10,6 +11,15 @@ impl GenesisBlock {
     pub fn new() -> anyhow::Result<Self> {
         let genesis_block_path: PathBuf =
             concat!(env!("PWD"), "/tests/data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json").into();
+        info!(
+            "Looking for genesis block at {}",
+            genesis_block_path.display()
+        );
+        assert!(
+            genesis_block_path.is_file(),
+            "Genesis block does not exist at {}",
+            genesis_block_path.display()
+        );
         Ok(Self(
             PrecomputedBlock::parse_file(&genesis_block_path, PcbVersion::V1)?,
             genesis_block_path.metadata().unwrap().len(),
