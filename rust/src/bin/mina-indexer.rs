@@ -163,38 +163,17 @@ pub struct ConfigArgs {
 impl ServerArgs {
     fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
         if self.locked_supply_csv.is_none() {
-            let path = match release_profile() {
-                ReleaseProfile::Production => PathBuf::from("/share/mina-indexer/data/locked.csv"),
-                ReleaseProfile::Development => concat!(env!("PWD"), "/data/locked.csv").into(),
-            };
+            let path = concat!(env!("PWD"), "/data/locked.csv").into();
             self.locked_supply_csv = Some(path);
         }
         if self.genesis_ledger.is_none() {
-            let ledger_path = match release_profile() {
-                ReleaseProfile::Production => {
-                    PathBuf::from("/share/mina-indexer/data/mainnet.json")
-                }
-                ReleaseProfile::Development => {
-                    concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json").into()
-                }
-            };
+            let ledger_path =
+                concat!(env!("PWD"), "/tests/data/genesis_ledgers/mainnet.json").into();
             self.genesis_ledger = Some(ledger_path);
         }
         self.pid = Some(pid);
         self.domain_socket_path = Some(domain_socket_path);
         self
-    }
-}
-
-pub enum ReleaseProfile {
-    Production,
-    Development,
-}
-
-fn release_profile() -> ReleaseProfile {
-    match std::env::var("RELEASE").unwrap_or_default().as_str() {
-        "production" => ReleaseProfile::Production,
-        _ => ReleaseProfile::Development,
     }
 }
 

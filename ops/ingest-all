@@ -6,7 +6,9 @@ set -o pipefail
 VER="$(git rev-parse --short=8 HEAD)"
 LOG=/mnt/mina-logs/"$VER"-log
 src="$(pwd)"
+IDXR="${src}/result/bin/mina-indexer"
 socket="$src"/mina-indexer.sock
+export RUST_BACKTRACE=1
 
 wait_for_socket() {
     while true; do
@@ -35,7 +37,7 @@ mkdir -p "$LOG"
 
 port="$(ephemeral_port)"
 
-./rust/target/release/mina-indexer \
+"${IDXR}" \
   --domain-socket-path "$socket" \
   server start \
     --web-port "$port" \
@@ -54,19 +56,17 @@ wait_for_socket
 
 # Tell the server to take a snapshot (checkpoint).
 #
-./rust/target/release/mina-indexer \
+"${IDXR}" \
   --domain-socket-path "$socket" \
   checkpoints create \
     --path /mnt/mina-logs/"$VER"-snapshot
 
-./rust/target/release/mina-indexer \
-  --domain-socket-path "$socket" \
-  shutdown
+"${IDXR}" --domain-socket-path "$socket" shutdown
 wait "$PID"
 
 # See if 'replay' works.
 #
-./rust/target/release/mina-indexer \
+"${IDXR}" \
   --domain-socket-path "$socket" \
   server replay \
     --web-port "$port" \
@@ -83,7 +83,5 @@ wait "$PID"
 PID=$!
 wait_for_socket
 
-./rust/target/release/mina-indexer \
-  --domain-socket-path "$socket" \
-  shutdown
+"${IDXR}" --domain-socket-path "$socket" shutdown
 wait "$PID"

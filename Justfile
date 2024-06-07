@@ -4,6 +4,7 @@
 # See https://github.com/casey/just for more.
 
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
+export CARGO_HOME := `pwd` + ".cargo"
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
