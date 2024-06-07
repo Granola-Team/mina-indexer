@@ -11,10 +11,13 @@ use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashMap;
 
-/// Key format `{fee}{slot}{pk}{state_hash}{num}`
-/// - fee:  8 BE bytes
-/// - slot: 4 BE bytes
-/// - num:  4 BE bytes
+/// **Key format:** `{fee}{slot}{pk}{hash}{num}`
+/// ```
+/// fee:  8 BE bytes
+/// slot: 4 BE bytes
+/// pk:   [PublicKey::LEN] bytes
+/// hash: [BlockHash::LEN] bytes
+/// num:  4 BE bytes
 fn snark_fee_prefix_key(
     fee: u64,
     global_slot: u32,
@@ -30,8 +33,9 @@ fn snark_fee_prefix_key(
     bytes
 }
 
-/// Key format `{prover}{slot}{index}`
-/// - prover: 55 pk bytes
+/// **Key format:** `{prover}{slot}{index}`
+/// ```
+/// - prover: [PublicKey::LEN] bytes
 /// - slot:   4 BE bytes
 /// - index:  4 BE bytes
 fn snark_prover_prefix_key(prover: &PublicKey, global_slot: u32, index: u32) -> Vec<u8> {
@@ -225,11 +229,10 @@ impl SnarkStore for IndexerStore {
         Ok(())
     }
 
-    fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
-        trace!("Getting top {n} SNARK workers");
-
+    fn get_top_snark_workers_by_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+        trace!("Getting top {n} SNARK workers by fees");
         Ok(self
-            .top_snarkers_iterator(IteratorMode::End)
+            .top_snark_workers_iterator(IteratorMode::End)
             .take(n)
             .map(|res| {
                 res.map(|(bytes, _)| {
@@ -245,9 +248,13 @@ impl SnarkStore for IndexerStore {
             .collect())
     }
 
-    fn top_snarkers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn top_snark_workers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database
             .iterator_cf(self.snark_top_producers_sort_cf(), mode)
+    }
+
+    fn snark_fees_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database.iterator_cf(self.snark_work_fees_cf(), mode)
     }
 
     fn set_snark_by_prover(

@@ -130,6 +130,13 @@ impl BlockWithoutHeight {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockComparison {
+    pub state_hash: BlockHash,
+    pub blockchain_length: u32,
+    pub hash_last_vrf_output: VrfOutput,
+}
+
 impl From<PrecomputedBlock> for Block {
     fn from(value: PrecomputedBlock) -> Self {
         Self {
@@ -170,6 +177,16 @@ impl From<&PrecomputedBlock> for BlockWithoutHeight {
     }
 }
 
+impl From<&PrecomputedBlock> for BlockComparison {
+    fn from(value: &PrecomputedBlock) -> Self {
+        Self {
+            state_hash: value.state_hash(),
+            blockchain_length: value.blockchain_length(),
+            hash_last_vrf_output: value.hash_last_vrf_output(),
+        }
+    }
+}
+
 impl std::str::FromStr for BlockHash {
     type Err = anyhow::Error;
 
@@ -191,6 +208,29 @@ impl From<String> for BlockHash {
 impl From<&str> for BlockHash {
     fn from(value: &str) -> Self {
         Self(value.to_string())
+    }
+}
+
+impl std::cmp::PartialOrd for BlockComparison {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for BlockComparison {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+
+        let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
+        let vrf_cmp = self.hash_last_vrf_output.cmp(&other.hash_last_vrf_output);
+        let hash_cmp = self.state_hash.cmp(&other.state_hash);
+
+        match (length_cmp, vrf_cmp, hash_cmp) {
+            (Ordering::Greater, _, _)
+            | (Ordering::Equal, Ordering::Greater, _)
+            | (Ordering::Equal, Ordering::Equal, Ordering::Greater) => Ordering::Less,
+            _ => Ordering::Greater,
+        }
     }
 }
 

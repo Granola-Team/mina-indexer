@@ -27,11 +27,14 @@ pub trait SnarkStore {
     /// Update top snark work producers
     fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()>;
 
-    /// Get top snark work producers
-    fn get_top_snarkers(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
+    /// Get top `n` SNARK producers by accumulated fees
+    fn get_top_snark_workers_by_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
 
-    /// Top snarker by fees terator
-    fn top_snarkers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    /// [DBIterator] over top SNARK producers by accumulated fees
+    fn top_snark_workers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// [DBIterator] over SNARKs by fee
+    fn snark_fees_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
     /// Set the SNARK for the prover in `global_slot` at `index`
     fn set_snark_by_prover(

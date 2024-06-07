@@ -2,19 +2,18 @@ use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
     block::store::BlockStore,
     command::{
+        decode_memo,
         signed::{self, SignedCommand, SignedCommandWithData},
         store::UserCommandStore,
         CommandStatusData,
     },
     ledger::public_key::PublicKey,
-    protocol::serialization_types::{
-        staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegation},
-        version_bytes,
+    protocol::serialization_types::staged_ledger_diff::{
+        SignedCommandPayloadBody, StakeDelegation,
     },
     store::{
-        to_be_bytes, txn_from_iterator, txn_sort_key_pk, txn_sort_key_prefix,
-        txn_sort_key_txn_hash, txn_to_iterator, user_commands_iterator,
-        user_commands_iterator_signed_command, user_commands_iterator_txn_hash, IndexerStore,
+        pk_of_key, pk_txn_sort_key_prefix, to_be_bytes, txn_hash_of_key,
+        user_commands_iterator_state_hash, user_commands_iterator_txn_hash, IndexerStore,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
@@ -38,7 +37,7 @@ impl TransactionsQueryRoot {
 
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
-                return Ok(db.get_user_command_by_hash(&hash)?.map(|cmd| {
+                return Ok(db.get_user_command(&hash, 0)?.map(|cmd| {
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 }));
             }
@@ -148,25 +147,25 @@ impl TransactionsQueryRoot {
         // from/to account (sender/receiver) query
         if query.from.as_ref().or(query.to.as_ref()).is_some() {
             let pk = query.from.as_ref().or(query.to.as_ref()).unwrap();
-            let start = txn_sort_key_prefix((pk as &str).into(), start_slot);
+            let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
             let mode = IteratorMode::From(&start, direction);
             let txn_iter = if query.from.is_some() {
-                txn_from_iterator(db, mode).flatten()
+                db.txn_from_iterator(mode).flatten()
             } else {
-                txn_to_iterator(db, mode).flatten()
+                db.txn_to_iterator(mode).flatten()
             };
 
             for (key, _) in txn_iter {
                 // public key bytes
-                let txn_pk = txn_sort_key_pk(&key);
+                let txn_pk = pk_of_key(&key);
                 if txn_pk.0 != *pk {
                     break;
                 }
 
                 // txn hash bytes
-                let txn_hash = txn_sort_key_txn_hash(&key);
+                let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
-                    .get_user_command_by_hash(&txn_hash)?
+                    .get_user_command(&txn_hash, 0)?
                     .expect("command at txn hash");
                 let txn =
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
@@ -183,8 +182,6 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
 
-        // TODO bound query search space if given any inputs
-
         let (start, direction) = match sort_by {
             TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
                 (to_be_bytes(0), Direction::Forward)
@@ -193,15 +190,24 @@ impl TransactionsQueryRoot {
                 (to_be_bytes(u32::MAX), Direction::Reverse)
             }
         };
-        for entry in user_commands_iterator(db, IteratorMode::From(&start, direction)).flatten() {
-            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&entry.0).ok()
-            {
+        for (key, _) in db
+            .user_commands_iterator(IteratorMode::From(&start, direction))
+            .flatten()
+        {
+            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&key).ok() {
                 continue;
             }
 
             // Only add transactions that satisfy the input query
-            let cmd = user_commands_iterator_signed_command(&entry.1)?;
-            let txn = Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+            let txn_hash = user_commands_iterator_txn_hash(&key)?;
+            let state_hash = user_commands_iterator_state_hash(&key)?;
+            let txn = Transaction::new(
+                db.get_user_command_state_hash(&txn_hash, &state_hash)?
+                    .unwrap(),
+                db,
+                epoch_num_user_commands,
+                total_num_user_commands,
+            );
 
             if query.matches(&txn) {
                 transactions.push(txn);
@@ -249,13 +255,6 @@ impl Transaction {
     }
 }
 
-pub fn decode_memo(bytes: Vec<u8>) -> anyhow::Result<String> {
-    let encoded_memo = bs58::encode(bytes)
-        .with_check_version(version_bytes::USER_COMMAND_MEMO)
-        .into_string();
-    Ok(encoded_memo)
-}
-
 impl TransactionWithoutBlock {
     pub fn new(
         cmd: SignedCommandWithData,
@@ -294,10 +293,7 @@ impl TransactionWithoutBlock {
                         }
                     }
                 };
-
                 let receiver = PublicKey::from(receiver).0;
-                let memo = decode_memo(common.memo.t.0).expect("decoded memo");
-
                 Self {
                     amount,
                     block_height: cmd.blockchain_length,
@@ -307,7 +303,7 @@ impl TransactionWithoutBlock {
                     from: PublicKey::from(sender).0,
                     hash: cmd.tx_hash,
                     kind: kind.to_string(),
-                    memo,
+                    memo: decode_memo(&common.memo.t.0),
                     nonce,
                     receiver: PK {
                         public_key: receiver.to_owned(),

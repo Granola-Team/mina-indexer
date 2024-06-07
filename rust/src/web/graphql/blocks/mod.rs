@@ -16,14 +16,10 @@ use crate::{
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{
-        blocks_global_slot_idx_iterator, blocks_global_slot_idx_state_hash_from_key, from_be_bytes,
-        to_be_bytes, IndexerStore,
-    },
+    store::{blocks_global_slot_idx_state_hash_from_key, to_be_bytes, IndexerStore},
     web::graphql::gen::BlockQueryInput,
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
-use log::debug;
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -126,8 +122,11 @@ impl BlocksQueryRoot {
         }
 
         // else iterate over global slot sorted blocks
-        for entry in blocks_global_slot_idx_iterator(db, speedb::IteratorMode::End).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&entry.0)?;
+        for (key, _) in db
+            .blocks_global_slot_idx_iterator(speedb::IteratorMode::End)
+            .flatten()
+        {
+            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
@@ -398,13 +397,8 @@ impl BlocksQueryRoot {
                 speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
             }
         };
-        for (key, _) in blocks_global_slot_idx_iterator(db, mode).flatten() {
+        for (key, _) in db.blocks_global_slot_idx_iterator(mode).flatten() {
             let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
-
-            // TODO
-            debug!("slot: {}", from_be_bytes(key[..4].to_vec()));
-            debug!("hash: {state_hash}");
-
             let pcb = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");

@@ -1,9 +1,10 @@
-use super::precomputed::PcbVersion;
+use super::{precomputed::PcbVersion, BlockComparison};
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
     ledger::public_key::PublicKey,
 };
+use speedb::{DBIterator, IteratorMode};
 
 pub trait BlockStore {
     /// Add block to the store
@@ -99,6 +100,15 @@ pub trait BlockStore {
     /// Get the epoch count of the best block
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
 
+    // Iterators
+
+    /// Iterator for blocks `{global_slot}{state_hash} -> _`
+    ///
+    /// Use [blocks_global_slot_idx_state_hash_from_key] to extract state hash
+    fn blocks_global_slot_idx_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    // Block counts
+
     /// Increment the epoch & pk block production counts
     fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
@@ -129,4 +139,22 @@ pub trait BlockStore {
         state_hash: &BlockHash,
         coinbase_receiver: &PublicKey,
     ) -> anyhow::Result<()>;
+
+    fn set_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+        comparison: &BlockComparison,
+    ) -> anyhow::Result<()>;
+
+    fn get_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<BlockComparison>>;
+
+    /// Compare blocks without deserializing them
+    fn block_cmp(
+        &self,
+        block: &BlockHash,
+        other: &BlockHash,
+    ) -> anyhow::Result<Option<std::cmp::Ordering>>;
 }

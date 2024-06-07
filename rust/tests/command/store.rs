@@ -22,6 +22,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path)?;
+
     let indexer = IndexerState::new(
         genesis_root.into(),
         IndexerVersion::new_testing(),
@@ -53,7 +54,8 @@ async fn add_and_get() -> anyhow::Result<()> {
     // check state hash key
     let result_cmds = indexer_store
         .as_ref()
-        .get_user_commands_in_block(&state_hash.into())?;
+        .get_block_user_commands(&state_hash.into())?
+        .unwrap_or_default();
     assert_eq!(result_cmds, block_cmds);
 
     // check each pk key
@@ -67,6 +69,7 @@ async fn add_and_get() -> anyhow::Result<()> {
         let result_pk_cmds: Vec<SignedCommand> = indexer_store
             .as_ref()
             .get_user_commands_for_public_key(&pk)?
+            .unwrap_or_default()
             .into_iter()
             .map(SignedCommand::from)
             .collect();
@@ -75,17 +78,23 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     // check transaction hash key
     for cmd in SignedCommand::from_precomputed(&block) {
-        let result_cmd: SignedCommand = indexer_store
-            .get_user_command_by_hash(&cmd.hash_signed_command()?)?
-            .unwrap()
-            .into();
-        assert_eq!(result_cmd, cmd);
+        let result_cmd: Option<SignedCommand> = indexer_store
+            .get_user_command(&cmd.hash_signed_command()?, 0)?
+            .map(|c| c.into());
+        assert_eq!(result_cmd, Some(cmd));
     }
 
     // iterate over transactions
     let mut curr_slot = 0;
-    for (key, value) in user_commands_iterator(&indexer_store, IteratorMode::End).flatten() {
-        let signed_cmd = user_commands_iterator_signed_command(&value)?;
+    for (key, _) in indexer_store
+        .user_commands_iterator(IteratorMode::End)
+        .flatten()
+    {
+        let txn_hash = user_commands_iterator_txn_hash(&key)?;
+        let state_hash = user_commands_iterator_state_hash(&key)?;
+        let signed_cmd = indexer_store
+            .get_user_command_state_hash(&txn_hash, &state_hash)?
+            .unwrap();
 
         // txn hashes should match
         assert_eq!(user_commands_iterator_txn_hash(&key)?, signed_cmd.tx_hash);
