@@ -1093,8 +1093,8 @@ test_rest_accounts_summary() {
     assert '0' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .total_num_snarks)
 
     # user commands
-    assert '150' $(curl --silent http://localhost:${port}/accounts/B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .epoch_num_user_commands)
-    assert '150' $(curl --silent http://localhost:${port}/accounts/B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .total_num_user_commands)
+    assert '241' $(curl --silent http://localhost:${port}/accounts/B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .epoch_num_user_commands)
+    assert '241' $(curl --silent http://localhost:${port}/accounts/B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .total_num_user_commands)
 
     # internal commands
     assert '2' $(curl --silent http://localhost:${port}/accounts/B62qmRG3THXszPjfJXDCk2MjDZqWLXMoVzyEWMPStEdfqhMe7GJaGxE | jq -r .epoch_num_internal_commands)

@@ -163,16 +163,16 @@ jsonpath "$.data.stakes[0].pk_epoch_num_blocks" == 0
 jsonpath "$.data.stakes[0].pk_total_num_blocks" == 0
 jsonpath "$.data.stakes[0].pk_epoch_num_snarks" == 0
 jsonpath "$.data.stakes[0].pk_total_num_snarks" == 0
-jsonpath "$.data.stakes[0].pk_epoch_num_user_commands" == 177
-jsonpath "$.data.stakes[0].pk_total_num_user_commands" == 177
+jsonpath "$.data.stakes[0].pk_epoch_num_user_commands" == 294
+jsonpath "$.data.stakes[0].pk_total_num_user_commands" == 294
 jsonpath "$.data.stakes[0].pk_epoch_num_internal_commands" == 198
 jsonpath "$.data.stakes[0].pk_total_num_internal_commands" == 198
 jsonpath "$.data.stakes[0].epoch_num_blocks" == 204
 jsonpath "$.data.stakes[0].total_num_blocks" == 204
 jsonpath "$.data.stakes[0].epoch_num_snarks" == 64
 jsonpath "$.data.stakes[0].total_num_snarks" == 64
-jsonpath "$.data.stakes[0].epoch_num_user_commands" == 180
-jsonpath "$.data.stakes[0].total_num_user_commands" == 180
+jsonpath "$.data.stakes[0].epoch_num_user_commands" == 303
+jsonpath "$.data.stakes[0].total_num_user_commands" == 303
 jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 207
 jsonpath "$.data.stakes[0].total_num_internal_commands" == 207
 
