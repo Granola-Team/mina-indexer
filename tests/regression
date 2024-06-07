@@ -1184,7 +1184,7 @@ test_rest_blocks() {
     # /blocks/slot={globl_slot} endpoint
     curl --silent http://localhost:${port}/blocks/slot=145 > output.json
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
-    
+
     teardown
 }
 
@@ -1533,7 +1533,7 @@ test_start_from_config() {
 test_start_without_blocks_dir() {
     enter_test test_start_without_blocks_dir
 
-    idxr_server_start_standard --block-watch-dir ./blocks 
+    idxr_server_start_standard --block-watch-dir ./blocks
     wait_for_socket
 
     dl_mainnet 15 ./blocks
