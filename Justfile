@@ -82,7 +82,7 @@ build-image:
 start-server: build
   RUST_BACKTRACE=1 \
   ./rust/target/release/mina-indexer \
-    --domain-socket-path ./mina-indexer.sock \
+    --socket ./mina-indexer.sock \
     server start \
       --log-level TRACE \
       --blocks-dir ./tests/data/initial-blocks \

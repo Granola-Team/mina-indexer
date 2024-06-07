@@ -38,7 +38,7 @@ mkdir -p "$LOG"
 port="$(ephemeral_port)"
 
 "${IDXR}" \
-  --domain-socket-path "$socket" \
+  --socket "$socket" \
   server start \
     --web-port "$port" \
     --log-level DEBUG \
@@ -57,17 +57,17 @@ wait_for_socket
 # Tell the server to take a snapshot (checkpoint).
 #
 "${IDXR}" \
-  --domain-socket-path "$socket" \
+  --socket "$socket" \
   checkpoints create \
     --path /mnt/mina-logs/"$VER"-snapshot
 
-"${IDXR}" --domain-socket-path "$socket" shutdown
+"${IDXR}" --socket "$socket" shutdown
 wait "$PID"
 
 # See if 'replay' works.
 #
 "${IDXR}" \
-  --domain-socket-path "$socket" \
+  --socket "$socket" \
   server replay \
     --web-port "$port" \
     --log-level DEBUG \
@@ -83,5 +83,5 @@ wait "$PID"
 PID=$!
 wait_for_socket
 
-"${IDXR}" --domain-socket-path "$socket" shutdown
+"${IDXR}" --socket "$socket" shutdown
 wait "$PID"

@@ -52,7 +52,7 @@ cp -r "$SRC"/data .
 SOCKET=./mina-indexer.sock
 if [ -e "$SOCKET" ]; then
     if "$SRC"/rust/target/release/mina-indexer \
-           --domain-socket-path "$SOCKET" \
+           --socket "$SOCKET" \
            shutdown
     then
         :
@@ -76,7 +76,7 @@ setsid \
     '"$@" 0< /dev/null 1>> ./log/out 2>> ./log/err &' \
     -- \
     "$SRC"/rust/target/release/mina-indexer \
-      --domain-socket-path "$SOCKET" \
+      --socket "$SOCKET" \
       server start \
         --log-level DEBUG \
         --web-hostname 0.0.0.0 \
