@@ -440,8 +440,8 @@ mod tests {
         assert!(block0 < block2);
         assert!(block1 < block2);
 
-        let path0: PathBuf = "./tests/initial-blocks/mainnet-10-3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5.json".into();
-        let path1: PathBuf = "./tests/initial-blocks/mainnet-10-3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL.json".into();
+        let path0: PathBuf = "../tests/data/initial-blocks/mainnet-10-3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5.json".into();
+        let path1: PathBuf = "../tests/data/initial-blocks/mainnet-10-3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL.json".into();
         let block0: Block = PrecomputedBlock::parse_file(&path0, PcbVersion::V1)?.into();
         let block1: Block = PrecomputedBlock::parse_file(&path1, PcbVersion::V1)?.into();
 

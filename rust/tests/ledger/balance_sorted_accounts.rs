@@ -20,7 +20,7 @@ fn check_balance() -> anyhow::Result<()> {
     const MAX_BLOCK_LENGTH_FILTER: u32 = 8;
 
     let store_dir = setup_new_db_dir("balance-sorted-db")?;
-    let blocks_dir = &PathBuf::from("./tests/initial-blocks");
+    let blocks_dir = &PathBuf::from("../tests/data/initial-blocks");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
         serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)

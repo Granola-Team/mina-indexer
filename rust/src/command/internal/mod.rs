@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn from_precomputed() -> anyhow::Result<()> {
-        let path = std::path::PathBuf::from("./tests/initial-blocks/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
+        let path = std::path::PathBuf::from("../tests/data/initial-blocks/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let internal_cmds = InternalCommand::from_precomputed(&block);
 
