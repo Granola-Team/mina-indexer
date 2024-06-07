@@ -31,6 +31,13 @@ pub struct Ledger {
     pub accounts: HashMap<PublicKey, Account>,
 }
 
+#[allow(clippy::len_without_is_empty)]
+impl Ledger {
+    pub fn len(&self) -> usize {
+        self.accounts.len()
+    }
+}
+
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct NonGenesisLedger {
     pub ledger: Ledger,
