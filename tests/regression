@@ -9,7 +9,6 @@ set -euo pipefail
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
 IDXR="$SRC"/rust/target/release/mina-indexer
-LEDGER="$SRC"/data/genesis_ledgers/mainnet.json
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 LOCKED_CSV="$SRC"/data/locked.csv
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
@@ -130,7 +129,6 @@ idxr_server_start() {
 
 idxr_server_start_standard() {
     idxr_server_start \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -141,7 +139,6 @@ idxr_server_start_standard() {
 idxr_server_sync() {
     port=$(ephemeral_port)
     idxr_server sync --web-port "$port" \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -151,7 +148,6 @@ idxr_server_sync() {
 idxr_server_replay() {
     port=$(ephemeral_port)
     idxr_server replay --web-port "$port" \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -342,7 +338,6 @@ test_startup_dirs_get_created() {
     enter_test test_startup_dirs_get_created
 
     idxr_server_start \
-        --genesis-ledger "$LEDGER" \
         --blocks-dir ./startup-blocks \
         --block-watch-dir ./watch-blocks \
         --staking-ledgers-dir ./startup-ledgers \
@@ -1070,7 +1065,6 @@ test_rest_accounts_summary() {
     port=$(ephemeral_port)
 
     idxr_server start \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -1264,7 +1258,6 @@ test_startup_staking_ledgers() {
     enter_test test_startup_staking_ledgers
 
     idxr_server_start \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --database-dir ./database \
@@ -1375,7 +1368,6 @@ test_staking_delegations() {
     enter_test test_staking_delegations
 
     idxr_server_start \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --database-dir ./database \
@@ -1491,7 +1483,6 @@ test_start_from_config() {
     wait_for_socket
     teardown
 
-    cp $LEDGER ./mainnet.json
     cp $LOCKED_CSV ./locked.csv
 
     dl_mainnet 15 ./blocks
@@ -1499,8 +1490,7 @@ test_start_from_config() {
     port=$(ephemeral_port)
     file=./config.json
     echo "
-    { \"genesis_ledger\": \"./mainnet.json\",
-      \"genesis_hash\": \"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ\",
+    { \"genesis_hash\": \"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ\",
       \"blocks_dir\": \"./blocks\",
       \"block_watch_dir\": \"./blocks\",
       \"staking_ledgers_dir\": \"./staking-ledgers\",
@@ -1553,7 +1543,6 @@ test_start_without_ledgers_dir() {
     enter_test test_start_without_ledgers_dir
 
     idxr_server_start \
-        --genesis-ledger "$LEDGER" \
         --ledgers-watch-dir ./staking-ledgers \
         --database-dir ./database
     wait_for_socket
@@ -1680,7 +1669,6 @@ test_hurl() {
     port=$(ephemeral_port)
 
     idxr_server start \
-        --genesis-ledger "$LEDGER" \
         --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
