@@ -1,3 +1,7 @@
+# This is not the authoritative pipeline definition. Only Buildkite settings
+# allow setting the authoritative config. This file exists to give some
+# visibility into the pipeline steps.
+
 steps:
 
 - label: "Developer Environment Build and Tier 1 Test"
@@ -9,6 +13,8 @@ steps:
     nix: true
     production: false
 
+# Only a 'main' branch that has succeeded on the above will be deployed.
+#
 - label: "Deploy to Production"
   if: build.branch == "main"
   key: deploy

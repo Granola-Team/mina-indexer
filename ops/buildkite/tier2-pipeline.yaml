@@ -1,3 +1,7 @@
+# This is not the authoritative pipeline definition. Only Buildkite settings
+# allow setting the authoritative config. This file exists to give some
+# visibility into the pipeline steps.
+
 steps:
 - label: "Tier 2 Testing"
   if: build.branch == "main"
