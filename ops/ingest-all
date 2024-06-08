@@ -42,7 +42,6 @@ port="$(ephemeral_port)"
   server start \
     --web-port "$port" \
     --log-level DEBUG \
-    --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
     --database-dir /mnt/mina-logs/"$VER"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
@@ -71,7 +70,6 @@ wait "$PID"
   server replay \
     --web-port "$port" \
     --log-level DEBUG \
-    --genesis-ledger "$src"/data/genesis_ledgers/mainnet.json \
     --database-dir /mnt/mina-logs/"$VER"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
