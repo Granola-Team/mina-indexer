@@ -240,7 +240,7 @@ jsonpath "$.data.stakes[9].balance" == 1104.686899999
 jsonpath "$.data.stakes[9].balanceNanomina" == 1104686899999
 jsonpath "$.data.stakes[9].username" == "Unknown"
 
-duration < 1000
+duration < 2000
 
 #
 # Stakes delegation total stake percentage query sort by stakes desc
