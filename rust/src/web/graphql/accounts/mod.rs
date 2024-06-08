@@ -4,7 +4,7 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::{account, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
-    store::account_balance_iterator,
+    store::account::AccountStore,
     web::graphql::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -129,7 +129,7 @@ impl AccountQueryRoot {
                 }));
         }
 
-        // TODO default query handler use balance-sorted accounts
+        // default query handler use balance-sorted accounts
         let mut accounts: Vec<Account> = Vec::with_capacity(limit);
         let best_ledger = db.get_best_ledger()?.expect("best ledger");
         let mode = match sort_by {
@@ -137,7 +137,7 @@ impl AccountQueryRoot {
             Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
         };
 
-        for (key, _) in account_balance_iterator(db, mode).flatten() {
+        for (key, _) in db.account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
             let account = best_ledger.accounts.get(&pk).expect("account in ledger");
 

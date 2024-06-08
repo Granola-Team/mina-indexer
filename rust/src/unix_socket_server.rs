@@ -998,7 +998,9 @@ async fn handle_conn(
             }
             Snarks::Top { num } => {
                 info!("Received top {num} SNARKers command");
-                Some(serde_json::to_string_pretty(&db.get_top_snarkers(num)?)?)
+                Some(serde_json::to_string_pretty(
+                    &db.get_top_snark_workers_by_fees(num)?,
+                )?)
             }
         },
         ClientCli::Shutdown => {
@@ -1075,7 +1077,9 @@ async fn handle_conn(
                 } else if !block::is_valid_state_hash(&end_state_hash.0) {
                     invalid_state_hash(&end_state_hash.0)
                 } else {
-                    let transactions = db.get_user_commands_for_public_key(&pk.clone().into())?;
+                    let transactions = db
+                        .get_user_commands_for_public_key(&pk.clone().into())?
+                        .unwrap_or_default();
                     let transaction_str = if verbose {
                         format_vec_jq_compatible(&transactions)
                     } else {
@@ -1108,7 +1112,7 @@ async fn handle_conn(
                 if !signed::is_valid_tx_hash(&hash) {
                     invalid_tx_hash(&hash)
                 } else {
-                    db.get_user_command_by_hash(&hash)?.map(|cmd| {
+                    db.get_user_command(&hash, 0)?.map(|cmd| {
                         if verbose {
                             format!("{cmd:?}")
                         } else {
@@ -1128,34 +1132,37 @@ async fn handle_conn(
                     invalid_state_hash(&state_hash)
                 } else {
                     let block_hash = BlockHash(state_hash.to_owned());
-                    Some(db.get_user_commands_in_block(&block_hash).map(|cmds| {
-                        let transaction_str = if verbose {
-                            format_vec_jq_compatible(&cmds)
-                        } else {
-                            let cmds: Vec<Command> = cmds.into_iter().map(Command::from).collect();
-                            format_vec_jq_compatible(&cmds)
-                        };
-                        if path.is_none() {
-                            debug!("Writing transactions for {state_hash} to stdout");
-                            transaction_str
-                        } else {
-                            let path = path.unwrap();
-                            if !path.is_dir() {
-                                debug!(
-                                    "Writing transactions for {state_hash} to {}",
-                                    path.display()
-                                );
-
-                                std::fs::write(&path, transaction_str).unwrap();
-                                format!(
-                                    "Transactions for {state_hash} written to {}",
-                                    path.display()
-                                )
+                    db.get_block_user_commands(&block_hash)
+                        .unwrap_or_default()
+                        .map(|cmds| {
+                            let transaction_str = if verbose {
+                                format_vec_jq_compatible(&cmds)
                             } else {
-                                file_must_not_be_a_directory(&path).unwrap()
+                                let cmds: Vec<Command> =
+                                    cmds.into_iter().map(Command::from).collect();
+                                format_vec_jq_compatible(&cmds)
+                            };
+                            if path.is_none() {
+                                debug!("Writing transactions for {state_hash} to stdout");
+                                transaction_str
+                            } else {
+                                let path = path.unwrap();
+                                if !path.is_dir() {
+                                    debug!(
+                                        "Writing transactions for {state_hash} to {}",
+                                        path.display()
+                                    );
+
+                                    std::fs::write(&path, transaction_str).unwrap();
+                                    format!(
+                                        "Transactions for {state_hash} written to {}",
+                                        path.display()
+                                    )
+                                } else {
+                                    file_must_not_be_a_directory(&path).unwrap()
+                                }
                             }
-                        }
-                    })?)
+                        })
                 }
             }
         },

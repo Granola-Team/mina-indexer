@@ -118,7 +118,7 @@ impl SignedCommand {
     }
 
     /// This returns a user command (transaction) hash that starts with
-    /// [TXN_HASH_START]
+    /// [TXN_HASH_PREFIX]
     pub fn hash_signed_command(&self) -> anyhow::Result<String> {
         let mut binprot_bytes = Vec::new();
         bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
@@ -479,10 +479,10 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
 }
 
 pub const TXN_HASH_LEN: usize = 53;
-pub const TXN_HASH_START: &str = "Ckp";
+pub const TXN_HASH_PREFIX: &str = "Ckp";
 
 pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with(TXN_HASH_START) && input.len() == TXN_HASH_LEN
+    input.starts_with(TXN_HASH_PREFIX) && input.len() == TXN_HASH_LEN
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
-        BlockHash,
+        BlockComparison, BlockHash,
     },
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
@@ -16,6 +16,7 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
+use speedb::{DBIterator, IteratorMode};
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
@@ -23,35 +24,35 @@ impl BlockStore for IndexerStore {
         trace!("Adding block {}", block.summary());
 
         // add block to db
-        let state_hash = block.state_hash().0;
+        let state_hash = block.state_hash();
         let value = serde_json::to_vec(&block)?;
 
         if matches!(
             self.database
-                .get_pinned_cf(self.blocks_cf(), state_hash.as_bytes()),
+                .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes()),
             Ok(Some(_))
         ) {
             trace!("Block already present {}", block.summary());
             return Ok(None);
         }
         self.database
-            .put_cf(self.blocks_cf(), state_hash.as_bytes(), value)?;
+            .put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value)?;
 
         // increment block production counts
         self.increment_block_production_count(block)?;
 
         // add to coinbase receiver index
-        self.set_coinbase_receiver(&block.state_hash(), &block.coinbase_receiver())?;
+        self.set_coinbase_receiver(&state_hash, &block.coinbase_receiver())?;
 
         // add to blockchain length index
-        self.set_blockchain_length(&block.state_hash(), block.blockchain_length())?;
+        self.set_blockchain_length(&state_hash, block.blockchain_length())?;
 
         // add to parent hash index
-        self.set_block_parent_hash(&block.state_hash(), &block.previous_state_hash())?;
+        self.set_block_parent_hash(&state_hash, &block.previous_state_hash())?;
 
         // add to balance update index
         self.set_block_balance_updates(
-            &block.state_hash(),
+            &state_hash,
             block.coinbase_receiver(),
             LedgerBalanceUpdate::from_precomputed(block),
         )?;
@@ -65,17 +66,20 @@ impl BlockStore for IndexerStore {
 
         // add block for each public key
         for pk in block.all_public_keys() {
-            self.add_block_at_public_key(&pk, &block.state_hash())?;
+            self.add_block_at_public_key(&pk, &state_hash)?;
         }
 
         // add height <-> global slot
         self.set_height_global_slot(block.blockchain_length(), block.global_slot_since_genesis())?;
 
         // add block to height list
-        self.add_block_at_height(&block.state_hash(), block.blockchain_length())?;
+        self.add_block_at_height(&state_hash, block.blockchain_length())?;
 
         // add block to slots list
-        self.add_block_at_slot(&block.state_hash(), block.global_slot_since_genesis())?;
+        self.add_block_at_slot(&state_hash, block.global_slot_since_genesis())?;
+
+        // add comparison data before user commands, SNARKs, and internal commands
+        self.set_block_comparison(&state_hash, &BlockComparison::from(block))?;
 
         // add block user commands
         self.add_user_commands(block)?;
@@ -86,8 +90,8 @@ impl BlockStore for IndexerStore {
         // add block SNARK work
         self.add_snark_work(block)?;
 
-        // store pcb's version
-        self.set_block_version(&block.state_hash(), block.version())?;
+        // add pcb's version
+        self.set_block_version(&state_hash, block.version())?;
 
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
@@ -104,10 +108,10 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
+            .and_then(|bytes| {
                 serde_json::from_slice::<PrecomputedBlock>(&bytes)
                     .with_context(|| format!("{:?}", bytes.to_vec()))
-                    .unwrap()
+                    .ok()
             }))
     }
 
@@ -446,7 +450,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.blocks_version_cf(), key)?
-            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
@@ -509,6 +513,15 @@ impl BlockStore for IndexerStore {
         trace!("Getting current epoch");
         Ok(self.get_best_block()?.map_or(0, |b| b.epoch_count()))
     }
+
+    // Iterators
+
+    fn blocks_global_slot_idx_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.blocks_global_slot_idx_cf(), mode)
+    }
+
+    // Block counts
 
     fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
@@ -587,5 +600,51 @@ impl BlockStore for IndexerStore {
             .database
             .get(Self::TOTAL_NUM_BLOCKS_KEY)?
             .map_or(0, from_be_bytes))
+    }
+
+    fn set_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+        comparison: &BlockComparison,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block comparison {state_hash}");
+        Ok(self.database.put_cf(
+            self.block_comparison_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(comparison)?,
+        )?)
+    }
+
+    fn get_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<BlockComparison>> {
+        trace!("Getting block comparison {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_comparison_cf(), state_hash.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+    }
+
+    fn block_cmp(
+        &self,
+        block: &BlockHash,
+        other: &BlockHash,
+    ) -> anyhow::Result<Option<std::cmp::Ordering>> {
+        // get stored block comparisons
+        let res1 = self
+            .database
+            .get_cf(self.block_comparison_cf(), block.0.as_bytes());
+        let res2 = self
+            .database
+            .get_cf(self.block_comparison_cf(), other.0.as_bytes());
+
+        // compare stored block comparisons
+        if let (Ok(Some(bytes1)), Ok(Some(bytes2))) = (res1, res2) {
+            let bc1: BlockComparison = serde_json::from_slice(&bytes1)?;
+            let bc2: BlockComparison = serde_json::from_slice(&bytes2)?;
+            return Ok(Some(bc1.cmp(&bc2)));
+        }
+        Ok(None)
     }
 }

@@ -18,7 +18,7 @@ HTTP 200
 [Asserts]
 
 jsonpath "$.data.transaction.block.stateHash" == "3NLgPYVDSV6y7ZKSQrjowedjZn9RuLwdx311vheWZEy3mBjKDbmj"
-jsonpath "$.data.transaction.epoch_num_user_commands" == 180
-jsonpath "$.data.transaction.total_num_user_commands" == 180
+jsonpath "$.data.transaction.epoch_num_user_commands" == 303
+jsonpath "$.data.transaction.total_num_user_commands" == 303
 
 duration < 100

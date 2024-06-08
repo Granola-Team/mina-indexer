@@ -2,6 +2,7 @@ use crate::{
     block::BlockHash,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
 };
+use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 pub trait AccountStore {
@@ -37,4 +38,13 @@ pub trait AccountStore {
         updates: Vec<PaymentDiff>,
         coinbase_receivers: HashSet<PublicKey>,
     ) -> anyhow::Result<()>;
+
+    // Iterators
+
+    /// Iterator for balance-sorted accounts
+    /// `{balance}{pk} -> _`
+    /// ```
+    /// - balance: 8 BE bytes
+    /// - pk:      [PublicKey::LEN] bytes
+    fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 }

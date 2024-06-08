@@ -11,6 +11,7 @@ use crate::{
     store::{account::AccountStore, u64_prefix_key, IndexerStore},
 };
 use log::trace;
+use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 impl AccountStore for IndexerStore {
@@ -174,5 +175,12 @@ impl AccountStore for IndexerStore {
             serde_json::to_vec(&(coinbase_receiver, balance_updates))?,
         )?;
         Ok(())
+    }
+
+    // Iterators
+
+    fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.account_balance_sort_cf(), mode)
     }
 }

@@ -4,6 +4,7 @@ use super::{
     Ledger,
 };
 use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
+use anyhow::anyhow;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -53,6 +54,14 @@ pub struct GenesisAccounts {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
     ledger: Ledger,
+}
+
+impl std::str::FromStr for GenesisRoot {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(|e| anyhow!("Error parsing genesis root: {e}"))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -163,8 +172,8 @@ impl GenesisLedger {
     }
 }
 
-pub fn parse_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<GenesisRoot> {
-    let data = std::fs::read(filename)?;
+pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<GenesisRoot> {
+    let data = std::fs::read(path)?;
     Ok(serde_json::from_slice(&data)?)
 }
 

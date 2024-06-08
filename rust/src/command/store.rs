@@ -3,9 +3,7 @@ use crate::{
     command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
 };
-
-// TODO add iterators
-// use speedb::DBIterator;
+use speedb::{DBIterator, IteratorMode};
 
 /// Store for user commands
 pub trait UserCommandStore {
@@ -13,16 +11,27 @@ pub trait UserCommandStore {
     /// public keys, transaction hash, and state hashes
     fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
+    /// Set user commands for the given block
+    fn set_block_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+
     /// Get indexed user commands from the given block
-    fn get_user_commands_in_block(
+    fn get_block_user_commands(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<UserCommandWithStatus>>;
+    ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>>;
 
-    /// Get indexed user command by its hash
-    fn get_user_command_by_hash(
+    /// Get user command by its hash & index
+    fn get_user_command(
         &self,
-        command_hash: &str,
+        txn_hash: &str,
+        index: u32,
+    ) -> anyhow::Result<Option<SignedCommandWithData>>;
+
+    /// Get user command by its hash & containing block
+    fn get_user_command_state_hash(
+        &self,
+        txn_hash: &str,
+        state_hash: &BlockHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
     /// Get indexed user commands involving the public key as a sender or
@@ -30,7 +39,7 @@ pub trait UserCommandStore {
     fn get_user_commands_for_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Vec<SignedCommandWithData>>;
+    ) -> anyhow::Result<Option<Vec<SignedCommandWithData>>>;
 
     /// Get user commands for the public key with number and/or state hash
     /// bounds
@@ -41,7 +50,40 @@ pub trait UserCommandStore {
         end_state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<SignedCommandWithData>>;
 
-    fn get_pk_num_user_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+    /// Set block containing `txn_hash`
+    fn set_user_command_state_hash(
+        &self,
+        state_hash: BlockHash,
+        txn_hash: &str,
+    ) -> anyhow::Result<()>;
+
+    /// Get state hashes of blocks containing `txn_hash` in block sorted order
+    fn get_user_command_state_hashes(
+        &self,
+        txn_hash: &str,
+    ) -> anyhow::Result<Option<Vec<BlockHash>>>;
+
+    /// Get number of blocks containing `txn_hash`
+    fn get_user_commands_num_containing_blocks(
+        &self,
+        txn_hash: &str,
+    ) -> anyhow::Result<Option<u32>>;
+
+    // Iterators
+
+    /// Iterator for user commands (transactions)
+    fn user_commands_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for user commands by sender
+    fn txn_from_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for user commands by receiver
+    fn txn_to_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    // User command counts
+
+    /// Get the number of blocks in which `pk` has transactions
+    fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
     /// Increment user commands per epoch count
     fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;

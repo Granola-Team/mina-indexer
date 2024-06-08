@@ -43,14 +43,14 @@ jsonpath "$.data.transactions" count == 50
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 3
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+jsonpath "$.data.transactions[0].memo" == ""
 jsonpath "$.data.transactions[0].hash" == "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 59
+jsonpath "$.data.transactions[49].blockHeight" == 37
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
-jsonpath "$.data.transactions[49].hash" == "CkpZ3EzeQLT4m3mLUwyKFdvF3cjvvFGUzR9jug14E8bFryTpTsxYz"
+jsonpath "$.data.transactions[49].memo" == ""
+jsonpath "$.data.transactions[49].hash" == "CkpYsbai6qHEoF53e8pFHdiWqhT34sPhSgbUVdxLmfzAZ8oMpKDuK"
 
 duration < 500
 
@@ -86,14 +86,14 @@ jsonpath "$.data.transactions" count == 50
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 120
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+jsonpath "$.data.transactions[0].memo" == ""
 jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 56
+jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].memo" == "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
-jsonpath "$.data.transactions[49].hash" == "CkpZDjNVLadk61ZhYnh9eaLc9g9yx19KqmLjJiZRqtavHsnvsKsnC"
+jsonpath "$.data.transactions[49].memo" == ""
+jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
 
 duration < 500
 
@@ -157,9 +157,6 @@ jsonpath "$.data.transactions[1].fee" == 10000000
 
 duration < 500
 
-# TODO state hash query
-# TODO global slot query
-
 #
 # Transactions from (sender) query
 #
@@ -203,9 +200,9 @@ jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 56
+jsonpath "$.data.transactions[49].blockHeight" == 100
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpZDjNVLadk61ZhYnh9eaLc9g9yx19KqmLjJiZRqtavHsnvsKsnC"
+jsonpath "$.data.transactions[49].hash" == "CkpZgsCnm3uFdZbbyPrsrzjZuiXPmkbdhvrzyimcv1zh98uV2p8Z2"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
@@ -256,9 +253,9 @@ jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 56
+jsonpath "$.data.transactions[49].blockHeight" == 100
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpZDjNVLadk61ZhYnh9eaLc9g9yx19KqmLjJiZRqtavHsnvsKsnC"
+jsonpath "$.data.transactions[49].hash" == "CkpZgsCnm3uFdZbbyPrsrzjZuiXPmkbdhvrzyimcv1zh98uV2p8Z2"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000

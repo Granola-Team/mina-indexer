@@ -270,8 +270,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 /// 1st byte - is length, always 32 for digests
 /// bytes 2 to 33 - are data, 0-right-padded if length is less than 32
 
-fn decode_memo(decoded: &[u8]) -> String {
-    let value = &decoded[2..decoded[1] as usize + 2];
+pub fn decode_memo(encoded: &[u8]) -> String {
+    let value = &encoded[2..encoded[1] as usize + 2];
     if let Ok(memo) = String::from_utf8(value.to_vec()) {
         memo
     } else {

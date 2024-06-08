@@ -10,8 +10,7 @@ use mina_indexer::{
     },
     server::IndexerVersion,
     state::IndexerState,
-    // store::IndexerStore,
-    store::{account_balance_iterator, IndexerStore},
+    store::{account::AccountStore, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -43,7 +42,8 @@ fn check_balance() -> anyhow::Result<()> {
     state.add_blocks(&mut bp)?;
 
     // check best ledger balances equal sorted balances
-    for (n, (key, _)) in account_balance_iterator(&indexer_store, speedb::IteratorMode::End)
+    for (n, (key, _)) in indexer_store
+        .account_balance_iterator(speedb::IteratorMode::End)
         .flatten()
         .enumerate()
     {

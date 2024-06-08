@@ -7,7 +7,7 @@ use mina_indexer::{
     constants::*,
     ledger::{
         self,
-        genesis::{GenesisConstants, GenesisLedger},
+        genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::IndexerStore,
@@ -166,10 +166,6 @@ impl ServerArgs {
             let path = "./data/locked.csv".into();
             self.locked_supply_csv = Some(path);
         }
-        if self.genesis_ledger.is_none() {
-            let ledger_path = "./data/genesis_ledgers/mainnet.json".into();
-            self.genesis_ledger = Some(ledger_path);
-        }
         self.pid = Some(pid);
         self.socket = Some(domain_socket_path);
         self
@@ -270,7 +266,6 @@ pub fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
 ) -> anyhow::Result<IndexerConfiguration> {
-    let ledger = args.genesis_ledger.expect("Genesis ledger wasn't provided");
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
     let block_watch_dir = args
@@ -323,11 +318,6 @@ pub fn process_indexer_configuration(
     );
 
     assert!(
-        ledger.is_file(),
-        "Ledger file does not exist at {}",
-        ledger.display()
-    );
-    assert!(
         // bad things happen if this condition fails
         canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
         "canonical update threshold must be strictly less than the transition frontier length!"
@@ -345,44 +335,60 @@ pub fn process_indexer_configuration(
     );
     fs::create_dir_all(staking_ledger_watch_dir.clone())?;
 
-    info!("Parsing ledger file at {}", ledger.display());
-    match ledger::genesis::parse_file(&ledger) {
-        Err(err) => {
-            error!("Unable to parse genesis ledger: {}", err);
-            std::process::exit(100)
-        }
-        Ok(genesis_root) => {
-            let genesis_ledger: GenesisLedger = genesis_root.into();
-            info!("Genesis ledger parsed successfully");
+    let genesis_ledger = if let Some(ledger) = args.genesis_ledger {
+        assert!(
+            ledger.is_file(),
+            "Ledger file does not exist at {}",
+            ledger.display()
+        );
+        info!("Parsing ledger file at {}", ledger.display());
 
-            Ok(IndexerConfiguration {
-                genesis_ledger,
-                genesis_hash,
-                genesis_constants,
-                constraint_system_digests,
-                version: PcbVersion::V1, // TODO make configurable
-                blocks_dir,
-                block_watch_dir,
-                staking_ledgers_dir,
-                staking_ledger_watch_dir,
-                prune_interval,
-                canonical_threshold,
-                canonical_update_threshold,
-                initialization_mode: mode,
-                ledger_cadence,
-                reporting_freq,
-                domain_socket_path,
-                missing_block_recovery_exe,
-                missing_block_recovery_delay,
-                missing_block_recovery_batch,
-            })
+        match ledger::genesis::parse_file(&ledger) {
+            Err(err) => {
+                error!("Unable to parse genesis ledger: {err}");
+                std::process::exit(100)
+            }
+            Ok(genesis_root) => {
+                info!(
+                    "Successfully parsed {} genesis ledger",
+                    genesis_root.ledger.name
+                );
+                genesis_root.into()
+            }
         }
-    }
+    } else {
+        let genesis_root =
+            GenesisRoot::from_str(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+        info!("Using default {} genesis ledger", genesis_root.ledger.name);
+        genesis_root.into()
+    };
+
+    Ok(IndexerConfiguration {
+        genesis_ledger,
+        genesis_hash,
+        genesis_constants,
+        constraint_system_digests,
+        version: PcbVersion::V1,
+        blocks_dir,
+        block_watch_dir,
+        staking_ledgers_dir,
+        staking_ledger_watch_dir,
+        prune_interval,
+        canonical_threshold,
+        canonical_update_threshold,
+        initialization_mode: mode,
+        ledger_cadence,
+        reporting_freq,
+        domain_socket_path,
+        missing_block_recovery_exe,
+        missing_block_recovery_delay,
+        missing_block_recovery_batch,
+    })
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ServerArgsJson {
-    genesis_ledger: String,
+    genesis_ledger: Option<String>,
     genesis_hash: String,
     genesis_constants: Option<String>,
     constraint_system_digests: Option<Vec<String>>,
@@ -414,11 +420,7 @@ impl From<ServerArgs> for ServerArgsJson {
         let domain_socket_path = value.socket.clone().unwrap();
         let value = value.with_dynamic_defaults(domain_socket_path, pid);
         Self {
-            genesis_ledger: value
-                .genesis_ledger
-                .expect("Genesis ledger wasn't provided")
-                .display()
-                .to_string(),
+            genesis_ledger: value.genesis_ledger.map(|path| path.display().to_string()),
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.display().to_string()),
             constraint_system_digests: value.constraint_system_digests,
@@ -461,7 +463,7 @@ impl From<ServerArgs> for ServerArgsJson {
 impl From<ServerArgsJson> for ServerArgs {
     fn from(value: ServerArgsJson) -> Self {
         Self {
-            genesis_ledger: value.genesis_ledger.parse().ok(),
+            genesis_ledger: value.genesis_ledger.and_then(|path| path.parse().ok()),
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.into()),
             constraint_system_digests: value.constraint_system_digests,

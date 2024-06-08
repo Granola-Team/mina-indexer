@@ -1,10 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
-    store::IndexerStore,
+    store::{from_be_bytes, to_be_bytes, IndexerStore},
 };
 use log::trace;
 
@@ -26,14 +26,14 @@ impl CanonicityStore for IndexerStore {
         // height -> state hash
         self.database.put_cf(
             self.canonicity_length_cf(),
-            height.to_be_bytes(),
+            to_be_bytes(height),
             state_hash.0.as_bytes(),
         )?;
 
         // slot -> state hash
         self.database.put_cf(
             self.canonicity_slot_cf(),
-            global_slot.to_be_bytes(),
+            to_be_bytes(global_slot),
             state_hash.0.as_bytes(),
         )?;
 
@@ -85,7 +85,7 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting known genesis state hashes");
         Ok(self
             .database
-            .get(Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
+            .get_pinned(Self::KNOWN_GENESIS_STATE_HASHES_KEY)?
             .map_or(vec![], |bytes| {
                 serde_json::from_slice(&bytes).expect("known genesis state hashes")
             }))
@@ -95,7 +95,7 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting known genesis prev state hashes");
         Ok(self
             .database
-            .get(Self::KNOWN_GENESIS_PREV_STATE_HASHES_KEY)?
+            .get_pinned(Self::KNOWN_GENESIS_PREV_STATE_HASHES_KEY)?
             .map_or(vec![], |bytes| {
                 serde_json::from_slice(&bytes).expect("known genesis prev state hashes")
             }))
@@ -105,92 +105,75 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonical state hash at height {height}");
         Ok(self
             .database
-            .get_pinned_cf(&self.canonicity_length_cf(), height.to_be_bytes())?
-            .and_then(|bytes| match BlockHash::from_bytes(&bytes) {
-                Ok(hash) => Some(hash),
-                Err(_) => None,
-            }))
+            .get_pinned_cf(&self.canonicity_length_cf(), to_be_bytes(height))?
+            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
     fn get_canonical_hash_at_slot(&self, global_slot: u32) -> anyhow::Result<Option<BlockHash>> {
         trace!("Getting canonical state hash at slot {global_slot}");
         Ok(self
             .database
-            .get_pinned_cf(&self.canonicity_slot_cf(), global_slot.to_be_bytes())?
-            .and_then(|bytes| match BlockHash::from_bytes(&bytes) {
-                Ok(hash) => Some(hash),
-                Err(_) => None,
-            }))
+            .get_pinned_cf(&self.canonicity_slot_cf(), to_be_bytes(global_slot))?
+            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
     fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>> {
         trace!("Getting max canonical blockchain length");
-
-        let canonicity_cf = self.canonicity_cf();
-        match self
+        Ok(self
             .database
-            .get_pinned_cf(&canonicity_cf, Self::MAX_CANONICAL_KEY)?
-            .map(|bytes| bytes.to_vec())
-        {
-            None => Ok(None),
-            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-        }
+            .get(Self::MAX_CANONICAL_KEY)?
+            .map(from_be_bytes))
     }
 
     fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()> {
         trace!("Setting max canonical blockchain length to {height}");
-
-        let canonicity_cf = self.canonicity_cf();
-        let value = serde_json::to_vec(&height)?;
         self.database
-            .put_cf(&canonicity_cf, Self::MAX_CANONICAL_KEY, value)?;
+            .put(Self::MAX_CANONICAL_KEY, to_be_bytes(height))?;
         Ok(())
     }
 
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
 
-        if let Ok(Some(best_tip)) = self.get_best_block() {
-            if let Some(blockchain_length) = self.get_block(state_hash)?.map(|pcb| match pcb {
-                PrecomputedBlock::V1(v1) => v1.blockchain_length,
-                PrecomputedBlock::V2(pcb_v2) => {
-                    pcb_v2.protocol_state.body.consensus_state.blockchain_length
-                }
-            }) {
-                if blockchain_length > best_tip.blockchain_length() {
-                    return Ok(None);
-                } else if let Some(max_canonical_length) =
-                    self.get_max_canonical_blockchain_length()?
-                {
-                    if blockchain_length > max_canonical_length {
-                        // follow best chain back from tip to given block
-                        let mut curr_block = best_tip;
-                        while curr_block.state_hash() != *state_hash
-                            && curr_block.blockchain_length() > max_canonical_length
-                        {
-                            if let Some(parent) =
-                                self.get_block(&curr_block.previous_state_hash())?
-                            {
-                                curr_block = parent;
-                            } else {
-                                break;
-                            }
+        if let (Ok(Some(best_tip)), Ok(Some(blockchain_length))) = (
+            self.get_best_block(),
+            self.get_blockchain_length(state_hash),
+        ) {
+            if blockchain_length > best_tip.blockchain_length() {
+                return Ok(None);
+            } else if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {
+                if blockchain_length > max_canonical_length {
+                    // follow best chain back from tip to given block
+                    let mut curr_block = best_tip;
+                    while curr_block.state_hash() != *state_hash
+                        && curr_block.blockchain_length() > max_canonical_length
+                    {
+                        if let Some(parent) = self.get_block(&curr_block.previous_state_hash())? {
+                            curr_block = parent;
+                        } else {
+                            break;
                         }
+                    }
 
+                    return Ok(Some(
                         if curr_block.state_hash() == *state_hash
                             && curr_block.blockchain_length() > max_canonical_length
                         {
-                            return Ok(Some(Canonicity::Canonical));
+                            Canonicity::Canonical
                         } else {
-                            return Ok(Some(Canonicity::Orphaned));
-                        }
-                    } else if self.get_canonical_hash_at_height(blockchain_length)?
-                        == Some(state_hash.clone())
-                    {
-                        return Ok(Some(Canonicity::Canonical));
-                    } else {
-                        return Ok(Some(Canonicity::Orphaned));
-                    }
+                            Canonicity::Orphaned
+                        },
+                    ));
+                } else {
+                    return Ok(Some(
+                        if self.get_canonical_hash_at_height(blockchain_length)?
+                            == Some(state_hash.clone())
+                        {
+                            Canonicity::Canonical
+                        } else {
+                            Canonicity::Orphaned
+                        },
+                    ));
                 }
             }
         }
