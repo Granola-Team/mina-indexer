@@ -57,6 +57,25 @@ impl TransactionsQueryRoot {
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
+        // transaction filtered by state hash
+        if let Some(state_hash) = query
+            .block
+            .as_ref()
+            .and_then(|block| block.state_hash.clone())
+        {
+            let mut transactions: Vec<Transaction> = db
+                .get_block(&state_hash.into())?
+                .into_iter()
+                .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                .map(|cmd| {
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
+                })
+                .filter(|txn| query.matches(txn))
+                .collect();
+            reorder_asc(&mut transactions, sort_by);
+            transactions.truncate(limit);
+            return Ok(transactions);
+        }
         // block height query
         if let Some(block_height) = query.block_height {
             let mut transactions: Vec<Transaction> = db
@@ -358,7 +377,7 @@ impl TransactionQueryInput {
             and,
             or,
             // TODO
-            block: _,
+            block,
             fee_payer: _,
             source: _,
             from_account: _,
@@ -367,6 +386,9 @@ impl TransactionQueryInput {
             token: _,
             is_delegation: _,
         } = self;
+        if let Some(state_hash) = block.as_ref().and_then(|b| b.state_hash.clone()) {
+            matches &= transaction_with_block.block.state_hash == state_hash;
+        }
         if let Some(hash) = hash {
             matches &= transaction.hash == *hash;
         }
