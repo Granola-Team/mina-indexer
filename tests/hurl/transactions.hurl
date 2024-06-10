@@ -306,3 +306,45 @@ HTTP 200
 
 # total data count
 jsonpath "$.data.transactions" count == 100
+
+
+POST {{url}}
+```graphql
+query TransactionsQuery(
+  $limit: Int = 10
+  $sort_by: TransactionSortByInput!
+  $query: TransactionQueryInput!
+) {
+  transactions(limit: $limit, sortBy: $sort_by, query: $query) {
+    hash
+    blockHeight
+    canonical
+    block {
+      stateHash
+    }
+  }
+}
+
+variables {
+  "limit": 1,
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "query": {
+      "canonical": true,
+      "block": {
+          "stateHash": "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+      }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 1
+
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[0].canonical" == true
+jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
+jsonpath "$.data.transactions[0].block.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+
+duration < 500
