@@ -183,9 +183,9 @@ dependencies = [
 
 [[package]]
 name = "actix-web"
-version = "4.6.0"
+version = "4.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1cf67dadb19d7c95e5a299e2dda24193b89d5d4f33a3b9800888ede9e19aa32"
+checksum = "5d6316df3fa569627c98b12557a8b6ff0674e5be4bb9b5e4ae2550ddb4964ed6"
 dependencies = [
  "actix-codec",
  "actix-http",
@@ -242,9 +242,9 @@ dependencies = [
 
 [[package]]
 name = "actix-web-codegen"
-version = "4.2.2"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb1f50ebbb30eca122b188319a4398b3f7bb4a8cdf50ecfb73bfc6a3c3ce54f5"
+checksum = "f591380e2e68490b5dfaf1dd1aa0ebe78d84ba7067078512b4ea6e4492d622b8"
 dependencies = [
  "actix-router",
  "proc-macro2",
@@ -496,9 +496,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "7.0.5"
+version = "7.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0808e3dc8be9cee801000b9261081cd7caae9935658be7e52d4df3d5c22bdce"
+checksum = "bf338d20ba5bab309f55ce8df95d65ee19446f7737f06f4a64593ab2c6b546ad"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -529,9 +529,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-actix-web"
-version = "7.0.5"
+version = "7.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6755fbb855b8fbb6d00d85a097885a63d556acff0ff59d2f5bced9b3d1de4590"
+checksum = "d50661e77b4c6c27ca018ad809d62fe40a02aa56b58fdc4eb333ceba56a024f1"
 dependencies = [
  "actix",
  "actix-http",
@@ -548,9 +548,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "7.0.5"
+version = "7.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae80fb7b67deeae84441a9eb156359b99be7902d2d706f43836156eec69a8226"
+checksum = "fc51fd6b7102acda72bc94e8ae1543844d5688ff394a6cf7c21f2a07fe2d64e4"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -565,9 +565,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "7.0.5"
+version = "7.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f0fffb19cd96eb084428289f4568b5ad48df32f782f891f709db96384fbdeb2"
+checksum = "75361eefd64e39f89bead4cb45fddbaf60ddb0e7b15fb7c852b6088bcd63071f"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -577,9 +577,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "7.0.5"
+version = "7.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c224c93047a7197fe0f1d6eee98245ba6049706c6c04a372864557fb61495e94"
+checksum = "c1f665d2d52b41c4ed1f01c43f3ef27a2fe0af2452ed5c8bc7ac9b1a8719afaa"
 dependencies = [
  "bytes",
  "indexmap",
@@ -912,9 +912,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.4"
+version = "4.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
+checksum = "a9689a29b593160de5bc4aacab7b5d54fb52231de70122626c178e6a368994c7"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -922,9 +922,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.2"
+version = "4.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
+checksum = "2e5387378c84f6faa26890ebf9f0a92989f8873d4d380467bcd0d8d8620424df"
 dependencies = [
  "anstream",
  "anstyle",
@@ -934,9 +934,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.4"
+version = "4.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
+checksum = "c780290ccf4fb26629baa7a1081e68ced113f1d3ec302fa5948f1c381ebf06c6"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2842,9 +2842,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.37.0"
+version = "1.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1adbebffeca75fcfd058afa480fb6c0b81e165a0323f9c9d39c9697e37c46787"
+checksum = "ba4f4a02a7a80d6f274636f0aa95c7e383b912d41fe721a31f29e29698585a4a"
 dependencies = [
  "backtrace",
  "bytes",
@@ -2861,9 +2861,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b8a1e28f2deaa14e508979454cb3a223b10b938b45af148bc0986de36f1923b"
+checksum = "5f5ae998a069d4b5aba8ee9dad856af7d520c3699e6159b185c2acd48155d39a"
 dependencies = [
  "proc-macro2",
  "quote",
