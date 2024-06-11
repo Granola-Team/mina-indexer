@@ -33,14 +33,21 @@ pub trait BlockStore {
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
 
     /// Set a block's blockchain length
-    fn set_blockchain_length(
+    fn set_block_height(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
     ) -> anyhow::Result<()>;
 
-    /// Get a block's blockchain length
-    fn get_blockchain_length(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+    /// Get a block's blockchain length without deserializing the PCB
+    fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+
+    /// Set a block's global slot
+    fn set_block_global_slot(&self, state_hash: &BlockHash, global_slot: u32)
+        -> anyhow::Result<()>;
+
+    /// Get a block's global slot without deserializing the PCB
+    fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Get number of blocks at the given blockchain length
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32>;
@@ -65,18 +72,24 @@ pub trait BlockStore {
     /// Add a block at the given global slot since genesis
     fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
 
-    /// Set block height <-> global slot
-    fn set_height_global_slot(&self, blockchain_length: u32, slot: u32) -> anyhow::Result<()>;
-
-    /// Get the global slot since genesis corresponding to the given block
-    /// height
-    fn get_globl_slot_from_height(&self, blockchain_length: u32) -> anyhow::Result<Option<u32>>;
-
-    /// Get the block height corresponding to the global slot since genesis
-    fn get_height_from_global_slot(
+    /// Include in one another's collection
+    fn set_block_height_global_slot_pair(
         &self,
-        global_slot_since_genesis: u32,
-    ) -> anyhow::Result<Option<u32>>;
+        blockchain_length: u32,
+        global_slot: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get the global slots corresponding to the given block height
+    fn get_global_slots_from_height(
+        &self,
+        blockchain_length: u32,
+    ) -> anyhow::Result<Option<Vec<u32>>>;
+
+    /// Get the block heights corresponding to the global slot since genesis
+    fn get_block_heights_from_global_slot(
+        &self,
+        global_slot: u32,
+    ) -> anyhow::Result<Option<Vec<u32>>>;
 
     /// Get number of blocks for the given public key
     fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32>;
@@ -102,10 +115,21 @@ pub trait BlockStore {
 
     // Iterators
 
-    /// Iterator for blocks `{global_slot}{state_hash} -> _`
-    ///
-    /// Use [blocks_global_slot_idx_state_hash_from_key] to extract state hash
-    fn blocks_global_slot_idx_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    /// Iterator for blocks via height
+    /// ```
+    /// key: {block_height}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn blocks_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for blocks via global slot
+    /// ```
+    /// key: {global_slot}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
     // Block counts
 
@@ -157,4 +181,16 @@ pub trait BlockStore {
         block: &BlockHash,
         other: &BlockHash,
     ) -> anyhow::Result<Option<std::cmp::Ordering>>;
+
+    /// Dump blocks via height to `path`
+    fn dump_blocks_via_height(&self, path: &std::path::Path) -> anyhow::Result<()>;
+
+    /// Blocks via height
+    fn blocks_via_height(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>>;
+
+    /// Dump blocks via global slot to `path`
+    fn dump_blocks_via_global_slot(&self, path: &std::path::Path) -> anyhow::Result<()>;
+
+    /// Blocks via global_slot
+    fn blocks_via_global_slot(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>>;
 }
