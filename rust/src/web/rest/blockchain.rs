@@ -2,13 +2,17 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
+    constants::VERSION,
     ledger::{
         account::{nanomina_to_mina, Amount},
         store::LedgerStore,
         LedgerHash,
     },
     snark_work::store::SnarkStore,
-    store::IndexerStore,
+    store::{
+        version::{IndexerStoreVersion, VersionStore},
+        IndexerStore,
+    },
     web::rest::locked_balances::LockedBalances,
 };
 use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
@@ -26,12 +30,12 @@ pub struct BlockchainSummary {
     circulating_supply: String,
     date_time: String,
     epoch: u32,
+    slot: u32,
     global_slot: u32,
     locked_supply: String,
     min_window_density: u32,
     next_epoch_ledger_hash: String,
     previous_state_hash: String,
-    slot: u32,
     snarked_ledger_hash: String,
     staged_ledger_hash: String,
     staking_epoch_ledger_hash: String,
@@ -46,6 +50,8 @@ pub struct BlockchainSummary {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
+    db_version: IndexerStoreVersion,
+    indexer_version: String,
 }
 
 fn millis_to_date_string(millis: i64) -> String {
@@ -58,6 +64,8 @@ struct SummaryInput {
     chain_id: String,
     best_tip: PrecomputedBlock,
     locked_balance: Option<Amount>,
+    db_version: IndexerStoreVersion,
+    indexer_version: String,
     epoch_num_blocks: u32,
     total_num_blocks: u32,
     epoch_num_snarks: u32,
@@ -74,6 +82,8 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         chain_id,
         best_tip,
         locked_balance,
+        db_version,
+        indexer_version,
         epoch_num_blocks,
         total_num_blocks,
         epoch_num_snarks,
@@ -162,6 +172,8 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
+        db_version,
+        indexer_version,
     })
 }
 
@@ -185,7 +197,11 @@ pub async fn get_blockchain_summary(
         let global_slot = best_tip.global_slot_since_genesis();
         let locked_balance = locked_balances.get_locked_amount(global_slot);
 
-        // get epoch & total info
+        // version info
+        let db_version = store.get_db_version().expect("store version");
+        let indexer_version = VERSION.to_string();
+
+        // epoch & total data counts
         let epoch_num_blocks = store
             .get_block_production_epoch_count(None)
             .expect("epoch blocks count");
@@ -213,6 +229,8 @@ pub async fn get_blockchain_summary(
             chain_id,
             best_tip,
             locked_balance,
+            db_version,
+            indexer_version,
             epoch_num_blocks,
             total_num_blocks,
             epoch_num_snarks,
