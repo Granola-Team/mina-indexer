@@ -313,6 +313,10 @@ impl LedgerStore for IndexerStore {
         Ok(())
     }
 
+    ///////////////
+    // Iterators //
+    ///////////////
+
     fn staking_ledger_balance_iterator(
         &self,
         mode: speedb::IteratorMode,
