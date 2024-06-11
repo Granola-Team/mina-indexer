@@ -12,9 +12,13 @@ SRC="$(git rev-parse --show-toplevel)"
 BIN="$SRC"/rust/target/release/mina-indexer
 "$BIN" --version
 
+# Differentiate some files/directories using the Git revision.
+#
+REV="$(git rev-parse --short=8 HEAD)"
+
 # We must configure:
 # 1. A directory to store files related to the mina-indexer, $PROD.
-# 2. A directory in which to store the logs.
+# 2. A directory in which to store the logs, $LOGS.
 # 3. A directory from which to read the blocks.
 # 4. A directory from which to read the staking ledgers.
 # 5. A directory that contains the "$SRC"/data directory for initialization.
@@ -29,7 +33,8 @@ cd "$PROD"
 
 # 2. Ensure that the log directory exists.
 #
-mkdir -p ./log
+LOGS=./logs/"$REV"
+mkdir -p "$LOGS"
 
 # 3. Configure the './blocks' directory, downloading blocks from the
 # granola-mina-blocks Linode bucket if need be. Note that the prior production
@@ -73,7 +78,7 @@ mkdir ./database
 #
 setsid \
   sh -c \
-    '"$@" 0< /dev/null 1>> ./log/out 2>> ./log/err &' \
+    '"$@" 0< /dev/null 1>> '"$LOGS"'/out 2>> '"$LOGS"'/err &' \
     -- \
     "$SRC"/rust/target/release/mina-indexer \
       --socket "$SOCKET" \
