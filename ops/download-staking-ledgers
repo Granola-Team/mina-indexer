@@ -22,6 +22,6 @@ MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
 # Perform the download.
 "$MY_DIR"/granola-rclone sync --metadata linode:granola-mina-staking-ledgers "$1"
-RESULT='Blocks downloaded.'
+RESULT='Staking ledgers downloaded.'
 
 chmod -R a-wx "$1"/*
