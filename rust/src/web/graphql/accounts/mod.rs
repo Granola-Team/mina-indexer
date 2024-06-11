@@ -4,11 +4,12 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::{account, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
-    store::account::AccountStore,
+    store::{account::AccountStore, username::UsernameStore},
     web::graphql::Timing,
 };
 use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use log::warn;
 use speedb::IteratorMode;
 
 #[derive(SimpleObject)]
@@ -49,6 +50,8 @@ pub struct Account {
 #[derive(InputObject)]
 pub struct AccountQueryInput {
     public_key: Option<String>,
+
+    username: Option<String>,
 
     balance: Option<u64>,
 
@@ -108,6 +111,11 @@ impl AccountQueryRoot {
                 .filter(|acct| query.unwrap().matches(acct))
                 .map_or(vec![], |acct| {
                     let pk = acct.public_key.clone();
+                    let username = match db.get_username(&pk) {
+                        Ok(None) | Err(_) => Some("Unknown".to_string()),
+                        Ok(username) => username,
+                    };
+
                     vec![Account::from((
                         acct.clone(),
                         db.get_block_production_pk_epoch_count(&pk, None)
@@ -126,6 +134,7 @@ impl AccountQueryRoot {
                             .expect("pk epoch internal command count"),
                         db.get_internal_commands_pk_total_count(&pk)
                             .expect("pk total internal command count"),
+                        username,
                     ))]
                 }));
         }
@@ -140,12 +149,24 @@ impl AccountQueryRoot {
 
         for (key, _) in db.account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
-            let account = best_ledger
+            let account = match best_ledger
                 .accounts
                 .get(&pk)
-                .with_context(|| format!("Failed to find public key in best ledger: {}", pk))?;
+                .with_context(|| format!("Failed to find public key in best ledger: {}", pk))
+            {
+                Ok(account) => account,
+                Err(_) => {
+                    warn!("Failed to find public key in best ledger: {}", pk);
+                    continue;
+                }
+            };
 
             if query.as_ref().map_or(true, |q| q.matches(account)) {
+                let username = match db.get_username(&pk) {
+                    Ok(None) | Err(_) => Some("Unknown".to_string()),
+                    Ok(username) => username,
+                };
+
                 let account = Account::from((
                     account.clone(),
                     db.get_block_production_pk_epoch_count(&pk, None)
@@ -164,6 +185,7 @@ impl AccountQueryRoot {
                         .expect("pk epoch internal command count"),
                     db.get_internal_commands_pk_total_count(&pk)
                         .expect("pk total internal command count"),
+                    username,
                 ));
 
                 accounts.push(account);
@@ -181,7 +203,7 @@ impl AccountQueryInput {
     fn matches(&self, account: &account::Account) -> bool {
         let AccountQueryInput {
             public_key,
-            // username,
+            username,
             balance,
             balance_gt,
             balance_gte,
@@ -192,13 +214,13 @@ impl AccountQueryInput {
         if let Some(public_key) = public_key {
             return *public_key == account.public_key.0;
         }
-        // TODO
-        // if let Some(username) = username {
-        //     return account
-        //         .username
-        //         .as_ref()
-        //         .map_or(false, |u| *username == u.0);
-        // }
+
+        if let Some(username) = username {
+            return account
+                .username
+                .as_ref()
+                .map_or(false, |u| *username == u.0);
+        }
         if let Some(balance) = balance {
             return *balance == account.balance.0;
         }
@@ -221,8 +243,34 @@ impl AccountQueryInput {
     }
 }
 
-impl From<(account::Account, u32, u32, u32, u32, u32, u32, u32, u32)> for Account {
-    fn from(account: (account::Account, u32, u32, u32, u32, u32, u32, u32, u32)) -> Self {
+impl
+    From<(
+        account::Account,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        Option<String>,
+    )> for Account
+{
+    fn from(
+        account: (
+            account::Account,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            Option<String>,
+        ),
+    ) -> Self {
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
@@ -230,10 +278,6 @@ impl From<(account::Account, u32, u32, u32, u32, u32, u32, u32, u32)> for Accoun
             balance: account.0.balance.0,
             time_locked: account.0.timing.is_some(),
             timing: account.0.timing.map(|t| t.into()),
-            username: account
-                .0
-                .username
-                .map_or(Some("Unknown".to_string()), |u| Some(u.0)),
             pk_epoch_num_blocks: account.1,
             pk_total_num_blocks: account.2,
             pk_epoch_num_snarks: account.3,
@@ -242,6 +286,7 @@ impl From<(account::Account, u32, u32, u32, u32, u32, u32, u32, u32)> for Accoun
             pk_total_num_user_commands: account.6,
             pk_epoch_num_internal_commands: account.7,
             pk_total_num_internal_commands: account.8,
+            username: account.9,
         }
     }
 }
