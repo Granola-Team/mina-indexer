@@ -7,6 +7,7 @@ use crate::{
     store::account::AccountStore,
     web::graphql::Timing,
 };
+use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::IteratorMode;
 
@@ -139,7 +140,10 @@ impl AccountQueryRoot {
 
         for (key, _) in db.account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
-            let account = best_ledger.accounts.get(&pk).expect("account in ledger");
+            let account = best_ledger
+                .accounts
+                .get(&pk)
+                .with_context(|| format!("Failed to find public key in best ledger: {}", pk))?;
 
             if query.as_ref().map_or(true, |q| q.matches(account)) {
                 let account = Account::from((
