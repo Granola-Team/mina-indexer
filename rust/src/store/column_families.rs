@@ -17,20 +17,28 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing block versions
     fn blocks_version_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting blocks by global slot
-    fn blocks_global_slot_idx_cf(&self) -> &ColumnFamily;
+    /// CF for sorting blocks by blockchain length.
+    /// Used with [blocks_height_iterator]
+    fn blocks_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting blocks by global slot.
+    /// Used with [blocks_global_slot_iterator]
+    fn blocks_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for storing global slot by height
-    fn block_height_to_global_slot_cf(&self) -> &ColumnFamily;
+    fn block_height_to_global_slots_cf(&self) -> &ColumnFamily;
 
     /// CF for storing height by global slot
-    fn block_global_slot_to_height_cf(&self) -> &ColumnFamily;
+    fn block_global_slot_to_heights_cf(&self) -> &ColumnFamily;
 
     /// CF for storing previous state hashes
     fn block_parent_hash_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing blockchain lengths
-    fn blockchain_length_cf(&self) -> &ColumnFamily;
+    /// CF for storing block heights
+    fn block_height_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing block global slots
+    fn block_global_slot_cf(&self) -> &ColumnFamily;
 
     /// CF for storing coinbase receivers
     fn coinbase_receiver_cf(&self) -> &ColumnFamily;
@@ -68,11 +76,17 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing transactions by hash & block order index
     fn user_commands_block_order_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting user commands by blockchain length
+    fn user_commands_height_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for sorting user commands by global slot
     fn user_commands_slot_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for storing global slot by txn hash
     fn user_commands_txn_hash_to_global_slot_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing blockchain length by txn hash
+    fn user_commands_txn_hash_to_block_height_cf(&self) -> &ColumnFamily;
 
     /// CF for storing internal commands
     fn internal_commands_cf(&self) -> &ColumnFamily;
@@ -104,11 +118,17 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing chain_id -> network
     fn chain_id_to_network_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting user commands by sender public key in [CommandStore]
-    fn txn_from_cf(&self) -> &ColumnFamily;
+    /// CF for sorting user commands by sender public key
+    fn txn_from_slot_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting user commands by receiver public key in [CommandStore]
-    fn txn_to_cf(&self) -> &ColumnFamily;
+    /// CF for sorting user commands by sender public key
+    fn txn_from_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting user commands by receiver public key
+    fn txn_to_slot_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting user commands by sender public key
+    fn txn_to_height_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch per account block prodution info
     fn block_production_pk_epoch_cf(&self) -> &ColumnFamily;

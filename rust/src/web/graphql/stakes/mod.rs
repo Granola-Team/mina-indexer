@@ -84,7 +84,8 @@ impl StakeQueryRoot {
         // if ledger hash is provided as a query input, use it for the ledger
         // otherwise, use the epoch number
         let staking_ledger = {
-            let opt = if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone())
+            let opt = if let Some((Some(ledger_hash), None)) =
+                query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch))
             {
                 db.get_staking_ledger_hash(&ledger_hash.into())?
             } else {

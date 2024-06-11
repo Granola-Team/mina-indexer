@@ -15,7 +15,6 @@ use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 impl AccountStore for IndexerStore {
-    // TODO make modular over different updates
     fn common_ancestor_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
@@ -36,8 +35,8 @@ impl AccountStore for IndexerStore {
         let mut b = new_best_tip.clone();
         let mut apply = vec![];
 
-        let a_length = self.get_blockchain_length(&a)?.expect("a has a length");
-        let b_length = self.get_blockchain_length(&b)?.expect("b has a length");
+        let a_length = self.get_block_height(&a)?.expect("a has a length");
+        let b_length = self.get_block_height(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
         let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
@@ -177,7 +176,9 @@ impl AccountStore for IndexerStore {
         Ok(())
     }
 
-    // Iterators
+    ///////////////
+    // Iterators //
+    ///////////////
 
     fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database

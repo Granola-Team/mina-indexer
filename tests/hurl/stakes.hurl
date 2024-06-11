@@ -291,3 +291,24 @@ jsonpath "$.data.stakes[0].balance" == 92.929966438
 jsonpath "$.data.stakes[0].nonce" == 4
 
 duration < 2000
+
+#
+# Test for public key uniqueness per epoch
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {epoch: 0, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
+    public_key
+    balance
+    nonce
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.stakes" count == 1
+
+duration < 1000

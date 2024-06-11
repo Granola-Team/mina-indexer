@@ -41,34 +41,53 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// `{global_slot}{state_hash} -> _`
-    fn blocks_global_slot_idx_cf(&self) -> &ColumnFamily {
+    /// ```
+    /// - global_slot: 4 BE bytes
+    /// - state_hash:  [BlockHash::LEN] bytes
+    fn blocks_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-global-slot-idx")
-            .expect("blocks-global-slot-idx column family exists")
+            .cf_handle("blocks-global-slot-sort")
+            .expect("blocks-global-slot-sort column family exists")
     }
 
-    fn block_height_to_global_slot_cf(&self) -> &ColumnFamily {
+    /// `{block_height}{state_hash} -> _`
+    /// ```
+    /// - block_height: 4 BE bytes
+    /// - state_hash:   [BlockHash::LEN] bytes
+    fn blocks_height_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("block-height-to-slot")
-            .expect("block-height-to-slot column family exists")
+            .cf_handle("blocks-height-sort")
+            .expect("blocks-height-sort column family exists")
     }
 
-    fn block_global_slot_to_height_cf(&self) -> &ColumnFamily {
+    fn block_height_to_global_slots_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("block-slot-to-height")
-            .expect("block-slot-to-height column family exists")
+            .cf_handle("block-height-to-slots")
+            .expect("block-height-to-slots column family exists")
+    }
+
+    fn block_global_slot_to_heights_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-slot-to-heights")
+            .expect("block-slot-to-heights column family exists")
     }
 
     fn block_parent_hash_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("block-parent-hash")
-            .expect("block-parent-hash column family exists")
+            .cf_handle("blocks-parent-hash")
+            .expect("blocks-parent-hash column family exists")
     }
 
-    fn blockchain_length_cf(&self) -> &ColumnFamily {
+    fn block_height_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blockchain-length")
-            .expect("blockchain-length column family exists")
+            .cf_handle("blocks-height")
+            .expect("blocks-height column family exists")
+    }
+
+    fn block_global_slot_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-global-slot")
+            .expect("blocks-global-slot column family exists")
     }
 
     fn coinbase_receiver_cf(&self) -> &ColumnFamily {
@@ -157,6 +176,17 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("user-commands-num-blocks column family exists")
     }
 
+    /// **Key format:** `{height}{txn_hash}{state_hash}`
+    /// ```
+    /// - height:     4 BE bytes
+    /// - txn_hash:   [TXN_HASH_LEN] bytes
+    /// - state_hash: [BlockHash::LEN] bytes
+    fn user_commands_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-height-sort")
+            .expect("user-commands-height-sort column family exists")
+    }
+
     /// **Key format:** `{slot}{txn_hash}{state_hash}`
     /// ```
     /// - slot:       4 BE bytes
@@ -166,6 +196,15 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("user-commands-slot-sort")
             .expect("user-commands-slot-sort column family exists")
+    }
+
+    /// `txn_hash -> blockchain_length`
+    ///
+    /// - `blockchain_length`: 4 BE bytes
+    fn user_commands_txn_hash_to_block_height_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-to-block-height")
+            .expect("user-commands-to-block-height column family exists")
     }
 
     /// `txn_hash -> global_slot`
@@ -243,16 +282,28 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("chain-id-to-network column family exists")
     }
 
-    fn txn_from_cf(&self) -> &ColumnFamily {
+    fn txn_from_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("txn-from")
-            .expect("txn-from column family exists")
+            .cf_handle("txn-from-slot-sort")
+            .expect("txn-from-slot-sort column family exists")
     }
 
-    fn txn_to_cf(&self) -> &ColumnFamily {
+    fn txn_from_height_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("txn-to")
-            .expect("txn-to column family exists")
+            .cf_handle("txn-from-height-sort")
+            .expect("txn-from-height-sort column family exists")
+    }
+
+    fn txn_to_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("txn-to-slot-sort")
+            .expect("txn-to-slot-sort column family exists")
+    }
+
+    fn txn_to_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("txn-to-height-sort")
+            .expect("txn-to-height-sort column family exists")
     }
 
     /// CF for per epoch per account block prodution info

@@ -10,13 +10,13 @@ use crate::{
     ledger::{diff::LedgerBalanceUpdate, public_key::PublicKey},
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore, from_be_bytes, global_slot_block_key, to_be_bytes, u32_prefix_key,
-        IndexerStore,
+        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
+        to_be_bytes, u32_prefix_key, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode};
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
@@ -45,7 +45,7 @@ impl BlockStore for IndexerStore {
         self.set_coinbase_receiver(&state_hash, &block.coinbase_receiver())?;
 
         // add to blockchain length index
-        self.set_blockchain_length(&state_hash, block.blockchain_length())?;
+        self.set_block_height(&state_hash, block.blockchain_length())?;
 
         // add to parent hash index
         self.set_block_parent_hash(&state_hash, &block.previous_state_hash())?;
@@ -57,10 +57,14 @@ impl BlockStore for IndexerStore {
             LedgerBalanceUpdate::from_precomputed(block),
         )?;
 
-        // add to global slots block index
+        // add block height for sorting
+        self.database
+            .put_cf(self.blocks_height_sort_cf(), block_height_key(block), b"")?;
+
+        // add global slot for sorting
         self.database.put_cf(
-            self.blocks_global_slot_idx_cf(),
-            global_slot_block_key(block),
+            self.blocks_global_slot_sort_cf(),
+            block_global_slot_key(block),
             b"",
         )?;
 
@@ -69,8 +73,11 @@ impl BlockStore for IndexerStore {
             self.add_block_at_public_key(&pk, &state_hash)?;
         }
 
-        // add height <-> global slot
-        self.set_height_global_slot(block.blockchain_length(), block.global_slot_since_genesis())?;
+        // add height/global slot
+        self.set_block_height_global_slot_pair(
+            block.blockchain_length(),
+            block.global_slot_since_genesis(),
+        )?;
 
         // add block to height list
         self.add_block_at_height(&state_hash, block.blockchain_length())?;
@@ -195,24 +202,45 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_blockchain_length(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
-        trace!("Getting blockchain length {state_hash}");
+    fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting block height {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.blockchain_length_cf(), state_hash.0.as_bytes())?
+            .get_pinned_cf(self.block_height_cf(), state_hash.0.as_bytes())?
             .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn set_blockchain_length(
+    fn set_block_height(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
     ) -> anyhow::Result<()> {
-        trace!("Setting blockchain length {blockchain_length}: {state_hash}");
+        trace!("Setting block height {state_hash}: {blockchain_length}");
         Ok(self.database.put_cf(
-            self.blockchain_length_cf(),
+            self.block_height_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(blockchain_length),
+        )?)
+    }
+
+    fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting block global slot {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_global_slot_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| from_be_bytes(bytes.to_vec())))
+    }
+
+    fn set_block_global_slot(
+        &self,
+        state_hash: &BlockHash,
+        global_slot: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block global slot {state_hash}: {global_slot}");
+        Ok(self.database.put_cf(
+            self.block_global_slot_cf(),
+            state_hash.0.as_bytes(),
+            to_be_bytes(global_slot),
         )?)
     }
 
@@ -445,7 +473,6 @@ impl BlockStore for IndexerStore {
 
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>> {
         trace!("Getting block {} version", state_hash.0);
-
         let key = state_hash.0.as_bytes();
         Ok(self
             .database
@@ -455,47 +482,66 @@ impl BlockStore for IndexerStore {
 
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
         trace!("Setting block {} version to {}", state_hash.0, version);
-
         let key = state_hash.0.as_bytes();
         let value = serde_json::to_vec(&version)?;
         Ok(self.database.put_cf(self.blocks_version_cf(), key, value)?)
     }
 
-    fn set_height_global_slot(&self, blockchain_length: u32, slot: u32) -> anyhow::Result<()> {
-        trace!("Setting height {} <-> slot {}", blockchain_length, slot);
+    fn set_block_height_global_slot_pair(
+        &self,
+        blockchain_length: u32,
+        global_slot: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
-        // add: slot -> height
-        self.database.put_cf(
-            self.block_global_slot_to_height_cf(),
-            to_be_bytes(blockchain_length),
-            to_be_bytes(slot),
-        )?;
+        // add slot to height's "slot collection"
+        let mut heights = self
+            .get_block_heights_from_global_slot(global_slot)?
+            .unwrap_or_default();
+        if !heights.contains(&blockchain_length) {
+            heights.push(blockchain_length);
+            heights.sort();
+            self.database.put_cf(
+                self.block_global_slot_to_heights_cf(),
+                to_be_bytes(global_slot),
+                serde_json::to_vec(&heights)?,
+            )?;
+        }
 
-        // add: height -> slot
-        self.database.put_cf(
-            self.block_height_to_global_slot_cf(),
-            to_be_bytes(slot),
-            to_be_bytes(blockchain_length),
-        )?;
-
+        // add height to slot's "height collection"
+        let mut slots = self
+            .get_global_slots_from_height(blockchain_length)?
+            .unwrap_or_default();
+        if !slots.contains(&global_slot) {
+            slots.push(global_slot);
+            slots.sort();
+            self.database.put_cf(
+                self.block_height_to_global_slots_cf(),
+                to_be_bytes(blockchain_length),
+                serde_json::to_vec(&slots)?,
+            )?;
+        }
         Ok(())
     }
 
-    fn get_globl_slot_from_height(&self, blockchain_length: u32) -> anyhow::Result<Option<u32>> {
+    fn get_global_slots_from_height(
+        &self,
+        blockchain_length: u32,
+    ) -> anyhow::Result<Option<Vec<u32>>> {
         trace!("Getting global slot for height {}", blockchain_length);
         Ok(self
             .database
             .get_pinned_cf(
-                self.block_global_slot_to_height_cf(),
+                self.block_global_slot_to_heights_cf(),
                 to_be_bytes(blockchain_length),
             )?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
     }
 
-    fn get_height_from_global_slot(
+    fn get_block_heights_from_global_slot(
         &self,
         global_slot_since_genesis: u32,
-    ) -> anyhow::Result<Option<u32>> {
+    ) -> anyhow::Result<Option<Vec<u32>>> {
         trace!(
             "Getting height for global slot {}",
             global_slot_since_genesis
@@ -503,10 +549,10 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(
-                self.block_height_to_global_slot_cf(),
+                self.block_height_to_global_slots_cf(),
                 to_be_bytes(global_slot_since_genesis),
             )?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap()))
     }
 
     fn get_current_epoch(&self) -> anyhow::Result<u32> {
@@ -514,14 +560,23 @@ impl BlockStore for IndexerStore {
         Ok(self.get_best_block()?.map_or(0, |b| b.epoch_count()))
     }
 
-    // Iterators
+    ///////////////
+    // Iterators //
+    ///////////////
 
-    fn blocks_global_slot_idx_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn blocks_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database
-            .iterator_cf(self.blocks_global_slot_idx_cf(), mode)
+            .iterator_cf(self.blocks_height_sort_cf(), mode)
     }
 
-    // Block counts
+    fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.blocks_global_slot_sort_cf(), mode)
+    }
+
+    //////////////////
+    // Block counts //
+    //////////////////
 
     fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
@@ -646,5 +701,99 @@ impl BlockStore for IndexerStore {
             return Ok(Some(bc1.cmp(&bc2)));
         }
         Ok(None)
+    }
+
+    fn dump_blocks_via_height(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        use std::{fs::File, io::Write};
+        trace!("Dumping blocks via height to {}", path.display());
+        let mut file = File::create(path)?;
+
+        for (key, _) in self
+            .blocks_height_iterator(speedb::IteratorMode::Start)
+            .flatten()
+        {
+            let state_hash = block_state_hash_from_key(&key)?;
+            let block_height = block_u32_prefix_from_key(&key)?;
+            let global_slot = self.get_block_global_slot(&state_hash)?.unwrap();
+
+            writeln!(
+                file,
+                "height: {block_height}\nslot:   {global_slot}\nstate:  {state_hash}"
+            )?;
+        }
+        Ok(())
+    }
+
+    fn blocks_via_height(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        let mut blocks = vec![];
+        trace!("Getting blocks via height (mode: {})", display_mode(mode));
+        for (key, _) in self.blocks_height_iterator(mode).flatten() {
+            let state_hash = block_state_hash_from_key(&key)?;
+            blocks.push(self.get_block(&state_hash)?.unwrap());
+        }
+        Ok(blocks)
+    }
+
+    fn dump_blocks_via_global_slot(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        use std::{fs::File, io::Write};
+        trace!("Dumping blocks via global slot to {}", path.display());
+        let mut file = File::create(path)?;
+
+        for (key, _) in self
+            .blocks_global_slot_iterator(speedb::IteratorMode::Start)
+            .flatten()
+        {
+            let state_hash = block_state_hash_from_key(&key)?;
+            let block_height = block_u32_prefix_from_key(&key)?;
+            let global_slot = self.get_block_global_slot(&state_hash)?.unwrap();
+
+            writeln!(
+                file,
+                "height: {block_height}\nslot:   {global_slot}\nstate:  {state_hash}"
+            )?;
+        }
+        Ok(())
+    }
+
+    fn blocks_via_global_slot(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>> {
+        let mut blocks = vec![];
+        trace!(
+            "Getting blocks via global slot (mode: {})",
+            display_mode(mode)
+        );
+        for (key, _) in self.blocks_global_slot_iterator(mode).flatten() {
+            let state_hash = block_state_hash_from_key(&key)?;
+            blocks.push(self.get_block(&state_hash)?.unwrap());
+        }
+        Ok(blocks)
+    }
+}
+
+fn block_height_key(block: &PrecomputedBlock) -> Vec<u8> {
+    let mut key = to_be_bytes(block.blockchain_length());
+    key.append(&mut block.state_hash().to_bytes());
+    key
+}
+
+fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
+    let mut key = to_be_bytes(block.global_slot_since_genesis());
+    key.append(&mut block.state_hash().to_bytes());
+    key
+}
+
+fn display_mode(mode: IteratorMode) -> String {
+    match mode {
+        IteratorMode::End => "End".to_string(),
+        IteratorMode::Start => "Start".to_string(),
+        IteratorMode::From(start, direction) => {
+            format!("{} from {start:?}", display_direction(direction))
+        }
+    }
+}
+
+fn display_direction(direction: Direction) -> String {
+    match direction {
+        Direction::Forward => "Forward".to_string(),
+        Direction::Reverse => "Reverse".to_string(),
     }
 }

@@ -61,6 +61,13 @@ impl UserCommandStore for IndexerStore {
                 b"",
             )?;
 
+            // add: key `{height}{txn_hash}{state_hash} -> _`
+            self.database.put_cf(
+                self.user_commands_height_sort_cf(),
+                txn_sort_key(block.blockchain_length(), &txn_hash, state_hash.clone()),
+                b"",
+            )?;
+
             // increment counts
             self.increment_user_commands_counts(command, epoch)?;
 
@@ -73,9 +80,21 @@ impl UserCommandStore for IndexerStore {
             )?;
 
             // add sender index
+            // `{sender}{height BE}{txn_hash}{state_hash} -> amount BE`
+            self.database.put_cf(
+                self.txn_from_height_sort_cf(),
+                pk_txn_sort_key(
+                    command.sender(),
+                    block.blockchain_length(),
+                    &txn_hash,
+                    block.state_hash(),
+                ),
+                command.amount().to_be_bytes(),
+            )?;
+
             // `{sender}{global_slot BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
-                self.txn_from_cf(),
+                self.txn_from_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.sender(),
                     block.global_slot_since_genesis(),
@@ -86,9 +105,21 @@ impl UserCommandStore for IndexerStore {
             )?;
 
             // add receiver index
+            // `{receiver}{height BE}{txn_hash}{state_hash} -> amount BE`
+            self.database.put_cf(
+                self.txn_to_height_sort_cf(),
+                pk_txn_sort_key(
+                    command.receiver(),
+                    block.blockchain_length(),
+                    &txn_hash,
+                    block.state_hash(),
+                ),
+                command.amount().to_be_bytes(),
+            )?;
+
             // `{receiver}{global_slot BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
-                self.txn_to_cf(),
+                self.txn_to_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.receiver(),
                     block.global_slot_since_genesis(),
@@ -341,22 +372,42 @@ impl UserCommandStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    // Iterators
+    ///////////////
+    // Iterators //
+    ///////////////
 
-    fn user_commands_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn user_commands_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database
             .iterator_cf(self.user_commands_slot_sort_cf(), mode)
     }
 
-    fn txn_from_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database.iterator_cf(self.txn_from_cf(), mode)
+    fn user_commands_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.user_commands_height_sort_cf(), mode)
     }
 
-    fn txn_to_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database.iterator_cf(self.txn_to_cf(), mode)
+    fn txn_from_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.txn_from_height_sort_cf(), mode)
     }
 
-    // User command counts
+    fn txn_from_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.txn_from_slot_sort_cf(), mode)
+    }
+
+    fn txn_to_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database
+            .iterator_cf(self.txn_to_height_sort_cf(), mode)
+    }
+
+    fn txn_to_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database.iterator_cf(self.txn_to_slot_sort_cf(), mode)
+    }
+
+    /////////////////////////
+    // User command counts //
+    /////////////////////////
 
     fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
         trace!("Getting number of user commands for {pk}");

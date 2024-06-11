@@ -4,17 +4,16 @@ use crate::{
     command::{
         decode_memo,
         signed::{self, SignedCommand, SignedCommandWithData},
-        store::UserCommandStore,
+        store::{
+            user_commands_iterator_state_hash, user_commands_iterator_txn_hash, UserCommandStore,
+        },
         CommandStatusData,
     },
     ledger::public_key::PublicKey,
     protocol::serialization_types::staged_ledger_diff::{
         SignedCommandPayloadBody, StakeDelegation,
     },
-    store::{
-        pk_of_key, pk_txn_sort_key_prefix, to_be_bytes, txn_hash_of_key,
-        user_commands_iterator_state_hash, user_commands_iterator_txn_hash, IndexerStore,
-    },
+    store::{pk_of_key, pk_txn_sort_key_prefix, to_be_bytes, txn_hash_of_key, IndexerStore},
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
@@ -169,9 +168,9 @@ impl TransactionsQueryRoot {
             let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
             let mode = IteratorMode::From(&start, direction);
             let txn_iter = if query.from.is_some() {
-                db.txn_from_iterator(mode).flatten()
+                db.txn_from_height_iterator(mode).flatten()
             } else {
-                db.txn_to_iterator(mode).flatten()
+                db.txn_to_height_iterator(mode).flatten()
             };
 
             for (key, _) in txn_iter {
@@ -210,7 +209,7 @@ impl TransactionsQueryRoot {
             }
         };
         for (key, _) in db
-            .user_commands_iterator(IteratorMode::From(&start, direction))
+            .user_commands_slot_iterator(IteratorMode::From(&start, direction))
             .flatten()
         {
             if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&key).ok() {

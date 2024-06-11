@@ -23,11 +23,7 @@ pub mod username_store_impl;
 pub mod version_store_impl;
 
 use self::fixed_keys::FixedKeys;
-use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    command::signed::TXN_HASH_LEN,
-    ledger::public_key::PublicKey,
-};
+use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
 use anyhow::anyhow;
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::path::{Path, PathBuf};
@@ -43,7 +39,7 @@ pub struct IndexerStore {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 57] = [
+    const COLUMN_FAMILIES: [&'static str; 63] = [
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
@@ -52,38 +48,57 @@ impl IndexerStore {
         "block-production-epoch",
         "blocks-state-hash",
         "blocks-version",
-        "blocks-global-slot-idx",
         "blocks-at-length",
         "blocks-at-slot",
-        "block-height-to-slot",
-        "block-slot-to-height",
-        "block-parent-hash",
-        "blockchain-length",
+        "blocks-height",
+        "blocks-height-sort",
+        "blocks-global-slot",
+        "blocks-global-slot-sort",
+        "blocks-parent-hash",
+        "block-height-to-slots",
+        "block-slot-to-heights",
         "block-comparison",
         "coinbase-receivers",
         "canonicity-length",
         "canonicity-slot",
+        // user commands
         "user-commands",
         "user-commands-pk",
         "user-commands-pk-num",
-        "user-command-state-hashes",
         "user-commands-block",
         "user-commands-block-order",
         "user-commands-num-blocks",
         "user-commands-slot-sort",
+        "user-commands-height-sort",
         "user-commands-to-global-slot",
-        "txn-from",
-        "txn-to",
+        "user-commands-to-block-height",
+        // user command -> list of state hashes
+        "user-command-state-hashes",
+        // sorting user commands by sender/receiver
+        "txn-from-slot-sort",
+        "txn-from-height-sort",
+        "txn-to-slot-sort",
+        "txn-to-height-sort",
+        // internal commands
         "internal-commands",
         "internal-commands-global-slot",
         "events",
         "ledgers",
+        // SNARKs
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
         "snark-work-fees",
         "snark-work-prover",
         "chain-id-to-network",
+        // sorting staking ledgers
+        "staking-ledger-epoch",
+        "staking-ledger-balance",
+        "staking-ledger-stake",
+        // usernames
+        "usernames",
+        "usernames-per-block",
+        // data counts
         "user-commands-epoch",
         "user-commands-pk-epoch",
         "user-commands-pk-total",
@@ -96,11 +111,6 @@ impl IndexerStore {
         "block-snark-counts",
         "block-user-command-counts",
         "block-internal-command-counts",
-        "usernames",
-        "usernames-per-block",
-        "staking-ledger-epoch",
-        "staking-ledger-balance",
-        "staking-ledger-stake",
     ];
 
     /// Creates a new _primary_ indexer store
@@ -150,13 +160,6 @@ impl IndexerStore {
     }
 }
 
-/// For [BlockStore]
-fn global_slot_block_key(block: &PrecomputedBlock) -> Vec<u8> {
-    let mut res = to_be_bytes(block.global_slot_since_genesis());
-    res.append(&mut block.state_hash().to_bytes());
-    res
-}
-
 /// For [UserCommandStore]
 
 const COMMAND_KEY_PREFIX: &str = "user-";
@@ -166,29 +169,16 @@ fn user_command_db_key_pk(pk: &str, n: u32) -> Vec<u8> {
     format!("{COMMAND_KEY_PREFIX}{pk}{n}").into_bytes()
 }
 
-/// Extracts state hash from the iterator entry (key)
-pub fn blocks_global_slot_idx_state_hash_from_key(key: &[u8]) -> anyhow::Result<String> {
-    Ok(String::from_utf8(key[4..].to_vec())?)
+/// Extracts state hash from the iterator key.
+/// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
+pub fn block_state_hash_from_key(key: &[u8]) -> anyhow::Result<BlockHash> {
+    BlockHash::from_bytes(&key[4..])
 }
 
-/// Global slot number from `key` in [user_commands_iterator]
-/// - keep the first 4 bytes
-pub fn user_commands_iterator_global_slot(key: &[u8]) -> u32 {
-    from_be_bytes(key[0..4].to_vec())
-}
-
-/// Transaction hash from `key` in [user_commands_iterator]
-/// - discard the first 4 bytes
-pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
-    String::from_utf8(key[4..(4 + TXN_HASH_LEN)].to_vec())
-        .map_err(|e| anyhow!("Error reading txn hash: {e}"))
-}
-
-/// State hash from `key` in [user_commands_iterator]
-/// - discard the first 4 bytes
-pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[(4 + TXN_HASH_LEN)..])
-        .map_err(|e| anyhow!("Error reading state hash: {e}"))
+/// Extracts u32 BE prefix from the iterator key.
+/// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
+pub fn block_u32_prefix_from_key(key: &[u8]) -> anyhow::Result<u32> {
+    Ok(from_be_bytes(key[..4].to_vec()))
 }
 
 pub fn to_be_bytes(value: u32) -> Vec<u8> {
@@ -223,40 +213,35 @@ fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
 }
 
 /// Key format for sorting txns by global slot:
-/// `{slot}{txn_hash}{state_hash}`
+/// `{u32_prefix}{txn_hash}{state_hash}`
 /// ```
-/// - slot:       4 BE bytes
+/// - u32_prefix: 4 BE bytes
 /// - txn_hash:   [TXN_HASH_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
-pub fn txn_sort_key(global_slot: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
-    let mut bytes = to_be_bytes(global_slot);
+pub fn txn_sort_key(prefix: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
+    let mut bytes = to_be_bytes(prefix);
     bytes.append(&mut txn_hash.as_bytes().to_vec());
     bytes.append(&mut state_hash.to_bytes());
     bytes
 }
 
 /// Key format for sorting txns by sender/receiver:
-/// `{pk}{slot}{txn_hash}{state_hash}`
+/// `{pk}{u32_sort}{txn_hash}{state_hash}`
 /// ```
 /// - pk:         [PublicKey::LEN] bytes
-/// - slot:       4 BE bytes
+/// - u32_sort:   4 BE bytes
 /// - txn_hash:   [TXN_HASH_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
-pub fn pk_txn_sort_key(
-    pk: PublicKey,
-    global_slot: u32,
-    txn_hash: &str,
-    state_hash: BlockHash,
-) -> Vec<u8> {
+pub fn pk_txn_sort_key(pk: PublicKey, sort: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
     let mut bytes = pk.to_bytes();
-    bytes.append(&mut txn_sort_key(global_slot, txn_hash, state_hash));
+    bytes.append(&mut txn_sort_key(sort, txn_hash, state_hash));
     bytes
 }
 
-/// Prefix `{pk}{global_slot}`
-pub fn pk_txn_sort_key_prefix(public_key: PublicKey, global_slot: u32) -> Vec<u8> {
+/// Prefix `{pk}{u32_sort}`
+pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
     let mut bytes = public_key.to_bytes();
-    bytes.append(&mut to_be_bytes(global_slot));
+    bytes.append(&mut to_be_bytes(sort));
     bytes
 }
 
@@ -264,25 +249,13 @@ pub fn pk_of_key(key: &[u8]) -> PublicKey {
     PublicKey::from_bytes(&key[..PublicKey::LEN]).expect("public key")
 }
 
-pub fn global_slot_of_key(key: &[u8]) -> u32 {
-    from_be_bytes(
-        key[PublicKey::LEN..]
-            .iter()
-            .take((u32::BITS / 8) as usize)
-            .cloned()
-            .collect(),
-    )
+pub fn u32_of_key(key: &[u8]) -> u32 {
+    from_be_bytes(key[PublicKey::LEN..(PublicKey::LEN + 4)].to_vec())
 }
 
 pub fn txn_hash_of_key(key: &[u8]) -> String {
-    String::from_utf8(
-        key[(PublicKey::LEN + 4)..]
-            .iter()
-            .take(TXN_HASH_LEN)
-            .cloned()
-            .collect(),
-    )
-    .expect("txn hash")
+    String::from_utf8(key[(PublicKey::LEN + 4)..(PublicKey::LEN + 4 + TXN_HASH_LEN)].to_vec())
+        .expect("txn hash")
 }
 
 pub fn state_hash_pk_txn_sort_key(key: &[u8]) -> BlockHash {

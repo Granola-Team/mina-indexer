@@ -135,10 +135,9 @@ impl CanonicityStore for IndexerStore {
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block with hash {}", state_hash.0);
 
-        if let (Ok(Some(best_tip)), Ok(Some(blockchain_length))) = (
-            self.get_best_block(),
-            self.get_blockchain_length(state_hash),
-        ) {
+        if let (Ok(Some(best_tip)), Ok(Some(blockchain_length))) =
+            (self.get_best_block(), self.get_block_height(state_hash))
+        {
             if blockchain_length > best_tip.blockchain_length() {
                 return Ok(None);
             } else if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {

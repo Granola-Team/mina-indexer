@@ -1,8 +1,11 @@
+use super::signed::TXN_HASH_LEN;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
+    store::from_be_bytes,
 };
+use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode};
 
 /// Store for user commands
@@ -69,18 +72,31 @@ pub trait UserCommandStore {
         txn_hash: &str,
     ) -> anyhow::Result<Option<u32>>;
 
-    // Iterators
+    ///////////////
+    // Iterators //
+    ///////////////
 
-    /// Iterator for user commands (transactions)
-    fn user_commands_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    /// Iterator for user commands via global slot
+    fn user_commands_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
-    /// Iterator for user commands by sender
-    fn txn_from_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    /// Iterator for user commands via blockchain length
+    fn user_commands_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
-    /// Iterator for user commands by receiver
-    fn txn_to_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    /// Iterator for user commands by sender via block height
+    fn txn_from_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
-    // User command counts
+    /// Iterator for user commands by sender via global slot
+    fn txn_from_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for user commands by sender via block height
+    fn txn_to_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for user commands by receiver via global slot
+    fn txn_to_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /////////////////////////
+    // User command counts //
+    /////////////////////////
 
     /// Get the number of blocks in which `pk` has transactions
     fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
@@ -133,4 +149,25 @@ pub trait UserCommandStore {
         command: &UserCommandWithStatus,
         epoch: u32,
     ) -> anyhow::Result<()>;
+}
+
+/// Global slot number from `key` in [user_commands_iterator]
+/// - keep the first 4 bytes
+/// - used for global slot & block height
+pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
+    from_be_bytes(key[..4].to_vec())
+}
+
+/// Transaction hash from `key` in [user_commands_iterator]
+/// - discard the first 4 bytes
+pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
+    String::from_utf8(key[4..(4 + TXN_HASH_LEN)].to_vec())
+        .map_err(|e| anyhow!("Error reading txn hash: {e}"))
+}
+
+/// State hash from `key` in [user_commands_iterator]
+/// - discard the first 4 + [TXN_HASH_LEN] bytes
+pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
+    BlockHash::from_bytes(&key[(4 + TXN_HASH_LEN)..])
+        .map_err(|e| anyhow!("Error reading state hash: {e}"))
 }
