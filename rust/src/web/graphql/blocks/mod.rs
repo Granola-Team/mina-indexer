@@ -16,10 +16,11 @@ use crate::{
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{blocks_global_slot_idx_state_hash_from_key, to_be_bytes, IndexerStore},
+    store::{block_state_hash_from_key, to_be_bytes, IndexerStore},
     web::graphql::gen::BlockQueryInput,
 };
-use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use anyhow::Context;
+use async_graphql::{self, Enum, Object, Result, SimpleObject};
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -29,7 +30,7 @@ pub struct BlocksQueryRoot;
 impl BlocksQueryRoot {
     async fn block<'ctx>(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &async_graphql::Context<'ctx>,
         query: Option<BlockQueryInput>,
     ) -> Result<Option<Block>> {
         let db = db(ctx);
@@ -123,14 +124,15 @@ impl BlocksQueryRoot {
 
         // else iterate over global slot sorted blocks
         for (key, _) in db
-            .blocks_global_slot_idx_iterator(speedb::IteratorMode::End)
+            .blocks_height_iterator(speedb::IteratorMode::End)
             .flatten()
         {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
+            let state_hash = block_state_hash_from_key(&key)?;
             let pcb = db
-                .get_block(&state_hash.clone().into())?
-                .expect("block to be returned");
-            let canonical = get_block_canonicity(db, &state_hash);
+                .get_block(&state_hash)?
+                .with_context(|| format!("state hash {state_hash}"))
+                .expect("block");
+            let canonical = get_block_canonicity(db, &state_hash.0);
             let block_num_snarks = db
                 .get_block_snarks_count(&pcb.state_hash())
                 .expect("snark counts")
@@ -168,7 +170,7 @@ impl BlocksQueryRoot {
 
     async fn blocks<'ctx>(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &async_graphql::Context<'ctx>,
         query: Option<BlockQueryInput>,
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
@@ -257,7 +259,7 @@ impl BlocksQueryRoot {
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit); // TODO exit earlier
+            blocks.truncate(limit);
             return Ok(blocks);
         }
 
@@ -274,7 +276,7 @@ impl BlocksQueryRoot {
                 .collect();
 
             reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit); // TODO exit earlier
+            blocks.truncate(limit);
             return Ok(blocks);
         }
 
@@ -397,11 +399,12 @@ impl BlocksQueryRoot {
                 speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
             }
         };
-        for (key, _) in db.blocks_global_slot_idx_iterator(mode).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
+        for (key, _) in db.blocks_height_iterator(mode).flatten() {
+            let state_hash = block_state_hash_from_key(&key)?;
             let pcb = db
-                .get_block(&state_hash.clone().into())?
-                .expect("block to be returned");
+                .get_block(&state_hash)?
+                .with_context(|| format!("state hash {state_hash}"))
+                .expect("block");
             let block = Block::from_precomputed(db, pcb, counts);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {

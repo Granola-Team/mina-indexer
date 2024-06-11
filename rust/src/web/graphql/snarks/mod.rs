@@ -3,7 +3,7 @@ use crate::{
     constants::*,
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
-    store::{blocks_global_slot_idx_state_hash_from_key, from_be_bytes, to_be_bytes, IndexerStore},
+    store::{block_state_hash_from_key, from_be_bytes, to_be_bytes, IndexerStore},
     web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -280,8 +280,8 @@ impl SnarkQueryRoot {
             SnarkSortByInput::BlockHeightDesc => speedb::IteratorMode::End,
         };
 
-        'outer: for (key, _) in db.blocks_global_slot_idx_iterator(mode).flatten() {
-            let state_hash = blocks_global_slot_idx_state_hash_from_key(&key)?;
+        'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
+            let state_hash = block_state_hash_from_key(&key)?.0;
             let block = db
                 .get_block(&state_hash.clone().into())?
                 .expect("block to be returned");
