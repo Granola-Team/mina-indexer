@@ -404,3 +404,42 @@ jsonpath "$.data.transactions[99].canonical" == true
 jsonpath "$.data.transactions[99].hash" == "CkpZCfVEHKrSUq7iV5pz6pAe6achsNCWtSY5G6vMqDgGoay2Ey2i2"
 jsonpath "$.data.transactions[99].block.stateHash" == "3NLuaJ8A7ubV4vFtc6YtnPUaMpiKAks2d7HmXByH6NkRS8EKG9Q8"
 jsonpath "$.data.transactions[99].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+
+#
+# Transactions by hash (block order)
+#
+
+POST {{url}}
+```graphql
+{
+  transactions(query: {hash: "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"} ) {
+    blockHeight
+    canonical
+    hash
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 4
+
+# all data
+jsonpath "$.data.transactions[0].blockHeight" == 6
+jsonpath "$.data.transactions[0].canonical" == true
+jsonpath "$.data.transactions[0].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
+
+jsonpath "$.data.transactions[1].blockHeight" == 6
+jsonpath "$.data.transactions[1].canonical" == false
+jsonpath "$.data.transactions[1].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
+
+jsonpath "$.data.transactions[2].blockHeight" == 6
+jsonpath "$.data.transactions[2].canonical" == false
+jsonpath "$.data.transactions[2].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
+
+jsonpath "$.data.transactions[3].blockHeight" == 6
+jsonpath "$.data.transactions[3].canonical" == false
+jsonpath "$.data.transactions[3].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
+
+duration < 500

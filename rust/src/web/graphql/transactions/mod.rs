@@ -81,6 +81,26 @@ impl TransactionsQueryRoot {
             transactions.truncate(limit);
             return Ok(transactions);
         }
+
+        // txn hash query (no state hash)
+        if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.clone()) {
+            let query = query.expect("query input to exists");
+            let mut transactions: Vec<Transaction> = vec![];
+            if let Ok(Some(state_hashes)) = db.get_user_command_state_hashes(&txn_hash) {
+                transactions = state_hashes
+                    .iter()
+                    .flat_map(|state_hash| db.get_block(state_hash).expect("block"))
+                    .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                    .map(|cmd| {
+                        Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
+                    })
+                    .filter(|txn| query.matches(txn))
+                    .collect();
+                transactions.truncate(limit);
+            }
+            return Ok(transactions);
+        }
+
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|input| input.block_height) {
             let query = query.expect("query input to exists");
