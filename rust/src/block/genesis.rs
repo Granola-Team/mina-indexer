@@ -1,28 +1,28 @@
 use super::precomputed::PcbVersion;
 use crate::block::precomputed::PrecomputedBlock;
-use log::info;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct GenesisBlock(pub PrecomputedBlock, pub u64);
 
+pub const GENESIS_MAINNET_BLOCK_CONTENTS: &str = include_str!("../../../data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
 impl GenesisBlock {
     /// Creates the mainnet genesis block as a PCB
     pub fn new() -> anyhow::Result<Self> {
-        let genesis_block_path: PathBuf =
-            concat!(env!("PWD"), "/tests/data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json").into();
-        info!(
-            "Looking for genesis block at {}",
-            genesis_block_path.display()
-        );
-        assert!(
-            genesis_block_path.is_file(),
-            "Genesis block does not exist at {}",
-            genesis_block_path.display()
-        );
+        let contents = GENESIS_MAINNET_BLOCK_CONTENTS.as_bytes().to_vec();
+        let size = contents.len() as u64;
+        let network = "mainnet";
+        let blockchain_length: u32 = 1;
+        let state_hash = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
+
         Ok(Self(
-            PrecomputedBlock::parse_file(&genesis_block_path, PcbVersion::V1)?,
-            genesis_block_path.metadata().unwrap().len(),
+            PrecomputedBlock::new(
+                network,
+                blockchain_length,
+                state_hash,
+                contents,
+                PcbVersion::V1,
+            )?,
+            size,
         ))
     }
 }

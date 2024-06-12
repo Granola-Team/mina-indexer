@@ -88,7 +88,6 @@
               filter = path: type:
                 (path != ".direnv") && (path != "rust/target");
             };
-            dataDir = ./data;
 
             cargoLock = { lockFile = ./rust/Cargo.lock; };
 
@@ -107,11 +106,6 @@
             preBuild = ''
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
-            '';
-            postBuild = ''
-              set -ex
-              mkdir -p $out/share/mina-indexer/data
-              cp -r ${dataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
             '';
             doCheck = true;
             checkPhase = ''
