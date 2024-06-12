@@ -50,7 +50,7 @@ pub struct BlockchainSummary {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
-    db_version: IndexerStoreVersion,
+    db_version: String,
     indexer_version: String,
 }
 
@@ -145,6 +145,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
     let total_currency = nanomina_to_mina(total_currency_u64);
     let circulating_supply = nanomina_to_mina(total_currency_u64 - locked_currency_u64);
     let locked_supply = nanomina_to_mina(locked_currency_u64);
+    let db_version = db_version.to_string();
 
     Some(BlockchainSummary {
         blockchain_length,
@@ -190,7 +191,7 @@ pub async fn get_blockchain_summary(
             .get_ledger_state_hash(state_hash, true)
             .expect("ledger exists")
             .map(|ledger| ledger.len())
-            .unwrap_or(0_usize);
+            .unwrap_or_default();
 
         // aggregated on-chain & off-chain time-locked tokens
         let chain_id = store.get_chain_id().expect("chain id").0;
@@ -241,7 +242,7 @@ pub async fn get_blockchain_summary(
             total_num_internal_commands,
             total_num_accounts,
         }) {
-            trace!("Blockchain summary: {:?}", summary);
+            trace!("Blockchain summary: {summary:?}");
             let body = serde_json::to_string_pretty(summary).expect("blockchain summary");
             return HttpResponse::Ok()
                 .content_type(ContentType::json())
