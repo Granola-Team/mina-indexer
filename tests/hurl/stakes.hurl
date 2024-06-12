@@ -133,7 +133,7 @@ duration < 5000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"} limit: 1) {
+  stakes(query: {epoch: 0, public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}, limit: 1) {
     pk_epoch_num_blocks
     pk_total_num_blocks
     pk_epoch_num_snarks
@@ -293,16 +293,14 @@ jsonpath "$.data.stakes[0].nonce" == 4
 duration < 2000
 
 #
-# Test for public key uniqueness per epoch
+# Test for existance of epoch 0 staking ledger in the presence of epoch 1 staking ledger
 #
 
 POST {{url}}
 ```graphql
 {
   stakes(query: {epoch: 0, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
-    public_key
-    balance
-    nonce
+    epoch
   }
 }
 ```
@@ -310,5 +308,26 @@ HTTP 200
 [Asserts]
 
 jsonpath "$.data.stakes" count == 1
+jsonpath "$.data.stakes[0].epoch" == 0
+
+duration < 1000
+
+#
+# Test for existance of epoch 1 staking ledger in the presence of epoch 0 staking ledger
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(query: {epoch: 1, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
+    epoch
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.stakes" count == 1
+jsonpath "$.data.stakes[0].epoch" == 1
 
 duration < 1000
