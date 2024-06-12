@@ -117,7 +117,7 @@ impl TransactionsQueryRoot {
                     (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
                     (Some(lte), None) => lte,
                     (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                    (None, None) => db.get_best_block_height()?.unwrap(),
                 };
                 (min_bound, max_bound)
             };
@@ -200,23 +200,25 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
 
-        let (start, direction) = match sort_by {
-            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
-                (to_be_bytes(0), Direction::Forward)
+        let iter = match sort_by {
+            TransactionSortByInput::BlockHeightAsc => {
+                db.user_commands_height_iterator(IteratorMode::From(&[0], Direction::Forward))
             }
-            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
-                (to_be_bytes(u32::MAX), Direction::Reverse)
+            TransactionSortByInput::BlockHeightDesc => db.user_commands_height_iterator(
+                IteratorMode::From(&to_be_bytes(u32::MAX), Direction::Reverse),
+            ),
+            TransactionSortByInput::DateTimeAsc => {
+                db.user_commands_slot_iterator(IteratorMode::From(&[0], Direction::Forward))
             }
+            TransactionSortByInput::DateTimeDesc => db.user_commands_slot_iterator(
+                IteratorMode::From(&to_be_bytes(u32::MAX), Direction::Reverse),
+            ),
         };
-        for (key, _) in db
-            .user_commands_slot_iterator(IteratorMode::From(&start, direction))
-            .flatten()
-        {
+        for (key, _) in iter.flatten() {
             if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&key).ok() {
                 continue;
             }
 
-            // Only add transactions that satisfy the input query
             let txn_hash = user_commands_iterator_txn_hash(&key)?;
             let state_hash = user_commands_iterator_state_hash(&key)?;
             let txn = Transaction::new(
@@ -315,6 +317,7 @@ impl TransactionWithoutBlock {
                 Self {
                     amount,
                     block_height: cmd.blockchain_length,
+                    global_slot: cmd.global_slot_since_genesis,
                     canonical,
                     failure_reason,
                     fee,
@@ -338,7 +341,6 @@ impl TransactionWithoutBlock {
 
 impl TransactionQueryInput {
     fn matches(&self, transaction_with_block: &Transaction) -> bool {
-        let mut matches = true;
         let transaction = transaction_with_block.transaction.clone();
         let TransactionQueryInput {
             hash,
@@ -363,6 +365,11 @@ impl TransactionQueryInput {
             block_height_gte,
             block_height_lt,
             block_height_lte,
+            global_slot,
+            global_slot_gt,
+            global_slot_gte,
+            global_slot_lt,
+            global_slot_lte,
             date_time,
             date_time_gt,
             date_time_gte,
@@ -375,7 +382,6 @@ impl TransactionQueryInput {
             nonce_gte,
             and,
             or,
-            // TODO
             block,
             fee_payer: _,
             source: _,
@@ -386,124 +392,218 @@ impl TransactionQueryInput {
             is_delegation: _,
         } = self;
         if let Some(state_hash) = block.as_ref().and_then(|b| b.state_hash.clone()) {
-            matches &= transaction_with_block.block.state_hash == state_hash;
+            if transaction_with_block.block.state_hash != state_hash {
+                return false;
+            }
         }
         if let Some(hash) = hash {
-            matches &= transaction.hash == *hash;
+            if transaction.hash != *hash {
+                return false;
+            }
         }
         if let Some(kind) = kind {
-            matches &= transaction.kind == *kind;
+            if transaction.kind != *kind {
+                return false;
+            }
         }
         if let Some(canonical) = canonical {
-            matches &= transaction.canonical == *canonical;
+            if transaction.canonical != *canonical {
+                return false;
+            }
         }
         if let Some(from) = from {
-            matches &= transaction.from == *from;
+            if transaction.from != *from {
+                return false;
+            }
         }
         if let Some(to) = to {
-            matches &= transaction.to == *to;
+            if transaction.to != *to {
+                return false;
+            }
         }
         if let Some(memo) = memo {
-            matches &= transaction.memo == *memo;
+            if transaction.memo != *memo {
+                return false;
+            }
         }
         if let Some(fee_token) = fee_token {
-            matches &= transaction.token == Some(*fee_token);
+            if transaction.token != Some(*fee_token) {
+                return false;
+            }
         }
         if let Some(query) = and {
-            matches &= query.iter().all(|and| and.matches(transaction_with_block));
+            if query.iter().all(|and| and.matches(transaction_with_block)) {
+                return false;
+            }
         }
         if let Some(query) = or {
-            if !query.is_empty() {
-                matches &= query.iter().any(|or| or.matches(transaction_with_block));
+            if !query.is_empty() && query.iter().any(|or| or.matches(transaction_with_block)) {
+                return false;
             }
         }
 
         // amount
         if let Some(amount) = amount {
-            matches &= transaction_with_block.transaction.amount == *amount;
+            if transaction_with_block.transaction.amount != *amount {
+                return false;
+            }
         }
         if let Some(amount_gt) = amount_gt {
-            matches &= transaction_with_block.transaction.amount == *amount_gt;
+            if transaction_with_block.transaction.amount <= *amount_gt {
+                return false;
+            }
         }
         if let Some(amount_gte) = amount_gte {
-            matches &= transaction_with_block.transaction.amount == *amount_gte;
+            if transaction_with_block.transaction.amount < *amount_gte {
+                return false;
+            }
         }
         if let Some(amount_lt) = amount_lt {
-            matches &= transaction_with_block.transaction.amount == *amount_lt;
+            if transaction_with_block.transaction.amount >= *amount_lt {
+                return false;
+            }
         }
         if let Some(amount_lte) = amount_lte {
-            matches &= transaction_with_block.transaction.amount == *amount_lte;
+            if transaction_with_block.transaction.amount > *amount_lte {
+                return false;
+            }
         }
 
         // fee
         if let Some(fee) = fee {
-            matches &= transaction.fee == *fee;
+            if transaction.fee != *fee {
+                return false;
+            }
         }
         if let Some(fee_gt) = fee_gt {
-            matches &= transaction_with_block.transaction.fee == *fee_gt;
+            if transaction_with_block.transaction.fee <= *fee_gt {
+                return false;
+            }
         }
         if let Some(fee_gte) = fee_gte {
-            matches &= transaction_with_block.transaction.fee == *fee_gte;
+            if transaction_with_block.transaction.fee < *fee_gte {
+                return false;
+            }
         }
         if let Some(fee_lt) = fee_lt {
-            matches &= transaction_with_block.transaction.fee == *fee_lt;
+            if transaction_with_block.transaction.fee >= *fee_lt {
+                return false;
+            }
         }
         if let Some(fee_lte) = fee_lte {
-            matches &= transaction_with_block.transaction.fee == *fee_lte;
+            if transaction_with_block.transaction.fee > *fee_lte {
+                return false;
+            }
         }
 
         // block height
         if let Some(block_height) = block_height {
-            matches &= transaction_with_block.transaction.block_height == *block_height;
+            if transaction_with_block.transaction.block_height != *block_height {
+                return false;
+            }
         }
         if let Some(block_height_gt) = block_height_gt {
-            matches &= transaction_with_block.transaction.block_height > *block_height_gt;
+            if transaction_with_block.transaction.block_height <= *block_height_gt {
+                return false;
+            }
         }
         if let Some(block_height_gte) = block_height_gte {
-            matches &= transaction_with_block.transaction.block_height >= *block_height_gte;
+            if transaction_with_block.transaction.block_height < *block_height_gte {
+                return false;
+            }
         }
         if let Some(block_height_lt) = block_height_lt {
-            matches &= transaction_with_block.transaction.block_height < *block_height_lt;
+            if transaction_with_block.transaction.block_height >= *block_height_lt {
+                return false;
+            }
         }
         if let Some(block_height_lte) = block_height_lte {
-            matches &= transaction_with_block.transaction.block_height <= *block_height_lte;
+            if transaction_with_block.transaction.block_height > *block_height_lte {
+                return false;
+            }
+        }
+
+        // global slot
+        if let Some(global_slot) = global_slot {
+            if transaction_with_block.transaction.global_slot != *global_slot {
+                return false;
+            }
+        }
+        if let Some(global_slot_gt) = global_slot_gt {
+            if transaction_with_block.transaction.global_slot <= *global_slot_gt {
+                return false;
+            }
+        }
+        if let Some(global_slot_gte) = global_slot_gte {
+            if transaction_with_block.transaction.global_slot < *global_slot_gte {
+                return false;
+            }
+        }
+        if let Some(global_slot_lt) = global_slot_lt {
+            if transaction_with_block.transaction.global_slot >= *global_slot_lt {
+                return false;
+            }
+        }
+        if let Some(global_slot_lte) = global_slot_lte {
+            if transaction_with_block.transaction.global_slot > *global_slot_lte {
+                return false;
+            }
         }
 
         // date time
         if let Some(date_time) = date_time {
-            matches &= transaction_with_block.block.date_time == *date_time;
+            if transaction_with_block.block.date_time != *date_time {
+                return false;
+            }
         }
         if let Some(date_time_gt) = date_time_gt {
-            matches &= transaction_with_block.block.date_time >= *date_time_gt;
+            if transaction_with_block.block.date_time < *date_time_gt {
+                return false;
+            }
         }
         if let Some(date_time_gte) = date_time_gte {
-            matches &= transaction_with_block.block.date_time <= *date_time_gte;
+            if transaction_with_block.block.date_time < *date_time_gte {
+                return false;
+            }
         }
         if let Some(date_time_lt) = date_time_lt {
-            matches &= transaction_with_block.block.date_time >= *date_time_lt;
+            if transaction_with_block.block.date_time >= *date_time_lt {
+                return false;
+            }
         }
         if let Some(date_time_lte) = date_time_lte {
-            matches &= transaction_with_block.block.date_time <= *date_time_lte;
+            if transaction_with_block.block.date_time > *date_time_lte {
+                return false;
+            }
         }
 
         // nonce
         if let Some(nonce) = nonce {
-            matches &= transaction_with_block.transaction.nonce == *nonce;
+            if transaction_with_block.transaction.nonce != *nonce {
+                return false;
+            }
         }
         if let Some(nonce_gt) = nonce_gt {
-            matches &= transaction_with_block.transaction.nonce == *nonce_gt;
+            if transaction_with_block.transaction.nonce <= *nonce_gt {
+                return false;
+            }
         }
         if let Some(nonce_gte) = nonce_gte {
-            matches &= transaction_with_block.transaction.nonce == *nonce_gte;
+            if transaction_with_block.transaction.nonce < *nonce_gte {
+                return false;
+            }
         }
         if let Some(nonce_lt) = nonce_lt {
-            matches &= transaction_with_block.transaction.nonce == *nonce_lt;
+            if transaction_with_block.transaction.nonce >= *nonce_lt {
+                return false;
+            }
         }
         if let Some(nonce_lte) = nonce_lte {
-            matches &= transaction_with_block.transaction.nonce == *nonce_lte;
+            if transaction_with_block.transaction.nonce > *nonce_lte {
+                return false;
+            }
         }
-
-        matches
+        true
     }
 }
 
@@ -524,6 +624,7 @@ pub enum TransactionSortByInput {
 pub struct TransactionWithoutBlock {
     amount: u64,
     block_height: u32,
+    global_slot: u32,
     canonical: bool,
     failure_reason: String,
     fee: u64,
