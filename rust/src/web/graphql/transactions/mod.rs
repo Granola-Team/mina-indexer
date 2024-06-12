@@ -13,7 +13,10 @@ use crate::{
     protocol::serialization_types::staged_ledger_diff::{
         SignedCommandPayloadBody, StakeDelegation,
     },
-    store::{pk_of_key, pk_txn_sort_key_prefix, to_be_bytes, txn_hash_of_key, IndexerStore},
+    store::{
+        pk_of_key, pk_txn_sort_key_prefix, state_hash_pk_txn_sort_key, to_be_bytes,
+        txn_hash_of_key, IndexerStore,
+    },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
@@ -48,20 +51,23 @@ impl TransactionsQueryRoot {
     pub async fn transactions(
         &self,
         ctx: &Context<'_>,
-        query: TransactionQueryInput,
+        query: Option<TransactionQueryInput>,
         #[graphql(default = 100)] limit: usize,
-        sort_by: TransactionSortByInput,
+        sort_by: Option<TransactionSortByInput>,
     ) -> Result<Vec<Transaction>> {
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
+        let sort_by = sort_by.unwrap_or(TransactionSortByInput::BlockHeightDesc);
+
         // transaction filtered by state hash
         if let Some(state_hash) = query
-            .block
             .as_ref()
+            .and_then(|input| input.block.as_ref())
             .and_then(|block| block.state_hash.clone())
         {
+            let query = query.expect("query input to exists");
             let mut transactions: Vec<Transaction> = db
                 .get_block(&state_hash.into())?
                 .into_iter()
@@ -76,7 +82,8 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
         // block height query
-        if let Some(block_height) = query.block_height {
+        if let Some(block_height) = query.as_ref().and_then(|input| input.block_height) {
+            let query = query.expect("query input to exists");
             let mut transactions: Vec<Transaction> = db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
@@ -93,11 +100,13 @@ impl TransactionsQueryRoot {
         }
 
         // block height bounded query
-        if query.block_height_gt.is_some()
-            || query.block_height_gte.is_some()
-            || query.block_height_lt.is_some()
-            || query.block_height_lte.is_some()
-        {
+        if query.as_ref().map_or(false, |q| {
+            q.block_height_gt.is_some()
+                || q.block_height_gte.is_some()
+                || q.block_height_lt.is_some()
+                || q.block_height_lte.is_some()
+        }) {
+            let query = query.expect("query input to exists");
             let (min, max) = {
                 let TransactionQueryInput {
                     block_height_gt,
@@ -163,8 +172,17 @@ impl TransactionsQueryRoot {
         };
 
         // from/to account (sender/receiver) query
-        if query.from.as_ref().or(query.to.as_ref()).is_some() {
-            let pk = query.from.as_ref().or(query.to.as_ref()).unwrap();
+
+        if query
+            .as_ref()
+            .map_or(false, |q| q.from.as_ref().or(q.to.as_ref()).is_some())
+        {
+            let query = query.expect("query input to exisist");
+            let pk = query
+                .from
+                .as_ref()
+                .or(query.to.as_ref())
+                .expect("pk to exist");
             let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
             let mode = IteratorMode::From(&start, direction);
             let txn_iter = if query.from.is_some() {
@@ -172,19 +190,17 @@ impl TransactionsQueryRoot {
             } else {
                 db.txn_to_height_iterator(mode).flatten()
             };
-
             for (key, _) in txn_iter {
                 // public key bytes
                 let txn_pk = pk_of_key(&key);
                 if txn_pk.0 != *pk {
                     break;
                 }
-
-                // txn hash bytes
+                let txn_state_hash = state_hash_pk_txn_sort_key(&key);
                 let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
-                    .get_user_command(&txn_hash, 0)?
-                    .expect("command at txn hash");
+                    .get_user_command_state_hash(&txn_hash, &txn_state_hash)?
+                    .expect("command at txn hash and state hash");
                 let txn =
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
 
@@ -215,10 +231,12 @@ impl TransactionsQueryRoot {
             ),
         };
         for (key, _) in iter.flatten() {
-            if query.hash.is_some() && query.hash != user_commands_iterator_txn_hash(&key).ok() {
-                continue;
+            if let Some(ref q) = query {
+                // early exit if txn hashes don't match if we're filtering by it
+                if q.hash.is_some() && q.hash != user_commands_iterator_txn_hash(&key).ok() {
+                    continue;
+                }
             }
-
             let txn_hash = user_commands_iterator_txn_hash(&key)?;
             let state_hash = user_commands_iterator_state_hash(&key)?;
             let txn = Transaction::new(
@@ -229,7 +247,7 @@ impl TransactionsQueryRoot {
                 total_num_user_commands,
             );
 
-            if query.matches(&txn) {
+            if query.as_ref().map_or(true, |q| q.matches(&txn)) {
                 transactions.push(txn);
 
                 if transactions.len() == limit {
