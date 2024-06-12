@@ -1677,7 +1677,7 @@ test_hurl() {
         --web-hostname "0.0.0.0"
     wait_for_socket
 
-    hurl --variable url=http://localhost:"$port"/graphql --test "$SRC"/tests/hurl/*.hurl
+    hurl --variable url=http://localhost:"$port"/graphql --test --parallel "$SRC"/tests/hurl/*.hurl
 
     teardown
 }
