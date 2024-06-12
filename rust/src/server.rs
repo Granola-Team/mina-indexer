@@ -264,10 +264,11 @@ pub fn initialize(
         }
     }
 
-    staking_ledgers_dir
-        .as_ref()
-        .iter()
-        .for_each(|d| state.add_startup_staking_ledgers_to_store(d).unwrap());
+    staking_ledgers_dir.as_ref().iter().for_each(|pathbuf| {
+        if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf) {
+            error!("Failed to ingest staking ledger: {:?} {}", pathbuf, e);
+        }
+    });
     Ok(state)
 }
 
