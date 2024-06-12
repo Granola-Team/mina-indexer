@@ -39,26 +39,28 @@ pub struct IndexerStore {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 63] = [
+    const COLUMN_FAMILIES: [&'static str; 70] = [
+        // accounts
         "account-balance",
         "account-balance-sort",
         "account-balance-updates",
-        "block-production-pk-epoch",
-        "block-production-pk-total",
-        "block-production-epoch",
+        // blocks
         "blocks-state-hash",
         "blocks-version",
         "blocks-at-length",
         "blocks-at-slot",
         "blocks-height",
-        "blocks-height-sort",
         "blocks-global-slot",
-        "blocks-global-slot-sort",
         "blocks-parent-hash",
+        "blocks-epoch",
+        "blocks-genesis-hash",
         "block-height-to-slots",
         "block-slot-to-heights",
+        "blocks-height-sort",
+        "blocks-global-slot-sort",
         "block-comparison",
         "coinbase-receivers",
+        // canonicity
         "canonicity-length",
         "canonicity-slot",
         // user commands
@@ -72,45 +74,58 @@ impl IndexerStore {
         "user-commands-height-sort",
         "user-commands-to-global-slot",
         "user-commands-to-block-height",
-        // user command -> list of state hashes
         "user-command-state-hashes",
         // sorting user commands by sender/receiver
         "txn-from-slot-sort",
         "txn-from-height-sort",
         "txn-to-slot-sort",
         "txn-to-height-sort",
-        // internal commands
-        "internal-commands",
-        "internal-commands-global-slot",
-        "events",
-        "ledgers",
         // SNARKs
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
         "snark-work-fees",
         "snark-work-prover",
-        "chain-id-to-network",
+        // internal commands
+        "internal-commands",
+        "internal-commands-global-slot",
+        // events
+        "events",
+        // staged & staking ledgers
+        "ledgers",
+        "staking-ledgers",
+        "staking-delegations",
+        "staking-ledger-genesis-hash",
+        "staking-ledger-epoch-to-hash",
+        "staking-ledger-hash-to-epoch",
         // sorting staking ledgers
         "staking-ledger-epoch",
         "staking-ledger-balance",
         "staking-ledger-stake",
+        // chain id
+        "chain-id-to-network",
         // usernames
         "usernames",
         "usernames-per-block",
-        // data counts
-        "user-commands-epoch",
-        "user-commands-pk-epoch",
-        "user-commands-pk-total",
-        "internal-commands-epoch",
-        "internal-commands-pk-epoch",
-        "internal-commands-pk-total",
-        "snarks-epoch",
-        "snarks-pk-epoch",
-        "snarks-pk-total",
+        // block counts
+        "block-production-pk-epoch",
+        "block-production-pk-total",
+        "block-production-epoch",
         "block-snark-counts",
         "block-user-command-counts",
         "block-internal-command-counts",
+        // user command counts
+        "user-commands-epoch",
+        "user-commands-pk-epoch",
+        "user-commands-pk-total",
+        // internal command counts
+        "internal-commands-epoch",
+        "internal-commands-pk-epoch",
+        "internal-commands-pk-total",
+        // SNARK counts
+        "snarks-epoch",
+        "snarks-pk-epoch",
+        "snarks-pk-total",
     ];
 
     /// Creates a new _primary_ indexer store

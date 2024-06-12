@@ -151,22 +151,25 @@ pub trait UserCommandStore {
     ) -> anyhow::Result<()>;
 }
 
-/// Global slot number from `key` in [user_commands_iterator]
+/// u32 prefix from `key`
 /// - keep the first 4 bytes
 /// - used for global slot & block height
+/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
     from_be_bytes(key[..4].to_vec())
 }
 
-/// Transaction hash from `key` in [user_commands_iterator]
-/// - discard the first 4 bytes
+/// Transaction hash from `key`
+/// - discard 4 bytes, keep [TXN_HASH_LEN] bytes
+/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
     String::from_utf8(key[4..(4 + TXN_HASH_LEN)].to_vec())
         .map_err(|e| anyhow!("Error reading txn hash: {e}"))
 }
 
-/// State hash from `key` in [user_commands_iterator]
+/// State hash from `key`
 /// - discard the first 4 + [TXN_HASH_LEN] bytes
+/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
     BlockHash::from_bytes(&key[(4 + TXN_HASH_LEN)..])
         .map_err(|e| anyhow!("Error reading state hash: {e}"))

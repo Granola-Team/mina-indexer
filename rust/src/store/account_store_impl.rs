@@ -6,7 +6,6 @@ use crate::{
     ledger::{
         diff::{account::PaymentDiff, LedgerBalanceUpdate},
         public_key::PublicKey,
-        store::LedgerStore,
     },
     store::{account::AccountStore, u64_prefix_key, IndexerStore},
 };
@@ -174,6 +173,19 @@ impl AccountStore for IndexerStore {
             serde_json::to_vec(&(coinbase_receiver, balance_updates))?,
         )?;
         Ok(())
+    }
+
+    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+        trace!("Getting account balance {pk}");
+
+        Ok(self
+            .database
+            .get_pinned_cf(self.account_balance_cf(), pk.0.as_bytes())?
+            .map(|bytes| {
+                let mut be_bytes = [0; 8];
+                be_bytes.copy_from_slice(&bytes[..8]);
+                u64::from_be_bytes(be_bytes)
+            }))
     }
 
     ///////////////

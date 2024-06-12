@@ -80,7 +80,6 @@ impl UserCommandStore for IndexerStore {
             )?;
 
             // add sender index
-            // `{sender}{height BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
                 self.txn_from_height_sort_cf(),
                 pk_txn_sort_key(
@@ -91,8 +90,6 @@ impl UserCommandStore for IndexerStore {
                 ),
                 command.amount().to_be_bytes(),
             )?;
-
-            // `{sender}{global_slot BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
                 self.txn_from_slot_sort_cf(),
                 pk_txn_sort_key(
@@ -105,7 +102,6 @@ impl UserCommandStore for IndexerStore {
             )?;
 
             // add receiver index
-            // `{receiver}{height BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
                 self.txn_to_height_sort_cf(),
                 pk_txn_sort_key(
@@ -116,8 +112,6 @@ impl UserCommandStore for IndexerStore {
                 ),
                 command.amount().to_be_bytes(),
             )?;
-
-            // `{receiver}{global_slot BE}{txn_hash}{state_hash} -> amount BE`
             self.database.put_cf(
                 self.txn_to_slot_sort_cf(),
                 pk_txn_sort_key(

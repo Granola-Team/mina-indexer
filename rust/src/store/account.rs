@@ -39,7 +39,12 @@ pub trait AccountStore {
         coinbase_receivers: HashSet<PublicKey>,
     ) -> anyhow::Result<()>;
 
-    // Iterators
+    /// Get pk's account balance
+    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    ///////////////
+    // Iterators //
+    ///////////////
 
     /// Iterator for balance-sorted accounts
     /// `{balance}{pk} -> _`

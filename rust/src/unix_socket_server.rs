@@ -762,7 +762,7 @@ async fn handle_conn(
                     trace!("{hash} is a ledger hash");
 
                     if let Some(staking_ledger) =
-                        db.get_staking_ledger_hash(&hash.clone().into())?
+                        db.get_staking_ledger_hash(&hash.clone().into(), None, None)?
                     {
                         let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                         if path.is_none() {
@@ -801,7 +801,7 @@ async fn handle_conn(
                 if !block::is_valid_state_hash(&genesis_state_hash) {
                     invalid_state_hash(&genesis_state_hash)
                 } else if let Some(staking_ledger) =
-                    db.get_staking_ledger_at_epoch(epoch, &Some(genesis_state_hash.into()))?
+                    db.get_staking_ledger_at_epoch(epoch, Some(genesis_state_hash.into()))?
                 {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                     if path.is_none() {

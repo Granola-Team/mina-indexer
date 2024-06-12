@@ -1154,7 +1154,7 @@ impl IndexerState {
                     {
                         if let Some(staking_ledger) = indexer_store.get_staking_ledger_at_epoch(
                             *epoch,
-                            &Some(genesis_state_hash.to_owned()),
+                            Some(genesis_state_hash.to_owned()),
                         )? {
                             // check delegation calculations
                             assert_eq!(
@@ -1324,7 +1324,9 @@ impl IndexerState {
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
-        if let Some(staking_ledger_hash) = indexer_store.get_staking_ledger_hash(ledger_hash)? {
+        if let Some(staking_ledger_hash) =
+            indexer_store.get_staking_ledger_at_epoch(*epoch, None)?
+        {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
                 staking_ledger_hash.ledger_hash, *ledger_hash,
@@ -1333,7 +1335,7 @@ impl IndexerState {
 
             if let Some(staking_ledger_epoch) = indexer_store.get_staking_ledger_at_epoch(
                 *epoch,
-                &Some(staking_ledger_hash.genesis_state_hash.clone()),
+                Some(staking_ledger_hash.genesis_state_hash.clone()),
             )? {
                 assert_eq!(staking_ledger_epoch.epoch, *epoch, "Invalid epoch");
                 assert_eq!(
