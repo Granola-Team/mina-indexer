@@ -217,33 +217,27 @@ impl BlocksQueryRoot {
 
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
-            let mut blocks: Vec<Block> = db
+            return Ok(db
                 .get_blocks_at_height(block_height)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .collect();
-
-            reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
-            return Ok(blocks);
+                .take(limit)
+                .collect());
         }
 
         // global slot query
-        if let Some(global_slot_since_genesis) = query
+        if let Some(global_slot) = query
             .as_ref()
             .and_then(|q| q.protocol_state.as_ref())
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
         {
-            let mut blocks: Vec<Block> = db
-                .get_blocks_at_slot(global_slot_since_genesis as u32)?
+            return Ok(db
+                .get_blocks_at_slot(global_slot as u32)?
                 .into_iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .collect();
-
-            reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
-            return Ok(blocks);
+                .take(limit)
+                .collect());
         }
 
         // coinbase receiver query

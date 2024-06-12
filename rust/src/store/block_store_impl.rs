@@ -5,6 +5,7 @@ use crate::{
         store::BlockStore,
         BlockComparison, BlockHash,
     },
+    canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{diff::LedgerBalanceUpdate, public_key::PublicKey},
@@ -332,7 +333,16 @@ impl BlockStore for IndexerStore {
             }
         }
 
-        blocks.sort();
+        blocks.sort_by(|a, b| {
+            use std::cmp::Ordering;
+            let a_canonicity = self.get_block_canonicity(&a.state_hash()).ok().flatten();
+            let b_canonicity = self.get_block_canonicity(&b.state_hash()).ok().flatten();
+            match (a_canonicity, b_canonicity) {
+                (Some(Canonicity::Canonical), _) => Ordering::Less,
+                (_, Some(Canonicity::Canonical)) => Ordering::Greater,
+                _ => a.cmp(b),
+            }
+        });
         Ok(blocks)
     }
 
@@ -384,7 +394,16 @@ impl BlockStore for IndexerStore {
             }
         }
 
-        blocks.sort();
+        blocks.sort_by(|a, b| {
+            use std::cmp::Ordering;
+            let a_canonicity = self.get_block_canonicity(&a.state_hash()).ok().flatten();
+            let b_canonicity = self.get_block_canonicity(&b.state_hash()).ok().flatten();
+            match (a_canonicity, b_canonicity) {
+                (Some(Canonicity::Canonical), _) => Ordering::Less,
+                (_, Some(Canonicity::Canonical)) => Ordering::Greater,
+                _ => a.cmp(b),
+            }
+        });
         Ok(blocks)
     }
 
