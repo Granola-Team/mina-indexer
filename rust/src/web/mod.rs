@@ -12,10 +12,10 @@ use actix_cors::Cors;
 use actix_web::{guard, middleware, web, web::Data, App, HttpServer};
 use async_graphql_actix_web::GraphQL;
 use log::warn;
-use std::{net, path::Path, sync::Arc};
+use std::{net, sync::Arc};
 
-fn load_locked_balances<P: AsRef<Path>>(path: Option<P>) -> LockedBalances {
-    match LockedBalances::from_csv(path) {
+fn load_locked_balances() -> LockedBalances {
+    match LockedBalances::new() {
         Ok(locked_balances) => locked_balances,
         Err(e) => {
             warn!("locked supply csv ingestion failed. {}", e);
@@ -24,12 +24,11 @@ fn load_locked_balances<P: AsRef<Path>>(path: Option<P>) -> LockedBalances {
     }
 }
 
-pub async fn start_web_server<A: net::ToSocketAddrs, P: AsRef<Path>>(
+pub async fn start_web_server<A: net::ToSocketAddrs>(
     state: Arc<IndexerStore>,
     addrs: A,
-    locked_supply: Option<P>,
 ) -> std::io::Result<()> {
-    let locked = Arc::new(load_locked_balances(locked_supply));
+    let locked = Arc::new(load_locked_balances());
 
     HttpServer::new(move || {
         App::new()

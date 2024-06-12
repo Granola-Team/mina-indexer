@@ -45,7 +45,6 @@ port="$(ephemeral_port)"
     --database-dir /mnt/mina-logs/"$VER"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
-    --locked-supply-csv "$src"/data/locked.csv \
     --ledger-cadence 5000 \
     > "$LOG"/out \
     2> "$LOG"/err \
@@ -73,7 +72,6 @@ wait "$PID"
     --database-dir /mnt/mina-logs/"$VER"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
-    --locked-supply-csv "$src"/data/locked.csv \
     --ledger-cadence 5000 \
     >> "$LOG"/out \
     2>> "$LOG"/err \
