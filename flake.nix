@@ -1,5 +1,9 @@
 {
-  inputs = { rust-overlay.url = "github:oxalica/rust-overlay"; };
+  inputs = {
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    nixpkgs.url =
+      "github:NixOS/nixpkgs?ref=47b604b07d1e8146d5398b42d3306fdebd343986";
+  };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachSystem [
