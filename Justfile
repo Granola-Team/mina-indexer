@@ -19,6 +19,7 @@ default:
 
 # Check for presence of dev dependencies.
 prereqs:
+  echo "--- Checking prereqs"
   cd rust && cargo --version
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
@@ -30,6 +31,7 @@ prereqs:
   shellcheck --version
 
 build:
+  echo "--- Performing build"
   cd rust && cargo build --release
 
 clean:
@@ -42,15 +44,19 @@ format:
 test: lint test-unit test-regression
 
 test-unit:
+  echo "--- Performing unit tests"
   cd rust && cargo nextest run --release
 
 test-unit-mina-rs:
+  echo "--- Performing long-running mina-rs unit tests"
   cd rust && cargo nextest run --release --features mina_rs
 
 test-regression subtest='': build
+  echo "--- Performing regressions test(s)"
   ./tests/regression {{subtest}}
 
 test-release: build
+  echo "--- Performing test_release"
   ./tests/regression test_release
 
 disallow-unused-cargo-deps:
@@ -60,6 +66,7 @@ audit:
   cd rust && cargo audit
 
 lint: && audit disallow-unused-cargo-deps
+  echo "--- Performing linting"
   shellcheck tests/regression
   shellcheck tests/stage-*
   shellcheck ops/productionize
@@ -70,7 +77,7 @@ lint: && audit disallow-unused-cargo-deps
 
 # Build OCI images.
 build-image:
-  echo "Building {{IMAGE}}"
+  echo "--- Building {{IMAGE}}"
   docker --version
   nix build .#dockerImage
   docker load < ./result
@@ -95,13 +102,17 @@ delete-database:
 
 # Run a server as if in production.
 productionize: build
+  echo "--- Productionizing"
   ./ops/productionize
 
 # Run the 1st tier of tests.
 tier1-test: prereqs test
 
 # Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
-tier2-test: build
+tier2-test: build test-unit-mina-rs
+  echo "--- Performing test_many_blocks regression test"
   tests/regression test_many_blocks
+  echo "--- Performing Nix build"
   nix build
+  echo "--- Ingesting all blocks..."
   ops/ingest-all
