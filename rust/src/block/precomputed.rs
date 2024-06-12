@@ -160,6 +160,25 @@ impl PrecomputedBlock {
         }
     }
 
+    pub fn new(
+        network: &str,
+        blockchain_length: u32,
+        state_hash: &str,
+        contents: Vec<u8>,
+        version: PcbVersion,
+    ) -> anyhow::Result<Self> {
+        let precomputed_block = PrecomputedBlock::from_file_contents(
+            BlockFileContents {
+                contents,
+                blockchain_length,
+                network: network.into(),
+                state_hash: state_hash.into(),
+            },
+            version,
+        )?;
+        Ok(precomputed_block)
+    }
+
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let network = extract_network(path);

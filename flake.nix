@@ -109,9 +109,6 @@
               cd rust
             '';
             postBuild = ''
-              set -ex
-              mkdir -p $out/share/mina-indexer/data
-              cp -r ${dataDir}/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json $out/share/mina-indexer/data
             '';
             doCheck = true;
             checkPhase = ''
