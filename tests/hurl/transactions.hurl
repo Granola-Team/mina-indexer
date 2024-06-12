@@ -200,9 +200,9 @@ jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 100
+jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpZgsCnm3uFdZbbyPrsrzjZuiXPmkbdhvrzyimcv1zh98uV2p8Z2"
+jsonpath "$.data.transactions[49].hash" == "CkpYpkePDRfsrWHxpGMMxVfWMy5xnSCjYTcsqyAqgo7keHwWThb8N"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
@@ -253,9 +253,9 @@ jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
-jsonpath "$.data.transactions[49].blockHeight" == 100
+jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpZgsCnm3uFdZbbyPrsrzjZuiXPmkbdhvrzyimcv1zh98uV2p8Z2"
+jsonpath "$.data.transactions[49].hash" == "CkpYpkePDRfsrWHxpGMMxVfWMy5xnSCjYTcsqyAqgo7keHwWThb8N"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
@@ -348,3 +348,59 @@ jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2F
 jsonpath "$.data.transactions[0].block.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 
 duration < 500
+
+POST {{url}}
+```graphql
+query TransactionsQueryDuplicate(
+  $limit: Int = 10
+  $sort_by: TransactionSortByInput!
+  $query: TransactionQueryInput!
+) {
+  transactions(limit: $limit, sortBy: $sort_by, query: $query) {
+    blockHeight
+    failureReason
+    canonical
+    amount
+    fee
+    kind
+    to
+    from
+    nonce
+    memo
+    hash
+    block {
+      dateTime
+      stateHash
+    }
+    receiver {
+      publicKey
+    }
+  }
+}
+
+variables {
+  "limit": 100,
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "query": {
+    "from": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+    "canonical": true
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 100
+
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[0].canonical" == true
+jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
+jsonpath "$.data.transactions[0].block.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.transactions[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+
+jsonpath "$.data.transactions[99].blockHeight" == 57
+jsonpath "$.data.transactions[99].canonical" == true
+jsonpath "$.data.transactions[99].hash" == "CkpZCfVEHKrSUq7iV5pz6pAe6achsNCWtSY5G6vMqDgGoay2Ey2i2"
+jsonpath "$.data.transactions[99].block.stateHash" == "3NLuaJ8A7ubV4vFtc6YtnPUaMpiKAks2d7HmXByH6NkRS8EKG9Q8"
+jsonpath "$.data.transactions[99].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
