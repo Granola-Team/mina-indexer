@@ -88,7 +88,6 @@
               filter = path: type:
                 (path != ".direnv") && (path != "rust/target");
             };
-            dataDir = ./data;
 
             cargoLock = { lockFile = ./rust/Cargo.lock; };
 
@@ -107,8 +106,6 @@
             preBuild = ''
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
-            '';
-            postBuild = ''
             '';
             doCheck = true;
             checkPhase = ''
