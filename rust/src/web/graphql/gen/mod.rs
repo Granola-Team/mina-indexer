@@ -828,6 +828,7 @@ pub struct TransactionQueryInput {
 
     // block height attributes
     pub block_height: Option<u32>,
+
     #[graphql(name = "blockHeight_gt")]
     pub block_height_gt: Option<u32>,
 
@@ -840,7 +841,20 @@ pub struct TransactionQueryInput {
     #[graphql(name = "blockHeight_lte")]
     pub block_height_lte: Option<u32>,
 
-    // TODO global slot?
+    // global slot attributes
+    pub global_slot: Option<u32>,
+
+    #[graphql(name = "globalSlot_gt")]
+    pub global_slot_gt: Option<u32>,
+
+    #[graphql(name = "globalSlot_gte")]
+    pub global_slot_gte: Option<u32>,
+
+    #[graphql(name = "globalSlot_lt")]
+    pub global_slot_lt: Option<u32>,
+
+    #[graphql(name = "globalSlot_lte")]
+    pub global_slot_lte: Option<u32>,
 
     // datetime attributes
     pub date_time: Option<DateTime>,

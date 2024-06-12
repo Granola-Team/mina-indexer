@@ -16,17 +16,17 @@ use log::{error, trace};
 use std::str::FromStr;
 
 impl LedgerStore for IndexerStore {
-    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<()> {
-        trace!(
-            "Adding staged ledger\nstate_hash: {}\nledger_hash: {}",
-            state_hash.0,
-            ledger_hash.0
-        );
+    ////////////////////
+    // Staged ledgers //
+    ////////////////////
 
-        // add state hash for ledger to db
-        let key = ledger_hash.0.as_bytes();
-        let value = state_hash.0.as_bytes();
-        self.database.put_cf(self.ledgers_cf(), key, value)?;
+    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<()> {
+        trace!("Adding staged ledger\nstate_hash: {state_hash}\nledger_hash: {ledger_hash}");
+        self.database.put_cf(
+            self.ledgers_cf(),
+            ledger_hash.0.as_bytes(),
+            state_hash.0.as_bytes(),
+        )?;
         Ok(())
     }
 
@@ -36,13 +36,14 @@ impl LedgerStore for IndexerStore {
     }
 
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
-        trace!("Adding staged ledger state hash {}", state_hash.0);
+        trace!("Adding staged ledger state hash {state_hash}");
 
         // add ledger to db
-        let key = state_hash.0.as_bytes();
-        let value = ledger.to_string();
-        let value = value.as_bytes();
-        self.database.put_cf(self.ledgers_cf(), key, value)?;
+        self.database.put_cf(
+            self.ledgers_cf(),
+            state_hash.0.as_bytes(),
+            ledger.to_string(),
+        )?;
 
         // index on state hash & add new ledger event
         if self
@@ -72,7 +73,7 @@ impl LedgerStore for IndexerStore {
                 }
                 None => {
                     if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
-                        error!("Block missing from store: {}", state_hash.0);
+                        error!("Block missing from store: {state_hash}");
                     }
                 }
             }
@@ -100,7 +101,7 @@ impl LedgerStore for IndexerStore {
         state_hash: &BlockHash,
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting staged ledger state hash {}", state_hash.0);
+        trace!("Getting staged ledger state hash {state_hash}");
 
         let mut state_hash = state_hash.clone();
         let mut to_apply = vec![];
@@ -112,7 +113,7 @@ impl LedgerStore for IndexerStore {
             .get_pinned_cf(self.ledgers_cf(), state_hash.0.as_bytes())?
             .is_none()
         {
-            trace!("No staged ledger found for state hash {}", state_hash);
+            trace!("No staged ledger found for state hash {state_hash}");
             if let Some(block) = self.get_block(&state_hash)? {
                 to_apply.push(block.clone());
                 state_hash = block.previous_state_hash();
@@ -122,13 +123,13 @@ impl LedgerStore for IndexerStore {
                 );
             } else {
                 if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
-                    error!("Block missing from store: {}", state_hash.0);
+                    error!("Block missing from store: {state_hash}");
                 }
                 return Ok(None);
             }
         }
 
-        trace!("Found staged ledger state hash {}", state_hash.0);
+        trace!("Found staged ledger state hash {state_hash}");
         to_apply.reverse();
 
         if let Some(mut ledger) = self
@@ -160,8 +161,7 @@ impl LedgerStore for IndexerStore {
     }
 
     fn get_ledger(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting staged ledger hash {}", ledger_hash.0);
-
+        trace!("Getting staged ledger hash {ledger_hash}");
         let key = ledger_hash.0.as_bytes();
         if let Some(state_hash) = self
             .database
@@ -182,53 +182,77 @@ impl LedgerStore for IndexerStore {
     }
 
     fn get_ledger_at_height(&self, height: u32, memoize: bool) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting staged ledger height {}", height);
-
+        trace!("Getting staged ledger height {height}");
         match self.get_canonical_hash_at_height(height)? {
             None => Ok(None),
             Some(state_hash) => self.get_ledger_state_hash(&state_hash, memoize),
         }
     }
 
+    /////////////////////
+    // Staking ledgers //
+    /////////////////////
+
     fn get_staking_ledger_at_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: &Option<BlockHash>,
+        genesis_state_hash: Option<BlockHash>,
     ) -> anyhow::Result<Option<StakingLedger>> {
-        trace!("Getting staking ledger epoch {}", epoch);
-
-        // default to current genesis state hash
+        trace!("Getting staking ledger epoch {epoch}");
         let genesis_state_hash = genesis_state_hash
             .clone()
-            .unwrap_or(self.get_best_block()?.unwrap().genesis_state_hash());
-        let key = format!("staking-{}-{}", genesis_state_hash.0, epoch);
-        if let Some(ledger_result) = self
-            .database
-            .get_pinned_cf(self.ledgers_cf(), key.as_bytes())?
-            .map(|bytes| bytes.to_vec())
-            .map(|bytes| {
-                let ledger_hash = String::from_utf8(bytes)?;
-                self.get_staking_ledger_hash(&ledger_hash.into())
-            })
-        {
-            return ledger_result;
+            .unwrap_or_else(|| self.get_best_block_genesis_hash().ok().flatten().unwrap());
+        if let Some(ledger_hash) = self.get_ledger_hash(epoch)? {
+            if let Some(ledger) = self
+                .database
+                .get_pinned_cf(
+                    self.staking_ledgers_cf(),
+                    staking_ledger_key(genesis_state_hash, epoch, &ledger_hash),
+                )?
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            {
+                return Ok(Some(ledger));
+            }
         }
         Ok(None)
     }
 
+    /// If some epoch is given, use it over the ledger hash,
+    /// else get the epoch from the ledger hash
     fn get_staking_ledger_hash(
         &self,
         ledger_hash: &LedgerHash,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<BlockHash>,
     ) -> anyhow::Result<Option<StakingLedger>> {
-        trace!("Getting staking ledger hash {}", ledger_hash.0);
-
-        if let Some(bytes) = self
-            .database
-            .get_pinned_cf(self.ledgers_cf(), ledger_hash.0.as_bytes())?
-        {
-            return Ok(Some(serde_json::from_slice::<StakingLedger>(&bytes)?));
+        trace!("Getting staking ledger hash {ledger_hash}");
+        match epoch {
+            None => {
+                if let (Ok(Some(epoch)), Some(genesis_state_hash)) = (
+                    self.get_epoch(ledger_hash),
+                    genesis_state_hash
+                        .or_else(|| self.get_best_block_genesis_hash().ok().flatten()),
+                ) {
+                    if let Ok(Some(bytes)) = self.database.get_pinned_cf(
+                        self.staking_ledgers_cf(),
+                        staking_ledger_key(genesis_state_hash, epoch, ledger_hash),
+                    ) {
+                        return Ok(Some(serde_json::from_slice(&bytes)?));
+                    }
+                }
+                Ok(None)
+            }
+            Some(epoch) => {
+                if let Ok(Some(staking_ledger)) =
+                    self.get_staking_ledger_at_epoch(epoch, genesis_state_hash)
+                {
+                    if staking_ledger.ledger_hash == *ledger_hash {
+                        return Ok(Some(staking_ledger));
+                    }
+                }
+                Ok(None)
+            }
         }
-        Ok(None)
     }
 
     fn add_staking_ledger(
@@ -240,30 +264,35 @@ impl LedgerStore for IndexerStore {
         trace!("Adding staking ledger {}", staking_ledger.summary());
 
         // add ledger at ledger hash
-        let key = staking_ledger.ledger_hash.0.as_bytes();
-        let value = serde_json::to_vec(&staking_ledger)?;
+        let key = staking_ledger_key(
+            genesis_state_hash.clone(),
+            staking_ledger.epoch,
+            &staking_ledger.ledger_hash,
+        );
         let is_new = self
             .database
-            .get_pinned_cf(self.ledgers_cf(), key)?
+            .get_pinned_cf(self.staking_ledgers_cf(), key.clone())?
             .is_none();
-        self.database.put_cf(self.ledgers_cf(), key, value)?;
+
+        // add staking ledger
+        self.database.put_cf(
+            self.staking_ledgers_cf(),
+            key,
+            serde_json::to_vec(&staking_ledger)?,
+        )?;
 
         // add (ledger hash, epoch) index
-        self.set_epoch(&staking_ledger.ledger_hash, epoch)?;
+        self.set_ledger_hash_epoch_pair(&staking_ledger.ledger_hash, epoch)?;
 
-        // add (genesis state hash, epoch) index
-        let key = format!("staking-{}-{}", genesis_state_hash.0, epoch);
-        let value = staking_ledger.ledger_hash.0.as_bytes();
-        self.database
-            .put_cf(self.ledgers_cf(), key.as_bytes(), value)?;
+        // add (ledger hash, genesis state hash) index
+        self.set_ledger_hash_genesis_pair(&staking_ledger.ledger_hash, genesis_state_hash)?;
 
-        // aggregate staking delegations
-        trace!("Aggregating staking delegations epoch {}", epoch);
+        // add aggregated delegations
+        trace!("Aggregating staking delegations epoch {epoch}");
         let aggregated_delegations = staking_ledger.aggregate_delegations()?;
-        let key = format!("delegations-{}-{}", genesis_state_hash.0, epoch);
         self.database.put_cf(
-            self.ledgers_cf(),
-            key.as_bytes(),
+            self.staking_delegations_cf(),
+            staking_ledger_epoch_key(genesis_state_hash.clone(), epoch),
             serde_json::to_vec(&aggregated_delegations)?,
         )?;
 
@@ -313,6 +342,88 @@ impl LedgerStore for IndexerStore {
         Ok(())
     }
 
+    fn get_delegations_epoch(
+        &self,
+        epoch: u32,
+        genesis_state_hash: &Option<BlockHash>,
+    ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
+        trace!("Getting staking delegations for epoch {epoch}");
+        let genesis_state_hash = genesis_state_hash
+            .clone()
+            .unwrap_or_else(|| self.get_best_block_genesis_hash().ok().flatten().unwrap());
+        if let Some(bytes) = self.database.get_pinned_cf(
+            self.staking_delegations_cf(),
+            staking_ledger_epoch_key(genesis_state_hash, epoch),
+        )? {
+            return Ok(Some(serde_json::from_slice(&bytes)?));
+        }
+        Ok(None)
+    }
+
+    fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>> {
+        trace!("Getting epoch for ledger {ledger_hash}");
+        Ok(self
+            .database
+            .get_cf(
+                self.staking_ledger_hash_to_epoch_cf(),
+                ledger_hash.0.as_bytes(),
+            )?
+            .map(from_be_bytes))
+    }
+
+    fn get_ledger_hash(&self, epoch: u32) -> anyhow::Result<Option<LedgerHash>> {
+        trace!("Getting ledger hash for epoch {epoch}");
+        Ok(self
+            .database
+            .get_cf(self.staking_ledger_epoch_to_hash_cf(), to_be_bytes(epoch))?
+            .and_then(|bytes| LedgerHash::from_bytes(bytes).ok()))
+    }
+
+    fn set_ledger_hash_epoch_pair(
+        &self,
+        ledger_hash: &LedgerHash,
+        epoch: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting epoch {epoch} for ledger {ledger_hash}");
+        self.database.put_cf(
+            self.staking_ledger_epoch_to_hash_cf(),
+            to_be_bytes(epoch),
+            ledger_hash.0.as_bytes(),
+        )?;
+        Ok(self.database.put_cf(
+            self.staking_ledger_hash_to_epoch_cf(),
+            ledger_hash.0.as_bytes(),
+            to_be_bytes(epoch),
+        )?)
+    }
+
+    fn set_ledger_hash_genesis_pair(
+        &self,
+        ledger_hash: &LedgerHash,
+        genesis_state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        trace!("Setting genesis state hash {genesis_state_hash} for ledger {ledger_hash}");
+        Ok(self.database.put_cf(
+            self.staking_ledger_genesis_hash_cf(),
+            ledger_hash.0.as_bytes(),
+            genesis_state_hash.0.as_bytes(),
+        )?)
+    }
+
+    fn get_genesis_state_hash(
+        &self,
+        ledger_hash: &LedgerHash,
+    ) -> anyhow::Result<Option<BlockHash>> {
+        trace!("Getting genesis state hash for ledger {ledger_hash}");
+        Ok(self
+            .database
+            .get_cf(
+                self.staking_ledger_genesis_hash_cf(),
+                ledger_hash.0.as_bytes(),
+            )?
+            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+    }
+
     ///////////////
     // Iterators //
     ///////////////
@@ -329,60 +440,9 @@ impl LedgerStore for IndexerStore {
         self.database
             .iterator_cf(self.staking_ledger_stake_cf(), mode)
     }
-
-    fn get_delegations_epoch(
-        &self,
-        epoch: u32,
-        genesis_state_hash: &Option<BlockHash>,
-    ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
-        trace!("Getting staking delegations for epoch {}", epoch);
-
-        // default to current genesis state hash
-        let genesis_state_hash = genesis_state_hash
-            .clone()
-            .unwrap_or(self.get_best_block()?.unwrap().genesis_state_hash());
-        let key = format!("delegations-{}-{}", genesis_state_hash.0, epoch);
-
-        if let Some(bytes) = self
-            .database
-            .get_pinned_cf(self.ledgers_cf(), key.as_bytes())?
-        {
-            return Ok(Some(serde_json::from_slice(&bytes)?));
-        }
-        Ok(None)
-    }
-
-    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
-        trace!("Getting account balance {pk}");
-
-        Ok(self
-            .database
-            .get_pinned_cf(self.account_balance_cf(), pk.0.as_bytes())?
-            .map(|bytes| {
-                let mut be_bytes = [0; 8];
-                be_bytes.copy_from_slice(&bytes[..8]);
-                u64::from_be_bytes(be_bytes)
-            }))
-    }
-
-    fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>> {
-        trace!("Getting epoch for ledger {}", ledger_hash.0);
-        Ok(self
-            .database
-            .get_pinned_cf(self.staking_ledger_epoch_cf(), ledger_hash.0.as_bytes())?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
-    }
-
-    fn set_epoch(&self, ledger_hash: &LedgerHash, epoch: u32) -> anyhow::Result<()> {
-        trace!("Setting epoch {epoch} for ledger {}", ledger_hash.0);
-        Ok(self.database.put_cf(
-            self.staking_ledger_epoch_cf(),
-            ledger_hash.0.as_bytes(),
-            to_be_bytes(epoch),
-        )?)
-    }
 }
 
+/// `{epoch BE}{amount BE}{suffix}`
 pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8> {
     let mut key = to_be_bytes(epoch);
     key.append(&mut amount.to_be_bytes().to_vec());
@@ -390,12 +450,12 @@ pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8>
     key
 }
 
-/// 4 bytes for epoch
+/// 4 BE bytes for epoch (u32)
 pub fn staking_ledger_sort_key_epoch(key: &[u8]) -> u32 {
     from_be_bytes(key[..4].to_vec())
 }
 
-/// 8 bytes for amount (u64)
+/// 8 BE bytes for amount (u64)
 pub fn staking_ledger_sort_key_amount(key: &[u8]) -> u32 {
     from_be_bytes(key[4..12].to_vec())
 }
@@ -403,4 +463,22 @@ pub fn staking_ledger_sort_key_amount(key: &[u8]) -> u32 {
 /// Remaining bytes for public key
 pub fn staking_ledger_sort_key_pk(key: &[u8]) -> PublicKey {
     PublicKey::from_bytes(&key[12..]).expect("public key from bytes")
+}
+
+/// `{genesis_state_hash}{epoch BE}{ledger_hash}`
+fn staking_ledger_key(
+    genesis_state_hash: BlockHash,
+    epoch: u32,
+    ledger_hash: &LedgerHash,
+) -> Vec<u8> {
+    let mut key = staking_ledger_epoch_key(genesis_state_hash, epoch);
+    key.append(&mut ledger_hash.0.clone().into_bytes());
+    key
+}
+
+/// `{genesis_state_hash}{epoch BE}`
+fn staking_ledger_epoch_key(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
+    let mut key = genesis_state_hash.to_bytes();
+    key.append(&mut to_be_bytes(epoch));
+    key
 }

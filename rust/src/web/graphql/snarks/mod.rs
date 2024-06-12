@@ -228,7 +228,7 @@ impl SnarkQueryRoot {
                     (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
                     (Some(lte), None) => lte,
                     (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block()?.unwrap().blockchain_length(),
+                    (None, None) => db.get_best_block_height()?.unwrap(),
                 };
                 (min_bound, max_bound)
             };

@@ -13,14 +13,34 @@ pub trait BlockStore {
     /// Get block from the store
     fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>>;
 
+    //////////////////////////
+    // Best block functions //
+    //////////////////////////
+
     /// Set best block state hash
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()>;
 
     /// Get best block from the store
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
 
-    /// Get best block hash from the store
+    /// Get the epoch count of the best block without deserializing the PCB
+    fn get_current_epoch(&self) -> anyhow::Result<u32>;
+
+    /// Get best block state hash without deserializing the PCB
     fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>>;
+
+    /// Get best block height without deserializing the PCB
+    fn get_best_block_height(&self) -> anyhow::Result<Option<u32>>;
+
+    /// Get best block global slot without deserializing the PCB
+    fn get_best_block_global_slot(&self) -> anyhow::Result<Option<u32>>;
+
+    /// Get best block genesis state hash without deserializing the PCB
+    fn get_best_block_genesis_hash(&self) -> anyhow::Result<Option<BlockHash>>;
+
+    /////////////////////////////
+    // General block functions //
+    /////////////////////////////
 
     /// Set a block's previous state hash
     fn set_block_parent_hash(
@@ -48,6 +68,25 @@ pub trait BlockStore {
 
     /// Get a block's global slot without deserializing the PCB
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+
+    /// Set a block's epoch
+    fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()>;
+
+    /// Get a block's epoch without deserializing the PCB
+    fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+
+    /// Set a block's genesis state hash
+    fn set_block_genesis_state_hash(
+        &self,
+        state_hash: &BlockHash,
+        genesis_state_hash: &BlockHash,
+    ) -> anyhow::Result<()>;
+
+    /// Get the given block's genesis state hash without deserializing the PCB
+    fn get_block_genesis_state_hash(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<BlockHash>>;
 
     /// Get number of blocks at the given blockchain length
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32>;
@@ -110,10 +149,37 @@ pub trait BlockStore {
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 
-    /// Get the epoch count of the best block
-    fn get_current_epoch(&self) -> anyhow::Result<u32>;
+    /// Get the indexed coinbase receiver for the given block
+    fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
-    // Iterators
+    /// Set the coinbase receiver for the given block
+    fn set_coinbase_receiver(
+        &self,
+        state_hash: &BlockHash,
+        coinbase_receiver: &PublicKey,
+    ) -> anyhow::Result<()>;
+
+    fn set_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+        comparison: &BlockComparison,
+    ) -> anyhow::Result<()>;
+
+    fn get_block_comparison(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<BlockComparison>>;
+
+    /// Compare blocks without deserializing the PCBs
+    fn block_cmp(
+        &self,
+        block: &BlockHash,
+        other: &BlockHash,
+    ) -> anyhow::Result<Option<std::cmp::Ordering>>;
+
+    ///////////////
+    // Iterators //
+    ///////////////
 
     /// Iterator for blocks via height
     /// ```
@@ -131,7 +197,9 @@ pub trait BlockStore {
     /// Use [block_state_hash_from_key] to extract state hash
     fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
-    // Block counts
+    //////////////////
+    // Block counts //
+    //////////////////
 
     /// Increment the epoch & pk block production counts
     fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
@@ -154,33 +222,9 @@ pub trait BlockStore {
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
 
-    /// Get the indexed coinbase receiver for the given block
-    fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
-
-    /// Set the coinbase receiver for the given block
-    fn set_coinbase_receiver(
-        &self,
-        state_hash: &BlockHash,
-        coinbase_receiver: &PublicKey,
-    ) -> anyhow::Result<()>;
-
-    fn set_block_comparison(
-        &self,
-        state_hash: &BlockHash,
-        comparison: &BlockComparison,
-    ) -> anyhow::Result<()>;
-
-    fn get_block_comparison(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<BlockComparison>>;
-
-    /// Compare blocks without deserializing them
-    fn block_cmp(
-        &self,
-        block: &BlockHash,
-        other: &BlockHash,
-    ) -> anyhow::Result<Option<std::cmp::Ordering>>;
+    ///////////////////////////////
+    // Dump block store contents //
+    ///////////////////////////////
 
     /// Dump blocks via height to `path`
     fn dump_blocks_via_height(&self, path: &std::path::Path) -> anyhow::Result<()>;

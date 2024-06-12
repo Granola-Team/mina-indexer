@@ -58,6 +58,15 @@ impl LedgerHash {
             hashv1.into();
         Self(versioned.to_base58_string().unwrap())
     }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
+        let hash = String::from_utf8(bytes)?;
+        if is_valid_ledger_hash(&hash) {
+            Ok(Self(hash))
+        } else {
+            bail!("Invalid ledger hash: {hash}")
+        }
+    }
 }
 
 impl std::str::FromStr for LedgerHash {
@@ -67,7 +76,7 @@ impl std::str::FromStr for LedgerHash {
         if is_valid_ledger_hash(s) {
             Ok(Self(s.to_string()))
         } else {
-            bail!("Invalid ledger hash: {}", s)
+            bail!("Invalid ledger hash: {s}")
         }
     }
 }
@@ -75,6 +84,12 @@ impl std::str::FromStr for LedgerHash {
 impl std::default::Default for LedgerHash {
     fn default() -> Self {
         Self("jxDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
+    }
+}
+
+impl std::fmt::Display for LedgerHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

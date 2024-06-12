@@ -61,7 +61,7 @@ impl StakeQueryRoot {
         let db = db(ctx);
 
         // default to current epoch
-        let curr_epoch = db.get_best_block()?.unwrap().epoch_count();
+        let curr_epoch = db.get_current_epoch()?;
         let epoch = match query {
             Some(ref query) => query.epoch.unwrap_or(curr_epoch),
             None => curr_epoch,
@@ -82,14 +82,14 @@ impl StakeQueryRoot {
         }
 
         // if ledger hash is provided as a query input, use it for the ledger
-        // otherwise, use the epoch number
+        // otherwise, use the provided or current epoch number
         let staking_ledger = {
-            let opt = if let Some((Some(ledger_hash), None)) =
+            let opt = if let Some((Some(ledger_hash), query_epoch)) =
                 query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch))
             {
-                db.get_staking_ledger_hash(&ledger_hash.into())?
+                db.get_staking_ledger_hash(&ledger_hash.into(), query_epoch, None)?
             } else {
-                db.get_staking_ledger_at_epoch(epoch, &None)?
+                db.get_staking_ledger_at_epoch(epoch, None)?
             };
             match opt {
                 Some(staking_ledger) => staking_ledger,
