@@ -125,10 +125,6 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
 
-    /// Path to the locked supply file (CSV)
-    #[arg(long, value_name = "FILE")]
-    locked_supply_csv: Option<PathBuf>,
-
     /// Path to the missing block recovery executable
     #[arg(long)]
     missing_block_recovery_exe: Option<PathBuf>,
@@ -162,10 +158,6 @@ pub struct ConfigArgs {
 
 impl ServerArgs {
     fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
-        if self.locked_supply_csv.is_none() {
-            let path = "./data/locked.csv".into();
-            self.locked_supply_csv = Some(path);
-        }
         self.pid = Some(pid);
         self.socket = Some(domain_socket_path);
         self
@@ -197,7 +189,6 @@ pub async fn main() -> anyhow::Result<()> {
                 }
             };
             let args = args.with_dynamic_defaults(domain_socket_path.clone(), std::process::id());
-            let locked_supply_csv = args.locked_supply_csv.clone();
             let database_dir = args.database_dir.clone();
             let web_hostname = args.web_hostname.clone();
             let web_port = args.web_port;
@@ -243,13 +234,7 @@ pub async fn main() -> anyhow::Result<()> {
                 web_hostname,
                 web_port
             );
-            match mina_indexer::web::start_web_server(
-                db.clone(),
-                (web_hostname, web_port),
-                locked_supply_csv,
-            )
-            .await
-            {
+            match mina_indexer::web::start_web_server(db.clone(), (web_hostname, web_port)).await {
                 Ok(()) => indexer.await_loop().await,
                 Err(e) => error!("Error starting web server: {e}"),
             }
@@ -403,7 +388,6 @@ struct ServerArgsJson {
     prune_interval: u32,
     canonical_threshold: u32,
     canonical_update_threshold: u32,
-    locked_supply_csv: Option<String>,
     web_hostname: String,
     web_port: u16,
     pid: Option<u32>,
@@ -443,9 +427,6 @@ impl From<ServerArgs> for ServerArgsJson {
             prune_interval: value.prune_interval,
             canonical_threshold: value.canonical_threshold,
             canonical_update_threshold: value.canonical_update_threshold,
-            locked_supply_csv: value
-                .locked_supply_csv
-                .and_then(|p| p.to_str().map(|s| s.to_owned())),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
@@ -478,7 +459,6 @@ impl From<ServerArgsJson> for ServerArgs {
             prune_interval: value.prune_interval,
             canonical_threshold: value.canonical_threshold,
             canonical_update_threshold: value.canonical_update_threshold,
-            locked_supply_csv: value.locked_supply_csv.map(|p| p.into()),
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,

@@ -87,7 +87,6 @@ setsid \
         --web-hostname 0.0.0.0 \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
-        --locked-supply-csv ./data/locked.csv \
         --database-dir ./database \
   &
 

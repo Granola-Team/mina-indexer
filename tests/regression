@@ -10,7 +10,6 @@ set -euo pipefail
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
 IDXR="$SRC"/rust/target/release/mina-indexer
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
-LOCKED_CSV="$SRC"/data/locked.csv
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
@@ -129,7 +128,6 @@ idxr_server_start() {
 
 idxr_server_start_standard() {
     idxr_server_start \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
@@ -139,7 +137,6 @@ idxr_server_start_standard() {
 idxr_server_sync() {
     port=$(ephemeral_port)
     idxr_server sync --web-port "$port" \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         "$@"
@@ -148,7 +145,6 @@ idxr_server_sync() {
 idxr_server_replay() {
     port=$(ephemeral_port)
     idxr_server replay --web-port "$port" \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database
@@ -1065,7 +1061,6 @@ test_rest_accounts_summary() {
     port=$(ephemeral_port)
 
     idxr_server start \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
@@ -1258,7 +1253,6 @@ test_startup_staking_ledgers() {
     enter_test test_startup_staking_ledgers
 
     idxr_server_start \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
@@ -1368,7 +1362,6 @@ test_staking_delegations() {
     enter_test test_staking_delegations
 
     idxr_server_start \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
@@ -1483,8 +1476,6 @@ test_start_from_config() {
     wait_for_socket
     teardown
 
-    cp $LOCKED_CSV ./locked.csv
-
     dl_mainnet 15 ./blocks
 
     port=$(ephemeral_port)
@@ -1502,7 +1493,6 @@ test_start_from_config() {
       \"prune_interval\": 10,
       \"canonical_threshold\": 10,
       \"canonical_update_threshold\": 2,
-      \"locked_supply_csv\": \"./locked.csv\",
       \"web_hostname\": \"localhost\",
       \"web_port\": ${port},
       \"network\": \"mainnet\"
@@ -1669,7 +1659,6 @@ test_hurl() {
     port=$(ephemeral_port)
 
     idxr_server start \
-        --locked-supply-csv "$LOCKED_CSV" \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \

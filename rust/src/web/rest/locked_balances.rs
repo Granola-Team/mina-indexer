@@ -1,7 +1,7 @@
 use crate::ledger::account::Amount;
 use csv::Reader;
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File, path::Path};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 struct Record {
@@ -14,17 +14,18 @@ pub struct LockedBalances {
     locked: HashMap<u32, Amount>,
 }
 
+pub const LOCKED_BALANCES_CONTENTS: &str = include_str!("../../../../data/locked.csv");
+
 impl LockedBalances {
-    pub fn from_csv<P: AsRef<Path>>(path: Option<P>) -> anyhow::Result<Self> {
+    pub fn new() -> anyhow::Result<Self> {
         let mut locked = HashMap::new();
-        if let Some(path) = path {
-            let file = File::open(path)?;
-            let mut rdr = Reader::from_reader(file);
-            for result in rdr.deserialize() {
-                let record: Record = result?;
-                locked.insert(record.slot, Amount(record.locked * 1_000_000_000_u64));
-            }
+
+        let mut rdr = Reader::from_reader(LOCKED_BALANCES_CONTENTS.as_bytes());
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            locked.insert(record.slot, Amount(record.locked * 1_000_000_000_u64));
         }
+
         Ok(LockedBalances { locked })
     }
 
