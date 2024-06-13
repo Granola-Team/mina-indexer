@@ -321,6 +321,18 @@ mod tests {
         ffi::OsString,
         path::{Path, PathBuf},
     };
+    impl Arbitrary for Network {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let idx = usize::arbitrary(g) % 4;
+            match idx {
+                0 => Network::Mainnet,
+                1 => Network::Devnet,
+                2 => Network::Testworld,
+                3 => Network::Berkeley,
+                _ => panic!("unknown network {idx}"),
+            }
+        }
+    }
 
     const FILENAMES_VALID: [&str; 23] = [
         "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
