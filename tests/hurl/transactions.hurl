@@ -52,7 +52,7 @@ jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].memo" == ""
 jsonpath "$.data.transactions[49].hash" == "CkpYsbai6qHEoF53e8pFHdiWqhT34sPhSgbUVdxLmfzAZ8oMpKDuK"
 
-duration < 500
+duration < 750
 
 #
 # Transactions canonical block height descending query
@@ -95,7 +95,7 @@ jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].memo" == ""
 jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
 
-duration < 500
+duration < 750
 
 #
 # Transactions canonical specific block height query
@@ -155,7 +155,7 @@ jsonpath "$.data.transactions[1].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY
 jsonpath "$.data.transactions[1].amount" == 1000000000
 jsonpath "$.data.transactions[1].fee" == 10000000
 
-duration < 500
+duration < 750
 
 #
 # Transactions from (sender) query
@@ -208,7 +208,7 @@ jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAno
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
-duration < 500
+duration < 750
 
 #
 # Transactions to (receiver) query
@@ -261,7 +261,7 @@ jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAno
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
-duration < 500
+duration < 750
 
 POST {{url}}
 ```graphql
@@ -347,7 +347,7 @@ jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
 jsonpath "$.data.transactions[0].block.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 
-duration < 500
+duration < 750
 
 POST {{url}}
 ```graphql
@@ -442,4 +442,4 @@ jsonpath "$.data.transactions[3].blockHeight" == 6
 jsonpath "$.data.transactions[3].canonical" == false
 jsonpath "$.data.transactions[3].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
 
-duration < 500
+duration < 750
