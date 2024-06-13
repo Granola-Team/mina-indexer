@@ -8,7 +8,7 @@ use crate::{
     chain::Network,
     command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
     constants::{berkeley::*, *},
-    ledger::{coinbase::Coinbase, public_key::PublicKey, LedgerHash},
+    ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
     mina_blocks::{common::from_str, v2},
     protocol::serialization_types::{
         blockchain_state::BlockchainState,
@@ -19,7 +19,10 @@ use crate::{
 };
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 pub struct BlockFileContents {
     pub(crate) network: Network,
@@ -569,6 +572,28 @@ impl PrecomputedBlock {
             .iter()
             .map(|cmd| cmd.hash_signed_command().unwrap())
             .collect()
+    }
+
+    pub fn username_updates(&self) -> HashMap<PublicKey, Username> {
+        let mut updates = HashMap::new();
+        self.commands().iter().for_each(|cmd| {
+            // check for the special name service txns
+            if cmd.is_applied() {
+                let sender = cmd.sender();
+                let receiver = cmd.receiver();
+                let memo = cmd.memo();
+                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+                {
+                    updates.insert(
+                        sender,
+                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                    );
+                }
+            }
+        });
+        updates
     }
 
     /// Base64 encoded string

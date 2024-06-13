@@ -7,7 +7,7 @@ use crate::{
         UserCommandWithStatus, UserCommandWithStatusT,
     },
     constants::*,
-    ledger::public_key::PublicKey,
+    ledger::{public_key::PublicKey, username::Username},
     store::{
         from_be_bytes, pk_txn_sort_key, to_be_bytes, txn_block_key, txn_sort_key, u32_prefix_key,
         user_command_db_key_pk, username::UsernameStore, IndexerStore,
@@ -27,6 +27,7 @@ impl UserCommandStore for IndexerStore {
         // per block
         self.set_block_user_commands(block)?;
         self.set_block_user_commands_count(&state_hash, user_commands.len() as u32)?;
+        self.set_block_username_updates(&state_hash, &block.username_updates())?;
 
         // per command
         for command in &user_commands {
@@ -34,7 +35,7 @@ impl UserCommandStore for IndexerStore {
             let txn_hash = signed.hash_signed_command()?;
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
-            // add: `{txn_hash}{state_hash}` -> signed command with data
+            // add signed command
             self.database.put_cf(
                 self.user_commands_cf(),
                 txn_block_key(&txn_hash, state_hash.clone()),
@@ -50,7 +51,7 @@ impl UserCommandStore for IndexerStore {
             // add state hash index
             self.set_user_command_state_hash(state_hash.clone(), &txn_hash)?;
 
-            // add: key `{global_slot}{txn_hash}{state_hash} -> _`
+            // add index for global slot sorting
             self.database.put_cf(
                 self.user_commands_slot_sort_cf(),
                 txn_sort_key(
@@ -61,7 +62,7 @@ impl UserCommandStore for IndexerStore {
                 b"",
             )?;
 
-            // add: key `{height}{txn_hash}{state_hash} -> _`
+            // add index for block height sorting
             self.database.put_cf(
                 self.user_commands_height_sort_cf(),
                 txn_sort_key(block.blockchain_length(), &txn_hash, state_hash.clone()),
@@ -124,15 +125,19 @@ impl UserCommandStore for IndexerStore {
             )?;
 
             // check for the special name service txns
-            let sender = command.sender();
-            let receiver = command.receiver();
-            let memo = command.memo();
-            if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
-                && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
-                    || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
-            {
-                let username = &memo[NAME_SERVICE_MEMO_PREFIX.len()..];
-                self.set_username(&sender, username.to_string())?;
+            if command.is_applied() {
+                let sender = command.sender();
+                let receiver = command.receiver();
+                let memo = command.memo();
+                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+                {
+                    self.set_username(
+                        &sender,
+                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                    )?;
+                }
             }
         }
 
