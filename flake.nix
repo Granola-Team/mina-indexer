@@ -59,6 +59,7 @@
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
             rclone
+            ruby
             rust
             shellcheck
           ] ++ buildDependencies;
