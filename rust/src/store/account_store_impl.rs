@@ -4,7 +4,7 @@ use crate::{
     canonicity::store::CanonicityStore,
     constants::*,
     ledger::{
-        diff::{account::PaymentDiff, LedgerBalanceUpdate},
+        diff::{account::PaymentDiff, LedgerUpdate},
         public_key::PublicKey,
     },
     store::{account::AccountStore, u64_prefix_key, IndexerStore},
@@ -74,7 +74,7 @@ impl AccountStore for IndexerStore {
         // balance updates don't require this reverse, but other updates may
         apply.reverse();
         Ok((
-            LedgerBalanceUpdate { apply, unapply }.to_diff_vec(),
+            <LedgerUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
             coinbase_receivers,
         ))
     }
@@ -83,11 +83,11 @@ impl AccountStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<(PublicKey, Vec<PaymentDiff>)>> {
-        trace!("Getting block balance updates for {}", state_hash.0);
+        trace!("Getting block balance updates for {state_hash}");
         Ok(self
             .database
             .get_pinned_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| serde_json::from_slice(&bytes).expect("balance updates")))
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     fn update_account_balances(
@@ -99,7 +99,7 @@ impl AccountStore for IndexerStore {
         trace!("Updating account balances {state_hash}");
 
         // update balances
-        for (pk, amount) in LedgerBalanceUpdate::balance_updates(updates) {
+        for (pk, amount) in <LedgerUpdate<PaymentDiff>>::balance_updates(updates) {
             if amount != 0 {
                 let pk = pk.into();
                 let balance = self.get_account_balance(&pk)?.unwrap_or(0);

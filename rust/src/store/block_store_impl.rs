@@ -9,7 +9,7 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
-        diff::{LedgerBalanceUpdate, LedgerDiff},
+        diff::{account::PaymentDiff, LedgerDiff, LedgerUpdate},
         public_key::PublicKey,
         store::LedgerStore,
     },
@@ -78,7 +78,7 @@ impl BlockStore for IndexerStore {
         self.set_block_balance_updates(
             &state_hash,
             block.coinbase_receiver(),
-            LedgerBalanceUpdate::from_precomputed(block),
+            <LedgerUpdate<PaymentDiff>>::from_precomputed(block),
         )?;
 
         // add block height/global slot for sorting

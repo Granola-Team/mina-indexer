@@ -21,12 +21,16 @@ pub struct LedgerDiff {
 
 /// Only used in the indexer store for balance sorting
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LedgerBalanceUpdate {
-    pub apply: Vec<PaymentDiff>,
-    pub unapply: Vec<PaymentDiff>,
+pub struct LedgerUpdate<T> {
+    pub apply: Vec<T>,
+    pub unapply: Vec<T>,
 }
 
-impl LedgerBalanceUpdate {
+impl LedgerUpdate<PaymentDiff> {
+    pub fn new(apply: Vec<PaymentDiff>, unapply: Vec<PaymentDiff>) -> Self {
+        Self { apply, unapply }
+    }
+
     pub fn balance_updates(diffs: Vec<PaymentDiff>) -> HashMap<String, i64> {
         let mut res = HashMap::new();
         for diff in diffs {
@@ -244,11 +248,11 @@ impl std::fmt::Debug for LedgerDiff {
     }
 }
 
-impl std::fmt::Debug for LedgerBalanceUpdate {
+impl std::fmt::Debug for LedgerUpdate<PaymentDiff> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "apply: {:#?}\n  unapply: {:#?}",
+            "apply:   {:#?}\nunapply: {:#?}",
             self.apply, self.unapply
         )
     }
