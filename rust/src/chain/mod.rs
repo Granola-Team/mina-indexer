@@ -4,7 +4,6 @@ use crate::constants::*;
 use bincode::{Decode, Encode};
 use clap::builder::OsStr;
 use hex::ToHex;
-use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter, Result};
 
@@ -56,19 +55,6 @@ pub enum Network {
     Devnet,
     Testworld,
     Berkeley,
-}
-
-impl Arbitrary for Network {
-    fn arbitrary(g: &mut Gen) -> Self {
-        let idx = usize::arbitrary(g) % 4;
-        match idx {
-            0 => Network::Mainnet,
-            1 => Network::Devnet,
-            2 => Network::Testworld,
-            3 => Network::Berkeley,
-            _ => panic!("unknown network {idx}"),
-        }
-    }
 }
 
 impl Network {
