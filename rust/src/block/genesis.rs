@@ -4,7 +4,9 @@ use crate::block::precomputed::PrecomputedBlock;
 #[derive(Debug)]
 pub struct GenesisBlock(pub PrecomputedBlock, pub u64);
 
-pub const GENESIS_MAINNET_BLOCK_CONTENTS: &str = include_str!("../../data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
+pub const GENESIS_MAINNET_BLOCK_CONTENTS: &str = include_str!(
+    "../../data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json"
+);
 impl GenesisBlock {
     /// Creates the mainnet genesis block as a PCB
     pub fn new() -> anyhow::Result<Self> {
