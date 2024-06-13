@@ -109,7 +109,7 @@ productionize: build
 tier1-test: prereqs test
 
 # Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
-tier2-test: build test-unit-mina-rs
+tier2-test: build test-unit-mina-rs build-image
   echo "--- Performing test_many_blocks regression test"
   tests/regression test_many_blocks
   echo "--- Performing Nix build"
