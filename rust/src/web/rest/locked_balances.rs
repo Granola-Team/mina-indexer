@@ -14,7 +14,7 @@ pub struct LockedBalances {
     locked: HashMap<u32, Amount>,
 }
 
-pub const LOCKED_BALANCES_CONTENTS: &str = include_str!("../../../../data/locked.csv");
+pub const LOCKED_BALANCES_CONTENTS: &str = include_str!("../../../data/locked.csv");
 
 impl LockedBalances {
     pub fn new() -> anyhow::Result<Self> {
