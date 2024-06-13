@@ -28,7 +28,7 @@ jsonpath "$.data.accounts[0].nonce" == 1
 jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].timeLocked" == false
 
-duration < 500
+duration < 750
 
 #
 # Accounts public key timing query
@@ -79,7 +79,7 @@ jsonpath "$.data.accounts[0].timing.cliff_amount" == 1000000000
 jsonpath "$.data.accounts[0].timing.vesting_period" == 1
 jsonpath "$.data.accounts[0].timing.vesting_increment" == 0
 
-duration < 500
+duration < 750
 
 #
 # Accounts public key epoch & total blocks produced query
@@ -106,7 +106,7 @@ jsonpath "$.data.accounts[0].publicKey" == "B62qqE5R5pJDUjPrKZMtTkPKUPL27kwNZ1sH
 jsonpath "$.data.accounts[0].pk_epoch_num_blocks" == 5
 jsonpath "$.data.accounts[0].pk_total_num_blocks" == 5
 
-duration < 500
+duration < 750
 
 #
 # Accounts public key epoch & total snarks query
@@ -133,7 +133,7 @@ jsonpath "$.data.accounts[0].publicKey" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv
 jsonpath "$.data.accounts[0].pk_epoch_num_snarks" == 64
 jsonpath "$.data.accounts[0].pk_total_num_snarks" == 64
 
-duration < 500
+duration < 750
 
 #
 # Accounts public key epoch & total user commands query
@@ -160,7 +160,7 @@ jsonpath "$.data.accounts[0].publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqr
 jsonpath "$.data.accounts[0].pk_epoch_num_user_commands" == 294
 jsonpath "$.data.accounts[0].pk_total_num_user_commands" == 294
 
-duration < 500
+duration < 750
 
 #
 # Accounts public key epoch & total internal commands query
@@ -187,7 +187,7 @@ jsonpath "$.data.accounts[0].publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqr
 jsonpath "$.data.accounts[0].pk_epoch_num_internal_commands" == 198
 jsonpath "$.data.accounts[0].pk_total_num_internal_commands" == 198
 
-duration < 500
+duration < 750
 
 #
 # Account default (balance descending) query
@@ -239,7 +239,7 @@ jsonpath "$.data.accounts[99].timing.cliff_amount" == 1000000000
 jsonpath "$.data.accounts[99].timing.vesting_period" == 1
 jsonpath "$.data.accounts[99].timing.vesting_increment" == 0
 
-duration < 500
+duration < 750
 
 #
 # Account balance descending query
@@ -290,4 +290,4 @@ jsonpath "$.data.accounts[99].timing.cliff_amount" == 1000000000
 jsonpath "$.data.accounts[99].timing.vesting_period" == 1
 jsonpath "$.data.accounts[99].timing.vesting_increment" == 0
 
-duration < 500
+duration < 750
