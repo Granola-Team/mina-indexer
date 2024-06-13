@@ -59,14 +59,18 @@ if [ -e "$SOCKET" ]; then
     fi
     sleep 1  # Allow the prior indexer some time to remove the socket without
              # surprising it by removing it, ourselves.
-    rm -f "$SOCKET"
 fi
+PID="$(pgrep mina-indexer)" || true
+kill "$PID" || true
+sleep 1
+kill -9 "$PID" || true
+sleep 1
+rm -f "$SOCKET"
 
 # 6. Create a possibly new, empty database directory.
 #
-mkdir -p ./databases
+rm -fr ./databases || true
 DB_DIR=./databases/"$REV"
-rm -fr "$DB_DIR" || true  # Could exist already, and be in use.
 mkdir -p "$DB_DIR"
 
 # We must daemonize. This requires forking a child in a new session. This is
