@@ -1400,20 +1400,15 @@ impl IndexerState {
         // apply the new canonical diffs and store each nth resulting ledger
         let mut ledger_diff = LedgerDiff::default();
         for canonical_block in canonical_blocks {
-            let diff = self
-                .diffs_map
-                .get(&canonical_block.state_hash)
-                .with_context(|| {
-                    format!(
-                        "Block: {}-{}",
-                        canonical_block.height, canonical_block.state_hash.0
-                    )
-                })
-                .expect("block is in diffs_map");
-
-            ledger_diff.append(diff.clone());
+            if let Some(diff) = self.diffs_map.get(&canonical_block.state_hash) {
+                ledger_diff.append(diff.clone());
+            } else {
+                error!(
+                    "Block not in diffs map (length {}): {}",
+                    canonical_block.blockchain_length, canonical_block.state_hash
+                );
+            }
         }
-
         self.ledger._apply_diff(&ledger_diff)
     }
 

@@ -470,7 +470,7 @@ impl StakesLedgerAccountWithMeta {
 
         let username = match db.get_username(&pk) {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
-            Ok(username) => username,
+            Ok(username) => username.map(|u| u.0),
         };
 
         Self {

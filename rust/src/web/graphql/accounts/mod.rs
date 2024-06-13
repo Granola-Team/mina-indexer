@@ -113,7 +113,7 @@ impl AccountQueryRoot {
                     let pk = acct.public_key.clone();
                     let username = match db.get_username(&pk) {
                         Ok(None) | Err(_) => Some("Unknown".to_string()),
-                        Ok(username) => username,
+                        Ok(username) => username.map(|u| u.0),
                     };
 
                     vec![Account::from((
@@ -164,7 +164,7 @@ impl AccountQueryRoot {
             if query.as_ref().map_or(true, |q| q.matches(account)) {
                 let username = match db.get_username(&pk) {
                     Ok(None) | Err(_) => Some("Unknown".to_string()),
-                    Ok(username) => username,
+                    Ok(username) => username.map(|u| u.0),
                 };
 
                 let account = Account::from((
@@ -212,32 +212,48 @@ impl AccountQueryInput {
             balance_ne,
         } = self;
         if let Some(public_key) = public_key {
-            return *public_key == account.public_key.0;
+            if *public_key != account.public_key.0 {
+                return false;
+            }
         }
-
         if let Some(username) = username {
-            return account
+            if account
                 .username
                 .as_ref()
-                .map_or(false, |u| *username == u.0);
+                .map_or(false, |u| !u.0.starts_with(username))
+            {
+                return false;
+            }
         }
         if let Some(balance) = balance {
-            return *balance == account.balance.0;
+            if account.balance.0 != *balance {
+                return false;
+            }
         }
         if let Some(balance_gt) = balance_gt {
-            return *balance_gt < account.balance.0;
+            if account.balance.0 <= *balance_gt {
+                return false;
+            }
         }
         if let Some(balance_gte) = balance_gte {
-            return *balance_gte <= account.balance.0;
+            if account.balance.0 < *balance_gte {
+                return false;
+            }
         }
         if let Some(balance_lt) = balance_lt {
-            return *balance_lt > account.balance.0;
+            if account.balance.0 >= *balance_lt {
+                return false;
+            }
         }
         if let Some(balance_lte) = balance_lte {
-            return *balance_lte >= account.balance.0;
+            if account.balance.0 > *balance_lte {
+                return false;
+            }
         }
         if let Some(balance_ne) = balance_ne {
-            return *balance_ne != account.balance.0;
+            if account.balance.0 == *balance_ne {
+                return false;
+            }
         }
         true
     }

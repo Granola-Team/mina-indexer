@@ -1,10 +1,10 @@
+use super::username::Username;
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::ZkappAccount,
 };
-use anyhow::bail;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -93,9 +93,6 @@ pub struct TokenPermissions {}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptChainHash(pub String);
 
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct Username(pub String);
-
 impl Account {
     /// Time-locked balance (subtracted from circulating supply)
     /// as per https://docs.minaprotocol.com/mina-protocol/time-locked-accounts
@@ -129,16 +126,9 @@ impl Account {
         }
     }
 
-    pub fn set_username(&mut self, username: String) -> anyhow::Result<()> {
-        const MAX_USERNAME_LENGTH: usize = 32;
-        if username.len() <= MAX_USERNAME_LENGTH {
-            self.username = Some(Username(username));
-            return Ok(());
-        }
-        bail!(
-            "Invalid username (length == {} > {MAX_USERNAME_LENGTH})",
-            username.len()
-        )
+    pub fn set_username(&mut self, username: Username) -> anyhow::Result<()> {
+        self.username = Some(username);
+        Ok(())
     }
 
     pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
@@ -251,18 +241,6 @@ pub fn nanomina_to_mina(num: u64) -> String {
         }
     }
     dec_str
-}
-
-impl std::default::Default for Username {
-    fn default() -> Self {
-        Self("Unknown".to_string())
-    }
-}
-
-impl std::fmt::Display for Username {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }
 
 impl std::fmt::Display for Account {

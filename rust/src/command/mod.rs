@@ -264,6 +264,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 }
 
+pub const MEMO_LEN: usize = 32;
+
 /// Decode memo
 ///
 /// 0th byte - tag to distinguish digests from other data

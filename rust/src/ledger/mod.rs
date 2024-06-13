@@ -5,6 +5,7 @@ pub mod genesis;
 pub mod public_key;
 pub mod staking;
 pub mod store;
+pub mod username;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
