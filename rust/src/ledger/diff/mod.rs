@@ -3,18 +3,18 @@ pub mod account;
 use self::account::{
     AccountDiff, AccountDiffType, FailedTransactionNonceDiff, PaymentDiff, UpdateType,
 };
-use super::account::Amount;
+use super::{account::Amount, coinbase::Coinbase, LedgerHash, PublicKey};
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{internal::InternalCommand, Command, Payment, UserCommandWithStatusT},
     constants::MAINNET_GENESIS_HASH,
-    ledger::{coinbase::Coinbase, PublicKey},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
+    pub staged_ledger_hash: LedgerHash,
     pub public_keys_seen: Vec<PublicKey>,
     pub account_diffs: Vec<AccountDiff>,
 }
@@ -197,21 +197,27 @@ impl LedgerDiff {
         account_diffs.append(&mut account_diff_fees);
 
         LedgerDiff {
+            staged_ledger_hash: precomputed_block.staged_ledger_hash(),
             public_keys_seen: precomputed_block.active_public_keys(),
             account_diffs,
         }
     }
 
     pub fn append(&mut self, other: Self) {
+        // add public keys
         other.public_keys_seen.into_iter().for_each(|account| {
             if !self.public_keys_seen.contains(&account) {
                 self.public_keys_seen.push(account);
             }
         });
 
+        // add diff
         other.account_diffs.into_iter().for_each(|update| {
             self.account_diffs.push(update);
         });
+
+        // update hash
+        self.staged_ledger_hash = other.staged_ledger_hash;
     }
 
     pub fn append_vec(diffs: Vec<Self>) -> Self {
