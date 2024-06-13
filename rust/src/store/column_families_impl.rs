@@ -352,6 +352,12 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("ledgers column family exists")
     }
 
+    fn block_ledger_diffs_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-ledger-diffs")
+            .expect("block-ledger-diffs column family exists")
+    }
+
     /// CF for storing staking ledgers
     /// ```
     /// - key: {genesis_hash}{epoch}{ledger_hash}

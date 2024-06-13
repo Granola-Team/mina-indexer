@@ -5,6 +5,7 @@ use crate::{
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
+        diff::LedgerDiff,
         public_key::PublicKey,
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
         store::LedgerStore,
@@ -187,6 +188,27 @@ impl LedgerStore for IndexerStore {
             None => Ok(None),
             Some(state_hash) => self.get_ledger_state_hash(&state_hash, memoize),
         }
+    }
+
+    fn set_block_ledger_diff(
+        &self,
+        state_hash: &BlockHash,
+        ledger_diff: LedgerDiff,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block ledger diff {state_hash}: {ledger_diff:?}");
+        Ok(self.database.put_cf(
+            self.block_ledger_diffs_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(&ledger_diff)?,
+        )?)
+    }
+
+    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>> {
+        trace!("Getting block ledger diff {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_ledger_diffs_cf(), state_hash.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     /////////////////////

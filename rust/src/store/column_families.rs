@@ -142,6 +142,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing staged ledgers
     fn ledgers_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block ledger diffs
+    fn block_ledger_diffs_cf(&self) -> &ColumnFamily;
+
     /// CF for storing staking ledgers
     fn staking_ledgers_cf(&self) -> &ColumnFamily;
 

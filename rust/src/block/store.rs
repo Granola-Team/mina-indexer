@@ -159,6 +159,7 @@ pub trait BlockStore {
         coinbase_receiver: &PublicKey,
     ) -> anyhow::Result<()>;
 
+    /// Index the block's minimimal info needed for comparison
     fn set_block_comparison(
         &self,
         state_hash: &BlockHash,

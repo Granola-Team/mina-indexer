@@ -20,10 +20,17 @@ impl VersionStore for IndexerStore {
             ..Default::default()
         };
         trace!("Setting db version");
-        Ok(self.database.put(
-            Self::INDEXER_STORE_VERSION_KEY,
-            serde_json::to_vec(&version)?,
-        )?)
+        if self
+            .database
+            .get(Self::INDEXER_STORE_VERSION_KEY)?
+            .is_none()
+        {
+            self.database.put(
+                Self::INDEXER_STORE_VERSION_KEY,
+                serde_json::to_vec(&version)?,
+            )?;
+        }
+        Ok(())
     }
 
     /// Get db version
