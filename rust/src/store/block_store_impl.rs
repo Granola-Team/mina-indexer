@@ -8,7 +8,11 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::{diff::LedgerBalanceUpdate, public_key::PublicKey},
+    ledger::{
+        diff::{LedgerBalanceUpdate, LedgerDiff},
+        public_key::PublicKey,
+        store::LedgerStore,
+    },
     snark_work::store::SnarkStore,
     store::{
         account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
@@ -39,6 +43,9 @@ impl BlockStore for IndexerStore {
             state_hash.0.as_bytes(),
             serde_json::to_vec(&block)?,
         )?;
+
+        // add to ledger diff index
+        self.set_block_ledger_diff(&state_hash, LedgerDiff::from_precomputed(block))?;
 
         // add to epoch index before setting other indices
         self.set_block_epoch(&state_hash, block.epoch_count())?;
