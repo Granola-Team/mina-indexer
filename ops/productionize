@@ -41,7 +41,7 @@ mkdir -p "$LOGS"
 #
 "$SRC"/ops/download-mina-blocks 5 ./blocks
 
-# 4. Read the staging ledgers from the './staking-ledgers' directory.
+# 4. Download the staking ledgers if needed.
 #
 "$SRC"/ops/download-staking-ledgers ./staking-ledgers
 
@@ -57,13 +57,17 @@ if [ -e "$SOCKET" ]; then
     then
         :
     fi
+    sleep 1  # Allow the prior indexer some time to remove the socket without
+             # surprising it by removing it, ourselves.
     rm -f "$SOCKET"
 fi
 
-# 6. Create an empty database directory.
+# 6. Create a possibly new, empty database directory.
 #
-rm -fr ./database
-mkdir ./database
+mkdir -p ./databases
+DB_DIR=./databases/"$REV"
+rm -fr "$DB_DIR" || true  # Could exist already, and be in use.
+mkdir -p "$DB_DIR"
 
 # We must daemonize. This requires forking a child in a new session. This is
 # done with 'setsid'. The child must itself create a grandchild that is the
@@ -82,7 +86,7 @@ setsid \
         --web-hostname 0.0.0.0 \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database \
+        --database-dir "$DB_DIR" \
   &
 
 # Wait for the above to return, otherwise the above fork'd process may not
