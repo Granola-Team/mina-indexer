@@ -3,16 +3,28 @@
 set -eux
 set -o pipefail
 
-VER="$(git rev-parse --short=8 HEAD)"
-LOG=/mnt/mina-logs/"$VER"-log
-src="$(pwd)"
-IDXR="${src}/rust/target/release/mina-indexer"
-socket="$src"/mina-indexer.sock
+# Ensure that we are within the source tree.
+#
+SRC="$(git rev-parse --show-toplevel)"
+
+# Confirm that the binary is present and working.
+#
+BIN="$SRC"/rust/target/release/mina-indexer
+"$BIN" --version
+
+# Differentiate some files/directories using the Git revision.
+#
+REV="$(git rev-parse --short=8 HEAD)"
+
+cd "${SRC}"
+
+LOG=/mnt/mina-logs/"$REV"-log
+SOCKET="$SRC"/mina-indexer.sock
 export RUST_BACKTRACE=1
 
 wait_for_socket() {
     while true; do
-        if [ -S "$socket" ]; then
+        if [ -S "$SOCKET" ]; then
             return
         fi
         sleep 60
@@ -37,12 +49,12 @@ mkdir -p "$LOG"
 
 port="$(ephemeral_port)"
 
-"${IDXR}" \
-  --socket "$socket" \
+"${BIN}" \
+  --socket "$SOCKET" \
   server start \
     --web-port "$port" \
     --log-level DEBUG \
-    --database-dir /mnt/mina-logs/"$VER"-database \
+    --database-dir /mnt/mina-logs/"$REV"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
     --ledger-cadence 5000 \
@@ -54,22 +66,22 @@ wait_for_socket
 
 # Tell the server to take a snapshot (checkpoint).
 #
-"${IDXR}" \
-  --socket "$socket" \
+"${BIN}" \
+  --socket "$SOCKET" \
   checkpoints create \
-    --path /mnt/mina-logs/"$VER"-snapshot
+    --path /mnt/mina-logs/"$REV"-snapshot
 
-"${IDXR}" --socket "$socket" shutdown
+"${BIN}" --socket "$SOCKET" shutdown
 wait "$PID"
 
 # See if 'replay' works.
 #
-"${IDXR}" \
-  --socket "$socket" \
+"${BIN}" \
+  --socket "$SOCKET" \
   server replay \
     --web-port "$port" \
     --log-level DEBUG \
-    --database-dir /mnt/mina-logs/"$VER"-database \
+    --database-dir /mnt/mina-logs/"$REV"-database \
     --blocks-dir /mnt/mina-logs/mina_network_block_data \
     --staking-ledgers-dir /mnt/mina-logs/mina_network_ledger_data \
     --ledger-cadence 5000 \
@@ -79,5 +91,5 @@ wait "$PID"
 PID=$!
 wait_for_socket
 
-"${IDXR}" --socket "$socket" shutdown
+"${BIN}" --socket "$SOCKET" shutdown
 wait "$PID"
