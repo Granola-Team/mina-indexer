@@ -37,6 +37,7 @@ fn set_usernames() -> anyhow::Result<()> {
         store
             .get_username(&"B62qkEtH1PxqjJPKitAmzfV2ozCuCcibBL4tLgpeXHvsaqVgrENjFhX".into())?
             .unwrap()
+            .0
     );
     Ok(())
 }

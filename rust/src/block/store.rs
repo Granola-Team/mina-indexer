@@ -17,13 +17,13 @@ pub trait BlockStore {
     // Best block functions //
     //////////////////////////
 
-    /// Set best block state hash
+    /// Index best block state hash
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()>;
 
     /// Get best block from the store
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
 
-    /// Get the epoch count of the best block without deserializing the PCB
+    /// Get best block epoch count without deserializing the PCB
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
 
     /// Get best block state hash without deserializing the PCB
@@ -42,7 +42,7 @@ pub trait BlockStore {
     // General block functions //
     /////////////////////////////
 
-    /// Set a block's previous state hash
+    /// Index the block's previous state hash
     fn set_block_parent_hash(
         &self,
         state_hash: &BlockHash,
@@ -52,7 +52,7 @@ pub trait BlockStore {
     /// Get a block's parent hash
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
 
-    /// Set a block's blockchain length
+    /// Index the block's blockchain length
     fn set_block_height(
         &self,
         state_hash: &BlockHash,
@@ -62,20 +62,20 @@ pub trait BlockStore {
     /// Get a block's blockchain length without deserializing the PCB
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
-    /// Set a block's global slot
+    /// Index the block's global slot
     fn set_block_global_slot(&self, state_hash: &BlockHash, global_slot: u32)
         -> anyhow::Result<()>;
 
     /// Get a block's global slot without deserializing the PCB
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
-    /// Set a block's epoch
+    /// Index the block's epoch count
     fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()>;
 
-    /// Get a block's epoch without deserializing the PCB
+    /// Get the block's epoch count without deserializing the PCB
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
-    /// Set a block's genesis state hash
+    /// Index the block's genesis state hash
     fn set_block_genesis_state_hash(
         &self,
         state_hash: &BlockHash,
@@ -143,7 +143,7 @@ pub trait BlockStore {
     /// Get children of a block
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
 
-    /// Set block version
+    /// Index block version
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
 
     /// Get the block's version
@@ -152,7 +152,7 @@ pub trait BlockStore {
     /// Get the indexed coinbase receiver for the given block
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
-    /// Set the coinbase receiver for the given block
+    /// Index the coinbase receiver for the given block
     fn set_coinbase_receiver(
         &self,
         state_hash: &BlockHash,
@@ -165,6 +165,7 @@ pub trait BlockStore {
         comparison: &BlockComparison,
     ) -> anyhow::Result<()>;
 
+    /// Get the info needed for block comparison without deserializing the PCB
     fn get_block_comparison(
         &self,
         state_hash: &BlockHash,
