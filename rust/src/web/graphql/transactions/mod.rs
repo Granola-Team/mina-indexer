@@ -155,7 +155,7 @@ impl TransactionsQueryRoot {
             if sort_by == TransactionSortByInput::BlockHeightDesc {
                 block_heights.reverse();
             }
-            let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
+            let mut transactions = Vec::new();
 
             'outer: for height in block_heights {
                 for block in db.get_blocks_at_height(height)? {
@@ -181,7 +181,7 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
         // iterator mode & direction determined by desired sorting
-        let mut transactions: Vec<Transaction> = Vec::with_capacity(limit);
+        let mut transactions = Vec::new();
         let (start_slot, direction) = match sort_by {
             TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
                 (0, Direction::Forward)

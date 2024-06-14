@@ -140,7 +140,7 @@ impl AccountQueryRoot {
         }
 
         // default query handler use balance-sorted accounts
-        let mut accounts: Vec<Account> = Vec::with_capacity(limit);
+        let mut accounts = Vec::new();
         let best_ledger = db.get_best_ledger()?.expect("best ledger");
         let mode = match sort_by {
             Some(AccountSortByInput::BalanceAsc) => IteratorMode::Start,

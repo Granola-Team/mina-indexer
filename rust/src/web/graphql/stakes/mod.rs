@@ -104,7 +104,7 @@ impl StakeQueryRoot {
         let delegations = db.get_delegations_epoch(epoch, &None)?.unwrap();
 
         // balance- & stake-sorted queries
-        let mut accounts = <Vec<StakesLedgerAccountWithMeta>>::with_capacity(limit);
+        let mut accounts = Vec::new();
         let iter = match sort_by {
             Some(StakeSortByInput::StakeDesc) | None => {
                 db.staking_ledger_stake_iterator(IteratorMode::From(

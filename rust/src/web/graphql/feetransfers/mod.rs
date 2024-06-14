@@ -182,7 +182,7 @@ impl FeetransferQueryRoot {
                 || q.block_height_lt.is_some()
                 || q.block_height_lte.is_some()
         }) {
-            let mut feetransfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
+            let mut feetransfers = Vec::new();
             let (min, max) = {
                 let FeetransferQueryInput {
                     block_height_gt,
@@ -294,7 +294,7 @@ fn get_fee_transfers(
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
 ) -> Result<Vec<FeetransferWithMeta>> {
-    let mut fee_transfers: Vec<FeetransferWithMeta> = Vec::with_capacity(limit);
+    let mut fee_transfers = Vec::new();
     let mode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
         speedb::IteratorMode::Start
     } else {
