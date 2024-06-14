@@ -5,6 +5,7 @@ use crate::{
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
+        diff::LedgerDiff,
         public_key::PublicKey,
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
         store::LedgerStore,
@@ -13,7 +14,6 @@ use crate::{
     store::{account::AccountStore, from_be_bytes, to_be_bytes, IndexerStore},
 };
 use log::{error, trace};
-use std::str::FromStr;
 
 impl LedgerStore for IndexerStore {
     ////////////////////
@@ -103,57 +103,55 @@ impl LedgerStore for IndexerStore {
     ) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting staged ledger state hash {state_hash}");
 
-        let mut state_hash = state_hash.clone();
-        let mut to_apply = vec![];
+        let mut curr_state_hash = state_hash.clone();
+        let mut diffs = vec![];
 
         // walk chain back to a stored ledger
-        // collect blocks to compute the current ledger
+        // collect diffs to compute the current ledger
         while self
             .database
-            .get_pinned_cf(self.ledgers_cf(), state_hash.0.as_bytes())?
+            .get_pinned_cf(self.ledgers_cf(), curr_state_hash.0.as_bytes())?
             .is_none()
         {
-            trace!("No staged ledger found for state hash {state_hash}");
-            if let Some(block) = self.get_block(&state_hash)? {
-                to_apply.push(block.clone());
-                state_hash = block.previous_state_hash();
-                trace!(
-                    "Checking for staged ledger state hash {}",
-                    block.previous_state_hash().0
-                );
+            trace!("No staged ledger found for state hash {curr_state_hash}");
+            if let Some(diff) = self.get_block_ledger_diff(&curr_state_hash)? {
+                diffs.push(diff);
+                if let Ok(Some(parent_hash)) = self.get_block_parent_hash(&curr_state_hash) {
+                    trace!("Checking for staged ledger state hash {parent_hash}");
+                    curr_state_hash = parent_hash;
+                }
             } else {
-                if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
-                    error!("Block missing from store: {state_hash}");
+                if curr_state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
+                    error!("Block missing from store: {curr_state_hash}");
                 }
                 return Ok(None);
             }
         }
 
-        trace!("Found staged ledger state hash {state_hash}");
-        to_apply.reverse();
+        trace!("Found staged ledger state hash {curr_state_hash}");
 
         if let Some(mut ledger) = self
             .database
-            .get_pinned_cf(self.ledgers_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| bytes.to_vec())
-            .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+            .get_pinned_cf(self.ledgers_cf(), curr_state_hash.0.as_bytes())?
+            .and_then(|bytes| Ledger::from_bytes(bytes.to_vec()).ok())
         {
-            if let Some(requested_block) = to_apply.last() {
-                for block in &to_apply {
-                    ledger._apply_diff_from_precomputed(block)?;
-                }
+            // apply diffs
+            diffs.reverse();
+            let diff = LedgerDiff::append_vec(diffs);
+            ledger._apply_diff(&diff)?;
 
-                if memoize {
-                    trace!("Memoizing ledger for block {}", requested_block.summary());
-                    self.add_ledger_state_hash(&requested_block.state_hash(), ledger.clone())?;
-                    self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                        DbLedgerEvent::NewLedger {
-                            state_hash: requested_block.state_hash(),
-                            ledger_hash: requested_block.staged_ledger_hash(),
-                            blockchain_length: requested_block.blockchain_length(),
-                        },
-                    )))?;
-                }
+            if memoize {
+                trace!("Memoizing ledger for block {state_hash}");
+                self.add_ledger_state_hash(state_hash, ledger.clone())?;
+                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                    DbLedgerEvent::NewLedger {
+                        state_hash: state_hash.clone(),
+                        ledger_hash: diff.staged_ledger_hash,
+                        blockchain_length: self
+                            .get_block_height(state_hash)?
+                            .expect("length indexed"),
+                    },
+                )))?;
             }
             return Ok(Some(ledger));
         }
@@ -166,14 +164,12 @@ impl LedgerStore for IndexerStore {
         if let Some(state_hash) = self
             .database
             .get_pinned_cf(self.ledgers_cf(), key)?
-            .map(|bytes| BlockHash(String::from_utf8(bytes.to_vec()).unwrap()))
+            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok())
         {
-            let key = state_hash.0.as_bytes();
             if let Some(ledger) = self
                 .database
-                .get_pinned_cf(self.ledgers_cf(), key)?
-                .map(|bytes| bytes.to_vec())
-                .map(|bytes| Ledger::from_str(&String::from_utf8(bytes).unwrap()).unwrap())
+                .get_pinned_cf(self.ledgers_cf(), state_hash.0.as_bytes())?
+                .and_then(|bytes| Ledger::from_bytes(bytes.to_vec()).ok())
             {
                 return Ok(Some(ledger));
             }
@@ -182,11 +178,32 @@ impl LedgerStore for IndexerStore {
     }
 
     fn get_ledger_at_height(&self, height: u32, memoize: bool) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting staged ledger height {height}");
-        match self.get_canonical_hash_at_height(height)? {
-            None => Ok(None),
-            Some(state_hash) => self.get_ledger_state_hash(&state_hash, memoize),
-        }
+        trace!("Getting staged ledger at height {height}");
+        self.get_canonical_hash_at_height(height)?
+            .map_or(Ok(None), |state_hash| {
+                self.get_ledger_state_hash(&state_hash, memoize)
+            })
+    }
+
+    fn set_block_ledger_diff(
+        &self,
+        state_hash: &BlockHash,
+        ledger_diff: LedgerDiff,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block ledger diff {state_hash}: {ledger_diff:?}");
+        Ok(self.database.put_cf(
+            self.block_ledger_diffs_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(&ledger_diff)?,
+        )?)
+    }
+
+    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>> {
+        trace!("Getting block ledger diff {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_ledger_diffs_cf(), state_hash.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     /////////////////////

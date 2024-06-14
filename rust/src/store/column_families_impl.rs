@@ -352,6 +352,12 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("ledgers column family exists")
     }
 
+    fn block_ledger_diffs_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-ledger-diffs")
+            .expect("block-ledger-diffs column family exists")
+    }
+
     /// CF for storing staking ledgers
     /// ```
     /// - key: {genesis_hash}{epoch}{ledger_hash}
@@ -489,11 +495,16 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Username store CFs //
     ////////////////////////
 
-    /// CF for storing usernames
-    fn usernames_cf(&self) -> &ColumnFamily {
+    fn username_pk_num_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("usernames")
-            .expect("usernames column family exists")
+            .cf_handle("username-pk-num")
+            .expect("username-pk-num column family exists")
+    }
+
+    fn username_pk_index_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("username-pk-index")
+            .expect("username-pk-index column family exists")
     }
 
     /// CF for storing state hash -> usernames

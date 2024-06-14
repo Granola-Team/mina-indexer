@@ -3,6 +3,7 @@
 use crate::{
     block::BlockHash,
     ledger::{
+        diff::LedgerDiff,
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
         Ledger, LedgerHash,
     },
@@ -42,6 +43,15 @@ pub trait LedgerStore {
 
     /// Get a ledger at a specified `blockchain_length`
     fn get_ledger_at_height(&self, height: u32, memoize: bool) -> anyhow::Result<Option<Ledger>>;
+
+    /// Index the block's ledger diff
+    fn set_block_ledger_diff(
+        &self,
+        state_hash: &BlockHash,
+        ledger_diff: LedgerDiff,
+    ) -> anyhow::Result<()>;
+
+    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
 
     /////////////////////
     // Staking ledgers //

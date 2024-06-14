@@ -142,6 +142,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing staged ledgers
     fn ledgers_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block ledger diffs
+    fn block_ledger_diffs_cf(&self) -> &ColumnFamily;
+
     /// CF for storing staking ledgers
     fn staking_ledgers_cf(&self) -> &ColumnFamily;
 
@@ -186,8 +189,11 @@ pub trait ColumnFamilyHelpers {
     // Username store //
     ////////////////////
 
-    /// CF for storing usernames
-    fn usernames_cf(&self) -> &ColumnFamily;
+    /// CF for storing update index
+    fn username_pk_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing indexed usernames
+    fn username_pk_index_cf(&self) -> &ColumnFamily;
 
     /// CF for storing state hash -> usernames
     fn usernames_per_block_cf(&self) -> &ColumnFamily;

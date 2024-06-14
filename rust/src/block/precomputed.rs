@@ -16,6 +16,7 @@ use crate::{
         protocol_state::{ProtocolState, ProtocolStateJson},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
+    store::username::UsernameUpdate,
 };
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -574,7 +575,7 @@ impl PrecomputedBlock {
             .collect()
     }
 
-    pub fn username_updates(&self) -> HashMap<PublicKey, Username> {
+    pub fn username_updates(&self) -> UsernameUpdate {
         let mut updates = HashMap::new();
         self.commands().iter().for_each(|cmd| {
             // check for the special name service txns
@@ -593,7 +594,7 @@ impl PrecomputedBlock {
                 }
             }
         });
-        updates
+        UsernameUpdate(updates)
     }
 
     /// Base64 encoded string

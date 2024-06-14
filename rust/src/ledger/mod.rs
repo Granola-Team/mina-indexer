@@ -25,7 +25,7 @@ use crate::{
 use anyhow::bail;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
@@ -50,7 +50,7 @@ pub enum LedgerError {
     InvalidDelegation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerHash(pub String);
 
 impl LedgerHash {
@@ -232,6 +232,10 @@ impl Ledger {
 
         serde_json::to_string_pretty(&accounts).unwrap()
     }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
+        Self::from_str(&String::from_utf8(bytes.to_vec())?)
+    }
 }
 
 impl ToString for Ledger {
@@ -240,12 +244,11 @@ impl ToString for Ledger {
         for (pk, acct) in &self.accounts {
             accounts.insert(pk.to_address(), acct.clone());
         }
-
         serde_json::to_string(&accounts).unwrap()
     }
 }
 
-impl std::str::FromStr for Ledger {
+impl FromStr for Ledger {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -254,7 +257,6 @@ impl std::str::FromStr for Ledger {
         for (pk, acct) in deser {
             accounts.insert(PublicKey(pk), acct);
         }
-
         Ok(Ledger { accounts })
     }
 }
@@ -360,10 +362,10 @@ mod tests {
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
-
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
                 public_key: public_key.clone(),
@@ -387,10 +389,10 @@ mod tests {
             PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
         let account = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
-
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),

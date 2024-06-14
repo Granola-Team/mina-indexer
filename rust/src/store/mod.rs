@@ -39,7 +39,7 @@ pub struct IndexerStore {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 70] = [
+    const COLUMN_FAMILIES: [&'static str; 72] = [
         // accounts
         "account-balance",
         "account-balance-sort",
@@ -93,6 +93,7 @@ impl IndexerStore {
         "events",
         // staged & staking ledgers
         "ledgers",
+        "block-ledger-diffs",
         "staking-ledgers",
         "staking-delegations",
         "staking-ledger-genesis-hash",
@@ -105,7 +106,8 @@ impl IndexerStore {
         // chain id
         "chain-id-to-network",
         // usernames
-        "usernames",
+        "username-pk-num",
+        "username-pk-index",
         "usernames-per-block",
         // block counts
         "block-production-pk-epoch",

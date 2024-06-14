@@ -6,8 +6,7 @@ use crate::{
         store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
-    constants::*,
-    ledger::{public_key::PublicKey, username::Username},
+    ledger::public_key::PublicKey,
     store::{
         from_be_bytes, pk_txn_sort_key, to_be_bytes, txn_block_key, txn_sort_key, u32_prefix_key,
         user_command_db_key_pk, username::UsernameStore, IndexerStore,
@@ -123,22 +122,6 @@ impl UserCommandStore for IndexerStore {
                 ),
                 command.amount().to_be_bytes(),
             )?;
-
-            // check for the special name service txns
-            if command.is_applied() {
-                let sender = command.sender();
-                let receiver = command.receiver();
-                let memo = command.memo();
-                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
-                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
-                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
-                {
-                    self.set_username(
-                        &sender,
-                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
-                    )?;
-                }
-            }
         }
 
         // per account
