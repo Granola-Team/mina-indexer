@@ -203,7 +203,7 @@ impl BlocksQueryRoot {
             total_num_internal_commands,
         ];
 
-        let mut blocks: Vec<Block> = Vec::with_capacity(limit);
+        let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
 
         // state hash query

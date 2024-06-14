@@ -100,7 +100,7 @@ impl SnarkQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<SnarkWithCanonicity>> {
         let db = db(ctx);
-        let mut snarks = Vec::with_capacity(limit);
+        let mut snarks = Vec::new();
         let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
 
         // state hash
@@ -167,7 +167,7 @@ impl SnarkQueryRoot {
                 }
             };
 
-            let mut snarks = Vec::with_capacity(limit);
+            let mut snarks = Vec::new();
             for (key, snark) in db.snark_prover_iterator(mode).flatten() {
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
                     return Ok(snarks);
@@ -208,7 +208,7 @@ impl SnarkQueryRoot {
                 || q.block_height_lt.is_some()
                 || q.block_height_lte.is_some()
         }) {
-            let mut snarks: Vec<SnarkWithCanonicity> = Vec::with_capacity(limit);
+            let mut snarks = Vec::new();
             let (min, max) = {
                 let SnarkQueryInput {
                     block_height_gt,
