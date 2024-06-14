@@ -118,7 +118,7 @@ setsid \
     "$SRC"/rust/target/release/mina-indexer \
       --socket "$SOCKET" \
       server start \
-        --log-level DEBUG \
+        --log-level TRACE \
         --web-hostname 0.0.0.0 \
         --database-dir "$DB_DIR" \
         --blocks-dir ./blocks \
