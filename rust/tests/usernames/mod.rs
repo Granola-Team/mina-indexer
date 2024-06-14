@@ -1,11 +1,14 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
-    block::parser::BlockParser,
+    block::{
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+    },
     constants::*,
     ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
     state::IndexerState,
-    store::{username::UsernameStore, IndexerStore},
+    store::{account::AccountUpdate, username::UsernameStore, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -30,7 +33,15 @@ fn set_usernames() -> anyhow::Result<()> {
         MAINNET_TRANSITION_FRONTIER_K,
     )?;
 
+    // ingest the blocks
     state.add_blocks(&mut bp)?;
+
+    // update usernames
+    let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;
+    store.update_usernames(AccountUpdate {
+        apply: vec![block.username_updates()],
+        ..Default::default()
+    })?;
 
     assert_eq!(
         "Betelgeuse",
