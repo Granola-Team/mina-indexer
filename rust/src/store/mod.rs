@@ -39,7 +39,7 @@ pub struct IndexerStore {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 71] = [
+    const COLUMN_FAMILIES: [&'static str; 72] = [
         // accounts
         "account-balance",
         "account-balance-sort",
@@ -106,7 +106,8 @@ impl IndexerStore {
         // chain id
         "chain-id-to-network",
         // usernames
-        "usernames",
+        "username-pk-num",
+        "username-pk-index",
         "usernames-per-block",
         // block counts
         "block-production-pk-epoch",

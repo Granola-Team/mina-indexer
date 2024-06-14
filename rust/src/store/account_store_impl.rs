@@ -3,11 +3,11 @@ use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::store::CanonicityStore,
     constants::*,
-    ledger::{
-        diff::{account::PaymentDiff, LedgerUpdate},
-        public_key::PublicKey,
+    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
+    store::{
+        account::{AccountStore, AccountUpdate},
+        u64_prefix_key, IndexerStore,
     },
-    store::{account::AccountStore, u64_prefix_key, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
@@ -21,8 +21,8 @@ impl AccountStore for IndexerStore {
     ) -> anyhow::Result<(Vec<PaymentDiff>, HashSet<PublicKey>)> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
-            old_best_tip.0,
-            new_best_tip.0
+            old_best_tip,
+            new_best_tip
         );
         let mut coinbase_receivers = HashSet::new();
 
@@ -74,7 +74,7 @@ impl AccountStore for IndexerStore {
         // balance updates don't require this reverse, but other updates may
         apply.reverse();
         Ok((
-            <LedgerUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
+            <AccountUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
             coinbase_receivers,
         ))
     }
@@ -99,7 +99,7 @@ impl AccountStore for IndexerStore {
         trace!("Updating account balances {state_hash}");
 
         // update balances
-        for (pk, amount) in <LedgerUpdate<PaymentDiff>>::balance_updates(updates) {
+        for (pk, amount) in <AccountUpdate<PaymentDiff>>::balance_updates(updates) {
             if amount != 0 {
                 let pk = pk.into();
                 let balance = self.get_account_balance(&pk)?.unwrap_or(0);

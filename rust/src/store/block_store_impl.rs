@@ -9,14 +9,17 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
-        diff::{account::PaymentDiff, LedgerDiff, LedgerUpdate},
+        diff::{account::PaymentDiff, LedgerDiff},
         public_key::PublicKey,
         store::LedgerStore,
     },
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
-        to_be_bytes, u32_prefix_key, IndexerStore,
+        account::{AccountStore, AccountUpdate},
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, to_be_bytes,
+        u32_prefix_key,
+        username::UsernameStore,
+        IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -78,7 +81,7 @@ impl BlockStore for IndexerStore {
         self.set_block_balance_updates(
             &state_hash,
             block.coinbase_receiver(),
-            <LedgerUpdate<PaymentDiff>>::from_precomputed(block),
+            <AccountUpdate<PaymentDiff>>::from_precomputed(block),
         )?;
 
         // add block height/global slot for sorting
@@ -179,9 +182,14 @@ impl BlockStore for IndexerStore {
                 return Ok(());
             }
 
+            // balance-sorted accounts
             let (balance_updates, coinbase_receivers) =
                 self.common_ancestor_account_balance_updates(&old, state_hash)?;
             self.update_account_balances(state_hash, balance_updates, coinbase_receivers)?;
+
+            // usernames
+            let username_updates = self.common_ancestor_username_updates(&old, state_hash)?;
+            self.update_usernames(username_updates)?;
         }
 
         // set new best tip

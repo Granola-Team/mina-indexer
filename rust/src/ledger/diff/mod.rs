@@ -1,133 +1,18 @@
 pub mod account;
 
-use self::account::{
-    AccountDiff, AccountDiffType, FailedTransactionNonceDiff, PaymentDiff, UpdateType,
-};
-use super::{account::Amount, coinbase::Coinbase, LedgerHash, PublicKey};
+use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
+use super::{coinbase::Coinbase, LedgerHash, PublicKey};
 use crate::{
     block::precomputed::PrecomputedBlock,
-    command::{internal::InternalCommand, Command, Payment, UserCommandWithStatusT},
-    constants::MAINNET_GENESIS_HASH,
+    command::{Command, Payment, UserCommandWithStatusT},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
     pub staged_ledger_hash: LedgerHash,
     pub public_keys_seen: Vec<PublicKey>,
     pub account_diffs: Vec<AccountDiff>,
-}
-
-/// Only used in the indexer store for balance sorting
-#[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LedgerUpdate<T> {
-    pub apply: Vec<T>,
-    pub unapply: Vec<T>,
-}
-
-impl LedgerUpdate<PaymentDiff> {
-    pub fn new(apply: Vec<PaymentDiff>, unapply: Vec<PaymentDiff>) -> Self {
-        Self { apply, unapply }
-    }
-
-    pub fn balance_updates(diffs: Vec<PaymentDiff>) -> HashMap<String, i64> {
-        let mut res = HashMap::new();
-        for diff in diffs {
-            let pk = diff.public_key.0;
-            let acc = res.remove(&pk).unwrap_or(0);
-            res.insert(
-                pk,
-                match diff.update_type {
-                    UpdateType::Credit => acc + diff.amount.0 as i64,
-                    UpdateType::Debit(_) => acc - diff.amount.0 as i64,
-                },
-            );
-        }
-        res
-    }
-
-    /// Unapply `self.unapply` & apply `self.apply` diffs
-    pub fn to_diff_vec(self) -> Vec<PaymentDiff> {
-        [
-            self.unapply
-                .into_iter()
-                .map(|diff| diff.unapply())
-                .collect(),
-            self.apply,
-        ]
-        .concat()
-    }
-
-    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<PaymentDiff> {
-        // magic mina
-        if block.state_hash().0 == MAINNET_GENESIS_HASH {
-            return vec![PaymentDiff {
-                update_type: UpdateType::Credit,
-                public_key: block.block_creator(),
-                amount: Amount(1000_u64),
-            }];
-        }
-
-        // otherwise
-        [
-            Command::from_precomputed(block)
-                .into_iter()
-                .flat_map(|cmd| match cmd {
-                    Command::Payment(Payment {
-                        source,
-                        amount,
-                        receiver,
-                        nonce: _,
-                    }) => vec![
-                        PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: source.clone(),
-                            amount,
-                        },
-                        PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.clone(),
-                            amount,
-                        },
-                    ],
-                    Command::Delegation(_) => vec![],
-                })
-                .collect::<Vec<PaymentDiff>>(),
-            InternalCommand::from_precomputed(block)
-                .iter()
-                .flat_map(|cmd| match cmd {
-                    InternalCommand::Coinbase { receiver, amount } => vec![PaymentDiff {
-                        update_type: UpdateType::Credit,
-                        public_key: receiver.clone(),
-                        amount: (*amount).into(),
-                    }],
-                    InternalCommand::FeeTransfer {
-                        sender,
-                        receiver,
-                        amount,
-                    }
-                    | InternalCommand::FeeTransferViaCoinbase {
-                        sender,
-                        receiver,
-                        amount,
-                    } => vec![
-                        PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: sender.clone(),
-                            amount: (*amount).into(),
-                        },
-                        PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.clone(),
-                            amount: (*amount).into(),
-                        },
-                    ],
-                })
-                .collect(),
-        ]
-        .concat()
-    }
 }
 
 impl LedgerDiff {
@@ -245,16 +130,6 @@ impl std::fmt::Debug for LedgerDiff {
             writeln!(f, "{account_diff:?}")?;
         }
         Ok(())
-    }
-}
-
-impl std::fmt::Debug for LedgerUpdate<PaymentDiff> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "apply:   {:#?}\nunapply: {:#?}",
-            self.apply, self.unapply
-        )
     }
 }
 
