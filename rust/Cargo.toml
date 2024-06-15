@@ -20,7 +20,7 @@ mina_rs = []
 anyhow = "1.0.81"
 # https://github.com/bincode-org/bincode/issues/674
 bincode = "2.0.0-rc.3"
-derive_more = "0.99"
+derive_more = { version = "0.99", default-features = false }
 serde = { version = "1.0.197", default-features = false }
 serde_json = { version = "1.0.114", default-features = false, features = ["unbounded_depth"] }
 smart-default = "0.7.1"
@@ -38,7 +38,7 @@ byteorder = "1.5.0"
 num = "0.4.1"
 speedb = { version = "0.0.5", default-features = false, features = ["zstd"] }
 id_tree = "1.8.0"
-time = { version = "0.3.34", features = ["serde-human-readable"] }
+time = { version = "0.3.34", default-features = false }
 log = "0.4.21"
 stderrlog = "0.6.0"
 bytesize = "1.2.0"
