@@ -8,7 +8,7 @@ set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
-IDXR="$SRC"/rust/target/release/mina-indexer
+IDXR="$SRC"/rust/target/debug/mina-indexer
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
@@ -205,8 +205,6 @@ enter_test() {
   test_name="$1"
   echo
   echo "Test: $1"
-  >&2 echo
-  >&2 echo "Test: $1"
 }
 
 test_indexer_cli_reports() {

@@ -75,3 +75,7 @@ features = ["full"]
 [profile.release]
 lto = "fat"
 incremental = true
+
+[profile.dev]
+debug = 0
+# strip = "debuginfo"

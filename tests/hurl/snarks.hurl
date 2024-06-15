@@ -47,7 +47,7 @@ jsonpath "$.data.snarks[9].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZ
 jsonpath "$.data.snarks[9].fee" == 0
 jsonpath "$.data.snarks[9].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
 
-duration < 750
+duration < 2000
 
 #
 # SNARKs canonical block height query
@@ -85,7 +85,7 @@ jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.snarks[63].fee" == 0
 
-duration < 1000
+duration < 2000
 
 #
 # SNARKs canonical state hash query
@@ -120,7 +120,7 @@ jsonpath "$.data.snarks[0].total_num_snarks" == 64
 jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
 
-duration < 750
+duration < 2000
 
 #
 # SNARKs by prover query
@@ -152,7 +152,7 @@ jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15De
 jsonpath "$.data.snarks[63].canonical" == true
 jsonpath "$.data.snarks[63].blockHeight" == 111
 
-duration < 750
+duration < 2000
 
 #
 # SNARKs canonical block height lte
@@ -175,7 +175,7 @@ jsonpath "$.data.snarks" count == 64
 jsonpath "$.data.snarks[0].blockHeight" == 111
 jsonpath "$.data.snarks[63].blockHeight" == 111
 
-duration < 750
+duration < 2000
 
 # TODO global slot query
 # TODO block height/global slot/date time bounded query

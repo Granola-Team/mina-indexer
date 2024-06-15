@@ -30,9 +30,25 @@ prereqs:
   hurl --version
   shellcheck --version
 
+audit:
+  cd rust && cargo audit
+
+disallow-unused-cargo-deps:
+  cd rust && cargo machete Cargo.toml
+
+lint: && audit disallow-unused-cargo-deps
+  echo "--- Performing lint"
+  shellcheck tests/regression
+  shellcheck tests/stage-*
+  shellcheck ops/productionize
+  shellcheck ops/ingest-all
+  cd rust && cargo {{nightly_if_required}} fmt --all --check
+  cd rust && cargo clippy --all-targets --all-features -- -D warnings
+  [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
+
 build:
   echo "--- Performing build"
-  cd rust && cargo build --release
+  cd rust && cargo build
 
 clean:
   cd rust && cargo clean
@@ -41,39 +57,21 @@ clean:
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
-test: lint test-unit test-regression
-
 test-unit:
   echo "--- Performing unit tests"
-  cd rust && cargo nextest run --release
+  cd rust && cargo nextest run
+
+check: lint test-unit
+
+test: lint test-unit test-regression
 
 test-unit-mina-rs:
   echo "--- Performing long-running mina-rs unit tests"
-  cd rust && cargo nextest run --release --features mina_rs
+  cd rust && cargo nextest run --features mina_rs
 
 test-regression subtest='': build
   echo "--- Performing regressions test(s)"
   ./tests/regression {{subtest}}
-
-test-release: build
-  echo "--- Performing test_release"
-  ./tests/regression test_release
-
-disallow-unused-cargo-deps:
-  cd rust && cargo machete Cargo.toml
-
-audit:
-  cd rust && cargo audit
-
-lint: && audit disallow-unused-cargo-deps
-  echo "--- Performing linting"
-  shellcheck tests/regression
-  shellcheck tests/stage-*
-  shellcheck ops/productionize
-  shellcheck ops/ingest-all
-  cd rust && cargo {{nightly_if_required}} fmt --all --check
-  cd rust && cargo clippy --all-targets --all-features -- -D warnings
-  [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 # Build OCI images.
 build-image:
@@ -88,7 +86,7 @@ build-image:
 # Start a server in the current directory.
 start-server: build
   RUST_BACKTRACE=1 \
-  ./rust/target/release/mina-indexer \
+  ./rust/target/debug/mina-indexer \
     --socket ./mina-indexer.sock \
     server start \
       --log-level TRACE \
@@ -112,6 +110,8 @@ tier1-test: prereqs test
 tier2-test: build test-unit-mina-rs build-image
   echo "--- Performing test_many_blocks regression test"
   tests/regression test_many_blocks
+  echo "--- Performing test_release"
+  ./tests/regression test_release
   echo "--- Performing Nix build"
   nix build
   echo "--- Ingesting all blocks..."
