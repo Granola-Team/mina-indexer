@@ -37,6 +37,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing block genesis state hashes
     fn block_genesis_state_hash_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block creators
+    fn block_creator_cf(&self) -> &ColumnFamily;
+
     /// CF for storing coinbase receivers
     fn block_coinbase_receiver_cf(&self) -> &ColumnFamily;
 
@@ -46,11 +49,23 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing block comparison data
     fn block_comparison_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing global slot by height
+    /// CF for storing `height -> global slots`
     fn block_height_to_global_slots_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing height by global slot
+    /// CF for storing `global slot -> heights`
     fn block_global_slot_to_heights_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting block creators by block height
+    fn block_creator_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting block creators by global slot
+    fn block_creator_slot_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting coinbase receivers by block height
+    fn block_coinbase_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting coinbase receivers by global slot
+    fn block_coinbase_slot_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for sorting blocks by blockchain length.
     /// Used with [blocks_height_iterator]
@@ -143,7 +158,10 @@ pub trait ColumnFamilyHelpers {
     fn ledgers_cf(&self) -> &ColumnFamily;
 
     /// CF for storing block ledger diffs
-    fn block_ledger_diffs_cf(&self) -> &ColumnFamily;
+    fn block_ledger_diff_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing block staged ledger hashes
+    fn block_staged_ledger_hash_cf(&self) -> &ColumnFamily;
 
     /// CF for storing staking ledgers
     fn staking_ledgers_cf(&self) -> &ColumnFamily;

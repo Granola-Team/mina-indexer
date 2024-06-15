@@ -1,11 +1,12 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
     block::{store::BlockStore, BlockHash},
-    canonicity::{store::CanonicityStore, Canonicity},
+    canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
-    store::{from_be_bytes, to_be_bytes, IndexerStore},
+    store::{to_be_bytes, DBUpdate, IndexerStore},
 };
+use anyhow::Context;
 use log::trace;
 
 impl CanonicityStore for IndexerStore {
@@ -36,9 +37,6 @@ impl CanonicityStore for IndexerStore {
             to_be_bytes(global_slot),
             state_hash.0.as_bytes(),
         )?;
-
-        // update canonical chain length
-        self.set_max_canonical_blockchain_length(height)?;
 
         // update top snarkers based on the incoming canonical block
         if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
@@ -117,65 +115,113 @@ impl CanonicityStore for IndexerStore {
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
-    fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>> {
-        trace!("Getting max canonical blockchain length");
-        Ok(self
-            .database
-            .get(Self::MAX_CANONICAL_KEY)?
-            .map(from_be_bytes))
-    }
-
-    fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()> {
-        trace!("Setting max canonical blockchain length to {height}");
-        self.database
-            .put(Self::MAX_CANONICAL_KEY, to_be_bytes(height))?;
-        Ok(())
-    }
-
     fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
-        trace!("Getting canonicity of block with hash {}", state_hash.0);
-
-        if let (Ok(Some(best_tip)), Ok(Some(blockchain_length))) =
-            (self.get_best_block(), self.get_block_height(state_hash))
-        {
-            if blockchain_length > best_tip.blockchain_length() {
-                return Ok(None);
-            } else if let Some(max_canonical_length) = self.get_max_canonical_blockchain_length()? {
-                if blockchain_length > max_canonical_length {
-                    // follow best chain back from tip to given block
-                    let mut curr_block = best_tip;
-                    while curr_block.state_hash() != *state_hash
-                        && curr_block.blockchain_length() > max_canonical_length
-                    {
-                        if let Some(parent) = self.get_block(&curr_block.previous_state_hash())? {
-                            curr_block = parent;
-                        } else {
-                            break;
-                        }
+        trace!("Getting canonicity of block {state_hash}");
+        if let Ok(Some(height)) = self.get_block_height(state_hash) {
+            return Ok(self
+                .get_canonical_hash_at_height(height)?
+                .map(|canonical_hash| {
+                    if *state_hash == canonical_hash {
+                        Canonicity::Canonical
+                    } else {
+                        Canonicity::Orphaned
                     }
-
-                    return Ok(Some(
-                        if curr_block.state_hash() == *state_hash
-                            && curr_block.blockchain_length() > max_canonical_length
-                        {
-                            Canonicity::Canonical
-                        } else {
-                            Canonicity::Orphaned
-                        },
-                    ));
-                } else {
-                    return Ok(Some(
-                        if self.get_canonical_hash_at_height(blockchain_length)?
-                            == Some(state_hash.clone())
-                        {
-                            Canonicity::Canonical
-                        } else {
-                            Canonicity::Orphaned
-                        },
-                    ));
-                }
-            }
+                }));
         }
         Ok(None)
+    }
+
+    fn reorg_canonicity_updates(
+        &self,
+        old_best_tip: &BlockHash,
+        new_best_tip: &BlockHash,
+    ) -> anyhow::Result<CanonicityUpdate> {
+        trace!("Getting reorg canonicity updates:\n  old: {old_best_tip}\n  new: {new_best_tip}");
+
+        // follows the old best tip back to the common ancestor
+        let mut a = old_best_tip.clone();
+        let mut unapply = vec![];
+
+        // follows the new best tip back to the common ancestor
+        let mut b = new_best_tip.clone();
+        let mut apply = vec![];
+
+        let a_length = self.get_block_height(&a)?.expect("a has a length");
+        let b_length = self.get_block_height(&b)?.expect("b has a length");
+
+        // bring b back to the same height as a
+        let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
+        for _ in 0..(b_length - a_length) {
+            // check if there's a previous block
+            if genesis_state_hashes.contains(&b) {
+                break;
+            }
+
+            apply.push(CanonicityDiff {
+                state_hash: b.clone(),
+                blockchain_length: b_length,
+                global_slot: self
+                    .get_block_global_slot(&b)?
+                    .with_context(|| format!("(length {b_length}): {b}"))
+                    .unwrap(),
+            });
+            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
+        }
+
+        // find the common ancestor
+        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
+        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
+
+        while a != b && !genesis_state_hashes.contains(&a) {
+            // collect canonicity diffs
+            unapply.push(CanonicityDiff {
+                state_hash: a.clone(),
+                blockchain_length: self.get_block_height(&a)?.unwrap(),
+                global_slot: self.get_block_global_slot(&a)?.unwrap(),
+            });
+            apply.push(CanonicityDiff {
+                state_hash: b.clone(),
+                blockchain_length: self.get_block_height(&b)?.unwrap(),
+                global_slot: self.get_block_global_slot(&b)?.unwrap(),
+            });
+
+            // descend
+            a = a_prev;
+            b = b_prev;
+
+            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
+            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
+        }
+        Ok(DBUpdate { apply, unapply })
+    }
+
+    fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()> {
+        trace!("Updating block canonicities: {updates:?}");
+        // unapply canonicities
+        for unapply in updates.unapply.iter() {
+            // remove from canonicity sets
+            self.database.delete_cf(
+                self.canonicity_length_cf(),
+                to_be_bytes(unapply.blockchain_length),
+            )?;
+            self.database
+                .delete_cf(self.canonicity_slot_cf(), to_be_bytes(unapply.global_slot))?;
+        }
+
+        // apply canonicities
+        for apply in updates.apply.iter() {
+            // remove from canonicity sets
+            self.database.put_cf(
+                self.canonicity_length_cf(),
+                to_be_bytes(apply.blockchain_length),
+                apply.state_hash.0.as_bytes(),
+            )?;
+            self.database.put_cf(
+                self.canonicity_slot_cf(),
+                to_be_bytes(apply.global_slot),
+                apply.state_hash.0.as_bytes(),
+            )?;
+        }
+        Ok(())
     }
 }

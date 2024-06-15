@@ -693,44 +693,15 @@ async fn handle_conn(
             Ledgers::Height { height, path } => {
                 info!("Received ledger-at-height {height} command");
 
-                if let Some(best_tip) = db.get_best_block()? {
-                    if height > best_tip.blockchain_length() {
+                if let Ok(Some(best_tip_height)) = db.get_best_block_height() {
+                    if height > best_tip_height {
                         // ahead of witness tree - cannot compute
-                        Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {}", best_tip.blockchain_length()))
+                        Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {best_tip_height}"))
                     } else {
-                        let ledger_str = if Some(height)
-                            > db.get_max_canonical_blockchain_length()?
-                        {
-                            // follow best chain back from tip to given height block and get the
-                            // ledger
-                            if let Some(mut curr_block) = db.get_block(&best_tip.state_hash())? {
-                                while curr_block.blockchain_length() > height {
-                                    if let Some(parent) =
-                                        db.get_block(&curr_block.previous_state_hash())?
-                                    {
-                                        curr_block = parent;
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                if let Some(ledger) =
-                                    db.get_ledger_state_hash(&curr_block.state_hash(), true)?
-                                {
-                                    ledger.to_string_pretty()
-                                } else {
-                                    block_missing_from_db(&curr_block.state_hash().0)
-                                }
-                            } else {
-                                best_tip_missing_from_db().unwrap()
-                            }
-                        } else if let Some(ledger) = db.get_ledger_at_height(height, true)? {
-                            ledger.to_string_pretty()
-                        } else {
-                            error!("Invalid ledger query. Ledger at height {height} not available");
-                            format!("Invalid ledger query. Ledger at height {height} not available")
-                        };
-
+                        let ledger_str = db
+                            .get_ledger_at_height(height, true)?
+                            .unwrap()
+                            .to_string_pretty();
                         if path.is_none() {
                             debug!("Writing ledger at height {height} to stdout");
                             Some(ledger_str)

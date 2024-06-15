@@ -16,7 +16,7 @@ use crate::{
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{block_state_hash_from_key, to_be_bytes, IndexerStore},
+    store::{block_state_hash_from_key, pk_of_key, to_be_bytes, IndexerStore},
     web::graphql::gen::BlockQueryInput,
 };
 use anyhow::Context;
@@ -68,7 +68,7 @@ impl BlocksQueryRoot {
                         block_num_user_commands,
                         block_num_internal_commands,
                         block: BlockWithoutCanonicity::new(
-                            pcb,
+                            &pcb,
                             canonical,
                             epoch_num_user_commands,
                             total_num_user_commands,
@@ -109,7 +109,7 @@ impl BlocksQueryRoot {
                 block_num_user_commands,
                 block_num_internal_commands,
                 block: BlockWithoutCanonicity::new(
-                    pcb,
+                    &pcb,
                     canonical,
                     epoch_num_user_commands,
                     total_num_user_commands,
@@ -122,7 +122,7 @@ impl BlocksQueryRoot {
             return Ok(None);
         }
 
-        // else iterate over global slot sorted blocks
+        // else iterate over height-sorted blocks
         for (key, _) in db
             .blocks_height_iterator(speedb::IteratorMode::End)
             .flatten()
@@ -153,7 +153,7 @@ impl BlocksQueryRoot {
                 block_num_user_commands,
                 block_num_internal_commands,
                 block: BlockWithoutCanonicity::new(
-                    pcb,
+                    &pcb,
                     canonical,
                     epoch_num_user_commands,
                     total_num_user_commands,
@@ -175,6 +175,9 @@ impl BlocksQueryRoot {
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
     ) -> Result<Vec<Block>> {
+        use speedb::{Direction::*, IteratorMode::*};
+        use BlockSortByInput::*;
+
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
@@ -204,13 +207,13 @@ impl BlocksQueryRoot {
         ];
 
         let mut blocks = Vec::new();
-        let sort_by = sort_by.unwrap_or(BlockSortByInput::BlockHeightDesc);
+        let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
         // state hash query
         if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
             let block = db.get_block(&state_hash.clone().into())?;
             return Ok(block
-                .into_iter()
+                .iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .collect());
         }
@@ -219,7 +222,7 @@ impl BlocksQueryRoot {
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
             return Ok(db
                 .get_blocks_at_height(block_height)?
-                .into_iter()
+                .iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .take(limit)
                 .collect());
@@ -234,7 +237,7 @@ impl BlocksQueryRoot {
         {
             return Ok(db
                 .get_blocks_at_slot(global_slot as u32)?
-                .into_iter()
+                .iter()
                 .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
                 .take(limit)
                 .collect());
@@ -246,14 +249,31 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
-            let mut blocks: Vec<Block> = db
-                .get_blocks_at_public_key(&coinbase_receiver.into())?
-                .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .collect();
+            let start = coinbase_receiver.as_bytes().to_vec();
+            let mut end = start.clone();
+            end.append(&mut to_be_bytes(u32::MAX));
 
-            reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
+            let iter = match sort_by {
+                BlockHeightAsc => db.coinbase_receiver_block_height_iterator(From(&start, Forward)),
+                BlockHeightDesc => db.coinbase_receiver_block_height_iterator(From(&end, Reverse)),
+                GlobalSlotAsc => db.coinbase_receiver_global_slot_iterator(From(&start, Forward)),
+                GlobalSlotDesc => db.coinbase_receiver_global_slot_iterator(From(&end, Reverse)),
+            };
+            for (key, _) in iter.flatten() {
+                if pk_of_key(&key).0 != coinbase_receiver {
+                    break;
+                }
+
+                let state_hash = block_state_hash_from_key(&key)?;
+                let pcb = db.get_block(&state_hash)?.unwrap();
+                if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
+                    blocks.push(block);
+
+                    if blocks.len() == limit {
+                        break;
+                    }
+                }
+            }
             return Ok(blocks);
         }
 
@@ -263,14 +283,31 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
-            let mut blocks: Vec<Block> = db
-                .get_blocks_at_public_key(&creator_account.into())?
-                .into_iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .collect();
+            let start = creator_account.as_bytes().to_vec();
+            let mut end = start.clone();
+            end.append(&mut to_be_bytes(u32::MAX));
 
-            reorder_asc(&mut blocks, sort_by);
-            blocks.truncate(limit);
+            let iter = match sort_by {
+                BlockHeightAsc => db.block_creator_block_height_iterator(From(&start, Forward)),
+                BlockHeightDesc => db.block_creator_block_height_iterator(From(&end, Reverse)),
+                GlobalSlotAsc => db.block_creator_global_slot_iterator(From(&start, Forward)),
+                GlobalSlotDesc => db.block_creator_global_slot_iterator(From(&end, Reverse)),
+            };
+            for (key, _) in iter.flatten() {
+                if pk_of_key(&key).0 != creator_account {
+                    break;
+                }
+
+                let state_hash = block_state_hash_from_key(&key)?;
+                let pcb = db.get_block(&state_hash)?.unwrap();
+                if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
+                    blocks.push(block);
+
+                    if blocks.len() == limit {
+                        break;
+                    }
+                }
+            }
             return Ok(blocks);
         }
 
@@ -306,12 +343,12 @@ impl BlocksQueryRoot {
             };
 
             let mut block_heights: Vec<u32> = (min..=max).collect();
-            if sort_by == BlockSortByInput::BlockHeightDesc {
+            if sort_by == BlockHeightDesc {
                 block_heights.reverse()
             }
 
             'outer: for height in block_heights {
-                for block in db.get_blocks_at_height(height)? {
+                for block in db.get_blocks_at_height(height)?.iter() {
                     if let Some(block_with_canonicity) =
                         precomputed_matches_query(db, &query, block, counts)
                     {
@@ -364,12 +401,12 @@ impl BlocksQueryRoot {
             };
 
             let mut block_slots: Vec<u32> = (min..=max).collect();
-            if sort_by == BlockSortByInput::BlockHeightDesc {
+            if sort_by == GlobalSlotDesc {
                 block_slots.reverse()
             }
 
             'outer: for global_slot in block_slots {
-                for block in db.get_blocks_at_slot(global_slot)? {
+                for block in db.get_blocks_at_slot(global_slot)?.iter() {
                     if let Some(block_with_canonicity) =
                         precomputed_matches_query(db, &query, block, counts)
                     {
@@ -383,23 +420,21 @@ impl BlocksQueryRoot {
             return Ok(blocks);
         }
 
-        // handle general search with global slot iterator
-        let start = to_be_bytes(u32::MAX);
-        let mode = match sort_by {
-            BlockSortByInput::BlockHeightAsc => {
-                speedb::IteratorMode::From(&[0], speedb::Direction::Forward)
-            }
-            BlockSortByInput::BlockHeightDesc => {
-                speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
-            }
+        let start = to_be_bytes(0);
+        let end = to_be_bytes(u32::MAX);
+        let iter = match sort_by {
+            BlockHeightAsc => db.blocks_height_iterator(From(&start, Forward)),
+            BlockHeightDesc => db.blocks_height_iterator(From(&end, Reverse)),
+            GlobalSlotAsc => db.blocks_global_slot_iterator(From(&start, Forward)),
+            GlobalSlotDesc => db.blocks_global_slot_iterator(From(&end, Reverse)),
         };
-        for (key, _) in db.blocks_height_iterator(mode).flatten() {
+        for (key, _) in iter.flatten() {
             let state_hash = block_state_hash_from_key(&key)?;
             let pcb = db
                 .get_block(&state_hash)?
                 .with_context(|| format!("state hash {state_hash}"))
                 .expect("block");
-            let block = Block::from_precomputed(db, pcb, counts);
+            let block = Block::from_precomputed(db, &pcb, counts);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
@@ -413,17 +448,10 @@ impl BlocksQueryRoot {
     }
 }
 
-fn reorder_asc<T>(values: &mut [T], sort_by: BlockSortByInput) {
-    match sort_by {
-        BlockSortByInput::BlockHeightAsc => values.reverse(),
-        BlockSortByInput::BlockHeightDesc => (),
-    }
-}
-
 fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
-    block: PrecomputedBlock,
+    block: &PrecomputedBlock,
     counts: [u32; 8],
 ) -> Option<Block> {
     let block_with_canonicity = Block::from_precomputed(db, block, counts);
@@ -444,6 +472,12 @@ pub enum BlockSortByInput {
 
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
+
+    #[graphql(name = "GLOBALSLOT_ASC")]
+    GlobalSlotAsc,
+
+    #[graphql(name = "GLOBALSLOT_DESC")]
+    GlobalSlotDesc,
 }
 
 #[derive(SimpleObject)]
@@ -685,7 +719,7 @@ struct ProtocolState {
 
 impl BlockWithoutCanonicity {
     pub fn new(
-        block: PrecomputedBlock,
+        block: &PrecomputedBlock,
         canonical: bool,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
@@ -823,15 +857,15 @@ impl BlockWithoutCanonicity {
             MAINNET_COINBASE_REWARD
         };
 
-        let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(&block)
+        let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(block)
             .into_iter()
-            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
+            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, block))
             .filter(|x| matches!(x, InternalCommandWithData::FeeTransfer { .. }))
             .map(|ft| ft.into())
             .collect();
 
         let user_commands: Vec<TransactionWithoutBlock> =
-            SignedCommandWithData::from_precomputed(&block)
+            SignedCommandWithData::from_precomputed(block)
                 .into_iter()
                 .map(|cmd| {
                     TransactionWithoutBlock::new(
@@ -843,7 +877,7 @@ impl BlockWithoutCanonicity {
                 })
                 .collect();
 
-        let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(&block)
+        let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(block)
             .into_iter()
             .map(|snark| (snark, block.state_hash().0, block_height, date_time.clone()).into())
             .collect();
@@ -1069,7 +1103,7 @@ impl BlockQueryInput {
 impl Block {
     pub fn from_precomputed(
         db: &Arc<IndexerStore>,
-        block: PrecomputedBlock,
+        block: &PrecomputedBlock,
         counts: [u32; 8],
     ) -> Self {
         let epoch_num_blocks = counts[0];
