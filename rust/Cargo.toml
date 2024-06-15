@@ -45,14 +45,14 @@ time = { version = "0.3.34", features = ["serde-human-readable"] }
 log = "0.4.21"
 stderrlog = "0.6.0"
 bytesize = "1.2.0"
-rust_decimal = { version = "1.34.3", features = ["serde"] }
+rust_decimal = { version = "1.34.3", default-features = false }
 rust_decimal_macros = "1.34.2"
 bs58 = { version = "0.5.0", default-features = false, features = ["std", "check"] }
-blake2 = "0.10.6"
+blake2 = { version = "0.10.6", default-features = false }
 tempfile = "3.10.1"
 actix-web = { version = "4.5.1", default-features = false, features = ["macros"] }
 actix-cors = "0.7.0"
-async-graphql = "7.0.3"
+async-graphql = { version = "7.0.3", default-features = false , features = ["graphiql"] }
 async-graphql-actix-web = "7.0.3"
 base64 = "0.22.0"
 hex-literal = "0.4.1"
