@@ -8,7 +8,7 @@ use mina_indexer::{
     ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
     state::IndexerState,
-    store::{account::AccountUpdate, username::UsernameStore, IndexerStore},
+    store::{username::UsernameStore, DBUpdate, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -30,6 +30,7 @@ fn set_usernames() -> anyhow::Result<()> {
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         store.clone(),
+        MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )?;
 
@@ -38,7 +39,7 @@ fn set_usernames() -> anyhow::Result<()> {
 
     // update usernames
     let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;
-    store.update_usernames(AccountUpdate {
+    store.update_usernames(DBUpdate {
         apply: vec![block.username_updates()],
         ..Default::default()
     })?;

@@ -6,9 +6,7 @@ use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::store::CanonicityStore,
     ledger::{public_key::PublicKey, username::Username},
-    store::{
-        account::AccountUpdate, column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes,
-    },
+    store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes, DBUpdate},
 };
 use log::{error, trace};
 use std::collections::HashMap;
@@ -46,7 +44,7 @@ impl UsernameStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn common_ancestor_username_updates(
+    fn reorg_username_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
@@ -99,9 +97,8 @@ impl UsernameStore for IndexerStore {
             b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
-        // balance updates don't require this reverse, but other updates may
         apply.reverse();
-        Ok(AccountUpdate { apply, unapply })
+        Ok(DBUpdate { apply, unapply })
     }
 
     fn update_usernames(&self, update: UsernameAccountUpdate) -> anyhow::Result<()> {

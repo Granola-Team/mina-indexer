@@ -1,4 +1,4 @@
-use super::account::AccountUpdate;
+use super::DBUpdate;
 use crate::{
     block::BlockHash,
     ledger::{public_key::PublicKey, username::Username},
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(Default, Serialize, Deserialize)]
 pub struct UsernameUpdate(pub HashMap<PublicKey, Username>);
 
-pub type UsernameAccountUpdate = AccountUpdate<UsernameUpdate>;
+pub type UsernameAccountUpdate = DBUpdate<UsernameUpdate>;
 
 pub trait UsernameStore {
     /// Get the username associated with `pk`
@@ -34,7 +34,7 @@ pub trait UsernameStore {
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>>;
 
     /// Generate account username updates when the best tip changes
-    fn common_ancestor_username_updates(
+    fn reorg_username_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
