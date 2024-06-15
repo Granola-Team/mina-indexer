@@ -2,7 +2,6 @@ use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    constants::*,
     ledger::{
         diff::LedgerDiff,
         genesis::{GenesisLedger, GenesisRoot},
@@ -28,7 +27,6 @@ async fn test() -> anyhow::Result<()> {
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
         10,
     )?;
 

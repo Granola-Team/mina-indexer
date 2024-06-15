@@ -48,7 +48,6 @@ async fn test() {
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store0.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();
@@ -56,7 +55,6 @@ async fn test() {
         genesis_ledger.into(),
         IndexerVersion::new_testing(),
         indexer_store1.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();

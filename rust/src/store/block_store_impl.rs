@@ -15,8 +15,11 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
-        to_be_bytes, u32_prefix_key, username::UsernameStore, DBUpdate, IndexerStore,
+        account::{AccountStore, AccountUpdate},
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, to_be_bytes,
+        u32_prefix_key,
+        username::UsernameStore,
+        IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -59,14 +62,8 @@ impl BlockStore for IndexerStore {
         // add to blockchain length index
         self.set_block_height(&state_hash, block.blockchain_length())?;
 
-        // add to block global slot index
-        self.set_block_global_slot(&state_hash, block.global_slot_since_genesis())?;
-
         // add to parent hash index
         self.set_block_parent_hash(&state_hash, &block.previous_state_hash())?;
-
-        // add to staged ledger hash index
-        self.set_block_staged_ledger_hash(&state_hash, &block.staged_ledger_hash())?;
 
         // add to genesis state hash index
         self.set_block_genesis_state_hash(&state_hash, &block.genesis_state_hash())?;
@@ -77,17 +74,14 @@ impl BlockStore for IndexerStore {
             block.global_slot_since_genesis(),
         )?;
 
-        // add to block creator index
-        self.set_block_creator(block)?;
-
         // add to coinbase receiver index
-        self.set_coinbase_receiver(block)?;
+        self.set_coinbase_receiver(&state_hash, &block.coinbase_receiver())?;
 
         // add to balance update index
         self.set_block_balance_updates(
             &state_hash,
             block.coinbase_receiver(),
-            <DBUpdate<PaymentDiff>>::from_precomputed(block),
+            <AccountUpdate<PaymentDiff>>::from_precomputed(block),
         )?;
 
         // add block height/global slot for sorting
@@ -188,18 +182,13 @@ impl BlockStore for IndexerStore {
                 return Ok(());
             }
 
-            // reorg updates
-            // canonicity
-            let canonicity_updates = self.reorg_canonicity_updates(&old, state_hash)?;
-            self.update_canonicity(canonicity_updates)?;
-
             // balance-sorted accounts
             let (balance_updates, coinbase_receivers) =
-                self.reorg_account_balance_updates(&old, state_hash)?;
+                self.common_ancestor_account_balance_updates(&old, state_hash)?;
             self.update_account_balances(state_hash, balance_updates, coinbase_receivers)?;
 
             // usernames
-            let username_updates = self.reorg_username_updates(&old, state_hash)?;
+            let username_updates = self.common_ancestor_username_updates(&old, state_hash)?;
             self.update_usernames(username_updates)?;
         }
 
@@ -285,45 +274,6 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
-        trace!("Getting block creator {state_hash}");
-        Ok(self
-            .database
-            .get_cf(self.block_creator_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
-    }
-
-    fn set_block_creator(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        let state_hash = block.state_hash();
-        let block_creator = block.block_creator();
-        trace!("Setting block creator: {state_hash} -> {block_creator}");
-
-        // index
-        self.database.put_cf(
-            self.block_creator_cf(),
-            state_hash.0.as_bytes(),
-            block_creator.0.as_bytes(),
-        )?;
-
-        // block height sort
-        self.database.put_cf(
-            self.block_creator_height_sort_cf(),
-            pk_block_sort_key(
-                block_creator.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
-            b"",
-        )?;
-
-        // global slot sort
-        Ok(self.database.put_cf(
-            self.block_creator_slot_sort_cf(),
-            pk_block_sort_key(block_creator, block.global_slot_since_genesis(), state_hash),
-            b"",
-        )?)
-    }
-
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
         trace!("Getting coinbase receiver for {state_hash}");
         Ok(self
@@ -332,38 +282,16 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
-    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        let state_hash = block.state_hash();
-        let coinbase_receiver = block.coinbase_receiver();
+    fn set_coinbase_receiver(
+        &self,
+        state_hash: &BlockHash,
+        coinbase_receiver: &PublicKey,
+    ) -> anyhow::Result<()> {
         trace!("Setting coinbase receiver: {state_hash} -> {coinbase_receiver}");
-
-        // index
-        self.database.put_cf(
+        Ok(self.database.put_cf(
             self.block_coinbase_receiver_cf(),
             state_hash.0.as_bytes(),
             coinbase_receiver.0.as_bytes(),
-        )?;
-
-        // block height sort
-        self.database.put_cf(
-            self.block_coinbase_height_sort_cf(),
-            pk_block_sort_key(
-                coinbase_receiver.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
-            b"",
-        )?;
-
-        // global slot sort
-        Ok(self.database.put_cf(
-            self.block_coinbase_slot_sort_cf(),
-            pk_block_sort_key(
-                coinbase_receiver.clone(),
-                block.global_slot_since_genesis(),
-                state_hash.clone(),
-            ),
-            b"",
         )?)
     }
 
@@ -717,26 +645,6 @@ impl BlockStore for IndexerStore {
             .iterator_cf(self.blocks_global_slot_sort_cf(), mode)
     }
 
-    fn block_creator_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database
-            .iterator_cf(self.block_creator_height_sort_cf(), mode)
-    }
-
-    fn block_creator_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database
-            .iterator_cf(self.block_creator_slot_sort_cf(), mode)
-    }
-
-    fn coinbase_receiver_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database
-            .iterator_cf(self.block_coinbase_height_sort_cf(), mode)
-    }
-
-    fn coinbase_receiver_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database
-            .iterator_cf(self.block_coinbase_slot_sort_cf(), mode)
-    }
-
     //////////////////
     // Block counts //
     //////////////////
@@ -947,14 +855,6 @@ fn block_height_key(block: &PrecomputedBlock) -> Vec<u8> {
 fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
     let mut key = to_be_bytes(block.global_slot_since_genesis());
     key.append(&mut block.state_hash().to_bytes());
-    key
-}
-
-/// `{pk}{height/slot BE}{state hash}`
-fn pk_block_sort_key(pk: PublicKey, sort_value: u32, state_hash: BlockHash) -> Vec<u8> {
-    let mut key = pk.to_bytes();
-    key.append(&mut to_be_bytes(sort_value));
-    key.append(&mut state_hash.to_bytes());
     key
 }
 

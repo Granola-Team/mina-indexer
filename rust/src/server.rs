@@ -188,7 +188,6 @@ pub fn initialize(
         genesis_ledger: genesis_ledger.clone(),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
-        canonical_threshold,
         canonical_update_threshold,
         ledger_cadence,
         reporting_freq,

@@ -76,14 +76,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     fn block_height_to_global_slots_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-height-to-slots")
-            .expect("blocks-height-to-slots column family exists")
+            .cf_handle("block-height-to-slots")
+            .expect("block-height-to-slots column family exists")
     }
 
     fn block_global_slot_to_heights_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-slot-to-heights")
-            .expect("blocks-slot-to-heights column family exists")
+            .cf_handle("block-slot-to-heights")
+            .expect("block-slot-to-heights column family exists")
     }
 
     fn block_parent_hash_cf(&self) -> &ColumnFamily {
@@ -116,40 +116,10 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-genesis-hash column family exists")
     }
 
-    fn block_creator_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("blocks-creator")
-            .expect("blocks-creator column family exists")
-    }
-
     fn block_coinbase_receiver_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-coinbase-receiver")
-            .expect("blocks-coinbase-receiver column family exists")
-    }
-
-    fn block_coinbase_height_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("coinbase-receiver-height-sort")
-            .expect("coinbase-receiver-height-sort column family exists")
-    }
-
-    fn block_coinbase_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("coinbase-receiver-slot-sort")
-            .expect("coinbase-receiver-slot-sort column family exists")
-    }
-
-    fn block_creator_height_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("block-creator-height-sort")
-            .expect("block-creator-height-sort column family exists")
-    }
-
-    fn block_creator_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("block-creator-slot-sort")
-            .expect("block-creator-slot-sort column family exists")
+            .cf_handle("coinbase-receivers")
+            .expect("coinbase-receivers column family exists")
     }
 
     /// CF for storing blocks at a fixed height:
@@ -174,8 +144,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     fn block_comparison_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-comparison")
-            .expect("blocks-comparison column family exists")
+            .cf_handle("block-comparison")
+            .expect("block-comparison column family exists")
     }
 
     ////////////////////////////
@@ -382,16 +352,10 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("ledgers column family exists")
     }
 
-    fn block_ledger_diff_cf(&self) -> &ColumnFamily {
+    fn block_ledger_diffs_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("blocks-ledger-diff")
-            .expect("blocks-ledger-diff column family exists")
-    }
-
-    fn block_staged_ledger_hash_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("blocks-staged-ledger-hash")
-            .expect("blocks-staged-ledger-hash column family exists")
+            .cf_handle("block-ledger-diffs")
+            .expect("block-ledger-diffs column family exists")
     }
 
     /// CF for storing staking ledgers
@@ -410,11 +374,12 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger hashes
     /// ```
-    /// - key: epoch
-    /// - val: ledger hash
+    /// - key: {genesis_hash}{epoch}
+    /// - val: ledger_hash
     /// where
+    /// - genesis_hash: [BlockHash::LEN] bytes
     /// - epoch:        4 BE bytes
-    /// - ledger hash:  [TXN_HASH_LEN] bytes
+    /// - ledger_hash:  [TXN_HASH_LEN] bytes
     fn staking_ledger_epoch_to_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-epoch-to-hash")
@@ -423,10 +388,10 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger epochs
     /// ```
-    /// - key: ledger hash
+    /// - key: ledger_hash
     /// - val: epoch
     /// where
-    /// - ledger hash: [TXN_HASH_LEN] bytes
+    /// - ledger_hash: [TXN_HASH_LEN] bytes
     /// - epoch:       4 BE bytes
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily {
         self.database
@@ -434,7 +399,7 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("staking-ledger-hash-to-epoch column family exists")
     }
 
-    /// CF for storing staking ledger genesis state hashes
+    /// CF for storing staking ledger genesis hashes
     /// ```
     /// - key: ledger_hash
     /// - val: genesis_hash

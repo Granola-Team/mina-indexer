@@ -22,7 +22,6 @@ async fn store() {
         genesis_root.into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .unwrap();

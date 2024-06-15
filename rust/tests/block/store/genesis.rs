@@ -20,7 +20,6 @@ fn block_added() -> anyhow::Result<()> {
         genesis_root.into(),
         IndexerVersion::new_testing(),
         indexer_store,
-        MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )?;
 

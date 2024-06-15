@@ -28,7 +28,6 @@ fn check_balance() -> anyhow::Result<()> {
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
         10,
     )?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery_filtered(

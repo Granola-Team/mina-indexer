@@ -1,13 +1,8 @@
 use super::{is_valid_ledger_file, StakingLedger};
-use crate::{
-    constants::MAINNET_GENESIS_HASH,
-    ledger::{store::LedgerStore, LedgerHash},
-    store::IndexerStore,
-};
+use crate::constants::MAINNET_GENESIS_HASH;
 use glob::glob;
 use std::{
     path::{Path, PathBuf},
-    str::FromStr,
     vec::IntoIter,
 };
 
@@ -32,48 +27,12 @@ impl StakingLedgerParser {
         })
     }
 
-    /// Only parse the staking ledger if it's not already in the db
-    pub fn next_ledger(
-        &mut self,
-        store: Option<&std::sync::Arc<IndexerStore>>,
-    ) -> anyhow::Result<Option<StakingLedger>> {
-        for next_path in self.ledger_paths.by_ref() {
-            if let Some(store) = store {
-                // extract epoch and ledger hash to check if it's in the db
-                if let Some((epoch, hash)) = extract_epoch_hash(&next_path) {
-                    if store.get_ledger_hash(epoch)? != Some(hash) {
-                        // add the missing staking ledger
-                        return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
-                            .map(Some);
-                    } else {
-                        continue;
-                    }
-                }
-            }
-
-            // parse all staking ledgers if no store
+    pub fn next_ledger(&mut self) -> anyhow::Result<Option<StakingLedger>> {
+        if let Some(next_path) = self.ledger_paths.next() {
             return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into()).map(Some);
         }
         Ok(None)
     }
-}
-
-pub fn extract_epoch_hash(path: &Path) -> Option<(u32, LedgerHash)> {
-    let filename = path.file_stem().and_then(|x| x.to_str()).unwrap();
-    let first_dash = filename.find('-');
-    let second_dash =
-        first_dash.and_then(|index| filename[index + 1..].find('-').map(|i| i + index + 1));
-    if let (Some(first_dash_pos), Some(second_dash_pos)) = (first_dash, second_dash) {
-        let potential_epoch = &filename[first_dash_pos + 1..second_dash_pos];
-        let potential_hash = &filename[second_dash_pos + 1..];
-        return potential_epoch.parse().ok().and_then(|e| {
-            match LedgerHash::from_str(potential_hash) {
-                Ok(ledger_hash) => Some((e, ledger_hash)),
-                Err(_) => None,
-            }
-        });
-    }
-    None
 }
 
 #[cfg(test)]
@@ -97,7 +56,7 @@ mod tests {
             ),
         ];
 
-        while let Some(staking_ledger) = ledger_parser.next_ledger(None)? {
+        while let Some(staking_ledger) = ledger_parser.next_ledger()? {
             assert_eq!(staking_ledger.epoch, expect[n].0);
             assert_eq!(staking_ledger.ledger_hash.0, expect[n].1);
             n += 1;

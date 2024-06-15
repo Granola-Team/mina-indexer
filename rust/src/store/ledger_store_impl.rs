@@ -192,7 +192,7 @@ impl LedgerStore for IndexerStore {
     ) -> anyhow::Result<()> {
         trace!("Setting block ledger diff {state_hash}: {ledger_diff:?}");
         Ok(self.database.put_cf(
-            self.block_ledger_diff_cf(),
+            self.block_ledger_diffs_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&ledger_diff)?,
         )?)
@@ -202,32 +202,8 @@ impl LedgerStore for IndexerStore {
         trace!("Getting block ledger diff {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.block_ledger_diff_cf(), state_hash.0.as_bytes())?
+            .get_pinned_cf(self.block_ledger_diffs_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
-    }
-
-    fn set_block_staged_ledger_hash(
-        &self,
-        state_hash: &BlockHash,
-        staged_ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<()> {
-        trace!("Setting block staged ledger hash {state_hash}: {staged_ledger_hash}");
-        Ok(self.database.put_cf(
-            self.block_staged_ledger_hash_cf(),
-            state_hash.0.as_bytes(),
-            staged_ledger_hash.0.as_bytes(),
-        )?)
-    }
-
-    fn get_block_staged_ledger_hash(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<LedgerHash>> {
-        trace!("Getting block staged ledger hash {state_hash}");
-        Ok(self
-            .database
-            .get_cf(self.block_staged_ledger_hash_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| LedgerHash::from_bytes(bytes).ok()))
     }
 
     /////////////////////
