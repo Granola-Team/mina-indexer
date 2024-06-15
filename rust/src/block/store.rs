@@ -149,15 +149,17 @@ pub trait BlockStore {
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
 
+    /// Get the indexed creator for the given block
+    fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
+
+    /// Index the creator for the given block
+    fn set_block_creator(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+
     /// Get the indexed coinbase receiver for the given block
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
     /// Index the coinbase receiver for the given block
-    fn set_coinbase_receiver(
-        &self,
-        state_hash: &BlockHash,
-        coinbase_receiver: &PublicKey,
-    ) -> anyhow::Result<()>;
+    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
     fn set_block_comparison(
@@ -198,6 +200,38 @@ pub trait BlockStore {
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
     fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for block creators via block height
+    /// ```
+    /// key: {creator}{height}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn block_creator_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for block creators via global slot
+    /// ```
+    /// key: {creator}{slot}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn block_creator_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for coinbase receivers via block height
+    /// ```
+    /// key: {pk}{height}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn coinbase_receiver_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
+    /// Iterator for coinbase receivers via global slot
+    /// ```
+    /// key: {pk}{slot}{state_hash}
+    /// val: b""
+    /// ```
+    /// Use [block_state_hash_from_key] to extract state hash
+    fn coinbase_receiver_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
     //////////////////
     // Block counts //

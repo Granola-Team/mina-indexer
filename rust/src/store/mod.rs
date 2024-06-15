@@ -25,6 +25,7 @@ pub mod version_store_impl;
 use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
 use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::path::{Path, PathBuf};
 use version::{IndexerStoreVersion, VersionStore};
@@ -36,10 +37,16 @@ pub struct IndexerStore {
     pub is_primary: bool,
 }
 
+#[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DBUpdate<T> {
+    pub apply: Vec<T>,
+    pub unapply: Vec<T>,
+}
+
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 72] = [
+    const COLUMN_FAMILIES: [&'static str; 78] = [
         // accounts
         "account-balance",
         "account-balance-sort",
@@ -54,12 +61,17 @@ impl IndexerStore {
         "blocks-parent-hash",
         "blocks-epoch",
         "blocks-genesis-hash",
-        "block-height-to-slots",
-        "block-slot-to-heights",
+        "blocks-height-to-slots",
+        "blocks-slot-to-heights",
         "blocks-height-sort",
         "blocks-global-slot-sort",
-        "block-comparison",
-        "coinbase-receivers",
+        "blocks-comparison",
+        "blocks-coinbase-receiver",
+        "blocks-creator",
+        "block-creator-height-sort",
+        "block-creator-slot-sort",
+        "coinbase-receiver-height-sort",
+        "coinbase-receiver-slot-sort",
         // canonicity
         "canonicity-length",
         "canonicity-slot",
@@ -89,11 +101,13 @@ impl IndexerStore {
         // internal commands
         "internal-commands",
         "internal-commands-global-slot",
-        // events
+        // indexer store events
         "events",
-        // staged & staking ledgers
+        // staged ledgers
         "ledgers",
-        "block-ledger-diffs",
+        "blocks-ledger-diff",
+        "blocks-staged-ledger-hash",
+        // staking ledgers & delegations
         "staking-ledgers",
         "staking-delegations",
         "staking-ledger-genesis-hash",
@@ -177,6 +191,19 @@ impl IndexerStore {
     }
 }
 
+impl<T> std::fmt::Debug for DBUpdate<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "apply:   {:#?}\nunapply: {:#?}",
+            self.apply, self.unapply
+        )
+    }
+}
+
 /// For [UserCommandStore]
 
 const COMMAND_KEY_PREFIX: &str = "user-";
@@ -186,10 +213,10 @@ fn user_command_db_key_pk(pk: &str, n: u32) -> Vec<u8> {
     format!("{COMMAND_KEY_PREFIX}{pk}{n}").into_bytes()
 }
 
-/// Extracts state hash from the iterator key.
+/// Extracts state hash suffix from the iterator key.
 /// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
 pub fn block_state_hash_from_key(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[4..])
+    BlockHash::from_bytes(&key[key.len() - BlockHash::LEN..])
 }
 
 /// Extracts u32 BE prefix from the iterator key.
@@ -262,6 +289,7 @@ pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
     bytes
 }
 
+/// Parse the first [PublicKey::LEN]
 pub fn pk_of_key(key: &[u8]) -> PublicKey {
     PublicKey::from_bytes(&key[..PublicKey::LEN]).expect("public key")
 }
