@@ -142,9 +142,11 @@ pub struct ServerArgs {
     network: Network,
 
     /// Domain socket path
+    #[arg(num_args = 1)]
     socket: Option<PathBuf>,
 
     /// Indexer process ID
+    #[arg(last = true)]
     pid: Option<u32>,
 }
 

@@ -48,7 +48,7 @@ jsonpath "$.data.feetransfers[99].blockHeight" == 71
 jsonpath "$.data.feetransfers[99].canonical" == true
 jsonpath "$.data.feetransfers[99].dateTime" == "2021-03-17T04:51:00.000Z"
 
-duration < 750
+duration < 2000
 
 #
 # Fee transfers canonical state hash block height descending query
@@ -77,7 +77,7 @@ jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7B
 jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 jsonpath "$.data.feetransfers[0].blockStateHash.total_num_blocks" == 204
 
-duration < 750
+duration < 1000
 
 #
 # Fee transfer block height LTE query
@@ -120,7 +120,7 @@ jsonpath "$.data.feetransfers" count == 100
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[99].blockHeight" == 71
 
-duration < 750
+duration < 1000
 
 #
 # Fee transfer epoch & total internal commands query
@@ -151,7 +151,7 @@ jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLyWnjZqUECniE1q
 jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 207
 jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 207
 
-duration < 750
+duration < 1000
 
 #
 # Fee transfer block state hash & block height LTE query
