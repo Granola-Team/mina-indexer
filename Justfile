@@ -32,7 +32,7 @@ prereqs:
 
 build:
   echo "--- Performing build"
-  cd rust && cargo build --release
+  cd rust && time cargo build --release
 
 clean:
   cd rust && cargo clean
@@ -45,42 +45,47 @@ test: lint test-unit test-regression
 
 test-unit:
   echo "--- Performing unit tests"
-  cd rust && cargo nextest run --release
+  cd rust && time cargo nextest run --release
 
 test-unit-mina-rs:
   echo "--- Performing long-running mina-rs unit tests"
-  cd rust && cargo nextest run --release --features mina_rs
+  cd rust && time cargo nextest run --release --features mina_rs
 
 test-regression subtest='': build
   echo "--- Performing regressions test(s)"
-  ./tests/regression {{subtest}}
+  time ./tests/regression {{subtest}}
 
 test-release: build
   echo "--- Performing test_release"
-  ./tests/regression test_release
+  time ./tests/regression test_release
 
 disallow-unused-cargo-deps:
-  cd rust && cargo machete Cargo.toml
+  echo "--- Auditing for unused Cargo dependencies"
+  cd rust && time cargo machete Cargo.toml
 
 audit:
-  cd rust && cargo audit
+  echo "--- Performing Cargo audit"
+  cd rust && time cargo audit
 
-lint: && audit disallow-unused-cargo-deps
-  echo "--- Performing linting"
+shellcheck:
+  echo "--- Linting shell scripts"
   shellcheck tests/regression
   shellcheck tests/stage-*
   shellcheck ops/productionize
   shellcheck ops/ingest-all
-  cd rust && cargo {{nightly_if_required}} fmt --all --check
-  cd rust && cargo clippy --all-targets --all-features -- -D warnings
+
+lint: shellcheck && audit disallow-unused-cargo-deps
+  echo "--- Performing linting"
+  cd rust && time cargo {{nightly_if_required}} fmt --all --check
+  cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 # Build OCI images.
 build-image:
   echo "--- Building {{IMAGE}}"
   docker --version
-  nix build .#dockerImage
-  docker load < ./result
+  time nix build .#dockerImage
+  time docker load < ./result
   docker run --rm -it {{IMAGE}} \
     mina-indexer server start --help
   docker image rm {{IMAGE}}
@@ -103,7 +108,7 @@ delete-database:
 # Run a server as if in production.
 productionize: build
   echo "--- Productionizing"
-  ./ops/productionize
+  time ./ops/productionize
 
 # Run the 1st tier of tests.
 tier1-test: prereqs test
@@ -111,8 +116,8 @@ tier1-test: prereqs test
 # Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
 tier2-test: build test-unit-mina-rs build-image
   echo "--- Performing test_many_blocks regression test"
-  tests/regression test_many_blocks
+  time tests/regression test_many_blocks
   echo "--- Performing Nix build"
-  nix build
+  time nix build
   echo "--- Ingesting all blocks..."
-  ops/ingest-all
+  time ops/ingest-all
