@@ -78,7 +78,7 @@ impl FeetransferWithMeta {
                 .unwrap_or_default();
             Ok(Some(Block {
                 block: BlockWithoutCanonicity::new(
-                    block,
+                    &block,
                     self.canonical,
                     epoch_num_user_commands,
                     total_num_user_commands,
