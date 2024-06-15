@@ -67,7 +67,7 @@ serde_stacker = "0.1.11"
 
 [dependencies.tokio]
 version = "1.36.0"
-features = ["full"]
+features = ["macros", "rt-multi-thread"]
 default-features = false
 
 [profile.release]
