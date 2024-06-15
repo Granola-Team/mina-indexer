@@ -9,7 +9,7 @@ SRC="$(git rev-parse --show-toplevel)"
 
 # Confirm that the binary is present and working.
 #
-BIN="$SRC"/rust/target/release/mina-indexer
+BIN="$SRC"/result/bin/mina-indexer
 "$BIN" --version
 
 # Differentiate some files/directories using the Git revision.
