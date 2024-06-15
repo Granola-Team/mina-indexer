@@ -88,6 +88,10 @@ pub struct IndexerState {
     /// Threshold for updating the canonical root and db ledger
     pub canonical_update_threshold: u32,
 
+    /// Threshold confirmations required to prune a canoncial block from the
+    /// witness tree
+    pub canonical_threshold: u32,
+
     /// Number of blocks added to the witness tree
     pub blocks_processed: u32,
 
@@ -139,6 +143,7 @@ pub struct IndexerStateConfig {
     pub indexer_store: Arc<IndexerStore>,
     pub transition_frontier_length: u32,
     pub prune_interval: u32,
+    pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
@@ -149,12 +154,14 @@ impl IndexerStateConfig {
         genesis_ledger: GenesisLedger,
         version: IndexerVersion,
         indexer_store: Arc<IndexerStore>,
+        canonical_threshold: u32,
         transition_frontier_length: u32,
     ) -> Self {
         IndexerStateConfig {
             version,
             genesis_ledger,
             indexer_store,
+            canonical_threshold,
             transition_frontier_length,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
@@ -170,12 +177,14 @@ impl IndexerState {
         genesis_ledger: GenesisLedger,
         version: IndexerVersion,
         indexer_store: Arc<IndexerStore>,
+        canonical_threshold: u32,
         transition_frontier_length: u32,
     ) -> anyhow::Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
             version,
             indexer_store,
+            canonical_threshold,
             transition_frontier_length,
         ))
     }
@@ -187,16 +196,16 @@ impl IndexerState {
             .indexer_store
             .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
-        // add genesis block and ledger to indexer store
-        config.indexer_store.add_genesis_ledger(
-            &MAINNET_GENESIS_PREV_STATE_HASH.into(),
-            config.genesis_ledger.clone().into(),
-        )?;
-        info!("Genesis ledger added to indexer store");
-
         let genesis_block = GenesisBlock::new()?;
         let genesis_bytes = genesis_block.1;
         let genesis_block = genesis_block.0;
+
+        // add genesis block and ledger to indexer store
+        config.indexer_store.add_genesis_ledger(
+            &genesis_block.previous_state_hash(),
+            config.genesis_ledger.clone().into(),
+        )?;
+        info!("Genesis ledger added to indexer store");
 
         config.indexer_store.add_block(&genesis_block)?;
         info!("Genesis block added to indexer store");
@@ -204,22 +213,21 @@ impl IndexerState {
         // update genesis best block
         config
             .indexer_store
-            .set_best_block(&MAINNET_GENESIS_HASH.into())?;
+            .set_best_block(&genesis_block.state_hash())?;
 
         // update genesis canonicity
-        config
-            .indexer_store
-            .set_max_canonical_blockchain_length(1)?;
         config.indexer_store.add_canonical_block(
             1,
             0,
-            &config.genesis_hash,
-            &config.genesis_hash,
-            Some(&MAINNET_GENESIS_PREV_STATE_HASH.into()),
+            &genesis_block.state_hash(),
+            &genesis_block.state_hash(),
+            Some(&genesis_block.previous_state_hash()),
         )?;
 
-        let root_branch =
-            Branch::new_genesis(config.genesis_hash, MAINNET_GENESIS_PREV_STATE_HASH.into())?;
+        let root_branch = Branch::new_genesis(
+            genesis_block.state_hash(),
+            genesis_block.previous_state_hash(),
+        )?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -242,6 +250,7 @@ impl IndexerState {
             indexer_store: Some(config.indexer_store),
             transition_frontier_length: config.transition_frontier_length,
             prune_interval: config.prune_interval,
+            canonical_threshold: config.canonical_threshold,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 1, // genesis block
             bytes_processed: genesis_bytes,
@@ -273,6 +282,7 @@ impl IndexerState {
             indexer_store: Some(config.indexer_store),
             transition_frontier_length: config.transition_frontier_length,
             prune_interval: config.prune_interval,
+            canonical_threshold: config.canonical_threshold,
             canonical_update_threshold: config.canonical_update_threshold,
             blocks_processed: 0, // no genesis block included
             bytes_processed: 0,
@@ -330,6 +340,7 @@ impl IndexerState {
             transition_frontier_length: transition_frontier_length
                 .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
+            canonical_threshold: MAINNET_CANONICAL_THRESHOLD,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             blocks_processed: 1, // root block
             bytes_processed: root_block_bytes,
@@ -386,7 +397,6 @@ impl IndexerState {
                         &block.genesis_state_hash(),
                         None,
                     )?;
-                    indexer_store.set_max_canonical_blockchain_length(block.blockchain_length())?;
 
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
@@ -508,7 +518,7 @@ impl IndexerState {
                     return Ok(true);
                 }
             } else {
-                debug!("Block not added: {:?}", db_event);
+                debug!("Block not added: {db_event:?}");
                 return Ok(false);
             };
 
@@ -888,20 +898,21 @@ impl IndexerState {
                     info!("Parsing staking ledgers in {}", ledgers_dir.display());
                 }
             }
-            Err(e) => error!("Error reading staking ledgers: {}", e),
+            Err(e) => error!("Error reading staking ledgers: {e}"),
         }
 
-        // parse staking ledgers in ledgers_dir
+        // parse staking ledgers in ledgers_dir if not it db already
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            while let Ok(Some(staking_ledger)) = ledger_parser.next_ledger() {
+            while let Ok(Some(staking_ledger)) =
+                ledger_parser.next_ledger(self.indexer_store.as_ref())
+            {
+                let summary = staking_ledger.summary();
                 self.staking_ledgers
                     .insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
-
-                let summary = staking_ledger.summary();
                 indexer_store
                     .add_staking_ledger(staking_ledger, &self.version.genesis_state_hash)?;
-                info!("Added staking ledger {}", summary);
+                info!("Added staking ledger {summary}");
             }
         }
         Ok(())
@@ -965,10 +976,12 @@ impl IndexerState {
                 // invariant
                 assert_eq!(
                     Some(*canonical_length),
-                    indexer_store.get_max_canonical_blockchain_length()?
+                    indexer_store
+                        .get_best_block_height()?
+                        .map(|height| 1.max(height.saturating_sub(self.canonical_threshold)))
                 );
 
-                // root branch root is canonical root
+                // root branch root is last new canonical block
                 // add all successive NewBlock's to the witness tree
                 if let Some(block) = indexer_store.get_block(state_hash)? {
                     self.root_branch = Branch::new(&block)?;
@@ -1172,8 +1185,8 @@ impl IndexerState {
                     blockchain_length,
                 }) => {
                     let indexer_store = self.indexer_store_or_panic();
-                    let block_summary = format!("(length {}): {}", blockchain_length, state_hash);
-                    info!("Replay new canonical block {}", block_summary);
+                    let block_summary = format!("(length {blockchain_length}): {state_hash}");
+                    info!("Replay new canonical block {block_summary}");
 
                     // check canonicity & block store
                     if let Some(canonical_hash) =
@@ -1185,9 +1198,9 @@ impl IndexerState {
                             assert_eq!(block.blockchain_length(), *blockchain_length);
                             return Ok(());
                         }
-                        panic!("Fatal: block not in store {}", block_summary);
+                        panic!("Fatal: block not in store {block_summary}");
                     }
-                    panic!("Fatal: canonical block not in store {}", block_summary);
+                    panic!("Fatal: canonical block not in store {block_summary}");
                 }
             },
             IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip {
