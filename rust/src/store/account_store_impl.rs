@@ -4,17 +4,14 @@ use crate::{
     canonicity::store::CanonicityStore,
     constants::*,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
-    store::{
-        account::{AccountStore, AccountUpdate},
-        u64_prefix_key, IndexerStore,
-    },
+    store::{account::AccountStore, u64_prefix_key, DBUpdate, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 impl AccountStore for IndexerStore {
-    fn common_ancestor_account_balance_updates(
+    fn reorg_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
@@ -74,7 +71,7 @@ impl AccountStore for IndexerStore {
         // balance updates don't require this reverse, but other updates may
         apply.reverse();
         Ok((
-            <AccountUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
+            <DBUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
             coinbase_receivers,
         ))
     }
@@ -99,7 +96,7 @@ impl AccountStore for IndexerStore {
         trace!("Updating account balances {state_hash}");
 
         // update balances
-        for (pk, amount) in <AccountUpdate<PaymentDiff>>::balance_updates(updates) {
+        for (pk, amount) in <DBUpdate<PaymentDiff>>::balance_updates(updates) {
             if amount != 0 {
                 let pk = pk.into();
                 let balance = self.get_account_balance(&pk)?.unwrap_or(0);

@@ -51,7 +51,20 @@ pub trait LedgerStore {
         ledger_diff: LedgerDiff,
     ) -> anyhow::Result<()>;
 
+    /// Get block ledger diff
     fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
+
+    /// Index the block's ledger diff
+    fn set_block_staged_ledger_hash(
+        &self,
+        state_hash: &BlockHash,
+        staged_ledger_hash: &LedgerHash,
+    ) -> anyhow::Result<()>;
+
+    fn get_block_staged_ledger_hash(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<LedgerHash>>;
 
     /////////////////////
     // Staking ledgers //

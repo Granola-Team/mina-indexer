@@ -1,3 +1,4 @@
+use super::DBUpdate;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{internal::InternalCommand, Command, Payment},
@@ -7,7 +8,6 @@ use crate::{
         public_key::PublicKey,
     },
 };
-use serde::{Deserialize, Serialize};
 use speedb::{DBIterator, IteratorMode};
 use std::collections::{HashMap, HashSet};
 
@@ -17,7 +17,7 @@ pub trait AccountStore {
 
     /// Generate account balance updates when the best tip changes.
     /// Return with set of coinbase receivers.
-    fn common_ancestor_account_balance_updates(
+    fn reorg_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
@@ -60,14 +60,7 @@ pub trait AccountStore {
     fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 }
 
-/// Only used for sorting the best ledger
-#[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AccountUpdate<T> {
-    pub apply: Vec<T>,
-    pub unapply: Vec<T>,
-}
-
-impl AccountUpdate<PaymentDiff> {
+impl DBUpdate<PaymentDiff> {
     pub fn new(apply: Vec<PaymentDiff>, unapply: Vec<PaymentDiff>) -> Self {
         Self { apply, unapply }
     }
@@ -168,18 +161,5 @@ impl AccountUpdate<PaymentDiff> {
                 .collect(),
         ]
         .concat()
-    }
-}
-
-impl<T> std::fmt::Debug for AccountUpdate<T>
-where
-    T: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "apply:   {:#?}\nunapply: {:#?}",
-            self.apply, self.unapply
-        )
     }
 }

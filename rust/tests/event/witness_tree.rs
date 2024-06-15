@@ -1,6 +1,7 @@
 use crate::helpers::setup_new_db_dir;
 use mina_indexer::{
     block::parser::BlockParser,
+    constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
@@ -22,6 +23,7 @@ async fn test() {
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
+        MAINNET_CANONICAL_THRESHOLD,
         10,
     )
     .unwrap();
