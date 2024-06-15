@@ -1,12 +1,9 @@
-use crate::{block::BlockHash, canonicity::Canonicity};
+use crate::{
+    block::BlockHash,
+    canonicity::{Canonicity, CanonicityUpdate},
+};
 
 pub trait CanonicityStore {
-    /// Get the length of the canonical chain
-    fn get_max_canonical_blockchain_length(&self) -> anyhow::Result<Option<u32>>;
-
-    /// Set the length of the canonical chain
-    fn set_max_canonical_blockchain_length(&self, height: u32) -> anyhow::Result<()>;
-
     /// Add the canonical block's height, global slot, and state hash
     fn add_canonical_block(
         &self,
@@ -16,6 +13,16 @@ pub trait CanonicityStore {
         genesis_state_hash: &BlockHash,
         genesis_prev_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<()>;
+
+    /// Update block canonicities
+    fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()>;
+
+    /// Generate canonicity updates when the best tip changes
+    fn reorg_canonicity_updates(
+        &self,
+        old_best_tip: &BlockHash,
+        new_best_tip: &BlockHash,
+    ) -> anyhow::Result<CanonicityUpdate>;
 
     /// Get the state hash of the canonical block at the given height
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>>;
