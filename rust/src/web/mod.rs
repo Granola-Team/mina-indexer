@@ -32,7 +32,6 @@ pub async fn start_web_server<A: net::ToSocketAddrs>(
 
     HttpServer::new(move || {
         App::new()
-            .wrap(middleware::Compress::default())
             .app_data(Data::new(state.clone()))
             .app_data(Data::new(locked.clone()))
             .service(blocks::get_blocks)
