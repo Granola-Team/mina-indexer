@@ -61,7 +61,8 @@ test-unit:
   echo "--- Performing unit tests"
   cd rust && cargo nextest run
 
-check: lint test-unit
+check:
+  cd rust && cargo check
 
 test: lint test-unit test-regression
 
