@@ -20,11 +20,11 @@ mina_rs = []
 anyhow = "1.0.81"
 # https://github.com/bincode-org/bincode/issues/674
 bincode = "2.0.0-rc.3"
-derive_more = "0.99"
+derive_more = { version = "0.99", default-features = false }
 serde = { version = "1.0.197", default-features = false }
 serde_json = { version = "1.0.114", default-features = false, features = ["unbounded_depth"] }
 smart-default = "0.7.1"
-clap = { version = "4.5.2", features = ["derive", "string"] }
+clap = { version = "4.5.2", default-features = false, features = ["help", "usage", "std", "derive", "string"] }
 thiserror = "1.0.58"
 glob = "0.3.1"
 mina_serialization_proc_macros = { path = "mina_serialization_macros/proc_macros" }
@@ -38,14 +38,14 @@ byteorder = "1.5.0"
 num = "0.4.1"
 speedb = { version = "0.0.5", default-features = false, features = ["zstd"] }
 id_tree = "1.8.0"
-time = { version = "0.3.34", features = ["serde-human-readable"] }
+time = { version = "0.3.34", default-features = false }
 log = "0.4.21"
 stderrlog = "0.6.0"
 bytesize = "1.2.0"
-rust_decimal = { version = "1.34.3", features = ["serde"] }
+rust_decimal = { version = "1.34.3", default-features = false }
 rust_decimal_macros = "1.34.2"
+blake2 = { version = "0.10.6", default-features = false }
 bs58 = { version = "0.5.0", default-features = false, features = ["check", "std"]}
-blake2 = "0.10.6"
 tempfile = "3.10.1"
 actix-web = { version = "4.5.1", default-features = false , features = ["macros"] }
 actix-cors = "0.7.0"
@@ -67,9 +67,13 @@ serde_stacker = "0.1.11"
 
 [dependencies.tokio]
 version = "1.36.0"
-features = ["full"]
+features = ["macros", "rt-multi-thread"]
 default-features = false
 
 [profile.release]
 lto = "fat"
 incremental = true
+
+[profile.dev]
+debug = 0
+# strip = "debuginfo"

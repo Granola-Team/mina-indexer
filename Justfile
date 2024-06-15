@@ -30,42 +30,12 @@ prereqs:
   hurl --version
   shellcheck --version
 
-build:
-  echo "--- Performing build"
-  cd rust && time cargo build --release
-
-clean:
-  cd rust && cargo clean
-  rm -rf result database mina-indexer.sock
-
-format:
-  cd rust && cargo {{nightly_if_required}} fmt --all
-
-test: lint test-unit test-regression
-
-test-unit:
-  echo "--- Performing unit tests"
-  cd rust && time cargo nextest run --release
-
-test-unit-mina-rs:
-  echo "--- Performing long-running mina-rs unit tests"
-  cd rust && time cargo nextest run --release --features mina_rs
-
-test-regression subtest='': build
-  echo "--- Performing regressions test(s)"
-  time ./tests/regression {{subtest}}
-
-test-release: build
-  echo "--- Performing test_release"
-  time ./tests/regression test_release
-
-disallow-unused-cargo-deps:
-  echo "--- Auditing for unused Cargo dependencies"
-  cd rust && time cargo machete Cargo.toml
-
 audit:
   echo "--- Performing Cargo audit"
   cd rust && time cargo audit
+
+disallow-unused-cargo-deps:
+  cd rust && cargo machete Cargo.toml
 
 shellcheck:
   echo "--- Linting shell scripts"
@@ -80,6 +50,35 @@ lint: shellcheck && audit disallow-unused-cargo-deps
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
+build:
+  echo "--- Performing build"
+  cd rust && time cargo build
+
+clean:
+  cd rust && cargo clean
+  rm -rf result database mina-indexer.sock
+
+format:
+  cd rust && cargo {{nightly_if_required}} fmt --all
+
+test-unit:
+  echo "--- Performing unit tests"
+  cd rust && time cargo nextest run
+
+# Perform a fast verification of whether the source compiles.
+check:
+  cd rust && time cargo check
+
+test: lint test-unit test-regression
+
+test-unit-mina-rs:
+  echo "--- Performing long-running mina-rs unit tests"
+  cd rust && time cargo nextest run --features mina_rs
+
+test-regression subtest='': build
+  echo "--- Performing regressions test(s)"
+  time ./tests/regression {{subtest}}
+
 # Build OCI images.
 build-image:
   echo "--- Building {{IMAGE}}"
@@ -93,7 +92,7 @@ build-image:
 # Start a server in the current directory.
 start-server: build
   RUST_BACKTRACE=1 \
-  ./rust/target/release/mina-indexer \
+  ./rust/target/debug/mina-indexer \
     --socket ./mina-indexer.sock \
     server start \
       --log-level TRACE \
@@ -117,6 +116,8 @@ tier1-test: prereqs test
 tier2-test: build test-unit-mina-rs build-image
   echo "--- Performing test_many_blocks regression test"
   time tests/regression test_many_blocks
+  echo "--- Performing test_release"
+  time tests/regression test_release
   echo "--- Performing Nix build"
   time nix build
   echo "--- Ingesting all blocks..."
