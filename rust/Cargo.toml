@@ -47,10 +47,10 @@ stderrlog = "0.6.0"
 bytesize = "1.2.0"
 rust_decimal = { version = "1.34.3", features = ["serde"] }
 rust_decimal_macros = "1.34.2"
-bs58 = { version = "0.5.0", features = ["check"] }
+bs58 = { version = "0.5.0", default-features = false, features = ["std", "check"] }
 blake2 = "0.10.6"
 tempfile = "3.10.1"
-actix-web = { version = "4.5.1", default_features = false, features = ["macros"] }
+actix-web = { version = "4.5.1", default-features = false, features = ["macros"] }
 actix-cors = "0.7.0"
 async-graphql = "7.0.3"
 async-graphql-actix-web = "7.0.3"
@@ -71,6 +71,7 @@ serde_stacker = "0.1.11"
 [dependencies.tokio]
 version = "1.36.0"
 features = ["full"]
+default-features = false
 
 [profile.release]
 lto = "fat"
