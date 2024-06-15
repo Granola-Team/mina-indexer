@@ -31,7 +31,8 @@ prereqs:
   shellcheck --version
 
 audit:
-  cd rust && cargo audit
+  echo "--- Performing Cargo audit"
+  cd rust && time cargo audit
 
 disallow-unused-cargo-deps:
   cd rust && cargo machete Cargo.toml
@@ -77,14 +78,6 @@ test-unit-mina-rs:
 test-regression subtest='': build
   echo "--- Performing regressions test(s)"
   time ./tests/regression {{subtest}}
-
-disallow-unused-cargo-deps:
-  echo "--- Auditing for unused Cargo dependencies"
-  cd rust && time cargo machete Cargo.toml
-
-audit:
-  echo "--- Performing Cargo audit"
-  cd rust && time cargo audit
 
 # Build OCI images.
 build-image:
