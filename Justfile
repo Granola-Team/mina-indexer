@@ -86,9 +86,9 @@ build-image:
   docker --version
   time nix build .#dockerImage
   time docker load < ./result
-  docker run --rm -it {{IMAGE}} \
-    mina-indexer server start --help
+  docker run --rm -it {{IMAGE}} mina-indexer server start --help
   docker image rm {{IMAGE}}
+  rm result
 
 # Start a server in the current directory.
 start-server:
@@ -115,7 +115,7 @@ productionize: nix-build
 tier1: tier1-prereqs check lint test-unit
 
 # Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
-tier2: test-regression tier2-prereqs nix-build test-unit-mina-rs build-image
+tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   echo "--- Performing test_many_blocks regression test"
   time tests/regression test_many_blocks
   echo "--- Performing test_release"
