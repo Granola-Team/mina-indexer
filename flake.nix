@@ -122,7 +122,7 @@
           dockerImage = pkgs.dockerTools.buildImage {
             name = "mina-indexer";
             created = "now";
-            tag = gitCommitHash;
+            tag = builtins.substring 0 8 (self.rev or "dev");
             copyToRoot = pkgs.buildEnv {
               paths = with pkgs; [ mina-indexer openssl zstd bash self ];
               name = "mina-indexer-root";
