@@ -29,16 +29,10 @@
 
         buildDependencies = with pkgs;
           [
-            cargo-machete
             cargo-nextest
-            check-jsonschema
             clang
-            curl
-            hurl
-            jq
             libclang.lib
             pkg-config
-            procps # For pwait
             rustPlatform.bindgenHook
           ] ++ runtimeDependencies ++ lib.optionals stdenv.isDarwin [
             frameworks.Security
@@ -52,12 +46,18 @@
         developmentDependencies = with pkgs;
           [
             cargo-audit
+            cargo-machete
+            curl
+            check-jsonschema
             git # Needed but not declared by Nix's 'stdenv' build.
             google-cloud-sdk # Required only to use O1's bucket.
+            hurl
+            jq
             just
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
+            procps # For pwait
             rclone
             ruby
             rust
@@ -87,7 +87,8 @@
             src = lib.cleanSourceWith {
               src = lib.cleanSource ./.;
               filter = path: type:
-                (path != ".direnv") && (path != "rust/target");
+                (path != ".direnv") && (path != "rust/target")
+                && (path != "ops") && (path != "Justfile") && (path != "tests");
             };
 
             cargoLock = { lockFile = ./rust/Cargo.lock; };
@@ -101,8 +102,6 @@
 
             postPatch = ''
               ln -s "${./rust/Cargo.lock}" Cargo.lock
-              patchShebangs tests/regression
-              patchShebangs tests/download_blocks
             '';
             preBuild = ''
               export GIT_COMMIT_HASH=${gitCommitHash}
@@ -111,14 +110,11 @@
             doCheck = true;
             checkPhase = ''
               set -ex
-              cargo fmt --all --check
               cargo clippy --all-targets --all-features -- -D warnings
-              cargo machete Cargo.toml
               cargo nextest run --release
             '';
             preInstall = ''
               mkdir -p $out/var/log/mina-indexer
-              mkdir -p $out/var/lib/mina-indexer
             '';
           };
           default = mina-indexer;
