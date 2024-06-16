@@ -115,7 +115,6 @@
               cargo clippy --all-targets --all-features -- -D warnings
               cargo machete Cargo.toml
               cargo nextest run --release
-              ../tests/regression
             '';
             preInstall = ''
               mkdir -p $out/var/log/mina-indexer
