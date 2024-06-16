@@ -15,4 +15,20 @@ steps:
     mina-logs: true
   env:
     NO_COLOR: 1
-  command: "nix develop --command just tier2-test"
+  command: "nix develop --command just tier2"
+
+# Only a 'main' branch that has succeeded on the above will be deployed.
+#
+- label: "Deploy to Production"
+  if: build.branch == "main"
+  key: deploy
+  depends_on: "tier2"
+  concurrency: 1
+  concurrency_group: "prod"
+  timeout_in_minutes: 2880
+  agents:
+    nix: true
+    production: true
+  env:
+    NO_COLOR: 1
+  command: "nix develop --command just productionize"

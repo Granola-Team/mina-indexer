@@ -18,17 +18,20 @@ default:
   @just --list --justfile {{justfile()}}
 
 # Check for presence of dev dependencies.
-prereqs:
-  echo "--- Checking prereqs"
+tier1-prereqs:
+  echo "--- Checking for tier-1 prereqs"
   cd rust && cargo --version
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
   cd rust && cargo clippy --version
   cd rust && cargo machete --help 2>&1 >/dev/null
+  shellcheck --version
+
+tier2-prereqs: tier1-prereqs
+  echo "--- Checking for tier-2 prereqs"
   jq --version
   check-jsonschema --version
   hurl --version
-  shellcheck --version
 
 audit:
   echo "--- Performing Cargo audit"
@@ -69,8 +72,6 @@ test-unit:
 check:
   cd rust && time cargo check
 
-test: lint test-unit test-regression
-
 test-unit-mina-rs:
   echo "--- Performing long-running mina-rs unit tests"
   cd rust && time cargo nextest run --features mina_rs
@@ -110,15 +111,15 @@ productionize: build
   time ./ops/productionize
 
 # Run the 1st tier of tests.
-tier1-test: prereqs test
+tier1: tier1-prereqs check lint test-unit
 
-# Run the 2nd tier of tests, ingesting blocks in /mnt/mina-logs...
-tier2-test: build test-unit-mina-rs build-image
+# Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
+tier2: tier2-prereqs test-regression test-unit-mina-rs
+  echo "--- Performing Nix build"
+  time nix build
   echo "--- Performing test_many_blocks regression test"
   time tests/regression test_many_blocks
   echo "--- Performing test_release"
   time tests/regression test_release
-  echo "--- Performing Nix build"
-  time nix build
   echo "--- Ingesting all blocks..."
   time ops/ingest-all
