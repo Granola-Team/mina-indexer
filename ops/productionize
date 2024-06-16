@@ -9,7 +9,7 @@ SRC="$(git rev-parse --show-toplevel)"
 
 # Confirm that the binary is present and working.
 #
-BIN="$SRC"/rust/target/release/mina-indexer
+BIN="$SRC"/result/bin/mina-indexer
 "$BIN" --version
 
 # Differentiate some files/directories using the Git revision.
@@ -89,9 +89,7 @@ wait "$PID"
 #
 SOCKET=./mina-indexer.sock
 if [ -e "$SOCKET" ]; then
-    if "$SRC"/rust/target/release/mina-indexer \
-           --socket "$SOCKET" \
-           shutdown
+    if "$BIN" --socket "$SOCKET" shutdown
     then
         :
     fi
@@ -115,7 +113,7 @@ setsid \
   sh -c \
     '"$@" 0< /dev/null 1>> '"$LOGS"'/out 2>> '"$LOGS"'/err &' \
     -- \
-    "$SRC"/rust/target/release/mina-indexer \
+    "$BIN" \
       --socket "$SOCKET" \
       server start \
         --log-level TRACE \

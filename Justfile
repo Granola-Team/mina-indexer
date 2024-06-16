@@ -53,9 +53,9 @@ lint: shellcheck && audit disallow-unused-cargo-deps
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
-build:
-  echo "--- Performing build"
-  cd rust && time cargo build
+nix-build:
+  echo "--- Performing Nix build"
+  nix build
 
 clean:
   cd rust && cargo clean
@@ -76,7 +76,7 @@ test-unit-mina-rs:
   echo "--- Performing long-running mina-rs unit tests"
   cd rust && time cargo nextest run --features mina_rs
 
-test-regression subtest='': build
+test-regression subtest='': nix-build
   echo "--- Performing regressions test(s)"
   time ./tests/regression {{subtest}}
 
@@ -91,7 +91,8 @@ build-image:
   docker image rm {{IMAGE}}
 
 # Start a server in the current directory.
-start-server: build
+start-server:
+  cd rust && cargo build
   RUST_BACKTRACE=1 \
   ./rust/target/debug/mina-indexer \
     --socket ./mina-indexer.sock \
@@ -106,7 +107,7 @@ delete-database:
   rm -fr ./database
 
 # Run a server as if in production.
-productionize: build
+productionize: nix-build
   echo "--- Productionizing"
   time ./ops/productionize
 
@@ -114,9 +115,7 @@ productionize: build
 tier1: tier1-prereqs check lint test-unit
 
 # Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
-tier2: tier2-prereqs test-regression test-unit-mina-rs
-  echo "--- Performing Nix build"
-  time nix build
+tier2: test-regression tier2-prereqs nix-build test-unit-mina-rs build-image
   echo "--- Performing test_many_blocks regression test"
   time tests/regression test_many_blocks
   echo "--- Performing test_release"
