@@ -14,6 +14,7 @@
     ] (system:
       let
         overlays = [ (import rust-overlay) ];
+
         pkgs = import nixpkgs { inherit system overlays; };
 
         rust = pkgs.rust-bin.fromRustupToolchainFile ./rust/rust-toolchain.toml;
@@ -65,6 +66,7 @@
           ] ++ buildDependencies;
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
+
       in with pkgs; {
         packages = flake-utils.lib.flattenTree rec {
           mina-indexer = rustPlatform.buildRustPackage rec {
@@ -72,16 +74,15 @@
               description = ''
                 The Mina Indexer is a re-imagined version of the software collectively called the "Mina archive node."
               '';
-              longDescription = ''
-                The Mina Indexer (indexer) is a re-imagined version of the software collectively called the "Mina archive node." It uses precomputed blocks to reconstitute the historical state of the Mina blockchain. The redesign focuses on improving ease of use and accessibility for developers to interact with the Mina blockchain.
-              '';
               homepage = "https://github.com/Granola-Team/mina-indexer";
               license = licenses.asl20;
               mainProgram = "mina-indexer";
               platforms = platforms.all;
               maintainers = [ ];
             };
+
             pname = cargo-toml.package.name;
+
             version = cargo-toml.package.version;
 
             src = lib.cleanSourceWith {
@@ -94,15 +95,15 @@
             cargoLock = { lockFile = ./rust/Cargo.lock; };
 
             nativeBuildInputs = buildDependencies;
+
             buildInputs = runtimeDependencies;
 
-            env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
+            # env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
 
+            # This is equivalent to `git rev-parse --short=8 HEAD`
             gitCommitHash = builtins.substring 0 8 (self.rev or "dev");
 
-            postPatch = ''
-              ln -s "${./rust/Cargo.lock}" Cargo.lock
-            '';
+            postPatch = ''ln -s "${./rust/Cargo.lock}" Cargo.lock'';
             preBuild = ''
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
@@ -113,32 +114,28 @@
               cargo clippy --all-targets --all-features -- -D warnings
               cargo nextest run --release
             '';
-            preInstall = ''
-              mkdir -p $out/var/log/mina-indexer
-            '';
+            preInstall = "mkdir -p $out/var/log/mina-indexer";
           };
+
           default = mina-indexer;
+
           dockerImage = pkgs.dockerTools.buildImage {
             name = "mina-indexer";
             created = "now";
-            # This is equivalent to `git rev-parse --short=8 HEAD`
-            tag = builtins.substring 0 8 (self.rev or "dev");
+            tag = gitCommitHash;
             copyToRoot = pkgs.buildEnv {
               paths = with pkgs; [ mina-indexer openssl zstd bash self ];
               name = "mina-indexer-root";
               pathsToLink = [ "/bin" "/share" ];
             };
             config.Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
-            config.Env = [ "RELEASE=production" ];
           };
         };
 
         devShells.default = mkShell {
           env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
           buildInputs = developmentDependencies;
-          shellHook = ''
-            export TMPDIR=/var/tmp
-          '';
+          shellHook = "export TMPDIR=/var/tmp";
         };
       });
 }
