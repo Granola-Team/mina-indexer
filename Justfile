@@ -19,7 +19,7 @@ default:
 
 # Check for presence of dev dependencies.
 tier1-prereqs:
-  echo "--- Checking for tier-1 prereqs"
+  @echo "--- Checking for tier-1 prereqs"
   cd rust && cargo --version
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
@@ -28,33 +28,33 @@ tier1-prereqs:
   shellcheck --version
 
 tier2-prereqs: tier1-prereqs
-  echo "--- Checking for tier-2 prereqs"
+  @echo "--- Checking for tier-2 prereqs"
   jq --version
   check-jsonschema --version
   hurl --version
 
 audit:
-  echo "--- Performing Cargo audit"
+  @echo "--- Performing Cargo audit"
   cd rust && time cargo audit
 
 disallow-unused-cargo-deps:
   cd rust && cargo machete Cargo.toml
 
 shellcheck:
-  echo "--- Linting shell scripts"
+  @echo "--- Linting shell scripts"
   shellcheck tests/regression
   shellcheck tests/stage-*
   shellcheck ops/productionize
   shellcheck ops/ingest-all
 
 lint: shellcheck && audit disallow-unused-cargo-deps
-  echo "--- Performing linting"
+  @echo "--- Linting"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 nix-build:
-  echo "--- Performing Nix build"
+  @echo "--- Performing Nix build"
   nix build
 
 clean:
@@ -65,24 +65,25 @@ format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
 test-unit:
-  echo "--- Performing unit tests"
+  @echo "--- Performing unit tests"
   cd rust && time cargo nextest run
 
 # Perform a fast verification of whether the source compiles.
 check:
+  @echo "--- Performing cargo check"
   cd rust && time cargo check
 
 test-unit-mina-rs:
-  echo "--- Performing long-running mina-rs unit tests"
+  @echo "--- Performing long-running mina-rs unit tests"
   cd rust && time cargo nextest run --features mina_rs
 
 test-regression subtest='': nix-build
-  echo "--- Performing regressions test(s)"
+  @echo "--- Performing regressions test(s)"
   time ./tests/regression {{subtest}}
 
 # Build OCI images.
 build-image:
-  echo "--- Building {{IMAGE}}"
+  @echo "--- Building {{IMAGE}}"
   docker --version
   time nix build .#dockerImage
   time docker load < ./result
@@ -108,7 +109,7 @@ delete-database:
 
 # Run a server as if in production.
 productionize: nix-build
-  echo "--- Productionizing"
+  @echo "--- Productionizing"
   time ./ops/productionize
 
 # Run the 1st tier of tests.
@@ -116,9 +117,9 @@ tier1: tier1-prereqs check lint test-unit
 
 # Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
 tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
-  echo "--- Performing test_many_blocks regression test"
+  @echo "--- Performing test_many_blocks regression test"
   time tests/regression test_many_blocks
-  echo "--- Performing test_release"
+  @echo "--- Performing test_release"
   time tests/regression test_release
-  echo "--- Ingesting all blocks..."
+  @echo "--- Ingesting all blocks..."
   time ops/ingest-all
