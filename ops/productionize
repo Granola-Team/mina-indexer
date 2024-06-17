@@ -116,7 +116,7 @@ setsid \
     "$BIN" \
       --socket "$SOCKET" \
       server start \
-        --log-level TRACE \
+        --log-level DEBUG \
         --web-hostname 0.0.0.0 \
         --database-dir "$DB_DIR" \
         --blocks-dir ./blocks \
