@@ -7,7 +7,6 @@ use crate::{
     store::{account::AccountStore, username::UsernameStore},
     web::graphql::Timing,
 };
-use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use log::warn;
 use speedb::IteratorMode;
@@ -90,13 +89,7 @@ impl AccountQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<Account>> {
         let db = db(ctx);
-        let state_hash = match db.get_best_block_hash() {
-            Ok(Some(state_hash)) => state_hash,
-            Ok(None) | Err(_) => {
-                return Ok(vec![]);
-            }
-        };
-        let ledger = match db.get_ledger_state_hash(&state_hash, true) {
+        let best_ledger = match db.get_best_ledger() {
             Ok(Some(ledger)) => ledger,
             Ok(None) | Err(_) => {
                 return Ok(vec![]);
@@ -105,43 +98,46 @@ impl AccountQueryRoot {
 
         // public key query handler
         if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.clone()) {
-            return Ok(ledger
+            let pk: PublicKey = public_key.into();
+            return Ok(best_ledger
                 .accounts
-                .get(&public_key.into())
-                .filter(|acct| query.unwrap().matches(acct))
-                .map_or(vec![], |acct| {
-                    let pk = acct.public_key.clone();
+                .get(&pk)
+                .into_iter()
+                .filter_map(|acct| {
                     let username = match db.get_username(&pk) {
-                        Ok(None) | Err(_) => Some("Unknown".to_string()),
-                        Ok(username) => username.map(|u| u.0),
+                        Ok(None) | Err(_) => None,
+                        Ok(Some(username)) => Some(username.0),
                     };
-
-                    vec![Account::from((
-                        acct.clone(),
-                        db.get_block_production_pk_epoch_count(&pk, None)
-                            .expect("pk epoch block count"),
-                        db.get_block_production_pk_total_count(&pk)
-                            .expect("pk total block count"),
-                        db.get_snarks_pk_epoch_count(&pk, None)
-                            .expect("pk epoch snark count"),
-                        db.get_snarks_pk_total_count(&pk)
-                            .expect("pk total snark count"),
-                        db.get_user_commands_pk_epoch_count(&pk, None)
-                            .expect("pk epoch user command count"),
-                        db.get_user_commands_pk_total_count(&pk)
-                            .expect("pk total user command count"),
-                        db.get_internal_commands_pk_epoch_count(&pk, None)
-                            .expect("pk epoch internal command count"),
-                        db.get_internal_commands_pk_total_count(&pk)
-                            .expect("pk total internal command count"),
-                        username,
-                    ))]
-                }));
+                    if query.as_ref().unwrap().matches(acct, username.as_ref()) {
+                        Some(Account::from((
+                            acct.clone(),
+                            db.get_block_production_pk_epoch_count(&pk, None)
+                                .expect("pk epoch block count"),
+                            db.get_block_production_pk_total_count(&pk)
+                                .expect("pk total block count"),
+                            db.get_snarks_pk_epoch_count(&pk, None)
+                                .expect("pk epoch snark count"),
+                            db.get_snarks_pk_total_count(&pk)
+                                .expect("pk total snark count"),
+                            db.get_user_commands_pk_epoch_count(&pk, None)
+                                .expect("pk epoch user command count"),
+                            db.get_user_commands_pk_total_count(&pk)
+                                .expect("pk total user command count"),
+                            db.get_internal_commands_pk_epoch_count(&pk, None)
+                                .expect("pk epoch internal command count"),
+                            db.get_internal_commands_pk_total_count(&pk)
+                                .expect("pk total internal command count"),
+                            username,
+                        )))
+                    } else {
+                        None
+                    }
+                })
+                .collect());
         }
 
         // default query handler use balance-sorted accounts
         let mut accounts = Vec::new();
-        let best_ledger = db.get_best_ledger()?.expect("best ledger");
         let mode = match sort_by {
             Some(AccountSortByInput::BalanceAsc) => IteratorMode::Start,
             Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
@@ -149,24 +145,22 @@ impl AccountQueryRoot {
 
         for (key, _) in db.account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
-            let account = match best_ledger
-                .accounts
-                .get(&pk)
-                .with_context(|| format!("Failed to find public key in best ledger: {}", pk))
-            {
-                Ok(account) => account,
-                Err(_) => {
-                    warn!("Failed to find public key in best ledger: {}", pk);
+            let account = match best_ledger.accounts.get(&pk) {
+                Some(account) => account,
+                None => {
+                    warn!("Failed to find public key in best ledger: {pk}");
                     continue;
                 }
             };
 
-            if query.as_ref().map_or(true, |q| q.matches(account)) {
-                let username = match db.get_username(&pk) {
-                    Ok(None) | Err(_) => Some("Unknown".to_string()),
-                    Ok(username) => username.map(|u| u.0),
-                };
-
+            let username = match db.get_username(&pk) {
+                Ok(None) | Err(_) => None,
+                Ok(Some(username)) => Some(username.0),
+            };
+            if query
+                .as_ref()
+                .map_or(true, |q| q.matches(account, username.as_ref()))
+            {
                 let account = Account::from((
                     account.clone(),
                     db.get_block_production_pk_epoch_count(&pk, None)
@@ -200,10 +194,10 @@ impl AccountQueryRoot {
 }
 
 impl AccountQueryInput {
-    fn matches(&self, account: &account::Account) -> bool {
+    fn matches(&self, account: &account::Account, username: Option<&String>) -> bool {
         let AccountQueryInput {
             public_key,
-            username,
+            username: query_username_prefix,
             balance,
             balance_gt,
             balance_gte,
@@ -216,12 +210,8 @@ impl AccountQueryInput {
                 return false;
             }
         }
-        if let Some(username) = username {
-            if account
-                .username
-                .as_ref()
-                .map_or(false, |u| !u.0.starts_with(username))
-            {
+        if let Some(username_prefix) = query_username_prefix {
+            if username.map_or(true, |u| !u.starts_with(username_prefix)) {
                 return false;
             }
         }
@@ -302,7 +292,7 @@ impl
             pk_total_num_user_commands: account.6,
             pk_epoch_num_internal_commands: account.7,
             pk_total_num_internal_commands: account.8,
-            username: account.9,
+            username: account.9.or(Some("Unknown".to_string())),
         }
     }
 }
