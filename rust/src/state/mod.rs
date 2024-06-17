@@ -15,8 +15,9 @@ use crate::{
     constants::*,
     event::{block::*, db::*, ledger::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
-        diff::LedgerDiff, genesis::GenesisLedger, staking::parser::StakingLedgerParser,
-        store::LedgerStore, Ledger, LedgerHash,
+        diff::LedgerDiff, genesis::GenesisLedger, public_key::PublicKey,
+        staking::parser::StakingLedgerParser, store::LedgerStore, username::Username, Ledger,
+        LedgerHash,
     },
     server::IndexerVersion,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
@@ -27,7 +28,7 @@ use crate::{
             WitnessTreeSummaryVerbose,
         },
     },
-    store::IndexerStore,
+    store::{username::UsernameStore, IndexerStore},
 };
 use anyhow::{bail, Context};
 use id_tree::NodeId;
@@ -522,7 +523,13 @@ impl IndexerState {
                 return Ok(false);
             };
 
-            self.update_best_block_in_store(&best_tip.state_hash)?;
+            if let Some(username_updates) = self.update_best_block_in_store(&best_tip.state_hash)? {
+                for (pk, username) in username_updates.iter() {
+                    if let Some(account) = self.ledger.accounts.get_mut(pk) {
+                        account.username = Some(username.clone());
+                    }
+                }
+            }
             new_canonical_blocks.iter().for_each(|block| {
                 self.add_canonical_block_to_store(block, &block.genesis_state_hash, None)
                     .unwrap()
@@ -843,23 +850,19 @@ impl IndexerState {
 
     /// Returns the ledger corresponding to the best tip
     pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
-        let best_ledger = self.ledger.clone();
+        let mut best_ledger = self.ledger.clone();
         let mut best_chain = self.best_chain();
         best_chain.reverse();
 
-        let diffs: Vec<LedgerDiff> = best_chain
-            .iter()
-            .map(|b| {
-                self.diffs_map
-                    .get(&b.state_hash)
-                    .with_context(|| format!("(length {}) {}", b.height, b.state_hash.0))
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
-        best_ledger
-            .apply_diff(&LedgerDiff::append_vec(diffs))
-            .map(Some)
+        for diff in best_chain.iter().map(|b| {
+            self.diffs_map
+                .get(&b.state_hash)
+                .with_context(|| format!("(length {}) {}", b.height, b.state_hash.0))
+                .unwrap()
+        }) {
+            best_ledger._apply_diff(diff)?;
+        }
+        Ok(Some(best_ledger))
     }
 
     /// Get the canonical block at the given height
@@ -944,11 +947,15 @@ impl IndexerState {
         Ok(())
     }
 
-    pub fn update_best_block_in_store(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
+    pub fn update_best_block_in_store(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.set_best_block(state_hash)?;
+            return indexer_store.get_block_username_updates(state_hash);
         }
-        Ok(())
+        Ok(None)
     }
 
     /// Sync from an existing db

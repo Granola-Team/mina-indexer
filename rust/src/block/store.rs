@@ -119,7 +119,7 @@ pub trait BlockStore {
     ) -> anyhow::Result<()>;
 
     /// Get the global slots corresponding to the given block height
-    fn get_global_slots_from_height(
+    fn get_block_global_slots_from_height(
         &self,
         blockchain_length: u32,
     ) -> anyhow::Result<Option<Vec<u32>>>;

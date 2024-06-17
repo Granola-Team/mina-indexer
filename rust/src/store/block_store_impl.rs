@@ -613,7 +613,7 @@ impl BlockStore for IndexerStore {
 
         // add height to slot's "height collection"
         let mut slots = self
-            .get_global_slots_from_height(blockchain_length)?
+            .get_block_global_slots_from_height(blockchain_length)?
             .unwrap_or_default();
         if !slots.contains(&global_slot) {
             slots.push(global_slot);
@@ -627,7 +627,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_global_slots_from_height(
+    fn get_block_global_slots_from_height(
         &self,
         blockchain_length: u32,
     ) -> anyhow::Result<Option<Vec<u32>>> {
