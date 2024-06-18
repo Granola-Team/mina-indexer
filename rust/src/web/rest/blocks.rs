@@ -11,6 +11,7 @@ use actix_web::{
     web::{self, Data},
     HttpResponse,
 };
+use anyhow::Context as aContext;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -91,9 +92,14 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
             if let Ok(blocks) = db.get_blocks_at_height(height) {
                 let blocks: Vec<BlockWithoutHeight> = blocks
                     .iter()
-                    .flat_map(|block| {
-                        if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
-                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                    .flat_map(|state_hash| {
+                        if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                            let block = db
+                                .get_block(&state_hash)
+                                .with_context(|| format!("block missing from store {state_hash}"))
+                                .unwrap()
+                                .unwrap();
+                            Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                         } else {
                             None
                         }
@@ -113,9 +119,14 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
             if let Ok(blocks) = db.get_blocks_at_slot(slot) {
                 let blocks: Vec<BlockWithoutHeight> = blocks
                     .iter()
-                    .flat_map(|block| {
-                        if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
-                            Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                    .flat_map(|state_hash| {
+                        if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                            let block = db
+                                .get_block(&state_hash)
+                                .with_context(|| format!("block missing from store {state_hash}"))
+                                .unwrap()
+                                .unwrap();
+                            Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                         } else {
                             None
                         }

@@ -15,6 +15,7 @@ use crate::{
     store::IndexerStore,
     web::graphql::db,
 };
+use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
 
@@ -214,8 +215,12 @@ impl FeetransferQueryRoot {
             }
 
             'outer: for height in block_heights {
-                for block in db.get_blocks_at_height(height)? {
-                    let canonical = get_block_canonicity(db, &block.state_hash().0);
+                for state_hash in db.get_blocks_at_height(height)?.iter() {
+                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let block = db
+                        .get_block(state_hash)?
+                        .with_context(|| format!("block missing from store {state_hash}"))
+                        .unwrap();
                     let mut internal_cmds = InternalCommandWithData::from_precomputed(&block);
                     if sort_by == FeetransferSortByInput::BlockHeightDesc {
                         internal_cmds.reverse()

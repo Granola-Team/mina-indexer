@@ -1267,18 +1267,18 @@ impl IndexerState {
             // check pk index
             for pk in block.all_public_keys() {
                 let blocks_pk = indexer_store.get_blocks_at_public_key(&pk)?;
-                assert!(blocks_pk.contains(&block));
+                assert!(blocks_pk.contains(state_hash));
             }
 
             // check blockchain_length index
             assert!(indexer_store
                 .get_blocks_at_height(*blockchain_length)?
-                .contains(&block));
+                .contains(state_hash));
 
             // check slot index
             assert!(indexer_store
                 .get_blocks_at_slot(block.global_slot_since_genesis())?
-                .contains(&block));
+                .contains(state_hash));
 
             // check user commands
             let block_user_cmds = indexer_store

@@ -29,8 +29,8 @@ fn add_and_get() -> anyhow::Result<()> {
         println!("{}", block.summary());
     }
 
-    for block in db.get_blocks_at_height(105489)? {
-        println!("{}", block.summary());
+    for state_hash in db.get_blocks_at_height(105489)? {
+        println!("{state_hash}");
     }
 
     assert_eq!(db.get_blocks_at_height(105489)?.len(), 3);
