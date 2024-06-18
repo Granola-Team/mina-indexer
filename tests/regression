@@ -2,13 +2,14 @@
 # shellcheck disable=SC2046,SC2086,SC2002
 
 # To debug, uncomment:
-# set -x
+set -x
 
 set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
-IDXR="$SRC"/result/bin/mina-indexer
+IDXR="${1:="$SRC"/result/bin/mina-indexer}"
+shift
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 

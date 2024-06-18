@@ -3,8 +3,9 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
+TOPLEVEL := `pwd`
+export CARGO_HOME := TOPLEVEL + ".cargo"
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
-export CARGO_HOME := `pwd` + ".cargo"
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
@@ -77,9 +78,21 @@ test-unit-mina-rs:
   @echo "--- Performing long-running mina-rs unit tests"
   cd rust && time cargo nextest run --features mina_rs
 
-test-regression subtest='': nix-build
+# Perform a debug build
+debug-build:
+  cd rust && cargo build
+
+# Quick debug-build-and-regression-test
+bt subtest='': debug-build
+  time ./tests/regression {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+
+# Quick (debug) unit-test, and regression-test
+tt subtest='': test-unit
+  time ./tests/regression {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+
+test-regression: nix-build
   @echo "--- Performing regressions test(s)"
-  time ./tests/regression {{subtest}}
+  time ./tests/regression
 
 # Build OCI images.
 build-image:
