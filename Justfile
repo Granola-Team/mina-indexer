@@ -55,7 +55,7 @@ lint: shellcheck && audit disallow-unused-cargo-deps
 
 nix-build:
   @echo "--- Performing Nix build"
-  nix build
+  nom build
 
 clean:
   cd rust && cargo clean
@@ -85,7 +85,7 @@ test-regression subtest='': nix-build
 build-image:
   @echo "--- Building {{IMAGE}}"
   docker --version
-  time nix build .#dockerImage
+  time nom build .#dockerImage
   time docker load < ./result
   docker run --rm -it {{IMAGE}} mina-indexer server start --help
   docker image rm {{IMAGE}}
