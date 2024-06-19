@@ -27,7 +27,6 @@ REV="$(git rev-parse --short=8 HEAD)"
 
 # Operate from this directory.
 #
-BASE_DIR="$HOME"/mina-indexer
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"
 

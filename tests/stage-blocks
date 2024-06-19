@@ -15,5 +15,5 @@ OUT_DIR=$4
 for LENGTH in $(seq "$MIN_LENGTH" "$MAX_LENGTH")
 do
   mkdir -p "${OUT_DIR}"
-  cp /mnt/mina-logs/mina_network_block_data/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
+  cp /mnt/mina-logs/blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
 done
