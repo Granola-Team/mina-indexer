@@ -90,9 +90,9 @@ bt subtest='': debug-build
 tt subtest='': test-unit
   time ./tests/regression {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
 
-test-regression: nix-build
+test-regression subtest='': nix-build
   @echo "--- Performing regressions test(s)"
-  time ./tests/regression
+  time ./tests/regression {{TOPLEVEL}}/result/bin/mina-indexer {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -131,9 +131,9 @@ tier1: tier1-prereqs check lint test-unit
 # Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
 tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   @echo "--- Performing test_many_blocks regression test"
-  time tests/regression test_many_blocks
+  time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
-  time tests/regression test_release
+  time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
 tier3:
   @echo "--- Ingesting all blocks..."
