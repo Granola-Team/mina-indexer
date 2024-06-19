@@ -221,11 +221,7 @@ impl FeetransferQueryRoot {
                         .get_block(state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
                         .unwrap();
-                    let mut internal_cmds = InternalCommandWithData::from_precomputed(&block);
-                    if sort_by == FeetransferSortByInput::BlockHeightDesc {
-                        internal_cmds.reverse()
-                    }
-                    for internal_cmd in internal_cmds {
+                    for internal_cmd in InternalCommandWithData::from_precomputed(&block) {
                         let ft = Feetransfer::from((
                             internal_cmd,
                             epoch_num_internal_commands,
