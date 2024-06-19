@@ -1,10 +1,12 @@
 #! /usr/bin/env bash
 
-set -eux
-set -o pipefail
+set -x
 
 BASE_DIR="$1"
 MAGNITUDE="$2"
+TESTING="${3:-false}"
+
+set -euo pipefail
 
 # Ensure that we are within the source tree.
 #
@@ -101,7 +103,7 @@ SNAPSHOT="$BASE_DIR"/"$REV"-snapshot
 "${BIN}" --socket "$SOCKET" shutdown
 wait "$PID"
 
-if [ -z "$3" ]; then
+if [ "$TESTING" == false ]; then
   # Terminate the prior production instance using the socket, if any. This will
   # not work if we change the on-wire comms protocol for the shutdown command,
   # note.
