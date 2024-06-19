@@ -526,6 +526,17 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("snark-work-prover column family exists")
     }
 
+    /// CF for storing/sorting SNARKs by prover and block height
+    /// `{prover}{block_height}{index} -> snark`
+    /// - prover:         55 pk bytes
+    /// - block height:   4 BE bytes
+    /// - index:          4 BE bytes
+    fn snark_work_prover_height_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-prover-height")
+            .expect("snark-work-prover column family exists")
+    }
+
     ////////////////////////
     // Username store CFs //
     ////////////////////////

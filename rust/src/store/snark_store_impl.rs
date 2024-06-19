@@ -51,6 +51,7 @@ impl SnarkStore for IndexerStore {
 
         let epoch = block.epoch_count();
         let global_slot = block.global_slot_since_genesis();
+        let block_height = block.blockchain_length();
         let completed_works = SnarkWorkSummary::from_precomputed(block);
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
@@ -125,6 +126,7 @@ impl SnarkStore for IndexerStore {
                     {
                         let snark: SnarkWorkSummary = snark.clone().into();
                         self.set_snark_by_prover(&snark, global_slot, index as u32)?;
+                        self.set_snark_by_prover_height(&snark, block_height, index as u32)?;
                         self.increment_snarks_counts(&snark, epoch)?;
                     }
                 }
@@ -280,6 +282,32 @@ impl SnarkStore for IndexerStore {
     /// - index:  4 BE bytes
     /// - snark:  serde_json encoded
     fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+        self.database.iterator_cf(self.snark_work_prover_cf(), mode)
+    }
+
+    fn set_snark_by_prover_height(
+        &self,
+        snark: &SnarkWorkSummary,
+        block_height: u32,
+        index: u32,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting snark slot {block_height} at index {index} for prover {}",
+            snark.prover
+        );
+        Ok(self.database.put_cf(
+            self.snark_work_prover_height_cf(),
+            snark_prover_prefix_key(&snark.prover, block_height, index),
+            serde_json::to_vec(snark)?,
+        )?)
+    }
+
+    /// `{prover}{slot}{index} -> snark`
+    /// - prover:         55 pk bytes
+    /// - block height:   4 BE bytes
+    /// - index:          4 BE bytes
+    /// - snark:          serde_json encoded
+    fn snark_prover_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database.iterator_cf(self.snark_work_prover_cf(), mode)
     }
 

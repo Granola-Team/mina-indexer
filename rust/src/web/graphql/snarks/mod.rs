@@ -156,6 +156,61 @@ impl SnarkQueryRoot {
             snarks.truncate(limit);
             return Ok(snarks);
         }
+        // prover query filter and sort by height
+        if let (Some(prover), Some(block_height_lte)) = (
+            query.as_ref().and_then(|q| q.prover.clone()),
+            query.as_ref().and_then(|q| q.block_height_lte),
+        ) {
+            let mut start = prover.as_bytes().to_vec();
+            let mode = match sort_by {
+                SnarkSortByInput::BlockHeightAsc => {
+                    speedb::IteratorMode::From(&start, speedb::Direction::Forward)
+                }
+                SnarkSortByInput::BlockHeightDesc => {
+                    let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
+                    *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
+                    start.append(&mut to_be_bytes(block_height_lte));
+                    start.append(&mut pk_prefix);
+                    speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+                }
+            };
+
+            let mut snarks = Vec::new();
+            for (key, snark) in db.snark_prover_height_iterator(mode).flatten() {
+                if key[..PublicKey::LEN] != *prover.as_bytes() {
+                    return Ok(snarks);
+                }
+
+                let block_height = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
+                let blocks_at_slot = db.get_blocks_at_slot(block_height)?;
+                let state_hash = blocks_at_slot[0].clone();
+                let canonical = get_block_canonicity(db, &state_hash.0);
+                let pcb = db
+                    .get_block(&state_hash)?
+                    .with_context(|| format!("block missing from store {state_hash}"))
+                    .expect("blocks exists");
+                let snark = serde_json::from_slice(&snark)?;
+                let sw = SnarkWithCanonicity {
+                    canonical,
+                    pcb,
+                    snark: (
+                        snark,
+                        state_hash,
+                        db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                        db.get_snarks_total_count().expect("total snarks count"),
+                    )
+                        .into(),
+                };
+                if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                    snarks.push(sw);
+
+                    if snarks.len() == limit {
+                        break;
+                    }
+                }
+            }
+            return Ok(snarks);
+        }
 
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {

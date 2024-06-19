@@ -50,7 +50,7 @@ pub struct DBUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 78] = [
+    const COLUMN_FAMILIES: [&'static str; 79] = [
         // accounts
         "account-balance",
         "account-balance-sort",
@@ -102,6 +102,7 @@ impl IndexerStore {
         "snark-work-top-producers-sort",
         "snark-work-fees",
         "snark-work-prover",
+        "snark-work-prover-height",
         // internal commands
         "internal-commands",
         "internal-commands-global-slot",
