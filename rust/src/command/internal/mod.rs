@@ -103,59 +103,34 @@ impl InternalCommand {
         for n in (0..account_diff_fees.len()).step_by(2) {
             match &account_diff_fees[n] {
                 AccountDiff::FeeTransfer(f) => {
-                    let (ic_sender, ic_receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
-
-                    // aggregate
-                    if let Some((idx, cmd)) =
-                        internal_cmds
-                            .iter()
-                            .enumerate()
-                            .find_map(|(m, cmd)| match cmd {
-                                Self::FeeTransfer {
-                                    sender,
-                                    receiver,
-                                    amount,
-                                } => {
-                                    if *sender == ic_sender && *receiver == ic_receiver {
-                                        return Some((
-                                            m,
-                                            Self::FeeTransfer {
-                                                sender: ic_sender.clone(),
-                                                receiver: ic_receiver.clone(),
-                                                amount: f.amount.0 + *amount,
-                                            },
-                                        ));
-                                    }
-                                    None
-                                }
-                                _ => None,
-                            })
-                    {
-                        internal_cmds.push(cmd);
-                        internal_cmds.swap_remove(idx);
+                    if f.update_type == UpdateType::Credit {
+                        internal_cmds.push(Self::FeeTransfer {
+                            sender: account_diff_fees[n + 1].public_key(),
+                            receiver: f.public_key.clone(),
+                            amount: f.amount.0,
+                        })
                     } else {
                         internal_cmds.push(Self::FeeTransfer {
-                            sender: ic_sender.clone(),
-                            receiver: ic_receiver.clone(),
+                            sender: f.public_key.clone(),
+                            receiver: account_diff_fees[n + 1].public_key(),
                             amount: f.amount.0,
-                        });
+                        })
                     }
                 }
                 AccountDiff::FeeTransferViaCoinbase(f) => {
-                    let (sender, receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
+                    if f.update_type == UpdateType::Credit {
+                        internal_cmds.push(Self::FeeTransferViaCoinbase {
+                            sender: account_diff_fees[n + 1].public_key(),
+                            receiver: f.public_key.clone(),
+                            amount: f.amount.0,
+                        })
                     } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
-                    internal_cmds.push(Self::FeeTransferViaCoinbase {
-                        sender,
-                        receiver,
-                        amount: f.amount.0,
-                    });
+                        internal_cmds.push(Self::FeeTransferViaCoinbase {
+                            sender: f.public_key.clone(),
+                            receiver: account_diff_fees[n + 1].public_key(),
+                            amount: f.amount.0,
+                        })
+                    }
                 }
                 AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
                     receiver: c.public_key.clone(),
