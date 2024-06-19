@@ -80,6 +80,7 @@ pub struct EpochStakeDelegation {
     pub pk: PublicKey,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
+    pub delegates: Vec<PublicKey>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +91,7 @@ pub struct AggregatedEpochStakeDelegation {
     pub total_stake: u64,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
+    pub delegates: Vec<PublicKey>,
 }
 
 impl From<StakingAccountJson> for StakingAccount {
@@ -213,25 +215,29 @@ impl StakingLedger {
                         pk: delegate.clone(),
                         total_delegated: Some(balance),
                         count_delegates: Some(1),
+                        delegates: vec![pk.clone()],
                     }),
                 ) {
                     None => (), // first delegation
                     Some(None) => {
-                        // pk delegated to another pk
+                        // delegated to another account
                         delegations.insert(delegate.clone(), None);
                     }
                     Some(Some(EpochStakeDelegation {
-                        pk,
+                        pk: delegate,
                         total_delegated,
                         count_delegates,
+                        mut delegates,
                     })) => {
                         // accumulate delegation
+                        delegates.push(pk.clone());
                         delegations.insert(
-                            delegate,
+                            delegate.clone(),
                             Some(EpochStakeDelegation {
-                                pk,
+                                pk: delegate,
                                 total_delegated: total_delegated.map(|acc| acc + balance),
                                 count_delegates: count_delegates.map(|acc| acc + 1),
+                                delegates,
                             }),
                         );
                     }
@@ -248,8 +254,7 @@ impl StakingLedger {
             if delegation.is_none() {
                 *delegation = Some(EpochStakeDelegation {
                     pk: pk.clone(),
-                    count_delegates: None,
-                    total_delegated: None,
+                    ..Default::default()
                 });
             }
         });
@@ -289,7 +294,7 @@ impl std::str::FromStr for ReceiptChainHash {
 
 #[cfg(test)]
 mod tests {
-    use super::{EpochStakeDelegation, StakingLedger};
+    use super::StakingLedger;
     use crate::{
         chain::Network, constants::MAINNET_GENESIS_HASH,
         ledger::staking::AggregatedEpochStakeDelegations,
@@ -324,7 +329,6 @@ mod tests {
             delegations,
             total_delegations,
         } = staking_ledger.aggregate_delegations()?;
-        let pk: PublicKey = "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4".into();
 
         assert_eq!(epoch, 0);
         assert_eq!(network, Network::Mainnet);
@@ -332,16 +336,50 @@ mod tests {
             ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
         );
-        assert_eq!(
-            delegations.get(&pk),
-            Some(&EpochStakeDelegation {
-                pk,
-                count_delegates: Some(25),
-                total_delegated: Some(13277838425206999)
-            })
-        );
+
+        let pk = PublicKey::from("B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4");
+        let mut pk_delegations = delegations.get(&pk).cloned().unwrap();
+        pk_delegations.delegates.sort();
+
+        assert_eq!(pk_delegations.pk, pk);
+        assert_eq!(pk_delegations.count_delegates, Some(25));
+        assert_eq!(pk_delegations.total_delegated, Some(13277838425206999));
         assert_eq!(total_delegations, 794268782956784283);
         assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
+
+        let mut expected_delegates: Vec<PublicKey> = [
+            "B62qmCwouxG2UzH6zEYGFWFFzUuSv9sbLnr96VJWDX3paSSucX7jAJN",
+            "B62qpz34iGX2eaRDyHmHbq3v1SnUgzounhudGZRfNUDh79JuTstPNy1",
+            "B62qjUut7tByYkosrfLDC5aKLSLQ2JxTbkBcfF3em3HwiyNkEsQmwfM",
+            "B62qmqMrgPshhHKLJ7DqWn1KeizEgga5MuGmWb2bXajUnyivfeMW6JE",
+            "B62qq4qohsvmTAJmvJ5wSepyNHKsh1wMPf1UjoHLKEuLmgH2RdAa4zt",
+            "B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4",
+            "B62qiigQwvLyyqUsAL3SmtjP43iGnUB1s1mUYrhvyZCc8PVFaW9ZQvd",
+            "B62qqhTWoZineudzfT9o4YTdruHTps1yANJz9z1Zw3YnFAMgCky8LFS",
+            "B62qrQW1u4635tmjLjkz7pdUrwE9QhmYP8rPb13SpaNBeHa4pGidstk",
+            "B62qnbZcyj5U8N4nqGyt8gf67qsGitf3LFfjRsNZuXV6c3XA84V7p1v",
+            "B62qppJosj13spPS9ZvkhqUfqkTRH9LHYHcUZR3Wivayjrs1tZcZxXq",
+            "B62qkK29ScnXfTzrDkkfASepKoTE57CT8SA4r43EQCCwwJXAsP5TGGN",
+            "B62qqKV2KTVR8Sic9Yq9P7Z1sb819smRBaCqWi7UuzHgiagLrSRmi6P",
+            "B62qkpKnTJ1uAR6ZQ7Z7DW9UwjDuzSZJkTPDDKUGHgBdi5bQAUJ1gG2",
+            "B62qizxV2Z1Lbf8TFb4Jzf3uJTd8CDBSuJ5ypkJdw9pZNKzW1Rzxrwh",
+            "B62qnipPgHt7ajPdMko2STLDAxWW1M5q6sZ8V578khR2KMQUbhxtTPN",
+            "B62qmtcbMEVVKN2guoyVEqmiPZtbvNhz4VUvUYvxesya3WHPkLiBvdK",
+            "B62qmru4aEDszwLFvH59BtZnU4QLC52nrSRBJW1EfdAp8cD5drg8QFM",
+            "B62qm3hoUHCPWGdKfrSK5Ek9STvGfwjf6L1uewvgFQHCVY4Y48DT4Qr",
+            "B62qoA478cjzLTGH3JqDrNXGjQNGQJeKesjnS6o9aVv875epCMtrrsD",
+            "B62qrYufgatwTD8UkM1tLnW5tfnSeWYSPtbBYyYvdQ4dvoA9KBeWfcH",
+            "B62qmEo9HSSLLM3DtUJwcNdeqqQ6zoNUMqXauu9ySWKdpo8W7T9bjR3",
+            "B62qknoGUuTS2MmtZMrJLX6SumUP5BjKJVhyPTKjSBH5xyenxZ8dTWV",
+            "B62qrPH1SqnVrh92QART2N8sjmjRqnidtp4my5SAxstpurqQheNAR9u",
+            "B62qpk2BRXnuxofXRU1z2y1LWRagabiSLoBuCJjDSv9ebVkzZE2zXnp",
+        ]
+        .into_iter()
+        .map(PublicKey::from)
+        .collect();
+        expected_delegates.sort();
+        assert_eq!(pk_delegations.delegates, expected_delegates);
+
         Ok(())
     }
 }

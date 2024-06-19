@@ -843,21 +843,25 @@ async fn handle_conn(
                     invalid_state_hash(&genesis_state_hash)
                 } else if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
-                } else if let Some(aggegated_delegations) =
+                } else if let Some(aggregated_delegations) =
                     db.get_delegations_epoch(epoch, &Some(genesis_state_hash.into()))?
                 {
                     let pk: PublicKey = pk.into();
-                    let epoch = aggegated_delegations.epoch;
-                    let network = aggegated_delegations.network;
-                    let total_delegations = aggegated_delegations.total_delegations;
-                    let count_delegates = aggegated_delegations
+                    let epoch = aggregated_delegations.epoch;
+                    let network = aggregated_delegations.network;
+                    let total_delegations = aggregated_delegations.total_delegations;
+                    let count_delegates = aggregated_delegations
                         .delegations
                         .get(&pk)
                         .and_then(|agg_del| agg_del.count_delegates);
-                    let total_delegated = aggegated_delegations
+                    let total_delegated = aggregated_delegations
                         .delegations
                         .get(&pk)
                         .and_then(|agg_del| agg_del.total_delegated);
+                    let delegates = aggregated_delegations
+                        .delegations
+                        .get(&pk)
+                        .map_or(vec![], |agg_del| agg_del.delegates.clone());
                     Some(serde_json::to_string_pretty(
                         &AggregatedEpochStakeDelegation {
                             pk,
@@ -866,16 +870,13 @@ async fn handle_conn(
                             count_delegates,
                             total_delegated,
                             total_stake: total_delegations,
+                            delegates,
                         },
                     )?)
                 } else {
-                    error!(
-                        "Public key {} is missing from staking ledger epoch {}",
-                        pk, epoch
-                    );
+                    error!("Public key {pk} is missing from staking ledger epoch {epoch}");
                     Some(format!(
-                        "Public key {} is missing from staking ledger epoch {}",
-                        pk, epoch
+                        "Public key {pk} is missing from staking ledger epoch {epoch}"
                     ))
                 }
             }

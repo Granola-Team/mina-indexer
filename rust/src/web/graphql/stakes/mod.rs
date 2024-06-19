@@ -292,6 +292,9 @@ pub struct StakesDelegationTotals {
 
     /// Value count delegates
     pub count_delegates: u32,
+
+    /// Value delegates
+    pub delegates: Vec<String>,
 }
 
 #[ComplexObject]
@@ -430,6 +433,7 @@ impl StakesLedgerAccountWithMeta {
             .unwrap_or_default();
         let total_delegated_nanomina = result.total_delegated.unwrap_or_default();
         let count_delegates = result.count_delegates.unwrap_or_default();
+        let delegates: Vec<String> = result.delegates.iter().map(|pk| pk.0.clone()).collect();
         let mut decimal = Decimal::from(total_delegated_nanomina);
         decimal.set_scale(9).ok();
 
@@ -493,6 +497,7 @@ impl StakesLedgerAccountWithMeta {
                 total_delegated,
                 total_delegated_nanomina,
                 total_currency,
+                delegates,
             },
             timing,
             epoch_num_blocks: db
