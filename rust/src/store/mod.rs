@@ -294,6 +294,12 @@ pub fn pk_of_key(key: &[u8]) -> PublicKey {
     PublicKey::from_bytes(&key[..PublicKey::LEN]).expect("public key")
 }
 
+pub fn balance_of_key(key: &[u8]) -> u64 {
+    let mut balance_bytes = [0; 8];
+    balance_bytes.copy_from_slice(&key[..8]);
+    u64::from_be_bytes(balance_bytes)
+}
+
 pub fn u32_of_key(key: &[u8]) -> u32 {
     from_be_bytes(key[PublicKey::LEN..(PublicKey::LEN + 4)].to_vec())
 }

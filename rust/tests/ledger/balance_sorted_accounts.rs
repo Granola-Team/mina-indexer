@@ -3,14 +3,12 @@ use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
     ledger::{
-        account::Account,
         genesis::{GenesisLedger, GenesisRoot},
-        public_key::PublicKey,
         store::LedgerStore,
     },
     server::IndexerVersion,
     state::IndexerState,
-    store::{account::AccountStore, IndexerStore},
+    store::{account::AccountStore, balance_of_key, pk_of_key, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -42,51 +40,39 @@ fn check_balance() -> anyhow::Result<()> {
     // ingest the blocks
     state.add_blocks(&mut bp)?;
 
-    // check best ledger balances equal sorted balances
+    // check sorted store balances equal best ledger balances
+    let mut curr_ledger_balance = None;
+    let best_ledger = indexer_store.get_best_ledger()?.unwrap();
     for (n, (key, _)) in indexer_store
         .account_balance_iterator(speedb::IteratorMode::End)
         .flatten()
         .enumerate()
     {
-        let pk = PublicKey::from_bytes(&key[8..])?;
-        let balance = indexer_store.get_account_balance(&pk)?.unwrap();
-        println!("(n: {n}) {pk}: {balance}");
+        let pk = pk_of_key(&key[8..]);
+        let pk_key_balance = balance_of_key(&key);
+        let pk_store_balance = indexer_store.get_account_balance(&pk)?.unwrap();
+        let pk_ledger_balance = best_ledger.accounts.get(&pk).unwrap().balance.0;
 
-        assert_eq!(
-            balance,
-            indexer_store
-                .get_best_ledger()?
-                .unwrap()
-                .accounts
-                .get(&pk)
-                .map_or(0, |acct| acct.balance.0)
+        println!(
+            "(n: {n}) {pk}: {pk_store_balance} (store), {pk_ledger_balance} (ledger), {pk_key_balance} (key)"
         );
+
+        // store balance coincides with best ledger balance
+        assert_eq!(pk_store_balance, pk_ledger_balance);
+
+        // store balance coincides with key balance
+        assert_eq!(pk_store_balance, pk_key_balance);
+
+        // best ledger balances decreasing
+        assert!(curr_ledger_balance.unwrap_or(u64::MAX) >= pk_ledger_balance);
+        curr_ledger_balance = Some(pk_ledger_balance);
     }
 
-    // check sorted balances match best ledger balances
-    let mut accounts: Vec<(PublicKey, Account)> =
-        state.best_ledger()?.unwrap().accounts.into_iter().collect();
-    accounts.sort_by(|y, x| {
-        let bal_cmp = x.1.balance.0.cmp(&y.1.balance.0);
-        if bal_cmp == std::cmp::Ordering::Equal {
-            x.0 .0.cmp(&y.0 .0)
-        } else {
-            bal_cmp
-        }
-    });
-
-    for (pk, acct) in accounts {
+    // check best ledger balances equal sorted store balances
+    for (pk, acct) in best_ledger.accounts {
         assert_eq!(
             acct.balance.0,
-            indexer_store.get_account_balance(&pk)?.unwrap(),
-            "{{ pk: {pk}, diffs: [{}, {}] }}",
-            indexer_store
-                .get_account_balance(&pk)?
-                .unwrap()
-                .saturating_sub(acct.balance.0),
-            acct.balance
-                .0
-                .saturating_sub(indexer_store.get_account_balance(&pk)?.unwrap()),
+            indexer_store.get_account_balance(&pk)?.unwrap()
         );
     }
 

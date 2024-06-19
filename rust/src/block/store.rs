@@ -92,8 +92,7 @@ pub trait BlockStore {
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32>;
 
     /// Get all blocks at the given blockchain length
-    fn get_blocks_at_height(&self, blockchain_length: u32)
-        -> anyhow::Result<Vec<PrecomputedBlock>>;
+    fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given blockchain length
     fn add_block_at_height(
@@ -106,7 +105,7 @@ pub trait BlockStore {
     fn get_num_blocks_at_slot(&self, slot: u32) -> anyhow::Result<u32>;
 
     /// Get all blocks at the given global slot since genesis
-    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<PrecomputedBlock>>;
+    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given global slot since genesis
     fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
@@ -119,7 +118,7 @@ pub trait BlockStore {
     ) -> anyhow::Result<()>;
 
     /// Get the global slots corresponding to the given block height
-    fn get_global_slots_from_height(
+    fn get_block_global_slots_from_height(
         &self,
         blockchain_length: u32,
     ) -> anyhow::Result<Option<Vec<u32>>>;
@@ -138,10 +137,10 @@ pub trait BlockStore {
         -> anyhow::Result<()>;
 
     /// Get blocks for the given public key
-    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<PrecomputedBlock>>;
+    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Get children of a block
-    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>>;
+    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Index block version
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;

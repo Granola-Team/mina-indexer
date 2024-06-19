@@ -156,7 +156,7 @@ jsonpath "$.data.blocks[4].blockHeight" == 84
 duration < 2000
 
 # 
-# Blocks specific height query
+# Blocks specific height query (ordered canonical first)
 # 
 
 POST {{url}}
@@ -180,7 +180,14 @@ jsonpath "$.data.blocks[0].stateHash" == "3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EM
 jsonpath "$.data.blocks[0].blockHeight" == 6
 jsonpath "$.data.blocks[0].canonical" == true
 
-# last block height 6
+jsonpath "$.data.blocks[1].stateHash" == "3NKvdydTvLVDJ9PKAXrisjsXoZQvUy1V2sbComWyB2uyhARCJZ5M"
+jsonpath "$.data.blocks[1].blockHeight" == 6
+jsonpath "$.data.blocks[1].canonical" == false
+
+jsonpath "$.data.blocks[2].stateHash" == "3NLM3k3Vk1qs36hZWdbWvi4sqwer3skbgPyHMWrZMBoscNLyjnY2"
+jsonpath "$.data.blocks[2].blockHeight" == 6
+jsonpath "$.data.blocks[2].canonical" == false
+
 jsonpath "$.data.blocks[3].stateHash" == "3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45"
 jsonpath "$.data.blocks[3].blockHeight" == 6
 jsonpath "$.data.blocks[3].canonical" == false
@@ -188,13 +195,13 @@ jsonpath "$.data.blocks[3].canonical" == false
 duration < 2000
 
 # 
-# Blocks global slot query
+# Blocks global slot query (ordered canonical first)
 # 
 
 POST {{url}}
 ```graphql
 {
-  blocks(query: {global_slot_since_genesis: 169}, sortBy: BLOCKHEIGHT_ASC) {
+  blocks(query: {protocolState: {consensusState: {slotSinceGenesis: 169}}}) {
     stateHash
     canonical
     blockHeight
@@ -212,11 +219,11 @@ jsonpath "$.data.blocks[0].stateHash" == "3NKpj5NkT4zrqAy1XPjWLe6BJuyprKEbu89kbx
 jsonpath "$.data.blocks[0].blockHeight" == 117
 jsonpath "$.data.blocks[0].canonical" == true
 
-jsonpath "$.data.blocks[1].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexvSLe7xgeVZA21Pp"
+jsonpath "$.data.blocks[1].stateHash" == "3NLgbVt67xbbKxJYrvhAmQbQeKcdf8fhwkJZjoAWsB6mS67V5gmB"
 jsonpath "$.data.blocks[1].blockHeight" == 117
 jsonpath "$.data.blocks[1].canonical" == false
 
-jsonpath "$.data.blocks[2].stateHash" == "3NLgbVt67xbbKxJYrvhAmQbQeKcdf8fhwkJZjoAWsB6mS67V5gmB"
+jsonpath "$.data.blocks[2].stateHash" == "3NLCUCD6Vbg1yvaSe4YmGPY3nwSRkdwiQdVexvSLe7xgeVZA21Pp"
 jsonpath "$.data.blocks[2].blockHeight" == 117
 jsonpath "$.data.blocks[2].canonical" == false
 

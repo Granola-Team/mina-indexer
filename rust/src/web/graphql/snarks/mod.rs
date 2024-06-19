@@ -1,11 +1,12 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     constants::*,
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::{block_state_hash_from_key, from_be_bytes, to_be_bytes, IndexerStore},
     web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
+use anyhow::Context as aContext;
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
 
@@ -133,8 +134,13 @@ impl SnarkQueryRoot {
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
             let mut snarks: Vec<SnarkWithCanonicity> = db
                 .get_blocks_at_height(block_height)?
-                .into_iter()
-                .flat_map(|block| {
+                .iter()
+                .flat_map(|state_hash| {
+                    let block = db
+                        .get_block(state_hash)
+                        .with_context(|| format!("block missing from store {state_hash}"))
+                        .unwrap()
+                        .unwrap();
                     SnarkWorkSummaryWithStateHash::from_precomputed(&block)
                         .into_iter()
                         .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
@@ -175,9 +181,12 @@ impl SnarkQueryRoot {
 
                 let global_slot = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
                 let blocks_at_slot = db.get_blocks_at_slot(global_slot)?;
-                let pcb = blocks_at_slot[0].clone();
-                let state_hash = pcb.state_hash().0;
-                let canonical = get_block_canonicity(db, &pcb.state_hash().0);
+                let state_hash = blocks_at_slot[0].clone();
+                let canonical = get_block_canonicity(db, &state_hash.0);
+                let pcb = db
+                    .get_block(&state_hash)?
+                    .with_context(|| format!("block missing from store {state_hash}"))
+                    .unwrap();
                 let snark = serde_json::from_slice(&snark)?;
                 let sw = SnarkWithCanonicity {
                     canonical,
@@ -239,10 +248,13 @@ impl SnarkQueryRoot {
             }
 
             'outer: for height in block_heights {
-                for block in db.get_blocks_at_height(height)? {
-                    let state_hash = block.state_hash().0;
-                    let canonical = get_block_canonicity(db, &state_hash);
-                    let snark_work = db.get_snark_work_in_block(&state_hash.clone().into())?;
+                for state_hash in db.get_blocks_at_height(height)? {
+                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let block = db
+                        .get_block(&state_hash)?
+                        .with_context(|| format!("block missing from store {state_hash}"))
+                        .unwrap();
+                    let snark_work = db.get_snark_work_in_block(&state_hash)?;
                     let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                         summaries
                             .into_iter()
@@ -281,12 +293,10 @@ impl SnarkQueryRoot {
         };
 
         'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
-            let state_hash = block_state_hash_from_key(&key)?.0;
-            let block = db
-                .get_block(&state_hash.clone().into())?
-                .expect("block to be returned");
-            let canonical = get_block_canonicity(db, &state_hash);
-            let snark_work = db.get_snark_work_in_block(&state_hash.clone().into())?;
+            let state_hash = block_state_hash_from_key(&key)?;
+            let block = db.get_block(&state_hash)?.expect("block to be returned");
+            let canonical = get_block_canonicity(db, &state_hash.0);
+            let snark_work = db.get_snark_work_in_block(&state_hash)?;
             let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                 summaries
                     .into_iter()
@@ -348,13 +358,13 @@ fn snark_summary_matches_query(
         }))
 }
 
-impl From<(SnarkWorkSummary, String, u32, u32)> for Snark {
-    fn from(snark: (SnarkWorkSummary, String, u32, u32)) -> Self {
+impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
+    fn from(snark: (SnarkWorkSummary, BlockHash, u32, u32)) -> Self {
         Snark {
             fee: snark.0.fee,
             prover: snark.0.prover.0,
             block: SnarkBlock {
-                state_hash: snark.1,
+                state_hash: snark.1 .0,
             },
             epoch_num_snarks: snark.2,
             total_num_snarks: snark.3,

@@ -18,7 +18,7 @@ use crate::{
     state::{summary::SummaryShort, IndexerState},
     store::version::VersionStore,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use log::{debug, error, info, trace, warn};
 use std::{
     future::Future,
@@ -236,17 +236,20 @@ async fn handle_conn(
                 verbose,
                 path,
             } => {
-                info!("Received blocks-at-height command");
-                let mut blocks_at_height = db.get_blocks_at_height(height)?;
-                blocks_at_height.sort();
-
+                info!("Received blocks-at-height {height} command");
+                let blocks_at_height = db.get_blocks_at_height(height)?;
                 let blocks_str = if verbose {
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
                                 Some(block.with_canonicity(canonicity))
                             } else {
                                 None
@@ -257,11 +260,16 @@ async fn handle_conn(
                 } else {
                     let blocks: Vec<BlockWithoutHeight> = blocks_at_height
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                             } else {
                                 None
                             }
@@ -293,19 +301,21 @@ async fn handle_conn(
                 verbose,
                 path,
             } => {
-                info!("Received blocks-at-slot command");
+                info!("Received blocks-at-slot {slot} command");
                 let slot: u32 = slot.parse()?;
-
-                let mut blocks_at_slot = db.get_blocks_at_slot(slot)?;
-                blocks_at_slot.sort();
-
+                let blocks_at_slot = db.get_blocks_at_slot(slot)?;
                 let blocks_str = if verbose {
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
                                 Some(block.with_canonicity(canonicity))
                             } else {
                                 None
@@ -316,11 +326,16 @@ async fn handle_conn(
                 } else {
                     let blocks: Vec<BlockWithoutHeight> = blocks_at_slot
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                             } else {
                                 None
                             }
@@ -352,21 +367,24 @@ async fn handle_conn(
                 verbose,
                 path,
             } => {
-                info!("Received blocks-at-public-key command");
+                info!("Received blocks-at-public-key command {pk}");
 
                 if !public_key::is_valid_public_key(&pk) {
                     invalid_public_key(&pk)
                 } else {
-                    let mut blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
-                    blocks_at_pk.sort();
-
+                    let blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
                     let blocks_str = if verbose {
                         let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_pk
                             .iter()
-                            .flat_map(|block| {
-                                if let Ok(Some(canonicity)) =
-                                    db.get_block_canonicity(&block.state_hash())
-                                {
+                            .flat_map(|state_hash| {
+                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                    let block = db
+                                        .get_block(state_hash)
+                                        .with_context(|| {
+                                            format!("block missing from store {state_hash}")
+                                        })
+                                        .unwrap()
+                                        .unwrap();
                                     Some(block.with_canonicity(canonicity))
                                 } else {
                                     None
@@ -377,11 +395,16 @@ async fn handle_conn(
                     } else {
                         let blocks: Vec<BlockWithoutHeight> = blocks_at_pk
                             .iter()
-                            .flat_map(|block| {
-                                if let Ok(Some(canonicity)) =
-                                    db.get_block_canonicity(&block.state_hash())
-                                {
-                                    Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                            .flat_map(|state_hash| {
+                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                    let block = db
+                                        .get_block(state_hash)
+                                        .with_context(|| {
+                                            format!("block missing from store {state_hash}")
+                                        })
+                                        .unwrap()
+                                        .unwrap();
+                                    Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                                 } else {
                                     None
                                 }
@@ -414,18 +437,20 @@ async fn handle_conn(
                 verbose,
                 path,
             } => {
-                info!("Received block-children command for block {}", state_hash);
-
-                let mut children = db.get_block_children(&state_hash.clone().into())?;
-                children.sort();
-
+                info!("Received block-children command for block {state_hash}");
+                let children = db.get_block_children(&state_hash.clone().into())?;
                 let blocks_str = if verbose {
                     let blocks: Vec<PrecomputedBlockWithCanonicity> = children
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
                                 Some(block.with_canonicity(canonicity))
                             } else {
                                 None
@@ -436,11 +461,16 @@ async fn handle_conn(
                 } else {
                     let blocks: Vec<BlockWithoutHeight> = children
                         .iter()
-                        .flat_map(|block| {
-                            if let Ok(Some(canonicity)) =
-                                db.get_block_canonicity(&block.state_hash())
-                            {
-                                Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap();
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                             } else {
                                 None
                             }
@@ -463,8 +493,7 @@ async fn handle_conn(
 
                         std::fs::write(path.clone(), blocks_str)?;
                         Some(format!(
-                            "Children of block {} written to {}",
-                            state_hash,
+                            "Children of block {state_hash} written to {}",
                             path.display()
                         ))
                     } else {

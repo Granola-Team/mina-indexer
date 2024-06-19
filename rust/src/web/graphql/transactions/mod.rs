@@ -19,6 +19,7 @@ use crate::{
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
+use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
@@ -103,19 +104,26 @@ impl TransactionsQueryRoot {
 
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|input| input.block_height) {
+            let mut transactions = vec![];
             let query = query.expect("query input to exists");
-            let mut transactions: Vec<Transaction> = db
-                .get_blocks_at_height(block_height)?
-                .into_iter()
-                .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
-                .map(|cmd| {
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
-                })
-                .filter(|txn| query.matches(txn))
-                .collect();
-
+            'outer: for state_hash in db.get_blocks_at_height(block_height)? {
+                let block = db
+                    .get_block(&state_hash)
+                    .with_context(|| format!("block missing from store {state_hash}"))
+                    .unwrap()
+                    .unwrap();
+                for cmd in SignedCommandWithData::from_precomputed(&block) {
+                    let txn =
+                        Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                    if query.matches(&txn) {
+                        transactions.push(txn);
+                        if transactions.len() == limit {
+                            break 'outer;
+                        }
+                    }
+                }
+            }
             reorder_asc(&mut transactions, sort_by);
-            transactions.truncate(limit);
             return Ok(transactions);
         }
 
@@ -158,7 +166,12 @@ impl TransactionsQueryRoot {
             let mut transactions = Vec::new();
 
             'outer: for height in block_heights {
-                for block in db.get_blocks_at_height(height)? {
+                for state_hash in db.get_blocks_at_height(height)? {
+                    let block = db
+                        .get_block(&state_hash)
+                        .with_context(|| format!("block missing from store {state_hash}"))
+                        .unwrap()
+                        .unwrap();
                     for cmd in SignedCommandWithData::from_precomputed(&block) {
                         let txn = Transaction::new(
                             cmd,
@@ -169,7 +182,6 @@ impl TransactionsQueryRoot {
 
                         if query.matches(&txn) {
                             transactions.push(txn);
-
                             if transactions.len() == limit {
                                 break 'outer;
                             }

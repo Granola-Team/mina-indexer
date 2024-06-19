@@ -71,7 +71,7 @@ impl BlockStore for IndexerStore {
         // add to genesis state hash index
         self.set_block_genesis_state_hash(&state_hash, &block.genesis_state_hash())?;
 
-        // add block height/global slot
+        // add block height/global slot index
         self.set_block_height_global_slot_pair(
             block.blockchain_length(),
             block.global_slot_since_genesis(),
@@ -398,10 +398,7 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_blocks_at_height(
-        &self,
-        blockchain_length: u32,
-    ) -> anyhow::Result<Vec<PrecomputedBlock>> {
+    fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>> {
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
         let mut blocks = vec![];
 
@@ -411,25 +408,10 @@ impl BlockStore for IndexerStore {
                 format!("{blockchain_length}-{n}"),
             )? {
                 None => break,
-                Some(bytes) => {
-                    let state_hash = BlockHash::from_bytes(&bytes)?;
-                    if let Some(block) = self.get_block(&state_hash)? {
-                        blocks.push(block);
-                    }
-                }
+                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
             }
         }
-
-        blocks.sort_by(|a, b| {
-            use std::cmp::Ordering;
-            let a_canonicity = self.get_block_canonicity(&a.state_hash()).ok().flatten();
-            let b_canonicity = self.get_block_canonicity(&b.state_hash()).ok().flatten();
-            match (a_canonicity, b_canonicity) {
-                (Some(Canonicity::Canonical), _) => Ordering::Less,
-                (_, Some(Canonicity::Canonical)) => Ordering::Greater,
-                _ => a.cmp(b),
-            }
-        });
+        blocks.sort_by(|a, b| block_cmp(self, a, b));
         Ok(blocks)
     }
 
@@ -460,7 +442,7 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<PrecomputedBlock>> {
+    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting blocks at slot {slot}");
 
         let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
@@ -472,25 +454,10 @@ impl BlockStore for IndexerStore {
                 .get_cf(self.blocks_at_global_slot_cf(), format!("{slot}-{n}"))?
             {
                 None => break,
-                Some(bytes) => {
-                    let state_hash = BlockHash::from_bytes(&bytes)?;
-                    if let Some(block) = self.get_block(&state_hash)? {
-                        blocks.push(block);
-                    }
-                }
+                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
             }
         }
-
-        blocks.sort_by(|a, b| {
-            use std::cmp::Ordering;
-            let a_canonicity = self.get_block_canonicity(&a.state_hash()).ok().flatten();
-            let b_canonicity = self.get_block_canonicity(&b.state_hash()).ok().flatten();
-            match (a_canonicity, b_canonicity) {
-                (Some(Canonicity::Canonical), _) => Ordering::Less,
-                (_, Some(Canonicity::Canonical)) => Ordering::Greater,
-                _ => a.cmp(b),
-            }
-        });
+        blocks.sort_by(|a, b| block_cmp(self, a, b));
         Ok(blocks)
     }
 
@@ -531,7 +498,7 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<PrecomputedBlock>> {
+    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting blocks at public key {pk}");
 
         let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
@@ -544,36 +511,32 @@ impl BlockStore for IndexerStore {
                 .get_pinned_cf(self.blocks_cf(), key.as_bytes())?
             {
                 None => break,
-                Some(bytes) => {
-                    let state_hash = BlockHash::from_bytes(&bytes)?;
-                    if let Some(block) = self.get_block(&state_hash)? {
-                        blocks.push(block);
-                    }
-                }
+                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
             }
         }
-
-        blocks.sort();
+        blocks.sort_by(|a, b| block_cmp(self, a, b));
         Ok(blocks)
     }
 
-    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<PrecomputedBlock>> {
-        trace!("Getting children of block {}", state_hash);
+    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>> {
+        trace!("Getting children of block {state_hash}");
 
         if let Some(height) = self.get_block(state_hash)?.map(|b| b.blockchain_length()) {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
-            let mut children: Vec<PrecomputedBlock> = blocks_at_next_height
+            let mut children: Vec<BlockHash> = blocks_at_next_height
                 .into_iter()
-                .filter(|b| b.previous_state_hash() == *state_hash)
+                .filter(|b| {
+                    self.get_block_parent_hash(b).ok().flatten() == Some(state_hash.clone())
+                })
                 .collect();
-            children.sort();
+            children.sort_by(|a, b| block_cmp(self, a, b));
             return Ok(children);
         }
-        bail!("Block missing from store {}", state_hash)
+        bail!("Block missing from store {state_hash}")
     }
 
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>> {
-        trace!("Getting block {} version", state_hash.0);
+        trace!("Getting block version {state_hash}");
         let key = state_hash.0.as_bytes();
         Ok(self
             .database
@@ -582,7 +545,7 @@ impl BlockStore for IndexerStore {
     }
 
     fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
-        trace!("Setting block {} version to {}", state_hash.0, version);
+        trace!("Setting block {state_hash} version to {version}");
         Ok(self.database.put_cf(
             self.block_version_cf(),
             state_hash.0.as_bytes(),
@@ -597,7 +560,7 @@ impl BlockStore for IndexerStore {
     ) -> anyhow::Result<()> {
         trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
-        // add slot to height's "slot collection"
+        // add height to slot's "height collection"
         let mut heights = self
             .get_block_heights_from_global_slot(global_slot)?
             .unwrap_or_default();
@@ -611,9 +574,9 @@ impl BlockStore for IndexerStore {
             )?;
         }
 
-        // add height to slot's "height collection"
+        // add slot to height's "slot collection"
         let mut slots = self
-            .get_global_slots_from_height(blockchain_length)?
+            .get_block_global_slots_from_height(blockchain_length)?
             .unwrap_or_default();
         if !slots.contains(&global_slot) {
             slots.push(global_slot);
@@ -627,15 +590,15 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_global_slots_from_height(
+    fn get_block_global_slots_from_height(
         &self,
         blockchain_length: u32,
     ) -> anyhow::Result<Option<Vec<u32>>> {
-        trace!("Getting global slot for height {}", blockchain_length);
+        trace!("Getting global slot for height {blockchain_length}");
         Ok(self
             .database
             .get_pinned_cf(
-                self.block_global_slot_to_heights_cf(),
+                self.block_height_to_global_slots_cf(),
                 to_be_bytes(blockchain_length),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
@@ -649,7 +612,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(
-                self.block_height_to_global_slots_cf(),
+                self.block_global_slot_to_heights_cf(),
                 to_be_bytes(global_slot),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
@@ -956,6 +919,19 @@ fn pk_block_sort_key(pk: PublicKey, sort_value: u32, state_hash: BlockHash) -> V
     key.append(&mut to_be_bytes(sort_value));
     key.append(&mut state_hash.to_bytes());
     key
+}
+
+fn block_cmp(db: &IndexerStore, a: &BlockHash, b: &BlockHash) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let a_canonicity = db.get_block_canonicity(a).ok().flatten();
+    let b_canonicity = db.get_block_canonicity(b).ok().flatten();
+    let a_cmp = db.get_block_comparison(a).unwrap().unwrap();
+    let b_cmp = db.get_block_comparison(b).unwrap().unwrap();
+    match (a_canonicity, b_canonicity) {
+        (Some(Canonicity::Canonical), _) => Ordering::Less,
+        (_, Some(Canonicity::Canonical)) => Ordering::Greater,
+        _ => a_cmp.cmp(&b_cmp),
+    }
 }
 
 fn display_mode(mode: IteratorMode) -> String {

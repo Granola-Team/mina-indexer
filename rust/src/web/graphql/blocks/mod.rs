@@ -3,7 +3,7 @@ use super::{
     millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD, PK,
 };
 use crate::{
-    block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
+    block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::{
         internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
         signed::SignedCommandWithData,
@@ -16,7 +16,9 @@ use crate::{
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{block_state_hash_from_key, pk_of_key, to_be_bytes, IndexerStore},
+    store::{
+        block_state_hash_from_key, block_u32_prefix_from_key, pk_of_key, to_be_bytes, IndexerStore,
+    },
     web::graphql::gen::BlockQueryInput,
 };
 use anyhow::Context;
@@ -128,10 +130,7 @@ impl BlocksQueryRoot {
             .flatten()
         {
             let state_hash = block_state_hash_from_key(&key)?;
-            let pcb = db
-                .get_block(&state_hash)?
-                .with_context(|| format!("state hash {state_hash}"))
-                .expect("block");
+            let pcb = get_block(db, &state_hash);
             let canonical = get_block_canonicity(db, &state_hash.0);
             let block_num_snarks = db
                 .get_block_snarks_count(&pcb.state_hash())
@@ -220,12 +219,16 @@ impl BlocksQueryRoot {
 
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
-            return Ok(db
-                .get_blocks_at_height(block_height)?
-                .iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .take(limit)
-                .collect());
+            for state_hash in db.get_blocks_at_height(block_height)?.iter() {
+                let pcb = get_block(db, state_hash);
+                if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
+                    blocks.push(block);
+                    if blocks.len() == limit {
+                        break;
+                    }
+                }
+            }
+            return Ok(blocks);
         }
 
         // global slot query
@@ -234,13 +237,18 @@ impl BlocksQueryRoot {
             .and_then(|q| q.protocol_state.as_ref())
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
+            .or(query.as_ref().and_then(|q| q.global_slot_since_genesis))
         {
-            return Ok(db
-                .get_blocks_at_slot(global_slot as u32)?
-                .iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
-                .take(limit)
-                .collect());
+            for state_hash in db.get_blocks_at_slot(global_slot)?.iter() {
+                let pcb = get_block(db, state_hash);
+                if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
+                    blocks.push(block);
+                    if blocks.len() == limit {
+                        break;
+                    }
+                }
+            }
+            return Ok(blocks);
         }
 
         // coinbase receiver query
@@ -265,10 +273,9 @@ impl BlocksQueryRoot {
                 }
 
                 let state_hash = block_state_hash_from_key(&key)?;
-                let pcb = db.get_block(&state_hash)?.unwrap();
+                let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
-
                     if blocks.len() == limit {
                         break;
                     }
@@ -299,10 +306,9 @@ impl BlocksQueryRoot {
                 }
 
                 let state_hash = block_state_hash_from_key(&key)?;
-                let pcb = db.get_block(&state_hash)?.unwrap();
+                let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
-
                     if blocks.len() == limit {
                         break;
                     }
@@ -342,24 +348,30 @@ impl BlocksQueryRoot {
                 (min_bound, max_bound)
             };
 
-            let mut block_heights: Vec<u32> = (min..=max).collect();
-            if sort_by == BlockHeightDesc {
-                block_heights.reverse()
-            }
+            let start = to_be_bytes(min);
+            let end = to_be_bytes(max + 1);
+            let mode = match sort_by {
+                BlockHeightAsc => From(&start, Forward),
+                _ => From(&end, Reverse),
+            };
+            for (key, _) in db.blocks_height_iterator(mode).flatten() {
+                let height = block_u32_prefix_from_key(&key)?;
+                if height < min || height > max {
+                    break;
+                }
 
-            'outer: for height in block_heights {
-                for block in db.get_blocks_at_height(height)?.iter() {
-                    if let Some(block_with_canonicity) =
-                        precomputed_matches_query(db, &query, block, counts)
-                    {
-                        blocks.push(block_with_canonicity);
-
-                        if blocks.len() == limit {
-                            break 'outer;
-                        }
+                let state_hash = block_state_hash_from_key(&key)?;
+                let pcb = get_block(db, &state_hash);
+                if let Some(block_with_canonicity) =
+                    precomputed_matches_query(db, &query, &pcb, counts)
+                {
+                    blocks.push(block_with_canonicity);
+                    if blocks.len() == limit {
+                        break;
                     }
                 }
             }
+            reorder(db, &mut blocks, sort_by);
             return Ok(blocks);
         }
 
@@ -388,38 +400,46 @@ impl BlocksQueryRoot {
                     (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
                     (Some(gte), None) => gte,
                     (None, Some(gt)) => gt + 1,
-                    (None, None) => 1,
+                    (None, None) => 0,
                 };
 
                 let max_bound = match (*slot_since_genesis_lte, *slot_since_genesis_lt) {
                     (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
                     (Some(lte), None) => lte,
                     (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block_height()?.unwrap(),
+                    (None, None) => db.get_best_block_global_slot()?.unwrap(),
                 };
                 (min_bound, max_bound)
             };
 
-            let mut block_slots: Vec<u32> = (min..=max).collect();
-            if sort_by == GlobalSlotDesc {
-                block_slots.reverse()
-            }
+            let start = to_be_bytes(min);
+            let end = to_be_bytes(max + 1);
+            let mode = match sort_by {
+                GlobalSlotAsc => From(&start, Forward),
+                _ => From(&end, Reverse),
+            };
+            for (key, _) in db.blocks_global_slot_iterator(mode).flatten() {
+                let slot = block_u32_prefix_from_key(&key)?;
+                if slot < min || slot > max {
+                    break;
+                }
 
-            'outer: for global_slot in block_slots {
-                for block in db.get_blocks_at_slot(global_slot)?.iter() {
-                    if let Some(block_with_canonicity) =
-                        precomputed_matches_query(db, &query, block, counts)
-                    {
-                        blocks.push(block_with_canonicity);
-                        if blocks.len() == limit {
-                            break 'outer;
-                        }
+                let state_hash = block_state_hash_from_key(&key)?;
+                let pcb = get_block(db, &state_hash);
+                if let Some(block_with_canonicity) =
+                    precomputed_matches_query(db, &query, &pcb, counts)
+                {
+                    blocks.push(block_with_canonicity);
+                    if blocks.len() == limit {
+                        break;
                     }
                 }
             }
+            reorder(db, &mut blocks, sort_by);
             return Ok(blocks);
         }
 
+        // default query handler
         let start = to_be_bytes(0);
         let end = to_be_bytes(u32::MAX);
         let iter = match sort_by {
@@ -432,13 +452,12 @@ impl BlocksQueryRoot {
             let state_hash = block_state_hash_from_key(&key)?;
             let pcb = db
                 .get_block(&state_hash)?
-                .with_context(|| format!("state hash {state_hash}"))
+                .with_context(|| format!("block missing from store hash {state_hash}"))
                 .expect("block");
             let block = Block::from_precomputed(db, &pcb, counts);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 blocks.push(block);
-
                 if blocks.len() == limit {
                     break;
                 }
@@ -987,10 +1006,36 @@ impl BlockQueryInput {
                 return false;
             }
         }
-        if let Some(global_slot) = global_slot_since_genesis {
-            if block.block.global_slot_since_genesis != *global_slot {
-                return false;
-            }
+
+        // global slot
+        if protocol_state
+            .as_ref()
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.slot_since_genesis)
+            .or(*global_slot_since_genesis)
+            .map_or(false, |global_slot| {
+                block
+                    .block
+                    .protocol_state
+                    .consensus_state
+                    .slot_since_genesis
+                    != global_slot
+                    || block.block.global_slot_since_genesis != global_slot
+            })
+        {
+            return false;
+        }
+
+        // epoch slot
+        if protocol_state
+            .as_ref()
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.slot)
+            .map_or(false, |slot| {
+                block.block.protocol_state.consensus_state.slot != slot
+            })
+        {
+            return false;
         }
 
         // block_height_gt(e) & block_height_lt(e)
@@ -1053,18 +1098,6 @@ impl BlockQueryInput {
             }
         }
 
-        // slot
-        if protocol_state
-            .as_ref()
-            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
-            .and_then(|consensus_state| consensus_state.slot)
-            .map_or(false, |slot| {
-                block.block.protocol_state.consensus_state.slot as i64 != slot
-            })
-        {
-            return false;
-        }
-
         // creator account
         if let Some(creator_account) = creator_account {
             if let Some(public_key) = creator_account.public_key.as_ref() {
@@ -1097,6 +1130,79 @@ impl BlockQueryInput {
             }
         }
         true
+    }
+}
+
+fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock {
+    db.get_block(state_hash)
+        .with_context(|| format!("block missing from store {state_hash}"))
+        .unwrap()
+        .unwrap()
+}
+
+fn reorder(db: &Arc<IndexerStore>, blocks: &mut [Block], sort_by: BlockSortByInput) {
+    use std::cmp::Ordering::{self, *};
+    use BlockSortByInput::*;
+
+    fn height_cmp(db: &Arc<IndexerStore>, a: &Block, b: &Block, cmp: Ordering) -> Ordering {
+        if cmp == Equal {
+            match (a.canonical, b.canonical) {
+                (true, _) => Less,
+                (_, true) => Greater,
+                _ => db
+                    .block_cmp(
+                        &a.block.state_hash.clone().into(),
+                        &b.block.state_hash.clone().into(),
+                    )
+                    .unwrap()
+                    .unwrap(),
+            }
+        } else {
+            cmp
+        }
+    }
+    fn slot_cmp(db: &Arc<IndexerStore>, a: &Block, b: &Block, cmp: Ordering) -> Ordering {
+        if cmp == Equal {
+            match (a.canonical, b.canonical) {
+                (true, _) => Less,
+                (_, true) => Greater,
+                _ => db
+                    .block_cmp(
+                        &a.block.state_hash.clone().into(),
+                        &b.block.state_hash.clone().into(),
+                    )
+                    .unwrap()
+                    .unwrap(),
+            }
+        } else {
+            cmp
+        }
+    }
+    match sort_by {
+        BlockHeightAsc => blocks
+            .sort_by(|a, b| height_cmp(db, a, b, a.block.block_height.cmp(&b.block.block_height))),
+        BlockHeightDesc => blocks
+            .sort_by(|a, b| height_cmp(db, a, b, b.block.block_height.cmp(&a.block.block_height))),
+        GlobalSlotAsc => blocks.sort_by(|a, b| {
+            slot_cmp(
+                db,
+                a,
+                b,
+                a.block
+                    .global_slot_since_genesis
+                    .cmp(&b.block.global_slot_since_genesis),
+            )
+        }),
+        GlobalSlotDesc => blocks.sort_by(|a, b| {
+            slot_cmp(
+                db,
+                a,
+                b,
+                b.block
+                    .global_slot_since_genesis
+                    .cmp(&a.block.global_slot_since_genesis),
+            )
+        }),
     }
 }
 
