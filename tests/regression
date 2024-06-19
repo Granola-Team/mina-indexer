@@ -1674,6 +1674,15 @@ test_hurl() {
     teardown
 }
 
+test_version_file() {
+    enter_test test_version_file
+
+    idxr_server_start_standard
+    wait_for_socket
+
+    [ -e "./database/INDEXER_VERSION" ]
+}
+
 test_missing_block_recovery() {
     enter_test test_missing_block_recovery
 
@@ -1745,6 +1754,7 @@ if [ "$#" -eq 0 ]; then
     test_internal_commands
     test_start_from_config
     test_hurl
+    test_version_file
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1784,6 +1794,7 @@ else
             "test_hurl") test_hurl ;;
             "test_clean_shutdown") test_clean_shutdown ;;
             "test_clean_kill") test_clean_kill ;;
+            "test_version_file") test_version_file ;;
             "test_release") test_release ;;
             # tier 2 tests (run via `just tier2-test`)
             "test_many_blocks") test_many_blocks ;;
