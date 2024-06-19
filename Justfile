@@ -45,8 +45,7 @@ shellcheck:
   @echo "--- Linting shell scripts"
   shellcheck tests/regression
   shellcheck tests/stage-*
-  shellcheck ops/productionize
-  shellcheck ops/ingest-all
+  shellcheck ops/deploy
 
 lint: shellcheck && audit disallow-unused-cargo-deps
   @echo "--- Linting"
@@ -123,7 +122,7 @@ delete-database:
 # Run a server as if in production.
 productionize: nix-build
   @echo "--- Productionizing"
-  time ./ops/productionize
+  time ./ops/deploy "$HOME"/mina-indexer 5
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
@@ -135,6 +134,6 @@ tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   @echo "--- Performing test_release"
   time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
-tier3:
+tier3: nix-build
   @echo "--- Ingesting all blocks..."
-  time ops/ingest-all
+  time ops/deploy /mnt/logs 6 test

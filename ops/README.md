@@ -13,12 +13,11 @@ Files in this directory:
 ./download-staking-ledgers
 ./granola-rclone
 ./hashes.list
-./ingest-all
 ./maybe-dups
 ./minaexplorer/download-staking-ledgers
 ./minaexplorer/ledgers.json
 ./o1-labs/download-mina-blocks
-./productionize
+./deploy
 ./rclone.conf
 ./upload-mina-blocks
 ./upload-staking-ledgers
@@ -55,10 +54,6 @@ Files in this directory:
 ./hashes.list
   TBD
 
-./ingest-all
-  Script to launch the mina-indexer and ingest all of the blocks found in
-  `/mnt/mina-logs/mina_network_block_data`.
-
 ./maybe-dups
   TBD
 
@@ -78,9 +73,9 @@ Files in this directory:
   Utility to download historical Mina precomputed block logs from the bucket
   maintained by O(1) Labs.
 
-./productionize
-  Utility to simulate running a production instance of Mina Indexer. Uses
-  `"$HOME"/mina-indexer` to store files. See the instructions in the script.
+./deploy
+  Utility to manage the running of a production instance of Mina Indexer. See
+  the instructions in the script.
 
 ./rclone.conf
   A mandatory config file used by `granola-rclone`.
