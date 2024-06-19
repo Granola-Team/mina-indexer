@@ -254,7 +254,7 @@ impl SnarkQueryRoot {
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
                         .unwrap();
-                    let snark_work = db.get_snark_work_in_block(&state_hash.clone().into())?;
+                    let snark_work = db.get_snark_work_in_block(&state_hash)?;
                     let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                         summaries
                             .into_iter()

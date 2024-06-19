@@ -95,7 +95,7 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
                     .flat_map(|state_hash| {
                         if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
                             let block = db
-                                .get_block(&state_hash)
+                                .get_block(state_hash)
                                 .with_context(|| format!("block missing from store {state_hash}"))
                                 .unwrap()
                                 .unwrap();
@@ -122,7 +122,7 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
                     .flat_map(|state_hash| {
                         if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
                             let block = db
-                                .get_block(&state_hash)
+                                .get_block(state_hash)
                                 .with_context(|| format!("block missing from store {state_hash}"))
                                 .unwrap()
                                 .unwrap();

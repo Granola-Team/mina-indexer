@@ -220,7 +220,7 @@ impl BlocksQueryRoot {
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|q| q.block_height) {
             for state_hash in db.get_blocks_at_height(block_height)?.iter() {
-                let pcb = get_block(db, &state_hash);
+                let pcb = get_block(db, state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
                     if blocks.len() == limit {
@@ -1012,7 +1012,7 @@ impl BlockQueryInput {
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
-            .or(global_slot_since_genesis.clone())
+            .or(*global_slot_since_genesis)
             .map_or(false, |global_slot| {
                 block
                     .block
@@ -1140,7 +1140,7 @@ fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock
         .unwrap()
 }
 
-fn reorder(db: &Arc<IndexerStore>, blocks: &mut Vec<Block>, sort_by: BlockSortByInput) {
+fn reorder(db: &Arc<IndexerStore>, blocks: &mut [Block], sort_by: BlockSortByInput) {
     use std::cmp::Ordering::{self, *};
     use BlockSortByInput::*;
 
