@@ -134,5 +134,7 @@ tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   time tests/regression test_many_blocks
   @echo "--- Performing test_release"
   time tests/regression test_release
+
+tier3:
   @echo "--- Ingesting all blocks..."
   time ops/ingest-all

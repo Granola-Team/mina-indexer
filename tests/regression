@@ -8,8 +8,12 @@ set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
-IDXR="${1:="$SRC"/result/bin/mina-indexer}"
-shift
+if [ "$#" -ne 0 ]; then
+  IDXR="$1"
+  shift
+else
+  IDXR="$SRC"/result/bin/mina-indexer
+fi
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
