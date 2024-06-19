@@ -20,6 +20,7 @@ query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryIn
     delegationTotals {
       countDelegates
       totalDelegated
+      delegates
     }
   }
 }
@@ -53,6 +54,9 @@ jsonpath "$.data.stakes[0].token" == 1
 jsonpath "$.data.stakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
 jsonpath "$.data.stakes[0].delegationTotals.countDelegates" == 1
 jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
+
+jsonpath "$.data.stakes[0].delegationTotals.delegates" count == 1
+jsonpath "$.data.stakes[0].delegationTotals.delegates[0]" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 
 duration < 10000
 
