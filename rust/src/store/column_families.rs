@@ -203,6 +203,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting SNARKs by prover
     fn snark_work_prover_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting SNARKS by prover and block height
+    fn snark_work_prover_height_cf(&self) -> &ColumnFamily;
+
     ////////////////////
     // Username store //
     ////////////////////

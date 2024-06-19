@@ -47,6 +47,17 @@ pub trait SnarkStore {
     /// Iterator over SNARKs by prover, sorted by global slot & index
     fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
 
+    /// Set the SNARK for the prover in `global_slot` at `index`
+    fn set_snark_by_prover_height(
+        &self,
+        snark: &SnarkWorkSummary,
+        block_height: u32,
+        index: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Iterator over SNARKs by prover, sorted by block height & index
+    fn snark_prover_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+
     /// Increment snarks per epoch count
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;
 
