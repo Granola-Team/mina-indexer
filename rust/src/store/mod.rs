@@ -25,9 +25,13 @@ pub mod version_store_impl;
 use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
 use anyhow::anyhow;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 use version::{IndexerStoreVersion, VersionStore};
 
 #[derive(Debug)]
@@ -175,6 +179,8 @@ impl IndexerStore {
             IndexerStoreVersion::MINOR,
             IndexerStoreVersion::PATCH,
         )?;
+        let version = primary.get_db_version().expect("db version exists");
+        persist_indexer_version(&version, path)?;
         Ok(primary)
     }
 
@@ -323,6 +329,23 @@ pub fn txn_block_key(txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
     let mut bytes = txn_hash.as_bytes().to_vec();
     bytes.append(&mut state_hash.clone().to_bytes());
     bytes
+}
+
+pub fn persist_indexer_version(
+    indexer_version: &IndexerStoreVersion,
+    path: &Path,
+) -> anyhow::Result<()> {
+    let mut versioned = path.to_path_buf();
+    versioned.push("INDEXER_VERSION");
+    if !versioned.exists() {
+        debug!("persisting INDEXER_VERSION in the database directory");
+        let serialized = serde_json::to_string(indexer_version)?;
+        let mut file = std::fs::File::create(versioned)?;
+        file.write_all(serialized.as_bytes())?;
+    } else {
+        debug!("INDEXER_VERSION file exists. Checking for compatability");
+    }
+    Ok(())
 }
 
 impl FixedKeys for IndexerStore {}
