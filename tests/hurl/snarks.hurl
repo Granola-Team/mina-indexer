@@ -177,5 +177,47 @@ jsonpath "$.data.snarks[63].blockHeight" == 111
 
 duration < 4000
 
+
+# filter by prover and sort by blockheight
+
+
+POST {{url}}
+```graphql
+query snarksAccountQuery($snarks_sort_by: SnarkSortByInput!, $snarks_limit: Int = 3, $snarks_query: SnarkQueryInput!) {
+    snarks(sortBy: $snarks_sort_by, limit: $snarks_limit, query: $snarks_query) {
+    canonical
+    blockHeight
+    block {
+      stateHash
+    }
+    fee
+    dateTime
+    prover
+  }
+}
+
+variables {
+  "snarks_sort_by":"BLOCKHEIGHT_ASC",
+  "snarks_limit":100,
+  "snarks_query":{
+    "prover":"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h",
+    "canonical":true,
+    "blockHeight_lte": 120
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.snarks" count == 64
+
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.snarks[63].blockHeight" == 111
+jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+
+duration < 4000
+
 # TODO global slot query
 # TODO block height/global slot/date time bounded query
