@@ -12,7 +12,7 @@ use crate::{
         staking::{self, StakingLedger},
         store::LedgerStore,
     },
-    state::{IndexerState, IndexerStateConfig},
+    state::{IndexerPhase, IndexerState, IndexerStateConfig},
     store::IndexerStore,
     unix_socket_server::{self, UnixSocketServer},
 };
@@ -270,6 +270,13 @@ pub fn initialize(
             error!("Failed to ingest staking ledger: {:?} {}", pathbuf, e);
         }
     });
+    debug!(
+        "Phase change: {} -> {}",
+        state.phase,
+        IndexerPhase::Watching
+    );
+    state.phase = IndexerPhase::Watching;
+
     Ok(state)
 }
 

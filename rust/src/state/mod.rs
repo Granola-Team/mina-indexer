@@ -487,9 +487,6 @@ impl IndexerState {
             bytesize::ByteSize::b(self.bytes_processed),
             total_time.elapsed() + offset,
         );
-
-        debug!("Phase change: {} -> {}", self.phase, IndexerPhase::Watching);
-        self.phase = IndexerPhase::Watching;
         Ok(())
     }
 
