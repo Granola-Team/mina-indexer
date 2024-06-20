@@ -33,11 +33,13 @@
             cargo-nextest
             clang
             libclang.lib
+            llvmPackages.bintools # For 'lld'
             pkg-config
             rustPlatform.bindgenHook
           ] ++ runtimeDependencies ++ lib.optionals stdenv.isDarwin [
             frameworks.Security
             frameworks.CoreServices
+            zld
           ];
 
         # used to ensure rustfmt is nightly version to support unstable features
