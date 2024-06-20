@@ -33,7 +33,9 @@
             cargo-nextest
             clang
             libclang.lib
-            llvmPackages.bintools # For 'lld'
+            mold-wrapped
+            # https://matklad.github.io/2022/03/14/rpath-or-why-lld-doesnt-work-on-nixos.html
+            # llvmPackages.bintools # For 'lld'
             pkg-config
             rustPlatform.bindgenHook
           ] ++ runtimeDependencies ++ lib.optionals stdenv.isDarwin [
