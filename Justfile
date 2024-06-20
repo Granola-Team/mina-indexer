@@ -127,13 +127,14 @@ productionize: nix-build
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
 
-# Run the 2nd tier of tests, ingesting blocks from /mnt/mina-logs...
+# Run the 2nd tier of tests.
 tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   @echo "--- Performing test_many_blocks regression test"
   time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
   time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
+# Run tier-3 tests, ingesting blocks from /mnt/mina-logs...
 tier3: nix-build
   @echo "--- Ingesting all blocks..."
-  time ops/deploy /mnt/logs 6 test
+  time ops/deploy /mnt/mina-logs 6 test
