@@ -290,9 +290,19 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
+            // properly set the upper bound for block height
+            let upper_bound = match (
+                query.as_ref().and_then(|q| q.block_height_lt),
+                query.as_ref().and_then(|q| q.block_height_lte),
+            ) {
+                (Some(lt), Some(lte)) => std::cmp::min(lte, lt - 1),
+                (Some(lt), None) => lt - 1,
+                (None, Some(lte)) => lte,
+                (None, None) => u32::MAX,
+            };
             let start = creator_account.as_bytes().to_vec();
             let mut end = start.clone();
-            end.append(&mut to_be_bytes(u32::MAX));
+            end.append(&mut to_be_bytes(upper_bound));
 
             let iter = match sort_by {
                 BlockHeightAsc => db.block_creator_block_height_iterator(From(&start, Forward)),
