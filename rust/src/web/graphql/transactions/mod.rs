@@ -127,6 +127,61 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
 
+        // iterator mode & direction determined by desired sorting
+        let mut transactions = Vec::new();
+        let (start_slot, direction) = match sort_by {
+            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
+                (0, Direction::Forward)
+            }
+            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
+                (u32::MAX, Direction::Reverse)
+            }
+        };
+
+        // from/to account (sender/receiver) query
+        if query
+            .as_ref()
+            .map_or(false, |q| q.from.as_ref().or(q.to.as_ref()).is_some())
+        {
+            let query = query.expect("query input to exisist");
+            let pk = query
+                .from
+                .as_ref()
+                .or(query.to.as_ref())
+                .expect("pk to exist");
+            let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
+            let mode = IteratorMode::From(&start, direction);
+            let txn_iter = if query.from.is_some() {
+                db.txn_from_height_iterator(mode).flatten()
+            } else {
+                db.txn_to_height_iterator(mode).flatten()
+            };
+            for (key, _) in txn_iter {
+                // public key bytes
+                let txn_pk = pk_of_key(&key);
+                if txn_pk.0 != *pk {
+                    break;
+                }
+                let txn_state_hash = state_hash_pk_txn_sort_key(&key);
+                let txn_hash = txn_hash_of_key(&key);
+                let cmd = db
+                    .get_user_command_state_hash(&txn_hash, &txn_state_hash)?
+                    .expect("command at txn hash and state hash");
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+
+                // include matching txns
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() == limit {
+                        break;
+                    }
+                };
+            }
+            return Ok(transactions);
+        }
+
         // block height bounded query
         if query.as_ref().map_or(false, |q| {
             q.block_height_gt.is_some()
@@ -188,62 +243,6 @@ impl TransactionsQueryRoot {
                         }
                     }
                 }
-            }
-            // reorder_asc(&mut transactions, sort_by);
-            return Ok(transactions);
-        }
-        // iterator mode & direction determined by desired sorting
-        let mut transactions = Vec::new();
-        let (start_slot, direction) = match sort_by {
-            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
-                (0, Direction::Forward)
-            }
-            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
-                (u32::MAX, Direction::Reverse)
-            }
-        };
-
-        // from/to account (sender/receiver) query
-
-        if query
-            .as_ref()
-            .map_or(false, |q| q.from.as_ref().or(q.to.as_ref()).is_some())
-        {
-            let query = query.expect("query input to exisist");
-            let pk = query
-                .from
-                .as_ref()
-                .or(query.to.as_ref())
-                .expect("pk to exist");
-            let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
-            let mode = IteratorMode::From(&start, direction);
-            let txn_iter = if query.from.is_some() {
-                db.txn_from_height_iterator(mode).flatten()
-            } else {
-                db.txn_to_height_iterator(mode).flatten()
-            };
-            for (key, _) in txn_iter {
-                // public key bytes
-                let txn_pk = pk_of_key(&key);
-                if txn_pk.0 != *pk {
-                    break;
-                }
-                let txn_state_hash = state_hash_pk_txn_sort_key(&key);
-                let txn_hash = txn_hash_of_key(&key);
-                let cmd = db
-                    .get_user_command_state_hash(&txn_hash, &txn_state_hash)?
-                    .expect("command at txn hash and state hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
-
-                // include matching txns
-                if query.matches(&txn) {
-                    transactions.push(txn);
-
-                    if transactions.len() == limit {
-                        break;
-                    }
-                };
             }
             return Ok(transactions);
         }
