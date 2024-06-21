@@ -5,8 +5,6 @@
 Files in this directory:
 
 ```
-./buildkite/ci-pipeline.yaml
-./buildkite/tier2-pipeline.yaml
 ./calculate_archive_ledgers.sh
 ./correct_file_names
 ./download-mina-blocks
@@ -22,15 +20,6 @@ Files in this directory:
 ./upload-mina-blocks
 ./upload-staking-ledgers
 ```
-
-./buildkite
-  Directory for settings for Buildkite.
-
-./buildkite/ci-pipeline.yaml
-  Non-authoritative YAML settings for the CI pipeline.
-
-./buildkite/tier2-pipeline.yaml
-  Non-authoritative YAML settings for the tier-2 testing (acceptance tests).
 
 ./calculate_archive_ledgers.sh
   TBD
