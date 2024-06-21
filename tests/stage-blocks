@@ -4,8 +4,15 @@
 # "$3" network, beginning with blocks of height "$1" and ending with blocks of
 # height "$2".
 
-set -x
+# set -x
 set -eu
+
+MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+
+# Put 10K blocks in place if they're not there already.
+#
+mkdir -p /mnt/mina-indexer
+"$MY_DIR"/../ops/download-mina-blocks 4 /mnt/mina-indexer/blocks
 
 MIN_LENGTH=$1
 MAX_LENGTH=$2
