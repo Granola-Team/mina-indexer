@@ -7,7 +7,7 @@
 # set -x
 set -eu
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 # Put 10K blocks in place if they're not there already.
 #
