@@ -1,9 +1,11 @@
 #! /bin/sh
 
 # Downloads Mina staking ledger logs from the Granola store.
-# $1 = destination path (e.g. /mnt/mina-indexer/staking-ledgers)
+# $1 = destination directory
 
-set -x
+# For debugging:
+# set -x
+
 set -eu
 
 RESULT='Failure.'

@@ -1,10 +1,12 @@
 #!/bin/sh
 
 # Uploads Mina node logs of blocks (so-called "precomputed blocks") to the Granola store.
-# $1 = order of magnitude of blocks desired (e.g. "4" uploads about 10,000 blocks)
-# $2 = source directory (e.g. /mnt/mina-indexer/blocks)
+# $1 = order of magnitude of blocks desired (e.g. "4" means about 10,000 blocks)
+# $2 = source directory
 
-set -x
+# For debugging, uncomment the following line:
+# set -x
+
 set -eu
 
 RESULT='Failure.'

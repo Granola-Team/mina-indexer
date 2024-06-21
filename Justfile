@@ -122,7 +122,7 @@ delete-database:
 # Run a server as if in production.
 productionize: nix-build
   @echo "--- Productionizing"
-  time ./ops/deploy "$HOME"/mina-indexer 4
+  time ./ops/deploy /mnt/mina-indexer/magnitude-4 4
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
