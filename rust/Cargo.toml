@@ -76,4 +76,4 @@ incremental = true
 
 [profile.dev]
 debug = 0
-# strip = "debuginfo"
+strip = "debuginfo"
