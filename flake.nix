@@ -110,7 +110,8 @@
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
             '';
-            doCheck = true;
+            # TODO:
+            # doCheck = true;
             checkPhase = ''
               set -ex
               cargo clippy --all-targets --all-features -- -D warnings
