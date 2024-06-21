@@ -43,9 +43,12 @@ disallow-unused-cargo-deps:
 
 shellcheck:
   @echo "--- Linting shell scripts"
-  shellcheck tests/regression
+  shellcheck tests/regression*
   shellcheck tests/stage-*
   shellcheck ops/deploy
+  shellcheck ops/productionize
+  shellcheck ops/tier3-test
+
 
 lint: shellcheck && audit disallow-unused-cargo-deps
   @echo "--- Linting"
@@ -83,21 +86,15 @@ debug-build:
 
 # Quick debug-build-and-regression-test
 bt subtest='': debug-build
-  time ./tests/regression {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
 
 # Quick (debug) unit-test, and regression-test
 tt subtest='': test-unit
-  time ./tests/regression {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
 
 test-regression subtest='': nix-build
   @echo "--- Performing regressions test(s)"
-  if [ -d /mnt/mina-indexer-dev ]; then \
-    time ./tests/regression {{TOPLEVEL}}/result/bin/mina-indexer {{subtest}} \
-  else \
-    >&2 echo '/mnt/mina-indexer-dev must exist to perform regression tests.' \
-    >@2 echo 'Failure.' \
-    exit 1 \
-  fi
+  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -128,12 +125,7 @@ delete-database:
 # Run a server as if in production.
 productionize: nix-build
   @echo "--- Productionizing"
-  if [ -d /mnt/mina-indexer-prod ]; then \
-    time ./ops/deploy /mnt/mina-indexer-prod/magnitude-4 4 \
-  else \
-    >&2 echo '/mnt/mina-indexer-prod must exist to productionize. Failure.' \
-    exit 1 \
-  fi
+  time ./ops/productionize
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
@@ -147,11 +139,5 @@ tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
 
 # Run tier-3 tests from './ops/deploy'.
 tier3: nix-build
-  @echo "--- Performing tier3 tests with 10^4 blocks"
-  if [ -d /mnt/mina-indexer-test ]; then \
-    time ./ops/deploy /mnt/mina-indexer-test/magnitude-4 4 test \
-  else \
-    >&2 echo '/mnt/mina-indexer-test must exist to perform regression tests.' \
-    >@2 echo 'Failure.' \
-    exit 1 \
-  fi
+  @echo "--- Performing tier3 tests"
+  time ./ops/tier3-test

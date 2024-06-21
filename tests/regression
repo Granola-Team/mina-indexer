@@ -84,7 +84,7 @@ cleanup() {
     exit "$err"
 }
 
-trap cleanup EXIT
+trap cleanup EXIT QUIT INT TERM
 
 ephemeral_port() {
     set +e
@@ -200,9 +200,9 @@ assert_directory_exists() {
 }
 
 teardown() {
-    shutdown_idxr
     rm -rf ./blocks
     rm -rf ./staking-ledgers
+    shutdown_idxr
     rm -rf ./database
     rm -f ./mina-indexer.sock
 }
@@ -1682,6 +1682,7 @@ test_version_file() {
     wait_for_socket
 
     [ -e "./database/INDEXER_VERSION" ]
+    teardown
 }
 
 test_missing_block_recovery() {

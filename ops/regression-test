@@ -1,0 +1,12 @@
+#! /bin/sh
+
+set -eu
+
+if [ -d /mnt/mina-indexer-dev ]; then
+  echo "Regression testing..."
+  ./tests/regression "$@"
+else
+  >&2 echo '/mnt/mina-indexer-dev must exist to perform regression tests.'
+  >@2 echo 'Failure.'
+  exit 1
+fi
