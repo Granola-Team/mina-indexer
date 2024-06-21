@@ -7,7 +7,8 @@ set -x
 set -euo pipefail
 
 # Collect the binaries under test and the test ledgers.
-SRC="$(CDPATH='' cd "$(dirname "$0")" && pwd)"/..
+SRC="$(git rev-parse --show-toplevel)"
+REV="$(git rev-parse --short=8 HEAD)"
 if [ "$#" -ne 0 ]; then
   IDXR="$1"
   shift
@@ -19,8 +20,9 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
-TEST_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')"
-cd "$TEST_DIR"
+BASE_DIR=/mnt/mina-indexer-dev/rev-"$REV"
+mkdir -p "$BASE_DIR"
+cd "$BASE_DIR"
 
 idxr() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock "$@"
@@ -79,7 +81,6 @@ cleanup() {
           fi
         fi
     fi
-    rm -rf "${TEST_DIR}"
     exit "$err"
 }
 

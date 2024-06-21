@@ -11,8 +11,8 @@ MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 # Put 10K blocks in place if they're not there already.
 #
-mkdir -p /mnt/mina-indexer
-"$MY_DIR"/../ops/download-mina-blocks 4 /mnt/mina-indexer/blocks
+mkdir -p /mnt/mina-indexer-dev
+"$MY_DIR"/../ops/download-mina-blocks 4 /mnt/mina-indexer-dev/blocks
 
 MIN_LENGTH=$1
 MAX_LENGTH=$2
@@ -22,5 +22,5 @@ OUT_DIR=$4
 for LENGTH in $(seq "$MIN_LENGTH" "$MAX_LENGTH")
 do
   mkdir -p "${OUT_DIR}"
-  cp /mnt/mina-indexer/blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
+  cp /mnt/mina-indexer-dev/blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
 done
