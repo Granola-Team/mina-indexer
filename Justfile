@@ -134,7 +134,7 @@ tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
   @echo "--- Performing test_release"
   time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
-# Run tier-3 tests, ingesting blocks from /mnt/mina-logs...
+# Run tier-3 tests from './ops/deploy'.
 tier3: nix-build
-  @echo "--- Ingesting all blocks..."
-  time ops/deploy /mnt/mina-logs 6 test
+  @echo "--- Performing tier3 tests with 10^4 blocks"
+  time ./ops/deploy /mnt/mina-indexer/magnitude-4 4 test

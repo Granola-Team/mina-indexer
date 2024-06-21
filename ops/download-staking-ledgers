@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # Downloads Mina staking ledger logs from the Granola store.
-# $1 = destination path (e.g. /mnt/mina-logs/mina_network_ledger_data)
+# $1 = destination path (e.g. /mnt/mina-indexer/staking-ledgers)
 
 set -x
 set -eu

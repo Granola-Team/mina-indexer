@@ -1,12 +1,16 @@
 #! /usr/bin/env bash
 
+# Uncomment to help with debugging:
 set -x
+
+set -eo pipefail
+
+TESTING="${3:-false}"
+
+set -u
 
 BASE_DIR="$1"
 MAGNITUDE="$2"
-TESTING="${3:-false}"
-
-set -euo pipefail
 
 # Ensure that we are within the source tree.
 #
