@@ -4,11 +4,11 @@ set -eu
 
 MAGNITUDE=4
 
-if [ -d /mnt/mina-indexer-test ]; then
+if [ -e /mnt/mina-indexer-test ]; then
   echo "Testing (tier 3) with 10^${MAGNITUDE} blocks."
   ./ops/deploy /mnt/mina-indexer-test/magnitude-"$MAGNITUDE" "$MAGNITUDE" test
 else
-  >&2 echo '/mnt/mina-indexer-dev must exist to perform regression tests.'
-  >@2 echo 'Failure.'
+  >&2 echo '/mnt/mina-indexer-test must exist to perform regression tests.'
+  >&2 echo 'Failure.'
   exit 1
 fi

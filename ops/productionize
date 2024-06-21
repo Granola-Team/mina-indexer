@@ -4,11 +4,11 @@ set -eu
 
 MAGNITUDE=4
 
-if [ -d /mnt/mina-indexer-prod ]; then
+if [ -e /mnt/mina-indexer-prod ]; then
   echo "Productionizing with 10^${MAGNITUDE} blocks."
   ./ops/deploy /mnt/mina-indexer-prod/magnitude-"$MAGNITUDE" "$MAGNITUDE"
 else
   >&2 echo '/mnt/mina-indexer-prod must exist to perform regression tests.'
-  >@2 echo 'Failure.'
+  >&2 echo 'Failure.'
   exit 1
 fi
