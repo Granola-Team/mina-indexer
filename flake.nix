@@ -33,7 +33,7 @@
             cargo-nextest
             clang
             libclang.lib
-            mold-wrapped  #https://github.com/rui314/mold#mold-a-modern-linker
+            mold-wrapped # https://github.com/rui314/mold#mold-a-modern-linker
             pkg-config
             rustPlatform.bindgenHook
           ] ++ runtimeDependencies ++ lib.optionals stdenv.isDarwin [
