@@ -9,7 +9,7 @@ MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 rc() {
   time \
     rclone \
-      -v -v \
+      --progress \
       --config "$MY_DIR"/rclone.conf \
       --buffer-size 128Mi \
       --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
