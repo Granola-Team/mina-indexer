@@ -45,6 +45,7 @@ shellcheck:
   @echo "--- Linting shell scripts"
   ruby -cw ops/regression-test
   ruby -cw ops/deploy-local-prod
+  ruby -cw ops/granola-rclone
   shellcheck tests/regression*
   shellcheck tests/stage-*
   shellcheck ops/deploy

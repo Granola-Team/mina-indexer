@@ -1,20 +1,26 @@
-#! /bin/sh
+#! /usr/bin/env -S ruby -w
 
-set -eu
+CONFIG_FILE = __dir__ + '/rclone.conf'
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
-
-# Wrap the command to access the S3 bucket (rclone).
+# It's okay to share these keys publicly, as they are read-only keys for data
+# that we want shared publicly. The data is also available to anyone via HTTPS.
 #
-rc() {
-  time \
-    rclone \
-      --progress \
-      --config "$MY_DIR"/rclone.conf \
-      --buffer-size 128Mi \
-      --s3-access-key-id "$LINODE_OBJ_ACCESS_KEY" \
-      --s3-secret-access-key "$LINODE_OBJ_SECRET_KEY" \
-      "$@"
-}
+DEFAULT_ACCESS_KEY = 'R58TFO04180PSP69L5TB'
+DEFAULT_SECRET_KEY = 'W2OUQ3V2BlhgFQdqHqx6Y0N4mdpDBv3M89trAKml'
 
-rc "$@"
+access_key = ENV['LINODE_OBJ_ACCESS_KEY'] || DEFAULT_ACCESS_KEY
+secret_key = ENV['LINODE_OBJ_SECRET_KEY'] || DEFAULT_SECRET_KEY
+
+result = system(
+  'time',
+  'rclone',
+  '--progress',
+  '--config', CONFIG_FILE,
+  '--buffer-size=128Mi',
+  "--s3-access-key-id=#{access_key}",
+  "--s3-secret-access-key=#{secret_key}",
+  *ARGV
+)
+unless result
+  abort "rclone failed"
+end
