@@ -228,36 +228,36 @@ impl SnarkQueryRoot {
             };
 
             let mut snarks = Vec::new();
-            for (key, snark) in db.snark_prover_iterator(mode).flatten() {
+            'outer: for (key, snark) in db.snark_prover_iterator(mode).flatten() {
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
-                    return Ok(snarks);
+                    break;
                 }
 
                 let global_slot = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
                 let blocks_at_slot = db.get_blocks_at_slot(global_slot)?;
-                let state_hash = blocks_at_slot[0].clone();
-                let canonical = get_block_canonicity(db, &state_hash.0);
-                let pcb = db
-                    .get_block(&state_hash)?
-                    .with_context(|| format!("block missing from store {state_hash}"))
-                    .unwrap();
-                let snark = serde_json::from_slice(&snark)?;
-                let sw = SnarkWithCanonicity {
-                    canonical,
-                    pcb,
-                    snark: (
-                        snark,
-                        state_hash,
-                        db.get_snarks_epoch_count(None).expect("epoch snarks count"),
-                        db.get_snarks_total_count().expect("total snarks count"),
-                    )
-                        .into(),
-                };
-                if query.as_ref().map_or(true, |q| q.matches(&sw)) {
-                    snarks.push(sw);
-
-                    if snarks.len() == limit {
-                        break;
+                for state_hash in blocks_at_slot {
+                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let pcb = db
+                        .get_block(&state_hash)?
+                        .with_context(|| format!("block missing from store {state_hash}"))
+                        .expect("block exists");
+                    let snark = serde_json::from_slice(&snark)?;
+                    let sw = SnarkWithCanonicity {
+                        canonical,
+                        pcb,
+                        snark: (
+                            snark,
+                            state_hash,
+                            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                            db.get_snarks_total_count().expect("total snarks count"),
+                        )
+                            .into(),
+                    };
+                    if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                        snarks.push(sw);
+                        if snarks.len() == limit {
+                            break 'outer;
+                        }
                     }
                 }
             }
