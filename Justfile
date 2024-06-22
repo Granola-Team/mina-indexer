@@ -135,9 +135,9 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
   time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer
   @echo "--- Performing test_many_blocks regression test"
-  time ./ops/regression {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
+  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
-  time ./ops/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
+  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
 # Run tier-3 tests from './ops/deploy'.
 tier3: nix-build
