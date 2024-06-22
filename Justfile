@@ -44,12 +44,11 @@ disallow-unused-cargo-deps:
 shellcheck:
   @echo "--- Linting shell scripts"
   ruby -cw ops/regression-test
+  ruby -cw ops/deploy-local-prod
   shellcheck tests/regression*
   shellcheck tests/stage-*
   shellcheck ops/deploy
-  shellcheck ops/productionize
   shellcheck ops/tier3-test
-
 
 lint: shellcheck && audit disallow-unused-cargo-deps
   @echo "--- Linting"
@@ -124,9 +123,9 @@ delete-database:
   rm -fr ./database
 
 # Run a server as if in production.
-productionize: nix-build
-  @echo "--- Productionizing"
-  time ./ops/productionize
+deploy-local-prod: nix-build
+  @echo "--- Deploying to production"
+  time ./ops/deploy-local-prod
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit test-regression

@@ -1,0 +1,22 @@
+#! /usr/bin/env -S ruby -w
+
+# Set the desired quantity of blocks, here.
+#
+MAGNITUDE=4  # 10^4 canonical blocks
+
+BASE_DIR='/mnt/mina-indexer-prod'
+
+unless File.exist?(BASE_DIR)
+  abort <<-eos
+    #{BASE_DIR} must exist to perform regression tests.
+    Failure.
+  eos
+end
+
+puts "Productionizing with 10^#{MAGNITUDE} blocks."
+deployment_exe = __dir__ + '/deploy'
+target_dir = BASE_DIR + "/magnitude-#{MAGNITUDE}"
+result = system(deployment_exe, target_dir, MAGNITUDE.to_s)
+unless result
+  abort "Failure: #{deployment_exe} #{target_dir} #{MAGNITUDE}"
+end
