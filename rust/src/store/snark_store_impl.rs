@@ -302,13 +302,14 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    /// `{prover}{slot}{index} -> snark`
+    /// `{prover}{height}{index} -> snark`
     /// - prover:         55 pk bytes
     /// - block height:   4 BE bytes
     /// - index:          4 BE bytes
     /// - snark:          serde_json encoded
     fn snark_prover_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
-        self.database.iterator_cf(self.snark_work_prover_cf(), mode)
+        self.database
+            .iterator_cf(self.snark_work_prover_height_cf(), mode)
     }
 
     fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {

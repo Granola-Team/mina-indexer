@@ -219,5 +219,41 @@ jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15De
 
 duration < 4000
 
+# Test SNARKs filtered by prover and sorted by block height
+POST {{url}}
+```graphql
+query SnarksQuery($sort_by: SnarkSortByInput, $limit: Int = 10, $query: SnarkQueryInput) {
+  snarks(sortBy: $sort_by, limit: $limit, query: $query) {
+    blockHeight
+    dateTime
+    prover
+    canonical
+    block {
+      stateHash
+    }
+    fee
+  }
+}
+
+variables {
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "limit": 100,
+  "query": {
+    "prover": "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h",
+    "canonical": true,
+    "blockHeight_lte": 111
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.snarks" count == 64
+
+jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+jsonpath "$.data.snarks[63].blockHeight" == 111
+jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+
 # TODO global slot query
 # TODO block height/global slot/date time bounded query
