@@ -92,9 +92,9 @@ bt subtest='': debug-build
 tt subtest='': test-unit
   time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
 
-test-regression subtest='': nix-build
+test-regression subtest='':
   @echo "--- Performing regressions test(s)"
-  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer {{subtest}}
+  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -128,14 +128,16 @@ productionize: nix-build
   time ./ops/productionize
 
 # Run the 1st tier of tests.
-tier1: tier1-prereqs check lint test-unit
+tier1: tier1-prereqs check lint test-unit test-regression
 
 # Run the 2nd tier of tests.
-tier2: tier2-prereqs test-regression test-unit-mina-rs && build-image
+tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
+  @echo "--- Performing regressions test(s) with Nix-built binary"
+  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer
   @echo "--- Performing test_many_blocks regression test"
-  time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
+  time ./ops/regression {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
-  time tests/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
+  time ./ops/regression {{TOPLEVEL}}/result/bin/mina-indexer test_release
 
 # Run tier-3 tests from './ops/deploy'.
 tier3: nix-build
