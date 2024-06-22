@@ -43,6 +43,7 @@ disallow-unused-cargo-deps:
 
 shellcheck:
   @echo "--- Linting shell scripts"
+  ruby -cw ops/regression-test
   shellcheck tests/regression*
   shellcheck tests/stage-*
   shellcheck ops/deploy
