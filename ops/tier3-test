@@ -2,7 +2,7 @@
 
 set -eu
 
-MAGNITUDE=4
+MAGNITUDE=5
 
 if [ -e /mnt/mina-indexer-test ]; then
   echo "Testing (tier 3) with 10^${MAGNITUDE} blocks."
