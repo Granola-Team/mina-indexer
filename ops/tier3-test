@@ -4,11 +4,13 @@ set -eu
 
 MAGNITUDE=5
 
-if [ -e /mnt/mina-indexer-test ]; then
+: "${VOLUMES_DIR:=/mnt}"
+TEST_DIR="$VOLUMES_DIR"/mina-indexer-test
+if [ -e "$TEST_DIR" ]; then
   echo "Testing (tier 3) with 10^${MAGNITUDE} blocks."
-  ./ops/deploy /mnt/mina-indexer-test/magnitude-"$MAGNITUDE" "$MAGNITUDE" test
+  ./ops/deploy "$TEST_DIR"/magnitude-"$MAGNITUDE" "$MAGNITUDE" test
 else
-  >&2 echo '/mnt/mina-indexer-test must exist to perform regression tests.'
+  >&2 echo "$TEST_DIR must exist to perform regression tests."
   >&2 echo 'Failure.'
   exit 1
 fi

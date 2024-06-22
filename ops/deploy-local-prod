@@ -4,7 +4,8 @@
 #
 MAGNITUDE=4  # 10^4 canonical blocks
 
-BASE_DIR='/mnt/mina-indexer-prod'
+VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
+BASE_DIR = VOLUMES_DIR + '/mina-indexer-prod'
 
 unless File.exist?(BASE_DIR)
   abort <<-eos

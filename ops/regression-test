@@ -1,6 +1,7 @@
 #! /usr/bin/env -S ruby -w
 
-BASE_DIR='/mnt/mina-indexer-dev'
+VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
+BASE_DIR = VOLUMES_DIR + '/mina-indexer-dev'
 
 if File.exist?(BASE_DIR)
   puts 'Regression testing...'

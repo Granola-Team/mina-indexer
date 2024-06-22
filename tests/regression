@@ -20,7 +20,9 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
-BASE_DIR=/mnt/mina-indexer-dev/rev-"$REV"
+: "${VOLUMES_DIR:=/mnt}"
+DEV_DIR="$VOLUMES_DIR"/mina-indexer-dev
+BASE_DIR="$DEV_DIR"/rev-"$REV"
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"
 
