@@ -129,7 +129,7 @@ duration < 4000
 POST {{url}}
 ```graphql
 {
-  snarks(query: {prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"}, limit: 100) {
+  snarks(query: {prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h", canonical: true}, limit: 100) {
     prover
     canonical
     blockHeight
