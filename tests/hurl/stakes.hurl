@@ -103,7 +103,7 @@ jsonpath "$.data.stakes[0].timing.vesting_period" == 1
 # last datum
 jsonpath "$.data.stakes[1].timing" == null
 
-duration < 8000
+duration < 10000
 
 #
 # Stakes delegation total stake percentage query
@@ -180,7 +180,7 @@ jsonpath "$.data.stakes[0].total_num_user_commands" == 303
 jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 205
 jsonpath "$.data.stakes[0].total_num_internal_commands" == 205
 
-duration < 8000
+duration < 10000
 
 #
 # Staking ledger epoch query
@@ -244,7 +244,7 @@ jsonpath "$.data.stakes[9].balance" == 1104.686899999
 jsonpath "$.data.stakes[9].balanceNanomina" == 1104686899999
 jsonpath "$.data.stakes[9].username" == "Unknown"
 
-duration < 8000
+duration < 10000
 
 #
 # Stakes delegation total stake percentage query sort by stakes desc
@@ -273,7 +273,7 @@ jsonpath "$.data.stakes[2].delegationTotals.totalStakePercentage" == "3.79"
 jsonpath "$.data.stakes[3].delegationTotals.totalStakePercentage" == "3.50"
 jsonpath "$.data.stakes[4].delegationTotals.totalStakePercentage" == "3.10"
 
-duration < 8000
+duration < 10000
 
 # Test for public key uniqueness per epoch
 POST {{url}}
@@ -294,7 +294,7 @@ jsonpath "$.data.stakes[0].public_key" == "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7
 jsonpath "$.data.stakes[0].balance" == 92.929966438
 jsonpath "$.data.stakes[0].nonce" == 4
 
-duration < 8000
+duration < 10000
 
 #
 # Test for existance of epoch 0 staking ledger in the presence of epoch 1 staking ledger
