@@ -1,4 +1,5 @@
 #! /usr/bin/env -S ruby -w
+# -*- mode: ruby -*-
 
 # Set the desired quantity of blocks, here.
 #
