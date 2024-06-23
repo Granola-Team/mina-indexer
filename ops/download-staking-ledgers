@@ -31,5 +31,5 @@ end
 # Files should be read-only.
 #
 Dir[DEST+'/*'].each do |f|
-  f.chmod(0444)
+  File.chmod(0444, f)
 end
