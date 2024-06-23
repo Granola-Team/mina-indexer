@@ -3,6 +3,9 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
+export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
+export TOPLEVEL := `pwd`
+export CARGO_HOME := TOPLEVEL + "/.cargo"
 IMAGE := "mina-indexer:$GIT_COMMIT_HASH"
 
 # Ensure rustfmt works in all environments
@@ -58,7 +61,8 @@ nix-build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result
+  @rm -rf result
+  @echo "Consider also 'git clean -xdfn'"
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -108,9 +112,9 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer
   @echo "--- Performing test_many_blocks regression test"
-  time ./ops/regression-test "${TOPLEVEL}"/result/bin/mina-indexer test_many_blocks
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
-  time ./ops/regression-test "${TOPLEVEL}"/result/bin/mina-indexer test_release
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
 
 # Run tier-3 tests from './ops/deploy'.
 tier3: nix-build
