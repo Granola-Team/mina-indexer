@@ -62,7 +62,7 @@ nix-build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result database mina-indexer.sock
+  rm -rf result
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -105,22 +105,6 @@ build-image:
   docker run --rm -it {{IMAGE}} mina-indexer server start --help
   docker image rm {{IMAGE}}
   rm result
-
-# Start a server in the current directory.
-start-server:
-  cd rust && cargo build
-  RUST_BACKTRACE=1 \
-  ./rust/target/debug/mina-indexer \
-    --socket ./mina-indexer.sock \
-    server start \
-      --log-level TRACE \
-      --blocks-dir ./tests/data/initial-blocks \
-      --staking-ledgers-dir ./tests/data/staking_ledgers \
-      --database-dir ./database
-
-# Delete the database created by 'start-server'.
-delete-database:
-  rm -fr ./database
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit test-regression

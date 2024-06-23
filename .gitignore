@@ -11,8 +11,5 @@
 .*.swp
 /.vscode
 
-# Running server locally
-/database
-
 # Local Cargo cache
 /.cargo/
