@@ -46,14 +46,14 @@ optimized for the Mina ecosystem.
 
 1. Install Nix [here](https://nixos.org/download.html).
 2. Enable Flakes using [this guide](https://nixos.wiki/wiki/Flakes).
-3. Install [Direnv](https://direnv.net).
+3. Install and configure [Direnv](https://direnv.net).
 
 ### Building the Project
 
-Run `just build` to compile the project. This will compile the `mina-indexer`
-binary. Run `just start-server` to start an instance.
+Run `just check` to verify that the project compiles. This will compile the
+`mina-indexer` binary in debug mode.
 
-### Running Tests
+### Testing
 
 #### Unit Tests
 
@@ -65,12 +65,65 @@ just test-unit
 
 #### Regression Tests
 
-To perform regression tests, which check for new bugs in existing
+To invoke the regression test suite, the directory '/mnt/mina-indexer-dev' must
+exist.
+
+This is on '/mnt' because the testing code may download large volumes of test
+data, and placing on '/mnt' gives an opportunity to use different storage
+volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
+you want to replace '/mnt' with another path.)
+
+To quickly perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-just test-regression
+just bt
 ```
+
+To perform the unit tests in additon to that, use:
+
+```bash
+just bt
+```
+
+To perform the test battery that the (tier-1) CI runs, use:
+
+```bash
+just tier1
+```
+
+#### More Tests
+
+To invoke a more comprehensive regression test suite, the directory
+'/mnt/mina-indexer-test' must exist.
+
+This is on '/mnt' because the testing code may download large volumes of test
+data, and placing on '/mnt' gives an opportunity to use different storage
+volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
+you want to replace '/mnt' with another path.)
+
+Invoke:
+
+```bash
+just tier2
+```
+
+Or, for even more testing:
+
+```bash
+just tier3
+```
+
+### Deployment
+
+To deploy a mina-indexer locally, '/mnt/mina-indexer-prod' must exist.
+
+This is on '/mnt' because the testing code may download large volumes of test
+data, and placing on '/mnt' gives an opportunity to use different storage
+volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
+you want to replace '/mnt' with another path.)
+
+Run `just deploy-local-prod` to start an instance.
 
 ## Generating OCI Images With Nix
 
