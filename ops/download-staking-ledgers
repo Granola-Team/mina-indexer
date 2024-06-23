@@ -1,4 +1,5 @@
 #! /usr/bin/env -S ruby -w
+# -*- mode: ruby -*-
 
 # Downloads Mina staking ledger logs from the Granola store.
 # ARGV[0] = destination directory

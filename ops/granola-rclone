@@ -1,4 +1,5 @@
 #! /usr/bin/env -S ruby -w
+# -*- mode: ruby -*-
 
 CONFIG_FILE = __dir__ + '/rclone.conf'
 
