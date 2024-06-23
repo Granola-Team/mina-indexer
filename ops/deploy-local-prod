@@ -17,8 +17,7 @@ end
 
 puts "Productionizing with 10^#{MAGNITUDE} blocks."
 deployment_exe = __dir__ + '/deploy'
-target_dir = BASE_DIR + "/magnitude-#{MAGNITUDE}"
-result = system(deployment_exe, target_dir, MAGNITUDE.to_s)
+result = system(deployment_exe, BASE_DIR, MAGNITUDE.to_s)
 unless result
-  abort "Failure: #{deployment_exe} #{target_dir} #{MAGNITUDE}"
+  abort "Failure: #{deployment_exe} #{BASE_DIR} #{MAGNITUDE}"
 end

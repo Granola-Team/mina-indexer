@@ -14,7 +14,7 @@ puts "Testing (tier 3) with 10^#{MAGNITUDE} blocks."
 deploy_exe = __dir__ + '/deploy'
 result = system(
   deploy_exe,
-  "#{TEST_DIR}/magnitude-#{MAGNITUDE}",
+  TEST_DIR,
   MAGNITUDE.to_s,
   'test'
 )
