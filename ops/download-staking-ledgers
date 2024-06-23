@@ -1,29 +1,35 @@
-#! /bin/sh
+#! /usr/bin/env -S ruby -w
 
 # Downloads Mina staking ledger logs from the Granola store.
-# $1 = destination directory
+# ARGV[0] = destination directory
 
-# For debugging:
-# set -x
+DEST = ARGV[0]
 
-set -eu
-
-RESULT='Failure.'
-exit_handler() {
-  echo "${RESULT} Exiting." >&2
-}
-trap exit_handler EXIT
-
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
-
-# Download the staking ledgers from the Granola bucket. "$1" is the destination
-# directory.
+clone_exe = __dir__ + '/granola-rclone'
 
 # Verify that we can connect.
-"$MY_DIR"/granola-rclone lsd linode:
+#
+args = [clone_exe, 'lsd', 'linode:']
+result = system(*args)
+unless result
+  abort 'granola-rclone does not work'
+end
 
 # Perform the download.
-"$MY_DIR"/granola-rclone sync --metadata linode:granola-mina-staking-ledgers "$1"
-RESULT='Staking ledgers downloaded.'
+#
+result = system(
+  clone_exe,
+  'sync',
+  '--metadata',
+  'linode:granola-mina-staking-ledgers',
+  DEST
+)
+unless result
+  abort 'Staking ledger download failed.'
+end
 
-chmod -R a-wx "$1"/*
+# Files should be read-only.
+#
+Dir[DEST+'/*'].each do |f|
+  f.chmod(0444)
+end

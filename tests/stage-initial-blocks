@@ -1,20 +1,20 @@
-#! /bin/sh
-#
-# Populates the "$4" directory with precomputed block records from the Mina
-# "$3" network, beginning with blocks of height "$1" and ending with blocks of
-# height "$2" (less than 120).
+#! /usr/bin/env -S ruby -w
 
-set -eu
+START_BLOCK = ARGV[0]
+END_BLOCK = ARGV[1]
+NETWORK = ARGV[2]
+DEST = ARGV[3]
 
-MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+require 'fileutils'
 
-MIN_LENGTH=$1
-MAX_LENGTH=$2
-NETWORK=$3
-OUT_DIR=$4
-
-for LENGTH in $(seq "$MIN_LENGTH" "$MAX_LENGTH")
-do
-  mkdir -p "${OUT_DIR}"
-  cp "${MY_DIR}"/data/initial-blocks/"${NETWORK}"-"${LENGTH}"-*.json "${OUT_DIR}"/
-done
+SOURCE_DIR = __dir__ + '/data/initial-blocks'
+PREFIX = SOURCE_DIR + '/' + NETWORK + '-'
+FileUtils.mkdir_p(DEST, verbose: true)
+for block in START_BLOCK..END_BLOCK
+  Dir[PREFIX + block + '-*.json'].each do |src|
+    target = DEST + '/' + File.basename(src)
+    unless File.exist?(target)
+      FileUtils.cp(src, target, verbose: true)
+    end
+  end
+end

@@ -21,6 +21,7 @@ default:
 # Check for presence of dev dependencies.
 tier1-prereqs:
   @echo "--- Checking for tier-1 prereqs"
+  ruby --version
   cd rust && cargo --version
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
@@ -37,24 +38,23 @@ tier2-prereqs: tier1-prereqs
 audit:
   @echo "--- Performing Cargo audit"
   cd rust && time cargo audit
-
-disallow-unused-cargo-deps:
   cd rust && cargo machete Cargo.toml
 
-shellcheck:
-  @echo "--- Linting shell scripts"
+lint: && audit
+  @echo "--- Linting ops scripts"
   ruby -cw ops/regression-test
   ruby -cw ops/deploy-local-prod
   ruby -cw ops/granola-rclone
+  ruby -cw ops/tier3-test
+  ruby -cw ops/download-staking-ledgers
+  ruby -cw tests/stage-initial-blocks
   shellcheck tests/regression*
-  shellcheck tests/stage-*
+  shellcheck tests/stage-blocks
   shellcheck ops/deploy
-  shellcheck ops/tier3-test
-
-lint: shellcheck && audit disallow-unused-cargo-deps
-  @echo "--- Linting"
+  @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
+  @echo "--- Linting Nix configs"
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
 
 nix-build:
@@ -123,11 +123,6 @@ start-server:
 delete-database:
   rm -fr ./database
 
-# Run a server as if in production.
-deploy-local-prod: nix-build
-  @echo "--- Deploying to production"
-  time ./ops/deploy-local-prod
-
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit test-regression
 
@@ -144,3 +139,8 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
 tier3: nix-build
   @echo "--- Performing tier3 tests"
   time ./ops/tier3-test
+
+# Run a server as if in production.
+deploy-local-prod: nix-build
+  @echo "--- Deploying to production"
+  time ./ops/deploy-local-prod
