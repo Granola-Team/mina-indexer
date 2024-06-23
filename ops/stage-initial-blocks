@@ -7,7 +7,7 @@ DEST = ARGV[3]
 
 require 'fileutils'
 
-SOURCE_DIR = __dir__ + '/data/initial-blocks'
+SOURCE_DIR = __dir__ + '/../tests/data/initial-blocks'
 PREFIX = SOURCE_DIR + '/' + NETWORK + '-'
 FileUtils.mkdir_p(DEST, verbose: true)
 for block in START_BLOCK..END_BLOCK

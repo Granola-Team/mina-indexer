@@ -159,23 +159,19 @@ idxr_server_replay() {
 }
 
 stage_mainnet_blocks() {
-    local BLOCKS_FETCHER="$SRC"/tests/stage-blocks
-    "$BLOCKS_FETCHER" 2 "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks 2 "$1" mainnet "$2"
 }
 
 dl_mainnet() {
-    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
-    "$BLOCKS_FETCHER" 2 "$1" mainnet "$2"
+    "$SRC"/ops/stage-initial-blocks 2 "$1" mainnet "$2"
 }
 
 dl_mainnet_single() {
-    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
-    "$BLOCKS_FETCHER" "$1" "$1" mainnet "$2"
+    "$SRC"/ops/stage-initial-blocks "$1" "$1" mainnet "$2"
 }
 
 dl_mainnet_range() {
-    local BLOCKS_FETCHER="$SRC"/tests/stage-initial-blocks
-    "$BLOCKS_FETCHER" "$1" "$2" mainnet "$3"
+    "$SRC"/ops/stage-initial-blocks "$1" "$2" mainnet "$3"
 }
 
 assert() {

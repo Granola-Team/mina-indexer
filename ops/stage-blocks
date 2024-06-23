@@ -1,0 +1,30 @@
+#! /usr/bin/env -S ruby -w
+
+START_BLOCK = ARGV[0]
+END_BLOCK = ARGV[1]
+NETWORK = ARGV[2]
+DEST = ARGV[3]
+
+require 'fileutils'
+
+# Put 10K blocks in place if they're not there already.
+#
+VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
+DEV_DIR = VOLUMES_DIR + '/mina-indexer-dev'
+FileUtils.mkdir_p(DEV_DIR)
+BLOCKS_DIR = DEV_DIR + '/blocks'
+system(
+  __dir__ + '/download-mina-blocks',
+  '4',
+  BLOCKS_DIR
+) || abort("Failure of download-mina-blocks")
+
+FileUtils.mkdir_p(DEST)
+for block in START_BLOCK..END_BLOCK
+  Dir[BLOCKS_DIR + '/' + NETWORK + '-' + block + "-*.json"].each do |src|
+    target = DEST + '/' + File.basename(src)
+    unless File.exist?(target)
+      FileUtils.cp(src, target, verbose: true)
+    end
+  end
+end

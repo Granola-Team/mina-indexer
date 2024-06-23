@@ -47,9 +47,8 @@ lint: && audit
   ruby -cw ops/granola-rclone
   ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
-  ruby -cw tests/stage-initial-blocks
+  ruby -cw tests/stage*blocks
   shellcheck tests/regression*
-  shellcheck tests/stage-blocks
   shellcheck ops/deploy
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
