@@ -3,8 +3,8 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
-TOPLEVEL := `pwd`
-export CARGO_HOME := TOPLEVEL + ".cargo"
+export TOPLEVEL := `pwd`
+export CARGO_HOME := TOPLEVEL + "/.cargo"
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
@@ -62,7 +62,8 @@ nix-build:
 
 clean:
   cd rust && cargo clean
-  rm -rf result
+  @rm -rf result
+  @echo "Consider also 'git clean -xdfn'"
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -84,17 +85,13 @@ test-unit-mina-rs:
 debug-build:
   cd rust && cargo build
 
-# Quick debug-build-and-regression-test
+# Quick debug-build and regression-test
 bt subtest='': debug-build
-  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
 
-# Quick (debug) unit-test, and regression-test
+# Quick (debug) unit-test and regression-test
 tt subtest='': test-unit
-  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
-
-test-regression subtest='':
-  @echo "--- Performing regressions test(s)"
-  time ./ops/regression-test {{TOPLEVEL}}/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -107,16 +104,18 @@ build-image:
   rm result
 
 # Run the 1st tier of tests.
-tier1: tier1-prereqs check lint test-unit test-regression
+tier1: tier1-prereqs check lint test-unit
+  @echo "--- Performing regressions test(s)"
+  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer
 
 # Run the 2nd tier of tests.
 tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
-  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer
   @echo "--- Performing test_many_blocks regression test"
-  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer test_many_blocks
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_many_blocks
   @echo "--- Performing test_release"
-  time ./ops/regression-test {{TOPLEVEL}}/result/bin/mina-indexer test_release
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
 
 # Run tier-3 tests from './ops/deploy'.
 tier3: nix-build

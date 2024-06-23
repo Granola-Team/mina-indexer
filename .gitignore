@@ -2,9 +2,14 @@
 /result
 /.gitconfig
 
-# direnv
+# direnv creates this directory as a cache
 .direnv
+
+# direnv reads this file for (local, custom) environment variables
 .env
+
+# direnv reads its configuration from .envrc, so never ignore that!
+!.envrc
 
 # Editor Droppings
 .idea*
