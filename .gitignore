@@ -4,7 +4,7 @@
 
 # direnv
 .direnv
-.envrc
+.env
 
 # Editor Droppings
 .idea*
