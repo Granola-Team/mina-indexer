@@ -8,29 +8,27 @@ DEST = ARGV[3]
 
 require 'fileutils'
 
-# Put either 1K or 10K blocks in place if they're not there already.
+# Put 10K blocks in place if they're not there already.
 #
-if END_BLOCK < 1000
-  magnitude = 3
-else
-  magnitude = 4
-end
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 DEV_DIR = VOLUMES_DIR + '/mina-indexer-dev'
 FileUtils.mkdir_p(DEV_DIR)
 BLOCKS_DIR = DEV_DIR + '/blocks'
 system(
   __dir__ + '/download-mina-blocks',
-  magnitude.to_s,
+  '4',
   BLOCKS_DIR
 ) || abort("Failure of download-mina-blocks")
 
 FileUtils.mkdir_p(DEST)
+print 'Staging blocks'
 for block in START_BLOCK..END_BLOCK
   Dir[BLOCKS_DIR + '/' + NETWORK + '-' + block.to_s + "-*.json"].each do |src|
+    print '.'
     target = DEST + '/' + File.basename(src)
     unless File.exist?(target)
-      FileUtils.cp(src, target, verbose: true)
+      FileUtils.cp(src, target)
     end
   end
 end
+puts
