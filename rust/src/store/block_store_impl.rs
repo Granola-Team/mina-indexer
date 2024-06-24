@@ -8,15 +8,14 @@ use crate::{
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::{
-        diff::{account::PaymentDiff, LedgerDiff},
-        public_key::PublicKey,
-        store::LedgerStore,
-    },
+    ledger::{diff::LedgerDiff, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
-        to_be_bytes, u32_prefix_key, username::UsernameStore, DBUpdate, IndexerStore,
+        account::{AccountBalanceUpdate, AccountStore},
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, to_be_bytes,
+        u32_prefix_key,
+        username::UsernameStore,
+        DBUpdate, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -86,8 +85,7 @@ impl BlockStore for IndexerStore {
         // add to balance update index
         self.set_block_balance_updates(
             &state_hash,
-            block.coinbase_receiver(),
-            <DBUpdate<PaymentDiff>>::from_precomputed(block),
+            &<DBUpdate<AccountBalanceUpdate>>::from_precomputed(block),
         )?;
 
         // add block height/global slot for sorting
@@ -194,9 +192,8 @@ impl BlockStore for IndexerStore {
             self.update_canonicity(canonicity_updates)?;
 
             // balance-sorted accounts
-            let (balance_updates, coinbase_receivers) =
-                self.reorg_account_balance_updates(&old, state_hash)?;
-            self.update_account_balances(state_hash, balance_updates, coinbase_receivers)?;
+            let balance_updates = self.reorg_account_balance_updates(&old, state_hash)?;
+            self.update_account_balances(state_hash, &balance_updates)?;
 
             // usernames
             let username_updates = self.reorg_username_updates(&old, state_hash)?;

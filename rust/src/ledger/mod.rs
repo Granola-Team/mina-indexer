@@ -349,7 +349,8 @@ mod tests {
         public_key::PublicKey,
         Ledger, LedgerHash,
     };
-    use std::collections::HashMap;
+    use crate::block::BlockHash;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn default_ledger_hash_is_valid_public_key() {
@@ -365,6 +366,9 @@ mod tests {
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            state_hash: BlockHash::default(),
+            new_pk_balances: BTreeMap::new(),
+            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
@@ -392,6 +396,9 @@ mod tests {
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            state_hash: BlockHash::default(),
+            new_pk_balances: BTreeMap::new(),
+            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {

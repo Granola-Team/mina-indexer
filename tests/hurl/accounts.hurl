@@ -23,7 +23,7 @@ jsonpath "$.data.accounts" count == 1
 
 # only datum
 jsonpath "$.data.accounts[0].publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
-jsonpath "$.data.accounts[0].balance" == 719020000000
+jsonpath "$.data.accounts[0].balance" == 720020000000
 jsonpath "$.data.accounts[0].nonce" == 1
 jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].timeLocked" == false

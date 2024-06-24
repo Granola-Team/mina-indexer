@@ -1,27 +1,27 @@
-use super::column_families::ColumnFamilyHelpers;
+use super::{account::AccountBalanceUpdate, column_families::ColumnFamilyHelpers};
 use crate::{
     block::{store::BlockStore, BlockHash},
-    canonicity::store::CanonicityStore,
-    constants::*,
-    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
-    store::{account::AccountStore, u64_prefix_key, DBUpdate, IndexerStore},
+    constants::MAINNET_GENESIS_HASH,
+    ledger::public_key::PublicKey,
+    store::{
+        account::{AccountStore, DBAccountBalanceUpdate},
+        u64_prefix_key, IndexerStore,
+    },
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashSet;
 
 impl AccountStore for IndexerStore {
     fn reorg_account_balance_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<(Vec<PaymentDiff>, HashSet<PublicKey>)> {
+    ) -> anyhow::Result<DBAccountBalanceUpdate> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
             old_best_tip,
             new_best_tip
         );
-        let mut coinbase_receivers = HashSet::new();
 
         // follows the old best tip back to the common ancestor
         let mut a = old_best_tip.clone();
@@ -35,15 +35,14 @@ impl AccountStore for IndexerStore {
         let b_length = self.get_block_height(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
-        let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
+        let genesis_state_hashes: Vec<BlockHash> = vec![MAINNET_GENESIS_HASH.into()];
         for _ in 0..(b_length - a_length) {
             // check if there's a previous block
             if genesis_state_hashes.contains(&b) {
                 break;
             }
 
-            coinbase_receivers.insert(self.get_coinbase_receiver(&b)?.expect("b has a coinbase"));
-            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap().1);
+            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap());
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -52,13 +51,9 @@ impl AccountStore for IndexerStore {
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
         while a != b && !genesis_state_hashes.contains(&a) {
-            // retain coinbase receivers
-            coinbase_receivers.insert(self.get_coinbase_receiver(&a)?.expect("a has a coinbase"));
-            coinbase_receivers.insert(self.get_coinbase_receiver(&b)?.expect("b has a coinbase"));
-
             // add blocks to appropriate collection
-            unapply.append(&mut self.get_block_balance_updates(&a)?.unwrap().1);
-            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap().1);
+            unapply.append(&mut self.get_block_balance_updates(&a)?.unwrap());
+            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap());
 
             // descend
             a = a_prev;
@@ -68,18 +63,14 @@ impl AccountStore for IndexerStore {
             b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
-        // balance updates don't require this reverse, but other updates may
         apply.reverse();
-        Ok((
-            <DBUpdate<PaymentDiff>>::new(apply, unapply).to_diff_vec(),
-            coinbase_receivers,
-        ))
+        Ok(<DBAccountBalanceUpdate>::new(apply, unapply))
     }
 
     fn get_block_balance_updates(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<(PublicKey, Vec<PaymentDiff>)>> {
+    ) -> anyhow::Result<Option<Vec<AccountBalanceUpdate>>> {
         trace!("Getting block balance updates for {state_hash}");
         Ok(self
             .database
@@ -90,45 +81,35 @@ impl AccountStore for IndexerStore {
     fn update_account_balances(
         &self,
         state_hash: &BlockHash,
-        updates: Vec<PaymentDiff>,
-        coinbase_receivers: HashSet<PublicKey>,
+        updates: &DBAccountBalanceUpdate,
     ) -> anyhow::Result<()> {
         trace!("Updating account balances {state_hash}");
 
         // update balances
-        for (pk, amount) in <DBUpdate<PaymentDiff>>::balance_updates(updates) {
-            if amount != 0 {
-                let pk = pk.into();
-                let balance = self.get_account_balance(&pk)?.unwrap_or(0);
-                let balance = if coinbase_receivers.contains(&pk) && balance == 0 && amount > 0 {
-                    (balance + amount.unsigned_abs()).saturating_sub(MAINNET_ACCOUNT_CREATION_FEE.0)
-                } else if amount > 0 {
+        for (pk, amount) in <DBAccountBalanceUpdate>::balance_updates(updates) {
+            if let Some(amount) = amount {
+                let balance = self.get_account_balance(&pk)?.unwrap_or_default();
+                let balance = if amount > 0 {
                     balance + amount.unsigned_abs()
                 } else {
                     balance.saturating_sub(amount.unsigned_abs())
                 };
 
-                // coinbase receivers may need to be removed
-                self.update_account_balance(
-                    &pk,
-                    if coinbase_receivers.contains(&pk) && balance == 0 {
-                        None
-                    } else {
-                        Some(balance)
-                    },
-                )?;
+                // update balance
+                self.update_account_balance(&pk, Some(balance))?;
+            } else {
+                // remove account
+                self.update_account_balance(&pk, None)?;
             }
         }
         Ok(())
     }
 
     fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()> {
-        trace!("Updating account balance {pk} -> {balance:?}");
-
-        // update balance info
+        // delete account when balance is none
         if balance.is_none() {
             // delete stale data
-            let b = self.get_account_balance(pk)?.unwrap_or(0);
+            let b = self.get_account_balance(pk)?.unwrap_or_default();
             self.database
                 .delete_cf(self.account_balance_cf(), pk.0.as_bytes())?;
             self.database
@@ -136,6 +117,7 @@ impl AccountStore for IndexerStore {
             return Ok(());
         }
 
+        // update account balance when some
         let balance = balance.unwrap();
         if let Some(old) = self.get_account_balance(pk)? {
             // delete stale balance sorting data
@@ -160,14 +142,13 @@ impl AccountStore for IndexerStore {
     fn set_block_balance_updates(
         &self,
         state_hash: &BlockHash,
-        coinbase_receiver: PublicKey,
-        balance_updates: Vec<PaymentDiff>,
+        balance_updates: &[AccountBalanceUpdate],
     ) -> anyhow::Result<()> {
         trace!("Setting block balance updates for {state_hash}");
         self.database.put_cf(
             self.account_balance_updates_cf(),
             state_hash.0.as_bytes(),
-            serde_json::to_vec(&(coinbase_receiver, balance_updates))?,
+            serde_json::to_vec(balance_updates)?,
         )?;
         Ok(())
     }
