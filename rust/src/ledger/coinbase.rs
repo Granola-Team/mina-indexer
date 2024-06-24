@@ -14,6 +14,8 @@ pub struct Coinbase {
     pub kind: CoinbaseKind,
     pub receiver: PublicKey,
     pub supercharge: bool,
+    pub is_new_account: bool,
+    pub receiver_balance: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -85,10 +87,18 @@ impl CoinbaseKind {
 }
 
 impl Coinbase {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let receiver: PublicKey = precomputed_block.consensus_state().coinbase_receiver.into();
-        let supercharge = precomputed_block.consensus_state().supercharge_coinbase;
-        let kind = CoinbaseKind::from_precomputed(precomputed_block);
+    pub fn amount(&self) -> u64 {
+        if self.is_new_account {
+            self.receiver_balance.unwrap_or_default()
+        } else if self.supercharge {
+            2 * MAINNET_COINBASE_REWARD
+        } else {
+            MAINNET_COINBASE_REWARD
+        }
+    }
+
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
+        let kind = CoinbaseKind::from_precomputed(block);
         let kind = if kind.len() < 2 {
             kind[0].clone()
         } else {
@@ -96,8 +106,10 @@ impl Coinbase {
         };
         Self {
             kind,
-            receiver,
-            supercharge,
+            receiver: block.coinbase_receiver(),
+            receiver_balance: block.coinbase_receiver_balance(),
+            is_new_account: block.accounts_created().1.is_some(),
+            supercharge: block.consensus_state().supercharge_coinbase,
         }
     }
 

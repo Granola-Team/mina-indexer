@@ -1,7 +1,6 @@
 use super::username::Username;
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::ZkappAccount,
 };
@@ -132,12 +131,10 @@ impl Account {
     }
 
     pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
-        let balance = if pre.balance.0 == 0 {
-            amount - MAINNET_ACCOUNT_CREATION_FEE
-        } else {
-            pre.balance + amount
-        };
-        Account { balance, ..pre }
+        Account {
+            balance: pre.balance + amount,
+            ..pre
+        }
     }
 
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {

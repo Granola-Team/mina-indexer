@@ -1,7 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
-    constants::*,
     ledger::{coinbase::Coinbase, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
@@ -88,13 +87,9 @@ impl AccountDiff {
     }
 
     pub fn from_coinbase(coinbase: Coinbase) -> Vec<Self> {
-        let amount = match coinbase.supercharge {
-            true => 2 * MAINNET_COINBASE_REWARD,
-            false => MAINNET_COINBASE_REWARD,
-        };
         let mut res = vec![Self::Coinbase(CoinbaseDiff {
             public_key: coinbase.receiver.clone(),
-            amount: amount.into(),
+            amount: coinbase.amount().into(),
         })];
 
         res.append(
@@ -264,25 +259,6 @@ impl AccountDiff {
 }
 
 impl PaymentDiff {
-    pub fn unapply(self) -> Self {
-        let PaymentDiff {
-            update_type,
-            public_key,
-            amount,
-        } = self;
-
-        // change update type: debit <-> credit
-        let update_type = match update_type {
-            UpdateType::Credit => UpdateType::Debit(None),
-            UpdateType::Debit(_) => UpdateType::Credit,
-        };
-        PaymentDiff {
-            update_type,
-            public_key,
-            amount,
-        }
-    }
-
     pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
         match diff {
             AccountDiff::Payment(diff)
@@ -377,10 +353,11 @@ mod tests {
         let fee = 10000000;
         let receiver: PublicKey = "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u".into();
         let snarker: PublicKey = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw".into();
-        let supercharge = true;
         let account_diff = AccountDiff::from_coinbase(Coinbase {
+            supercharge: true,
+            is_new_account: true,
             receiver: receiver.clone(),
-            supercharge,
+            receiver_balance: Some(1439 * (1e9 as u64)),
             kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
                 receiver_pk: snarker.clone(),
                 fee,
@@ -389,7 +366,7 @@ mod tests {
         let expected_account_diff = vec![
             AccountDiff::Coinbase(CoinbaseDiff {
                 public_key: receiver.clone(),
-                amount: Amount(1440 * (1e9 as u64)),
+                amount: Amount(1439 * (1e9 as u64)),
             }),
             AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key: receiver,
@@ -466,10 +443,11 @@ mod tests {
     #[test]
     fn test_from_coinbase() {
         let receiver: PublicKey = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw".into();
-        let supercharge = true;
         let account_diff = AccountDiff::from_coinbase(Coinbase {
+            supercharge: true,
+            is_new_account: false,
+            receiver_balance: None,
             receiver: receiver.clone(),
-            supercharge,
             kind: CoinbaseKind::One(None),
         });
         let expected_account_diff = vec![AccountDiff::Coinbase(CoinbaseDiff {
