@@ -39,6 +39,9 @@ def configExecDir
   FileUtils.mkdir_p EXE_DIR
   idxr = SRC_TOP + '/result/bin/mina-indexer'
   FileUtils.cp idxr, EXE
+
+  # Add the write bit in case we need to overwrite, later.
+  File.chmod(0700, EXE)
 end
 
 # Socket
@@ -68,5 +71,5 @@ end
 
 # Database directory
 
-DB_VERSION = '0.1.1'
+DB_VERSION = '0.5.0'
 DB_DIR = BASE_DIR + '/db/' + DB_VERSION
