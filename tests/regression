@@ -2,7 +2,7 @@
 # shellcheck disable=SC2046,SC2086,SC2002
 
 # To debug, uncomment:
-set -x
+# set -x
 
 set -euo pipefail
 
@@ -53,7 +53,7 @@ shutdown_idxr() {
     # Shutdown command succeeded, but PID may still be active.
     if ! timeout 10s pwait -F ./idxr_pid; then
       # Either it timed out, or that PID did not exist.
-      if ps -p "$(cat ./idxr_pid)"; then
+      if ps -p "$(cat ./idxr_pid)" >/dev/null; then
         # The process still exists. The pwait must have timed out.
         echo "  The shutdown command did not kill the process. Failure."
         return 1
@@ -111,7 +111,8 @@ wait_for_socket() {
             return
         fi
         (( num_retries+=1 ))
-        sleep 0.5
+        echo "Sleeping ($num_retries)..."
+        sleep 1
     done
 }
 
@@ -120,6 +121,7 @@ wait_forever_for_socket() {
         if [ -S ./mina-indexer.sock ]; then
             return
         fi
+        echo "Sleeping 10 s ..."
         sleep 10
     done
 }
@@ -1599,7 +1601,7 @@ test_clean_kill() {
     timeout 10s pwait -F ./idxr_pid || true
 
     # We waited with pwait. If the process is still there, it's a fail.
-    if ps -p "$PID"; then
+    if ps -p "$PID" >/dev/null; then
         echo "  The signal did not kill the process. Failure."
         return 1
     fi
