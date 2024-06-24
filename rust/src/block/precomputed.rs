@@ -21,7 +21,7 @@ use crate::{
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
 
@@ -262,28 +262,45 @@ impl PrecomputedBlock {
             .sum()
     }
 
-    pub fn accounts_created(&self) -> Vec<PublicKey> {
-        self.commands()
-            .into_iter()
-            .filter_map(|cmd| {
-                let signed: SignedCommand = cmd.clone().into();
-                if cmd
-                    .status_data()
-                    .fee_payer_account_creation_fee_paid()
-                    .is_some()
-                {
-                    Some(signed.fee_payer_pk())
-                } else if cmd
-                    .status_data()
-                    .receiver_account_creation_fee_paid()
-                    .is_some()
-                {
-                    Some(signed.receiver_pk())
-                } else {
-                    None
-                }
-            })
-            .collect()
+    /// Returns the pair of
+    /// - new pk balances (after applying coinbase, before fee transfers)
+    /// - new coinbase receiver option
+    pub fn accounts_created(&self) -> (BTreeMap<PublicKey, u64>, Option<PublicKey>) {
+        let mut new_coinbase_receiver = None;
+        let mut account_balances = BTreeMap::new();
+
+        // maybe coinbase receiver
+        if let Some(bal) = self.coinbase_receiver_balance() {
+            if [
+                MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+                // supercharged
+                2 * MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+            ]
+            .contains(&bal)
+            {
+                account_balances.insert(self.coinbase_receiver(), bal);
+                new_coinbase_receiver = Some(self.coinbase_receiver());
+            }
+        }
+
+        // from user commands
+        self.commands().iter().for_each(|cmd| {
+            let status = cmd.status_data();
+            let signed: SignedCommand = cmd.clone().into();
+
+            if status.fee_payer_account_creation_fee_paid().is_some() {
+                account_balances.insert(
+                    signed.fee_payer_pk(),
+                    status.fee_payer_balance().unwrap_or_default(),
+                );
+            } else if status.receiver_account_creation_fee_paid().is_some() {
+                account_balances.insert(
+                    signed.receiver_pk(),
+                    status.receiver_balance().unwrap_or_default(),
+                );
+            }
+        });
+        (account_balances, new_coinbase_receiver)
     }
 
     pub fn consensus_state(&self) -> mina_consensus::ConsensusState {
