@@ -163,15 +163,18 @@ stage_mainnet_blocks() {
 }
 
 dl_mainnet() {
-    "$SRC"/ops/stage-initial-blocks 2 "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks 2 "$1" mainnet "$2"
+    # "$SRC"/ops/stage-initial-blocks 2 "$1" mainnet "$2"
 }
 
 dl_mainnet_single() {
-    "$SRC"/ops/stage-initial-blocks "$1" "$1" mainnet "$2"
+    # "$SRC"/ops/stage-initial-blocks "$1" "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks "$1" "$1" mainnet "$2"
 }
 
 dl_mainnet_range() {
-    "$SRC"/ops/stage-initial-blocks "$1" "$2" mainnet "$3"
+    # "$SRC"/ops/stage-initial-blocks "$1" "$2" mainnet "$3"
+    "$SRC"/ops/stage-blocks "$1" "$2" mainnet "$3"
 }
 
 assert() {
