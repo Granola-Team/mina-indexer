@@ -63,7 +63,7 @@ nix-build:
 
 clean:
   cd rust && cargo clean
-  @rm -rf result
+  rm -f result
   @echo "Consider also 'git clean -xdfn'"
 
 format:
@@ -118,12 +118,12 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing test_release"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
 
-# Run tier-3 tests from './ops/deploy'.
+# Run tier-3 tests.
 tier3: nix-build
   @echo "--- Performing tier3 tests"
   time ./ops/tier3-test
 
 # Run a server as if in production.
-deploy-local-prod: # nix-build
+deploy-local-prod: nix-build
   @echo "--- Deploying to production"
   time ./ops/deploy-local-prod
