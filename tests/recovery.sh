@@ -1,6 +1,10 @@
 #! /bin/sh
 
+# $1 = network
+# $2 = block height
+# $3 = destination
+
 set -eu
 
 MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
-cp "$MY_DIR"/data/initial-blocks/"$1"-"$2"-*.json "$3"
+"$MY_DIR"/../ops/stage-blocks "$2" "$2" "$1" "$3"
