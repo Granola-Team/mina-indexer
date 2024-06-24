@@ -2,7 +2,7 @@
 # shellcheck disable=SC2046,SC2086,SC2002
 
 # To debug, uncomment:
-set -x
+# set -x
 
 set -euo pipefail
 
@@ -53,7 +53,7 @@ shutdown_idxr() {
     # Shutdown command succeeded, but PID may still be active.
     if ! timeout 10s pwait -F ./idxr_pid; then
       # Either it timed out, or that PID did not exist.
-      if ps -p "$(cat ./idxr_pid)"; then
+      if ps -p "$(cat ./idxr_pid)" >/dev/null; then
         # The process still exists. The pwait must have timed out.
         echo "  The shutdown command did not kill the process. Failure."
         return 1
@@ -111,7 +111,8 @@ wait_for_socket() {
             return
         fi
         (( num_retries+=1 ))
-        sleep 0.5
+        echo "Sleeping ($num_retries)..."
+        sleep 1
     done
 }
 
@@ -120,7 +121,8 @@ wait_forever_for_socket() {
         if [ -S ./mina-indexer.sock ]; then
             return
         fi
-        sleep 60
+        echo "Sleeping 10 s ..."
+        sleep 10
     done
 }
 
@@ -162,16 +164,12 @@ stage_mainnet_blocks() {
     "$SRC"/ops/stage-blocks 2 "$1" mainnet "$2"
 }
 
-dl_mainnet() {
-    "$SRC"/ops/stage-initial-blocks 2 "$1" mainnet "$2"
-}
-
 dl_mainnet_single() {
-    "$SRC"/ops/stage-initial-blocks "$1" "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks "$1" "$1" mainnet "$2"
 }
 
 dl_mainnet_range() {
-    "$SRC"/ops/stage-initial-blocks "$1" "$2" mainnet "$3"
+    "$SRC"/ops/stage-blocks "$1" "$2" mainnet "$3"
 }
 
 assert() {
@@ -323,7 +321,7 @@ test_server_startup() {
 test_ipc_is_available_immediately() {
     enter_test test_ipc_is_available_immediately
 
-    dl_mainnet 100 ./blocks
+    stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard \
         --genesis-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
@@ -385,7 +383,7 @@ test_account_public_key_json() {
 test_canonical_root() {
     enter_test test_canonical_root
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -406,7 +404,7 @@ test_canonical_threshold() {
     num_seq_blocks=15
     canonical_threshold=2
 
-    dl_mainnet $num_seq_blocks ./blocks
+    stage_mainnet_blocks $num_seq_blocks ./blocks
 
     idxr_server_start_standard \
         --canonical-threshold $canonical_threshold
@@ -425,7 +423,7 @@ test_canonical_threshold() {
 test_best_tip() {
     enter_test test_best_tip
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -452,7 +450,7 @@ test_best_tip() {
 test_blocks() {
     enter_test test_blocks
 
-    dl_mainnet 10 ./blocks
+    stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -560,7 +558,7 @@ test_blocks() {
 test_block_copy() {
     enter_test test_block_copy
 
-    dl_mainnet 10 ./blocks
+    stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -598,7 +596,7 @@ test_block_copy() {
 test_missing_blocks() {
     enter_test test_missing_blocks
 
-    dl_mainnet 10 ./blocks
+    stage_mainnet_blocks 10 ./blocks
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
 
@@ -661,7 +659,7 @@ test_best_chain() {
     enter_test test_best_chain
 
     mkdir best_chain
-    dl_mainnet 12 ./blocks
+    stage_mainnet_blocks 12 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -709,7 +707,7 @@ test_ledgers() {
     enter_test test_ledgers
 
     mkdir ledgers
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -767,7 +765,7 @@ test_ledgers() {
 test_sync() {
     enter_test test_sync
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -799,7 +797,7 @@ test_sync() {
 test_replay() {
     enter_test test_replay
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -832,7 +830,7 @@ test_transactions() {
     enter_test test_transactions
 
     mkdir transactions
-    dl_mainnet 13 ./blocks
+    stage_mainnet_blocks 13 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -928,7 +926,7 @@ test_snark_work() {
     enter_test test_snark_work
 
     mkdir snark_work
-    dl_mainnet 120 ./blocks
+    stage_mainnet_blocks 120 ./blocks
 
     idxr_server_start_standard \
         --canonical-threshold 5
@@ -985,7 +983,7 @@ test_snark_work() {
 test_checkpoint() {
     enter_test test_checkpoint
 
-    dl_mainnet 13 ./blocks
+    stage_mainnet_blocks 13 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -1062,7 +1060,7 @@ test_many_blocks() {
 test_rest_accounts_summary() {
     enter_test test_rest_accounts_summary
 
-    dl_mainnet 100 ./blocks
+    stage_mainnet_blocks 100 ./blocks
     port=$(ephemeral_port)
 
     idxr_server start \
@@ -1158,7 +1156,7 @@ test_rest_accounts_summary() {
 test_rest_blocks() {
     enter_test test_rest_blocks
 
-    dl_mainnet 100 ./blocks
+    stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard --web-hostname "0.0.0.0"
     wait_for_socket
@@ -1182,11 +1180,10 @@ test_rest_blocks() {
     teardown
 }
 
-# Release version is fast
 test_release() {
     enter_test test_release
 
-    stage_mainnet_blocks 5000 ./blocks
+    stage_mainnet_blocks 9999 ./blocks
 
     idxr_server_start_standard
     wait_forever_for_socket
@@ -1197,10 +1194,10 @@ test_release() {
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    assert '5000' $best_length
-    assert '4990' $canonical_length
-    assert '3NKiyxhxfohCGpHkQg7TC1cNxHzAHbcHCUAdSM1aNt2u6dGtVrvC' $canonical_hash
-    assert '3NLn1bsWFjycHNJGGLy3KSxXSW6ixmFrunn1iym5GWjTXxkt6oFi' $best_hash
+    assert '9999' $best_length
+    assert '9989' $canonical_length
+    assert '3NKSj9ZRtZq9XCKkbf1a5s5YHWUMJkpLtp6irQKMPMKi24dU9yLi' $canonical_hash
+    assert '3NLjanAoyqjqmPsQHafJcvQiGW2xbvyXANHxEyNwPwan2eUoZBV9' $best_hash
 
     pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
 
@@ -1234,7 +1231,7 @@ test_genesis_block_creator() {
 test_txn_nonces() {
     enter_test test_txn_nonces
 
-    dl_mainnet 100 ./blocks
+    stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -1413,7 +1410,7 @@ test_staking_delegations() {
 test_internal_commands() {
     enter_test test_internal_commands
 
-    dl_mainnet 11 ./blocks
+    stage_mainnet_blocks 11 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
@@ -1481,7 +1478,7 @@ test_start_from_config() {
     wait_for_socket
     teardown
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
 
     port=$(ephemeral_port)
     file=./config.json
@@ -1521,7 +1518,7 @@ test_start_without_blocks_dir() {
     idxr_server_start_standard --block-watch-dir ./blocks
     wait_for_socket
 
-    dl_mainnet 15 ./blocks
+    stage_mainnet_blocks 15 ./blocks
     sleep 1
 
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1604,7 +1601,7 @@ test_clean_kill() {
     timeout 10s pwait -F ./idxr_pid || true
 
     # We waited with pwait. If the process is still there, it's a fail.
-    if ps -p "$PID"; then
+    if ps -p "$PID" >/dev/null; then
         echo "  The signal did not kill the process. Failure."
         return 1
     fi
@@ -1622,7 +1619,7 @@ test_clean_kill() {
 test_block_children() {
     enter_test test_block_children
 
-    dl_mainnet 10 ./blocks
+    stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard --staking-ledger-watch-dir ./staking-ledgers
     wait_for_socket
@@ -1660,7 +1657,7 @@ test_block_children() {
 test_hurl() {
     enter_test test_hurl
 
-    dl_mainnet 120 ./blocks
+    stage_mainnet_blocks 120 ./blocks
     port=$(ephemeral_port)
 
     idxr_server start \
@@ -1689,7 +1686,7 @@ test_version_file() {
 test_missing_block_recovery() {
     enter_test test_missing_block_recovery
 
-    dl_mainnet 5 ./blocks
+    stage_mainnet_blocks 5 ./blocks
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
     # wait for 3s in between recovery attempts
@@ -1710,7 +1707,7 @@ test_missing_block_recovery() {
     assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
-    sleep 5
+    sleep 10
 
     # check that all dangling branches have resolved & the best block has the right height
     assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
@@ -1798,9 +1795,9 @@ else
             "test_clean_shutdown") test_clean_shutdown ;;
             "test_clean_kill") test_clean_kill ;;
             "test_version_file") test_version_file ;;
-            "test_release") test_release ;;
-            # tier 2 tests (run via `just tier2-test`)
+            # Tier 2 tests:
             "test_many_blocks") test_many_blocks ;;
+            "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
         esac
     done

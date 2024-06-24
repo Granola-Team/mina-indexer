@@ -23,7 +23,7 @@ fn gaps() -> anyhow::Result<()> {
     }
 
     // only length 2 is known to be canonical
-    assert_eq!(block_parser.total_num_blocks, 25);
+    assert_eq!(block_parser.total_num_blocks, 26);
     assert_eq!(block_parser.num_deep_canonical_blocks, 1);
     Ok(())
 }

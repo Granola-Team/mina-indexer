@@ -1,8 +1,8 @@
 #! /usr/bin/env -S ruby -w
 # -*- mode: ruby -*-
 
-START_BLOCK = ARGV[0]
-END_BLOCK = ARGV[1]
+START_BLOCK = ARGV[0].to_i
+END_BLOCK = ARGV[1].to_i
 NETWORK = ARGV[2]
 DEST = ARGV[3]
 
@@ -21,11 +21,14 @@ system(
 ) || abort("Failure of download-mina-blocks")
 
 FileUtils.mkdir_p(DEST)
+print 'Staging blocks'
 for block in START_BLOCK..END_BLOCK
-  Dir[BLOCKS_DIR + '/' + NETWORK + '-' + block + "-*.json"].each do |src|
+  Dir[BLOCKS_DIR + '/' + NETWORK + '-' + block.to_s + "-*.json"].each do |src|
+    print '.'
     target = DEST + '/' + File.basename(src)
     unless File.exist?(target)
-      FileUtils.cp(src, target, verbose: true)
+      FileUtils.cp(src, target)
     end
   end
 end
+puts
