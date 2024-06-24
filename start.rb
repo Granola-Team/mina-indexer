@@ -59,13 +59,11 @@ getLedgers
 
 if current
   puts "Shutting down #{current}..."
-  unless system(
+ system(
     EXE,
     "--socket #{BASE_DIR}/mina-indexer-#{current}.socket",
     "shutdown"
-  ) do
-    puts "Shutting down (via command line and socket) failed. Moving on."
-  end
+  ) || puts('Shutting down (via command line and socket) failed. Moving on.')
 
   # Maybe the shutdown worked, maybe it didn't. Either way, give the process
   # a second to clean up.

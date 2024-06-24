@@ -24,7 +24,7 @@ end
 
 # Logs
 
-LOGS_DIR = BASE_DIR + '/logs' + REV
+LOGS_DIR = BASE_DIR + '/logs/' + REV
 
 def configLogDir
   FileUtils.mkdir_p LOGS_DIR
@@ -33,7 +33,7 @@ end
 # Executable
 
 EXE_DIR = BASE_DIR + '/bin'
-EXE = EXE_DIR + '/' + REV
+EXE = EXE_DIR + '/mina-indexer-' + REV
 
 def configExecDir
   FileUtils.mkdir_p EXE_DIR
@@ -50,9 +50,8 @@ SOCKET = BASE_DIR + '/mina-indexer-' + REV + '.socket'
 LEDGERS_DIR = BASE_DIR + "/staking-ledgers"
 
 def getLedgers
-  unless system(SRC_TOP + '/ops/download-staking-ledgers', LEDGERS_DIR) do
-    abort "Something went wrong with staking ledger downloads."
-  end
+  system(SRC_TOP + '/ops/download-staking-ledgers', LEDGERS_DIR) ||
+    abort('Something went wrong with staking ledger downloads.')
 end
 
 # Blocks
@@ -60,16 +59,14 @@ end
 BLOCKS_DIR = BASE_DIR + "/blocks"
 
 def getBlocks magnitude
-  unless system(
+  system(
     SRC_TOP + '/ops/download-mina-blocks',
     magnitude.to_s,
     BLOCKS_DIR
-  ) do
-    abort "Downloading Mina blocks failed."
-  end
+  ) || abort('Downloading Mina blocks failed.')
 end
 
 # Database directory
 
 DB_VERSION = '0.1.1'
-DB_DIR = BASE_DIR + '/db' + DB_VERSION
+DB_DIR = BASE_DIR + '/db/' + DB_VERSION
