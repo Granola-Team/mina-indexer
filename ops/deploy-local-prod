@@ -3,7 +3,7 @@
 
 # Set the desired quantity of blocks, here.
 #
-MAGNITUDE=5  # 10^5 canonical blocks
+MAGNITUDE=4  # 10^5 canonical blocks
 
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
 BASE_DIR = VOLUMES_DIR + '/mina-indexer-prod'
@@ -16,8 +16,7 @@ unless File.exist?(BASE_DIR)
 end
 
 puts "Productionizing with 10^#{MAGNITUDE} blocks."
-deployment_exe = __dir__ + '/deploy'
-result = system(deployment_exe, BASE_DIR, MAGNITUDE.to_s)
-unless result
+deployment_exe = __dir__ + '/../start.rb'
+unless system(deployment_exe, BASE_DIR, MAGNITUDE.to_s)
   abort "Failure: #{deployment_exe} #{BASE_DIR} #{MAGNITUDE}"
 end

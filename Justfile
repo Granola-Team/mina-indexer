@@ -48,6 +48,7 @@ lint: && audit
   ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage*blocks
+  ruby -cw *.rb
   shellcheck tests/regression*
   shellcheck ops/deploy
   @echo "--- Linting Rust code"
@@ -123,6 +124,6 @@ tier3: nix-build
   time ./ops/tier3-test
 
 # Run a server as if in production.
-deploy-local-prod: nix-build
+deploy-local-prod: # nix-build
   @echo "--- Deploying to production"
   time ./ops/deploy-local-prod
