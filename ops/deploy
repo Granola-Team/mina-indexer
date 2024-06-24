@@ -98,7 +98,9 @@ wait_for_socket
 
 # Tell the server to take a snapshot (checkpoint).
 #
-SNAPSHOT="$BASE_DIR"/"$REV"-snapshot
+mkdir -p "$BASE_DIR"/snapshots
+SNAPSHOT="$BASE_DIR"/snapshots/"$REV"
+
 "${BIN}" --socket "$SOCKET" checkpoints create --path "$SNAPSHOT"
 
 # Then shut it down.
