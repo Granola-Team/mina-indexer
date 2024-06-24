@@ -198,6 +198,9 @@ assert_directory_exists() {
 }
 
 teardown() {
+    rm -f ./epoch_42_ledger.json
+    rm -f ./epoch_0_staking_delegations.json
+    rm -f ./epoch_0_ledger.json
     rm -rf ./blocks
     rm -rf ./staking-ledgers
     shutdown_idxr
