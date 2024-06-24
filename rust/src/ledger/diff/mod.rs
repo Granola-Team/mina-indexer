@@ -3,15 +3,31 @@ pub mod account;
 use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
 use super::{coinbase::Coinbase, LedgerHash, PublicKey};
 use crate::{
-    block::precomputed::PrecomputedBlock,
+    block::{precomputed::PrecomputedBlock, BlockHash},
     command::{Command, Payment, UserCommandWithStatusT},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
+    /// State hash of the block
+    pub state_hash: BlockHash,
+
+    /// Staged ledger hash of the resulting ledger
     pub staged_ledger_hash: LedgerHash,
+
+    /// Some(pk) if the coinbase receiver account is new,
+    /// else None
+    pub new_coinbase_receiver: Option<PublicKey>,
+
+    /// All pk's involved in the block
     pub public_keys_seen: Vec<PublicKey>,
+
+    /// Map of new pk -> balance (after coinbase, before fee transfers)
+    pub new_pk_balances: BTreeMap<PublicKey, u64>,
+
+    /// Account updates
     pub account_diffs: Vec<AccountDiff>,
 }
 
@@ -85,10 +101,14 @@ impl LedgerDiff {
         }
         account_diffs.append(&mut account_diff_fees);
 
+        let accounts_created = precomputed_block.accounts_created();
         LedgerDiff {
+            account_diffs,
+            new_pk_balances: accounts_created.0,
+            new_coinbase_receiver: accounts_created.1,
+            state_hash: precomputed_block.state_hash(),
             staged_ledger_hash: precomputed_block.staged_ledger_hash(),
             public_keys_seen: precomputed_block.active_public_keys(),
-            account_diffs,
         }
     }
 
