@@ -1755,8 +1755,6 @@ if [ "$#" -eq 0 ]; then
     test_start_from_config
     test_hurl
     test_version_file
-    test_many_blocks
-    # We omit `test_release` because it takes too long.
 else
     # Run only specified tests
     for test_name in "$@"; do
@@ -1797,6 +1795,7 @@ else
             "test_clean_shutdown") test_clean_shutdown ;;
             "test_clean_kill") test_clean_kill ;;
             "test_version_file") test_version_file ;;
+            # Tier 2 tests:
             "test_many_blocks") test_many_blocks ;;
             "test_release") test_release ;;
             *) echo "Unknown test: $test_name" ;;
