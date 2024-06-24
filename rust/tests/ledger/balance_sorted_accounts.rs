@@ -1,4 +1,5 @@
 use crate::helpers::setup_new_db_dir;
+use anyhow::Context;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
@@ -14,8 +15,6 @@ use std::{path::PathBuf, sync::Arc};
 
 #[test]
 fn check_balance() -> anyhow::Result<()> {
-    const MAX_BLOCK_LENGTH_FILTER: u32 = 8;
-
     let store_dir = setup_new_db_dir("balance-sorted-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
@@ -29,10 +28,9 @@ fn check_balance() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
     )?;
-    let mut bp = BlockParser::new_with_canonical_chain_discovery_filtered(
+    let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,
-        MAX_BLOCK_LENGTH_FILTER,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )?;
@@ -51,11 +49,19 @@ fn check_balance() -> anyhow::Result<()> {
         let pk = pk_of_key(&key[8..]);
         let pk_key_balance = balance_of_key(&key);
         let pk_store_balance = indexer_store.get_account_balance(&pk)?.unwrap();
-        let pk_ledger_balance = best_ledger.accounts.get(&pk).unwrap().balance.0;
+        let pk_ledger_balance = best_ledger
+            .accounts
+            .get(&pk)
+            .with_context(|| format!("pk: {pk}"))
+            .unwrap()
+            .balance
+            .0;
 
-        println!(
-            "(n: {n}) {pk}: {pk_store_balance} (store), {pk_ledger_balance} (ledger), {pk_key_balance} (key)"
-        );
+        if pk_store_balance != pk_ledger_balance || pk_store_balance != pk_key_balance {
+            println!(
+                "(n: {n}) {pk}: {pk_store_balance} (store), {pk_ledger_balance} (ledger), {pk_key_balance} (key)"
+            );
+        }
 
         // store balance coincides with best ledger balance
         assert_eq!(pk_store_balance, pk_ledger_balance);
