@@ -1,7 +1,7 @@
 #! /usr/bin/env -S ruby -w
 # -*- mode: ruby -*-
 
-MAGNITUDE = 5
+MAGNITUDE = ARGV[0]
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 TEST_DIR = VOLUMES_DIR + '/mina-indexer-test'
