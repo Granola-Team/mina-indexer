@@ -107,7 +107,14 @@ build-image:
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
   @echo "--- Performing regressions test(s)"
-  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer
+  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer \
+    test_ipc_is_available_immediately \
+    test_clean_shutdown \
+    test_clean_kill \
+    test_account_balance_cli \
+    test_best_chain \
+    test_rest_accounts_summary \
+    test_hurl
 
 # Run the 2nd tier of tests.
 tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
