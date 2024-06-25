@@ -4,16 +4,67 @@
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
 BASE_DIR = VOLUMES_DIR + '/mina-indexer-dev'
 
-if File.exist?(BASE_DIR)
-  puts 'Regression testing...'
-  regression_exe = __dir__ + '/../tests/regression'
-  result = system(regression_exe, *ARGV)
-  unless result
-    abort "Failure from: #{regression_exe}"
-  end
-else
+unless File.exist?(BASE_DIR)
   abort <<-eos
     #{BASE_DIR} must exist to perform regression tests.
     Failure.
   eos
 end
+
+test_names = [
+  'indexer_cli_reports',
+  'server_startup',
+  'ipc_is_available_immediately',
+  'startup_dirs_get_created',
+  'start_without_blocks_dir',
+  'clean_shutdown',
+  'clean_kill',
+  'account_balance_cli',
+  'account_public_key_json',
+  'canonical_root',
+  'canonical_threshold',
+  'best_tip',
+  'blocks',
+  'block_copy',
+  'missing_blocks',
+  'missing_block_recovery',
+  'best_chain',
+  'block_children',
+  'ledgers',
+  'sync',
+  'replay',
+  'transactions',
+  'snark_work',
+  'checkpoint',
+  'rest_accounts_summary',
+  'rest_blocks',
+  'genesis_block_creator',
+  'txn_nonces',
+  'startup_staking_ledgers',
+  'watch_staking_ledgers',
+  'staking_delegations',
+  'internal_commands',
+  'start_from_config',
+  'hurl',
+  'version_file',
+]
+
+long_test_names = [
+  'test_many_blocks',
+  'test_release',
+]
+
+puts 'Regression testing...'
+regression_exe = __dir__ + '/../tests/regression.bash'
+EXE = ARGV.shift
+if ARGV.length < 1
+  # Run all tests, but not the long-running ones.
+  tests = test_names
+else
+  tests = ARGV
+end
+tests.each do |tn|
+  system(regression_exe, EXE, 'test_' + tn) ||
+    abort("Failure from: #{regression_exe} #{EXE} test_#{tn}")
+end
+puts 'Regression testing complete.'

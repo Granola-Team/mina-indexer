@@ -6,15 +6,12 @@
 
 set -euo pipefail
 
+IDXR="$1"
+shift
+
 # Collect the binaries under test and the test ledgers.
 SRC="$(git rev-parse --show-toplevel)"
 REV="$(git rev-parse --short=8 HEAD)"
-if [ "$#" -ne 0 ]; then
-  IDXR="$1"
-  shift
-else
-  IDXR="$SRC"/result/bin/mina-indexer
-fi
 STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
 SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 
@@ -1717,91 +1714,53 @@ test_missing_block_recovery() {
     teardown
 }
 
-# Check command-line arguments
-if [ "$#" -eq 0 ]; then
-    # No arguments provided, run all tests
-    test_indexer_cli_reports
-    test_server_startup
-    test_ipc_is_available_immediately
-    test_startup_dirs_get_created
-    test_start_without_blocks_dir
-    test_clean_shutdown
-    test_clean_kill
-    test_account_balance_cli
-    test_account_public_key_json
-    test_canonical_root
-    test_canonical_threshold
-    test_best_tip
-    test_blocks
-    test_block_copy
-    test_missing_blocks
-    test_missing_block_recovery
-    test_best_chain
-    test_block_children
-    test_ledgers
-    test_sync
-    test_replay
-    test_transactions
-    test_snark_work
-    test_checkpoint
-    test_rest_accounts_summary
-    test_rest_blocks
-    test_genesis_block_creator
-    test_txn_nonces
-    test_startup_staking_ledgers
-    test_watch_staking_ledgers
-    test_staking_delegations
-    test_internal_commands
-    test_start_from_config
-    test_hurl
-    test_version_file
-else
-    # Run only specified tests
-    for test_name in "$@"; do
-        case $test_name in
-            "test_indexer_cli_reports") test_indexer_cli_reports ;;
-            "test_server_startup") test_server_startup ;;
-            "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
-            "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
-            "test_start_without_blocks_dir") test_start_without_blocks_dir ;;
-            "test_start_without_ledgers_dir") test_start_without_ledgers_dir ;;
-            "test_account_balance_cli") test_account_balance_cli ;;
-            "test_account_public_key_json") test_account_public_key_json ;;
-            "test_canonical_root") test_canonical_root ;;
-            "test_canonical_threshold") test_canonical_threshold ;;
-            "test_best_tip") test_best_tip ;;
-            "test_blocks") test_blocks ;;
-            "test_block_copy") test_block_copy ;;
-            "test_missing_blocks") test_missing_blocks ;;
-            "test_missing_block_recovery") test_missing_block_recovery ;;
-            "test_best_chain") test_best_chain ;;
-            "test_block_children") test_block_children ;;
-            "test_ledgers") test_ledgers ;;
-            "test_sync") test_sync ;;
-            "test_replay") test_replay ;;
-            "test_transactions") test_transactions ;;
-            "test_snark_work") test_snark_work ;;
-            "test_checkpoint") test_checkpoint ;;
-            "test_rest_accounts_summary") test_rest_accounts_summary ;;
-            "test_rest_blocks") test_rest_blocks ;;
-            "test_genesis_block_creator") test_genesis_block_creator ;;
-            "test_txn_nonces") test_txn_nonces ;;
-            "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
-            "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
-            "test_staking_delegations") test_staking_delegations ;;
-            "test_internal_commands") test_internal_commands ;;
-            "test_start_from_config") test_start_from_config ;;
-            "test_hurl") test_hurl ;;
-            "test_clean_shutdown") test_clean_shutdown ;;
-            "test_clean_kill") test_clean_kill ;;
-            "test_version_file") test_version_file ;;
-            # Tier 2 tests:
-            "test_many_blocks") test_many_blocks ;;
-            "test_release") test_release ;;
-            *) echo "Unknown test: $test_name" ;;
-        esac
-    done
-fi
-
-echo
-echo "Regression testing complete."
+# ----
+# Main
+# ----
+echo Received "$@"
+for test_name in "$@"; do
+    case $test_name in
+        "test_indexer_cli_reports") test_indexer_cli_reports ;;
+        "test_server_startup") test_server_startup ;;
+        "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
+        "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
+        "test_start_without_blocks_dir") test_start_without_blocks_dir ;;
+        "test_start_without_ledgers_dir") test_start_without_ledgers_dir ;;
+        "test_account_balance_cli") test_account_balance_cli ;;
+        "test_account_public_key_json") test_account_public_key_json ;;
+        "test_canonical_root") test_canonical_root ;;
+        "test_canonical_threshold") test_canonical_threshold ;;
+        "test_best_tip") test_best_tip ;;
+        "test_blocks") test_blocks ;;
+        "test_block_copy") test_block_copy ;;
+        "test_missing_blocks") test_missing_blocks ;;
+        "test_missing_block_recovery") test_missing_block_recovery ;;
+        "test_best_chain") test_best_chain ;;
+        "test_block_children") test_block_children ;;
+        "test_ledgers") test_ledgers ;;
+        "test_sync") test_sync ;;
+        "test_replay") test_replay ;;
+        "test_transactions") test_transactions ;;
+        "test_snark_work") test_snark_work ;;
+        "test_checkpoint") test_checkpoint ;;
+        "test_rest_accounts_summary") test_rest_accounts_summary ;;
+        "test_rest_blocks") test_rest_blocks ;;
+        "test_genesis_block_creator") test_genesis_block_creator ;;
+        "test_txn_nonces") test_txn_nonces ;;
+        "test_startup_staking_ledgers") test_startup_staking_ledgers ;;
+        "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
+        "test_staking_delegations") test_staking_delegations ;;
+        "test_internal_commands") test_internal_commands ;;
+        "test_start_from_config") test_start_from_config ;;
+        "test_hurl") test_hurl ;;
+        "test_clean_shutdown") test_clean_shutdown ;;
+        "test_clean_kill") test_clean_kill ;;
+        "test_version_file") test_version_file ;;
+        # Tier 2 tests:
+        "test_many_blocks") test_many_blocks ;;
+        "test_release") test_release ;;
+        *) echo "Unknown test: $test_name"
+           exit 1
+           ;;
+    esac
+done
