@@ -48,6 +48,15 @@ end
 
 SOCKET = BASE_DIR + '/mina-indexer-' + REV + '.socket'
 
+def waitForSocket(waitInterval)
+  waitSeconds = 0
+  until File.exist?(SOCKET) do
+    puts "Waited #{waitSeconds} s for #{SOCKET}..."
+    sleep waitInterval
+    waitSeconds += waitInterval
+  end
+end
+
 # Ledgers 
 
 LEDGERS_DIR = BASE_DIR + "/staking-ledgers"

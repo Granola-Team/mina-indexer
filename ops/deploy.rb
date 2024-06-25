@@ -17,46 +17,16 @@ if File.exist? CURRENT
   end
 end
 
+# Configure the directories as needed.
+#
 createBaseDir
 configExecDir
 configLogDir
 getBlocks MAGNITUDE
 getLedgers
 
-# Perform the initial ingestion.
-#
-#Dir.chdir BASE_DIR
-#port = randomPort
-#pid = spawn EXE +
-#  " --socket #{SOCKET}" +
-#  " server start" +
-#  " --web-port #{port}" +
-#  " --log-level DEBUG" +
-#  " --database-dir #{DB_DIR}" +
-#  " --blocks-dir #{BLOCKS_DIR}" +
-#  " --staking-ledgers-dir #{LEDGERS_DIR}" +
-#  " --ledger-cadence 5000" +
-#  " > #{LOGS_DIR}/out 2> #{LOGS_DIR}/err"
-#waitSeconds = 0
-#until File.exist?(SOCKET) do
-#  puts "Waiting (#{waitSeconds} s total) for #{SOCKET}..."
-#  sleep 10
-#  waitSeconds += 10
-#end
-#puts "Socket (#{SOCKET}) was created."
-#puts "Shutting down the ingester via #{SOCKET}..."
-#success = system EXE + " --socket #{SOCKET} shutdown"
-#if success
-#  puts "... ingester successfully shut down."
-#else
-#  abort "The shut down (via #{SOCKET} failed."
-#end
-#Process::wait pid
-#
-# The ingestion should have completed at this point.
-
 # Terminate the current version, if any.
-
+#
 if current
   puts "Shutting down #{current}..."
   system(
@@ -71,6 +41,7 @@ if current
 end
 
 # Now, we take over.
+#
 File::write CURRENT, REV
 
 # Daemonize the EXE.
