@@ -48,7 +48,7 @@ lint: && audit
   ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage*blocks
-  ruby -cw *.rb
+  ruby -cw ops/*.rb
   shellcheck tests/regression*
   shellcheck ops/deploy
   @echo "--- Linting Rust code"
