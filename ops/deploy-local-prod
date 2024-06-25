@@ -1,9 +1,7 @@
 #! /usr/bin/env -S ruby -w
 # -*- mode: ruby -*-
 
-# Set the desired quantity of blocks, here.
-#
-MAGNITUDE=4  # 10^5 canonical blocks
+MAGNITUDE = ARGV[0]
 
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
 BASE_DIR = VOLUMES_DIR + '/mina-indexer-prod'

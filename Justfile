@@ -124,6 +124,6 @@ tier3 magnitude='5': # nix-build
   time ./ops/tier3-test {{magnitude}}
 
 # Run a server as if in production.
-deploy-local-prod: nix-build
+deploy-local-prod magnitude='5': nix-build
   @echo "--- Deploying to production"
-  time ./ops/deploy-local-prod
+  time ./ops/deploy-local-prod {{magnitude}}
