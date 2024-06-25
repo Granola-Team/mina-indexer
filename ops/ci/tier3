@@ -1,6 +1,6 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-3 testing.
 
-nix develop --command just tier3 5
+nix develop --command just tier3 6
 
-# The argument to "just tier3", "5", is the "magnitude". See Justfile.
+# The argument to "just tier3", "6", is the "magnitude". See Justfile.

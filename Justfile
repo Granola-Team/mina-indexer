@@ -119,11 +119,11 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
 
 # Run tier-3 tests.
-tier3 magnitude='5': nix-build
+tier3 magnitude='4': nix-build
   @echo "--- Performing tier3 tests"
   time ./ops/tier3-test {{magnitude}}
 
 # Run a server as if in production.
-deploy-local-prod magnitude='5': nix-build
+deploy-local-prod magnitude='4': nix-build
   @echo "--- Deploying to production"
   time ./ops/deploy-local-prod {{magnitude}}
