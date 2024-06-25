@@ -108,22 +108,22 @@ build-image:
 tier1: tier1-prereqs check lint test-unit
   @echo "--- Performing regressions test(s)"
   time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer \
-    test_ipc_is_available_immediately \
-    test_clean_shutdown \
-    test_clean_kill \
-    test_account_balance_cli \
-    test_best_chain \
-    test_rest_accounts_summary \
-    test_hurl
+    ipc_is_available_immediately \
+    clean_shutdown \
+    clean_kill \
+    account_balance_cli \
+    best_chain \
+    rest_accounts_summary \
+    hurl
 
 # Run the 2nd tier of tests.
 tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer
-  @echo "--- Performing test_many_blocks regression test"
-  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_many_blocks
-  @echo "--- Performing test_release"
-  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
+  @echo "--- Performing many_blocks regression test"
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer many_blocks
+  @echo "--- Performing release"
+  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer release
 
 # Run tier-3 tests.
 tier3 magnitude='4': nix-build
