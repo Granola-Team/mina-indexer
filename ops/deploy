@@ -3,11 +3,7 @@
 # Uncomment to help with debugging:
 set -x
 
-set -eo pipefail
-
-TESTING="${3:-false}"
-
-set -u
+set -euo pipefail
 
 BASE_DIR="$1"
 MAGNITUDE="$2"
@@ -108,52 +104,9 @@ SNAPSHOT="$BASE_DIR"/snapshots/"$REV"
 "${BIN}" --socket "$SOCKET" shutdown
 wait "$PID"
 
-if [ "$TESTING" == false ]; then
-  # Terminate the prior production instance using the socket, if any. This will
-  # not work if we change the on-wire comms protocol for the shutdown command,
-  # note.
-  #
-  SOCKET=./mina-indexer.sock
-  if [ -e "$SOCKET" ]; then
-      if "$BIN" --socket "$SOCKET" shutdown
-      then
-          :
-      fi
-      sleep 1  # Allow the prior indexer some time to remove the socket without
-               # surprising it by removing it, ourselves.
-      rm -f "$SOCKET"
-  fi
-
-  # We must daemonize. This requires forking a child in a new session. This is
-  # done with 'setsid'. The child must itself create a grandchild that is the
-  # mina-indexer. We use a shell invocation with a terminal '&' to fork that
-  # second time. Do not attempt to "simplify" this unless you really know what
-  # you are doing.
-  #
-  setsid \
-    sh -c \
-      '"$@" 0< /dev/null 1>> '"$LOGS"'/out 2>> '"$LOGS"'/err &' \
-      -- \
-      "$BIN" \
-        --socket "$SOCKET" \
-        server start \
-          --log-level DEBUG \
-          --web-hostname 0.0.0.0 \
-          --database-dir "$DB_DIR" \
-          --blocks-dir "$BLOCKS" \
-          --staking-ledgers-dir "$LEDGERS" \
-    &
-
-  # Wait for the above to return, otherwise the above fork'd process may not
-  # fully launch.
-  #
-  wait $!
-else
-  # We are testing, not going to production.
-
-  # See if 'replay' works.
-  # TODO: it does not work.
-  #
+# See if 'replay' works.
+# TODO: it does not work.
+echo "Skipping replay. It does not work. See issue #1196."
 #  "${BIN}" \
 #    --socket "$SOCKET" \
 #    server replay \
@@ -171,5 +124,5 @@ else
 #
 #  "${BIN}" --socket "$SOCKET" shutdown
 #  wait "$PID"
-  echo "Skipping replay. Do not work. See issue #1196."
-fi
+
+echo "Finished ops/deploy."

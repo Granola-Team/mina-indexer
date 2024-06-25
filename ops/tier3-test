@@ -1,7 +1,7 @@
 #! /usr/bin/env -S ruby -w
 # -*- mode: ruby -*-
 
-MAGNITUDE = 5
+MAGNITUDE = ARGV[0]
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 TEST_DIR = VOLUMES_DIR + '/mina-indexer-test'
@@ -12,13 +12,5 @@ end
 
 puts "Testing (tier 3) with 10^#{MAGNITUDE} blocks."
 deploy_exe = __dir__ + '/deploy'
-result = system(
-  deploy_exe,
-  TEST_DIR,
-  MAGNITUDE.to_s,
-  'test'
-)
-
-unless result
-  abort "tier3-test failed"
-end
+system(deploy_exe, TEST_DIR, MAGNITUDE.to_s) ||
+  abort('tier3-test failed')

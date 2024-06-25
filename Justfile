@@ -48,6 +48,7 @@ lint: && audit
   ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage*blocks
+  ruby -cw ops/*.rb
   shellcheck tests/regression*
   shellcheck ops/deploy
   @echo "--- Linting Rust code"
@@ -62,7 +63,7 @@ nix-build:
 
 clean:
   cd rust && cargo clean
-  @rm -rf result
+  rm -f result
   @echo "Consider also 'git clean -xdfn'"
 
 format:
@@ -117,12 +118,12 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing test_release"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer test_release
 
-# Run tier-3 tests from './ops/deploy'.
-tier3: nix-build
+# Run tier-3 tests.
+tier3 magnitude='5': nix-build
   @echo "--- Performing tier3 tests"
-  time ./ops/tier3-test
+  time ./ops/tier3-test {{magnitude}}
 
 # Run a server as if in production.
-deploy-local-prod: nix-build
+deploy-local-prod magnitude='5': nix-build
   @echo "--- Deploying to production"
-  time ./ops/deploy-local-prod
+  time ./ops/deploy-local-prod {{magnitude}}
