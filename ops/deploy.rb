@@ -3,7 +3,7 @@
 BASE_DIR = ARGV[0]
 MAGNITUDE = ARGV[1]
 
-require './helpers'  # Expects BASE_DIR and MAGNITUDE to be defined
+require __dir__ + '/helpers'  # Expects BASE_DIR and MAGNITUDE to be defined
 
 # First check to see if we are trying to redeploy the same revision that is
 # currently running.
