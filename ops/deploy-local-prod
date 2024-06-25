@@ -14,7 +14,7 @@ unless File.exist?(BASE_DIR)
 end
 
 puts "Productionizing with 10^#{MAGNITUDE} blocks."
-deployment_exe = __dir__ + '/../start.rb'
+deployment_exe = __dir__ + '/deploy.rb'
 unless system(deployment_exe, BASE_DIR, MAGNITUDE.to_s)
   abort "Failure: #{deployment_exe} #{BASE_DIR} #{MAGNITUDE}"
 end
