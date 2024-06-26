@@ -46,15 +46,16 @@ lint:
   ruby -cw ops/granola-rclone
   ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
-  ruby -cw ops/stage*blocks
+  ruby -cw ops/stage-blocks
   ruby -cw ops/*.rb
-  shellcheck tests/regression*
+  shellcheck tests/regression.bash
   shellcheck ops/deploy
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   @echo "--- Linting Nix configs"
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
+  @echo "--- Linting Cargo dependencies"
   cd rust && cargo machete Cargo.toml
 
 nix-build:
