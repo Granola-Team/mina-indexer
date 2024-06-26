@@ -316,7 +316,7 @@ pub async fn run(
             let tx = tx.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
-                    error!("Error sending event result: {}", e);
+                    panic!("Failed to send watcher event, closing: {}", e);
                 }
             });
         },
