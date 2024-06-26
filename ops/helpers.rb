@@ -30,6 +30,14 @@ def configLogDir
   FileUtils.mkdir_p LOGS_DIR
 end
 
+# Snapshots
+
+SNAPSHOT_DIR = BASE_DIR + '/snapshots/' + REV
+
+def configSnapshotDir
+  FileUtils.mkdir_p SNAPSHOT_DIR
+end
+
 # Executable
 
 EXE_DIR = BASE_DIR + '/bin'
