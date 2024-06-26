@@ -15,7 +15,7 @@ secret_key = ENV['LINODE_OBJ_SECRET_KEY'] || DEFAULT_SECRET_KEY
 result = system(
   'time',
   'rclone',
-  '--progress',
+  '--log-level', 'INFO',
   '--config', CONFIG_FILE,
   '--buffer-size=128Mi',
   "--s3-access-key-id=#{access_key}",
