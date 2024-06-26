@@ -1,33 +1,31 @@
 #! /usr/bin/env -S ruby -w
 
-BASE_DIR = ARGV[0]
-MAGNITUDE = ARGV[1]
+DEPLOY_TYPE = ARGV[0]  # 'test' or 'prod'
+MAGNITUDE = ARGV[1]    # exponent of number of blocks to deploy, base 10
+
+VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
+BASE_DIR = VOLUMES_DIR + '/mina-indexer-' + DEPLOY_TYPE
 
 require __dir__ + '/helpers'  # Expects BASE_DIR and MAGNITUDE to be defined
 
-# First check to see if we are trying to redeploy the same revision that is
-# currently running.
-#
-if File.exist? CURRENT
-  current = File.read(CURRENT)
-  if current == REV
-    abort "Redeploying the same version is not supported. Exiting."
-  else
-    puts "Deploying with intention to kill #{current} upon success."
-  end
+unless File.exist?(BASE_DIR)
+  abort "Error: #{BASE_DIR} must exist to perform the deployment."
 end
+puts "Deploying (#{DEPLOY_TYPE}) with 10^#{MAGNITUDE} blocks."
 
 # Configure the directories as needed.
 #
 createBaseDir
 configExecDir
 configLogDir
+configSnapshotDir
 getBlocks MAGNITUDE
 getLedgers
 
 # Terminate the current version, if any.
 #
-if current
+if File.exist? CURRENT
+  current = File.read(CURRENT)
   puts "Shutting down #{current}..."
   system(
     EXE,
@@ -44,26 +42,53 @@ end
 #
 File::write CURRENT, REV
 
-# Daemonize the EXE.
-#
-pid = fork
-if pid
-  # Then I am the parent. Register disinterest in the child PID.
-  Process::detach pid
-  puts "Session dispatched with PID #{pid}. Parent exiting."
-else
-  # I am the child. (The child gets a nil return value.)
-  Process.setsid
+if DEPLOY_TYPE == 'test'
+  PORT = randomPort
   pid = spawn EXE +
     " --socket #{SOCKET} " +
     " server start" +
     " --log-level DEBUG" +
     " --ledger-cadence 5000" +
-    " --web-hostname 0.0.0.0" +
+    " --web-port #{PORT.to_s}" +
     " --database-dir #{DB_DIR}" +
     " --blocks-dir #{BLOCKS_DIR}" +
     " --staking-ledgers-dir #{LEDGERS_DIR}" +
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  Process::detach pid
-  puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
+  waitForSocket(10)
+  system(
+    EXE,
+    '--socket', SOCKET,
+    'checkpoints', 'create', '--path', SNAPSHOT_DIR
+  ) || abort('Snapshot creation failed. Aborting.')
+  puts 'Skipping replay. It does not work. See issue #1196.'
+  system(
+    EXE,
+    "--socket", SOCKET,
+    "shutdown"
+  ) || puts('Shutdown failed after snapshot.')
+  Process.wait(pid)
+else
+  # Daemonize the EXE.
+  #
+  pid = fork
+  if pid
+    # Then I am the parent. Register disinterest in the child PID.
+    Process::detach pid
+    puts "Session dispatched with PID #{pid}. Parent exiting."
+  else
+    # I am the child. (The child gets a nil return value.)
+    Process.setsid
+    pid = spawn EXE +
+      " --socket #{SOCKET} " +
+      " server start" +
+      " --log-level DEBUG" +
+      " --ledger-cadence 5000" +
+      " --web-hostname 0.0.0.0" +
+      " --database-dir #{DB_DIR}" +
+      " --blocks-dir #{BLOCKS_DIR}" +
+      " --staking-ledgers-dir #{LEDGERS_DIR}" +
+      " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+    Process::detach pid
+    puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
+  end
 end

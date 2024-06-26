@@ -42,14 +42,11 @@ audit:
 lint:
   @echo "--- Linting ops scripts"
   ruby -cw ops/regression-test
-  ruby -cw ops/deploy-local-prod
   ruby -cw ops/granola-rclone
-  ruby -cw ops/tier3-test
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage-blocks
   ruby -cw ops/*.rb
   shellcheck tests/regression.bash
-  shellcheck ops/deploy
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
@@ -127,11 +124,11 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer release
 
 # Run tier-3 tests.
-tier3 magnitude='4': nix-build
+tier3 magnitude='4':  #nix-build
   @echo "--- Performing tier3 tests"
-  time ./ops/tier3-test {{magnitude}}
+  time ./ops/deploy.rb test {{magnitude}}
 
 # Run a server as if in production.
 deploy-local-prod magnitude='6': nix-build
   @echo "--- Deploying to production"
-  time ./ops/deploy-local-prod {{magnitude}}
+  time ./ops/deploy.rb prod {{magnitude}}
