@@ -10,7 +10,7 @@ use mina_indexer::{
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
-    store::IndexerStore,
+    store::{version::IndexerStoreVersion, IndexerStore},
 };
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use stderrlog::{ColorChoice, Timestamp};
@@ -36,6 +36,8 @@ enum IndexerCommand {
     /// Client commands
     #[clap(flatten)]
     Client(#[command(subcommand)] client::ClientCli),
+    /// Database version
+    DbVersion,
 }
 
 #[derive(Subcommand, Debug)]
@@ -175,6 +177,11 @@ pub async fn main() -> anyhow::Result<()> {
     let domain_socket_path = cli.socket;
 
     match cli.command {
+        IndexerCommand::DbVersion => {
+            let version = IndexerStoreVersion::default();
+            println!("{:?}", version);
+            return Ok(());
+        }
         IndexerCommand::Client(args) => client::run(&args, &domain_socket_path).await,
         IndexerCommand::Server { server_command } => {
             let (args, mut mode) = match *server_command {
