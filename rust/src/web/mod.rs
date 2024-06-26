@@ -13,6 +13,7 @@ use actix_web::{guard, middleware, web, web::Data, App, HttpServer};
 use async_graphql_actix_web::GraphQL;
 use log::warn;
 use std::{net, sync::Arc};
+use tokio_graceful_shutdown::{FutureExt, SubsystemHandle};
 
 fn load_locked_balances() -> LockedBalances {
     match LockedBalances::new() {
@@ -25,12 +26,13 @@ fn load_locked_balances() -> LockedBalances {
 }
 
 pub async fn start_web_server<A: net::ToSocketAddrs>(
+    subsys: SubsystemHandle,
     state: Arc<IndexerStore>,
     addrs: A,
-) -> std::io::Result<()> {
+) -> anyhow::Result<()> {
     let locked = Arc::new(load_locked_balances());
 
-    HttpServer::new(move || {
+    let _ = HttpServer::new(move || {
         App::new()
             .app_data(Data::new(state.clone()))
             .app_data(Data::new(locked.clone()))
@@ -51,7 +53,11 @@ pub async fn start_web_server<A: net::ToSocketAddrs>(
             .wrap(Cors::permissive())
             .wrap(middleware::Logger::default())
     })
-    .bind(addrs)?
+    .bind(addrs)
+    .unwrap()
     .run()
-    .await
+    .cancel_on_shutdown(&subsys)
+    .await;
+
+    Ok(())
 }
