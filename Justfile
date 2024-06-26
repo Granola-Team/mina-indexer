@@ -38,9 +38,8 @@ tier2-prereqs: tier1-prereqs
 audit:
   @echo "--- Performing Cargo audit"
   cd rust && time cargo audit
-  cd rust && cargo machete Cargo.toml
 
-lint: && audit
+lint:
   @echo "--- Linting ops scripts"
   ruby -cw ops/regression-test
   ruby -cw ops/deploy-local-prod
@@ -56,6 +55,7 @@ lint: && audit
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   @echo "--- Linting Nix configs"
   [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
+  cd rust && cargo machete Cargo.toml
 
 nix-build:
   @echo "--- Performing Nix build"
