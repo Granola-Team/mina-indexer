@@ -1,17 +1,17 @@
 #! /usr/bin/env -S ruby -w
 
-DEPLOY_TYPE = ARGV[0]  # 'test' or 'prod'
-MAGNITUDE = ARGV[1]    # exponent of number of blocks to deploy, base 10
+DEPLOY_TYPE = ARGV[0]   # 'test' or 'prod'
+BLOCKS_COUNT = ARGV[1]  #  number of blocks to deploy
 
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || '/mnt'
 BASE_DIR = VOLUMES_DIR + '/mina-indexer-' + DEPLOY_TYPE
 
-require __dir__ + '/helpers'  # Expects BASE_DIR and MAGNITUDE to be defined
+require __dir__ + '/helpers'  # Expects BASE_DIR to be defined
 
 unless File.exist?(BASE_DIR)
   abort "Error: #{BASE_DIR} must exist to perform the deployment."
 end
-puts "Deploying (#{DEPLOY_TYPE}) with 10^#{MAGNITUDE} blocks."
+puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
 # Configure the directories as needed.
 #
@@ -19,7 +19,7 @@ createBaseDir
 configExecDir
 configLogDir
 configSnapshotDir
-getBlocks MAGNITUDE
+getBlocks BLOCKS_COUNT
 getLedgers
 
 # Terminate the current version, if any.
@@ -67,6 +67,7 @@ if DEPLOY_TYPE == 'test'
     "shutdown"
   ) || puts('Shutdown failed after snapshot.')
   Process.wait(pid)
+  File::delete(CURRENT)
 else
   # Daemonize the EXE.
   #

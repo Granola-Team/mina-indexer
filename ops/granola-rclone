@@ -12,16 +12,14 @@ DEFAULT_SECRET_KEY = 'W2OUQ3V2BlhgFQdqHqx6Y0N4mdpDBv3M89trAKml'
 access_key = ENV['LINODE_OBJ_ACCESS_KEY'] || DEFAULT_ACCESS_KEY
 secret_key = ENV['LINODE_OBJ_SECRET_KEY'] || DEFAULT_SECRET_KEY
 
-result = system(
-  'time',
+args = [
   'rclone',
-  '--log-level', 'INFO',
+  '-vv', # '--log-level', 'INFO',
   '--config', CONFIG_FILE,
   '--buffer-size=128Mi',
   "--s3-access-key-id=#{access_key}",
   "--s3-secret-access-key=#{secret_key}",
   *ARGV
-)
-unless result
-  abort "rclone failed"
-end
+]
+STDERR.puts "granola-rclone issuing: #{args}"
+system(*args) || abort('rclone failed')

@@ -7,7 +7,7 @@ Files in this directory:
 ```
 ./calculate_archive_ledgers.sh
 ./correct_file_names
-./download-mina-blocks
+./download-mina-blocks.rb
 ./download-staking-ledgers
 ./granola-rclone
 ./hashes.list
@@ -27,7 +27,7 @@ Files in this directory:
 ./correct_file_names
   TBD
 
-./download-mina-blocks
+./download-mina-blocks.rb
   Downloads Mina blocks stored in the Granola cloud object storage bucket by
   using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY` etc.). See the
   instructions at the top of the script.
@@ -62,7 +62,7 @@ Files in this directory:
   Utility to download historical Mina precomputed block logs from the bucket
   maintained by O(1) Labs.
 
-./deploy
+./deploy.rb
   Utility to manage the running of a production instance of Mina Indexer. See
   the instructions in the script.
 

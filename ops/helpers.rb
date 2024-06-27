@@ -78,10 +78,11 @@ end
 
 BLOCKS_DIR = BASE_DIR + "/blocks"
 
-def getBlocks magnitude
+def getBlocks(block_count)
   system(
-    SRC_TOP + '/ops/download-mina-blocks',
-    magnitude.to_s,
+    SRC_TOP + '/ops/download-mina-blocks.rb',
+    '1',               # start block
+    block_count.to_s,  # end block
     BLOCKS_DIR
   ) || abort('Downloading Mina blocks failed.')
 end
