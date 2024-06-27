@@ -1,7 +1,10 @@
 use crate::constants::MAINNET_GENESIS_HASH;
 use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
-use std::{path::PathBuf, process};
+use std::{
+    path::{Path, PathBuf},
+    process,
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
@@ -414,25 +417,23 @@ pub enum InternalCommands {
     },
 }
 
-impl ClientCli {
-    pub async fn run(&self, domain_socket_path: PathBuf) -> anyhow::Result<()> {
-        let conn = UnixStream::connect(domain_socket_path)
-            .await
-            .unwrap_or_else(|e| {
-                eprintln!("Unable to connect to the Unix domain socket server: {}", e);
-                process::exit(111);
-            });
-        let (reader, mut writer) = conn.into_split();
-        let mut reader = BufReader::new(reader);
-        let mut buffer = Vec::with_capacity(BUFFER_SIZE);
-        let encoded = bincode::encode_to_vec(self, BIN_CODE_CONFIG)?;
+pub async fn run(command: &ClientCli, domain_socket_path: &Path) -> anyhow::Result<()> {
+    let conn = UnixStream::connect(domain_socket_path)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Unable to connect to the Unix domain socket server: {}", e);
+            process::exit(111);
+        });
+    let (reader, mut writer) = conn.into_split();
+    let mut reader = BufReader::new(reader);
+    let mut buffer = Vec::with_capacity(BUFFER_SIZE);
+    let encoded = bincode::encode_to_vec(command, BIN_CODE_CONFIG)?;
 
-        writer.write_all(&encoded).await?;
-        reader.read_to_end(&mut buffer).await?;
+    writer.write_all(&encoded).await?;
+    reader.read_to_end(&mut buffer).await?;
 
-        let msg = String::from_utf8(buffer)?;
-        let msg = msg.trim_end();
-        println!("{msg}");
-        Ok(())
-    }
+    let msg = String::from_utf8(buffer)?;
+    let msg = msg.trim_end();
+    println!("{msg}");
+    Ok(())
 }

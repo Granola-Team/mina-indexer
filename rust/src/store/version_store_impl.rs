@@ -19,7 +19,7 @@ impl VersionStore for IndexerStore {
             patch,
             ..Default::default()
         };
-        trace!("Setting database version: {version:#?}");
+        trace!("Setting db version");
         if self
             .database
             .get(Self::INDEXER_STORE_VERSION_KEY)?
@@ -35,7 +35,7 @@ impl VersionStore for IndexerStore {
 
     /// Get db version
     fn get_db_version(&self) -> anyhow::Result<IndexerStoreVersion> {
-        trace!("Getting database version");
+        trace!("Getting db version");
         Ok(self
             .database
             .get(Self::INDEXER_STORE_VERSION_KEY)?
