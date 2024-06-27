@@ -4,6 +4,10 @@ START_BLOCK = ARGV[0]
 END_BLOCK = ARGV[1]
 DEST = ARGV[2]
 
+require 'fileutils'
+
+FileUtils.mkdir_p(DEST)
+
 # Fetch the blocks list, if not already present.
 #
 blocks_list = DEST + '/../blocks.list'

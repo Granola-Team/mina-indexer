@@ -35,7 +35,9 @@ end
 SNAPSHOT_DIR = BASE_DIR + '/snapshots/' + REV
 
 def configSnapshotDir
-  FileUtils.mkdir_p SNAPSHOT_DIR
+  # FileUtils.mkdir_p SNAPSHOT_DIR
+  # ^ Do not do this because it will cause mina-indexer to fail to create the
+  #   snapshot.
 end
 
 # Executable
