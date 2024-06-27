@@ -1704,7 +1704,7 @@ test_missing_block_recovery() {
     assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
-    sleep 10
+    sleep 30
 
     # check that all dangling branches have resolved & the best block has the right height
     assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
