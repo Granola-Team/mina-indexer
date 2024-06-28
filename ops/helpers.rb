@@ -32,7 +32,9 @@ end
 
 # Snapshots
 
-SNAPSHOT_DIR = BASE_DIR + '/snapshots/' + REV
+def snapshot_dir(block_height)
+  BASE_DIR + '/snapshots/' + DB_VERSION + '-' + block_height.to_s
+end
 
 def configSnapshotDir
   FileUtils.mkdir_p(BASE_DIR + '/snapshots')
@@ -75,16 +77,16 @@ end
 
 # Blocks
 
-def blocks_dir(block_count)
-  BASE_DIR + '/blocks-' + block_count.to_s
+def blocks_dir(block_height)
+  BASE_DIR + '/blocks-' + block_height.to_s
 end
 
-def get_blocks(block_count)
+def get_blocks(block_height)
   system(
     SRC_TOP + '/ops/download-mina-blocks.rb',
     '1',               # start block
-    block_count.to_s,  # end block
-    blocks_dir(block_count)
+    block_height.to_s,  # end block
+    blocks_dir(block_height)
   ) || abort('Downloading Mina blocks failed.')
 end
 
@@ -92,6 +94,6 @@ end
 
 DB_VERSION = '0.5.0'
 
-def db_dir(block_count)
-  BASE_DIR + '/db/' + DB_VERSION + '-' + block_count.to_s
+def db_dir(block_height)
+  BASE_DIR + '/db/' + DB_VERSION + '-' + block_height.to_s
 end

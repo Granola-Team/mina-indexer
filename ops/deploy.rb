@@ -58,7 +58,7 @@ if DEPLOY_TYPE == 'test'
   system(
     EXE,
     '--socket', SOCKET,
-    'checkpoints', 'create', '--path', SNAPSHOT_DIR
+    'checkpoints', 'create', '--path', snapshot_dir(BLOCKS_COUNT)
   ) || abort('Snapshot creation failed. Aborting.')
   puts 'Skipping replay. It does not work. See issue #1196.'
   system(
