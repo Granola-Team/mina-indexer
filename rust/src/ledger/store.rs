@@ -128,6 +128,21 @@ pub trait LedgerStore {
     fn get_genesis_state_hash(&self, ledger_hash: &LedgerHash)
         -> anyhow::Result<Option<BlockHash>>;
 
+    /// Get the total number of accounts per staking ledger
+    fn get_staking_ledger_accounts_count_epoch(
+        &self,
+        epoch: u32,
+        genesis_state_hash: BlockHash,
+    ) -> anyhow::Result<u32>;
+
+    /// set the total number of accounts per staking ledger
+    fn set_staking_ledger_accounts_count_epoch(
+        &self,
+        epoch: u32,
+        genesis_state_hash: BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()>;
+
     ///////////////
     // Iterators //
     ///////////////

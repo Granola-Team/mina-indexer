@@ -360,7 +360,13 @@ impl LedgerStore for IndexerStore {
                 serde_json::to_vec(account)?,
             )?;
         }
-
+        // add staking ledger count at epoch
+        let count = staking_ledger.staking_ledger.values().count();
+        self.set_staking_ledger_accounts_count_epoch(
+            epoch,
+            genesis_state_hash.clone(),
+            count as u32,
+        )?;
         if is_new {
             // add new ledger event
             self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
@@ -480,6 +486,39 @@ impl LedgerStore for IndexerStore {
     fn staking_ledger_stake_iterator(&self, mode: speedb::IteratorMode) -> speedb::DBIterator<'_> {
         self.database
             .iterator_cf(self.staking_ledger_stake_cf(), mode)
+    }
+
+    ////////////////////////////
+    // Staking ledger counts //
+    ///////////////////////////
+
+    fn get_staking_ledger_accounts_count_epoch(
+        &self,
+        epoch: u32,
+        genesis_state_hash: BlockHash,
+    ) -> anyhow::Result<u32> {
+        trace!("Getting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}");
+        Ok(self
+            .database
+            .get_cf(
+                self.staking_ledger_accounts_epoch_cf(),
+                staking_ledger_epoch_key(genesis_state_hash, epoch),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn set_staking_ledger_accounts_count_epoch(
+        &self,
+        epoch: u32,
+        genesis_state_hash: BlockHash,
+        count: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting staking ledger accounts count for epoc {epoch} {genesis_state_hash:?}: {count}");
+        Ok(self.database.put_cf(
+            self.staking_ledger_accounts_epoch_cf(),
+            staking_ledger_epoch_key(genesis_state_hash, epoch),
+            to_be_bytes(count),
+        )?)
     }
 }
 

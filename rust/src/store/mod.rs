@@ -54,7 +54,7 @@ pub struct DBUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 79] = [
+    const COLUMN_FAMILIES: [&'static str; 80] = [
         // accounts
         "account-balance",
         "account-balance-sort",
@@ -126,6 +126,7 @@ impl IndexerStore {
         "staking-ledger-epoch",
         "staking-ledger-balance",
         "staking-ledger-stake",
+        "staking-ledger-accounts-epoch",
         // chain id
         "chain-id-to-network",
         // usernames
