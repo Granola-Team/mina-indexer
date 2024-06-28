@@ -28,12 +28,9 @@ pub enum ClientCli {
     #[clap(subcommand)]
     Chain(Chain),
 
-    /// Create a snapshot of the Indexer store
-    CreateSnapshot {
-        /// Directory to write the snapshot file to [default: pwd]
-        #[arg(long, default_value = "./")]
-        output_dir: PathBuf,
-    },
+    /// Create a checkpoint of the indexer store
+    #[clap(subcommand)]
+    Checkpoints(Checkpoints),
 
     /// Query ledgers
     #[clap(subcommand)]
@@ -202,6 +199,17 @@ pub enum Chain {
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
+    },
+}
+
+#[derive(Subcommand, Debug, Encode, Decode)]
+#[command(author, version, about, long_about = None)]
+pub enum Checkpoints {
+    /// Create a checkpoint of the indexer store
+    Create {
+        /// Path to write the checkpoint
+        #[arg(long)]
+        path: PathBuf,
     },
 }
 

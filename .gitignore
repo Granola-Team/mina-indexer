@@ -2,10 +2,6 @@
 /result
 /.gitconfig
 
-# database and snapshots
-database/
-*.gz
-
 # direnv creates this directory as a cache
 .direnv
 

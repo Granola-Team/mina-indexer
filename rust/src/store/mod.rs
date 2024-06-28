@@ -24,18 +24,14 @@ pub mod version_store_impl;
 
 use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
-use anyhow::{anyhow, Context};
-use chrono::{Datelike, Local};
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use log::{debug, error};
+use anyhow::anyhow;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
-    fs::{self, read_dir, File},
-    io::{self, prelude::*, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
-use tar::Archive;
 use version::{IndexerStoreVersion, VersionStore};
 
 #[derive(Debug)]
@@ -189,108 +185,17 @@ impl IndexerStore {
         Ok(primary)
     }
 
-    /// Create a snapshot of the Indexer store
-    pub fn create_snapshot(&self, input_dir: &PathBuf) -> Result<String, anyhow::Error> {
+    pub fn create_checkpoint(&self, path: &Path) -> anyhow::Result<()> {
         use speedb::checkpoint::Checkpoint;
 
-        if !input_dir.is_dir() {
-            let msg = format!("{input_dir:#?} is not a directory");
-            error!("{msg}");
-            Err(anyhow!(msg))
-        } else {
-            let snapshot_temp_dir = input_dir.join("snapshot_temp");
-            let result = Checkpoint::new(&self.database)?
-                .create_checkpoint(&snapshot_temp_dir)
-                .map_err(|e| anyhow!("Error creating database snapshot: {}", e));
-
-            if result.is_ok() {
-                let output_filename = format!(
-                    "snapshot_{}_{}.tar.gz",
-                    get_current_date(),
-                    IndexerStoreVersion::default().major_minor_patch()
-                );
-
-                let output_filepath = input_dir.join(output_filename);
-
-                let result = compress_directory(&snapshot_temp_dir, &output_filepath)
-                    .with_context(|| format!("Failed to compress directory {input_dir:#?})"));
-                if result.is_ok() {
-                    let result = fs::remove_dir_all(&snapshot_temp_dir).with_context(|| {
-                        format!("Failed to remove directory {snapshot_temp_dir:#?})")
-                    });
-                    if result.is_ok() {
-                        return Ok(format!(
-                            "Snapshot created and saved as {output_filepath:#?}"
-                        ));
-                    }
-                }
-            }
-            #[allow(clippy::unnecessary_unwrap)]
-            Err(result.unwrap_err())
-        }
-    }
-}
-
-/// Restore a snapshot of the Indexer store
-pub fn restore_snapshot(
-    snapshot_file_path: &PathBuf,
-    restore_dir: &PathBuf,
-) -> Result<String, anyhow::Error> {
-    if !snapshot_file_path.exists() {
-        let msg = format!("{snapshot_file_path:#?} does not exist");
-        error!("{msg}");
-        Err(anyhow!(msg))
-    } else if restore_dir.is_dir() {
-        let msg = format!("{restore_dir:#?} must not exist (but currently does)");
-        error!("{msg}");
-        Err(anyhow!(msg))
-    } else {
-        let result = decompress_file(snapshot_file_path, restore_dir)
-            .with_context(|| format!("Failed to decompress file {snapshot_file_path:#?}"));
-        if result.is_ok() {
-            Ok(format!(
-                "Snapshot restored to {restore_dir:#?}.\n\nPlease start server using: `server sync --database-dir {restore_dir:#?}`"
-            ))
-        } else {
-            #[allow(clippy::unnecessary_unwrap)]
-            Err(result.unwrap_err())
-        }
-    }
-}
-
-fn decompress_file(compressed_file_path: &PathBuf, output_dir: &PathBuf) -> io::Result<()> {
-    fs::create_dir_all(output_dir)?;
-
-    let compressed_file = File::open(compressed_file_path)?;
-    let mut decoder = GzDecoder::new(compressed_file);
-
-    let mut buffer = Vec::new();
-    decoder.read_to_end(&mut buffer)?;
-
-    let mut archive = Archive::new(buffer.as_slice());
-    archive.unpack(output_dir)
-}
-
-fn compress_directory(input_dir: &PathBuf, output_file: &PathBuf) -> io::Result<()> {
-    let output_file = File::create(output_file)?;
-    let encoder = GzEncoder::new(output_file, Compression::default());
-
-    let mut archive = tar::Builder::new(encoder);
-    let dir = read_dir(input_dir)?;
-
-    for entry in dir {
-        let file = entry?.path();
-        let file_name = &file.file_name().unwrap().to_str().unwrap();
-        archive.append_file(file_name, &mut File::open(&file)?)?;
+        let checkpoint = Checkpoint::new(&self.database)?;
+        Checkpoint::create_checkpoint(&checkpoint, path)
+            .map_err(|e| anyhow!("Error creating db checkpoint: {}", e))
     }
 
-    archive.finish()
-}
-
-// Get the current date as "YYYY-MM-DD"
-fn get_current_date() -> String {
-    let now = Local::now();
-    format!("{:04}-{:02}-{:02}", now.year(), now.month(), now.day())
+    pub fn db_path(&self) -> &Path {
+        &self.db_path
+    }
 }
 
 impl<T> std::fmt::Debug for DBUpdate<T>
