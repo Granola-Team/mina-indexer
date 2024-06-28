@@ -13,7 +13,7 @@ require 'fileutils'
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 DEV_DIR = VOLUMES_DIR + '/mina-indexer-dev'
 FileUtils.mkdir_p(DEV_DIR)
-block_count = [5000, END_BLOCK].max
+block_count = [9999, END_BLOCK].max
 BLOCKS_DIR = DEV_DIR + '/blocks-' + block_count.to_s
 args = [
   __dir__ + '/download-mina-blocks.rb',
