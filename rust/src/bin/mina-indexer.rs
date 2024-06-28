@@ -179,7 +179,8 @@ pub async fn main() -> anyhow::Result<()> {
     match cli.command {
         IndexerCommand::DbVersion => {
             let version = IndexerStoreVersion::default();
-            println!("{:?}", version);
+            let msg = serde_json::to_string(&version)?;
+            println!("{msg}");
             return Ok(());
         }
         IndexerCommand::Client(args) => client::run(&args, &domain_socket_path).await,
