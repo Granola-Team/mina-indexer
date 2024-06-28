@@ -573,7 +573,7 @@ test_block_copy() {
 
     # add block 11
     dl_mainnet_single 11 ./blocks
-    sleep 1
+    sleep 10
 
     # check
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
