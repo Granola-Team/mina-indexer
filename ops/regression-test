@@ -35,7 +35,7 @@ test_names = [
   'replay',
   'transactions',
   'snark_work',
-  'checkpoint',
+  'snapshot',
   'rest_accounts_summary',
   'rest_blocks',
   'genesis_block_creator',
