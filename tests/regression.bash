@@ -240,11 +240,11 @@ test_indexer_cli_reports() {
     idxr blocks children --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks children"
 
-    idxr checkpoints --help 2>&1 |
-        grep -iq "Usage: mina-indexer checkpoints"
+    idxr create-snapshot --help 2>&1 |
+        grep -iq "Usage: mina-indexer create-snapshot"
 
-    idxr checkpoints create --help 2>&1 |
-        grep -iq "Usage: mina-indexer checkpoints create"
+    idxr restore-snapshot --help 2>&1 |
+        grep -iq "Usage: mina-indexer restore-snapshot"
 
     idxr ledgers best --help 2>&1 |
         grep -iq "Usage: mina-indexer ledgers best"
@@ -976,46 +976,54 @@ test_snark_work() {
     teardown
 }
 
-# Indexer server correctly creates a db checkpoint
-test_checkpoint() {
-    enter_test test_checkpoint
+# Indexer server correctly creates a db snapshot
+test_snapshot() {
+    enter_test test_snapshot
 
     stage_mainnet_blocks 13 ./blocks
 
     idxr_server_start_standard
     wait_for_socket
 
-    # pre-checkpoint results
+    local SNAPSHOT_DIR="./snapshot"
+
+    # pre-snapshot results
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
     amount=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
 
-    # create checkpoint in ./checkpoint
-    idxr checkpoints create --path ./checkpoint
+    # create snapshot in $SNAPSHOT_DIR
+    idxr create-snapshot --output-dir .
 
     # kill running indexer and remove directories
     teardown
 
-    # sync a new indexer from checkpointed db
-    idxr_server_sync --database-dir ./checkpoint
+    local DATE
+    DATE=$(date +"%Y-%m-%d")
+    local DB_VERSION
+    DB_VERSION=$(idxr db-version | jq -r '"\(.major).\(.minor).\(.patch)"')
+    idxr restore-snapshot --snapshot-file-path ./snapshot_"$DATE"_"$DB_VERSION".tar.gz --restore-dir "$SNAPSHOT_DIR"
+
+    # sync a new indexer from snapshoted db
+    idxr_server_sync --database-dir "$SNAPSHOT_DIR"
     wait_for_socket
 
-    # post-checkpoint reults
-    canonical_hash_checkpoint=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    canonical_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
-    best_hash_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    best_length_checkpoint=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    amount_checkpoint=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
+    # post-snapshot reults
+    canonical_hash_snapshot=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length_snapshot=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+    best_hash_snapshot=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length_snapshot=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    amount_snapshot=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
 
-    assert $canonical_hash $canonical_hash_checkpoint
-    assert $canonical_length $canonical_length_checkpoint
-    assert $best_hash $best_hash_checkpoint
-    assert $best_length $best_length_checkpoint
-    assert $amount $amount_checkpoint
+    assert $canonical_hash $canonical_hash_snapshot
+    assert $canonical_length $canonical_length_snapshot
+    assert $best_hash $best_hash_snapshot
+    assert $best_length $best_length_snapshot
+    assert $amount $amount_snapshot
 
-    rm -rf ./checkpoint
+    rm -rf "$SNAPSHOT_DIR"
     teardown
 }
 
@@ -1741,7 +1749,7 @@ for test_name in "$@"; do
         "test_replay") test_replay ;;
         "test_transactions") test_transactions ;;
         "test_snark_work") test_snark_work ;;
-        "test_checkpoint") test_checkpoint ;;
+        "test_snapshot") test_snapshot ;;
         "test_rest_accounts_summary") test_rest_accounts_summary ;;
         "test_rest_blocks") test_rest_blocks ;;
         "test_genesis_block_creator") test_genesis_block_creator ;;

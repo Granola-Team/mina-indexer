@@ -606,25 +606,22 @@ async fn handle_conn(
                 }
             }
         },
-        ClientCli::Checkpoints(__) => match __ {
-            Checkpoints::Create { path } => {
-                info!("Received checkpoint command");
-                if path.exists() {
-                    error!("Checkpoint directory already exists at {}", path.display());
-                    Some(format!(
-                        "Checkpoint directory already exists at {}",
-                        path.display()
-                    ))
+        ClientCli::CreateSnapshot { output_dir } => {
+            info!("Received create-snapshot command");
+            if !output_dir.is_dir() {
+                let msg = format!("{output_dir:#?} is not a directory");
+                error!("{msg}");
+                Some(msg)
+            } else {
+                let result = db.create_snapshot(&output_dir);
+                if result.is_ok() {
+                    result.ok()
                 } else {
-                    debug!("Creating checkpoint at {}", path.display());
-                    db.create_checkpoint(&path)?;
-                    Some(format!(
-                        "Checkpoint created and saved to {}",
-                        path.display()
-                    ))
+                    #[allow(clippy::unnecessary_unwrap)]
+                    Some(result.unwrap_err().to_string())
                 }
             }
-        },
+        }
         ClientCli::Ledgers(__) => match __ {
             Ledgers::Best { path } => {
                 info!("Received best-ledger command");

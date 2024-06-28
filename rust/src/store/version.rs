@@ -26,6 +26,11 @@ impl IndexerStoreVersion {
     pub const MAJOR: u32 = 0;
     pub const MINOR: u32 = 5;
     pub const PATCH: u32 = 0;
+
+    /// Output as `MAJOR`.`MINOR`.`PATCH`
+    pub fn major_minor_patch(&self) -> String {
+        format!("{}.{}.{}", self.major, self.minor, self.patch)
+    }
 }
 
 impl std::default::Default for IndexerStoreVersion {
@@ -41,10 +46,6 @@ impl std::default::Default for IndexerStoreVersion {
 
 impl std::fmt::Display for IndexerStoreVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}-{}",
-            self.major, self.minor, self.patch, self.git_commit_sha
-        )
+        write!(f, "{}-{}", self.major_minor_patch(), self.git_commit_sha)
     }
 }
