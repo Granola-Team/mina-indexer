@@ -1,4 +1,4 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for production deployment.
 
-nix develop --command just deploy-local-prod 200000
+nix develop --command just deploy-local-prod 270000
