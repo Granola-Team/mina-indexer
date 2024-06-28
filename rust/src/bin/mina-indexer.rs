@@ -10,7 +10,7 @@ use mina_indexer::{
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
-    store::{version::IndexerStoreVersion, IndexerStore},
+    store::{self, version::IndexerStoreVersion, IndexerStore},
 };
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use stderrlog::{ColorChoice, Timestamp};
@@ -38,6 +38,16 @@ enum IndexerCommand {
     Client(#[command(subcommand)] client::ClientCli),
     /// Database version
     DbVersion,
+    /// Restore a snapshot of the Indexer store
+    RestoreSnapshot {
+        /// Full file path to the compressed snapshot file to restore
+        #[arg(long)]
+        snapshot_file_path: PathBuf,
+
+        /// Full file path to the location to restore to
+        #[arg(long)]
+        restore_dir: PathBuf,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -180,6 +190,33 @@ pub async fn main() -> anyhow::Result<()> {
         IndexerCommand::DbVersion => {
             let version = IndexerStoreVersion::default();
             let msg = serde_json::to_string(&version)?;
+            println!("{msg}");
+            return Ok(());
+        }
+        IndexerCommand::RestoreSnapshot {
+            snapshot_file_path,
+            restore_dir,
+        } => {
+            info!("Received restore-snapshot with file {snapshot_file_path:#?} and dir {restore_dir:#?}");
+            let msg = if !snapshot_file_path.exists() {
+                let msg = format!("{snapshot_file_path:#?} does not exist");
+                error!("{msg}");
+                msg
+            } else if restore_dir.is_dir() {
+                // TODO: allow prompting user to overwrite
+                let msg = format!("{restore_dir:#?} must not exist (but currently does)");
+                error!("{msg}");
+                msg
+            } else {
+                let result = store::restore_snapshot(&snapshot_file_path, &restore_dir);
+                if result.is_ok() {
+                    result?
+                } else {
+                    #[allow(clippy::unnecessary_unwrap)]
+                    let err = result.unwrap_err();
+                    format!("{}: {:#?}", err, err.root_cause().to_string())
+                }
+            };
             println!("{msg}");
             return Ok(());
         }
