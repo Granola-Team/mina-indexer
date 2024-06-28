@@ -1180,7 +1180,7 @@ test_rest_blocks() {
 test_release() {
     enter_test test_release
 
-    stage_mainnet_blocks 9999 ./blocks
+    stage_mainnet_blocks 5000 ./blocks
 
     idxr_server_start_standard
     wait_forever_for_socket

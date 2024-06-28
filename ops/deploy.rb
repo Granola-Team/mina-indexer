@@ -19,7 +19,7 @@ createBaseDir
 configExecDir
 configLogDir
 configSnapshotDir
-getBlocks BLOCKS_COUNT
+get_blocks BLOCKS_COUNT
 getLedgers
 
 # Terminate the current version, if any.
@@ -50,8 +50,8 @@ if DEPLOY_TYPE == 'test'
     " --log-level DEBUG" +
     " --ledger-cadence 5000" +
     " --web-port #{PORT.to_s}" +
-    " --database-dir #{DB_DIR}" +
-    " --blocks-dir #{BLOCKS_DIR}" +
+    " --database-dir #{db_dir(BLOCKS_COUNT)}" +
+    " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" +
     " --staking-ledgers-dir #{LEDGERS_DIR}" +
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   waitForSocket(10)
@@ -85,8 +85,8 @@ else
       " --log-level DEBUG" +
       " --ledger-cadence 5000" +
       " --web-hostname 0.0.0.0" +
-      " --database-dir #{DB_DIR}" +
-      " --blocks-dir #{BLOCKS_DIR}" +
+      " --database-dir #{db_dir(BLOCKS_COUNT)}" +
+      " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" +
       " --staking-ledgers-dir #{LEDGERS_DIR}" +
       " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     Process::detach pid

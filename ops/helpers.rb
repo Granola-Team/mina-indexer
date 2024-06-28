@@ -35,9 +35,7 @@ end
 SNAPSHOT_DIR = BASE_DIR + '/snapshots/' + REV
 
 def configSnapshotDir
-  # FileUtils.mkdir_p SNAPSHOT_DIR
-  # ^ Do not do this because it will cause mina-indexer to fail to create the
-  #   snapshot.
+  FileUtils.mkdir_p(BASE_DIR + '/snapshots')
 end
 
 # Executable
@@ -48,10 +46,9 @@ EXE = EXE_DIR + '/mina-indexer-' + REV
 def configExecDir
   FileUtils.mkdir_p EXE_DIR
   idxr = SRC_TOP + '/result/bin/mina-indexer'
-  FileUtils.cp idxr, EXE
-
-  # Add the write bit in case we need to overwrite, later.
-  File.chmod(0700, EXE)
+  unless File.exist?(EXE)
+    FileUtils.cp idxr, EXE
+  end
 end
 
 # Socket
@@ -78,18 +75,23 @@ end
 
 # Blocks
 
-BLOCKS_DIR = BASE_DIR + "/blocks"
+def blocks_dir(block_count)
+  BASE_DIR + '/blocks-' + block_count.to_s
+end
 
-def getBlocks(block_count)
+def get_blocks(block_count)
   system(
     SRC_TOP + '/ops/download-mina-blocks.rb',
     '1',               # start block
     block_count.to_s,  # end block
-    BLOCKS_DIR
+    blocks_dir(block_count)
   ) || abort('Downloading Mina blocks failed.')
 end
 
 # Database directory
 
 DB_VERSION = '0.5.0'
-DB_DIR = BASE_DIR + '/db/' + DB_VERSION
+
+def db_dir(block_count)
+  BASE_DIR + '/db/' + DB_VERSION + '-' + block_count.to_s
+end
