@@ -18,7 +18,7 @@ puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 createBaseDir
 configExecDir
 configLogDir
-configSnapshotDir
+config_snapshot_dir BLOCKS_COUNT
 get_blocks BLOCKS_COUNT
 getLedgers
 

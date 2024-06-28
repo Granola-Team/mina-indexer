@@ -36,8 +36,8 @@ def snapshot_dir(block_height)
   BASE_DIR + '/snapshots/' + DB_VERSION + '-' + block_height.to_s
 end
 
-def configSnapshotDir
-  FileUtils.mkdir_p(BASE_DIR + '/snapshots')
+def config_snapshot_dir(block_height)
+  FileUtils.mkdir_p(snapshot_dir(block_height))
 end
 
 # Executable
