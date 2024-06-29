@@ -286,7 +286,8 @@ fn matches_event_kind(kind: EventKind) -> bool {
         kind,
         EventKind::Access(notify::event::AccessKind::Close(
             notify::event::AccessMode::Write
-        )) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+        )) | EventKind::Create(notify::event::CreateKind::File)
+            | EventKind::Modify(notify::event::ModifyKind::Name(_))
     )
 }
 

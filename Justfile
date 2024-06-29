@@ -109,6 +109,7 @@ tier1: tier1-prereqs check lint test-unit
     ipc_is_available_immediately \
     clean_shutdown \
     clean_kill \
+    block_copy \
     account_balance_cli \
     best_chain \
     rest_accounts_summary \
