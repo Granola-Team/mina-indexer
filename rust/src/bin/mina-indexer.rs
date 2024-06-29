@@ -30,7 +30,7 @@ struct Cli {
     #[command(subcommand)]
     command: IndexerCommand,
     /// Path to the Unix domain socket file
-    #[arg(long, default_value = "./mina-indexer.sock")]
+    #[arg(long, default_value = "./mina-indexer.sock", num_args = 1)]
     socket: PathBuf,
 }
 
@@ -162,10 +162,6 @@ pub struct ServerArgs {
     #[arg(long, default_value = Network::Mainnet)]
     network: Network,
 
-    /// Domain socket path
-    #[arg(num_args = 1)]
-    socket: Option<PathBuf>,
-
     /// Indexer process ID
     #[arg(last = true)]
     pid: Option<u32>,
@@ -180,9 +176,8 @@ pub struct ConfigArgs {
 }
 
 impl ServerArgs {
-    fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
+    fn with_dynamic_defaults(mut self, pid: u32) -> Self {
         self.pid = Some(pid);
-        self.socket = Some(domain_socket_path);
         self
     }
 }
@@ -193,8 +188,8 @@ pub const DEFAULT_STAKING_LEDGERS_DIR: &str = "/share/mina-indexer/staking-ledge
 #[tokio::main]
 #[allow(clippy::unused_unit)]
 pub async fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let domain_socket_path = cli.socket;
+    let args = Cli::parse();
+    let domain_socket_path = args.socket;
 
     Toplevel::new(|s| async move {
         s.start(SubsystemBuilder::new("Main", |s| async move {
@@ -260,7 +255,7 @@ impl ServerCommand {
                 (args.into(), InitializationMode::New)
             }
         };
-        let args = args.with_dynamic_defaults(domain_socket_path, std::process::id());
+        let args = args.with_dynamic_defaults(std::process::id());
         let database_dir = args.database_dir.clone();
         let web_hostname = args.web_hostname.clone();
         let web_port = args.web_port;
@@ -285,7 +280,7 @@ impl ServerCommand {
         check_or_write_pid_file(&database_dir);
 
         debug!("Building an indexer configuration");
-        let config = process_indexer_configuration(args, mode)?;
+        let config = process_indexer_configuration(args, mode, domain_socket_path)?;
 
         debug!("Creating a new IndexerStore in {}", database_dir.display());
         let db = Arc::new(IndexerStore::new(&database_dir)?);
@@ -315,6 +310,7 @@ impl ServerCommand {
 fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
+    domain_socket_path: PathBuf,
 ) -> anyhow::Result<IndexerConfiguration> {
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
@@ -332,7 +328,6 @@ fn process_indexer_configuration(
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
     let reporting_freq = args.reporting_freq;
-    let domain_socket_path = args.socket.unwrap_or("./mina-indexer.sock".into());
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
@@ -491,7 +486,6 @@ struct ServerArgsJson {
     web_hostname: String,
     web_port: u16,
     pid: Option<u32>,
-    domain_socket_path: Option<String>,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_batch: Option<bool>,
@@ -501,8 +495,7 @@ struct ServerArgsJson {
 impl From<ServerArgs> for ServerArgsJson {
     fn from(value: ServerArgs) -> Self {
         let pid = value.pid.unwrap();
-        let domain_socket_path = value.socket.clone().unwrap();
-        let value = value.with_dynamic_defaults(domain_socket_path, pid);
+        let value = value.with_dynamic_defaults(pid);
         Self {
             genesis_ledger: value.genesis_ledger.map(|path| path.display().to_string()),
             genesis_hash: value.genesis_hash,
@@ -530,7 +523,6 @@ impl From<ServerArgs> for ServerArgsJson {
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
-            domain_socket_path: value.socket.map(|s| s.display().to_string()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value
                 .missing_block_recovery_exe
@@ -562,7 +554,6 @@ impl From<ServerArgsJson> for ServerArgs {
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
-            socket: value.domain_socket_path.map(|s| s.into()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
