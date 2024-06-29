@@ -68,12 +68,12 @@ format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
 test-unit:
-  @echo "--- Performing unit tests"
+  @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run
 
 # Perform a fast verification of whether the source compiles.
 check:
-  @echo "--- Performing cargo check"
+  @echo "--- Invoking 'cargo check'"
   cd rust && time cargo check
 
 test-unit-mina-rs:
@@ -104,7 +104,7 @@ build-image:
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
-  @echo "--- Performing regressions test(s)"
+  @echo "--- Performing regressions tests subset"
   time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer \
     ipc_is_available_immediately \
     clean_shutdown \
@@ -120,7 +120,7 @@ tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer
   @echo "--- Performing many_blocks regression test"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer many_blocks
-  @echo "--- Performing release"
+  @echo "--- Testing 'release'"
   time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer release
 
 # Run tier-3 tests.
