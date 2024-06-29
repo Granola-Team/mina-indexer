@@ -25,7 +25,6 @@ pub mod version_store_impl;
 use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
 use anyhow::{anyhow, Context};
-use chrono::{Datelike, Local};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
@@ -191,44 +190,29 @@ impl IndexerStore {
     }
 
     /// Create a snapshot of the Indexer store
-    pub fn create_snapshot(&self, input_dir: &PathBuf) -> Result<String, anyhow::Error> {
+    pub fn create_snapshot(&self, output_filepath: &PathBuf) -> Result<String, anyhow::Error> {
         use speedb::checkpoint::Checkpoint;
 
-        if !input_dir.is_dir() {
-            let msg = format!("{input_dir:#?} is not a directory");
-            error!("{msg}");
-            Err(anyhow!(msg))
-        } else {
-            let snapshot_temp_dir = input_dir.join("snapshot_temp");
-            let result = Checkpoint::new(&self.database)?
-                .create_checkpoint(&snapshot_temp_dir)
-                .map_err(|e| anyhow!("Error creating database snapshot: {}", e));
-
+        let mut snapshot_temp_dir = output_filepath.clone();
+        snapshot_temp_dir.set_extension(".rbb");
+        let result = Checkpoint::new(&self.database)?
+            .create_checkpoint(&snapshot_temp_dir)
+            .map_err(|e| anyhow!("Error creating database snapshot: {}", e));
+        if result.is_ok() {
+            let result = compress_directory(&snapshot_temp_dir, output_filepath)
+                .with_context(|| "Failed to compress database.");
             if result.is_ok() {
-                let output_filename = format!(
-                    "snapshot_{}_{}.tar.gz",
-                    get_current_date(),
-                    IndexerStoreVersion::default().major_minor_patch()
-                );
-
-                let output_filepath = input_dir.join(output_filename);
-
-                let result = compress_directory(&snapshot_temp_dir, &output_filepath)
-                    .with_context(|| format!("Failed to compress directory {input_dir:#?})"));
+                let result = fs::remove_dir_all(&snapshot_temp_dir)
+                    .with_context(|| format!("Failed to remove directory {snapshot_temp_dir:#?})"));
                 if result.is_ok() {
-                    let result = fs::remove_dir_all(&snapshot_temp_dir).with_context(|| {
-                        format!("Failed to remove directory {snapshot_temp_dir:#?})")
-                    });
-                    if result.is_ok() {
-                        return Ok(format!(
-                            "Snapshot created and saved as {output_filepath:#?}"
-                        ));
-                    }
+                    return Ok(format!(
+                        "Snapshot created and saved as {output_filepath:#?}"
+                    ));
                 }
             }
-            #[allow(clippy::unnecessary_unwrap)]
-            Err(result.unwrap_err())
         }
+        #[allow(clippy::unnecessary_unwrap)]
+        Err(result.unwrap_err())
     }
 }
 
@@ -286,12 +270,6 @@ fn compress_directory(input_dir: &PathBuf, output_file: &PathBuf) -> io::Result<
     }
 
     archive.finish()
-}
-
-// Get the current date as "YYYY-MM-DD"
-fn get_current_date() -> String {
-    let now = Local::now();
-    format!("{:04}-{:02}-{:02}", now.year(), now.month(), now.day())
 }
 
 impl<T> std::fmt::Debug for DBUpdate<T>

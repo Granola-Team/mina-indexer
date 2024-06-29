@@ -606,20 +606,14 @@ async fn handle_conn(
                 }
             }
         },
-        ClientCli::CreateSnapshot { output_dir } => {
+        ClientCli::CreateSnapshot { output_path } => {
             info!("Received create-snapshot command");
-            if !output_dir.is_dir() {
-                let msg = format!("{output_dir:#?} is not a directory");
-                error!("{msg}");
-                Some(msg)
+            let result = db.create_snapshot(&output_path);
+            if result.is_ok() {
+                result.ok()
             } else {
-                let result = db.create_snapshot(&output_dir);
-                if result.is_ok() {
-                    result.ok()
-                } else {
-                    #[allow(clippy::unnecessary_unwrap)]
-                    Some(result.unwrap_err().to_string())
-                }
+                #[allow(clippy::unnecessary_unwrap)]
+                Some(result.unwrap_err().to_string())
             }
         }
         ClientCli::Ledgers(__) => match __ {

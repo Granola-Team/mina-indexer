@@ -30,9 +30,9 @@ pub enum ClientCli {
 
     /// Create a snapshot of the Indexer store
     CreateSnapshot {
-        /// Directory to write the snapshot file to [default: pwd]
-        #[arg(long, default_value = "./")]
-        output_dir: PathBuf,
+        /// Snapshot file
+        #[arg(long, default_value = "./snapshot")]
+        output_path: PathBuf,
     },
 
     /// Query ledgers

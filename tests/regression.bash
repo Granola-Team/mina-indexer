@@ -985,8 +985,6 @@ test_snapshot() {
     idxr_server_start_standard
     wait_for_socket
 
-    local SNAPSHOT_DIR="./snapshot"
-
     # pre-snapshot results
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
@@ -994,20 +992,17 @@ test_snapshot() {
     best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
     amount=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
 
-    # create snapshot in $SNAPSHOT_DIR
-    idxr create-snapshot --output-dir .
+    set -x
+    # create snapshot
+    idxr create-snapshot --output-path ./snapshot
 
     # kill running indexer and remove directories
     teardown
 
-    local DATE
-    DATE=$(date +"%Y-%m-%d")
-    local DB_VERSION
-    DB_VERSION=$(idxr db-version | jq -r '"\(.major).\(.minor).\(.patch)"')
-    idxr restore-snapshot --snapshot-file-path ./snapshot_"$DATE"_"$DB_VERSION".tar.gz --restore-dir "$SNAPSHOT_DIR"
+    idxr restore-snapshot --snapshot-file-path ./snapshot --restore-dir ./restore-path
 
     # sync a new indexer from snapshoted db
-    idxr_server_sync --database-dir "$SNAPSHOT_DIR"
+    idxr_server_sync --database-dir ./restore-path
     wait_for_socket
 
     # post-snapshot reults
@@ -1023,7 +1018,7 @@ test_snapshot() {
     assert $best_length $best_length_snapshot
     assert $amount $amount_snapshot
 
-    rm -rf "$SNAPSHOT_DIR"
+    rm -rf ./snapshot ./restore-path
     teardown
 }
 

@@ -18,7 +18,7 @@ puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 createBaseDir
 configExecDir
 configLogDir
-config_snapshot_dir BLOCKS_COUNT
+config_snapshots_dir
 get_blocks BLOCKS_COUNT
 getLedgers
 
@@ -55,18 +55,22 @@ if DEPLOY_TYPE == 'test'
     " --staking-ledgers-dir #{LEDGERS_DIR}" +
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   waitForSocket(10)
+  puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
   system(
     EXE,
     '--socket', SOCKET,
-    'create-snapshot', '--output-dir', snapshot_dir(BLOCKS_COUNT)
+    'create-snapshot', '--output-path', snapshot_path(BLOCKS_COUNT)
   ) || abort('Snapshot creation failed. Aborting.')
+  puts 'Snapshot complete.'
   puts 'Skipping replay. It does not work. See issue #1196.'
+  puts 'Initiating shutdown...'
   system(
     EXE,
     "--socket", SOCKET,
     "shutdown"
   ) || puts('Shutdown failed after snapshot.')
   Process.wait(pid)
+  puts 'Shutdown complete'
   File::delete(CURRENT)
 else
   # Daemonize the EXE.
