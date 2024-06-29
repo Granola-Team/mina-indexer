@@ -2,6 +2,7 @@ use super::db;
 use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
+    constants::MAINNET_GENESIS_HASH,
     ledger::{
         staking::{AggregatedEpochStakeDelegations, StakingAccount},
         store::LedgerStore,
@@ -205,6 +206,10 @@ pub struct StakesLedgerAccountWithMeta {
     /// Value total num internal commands
     #[graphql(name = "total_num_internal_commands")]
     total_num_internal_commands: u32,
+
+    /// Value total num accounts
+    #[graphql(name = "epoch_num_accounts")]
+    epoch_num_accounts: u32,
 }
 
 #[derive(SimpleObject, Default)]
@@ -221,7 +226,7 @@ pub struct StakesLedgerAccount {
     /// Value delegate
     pub delegate: String,
 
-    /// Value epoch
+    /// Value public key
     pub pk: String,
 
     /// Value username
@@ -521,6 +526,9 @@ impl StakesLedgerAccountWithMeta {
                 .expect("epoch internal command count"),
             total_num_internal_commands: db
                 .get_internal_commands_total_count()
+                .expect("total internal command count"),
+            epoch_num_accounts: db
+                .get_staking_ledger_accounts_count_epoch(epoch, MAINNET_GENESIS_HASH.into())
                 .expect("total internal command count"),
         }
     }

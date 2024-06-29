@@ -262,6 +262,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for per epoch snark totals
     fn snarks_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for per epoch snark totals
+    fn staking_ledger_accounts_epoch_cf(&self) -> &ColumnFamily;
+
     /// CF for per epoch per acccount snark totals
     fn snarks_pk_epoch_cf(&self) -> &ColumnFamily;
 

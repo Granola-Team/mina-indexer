@@ -718,4 +718,13 @@ impl ColumnFamilyHelpers for IndexerStore {
             .cf_handle("snarks-epoch")
             .expect("snarks-epoch column family exists")
     }
+
+    /// CF for per epoch total staking ledger accounts
+    /// - key: `epoch`
+    /// - value: number of staking ledgers in `epoch`
+    fn staking_ledger_accounts_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-accounts-epoch")
+            .expect("staking-ledger-accounts-epoch column family exists")
+    }
 }
