@@ -194,7 +194,7 @@ impl IndexerStore {
         use speedb::checkpoint::Checkpoint;
 
         let mut snapshot_temp_dir = output_filepath.clone();
-        snapshot_temp_dir.set_extension(".rbb");
+        snapshot_temp_dir.set_extension("tmp-snapshot");
         let result = Checkpoint::new(&self.database)?
             .create_checkpoint(&snapshot_temp_dir)
             .map_err(|e| anyhow!("Error creating database snapshot: {}", e));

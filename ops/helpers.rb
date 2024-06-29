@@ -39,7 +39,7 @@ def config_snapshots_dir
 end
 
 def snapshot_path(block_height)
-  SNAPSHOTS_DIR + '/' + DB_VERSION + '-' + block_height.to_s + '-' + REV
+  SNAPSHOTS_DIR + '/' + DB_VERSION + '-' + block_height.to_s + '-' + REV + '.snapshot'
 end
 
 # Executable
