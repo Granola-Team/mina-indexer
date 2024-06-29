@@ -29,7 +29,7 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).unwrap();
+    state.add_blocks(&mut block_parser, None).unwrap();
 
     let event_log = indexer_store.get_event_log().unwrap();
 

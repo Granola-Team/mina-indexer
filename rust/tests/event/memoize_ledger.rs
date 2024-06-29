@@ -36,7 +36,7 @@ async fn test() -> anyhow::Result<()> {
     )?;
 
     // add all blocks & get store handle
-    state.add_blocks(&mut block_parser)?;
+    state.add_blocks(&mut block_parser, None)?;
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
 

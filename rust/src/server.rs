@@ -80,7 +80,7 @@ pub async fn start_indexer(
     let missing_block_recovery_batch = config.missing_block_recovery_batch;
     let domain_socket_path = config.domain_socket_path.clone();
 
-    let state = initialize(config, store);
+    let state = initialize(config, store, &subsys);
 
     if let Err(e) = state {
         error!("Error in server initialization: {}", e);
@@ -117,6 +117,7 @@ pub async fn start_indexer(
 fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
+    subsys: &SubsystemHandle,
 ) -> anyhow::Result<IndexerState> {
     info!("Starting mina-indexer server");
 
@@ -210,7 +211,7 @@ fn initialize(
                     }
                 };
                 info!("Initializing indexer state");
-                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
+                state.initialize_with_canonical_chain_discovery(&mut block_parser, subsys)?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
@@ -222,7 +223,7 @@ fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser, Some(subsys))?;
                 }
             }
             InitializationMode::Sync => {
@@ -235,7 +236,7 @@ fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser, Some(subsys))?;
                 }
             }
         }

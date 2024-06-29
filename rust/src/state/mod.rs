@@ -39,6 +39,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio_graceful_shutdown::SubsystemHandle;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known
@@ -360,6 +361,7 @@ impl IndexerState {
     pub fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
+        subsys: &SubsystemHandle,
     ) -> anyhow::Result<()> {
         let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
@@ -432,27 +434,24 @@ impl IndexerState {
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks
-        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
-    }
-
-    /// Initialize indexer state without short-circuiting canonical blocks
-    pub fn initialize_without_canonical_chain_discovery(
-        &mut self,
-        block_parser: &mut BlockParser,
-    ) -> anyhow::Result<()> {
-        self.add_blocks(block_parser)
+        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()), Some(subsys))
     }
 
     /// Adds blocks to the state according to `block_parser` then changes phase
     /// to Watching
-    pub fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        self.add_blocks_with_time(block_parser, None)
+    pub fn add_blocks(
+        &mut self,
+        block_parser: &mut BlockParser,
+        subsys: Option<&SubsystemHandle>,
+    ) -> anyhow::Result<()> {
+        self.add_blocks_with_time(block_parser, None, subsys)
     }
 
     fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
         elapsed: Option<Duration>,
+        subsys: Option<&SubsystemHandle>,
     ) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
@@ -478,6 +477,10 @@ impl IndexerState {
                     self.bytes_processed += block_bytes;
                     self.add_block_to_store(&block)?;
                 }
+            }
+            if subsys.is_some_and(|s| s.is_shutdown_requested()) {
+                info!("Shutdown requested; exiting early");
+                break;
             }
         }
 
