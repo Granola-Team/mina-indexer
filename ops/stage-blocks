@@ -35,7 +35,6 @@ for block_height in START_BLOCK..END_BLOCK
     unless File.exist?(target)
       # Use hard links to avoid uselessly overfilling the storage.
       File.link(src, target)
-      # FileUtils.cp(src, target)
     end
   end
 end
