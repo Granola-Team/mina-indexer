@@ -1,6 +1,6 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-3 testing.
 
-nix develop --command just tier3 270000
+nix develop --command just tier3 340000
 
 # The argument to "just tier3" is the number of blocks to use.
