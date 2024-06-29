@@ -325,6 +325,7 @@ POST {{url}}
 {
   stakes(query: {epoch: 1, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
     epoch
+    epoch_num_accounts
   }
 }
 ```
@@ -333,5 +334,6 @@ HTTP 200
 
 jsonpath "$.data.stakes" count == 1
 jsonpath "$.data.stakes[0].epoch" == 1
+jsonpath "$.data.stakes[0].epoch_num_accounts" == 1676
 
 duration < 1000
