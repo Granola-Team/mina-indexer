@@ -27,7 +27,7 @@ system(*args) || abort("Failure of download-mina-blocks")
 # Copy (or hard link) the correct block files into the staging directory.
 #
 FileUtils.mkdir_p(DEST)
-print 'Staging blocks'
+print 'Staging blocks... '
 for block in START_BLOCK..END_BLOCK
   Dir[BLOCKS_DIR + '/' + NETWORK + '-' + block.to_s + "-*.json"].each do |src|
     print '.'  # To show progress
