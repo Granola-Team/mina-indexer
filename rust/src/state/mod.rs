@@ -966,16 +966,38 @@ impl IndexerState {
         let blocks_processed;
 
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let event_log = indexer_store.get_event_log()?;
-            let canonical_block_events = event_log.iter().filter(|e| e.is_canonical_block_event());
-            blocks_processed = event_log.iter().filter(|e| e.is_new_block_event()).count() as u32;
+            let next_seq_num = indexer_store.get_next_seq_num()?;
+            let most_recent_canonical_block_event = indexer_store
+                .event_log_iterator(speedb::IteratorMode::From(
+                    &next_seq_num.to_be_bytes(),
+                    speedb::Direction::Reverse,
+                ))
+                .flatten()
+                .find_map(|(_, bytes)| {
+                    let e: IndexerEvent = serde_json::from_slice(&bytes).unwrap();
+                    if e.is_canonical_block_event() {
+                        Some(e)
+                    } else {
+                        None
+                    }
+                });
+            blocks_processed = indexer_store
+                .event_log_iterator(speedb::IteratorMode::Start)
+                .flatten()
+                .filter(|(_, value)| {
+                    if let Ok(e) = serde_json::from_slice::<IndexerEvent>(value) {
+                        return e.is_new_block_event();
+                    }
+                    false
+                })
+                .count() as u32;
 
             if let Some(IndexerEvent::Db(DbEvent::Canonicity(
                 DbCanonicityEvent::NewCanonicalBlock {
                     blockchain_length: canonical_length,
                     state_hash,
                 },
-            ))) = canonical_block_events.last()
+            ))) = most_recent_canonical_block_event.as_ref()
             {
                 // invariant
                 assert_eq!(
@@ -999,20 +1021,27 @@ impl IndexerState {
                     self.canonical_root = tip.clone();
                     self.best_tip = tip;
 
-                    for state_hash in event_log.iter().filter_map(|e| match e {
-                        IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
-                            state_hash,
-                            blockchain_length,
-                        })) => {
-                            if blockchain_length > canonical_length {
-                                Some(state_hash)
-                            } else {
-                                None
+                    for state_hash in indexer_store
+                        .event_log_iterator(speedb::IteratorMode::From(
+                            &next_seq_num.to_be_bytes(),
+                            speedb::Direction::Reverse,
+                        ))
+                        .flatten()
+                        .filter_map(|(_, bytes)| match serde_json::from_slice(&bytes) {
+                            Ok(IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                                state_hash,
+                                blockchain_length,
+                            }))) => {
+                                if blockchain_length > *canonical_length {
+                                    Some(state_hash)
+                                } else {
+                                    None
+                                }
                             }
-                        }
-                        _ => None,
-                    }) {
-                        if let Some(block) = indexer_store.get_block(state_hash)? {
+                            _ => None,
+                        })
+                    {
+                        if let Some(block) = indexer_store.get_block(&state_hash)? {
                             successive_blocks.push(block);
                         } else {
                             panic!(
@@ -1029,13 +1058,21 @@ impl IndexerState {
                 min_length_filter = Some(*canonical_length);
             } else {
                 // add all NewBlock's to the witness tree
-                for state_hash in event_log.iter().filter_map(|e| match e {
-                    IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
-                        state_hash, ..
-                    })) => Some(state_hash),
-                    _ => None,
-                }) {
-                    if let Some(block) = indexer_store.get_block(state_hash)? {
+                for state_hash in indexer_store
+                    .event_log_iterator(speedb::IteratorMode::From(
+                        &next_seq_num.to_be_bytes(),
+                        speedb::Direction::Reverse,
+                    ))
+                    .flatten()
+                    .filter_map(|(_, bytes)| match serde_json::from_slice(&bytes) {
+                        Ok(IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
+                            state_hash,
+                            ..
+                        }))) => Some(state_hash),
+                        _ => None,
+                    })
+                {
+                    if let Some(block) = indexer_store.get_block(&state_hash)? {
                         successive_blocks.push(block);
                     }
                 }
