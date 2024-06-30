@@ -24,6 +24,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
+use tokio::{fs::File, io::AsyncReadExt};
 
 pub struct BlockFileContents {
     pub(crate) network: Network,
@@ -184,11 +185,13 @@ impl PrecomputedBlock {
     }
 
     /// Parses the precomputed block if the path is a valid block file
-    pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
+    pub async fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let network = extract_network(path);
         let blockchain_length = extract_block_height(path).expect("length in filename");
         let state_hash = extract_state_hash(path);
-        let contents = std::fs::read(path)?;
+        let mut file = File::open(path).await?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).await?;
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
@@ -740,10 +743,10 @@ mod tests {
     use hex_literal::hex;
     use std::path::PathBuf;
 
-    #[test]
-    fn vrf_output() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn vrf_output() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
         assert_eq!(
             block.last_vrf_output(),
             "bgHnww8tqHDhk3rBpW9tse_L_WPup7yKDKigNvoeBwA=".to_string()

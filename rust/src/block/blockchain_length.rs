@@ -71,8 +71,8 @@ mod test {
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
-    #[test]
-    fn check() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn check() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/canonical_chain_discovery/contiguous/mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json".into();
         let BlockchainLengthBlock {
             protocol_state:
@@ -83,7 +83,7 @@ mod test {
                         },
                 },
         } = serde_json::from_slice(&std::fs::read(&path)?)?;
-        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
 
         assert_eq!(blockchain_length.parse::<u32>()?, pcb.blockchain_length());
         Ok(())

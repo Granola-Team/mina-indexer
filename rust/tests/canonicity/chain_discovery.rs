@@ -7,8 +7,8 @@ use mina_indexer::{
 };
 use std::path::PathBuf;
 
-#[test]
-fn gaps() -> anyhow::Result<()> {
+#[tokio::test]
+async fn gaps() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/gaps");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
@@ -17,7 +17,7 @@ fn gaps() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some((block, _)) = block_parser.next_block()? {
+    while let Some((block, _)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -28,8 +28,8 @@ fn gaps() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn contiguous() -> anyhow::Result<()> {
+#[tokio::test]
+async fn contiguous() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
@@ -38,7 +38,7 @@ fn contiguous() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some((block, _)) = block_parser.next_block()? {
+    while let Some((block, _)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -49,8 +49,8 @@ fn contiguous() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn missing_parent() -> anyhow::Result<()> {
+#[tokio::test]
+async fn missing_parent() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/missing_parent");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
         &blocks_dir,
@@ -59,7 +59,7 @@ fn missing_parent() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some((block, _)) = block_parser.next_block()? {
+    while let Some((block, _)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -91,8 +91,8 @@ fn one_block() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn canonical_threshold() -> anyhow::Result<()> {
+#[tokio::test]
+async fn canonical_threshold() -> anyhow::Result<()> {
     let canonical_threshold = 2;
     let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
@@ -102,7 +102,7 @@ fn canonical_threshold() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )?;
 
-    while let Some((block, _)) = block_parser.next_block()? {
+    while let Some((block, _)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }

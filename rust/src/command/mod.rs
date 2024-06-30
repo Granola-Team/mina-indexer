@@ -761,8 +761,8 @@ mod test {
         }
     }
 
-    #[test]
-    fn mainnet_user_command_with_status_json() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn mainnet_user_command_with_status_json() -> anyhow::Result<()> {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
@@ -873,7 +873,7 @@ mod test {
         let contents = std::fs::read(path.clone())?;
         let mina_json: Value =
             from_slice::<Value>(&contents)?["staged_ledger_diff"]["diff"][0]["commands"][0].clone();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 

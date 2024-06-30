@@ -81,23 +81,22 @@ impl MinaIndexer {
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = config.missing_block_recovery_batch;
         let domain_socket_path = config.domain_socket_path.clone();
+        let state = initialize(config, store).await.unwrap_or_else(|e| {
+            error!("Error in server initialization: {}", e);
+            std::process::exit(1);
+        });
+        let state = Arc::new(RwLock::new(state));
+        // Needs read-only state for summary
+        let uds_state = state.clone();
+        tokio::spawn(async move {
+            unix_socket_server::run(
+                UnixSocketServer::new(uds_state, domain_socket_path),
+                wait_for_signal(),
+            )
+            .await;
+        });
+
         Ok(Self(tokio::spawn(async move {
-            let state = initialize(config, store).unwrap_or_else(|e| {
-                error!("Error in server initialization: {}", e);
-                std::process::exit(1);
-            });
-            let state = Arc::new(RwLock::new(state));
-
-            // Needs read-only state for summary
-            let uds_state = state.clone();
-            tokio::spawn(async move {
-                unix_socket_server::run(
-                    UnixSocketServer::new(uds_state, domain_socket_path),
-                    wait_for_signal(),
-                )
-                .await;
-            });
-
             // Modifies the state
             if let Err(e) = run(
                 block_watch_dir,
@@ -134,7 +133,7 @@ async fn wait_for_signal() {
     }
 }
 
-pub fn initialize(
+pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
@@ -224,7 +223,9 @@ pub fn initialize(
                     }
                 };
                 info!("Initializing indexer state");
-                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
+                state
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)
+                    .await?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
@@ -236,7 +237,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser).await?;
                 }
             }
             InitializationMode::Sync => {
@@ -249,7 +250,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser).await?;
                 }
             }
         }
@@ -383,7 +384,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 debug!("Valid precomputed block file: {}", path.display());
 
                 let mut version = state.read().await.version.clone();
-                match PrecomputedBlock::parse_file(&path, version.version.clone()) {
+                match PrecomputedBlock::parse_file(&path, version.version.clone()).await {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;

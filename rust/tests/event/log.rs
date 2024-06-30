@@ -62,14 +62,14 @@ async fn test() {
     .unwrap();
 
     // add parser0 blocks to state0
-    state0.add_blocks(&mut block_parser0).unwrap();
+    state0.add_blocks(&mut block_parser0).await.unwrap();
 
     // add parser1 blocks to state1
     // - add block to db
     // - add block to witness tree
     // - update best tip
     // - update canonicities
-    while let Some((block, _)) = block_parser1.next_block().unwrap() {
+    while let Some((block, _)) = block_parser1.next_block().await.unwrap() {
         let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store

@@ -357,7 +357,7 @@ impl IndexerState {
     /// blocks
     ///
     /// Short-circuits adding canonical blocks to the witness tree
-    pub fn initialize_with_canonical_chain_discovery(
+    pub async fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
@@ -380,7 +380,7 @@ impl IndexerState {
                 self.report_from_block_count(block_parser, total_time);
 
                 if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
-                    block_parser.next_block()?
+                    block_parser.next_block().await?
                 {
                     let state_hash = block.state_hash();
                     self.bytes_processed += block_bytes;
@@ -433,23 +433,24 @@ impl IndexerState {
 
         // deep canonical & recent blocks added, now add orphaned blocks
         self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
+            .await
     }
 
     /// Initialize indexer state without short-circuiting canonical blocks
-    pub fn initialize_without_canonical_chain_discovery(
+    pub async fn initialize_without_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
-        self.add_blocks(block_parser)
+        self.add_blocks(block_parser).await
     }
 
     /// Adds blocks to the state according to `block_parser` then changes phase
     /// to Watching
-    pub fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        self.add_blocks_with_time(block_parser, None)
+    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
+        self.add_blocks_with_time(block_parser, None).await
     }
 
-    fn add_blocks_with_time(
+    async fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
         elapsed: Option<Duration>,
@@ -463,7 +464,7 @@ impl IndexerState {
             BLOCK_REPORTING_FREQ_SEC, self.reporting_freq
         );
 
-        while let Some((parsed_block, block_bytes)) = block_parser.next_block()? {
+        while let Some((parsed_block, block_bytes)) = block_parser.next_block().await? {
             self.report_progress(block_parser, step_time, total_time)?;
             step_time = Instant::now();
 

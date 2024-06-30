@@ -220,13 +220,16 @@ impl BlockParser {
         }
     }
 
-    fn consume_block(
+    async fn consume_block(
         &mut self,
         path: &Path,
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
     ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         let block_bytes = path.metadata().unwrap().len();
-        match PrecomputedBlock::parse_file(path, self.version.clone()).map(designation) {
+        match PrecomputedBlock::parse_file(path, self.version.clone())
+            .await
+            .map(designation)
+        {
             Ok(parsed_block) => {
                 self.blocks_processed += 1;
                 self.bytes_processed += block_bytes;
@@ -239,17 +242,19 @@ impl BlockParser {
     /// - deep canonical
     /// - recent
     /// - orphaned
-    pub fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
+    pub async fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         if let Some(next_path) = self.canonical_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::DeepCanonical);
+            return self
+                .consume_block(&next_path, &ParsedBlock::DeepCanonical)
+                .await;
         }
 
         if let Some(next_path) = self.recent_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::Recent);
+            return self.consume_block(&next_path, &ParsedBlock::Recent).await;
         }
 
         if let Some(next_path) = self.orphaned_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::Orphaned);
+            return self.consume_block(&next_path, &ParsedBlock::Orphaned).await;
         }
 
         Ok(None)
@@ -262,13 +267,15 @@ impl BlockParser {
         state_hash: &str,
     ) -> anyhow::Result<(PrecomputedBlock, u64)> {
         let mut next_block: (PrecomputedBlock, u64) = self
-            .next_block()?
+            .next_block()
+            .await?
             .map(|p| (p.0.into(), p.1))
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.0.state_hash().0 != state_hash {
             next_block = self
-                .next_block()?
+                .next_block()
+                .await?
                 .map(|p| (p.0.into(), p.1))
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }
