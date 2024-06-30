@@ -64,7 +64,7 @@ impl UnixSocketServer {
 }
 
 /// Start Unix Domain Socket server
-pub async fn run(server: UnixSocketServer, shutdown: impl Future) {
+pub async fn run(server: UnixSocketServer, shutdown: impl Future) -> anyhow::Result<()> {
     let listener = UnixListener::bind(server.unix_socket.clone())
         .or_else(|e| try_remove_old_socket(e, &server.unix_socket))
         .unwrap_or_else(|e| panic!("Unable to bind to Unix domain socket file: {}", e));
@@ -77,6 +77,8 @@ pub async fn run(server: UnixSocketServer, shutdown: impl Future) {
     tokio::select! {
         _ = shutdown => {
             info!("Received shutdown signal");
+            return Ok(());
+
         }
         res = server.run(&listener) => {
             if let Err(e) = res {
@@ -85,6 +87,7 @@ pub async fn run(server: UnixSocketServer, shutdown: impl Future) {
         }
     }
     info!("Unix domain socket server shutdown gracefully");
+    Ok(())
 }
 
 pub async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli> {

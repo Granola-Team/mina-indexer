@@ -81,6 +81,7 @@ impl MinaIndexer {
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = config.missing_block_recovery_batch;
         let domain_socket_path = config.domain_socket_path.clone();
+        let shutdown = wait_for_signal();
         let state = initialize(config, store).await.unwrap_or_else(|e| {
             error!("Error in server initialization: {}", e);
             std::process::exit(1);
@@ -89,11 +90,14 @@ impl MinaIndexer {
         // Needs read-only state for summary
         let uds_state = state.clone();
         tokio::spawn(async move {
-            unix_socket_server::run(
-                UnixSocketServer::new(uds_state, domain_socket_path),
-                wait_for_signal(),
+            let _ = unix_socket_server::run(
+                UnixSocketServer::new(uds_state, domain_socket_path.clone()),
+                shutdown,
             )
             .await;
+            info!("UNIX socket server shutting down");
+            tokio::fs::remove_file(domain_socket_path).await.unwrap();
+            debug!("UNIX socket removed");
         });
 
         Ok(Self(tokio::spawn(async move {
@@ -367,7 +371,7 @@ pub async fn run(
         }
     }
 
-    info!("Ingestion cleanly shutdown");
+    info!("Ingestion watching cleanly shutdown");
     let state = state.write().await;
     state
         .indexer_store
