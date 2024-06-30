@@ -889,7 +889,7 @@ impl IndexerState {
     }
 
     /// Add staking ledgers to the underlying ledger store
-    pub fn add_startup_staking_ledgers_to_store(
+    pub async fn add_startup_staking_ledgers_to_store(
         &mut self,
         ledgers_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
@@ -906,7 +906,7 @@ impl IndexerState {
         let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             while let Ok(Some(staking_ledger)) =
-                ledger_parser.next_ledger(self.indexer_store.as_ref())
+                ledger_parser.next_ledger(self.indexer_store.as_ref()).await
             {
                 let summary = staking_ledger.summary();
                 self.staking_ledgers

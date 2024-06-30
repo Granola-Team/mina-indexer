@@ -266,11 +266,12 @@ pub async fn initialize(
         }
     }
 
-    staking_ledgers_dir.as_ref().iter().for_each(|pathbuf| {
-        if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf) {
+    for pathbuf in staking_ledgers_dir.iter() {
+        if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf).await {
             error!("Failed to ingest staking ledger: {:?} {}", pathbuf, e);
         }
-    });
+    }
+
     debug!(
         "Phase change: {} -> {}",
         state.phase,
@@ -424,7 +425,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let mut state = state.write().await;
 
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()) {
+                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()).await
+                    {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();
