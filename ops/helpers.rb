@@ -94,7 +94,7 @@ end
 
 # Database directory
 
-DB_VERSION = '0.5.0'
+DB_VERSION = '0.6.0'
 
 def db_dir(block_height)
   BASE_DIR + '/db/' + DB_VERSION + '-' + block_height.to_s
