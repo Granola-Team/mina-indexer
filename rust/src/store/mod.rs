@@ -195,24 +195,18 @@ impl IndexerStore {
 
         let mut snapshot_temp_dir = output_filepath.clone();
         snapshot_temp_dir.set_extension("tmp-snapshot");
-        let result = Checkpoint::new(&self.database)?
+        Checkpoint::new(&self.database)?
             .create_checkpoint(&snapshot_temp_dir)
-            .map_err(|e| anyhow!("Error creating database snapshot: {}", e));
-        if result.is_ok() {
-            let result = compress_directory(&snapshot_temp_dir, output_filepath)
-                .with_context(|| "Failed to compress database.");
-            if result.is_ok() {
-                let result = fs::remove_dir_all(&snapshot_temp_dir)
-                    .with_context(|| format!("Failed to remove directory {snapshot_temp_dir:#?})"));
-                if result.is_ok() {
-                    return Ok(format!(
-                        "Snapshot created and saved as {output_filepath:#?}"
-                    ));
-                }
-            }
-        }
-        #[allow(clippy::unnecessary_unwrap)]
-        Err(result.unwrap_err())
+            .map_err(|e| anyhow!("Error creating database snapshot: {e}"))
+            .and_then(|_| {
+                compress_directory(&snapshot_temp_dir, output_filepath)
+                    .with_context(|| "Failed to compress database.")
+            })
+            .and_then(|_| {
+                fs::remove_dir_all(&snapshot_temp_dir)
+                    .with_context(|| format!("Failed to remove directory {snapshot_temp_dir:#?})"))
+            })
+            .map(|_| format!("Snapshot created and saved as {output_filepath:#?}"))
     }
 }
 
@@ -230,16 +224,11 @@ pub fn restore_snapshot(
         error!("{msg}");
         Err(anyhow!(msg))
     } else {
-        let result = decompress_file(snapshot_file_path, restore_dir)
-            .with_context(|| format!("Failed to decompress file {snapshot_file_path:#?}"));
-        if result.is_ok() {
-            Ok(format!(
+        decompress_file(snapshot_file_path, restore_dir)
+            .with_context(|| format!("Failed to decompress file {snapshot_file_path:#?}"))
+            .map(|_| format!(
                 "Snapshot restored to {restore_dir:#?}.\n\nPlease start server using: `server sync --database-dir {restore_dir:#?}`"
             ))
-        } else {
-            #[allow(clippy::unnecessary_unwrap)]
-            Err(result.unwrap_err())
-        }
     }
 }
 

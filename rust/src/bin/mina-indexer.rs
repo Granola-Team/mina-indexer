@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use log::{error, info, trace, LevelFilter};
+use log::{debug, error, info, trace, LevelFilter};
 use mina_indexer::{
     block::precomputed::PcbVersion,
     chain::Network,
@@ -208,13 +208,9 @@ pub async fn main() -> anyhow::Result<()> {
                 error!("{msg}");
                 msg
             } else {
-                let result = store::restore_snapshot(&snapshot_file_path, &restore_dir);
-                if result.is_ok() {
-                    result?
-                } else {
-                    #[allow(clippy::unnecessary_unwrap)]
-                    let err = result.unwrap_err();
-                    format!("{}: {:#?}", err, err.root_cause().to_string())
+                match store::restore_snapshot(&snapshot_file_path, &restore_dir) {
+                    Ok(s) => s,
+                    Err(e) => format!("{e}: {:#?}", e.root_cause().to_string()),
                 }
             };
             println!("{msg}");
@@ -264,22 +260,21 @@ pub async fn main() -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&args_json)?
             );
 
-            trace!("Building an indexer configuration");
+            debug!("Building an indexer configuration");
             let config = process_indexer_configuration(args, mode)?;
 
-            trace!("Creating a new IndexerStore in {}", database_dir.display());
+            debug!("Creating a new IndexerStore in {}", database_dir.display());
             let db = Arc::new(IndexerStore::new(&database_dir)?);
 
-            trace!(
+            debug!(
                 "Creating an Indexer listening on {}",
                 domain_socket_path.display()
             );
             let indexer = MinaIndexer::new(config, db.clone()).await?;
 
-            trace!(
+            debug!(
                 "Starting the HTTP server listening on {}:{}",
-                web_hostname,
-                web_port
+                web_hostname, web_port
             );
             match mina_indexer::web::start_web_server(db.clone(), (web_hostname, web_port)).await {
                 Ok(()) => indexer.await_loop().await,

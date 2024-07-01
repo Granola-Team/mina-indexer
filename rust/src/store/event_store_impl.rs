@@ -8,32 +8,35 @@ use log::trace;
 impl EventStore for IndexerStore {
     fn add_event(&self, event: &IndexerEvent) -> anyhow::Result<u32> {
         let seq_num = self.get_next_seq_num()?;
-        trace!("Adding event {seq_num}: {:?}", event);
+        trace!("Adding event {seq_num}: {event:?}");
 
         if matches!(event, IndexerEvent::WitnessTree(_)) {
             return Ok(seq_num);
         }
 
         // add event to db
-        let key = seq_num.to_be_bytes();
-        let value = serde_json::to_vec(&event)?;
-        self.database.put_cf(self.events_cf(), key, value)?;
+        self.database.put_cf(
+            self.events_cf(),
+            seq_num.to_be_bytes(),
+            serde_json::to_vec(&event)?,
+        )?;
 
         // increment event sequence number
         let next_seq_num = seq_num + 1;
-        let value = serde_json::to_vec(&next_seq_num)?;
-        self.database
-            .put_cf(self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY, value)?;
+        self.database.put_cf(
+            self.events_cf(),
+            Self::NEXT_EVENT_SEQ_NUM_KEY,
+            serde_json::to_vec(&next_seq_num)?,
+        )?;
 
         // return next event sequence number
         Ok(next_seq_num)
     }
 
     fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
-        let key = seq_num.to_be_bytes();
         let event = self
             .database
-            .get_pinned_cf(self.events_cf(), key)?
+            .get_pinned_cf(self.events_cf(), seq_num.to_be_bytes())?
             .map(|bytes| serde_json::from_slice(&bytes).unwrap());
 
         trace!("Getting event {seq_num}: {:?}", event.clone().unwrap());

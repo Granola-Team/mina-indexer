@@ -109,7 +109,7 @@ impl MinaIndexer {
             )
             .await
             {
-                error!("Error in server run: {}", e);
+                error!("Error in server run: {e}");
                 std::process::exit(1);
             }
         })))
@@ -220,7 +220,7 @@ pub fn initialize(
                 ) {
                     Ok(block_parser) => block_parser,
                     Err(e) => {
-                        panic!("Obtaining block parser failed: {}", e);
+                        panic!("Obtaining block parser failed: {e}");
                     }
                 };
                 info!("Initializing indexer state");
@@ -267,7 +267,7 @@ pub fn initialize(
 
     staking_ledgers_dir.as_ref().iter().for_each(|pathbuf| {
         if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf) {
-            error!("Failed to ingest staking ledger: {:?} {}", pathbuf, e);
+            error!("Failed to ingest staking ledger {} {e}", pathbuf.display());
         }
     });
     debug!(
@@ -317,7 +317,7 @@ pub async fn run(
             let tx = tx.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
-                    panic!("Failed to send watcher event, closing: {}", e);
+                    panic!("Failed to send watcher event, closing: {e}");
                 }
             });
         },
@@ -352,7 +352,7 @@ pub async fn run(
             Some(res) = rx.recv() => {
                 match res {
                     Ok(event) => process_event(event, &state).await?,
-                    Err(e) => error!("Ingestion watcher error: {}", e),
+                    Err(e) => error!("Ingestion watcher error: {e}"),
                 }
             }
 
@@ -365,12 +365,12 @@ pub async fn run(
         }
     }
 
-    info!("Ingestion cleanly shutdown");
+    info!("Ingestion successfully shutdown");
     let state = state.write().await;
-    state
-        .indexer_store
-        .iter()
-        .for_each(|store| store.database.cancel_all_background_work(true));
+    state.indexer_store.iter().for_each(|store| {
+        info!("Canceling db background work");
+        store.database.cancel_all_background_work(true)
+    });
     Ok(())
 }
 
@@ -403,7 +403,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                                     info!("Added block {}", block.summary())
                                 }
                             }
-                            Err(e) => error!("Error adding block: {}", e),
+                            Err(e) => error!("Error adding block: {e}"),
                         }
 
                         // check for block parser version update
@@ -415,7 +415,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                             version.genesis_state_hash = state.version.genesis_state_hash.clone();
                         }
                     }
-                    Err(e) => error!("Error parsing precomputed block: {}", e),
+                    Err(e) => error!("Error parsing precomputed block: {e}"),
                 }
             } else if staking::is_valid_ledger_file(&path) {
                 // Acquire write lock
@@ -435,15 +435,15 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                             ) {
                                 Ok(_) => {
                                     state.staking_ledgers.insert(epoch, ledger_hash);
-                                    info!("Added staking ledger {}", ledger_summary);
+                                    info!("Added staking ledger {ledger_summary}");
                                 }
                                 Err(e) => {
-                                    error!("Error adding staking ledger {} {}", ledger_summary, e)
+                                    error!("Error adding staking ledger {ledger_summary} {e}")
                                 }
                             }
                         }
                         Err(e) => {
-                            error!("Error parsing staking ledger: {}", e)
+                            error!("Error parsing staking ledger: {e}")
                         }
                     }
                 } else {
@@ -489,8 +489,7 @@ async fn recover_missing_blocks(
                 stderr().write_all(&output.stderr).unwrap();
             }
             Err(e) => error!(
-                "Error recovery missing block: {}, pgm: {}, args: {:?}",
-                e,
+                "Error recovery missing block: {e}, pgm: {}, args: {:?}",
                 cmd.get_program().to_str().unwrap(),
                 cmd.get_args()
                     .map(|arg| arg.to_str().unwrap())

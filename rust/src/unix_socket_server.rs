@@ -608,12 +608,9 @@ async fn handle_conn(
         },
         ClientCli::CreateSnapshot { output_path } => {
             info!("Received create-snapshot command");
-            let result = db.create_snapshot(&output_path);
-            if result.is_ok() {
-                result.ok()
-            } else {
-                #[allow(clippy::unnecessary_unwrap)]
-                Some(result.unwrap_err().to_string())
+            match db.create_snapshot(&output_path) {
+                Err(e) => Some(e.to_string()),
+                Ok(s) => Some(s),
             }
         }
         ClientCli::Ledgers(__) => match __ {
