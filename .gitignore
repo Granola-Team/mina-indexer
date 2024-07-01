@@ -5,6 +5,7 @@
 # database and snapshots
 database/
 *.gz
+PID
 
 # direnv creates this directory as a cache
 .direnv

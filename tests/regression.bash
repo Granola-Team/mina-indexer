@@ -329,6 +329,17 @@ test_ipc_is_available_immediately() {
     teardown
 }
 
+# Indexer fails to start if there is a running Indexer
+test_pid_file() {
+    enter_test test_pid_file
+
+    idxr_server_start_standard
+    # 2nd Indxer instance should fail to start
+    idxr_server_start_standard
+
+    teardown
+}
+
 # Indexer server starts and creates directories with minimal args
 test_startup_dirs_get_created() {
     enter_test test_startup_dirs_get_created
@@ -1758,6 +1769,7 @@ for test_name in "$@"; do
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;
+        "test_pid_file") test_pid_file ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
         "test_release") test_release ;;

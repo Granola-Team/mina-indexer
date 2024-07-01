@@ -1540,6 +1540,7 @@ dependencies = [
  "hex-literal",
  "id_tree",
  "lazy_static",
+ "libc",
  "log",
  "mina_serialization_proc_macros",
  "mina_serialization_versioned",

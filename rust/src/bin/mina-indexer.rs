@@ -12,7 +12,12 @@ use mina_indexer::{
     server::{IndexerConfiguration, InitializationMode, MinaIndexer},
     store::{self, version::IndexerStoreVersion, IndexerStore},
 };
-use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
+use std::{
+    fs::{self},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 use stderrlog::{ColorChoice, Timestamp};
 
 #[derive(Parser, Debug)]
@@ -260,6 +265,8 @@ pub async fn main() -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&args_json)?
             );
 
+            check_or_write_pid_file(&database_dir);
+
             debug!("Building an indexer configuration");
             let config = process_indexer_configuration(args, mode)?;
 
@@ -411,6 +418,41 @@ pub fn process_indexer_configuration(
         missing_block_recovery_delay,
         missing_block_recovery_batch,
     })
+}
+
+fn check_or_write_pid_file(database_dir: &Path) {
+    use mina_indexer::platform;
+    use std::{fs::File, io::Write, process};
+
+    let _ = fs::create_dir_all(database_dir);
+
+    let pid_path = database_dir.join("PID");
+
+    if let Ok(pid) = fs::read_to_string(&pid_path) {
+        let pid = pid
+            .trim()
+            .parse::<i32>()
+            .unwrap_or_else(|_| panic!("Expected to find PID in {pid_path:#?}"));
+        if platform::is_process_running(pid) {
+            eprintln!("Will not start due to a running Indexer with PID {pid}");
+            process::exit(130);
+        }
+        return;
+    };
+
+    match File::create(&pid_path) {
+        Ok(mut pid_file) => {
+            let pid = process::id();
+            if let Err(e) = write!(pid_file, "{}", pid) {
+                eprintln!("Error writing PID ({pid}) to {pid_path:#?}: {}", e);
+                process::exit(131);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error writing PID to {pid_path:#?}: {}", e);
+            process::exit(131);
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
