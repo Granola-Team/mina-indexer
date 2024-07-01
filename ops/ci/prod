@@ -3,4 +3,4 @@
 
 ulimit -Sn
 ulimit -Hn
-nix develop --command just deploy-local-prod 270000
+nix develop --command just deploy-local-prod 340000
