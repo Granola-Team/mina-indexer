@@ -208,13 +208,9 @@ pub async fn main() -> anyhow::Result<()> {
                 error!("{msg}");
                 msg
             } else {
-                let result = store::restore_snapshot(&snapshot_file_path, &restore_dir);
-                if result.is_ok() {
-                    result?
-                } else {
-                    #[allow(clippy::unnecessary_unwrap)]
-                    let err = result.unwrap_err();
-                    format!("{}: {:#?}", err, err.root_cause().to_string())
+                match store::restore_snapshot(&snapshot_file_path, &restore_dir) {
+                    Ok(s) => s,
+                    Err(e) => format!("{e}: {:#?}", e.root_cause().to_string()),
                 }
             };
             println!("{msg}");
