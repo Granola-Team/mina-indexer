@@ -270,7 +270,7 @@ pub fn initialize(
             }
         }
     }
-    
+
     debug!(
         "Phase change: {} -> {}",
         state.phase,
