@@ -1077,6 +1077,7 @@ impl IndexerState {
             panic!("Fatal sync error: no indexer store");
         };
 
+        witness_tree_blocks.reverse();
         for block in witness_tree_blocks {
             trace!("Sync: add block {}", block.summary());
             self.add_block_to_witness_tree(&block)?;
