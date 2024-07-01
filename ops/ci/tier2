@@ -1,4 +1,6 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-2 testing.
 
+ulimit -Sn
+ulimit -Hn
 nix develop --command just tier2
