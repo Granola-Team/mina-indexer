@@ -5,11 +5,11 @@ use crate::{
     constants::VERSION,
     ledger::{
         account::{nanomina_to_mina, Amount},
-        store::LedgerStore,
         LedgerHash,
     },
     snark_work::store::SnarkStore,
     store::{
+        account::AccountStore,
         version::{IndexerStoreVersion, VersionStore},
         IndexerStore,
     },
@@ -41,7 +41,7 @@ pub struct BlockchainSummary {
     staking_epoch_ledger_hash: String,
     state_hash: String,
     total_currency: String,
-    total_num_accounts: usize,
+    total_num_accounts: u32,
     epoch_num_blocks: u32,
     total_num_blocks: u32,
     epoch_num_snarks: u32,
@@ -74,7 +74,7 @@ struct SummaryInput {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
-    total_num_accounts: usize,
+    total_num_accounts: u32,
 }
 
 fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
@@ -186,11 +186,9 @@ pub async fn get_blockchain_summary(
     let db = store.as_ref();
     if let Ok(Some(best_tip)) = db.get_best_block() {
         trace!("Found best tip: {}", best_tip.summary());
-        let state_hash = &best_tip.state_hash();
         let total_num_accounts = store
-            .get_ledger_state_hash(state_hash, true)
-            .expect("ledger exists")
-            .map(|ledger| ledger.len())
+            .get_num_accounts()
+            .unwrap_or_default()
             .unwrap_or_default();
 
         // aggregated on-chain & off-chain time-locked tokens
