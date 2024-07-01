@@ -1,10 +1,11 @@
-use super::{account::AccountBalanceUpdate, column_families::ColumnFamilyHelpers};
+use super::{account::AccountBalanceUpdate, column_families::ColumnFamilyHelpers, from_be_bytes};
 use crate::{
     block::{store::BlockStore, BlockHash},
     constants::MAINNET_GENESIS_HASH,
     ledger::public_key::PublicKey,
     store::{
         account::{AccountStore, DBAccountBalanceUpdate},
+        fixed_keys::FixedKeys,
         u64_prefix_key, IndexerStore,
     },
 };
@@ -85,6 +86,16 @@ impl AccountStore for IndexerStore {
     ) -> anyhow::Result<()> {
         trace!("Updating account balances {state_hash}");
 
+        use AccountBalanceUpdate::*;
+        fn count(updates: &[AccountBalanceUpdate]) -> i32 {
+            updates.iter().fold(0, |acc, update| match update {
+                CreateAccount(_) => acc + 1,
+                RemoveAccount(_) => acc - 1,
+                Payment(_) => acc,
+            })
+        }
+        self.update_num_accounts(count(&updates.apply) - count(&updates.unapply))?;
+
         // update balances
         for (pk, amount) in <DBAccountBalanceUpdate>::balance_updates(updates) {
             if let Some(amount) = amount {
@@ -103,6 +114,42 @@ impl AccountStore for IndexerStore {
             }
         }
         Ok(())
+    }
+
+    fn update_num_accounts(&self, adjust: i32) -> anyhow::Result<()> {
+        use std::cmp::Ordering::*;
+
+        match adjust.cmp(&0) {
+            Equal => (),
+            Greater => {
+                let old = self
+                    .database
+                    .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
+                    .map_or(0, from_be_bytes);
+                self.database.put(
+                    Self::TOTAL_NUM_ACCOUNTS_KEY,
+                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+            Less => {
+                let old = self
+                    .database
+                    .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
+                    .map_or(0, from_be_bytes);
+                self.database.put(
+                    Self::TOTAL_NUM_ACCOUNTS_KEY,
+                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn get_num_accounts(&self) -> anyhow::Result<Option<u32>> {
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
+            .map(from_be_bytes))
     }
 
     fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()> {

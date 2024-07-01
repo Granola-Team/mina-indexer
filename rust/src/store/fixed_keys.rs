@@ -11,6 +11,7 @@ pub trait FixedKeys {
     const INDEXER_STORE_VERSION_KEY: &'static [u8] = "indexer_store_version".as_bytes();
 
     // indexed totals
+    const TOTAL_NUM_ACCOUNTS_KEY: &'static [u8] = "total_num_accounts".as_bytes();
     const TOTAL_NUM_BLOCKS_KEY: &'static [u8] = "total_num_blocks".as_bytes();
     const TOTAL_NUM_SNARKS_KEY: &'static [u8] = "total_num_snarks".as_bytes();
     const TOTAL_NUM_FEE_TRANSFERS_KEY: &'static [u8] = "total_num_fee_transfers".as_bytes();

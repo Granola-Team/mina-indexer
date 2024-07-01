@@ -48,6 +48,12 @@ pub trait AccountStore {
     /// Get pk's account balance
     fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
 
+    /// Update best ledger accounts count
+    fn update_num_accounts(&self, adjust: i32) -> anyhow::Result<()>;
+
+    /// Get best ledger accounts count
+    fn get_num_accounts(&self) -> anyhow::Result<Option<u32>>;
+
     ///////////////
     // Iterators //
     ///////////////
