@@ -243,10 +243,10 @@ mod tests {
     use super::*;
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
 
-    #[test]
-    fn from_precomputed() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn from_precomputed() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./tests/data/canonical_chain_discovery/contiguous/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
         let internal_cmds = InternalCommand::from_precomputed(&block);
 
         assert_eq!(

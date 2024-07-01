@@ -28,7 +28,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     )?;
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser)?;
+    state.add_blocks(&mut block_parser).await?;
 
     // This block is deep canonical:
     // 0: mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json

@@ -28,7 +28,7 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).unwrap();
+    state.add_blocks(&mut block_parser).await.unwrap();
 
     // fresh state to sync events with no genesis events
     let config = IndexerStateConfig::new(

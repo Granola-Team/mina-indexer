@@ -161,12 +161,12 @@ mod tests {
     };
     use std::path::PathBuf;
 
-    #[test]
-    fn fees_from_precomputed_111() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn fees_from_precomputed_111() -> anyhow::Result<()> {
         use crate::ledger::diff::account::AccountDiffType::*;
 
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-111-3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK.json");
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
         let ledger_diff = LedgerDiff::from_precomputed(&block);
         let expected = LedgerDiff::from(&[
             (
@@ -211,12 +211,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn fees_from_precomputed_320081() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn fees_from_precomputed_320081() -> anyhow::Result<()> {
         use crate::ledger::diff::account::AccountDiffType::*;
 
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-320081-3NK3bLM3eMyCum34ovAGCUw2GWUqDxkNwiti8XtKBYrocinp8oZM.json");
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1).await?;
         let mut ledger_diff = LedgerDiff::from_precomputed(&block);
         let mut expected = LedgerDiff::from(&[
             (

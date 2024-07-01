@@ -81,23 +81,26 @@ impl MinaIndexer {
         let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = config.missing_block_recovery_batch;
         let domain_socket_path = config.domain_socket_path.clone();
+        let shutdown = wait_for_signal();
+        let state = initialize(config, store).await.unwrap_or_else(|e| {
+            error!("Error in server initialization: {}", e);
+            std::process::exit(1);
+        });
+        let state = Arc::new(RwLock::new(state));
+        // Needs read-only state for summary
+        let uds_state = state.clone();
+        tokio::spawn(async move {
+            let _ = unix_socket_server::run(
+                UnixSocketServer::new(uds_state, domain_socket_path.clone()),
+                shutdown,
+            )
+            .await;
+            info!("UNIX socket server shutting down");
+            tokio::fs::remove_file(domain_socket_path).await.unwrap();
+            debug!("UNIX socket removed");
+        });
+
         Ok(Self(tokio::spawn(async move {
-            let state = initialize(config, store).unwrap_or_else(|e| {
-                error!("Error in server initialization: {}", e);
-                std::process::exit(1);
-            });
-            let state = Arc::new(RwLock::new(state));
-
-            // Needs read-only state for summary
-            let uds_state = state.clone();
-            tokio::spawn(async move {
-                unix_socket_server::run(
-                    UnixSocketServer::new(uds_state, domain_socket_path),
-                    wait_for_signal(),
-                )
-                .await;
-            });
-
             // Modifies the state
             if let Err(e) = run(
                 block_watch_dir,
@@ -134,7 +137,7 @@ async fn wait_for_signal() {
     }
 }
 
-pub fn initialize(
+pub async fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
@@ -224,7 +227,9 @@ pub fn initialize(
                     }
                 };
                 info!("Initializing indexer state");
-                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
+                state
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)
+                    .await?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
@@ -236,7 +241,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser).await?;
                 }
             }
             InitializationMode::Sync => {
@@ -249,7 +254,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser).await?;
                 }
             }
         }
@@ -265,11 +270,12 @@ pub fn initialize(
         }
     }
 
-    staking_ledgers_dir.as_ref().iter().for_each(|pathbuf| {
-        if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf) {
+    for pathbuf in staking_ledgers_dir.iter() {
+        if let Err(e) = state.add_startup_staking_ledgers_to_store(pathbuf).await {
             error!("Failed to ingest staking ledger: {:?} {}", pathbuf, e);
         }
-    });
+    }
+
     debug!(
         "Phase change: {} -> {}",
         state.phase,
@@ -365,7 +371,7 @@ pub async fn run(
         }
     }
 
-    info!("Ingestion cleanly shutdown");
+    info!("Ingestion watching cleanly shutdown");
     let state = state.write().await;
     state
         .indexer_store
@@ -383,7 +389,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 debug!("Valid precomputed block file: {}", path.display());
 
                 let mut version = state.read().await.version.clone();
-                match PrecomputedBlock::parse_file(&path, version.version.clone()) {
+                match PrecomputedBlock::parse_file(&path, version.version.clone()).await {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
@@ -423,7 +429,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let mut state = state.write().await;
 
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()) {
+                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()).await
+                    {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();

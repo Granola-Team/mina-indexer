@@ -10,8 +10,8 @@ use mina_indexer::{
 };
 use std::{collections::HashMap, path::PathBuf, time::Instant};
 
-#[test]
-fn add_and_get() -> anyhow::Result<()> {
+#[tokio::test]
+async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("block-store-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
@@ -27,7 +27,7 @@ fn add_and_get() -> anyhow::Result<()> {
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some((block, _)) = bp.next_block()? {
+    while let Some((block, _)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash();
 

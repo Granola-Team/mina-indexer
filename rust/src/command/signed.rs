@@ -490,14 +490,16 @@ mod tests {
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
-    #[test]
-    fn transaction_hash() {
+    #[tokio::test]
+    async fn transaction_hash() {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
 
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1)
+            .await
+            .unwrap();
         let hashes = precomputed_block.command_hashes();
         let expect = vec![
             "CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string(),

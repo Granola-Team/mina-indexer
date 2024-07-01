@@ -28,7 +28,7 @@ async fn test() {
     .unwrap();
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).unwrap();
+    state.add_blocks(&mut block_parser).await.unwrap();
 
     // fresh state to replay events on top of
     let config = IndexerStateConfig::new(
