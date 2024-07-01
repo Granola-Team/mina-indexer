@@ -3,6 +3,7 @@ pub mod blocks;
 pub mod feetransfers;
 pub mod gen;
 pub mod snarks;
+pub mod staged_ledgers;
 pub mod stakes;
 pub mod transactions;
 pub mod version;
@@ -24,6 +25,7 @@ pub struct Root(
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
     snarks::SnarkQueryRoot,
+    staged_ledgers::StagedLedgerQueryRoot,
     version::VersionQueryRoot,
 );
 
