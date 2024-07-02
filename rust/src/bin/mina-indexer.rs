@@ -9,16 +9,19 @@ use mina_indexer::{
         self,
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
-    server::{IndexerConfiguration, InitializationMode, MinaIndexer},
+    server::{start_indexer, IndexerConfiguration, InitializationMode},
     store::{self, version::IndexerStoreVersion, IndexerStore},
+    web::start_web_server,
 };
 use std::{
-    fs::{self},
+    fs,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 use stderrlog::{ColorChoice, Timestamp};
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version = VERSION, about, long_about = Some("Mina Indexer\n\n\
@@ -27,16 +30,17 @@ struct Cli {
     #[command(subcommand)]
     command: IndexerCommand,
     /// Path to the Unix domain socket file
-    #[arg(long, default_value = "./mina-indexer.sock")]
+    #[arg(long, default_value = "./mina-indexer.sock", num_args = 1)]
     socket: PathBuf,
 }
 
 #[derive(Subcommand, Debug)]
+#[allow(clippy::large_enum_variant)]
 enum IndexerCommand {
     /// Server commands
     Server {
         #[command(subcommand)]
-        server_command: Box<ServerCommand>,
+        server_command: ServerCommand,
     },
     /// Client commands
     #[clap(flatten)]
@@ -158,10 +162,6 @@ pub struct ServerArgs {
     #[arg(long, default_value = Network::Mainnet)]
     network: Network,
 
-    /// Domain socket path
-    #[arg(num_args = 1)]
-    socket: Option<PathBuf>,
-
     /// Indexer process ID
     #[arg(last = true)]
     pid: Option<u32>,
@@ -176,9 +176,8 @@ pub struct ConfigArgs {
 }
 
 impl ServerArgs {
-    fn with_dynamic_defaults(mut self, domain_socket_path: PathBuf, pid: u32) -> Self {
+    fn with_dynamic_defaults(mut self, pid: u32) -> Self {
         self.pid = Some(pid);
-        self.socket = Some(domain_socket_path);
         self
     }
 }
@@ -187,118 +186,131 @@ pub const DEFAULT_BLOCKS_DIR: &str = "/share/mina-indexer/blocks";
 pub const DEFAULT_STAKING_LEDGERS_DIR: &str = "/share/mina-indexer/staking-ledgers";
 
 #[tokio::main]
+#[allow(clippy::unused_unit)]
 pub async fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let domain_socket_path = cli.socket;
+    let args = Cli::parse();
+    let domain_socket_path = args.socket;
 
-    match cli.command {
-        IndexerCommand::DbVersion => {
-            let version = IndexerStoreVersion::default();
-            let msg = serde_json::to_string(&version)?;
-            println!("{msg}");
-            return Ok(());
-        }
-        IndexerCommand::RestoreSnapshot {
-            snapshot_file_path,
-            restore_dir,
-        } => {
-            info!("Received restore-snapshot with file {snapshot_file_path:#?} and dir {restore_dir:#?}");
-            let msg = if !snapshot_file_path.exists() {
-                let msg = format!("{snapshot_file_path:#?} does not exist");
-                error!("{msg}");
-                msg
-            } else if restore_dir.is_dir() {
-                // TODO: allow prompting user to overwrite
-                let msg = format!("{restore_dir:#?} must not exist (but currently does)");
-                error!("{msg}");
-                msg
-            } else {
-                match store::restore_snapshot(&snapshot_file_path, &restore_dir) {
-                    Ok(s) => s,
-                    Err(e) => format!("{e}: {:#?}", e.root_cause().to_string()),
+    Toplevel::new(|s| async move {
+        s.start(SubsystemBuilder::new("Main", |s| async move {
+            let result: Result<(), _> = match args.command {
+                IndexerCommand::Client(cli) => cli.run(domain_socket_path).await,
+                IndexerCommand::Server { server_command } => {
+                    server_command.run(s, domain_socket_path).await
+                }
+                IndexerCommand::DbVersion => {
+                    let version = IndexerStoreVersion::default();
+                    let msg = serde_json::to_string(&version)?;
+                    println!("{msg}");
+                    return Ok(());
+                }
+                IndexerCommand::RestoreSnapshot {
+                    snapshot_file_path,
+                    restore_dir,
+                } => {
+                    info!("Received restore-snapshot with file {snapshot_file_path:#?} and dir {restore_dir:#?}");
+                    let msg = if !snapshot_file_path.exists() {
+                        let msg = format!("{snapshot_file_path:#?} does not exist");
+                        error!("{msg}");
+                        msg
+                    } else if restore_dir.is_dir() {
+                        // TODO: allow prompting user to overwrite
+                        let msg = format!("{restore_dir:#?} must not exist (but currently does)");
+                        error!("{msg}");
+                        msg
+                    } else {
+                        let result = store::restore_snapshot(&snapshot_file_path, &restore_dir);
+                        if result.is_ok() {
+                            result?
+                        } else {
+                            #[allow(clippy::unnecessary_unwrap)]
+                            let err = result.unwrap_err();
+                            format!("{}: {:#?}", err, err.root_cause().to_string())
+                        }
+                    };
+                    println!("{msg}");
+                    return Ok(());
                 }
             };
-            println!("{msg}");
-            return Ok(());
-        }
-        IndexerCommand::Client(args) => client::run(&args, &domain_socket_path).await,
-        IndexerCommand::Server { server_command } => {
-            let (args, mut mode) = match *server_command {
-                ServerCommand::Shutdown => {
-                    return client::run(&client::ClientCli::Shutdown, &domain_socket_path).await;
-                }
-                ServerCommand::Start(args) => (args, InitializationMode::New),
-                ServerCommand::Sync(args) => (args, InitializationMode::Sync),
-                ServerCommand::Replay(args) => (args, InitializationMode::Replay),
-                ServerCommand::StartViaConfig(args) => {
-                    let contents = std::fs::read(args.path.expect("server args config file"))?;
-                    let args: ServerArgsJson = serde_json::from_slice(&contents)?;
-                    (args.into(), InitializationMode::New)
-                }
-            };
-            let args = args.with_dynamic_defaults(domain_socket_path.clone(), std::process::id());
-            let database_dir = args.database_dir.clone();
-            let web_hostname = args.web_hostname.clone();
-            let web_port = args.web_port;
+            result
+        }));
+    })
+    .catch_signals()
+    .handle_shutdown_requests(Duration::from_millis(1000))
+    .await
+    .map_err(Into::into)
+}
 
-            // default to sync if there's a nonempty db dir
-            if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
-                if matches!(mode, InitializationMode::New) && dir.count() != 0 {
-                    // sync from existing db
-                    mode = InitializationMode::Sync;
-                }
+impl ServerCommand {
+    async fn run(self, subsys: SubsystemHandle, domain_socket_path: PathBuf) -> anyhow::Result<()> {
+        use ServerCommand::*;
+        let (args, mut mode) = match self {
+            Shutdown => return client::ClientCli::Shutdown.run(domain_socket_path).await,
+            Start(args) => (args, InitializationMode::New),
+            Sync(args) => (args, InitializationMode::Sync),
+            Replay(args) => (args, InitializationMode::Replay),
+            StartViaConfig(args) => {
+                let contents = std::fs::read(args.path.expect("server args config file"))?;
+                let args: ServerArgsJson = serde_json::from_slice(&contents)?;
+                (args.into(), InitializationMode::New)
             }
+        };
+        let args = args.with_dynamic_defaults(std::process::id());
+        let database_dir = args.database_dir.clone();
+        let web_hostname = args.web_hostname.clone();
+        let web_port = args.web_port;
 
-            // initialize logging
-            stderrlog::new()
-                .module(module_path!())
-                .color(ColorChoice::Never)
-                .timestamp(Timestamp::Microsecond)
-                .verbosity(args.log_level)
-                .init()
-                .unwrap();
-
-            // log server config
-            let args_json: ServerArgsJson = args.clone().into();
-            info!(
-                "Indexer config:\n{}",
-                serde_json::to_string_pretty(&args_json)?
-            );
-
-            check_or_write_pid_file(&database_dir);
-
-            debug!("Building an indexer configuration");
-            let config = process_indexer_configuration(args, mode)?;
-
-            debug!("Creating a new IndexerStore in {}", database_dir.display());
-            let db = Arc::new(IndexerStore::new(&database_dir)?);
-
-            debug!(
-                "Creating an Indexer listening on {}",
-                domain_socket_path.display()
-            );
-            let indexer = MinaIndexer::new(config, db.clone()).await?;
-
-            debug!(
-                "Starting the HTTP server listening on {}:{}",
-                web_hostname, web_port
-            );
-            match mina_indexer::web::start_web_server(db.clone(), (web_hostname, web_port)).await {
-                Ok(()) => indexer.await_loop().await,
-                Err(e) => error!("Error starting web server: {e}"),
+        // default to sync if there's a nonempty db dir
+        if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
+            if matches!(mode, InitializationMode::New) && dir.count() != 0 {
+                // sync from existing db
+                mode = InitializationMode::Sync;
             }
-
-            info!("Shutting down primary rocksdb instance");
-            db.database.cancel_all_background_work(true);
-            drop(db);
-            Ok(())
         }
+
+        // initialize logging
+        stderrlog::new()
+            .module(module_path!())
+            .color(ColorChoice::Never)
+            .timestamp(Timestamp::Microsecond)
+            .verbosity(args.log_level)
+            .init()
+            .unwrap();
+
+        check_or_write_pid_file(&database_dir);
+
+        debug!("Building an indexer configuration");
+        let config = process_indexer_configuration(args, mode, domain_socket_path)?;
+
+        debug!("Creating a new IndexerStore in {}", database_dir.display());
+        let db = Arc::new(IndexerStore::new(&database_dir)?);
+
+        let state = db.clone();
+        subsys.start(SubsystemBuilder::new("Indexer", move |s| {
+            start_indexer(s, config, state)
+        }));
+
+        info!(
+            "Starting the web server listening on {}:{}",
+            web_hostname, web_port
+        );
+
+        let state = db.clone();
+        subsys.start(SubsystemBuilder::new("Web Server", move |s| {
+            start_web_server(s, state, (web_hostname, web_port))
+        }));
+
+        info!("Shutting down primary database instance");
+        db.database.cancel_all_background_work(true);
+        drop(db);
+        Ok(())
     }
 }
 
-pub fn process_indexer_configuration(
+fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
+    domain_socket_path: PathBuf,
 ) -> anyhow::Result<IndexerConfiguration> {
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
@@ -316,7 +328,6 @@ pub fn process_indexer_configuration(
     let canonical_update_threshold = args.canonical_update_threshold;
     let ledger_cadence = args.ledger_cadence;
     let reporting_freq = args.reporting_freq;
-    let domain_socket_path = args.socket.unwrap_or("./mina-indexer.sock".into());
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
@@ -475,7 +486,6 @@ struct ServerArgsJson {
     web_hostname: String,
     web_port: u16,
     pid: Option<u32>,
-    domain_socket_path: Option<String>,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_batch: Option<bool>,
@@ -485,8 +495,7 @@ struct ServerArgsJson {
 impl From<ServerArgs> for ServerArgsJson {
     fn from(value: ServerArgs) -> Self {
         let pid = value.pid.unwrap();
-        let domain_socket_path = value.socket.clone().unwrap();
-        let value = value.with_dynamic_defaults(domain_socket_path, pid);
+        let value = value.with_dynamic_defaults(pid);
         Self {
             genesis_ledger: value.genesis_ledger.map(|path| path.display().to_string()),
             genesis_hash: value.genesis_hash,
@@ -514,7 +523,6 @@ impl From<ServerArgs> for ServerArgsJson {
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
-            domain_socket_path: value.socket.map(|s| s.display().to_string()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value
                 .missing_block_recovery_exe
@@ -546,7 +554,6 @@ impl From<ServerArgsJson> for ServerArgs {
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
-            socket: value.domain_socket_path.map(|s| s.into()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,

@@ -14,7 +14,7 @@ use crate::{
     },
     state::{IndexerPhase, IndexerState, IndexerStateConfig},
     store::IndexerStore,
-    unix_socket_server::{self, UnixSocketServer},
+    unix_socket_server::{create_socket_listener, handle_connection},
 };
 use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -27,8 +27,8 @@ use std::{
 use tokio::{
     runtime::Handle,
     sync::{mpsc, RwLock},
-    task::JoinHandle,
 };
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 
 #[derive(Clone, Debug)]
 pub struct IndexerVersion {
@@ -61,8 +61,6 @@ pub struct IndexerConfiguration {
     pub missing_block_recovery_batch: bool,
 }
 
-pub struct MinaIndexer(JoinHandle<()>);
-
 #[derive(Debug, Clone)]
 pub enum InitializationMode {
     New,
@@ -70,73 +68,56 @@ pub enum InitializationMode {
     Sync,
 }
 
-impl MinaIndexer {
-    pub async fn new(
-        config: IndexerConfiguration,
-        store: Arc<IndexerStore>,
-    ) -> anyhow::Result<Self> {
-        let block_watch_dir = config.block_watch_dir.clone();
-        let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
-        let missing_block_recovery_delay = config.missing_block_recovery_delay;
-        let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
-        let missing_block_recovery_batch = config.missing_block_recovery_batch;
-        let domain_socket_path = config.domain_socket_path.clone();
-        Ok(Self(tokio::spawn(async move {
-            let state = initialize(config, store).unwrap_or_else(|e| {
-                error!("Error in server initialization: {}", e);
-                std::process::exit(1);
-            });
-            let state = Arc::new(RwLock::new(state));
-
-            // Needs read-only state for summary
-            let uds_state = state.clone();
-            tokio::spawn(async move {
-                unix_socket_server::run(
-                    UnixSocketServer::new(uds_state, domain_socket_path),
-                    wait_for_signal(),
-                )
-                .await;
-            });
-
-            // Modifies the state
-            if let Err(e) = run(
-                block_watch_dir,
-                staking_ledger_watch_dir,
-                missing_block_recovery_delay,
-                missing_block_recovery_exe,
-                missing_block_recovery_batch,
-                state,
-            )
-            .await
-            {
-                error!("Error in server run: {e}");
-                std::process::exit(1);
-            }
-        })))
-    }
-
-    pub async fn await_loop(self) {
-        let _ = self.0.await;
-    }
-}
-
-async fn wait_for_signal() {
-    use tokio::signal::unix::{signal, SignalKind};
-    let mut term = signal(SignalKind::terminate()).expect("sigterm signal handler registered");
-    let mut int = signal(SignalKind::interrupt()).expect("sigitm signal handler registered");
-    tokio::select! {
-        _ = term.recv() => {
-            trace!("Received SIGTERM");
-        },
-        _ = int.recv() => {
-            info!("Received SIGINT");
-        },
-    }
-}
-
-pub fn initialize(
+pub async fn start_indexer(
+    subsys: SubsystemHandle,
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
+) -> anyhow::Result<()> {
+    let block_watch_dir = config.block_watch_dir.clone();
+    let staking_ledger_watch_dir = config.staking_ledger_watch_dir.clone();
+    let missing_block_recovery_delay = config.missing_block_recovery_delay;
+    let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
+    let missing_block_recovery_batch = config.missing_block_recovery_batch;
+    let domain_socket_path = config.domain_socket_path.clone();
+
+    let state = initialize(config, store, &subsys);
+
+    if let Err(e) = state {
+        error!("Error in server initialization: {}", e);
+        std::process::exit(1);
+    }
+
+    let state = Arc::new(RwLock::new(state.unwrap()));
+
+    // Needs read-only state for summary
+    let uds_state = state.clone();
+
+    let listener = create_socket_listener(&domain_socket_path);
+
+    subsys.start(SubsystemBuilder::new("Socket Listener", {
+        move |subsys| handle_connection(listener, uds_state, subsys)
+    }));
+
+    // Modifies the state
+    let _ = run(
+        &subsys,
+        block_watch_dir,
+        staking_ledger_watch_dir,
+        missing_block_recovery_delay,
+        missing_block_recovery_exe,
+        missing_block_recovery_batch,
+        state,
+    )
+    .await;
+
+    subsys.on_shutdown_requested().await;
+    Ok(())
+}
+
+fn initialize(
+    config: IndexerConfiguration,
+    store: Arc<IndexerStore>,
+    subsys: &SubsystemHandle,
 ) -> anyhow::Result<IndexerState> {
     info!("Starting mina-indexer server");
 
@@ -230,7 +211,7 @@ pub fn initialize(
                     }
                 };
                 info!("Initializing indexer state");
-                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
+                state.initialize_with_canonical_chain_discovery(&mut block_parser, subsys)?;
             }
             InitializationMode::Replay => {
                 let min_length_filter = state.replay_events()?;
@@ -242,7 +223,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser, Some(subsys))?;
                 }
             }
             InitializationMode::Sync => {
@@ -255,7 +236,7 @@ pub fn initialize(
 
                 if block_parser.total_num_blocks > 0 {
                     info!("Adding new blocks from {}", blocks_dir.display());
-                    state.add_blocks(&mut block_parser)?;
+                    state.add_blocks(&mut block_parser, Some(subsys))?;
                 }
             }
         }
@@ -302,7 +283,8 @@ fn matches_event_kind(kind: EventKind) -> bool {
     )
 }
 
-pub async fn run(
+async fn run(
+    subsys: &SubsystemHandle,
     block_watch_dir: impl AsRef<Path>,
     staking_ledger_watch_dir: impl AsRef<Path>,
     missing_block_recovery_delay: Option<u64>,
@@ -343,9 +325,7 @@ pub async fn run(
     // recover missing blocks
     loop {
         tokio::select! {
-            // watch for shutdown signal
-            _ = wait_for_signal() => {
-                info!("Ingestion shutdown signal received");
+            _ = subsys.on_shutdown_requested() => {
                 break;
             }
 

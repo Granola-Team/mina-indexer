@@ -36,7 +36,7 @@ fn check_balance() -> anyhow::Result<()> {
     )?;
 
     // ingest the blocks
-    state.add_blocks(&mut bp)?;
+    state.add_blocks(&mut bp, None)?;
 
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
