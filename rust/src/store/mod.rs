@@ -250,7 +250,7 @@ fn compress_directory(input_dir: &PathBuf, output_file: &PathBuf) -> io::Result<
     info!("Starting compression of {input_dir:#?} to {output_file:#?}");
 
     let output_file = File::create(output_file)?;
-    let encoder = GzEncoder::new(output_file, Compression::default());
+    let encoder = GzEncoder::new(output_file, Compression::none());
 
     let mut archive = tar::Builder::new(encoder);
     let dir = read_dir(input_dir)?;
