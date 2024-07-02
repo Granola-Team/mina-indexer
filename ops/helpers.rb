@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'json'
 
 # Constants
 
@@ -45,13 +46,13 @@ end
 # Executable
 
 EXE_DIR = BASE_DIR + '/bin'
+EXE_SRC = SRC_TOP + '/result/bin/mina-indexer'
 EXE = EXE_DIR + '/mina-indexer-' + REV
 
 def configExecDir
   FileUtils.mkdir_p EXE_DIR
-  idxr = SRC_TOP + '/result/bin/mina-indexer'
   unless File.exist?(EXE)
-    FileUtils.cp idxr, EXE
+    FileUtils.cp EXE_SRC, EXE
   end
 end
 
@@ -94,7 +95,9 @@ end
 
 # Database directory
 
-DB_VERSION = '0.6.0'
+v = JSON.parse(`#{EXE_SRC} db-version`)
+DB_VERSION_JSON = v
+DB_VERSION = v['major'].to_s + '.' + v['minor'].to_s + '.' + v['patch'].to_s
 
 def db_dir(block_height)
   BASE_DIR + '/db/' + DB_VERSION + '-' + block_height.to_s
