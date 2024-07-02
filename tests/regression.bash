@@ -334,8 +334,19 @@ test_pid_file() {
     enter_test test_pid_file
 
     idxr_server_start_standard
+    sleep 3
+    assert "$(cat ./database/PID)" "$(cat ./idxr_pid)"
+
     # 2nd Indxer instance should fail to start
-    idxr_server_start_standard
+
+    # We wrap this in an if statement so that we do not crash early
+    if ! idxr_server_start_standard; then
+      assert "$?" 0
+    else
+      assert "$?" 0
+    fi
+
+    [ "$(cat ./database/PID)" != "$(cat ./idxr_pid)" ]
 
     teardown
 }
