@@ -199,6 +199,7 @@ impl IndexerStore {
             .create_checkpoint(&snapshot_temp_dir)
             .map_err(|e| anyhow!("Error creating database snapshot: {e}"))
             .and_then(|_| {
+                persist_indexer_version(&IndexerStoreVersion::default(), &snapshot_temp_dir)?;
                 compress_directory(&snapshot_temp_dir, output_filepath)
                     .with_context(|| "Failed to compress database.")
             })
