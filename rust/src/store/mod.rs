@@ -26,7 +26,7 @@ use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
 use anyhow::{anyhow, Context};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use log::{debug, error};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
@@ -203,6 +203,7 @@ impl IndexerStore {
                     .with_context(|| "Failed to compress database.")
             })
             .and_then(|_| {
+                info!("Finished outputting snapshot to {output_filepath:#?}");
                 fs::remove_dir_all(&snapshot_temp_dir)
                     .with_context(|| format!("Failed to remove directory {snapshot_temp_dir:#?})"))
             })
@@ -246,6 +247,8 @@ fn decompress_file(compressed_file_path: &PathBuf, output_dir: &PathBuf) -> io::
 }
 
 fn compress_directory(input_dir: &PathBuf, output_file: &PathBuf) -> io::Result<()> {
+    info!("Starting compression of {input_dir:#?} to {output_file:#?}");
+
     let output_file = File::create(output_file)?;
     let encoder = GzEncoder::new(output_file, Compression::default());
 
