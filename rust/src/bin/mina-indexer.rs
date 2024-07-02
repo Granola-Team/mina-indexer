@@ -300,6 +300,8 @@ impl ServerCommand {
             start_web_server(s, state, (web_hostname, web_port))
         }));
 
+        subsys.on_shutdown_requested().await;
+
         info!("Shutting down primary database instance");
         db.database.cancel_all_background_work(true);
         drop(db);
