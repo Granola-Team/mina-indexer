@@ -18,6 +18,7 @@ use crate::{
 };
 use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use speedb::checkpoint::Checkpoint;
 use std::{
     collections::HashSet,
     fs,
@@ -82,12 +83,15 @@ pub async fn start_indexer(
 
     let state = initialize(config, store, &subsys);
 
-    if let Err(e) = state {
-        error!("Error in server initialization: {}", e);
-        std::process::exit(1);
-    }
+    let state = match state {
+        Err(e) => {
+            error!("Failed to initialize server: {}", e);
+            std::process::exit(1);
+        }
+        Ok(s) => s,
+    };
 
-    let state = Arc::new(RwLock::new(state.unwrap()));
+    let state = Arc::new(RwLock::new(state));
 
     // Needs read-only state for summary
     let uds_state = state.clone();
@@ -258,6 +262,14 @@ fn initialize(
         IndexerPhase::Watching
     );
     state.phase = IndexerPhase::Watching;
+
+    // flush/compress database
+    let store = state.indexer_store.as_ref().unwrap();
+    let temp_checkpoint_dir = store.db_path.join("tmp-checkpoint");
+    Checkpoint::new(&store.database)?.create_checkpoint(&temp_checkpoint_dir)?;
+    // remove checkpoint since we don't actually need it and are just using it for
+    // flushing/compressing
+    fs::remove_dir_all(&temp_checkpoint_dir)?;
 
     Ok(state)
 }
