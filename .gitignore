@@ -21,3 +21,6 @@ database/
 
 # Local Cargo cache
 /.cargo/
+
+# Emacs project preferences
+.dir-locals.el
