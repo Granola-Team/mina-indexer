@@ -22,6 +22,7 @@ DEV_DIR="$VOLUMES_DIR"/mina-indexer-dev
 BASE_DIR="$DEV_DIR"/rev-"$REV"
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"
+PID_FILE="$BASE_DIR"/idxr_pid
 
 idxr() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock "$@"
@@ -37,7 +38,7 @@ shutdown_idxr() {
        return 1
     fi
 
-    if [ ! -e ./idxr_pid ]; then
+    if [ ! -e "$PID_FILE" ]; then
         echo "  Missing PID file. Shutdown failed."
         return 1
     fi
@@ -47,10 +48,12 @@ shutdown_idxr() {
       return 1
     fi
 
+    PID=$(< "$PID_FILE")
+
     # Shutdown command succeeded, but PID may still be active.
-    if ! timeout 10s pwait -F ./idxr_pid; then
+    if ! pwait "$PID"; then
       # Either it timed out, or that PID did not exist.
-      if ps -p "$(cat ./idxr_pid)" >/dev/null; then
+      if ps -p "$PID" >/dev/null; then
         # The process still exists. The pwait must have timed out.
         echo "  The shutdown command did not kill the process. Failure."
         return 1
@@ -64,7 +67,7 @@ shutdown_idxr() {
     fi
 
     echo "Deleting PID file."
-    rm -f ./idxr_pid
+    rm -f "$PID_FILE"
 }
 
 # Invoke this function when exiting this script for any reason.
@@ -75,8 +78,8 @@ cleanup() {
         echo "Test failed ($test_name): $err"
         if ! shutdown_idxr; then
           # If there is a PID file, try to kill the process forcefully.
-          if [ -e ./idxr_pid ]; then
-            kill "$(cat ./idxr_pid)"
+          if [ -e $PID_FILE ]; then
+            kill $(< "$PID_FILE")
           fi
         fi
     fi
@@ -125,7 +128,7 @@ wait_forever_for_socket() {
 
 idxr_server() {
     idxr server "$@" &
-    echo $! > ./idxr_pid
+    echo $! > "$PID_FILE"
 }
 
 idxr_server_start() {
@@ -1588,17 +1591,17 @@ test_clean_kill() {
     idxr_server_start_standard
     wait_for_socket
 
-    if [ ! -e ./idxr_pid ]; then
+    if [ ! -e "$PID_FILE" ]; then
         echo "  Missing PID file. Cannot kill. Failure."
         return 1
     fi
 
     echo "  Sending Mina Indexer a SIGTERM"
-    PID="$(cat ./idxr_pid)"
+    PID=$(< "$PID_FILE")
     kill "$PID"
 
     # We must give the process a chance to die, with 'pwait'.
-    timeout 10s pwait -F ./idxr_pid || true
+    pwait "$PID"
 
     # We waited with pwait. If the process is still there, it's a fail.
     if ps -p "$PID" >/dev/null; then
@@ -1614,6 +1617,10 @@ test_clean_kill() {
     #    fi
 
     teardown
+}
+
+pwait() {
+    lsof -p "$1" +r 1 | awk '/^=/ { if (T++ >= 10) { exit 1 } }'
 }
 
 test_block_children() {

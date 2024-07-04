@@ -60,7 +60,7 @@
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
             nixfmt-classic
-            procps # For pwait
+            lsof
             rclone
             ruby
             rust
