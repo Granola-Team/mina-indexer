@@ -141,13 +141,6 @@ idxr_server_start_standard() {
         "$@"
 }
 
-idxr_server_sync() {
-    idxr_server_start \
-        --blocks-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
-        "$@"
-}
-
 stage_mainnet_blocks() {
     "$SRC"/ops/stage-blocks 2 "$1" mainnet "$2"
 }
@@ -231,12 +224,6 @@ test_indexer_cli_reports() {
     idxr blocks children --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks children"
 
-    idxr create-snapshot --help 2>&1 |
-        grep -iq "Usage: mina-indexer create-snapshot"
-
-    idxr restore-snapshot --help 2>&1 |
-        grep -iq "Usage: mina-indexer restore-snapshot"
-
     idxr ledgers best --help 2>&1 |
         grep -iq "Usage: mina-indexer ledgers best"
 
@@ -258,8 +245,8 @@ test_indexer_cli_reports() {
     idxr staking-ledgers hash --help 2>&1 |
         grep -iq "Usage: mina-indexer staking-ledgers hash"
 
-    idxr server shutdown --help 2>&1 |
-        grep -iq "Usage: mina-indexer server shutdown"
+    idxr shutdown --help 2>&1 |
+        grep -iq "Usage: mina-indexer shutdown"
 
     idxr summary --help 2>&1 |
         grep -iq "Usage: mina-indexer summary"
@@ -290,6 +277,26 @@ test_indexer_cli_reports() {
 
     idxr version --help 2>&1 |
         grep -iq "Usage: mina-indexer version"
+
+    idxr db-version --help 2>&1 |
+        grep -iq "Usage: mina-indexer db-version"
+
+    # Database commands
+    idxr server start --help 2>&1 |
+        grep -iq "Usage: mina-indexer server start"
+
+    idxr server shutdown --help 2>&1 |
+        grep -iq "Usage: mina-indexer server shutdown"
+
+    # Database commands
+    idxr database create --help 2>&1 |
+        grep -iq "Usage: mina-indexer database create"
+
+    idxr database snapshot --help 2>&1 |
+        grep -iq "Usage: mina-indexer database snapshot"
+
+    idxr database restore --help 2>&1 |
+        grep -iq "Usage: mina-indexer database restore"
 }
 
 # Indexer server starts up without any precomputed blocks
@@ -315,7 +322,6 @@ test_ipc_is_available_immediately() {
     wait_for_socket
 
     idxr summary
-
     teardown
 }
 
@@ -951,7 +957,7 @@ test_snark_work() {
     teardown
 }
 
-# Indexer server correctly creates a db snapshot
+# Restart from a snapshot of a running indexer database
 test_snapshot() {
     enter_test test_snapshot
     stage_mainnet_blocks 13 ./blocks
@@ -966,17 +972,20 @@ test_snapshot() {
     best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
     amount=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
 
-    set -x
-    # create snapshot
-    idxr create-snapshot --output-path ./snapshot
+    # create snapshot of running indexer
+    idxr database snapshot --output-path ./snapshot
 
     # kill running indexer and remove directories
     teardown
 
-    idxr restore-snapshot --snapshot-file-path ./snapshot --restore-dir ./restore-path
+    # restore the db directory from the snapshot
+    idxr database restore --snapshot-file ./snapshot --restore-dir ./restore-path
 
-    # sync a new indexer from snapshoted db
-    idxr_server_sync --database-dir ./restore-path
+    # start a new indexer from the db
+    idxr_server_start \
+        --database-dir ./restore-path \
+        --blocks-dir ./blocks \
+        --staking-ledgers-dir ./staking-ledgers
     wait_for_socket
 
     # post-snapshot reults
@@ -999,7 +1008,6 @@ test_snapshot() {
 # Indexer server starts with many blocks
 test_many_blocks() {
     enter_test test_many_blocks
-
     stage_mainnet_blocks 1000 ./blocks
 
     idxr_server_start_standard \
@@ -1033,10 +1041,9 @@ test_many_blocks() {
 
 test_rest_accounts_summary() {
     enter_test test_rest_accounts_summary
-
     stage_mainnet_blocks 100 ./blocks
-    port=$(ephemeral_port)
 
+    port=$(ephemeral_port)
     idxr_server start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -1129,7 +1136,6 @@ test_rest_accounts_summary() {
 
 test_rest_blocks() {
     enter_test test_rest_blocks
-
     stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard --web-hostname "0.0.0.0"
@@ -1156,7 +1162,6 @@ test_rest_blocks() {
 
 test_release() {
     enter_test test_release
-
     stage_mainnet_blocks 9999 ./blocks
 
     idxr_server_start_standard
@@ -1270,7 +1275,7 @@ test_watch_staking_ledgers() {
 
     # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
-    sleep 3
+    sleep 1
 
     # write epoch 0 ledger to file
     idxr staking-ledgers epoch --epoch 0 --path ./epoch_0_ledger.json
@@ -1302,7 +1307,7 @@ test_watch_staking_ledgers() {
     # Move epoch 42 staking ledger to watched directory
     epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
     cp "$STAKING_LEDGERS"/mainnet-42-"$epoch42".json ./staking-ledgers/
-    sleep 3
+    sleep 1
 
     # write epoch 42 ledger to file
     idxr staking-ledgers epoch --epoch 42 --path ./epoch_42_ledger.json
@@ -1463,8 +1468,7 @@ test_start_from_config() {
       \"canonical_update_threshold\": 2,
       \"web_hostname\": \"localhost\",
       \"web_port\": ${port},
-      \"network\": \"mainnet\",
-      \"self_check\": false
+      \"network\": \"mainnet\"
     }" > $file
 
     idxr_server_start --config $file
@@ -1561,10 +1565,9 @@ test_block_children() {
 
 test_hurl() {
     enter_test test_hurl
-
     stage_mainnet_blocks 120 ./blocks
-    port=$(ephemeral_port)
 
+    port=$(ephemeral_port)
     idxr_server start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir $STAKING_LEDGERS \
@@ -1590,7 +1593,6 @@ test_version_file() {
 
 test_missing_block_recovery() {
     enter_test test_missing_block_recovery
-
     stage_mainnet_blocks 5 ./blocks
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
@@ -1622,6 +1624,70 @@ test_missing_block_recovery() {
     teardown
 }
 
+# Create an indexer database & start indexing
+test_database_create() {
+    enter_test test_database_create
+    stage_mainnet_blocks 10 ./blocks
+
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --staking-ledgers-dir ./staking-ledgers
+    idxr_server_start_standard
+    wait_for_socket
+
+    # check data
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+
+    assert 10 $best_length
+    assert 1 $canonical_length
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+
+    teardown
+}
+
+# Create an indexer database snapshot from a db directory without a running indexer.
+# Restore the database from the snapshot & start indexing
+test_snapshot_database_dir() {
+    enter_test test_database_create_from_dir
+    stage_mainnet_blocks 10 ./blocks
+
+    # create indexer database
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --staking-ledgers-dir ./staking-ledgers
+    
+    # create snapshot & restores
+    idxr database snapshot --database-dir ./database
+    idxr database restore --restore-dir ./restore-dir
+    rm -rf ./database
+
+    # start indexer from restored db
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --database-dir ./restore-dir \
+        --staking-ledgers-dir ./staking-ledgers
+    wait_for_socket
+
+    # check data
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+
+    assert 10 $best_length
+    assert 1 $canonical_length
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+
+    teardown
+}
+
 # ----
 # Main
 # ----
@@ -1630,6 +1696,8 @@ for test_name in "$@"; do
         "test_indexer_cli_reports") test_indexer_cli_reports ;;
         "test_server_startup") test_server_startup ;;
         "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
+        "test_database_create") test_database_create ;;
+        "test_snapshot_database_dir") test_snapshot_database_dir ;;
         "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
         "test_account_balance_cli") test_account_balance_cli ;;
         "test_account_public_key_json") test_account_public_key_json ;;
