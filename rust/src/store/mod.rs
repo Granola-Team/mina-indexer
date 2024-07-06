@@ -229,7 +229,7 @@ pub fn restore_snapshot(
         decompress_file(snapshot_file_path, restore_dir)
             .with_context(|| format!("Failed to decompress file {snapshot_file_path:#?}"))
             .map(|_| format!(
-                "Snapshot restored to {restore_dir:#?}.\n\nPlease start server using: `server sync --database-dir {restore_dir:#?}`"
+                "Snapshot restored to {restore_dir:#?}.\n\nPlease start server using: `mina-indexer server start --database-dir {restore_dir:#?}`"
             ))
     }
 }
