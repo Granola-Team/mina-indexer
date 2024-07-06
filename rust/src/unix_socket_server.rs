@@ -337,7 +337,6 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received blocks-at-public-key command {pk}");
-
                     if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
                     } else {
@@ -486,9 +485,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received best-chain command");
-
                     let start_state_hash: BlockHash = start_state_hash.into();
-
                     if let Some(best_tip) = db.get_best_block()? {
                         let end_state_hash: String = {
                             if end_state_hash.is_none() {
@@ -593,7 +590,6 @@ pub async fn handle_connection(
             ClientCli::Ledgers(__) => match __ {
                 Ledgers::Best { path } => {
                     info!("Received best-ledger command");
-
                     if let Some(best_tip) = db.get_best_block()? {
                         if let Some(ledger) =
                             db.get_ledger_state_hash(&best_tip.state_hash(), false)?

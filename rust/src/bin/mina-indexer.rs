@@ -9,7 +9,9 @@ use mina_indexer::{
         self,
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
-    server::{start_indexer, IndexerConfiguration, InitializationMode},
+    server::{
+        initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
+    },
     store::{restore_snapshot, IndexerStore},
     web::start_web_server,
 };
@@ -21,6 +23,7 @@ use std::{
     time::Duration,
 };
 use stderrlog::{ColorChoice, Timestamp};
+use tempfile::TempDir;
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 
 #[derive(Parser, Debug)]
@@ -43,19 +46,15 @@ enum IndexerCommand {
         #[command(subcommand)]
         server_command: ServerCommand,
     },
+
     /// Client commands
     #[clap(flatten)]
     Client(#[command(subcommand)] client::ClientCli),
 
-    /// Restore a snapshot of the Indexer store
-    RestoreSnapshot {
-        /// Full file path to the compressed snapshot file to restore
-        #[arg(long)]
-        snapshot_file_path: PathBuf,
-
-        /// Full file path to the location to restore to
-        #[arg(long)]
-        restore_dir: PathBuf,
+    /// Database commands
+    Database {
+        #[command(subcommand)]
+        db_command: DatabaseCommand,
     },
 }
 
@@ -66,6 +65,35 @@ enum ServerCommand {
 
     /// Shutdown the server
     Shutdown,
+}
+
+#[derive(Subcommand, Debug)]
+enum DatabaseCommand {
+    /// Create a new mina indexer database to use with `mina-indexer start`
+    Create(Box<ServerArgs>),
+
+    /// Create a snapshot of a mina indexer database
+    Snapshot {
+        /// Full path to the new snapshot file
+        #[arg(long, default_value = "./snapshot")]
+        output_path: PathBuf,
+
+        /// Full path to a mina indexer database directory.
+        /// If null, snapshot a running indexer database.
+        #[arg(long)]
+        database_dir: Option<PathBuf>,
+    },
+
+    /// Restore an indexer database from a compressed snapshot file
+    Restore {
+        /// Full path to the compressed snapshot file
+        #[arg(long, default_value = "./snapshot")]
+        snapshot_file: PathBuf,
+
+        /// Full path to the database directory
+        #[arg(long)]
+        restore_dir: PathBuf,
+    },
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -185,28 +213,9 @@ pub async fn main() -> anyhow::Result<()> {
         s.start(SubsystemBuilder::new("Main", |s| async move {
             match args.command {
                 IndexerCommand::Client(cli) => cli.run(domain_socket_path).await,
+                IndexerCommand::Database { db_command } => db_command.run(domain_socket_path).await,
                 IndexerCommand::Server { server_command } => {
                     server_command.run(s, domain_socket_path).await
-                }
-                IndexerCommand::RestoreSnapshot {
-                    snapshot_file_path,
-                    restore_dir,
-                } => {
-                    info!("Received restore-snapshot with file {snapshot_file_path:#?} and dir {restore_dir:#?}");
-                    let msg = if !snapshot_file_path.exists() {
-                        let msg = format!("{snapshot_file_path:#?} does not exist");
-                        error!("{msg}");
-                        msg
-                    } else if restore_dir.is_dir() {
-                        // TODO: allow prompting user to overwrite
-                        let msg = format!("{restore_dir:#?} must not exist (but currently does)");
-                        error!("{msg}");
-                        msg
-                    } else {
-                        restore_snapshot(&snapshot_file_path, &restore_dir).unwrap_or_else(|e| format!("{e}: {:#?}", e.root_cause()))
-                    };
-                    println!("{msg}");
-                    Ok(())
                 }
             }
         }));
@@ -277,6 +286,67 @@ impl ServerCommand {
         subsys.on_shutdown_requested().await;
         db.database.cancel_all_background_work(true);
         drop(db);
+        Ok(())
+    }
+}
+
+impl DatabaseCommand {
+    async fn run(self, domain_socket_path: PathBuf) -> anyhow::Result<()> {
+        // initialize logging
+        stderrlog::new()
+            .module(module_path!())
+            .color(ColorChoice::Never)
+            .timestamp(Timestamp::Microsecond)
+            .verbosity(LevelFilter::Info)
+            .init()
+            .unwrap();
+
+        match self {
+            Self::Snapshot {
+                output_path,
+                database_dir,
+            } => {
+                if let Some(database_dir) = database_dir {
+                    if !database_dir.exists() {
+                        error!("Database dir {database_dir:#?} does not exist");
+                    } else {
+                        info!("Creating snapshot of database dir {database_dir:#?}");
+                        let tmp_dir = TempDir::new()?;
+                        let db = IndexerStore::read_only(&database_dir, tmp_dir.as_ref())?;
+                        db.create_snapshot(&output_path)?;
+                    }
+                } else {
+                    info!("Creating snapshot of running mina indexer");
+                    return client::ClientCli::CreateSnapshot { output_path }
+                        .run(domain_socket_path)
+                        .await;
+                }
+            }
+            Self::Restore {
+                snapshot_file,
+                restore_dir,
+            } => {
+                info!("Restoring mina indexer database from snapshot file {snapshot_file:#?} to {restore_dir:#?}");
+                restore_snapshot(&snapshot_file, &restore_dir).unwrap_or_else(|e| error!("{e}"))
+            }
+            Self::Create(args) => {
+                let database_dir = args.database_dir.clone();
+                info!("Creating mina indexer database in {database_dir:#?}");
+                fs::create_dir_all(database_dir.clone()).ok();
+
+                debug!("Building mina indexer configuration");
+                let config = process_indexer_configuration(
+                    *args,
+                    InitializationMode::New,
+                    domain_socket_path,
+                )?;
+
+                debug!("Creating a new mina indexer database in {database_dir:#?}");
+                let db = Arc::new(IndexerStore::new(&database_dir)?);
+                let store = db.clone();
+                initialize_indexer_database(config, store).await?;
+            }
+        }
         Ok(())
     }
 }
@@ -398,6 +468,7 @@ fn protocol_constants(path: Option<PathBuf>) -> anyhow::Result<GenesisConstants>
 fn check_or_write_pid_file(database_dir: &Path) {
     use mina_indexer::platform;
     use std::{fs::File, io::Write, process};
+
     fs::create_dir_all(database_dir).ok();
     let pid_path = database_dir.join("PID");
     if let Ok(pid) = fs::read_to_string(&pid_path) {
@@ -444,7 +515,6 @@ struct ServerArgsJson {
     canonical_update_threshold: u32,
     web_hostname: String,
     web_port: u16,
-    self_check: bool,
     pid: Option<u32>,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
@@ -472,7 +542,6 @@ impl From<ServerArgs> for ServerArgsJson {
             canonical_update_threshold: value.canonical_update_threshold,
             web_hostname: value.web_hostname,
             web_port: value.web_port,
-            self_check: value.self_check,
             pid: value.pid,
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value
@@ -502,7 +571,7 @@ impl From<ServerArgsJson> for ServerArgs {
             canonical_update_threshold: value.canonical_update_threshold,
             web_hostname: value.web_hostname,
             web_port: value.web_port,
-            self_check: value.self_check,
+            self_check: false,
             config: None,
             pid: value.pid,
             missing_block_recovery_delay: value.missing_block_recovery_delay,

@@ -68,6 +68,22 @@ pub enum InitializationMode {
     Sync,
 }
 
+/// Initializes indexer database
+pub async fn initialize_indexer_database(
+    config: IndexerConfiguration,
+    store: Arc<IndexerStore>,
+) -> anyhow::Result<()> {
+    let state = initialize(config, store).unwrap_or_else(|e| {
+        error!("Failed to initialize mina indexer state: {e}");
+        std::process::exit(1);
+    });
+    if let Some(indexer_store) = state.indexer_store {
+        indexer_store.database.cancel_all_background_work(true);
+        drop(indexer_store);
+    }
+    Ok(())
+}
+
 /// Initializes witness tree, connects database, starts UDS server & runs the
 /// indexer
 pub async fn start_indexer(
@@ -83,12 +99,10 @@ pub async fn start_indexer(
     let domain_socket_path = config.domain_socket_path.clone();
 
     // initialize witness tree & connect database
-    let state = Arc::new(RwLock::new(
-        initialize(config, store, &subsys).unwrap_or_else(|e| {
-            error!("Failed to initialize mina indexer state: {e}");
-            std::process::exit(1);
-        }),
-    ));
+    let state = Arc::new(RwLock::new(initialize(config, store).unwrap_or_else(|e| {
+        error!("Failed to initialize mina indexer state: {e}");
+        std::process::exit(1);
+    })));
 
     // read-only state
     start_uds_server(&subsys, state.clone(), &domain_socket_path).await?;
@@ -125,7 +139,6 @@ async fn start_uds_server(
 fn initialize(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
-    subsys: &SubsystemHandle,
 ) -> anyhow::Result<IndexerState> {
     info!("Initializing new mina indexer");
     let db_path = store.db_path.clone();
@@ -210,7 +223,7 @@ fn initialize(
                 reporting_freq,
             )
             .unwrap_or_else(|e| panic!("Obtaining block parser failed: {e}"));
-            state.initialize_with_canonical_chain_discovery(&mut block_parser, subsys)?;
+            state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
         }
         InitializationMode::Replay => {
             let min_length_filter = state.replay_events()?;
@@ -222,7 +235,7 @@ fn initialize(
 
             if block_parser.total_num_blocks > 0 {
                 info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser, Some(subsys))?;
+                state.add_blocks(&mut block_parser)?;
             }
         }
         InitializationMode::Sync => {
@@ -235,7 +248,7 @@ fn initialize(
 
             if block_parser.total_num_blocks > 0 {
                 info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser, Some(subsys))?;
+                state.add_blocks(&mut block_parser)?;
             }
         }
     }

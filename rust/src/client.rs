@@ -25,9 +25,10 @@ pub enum ClientCli {
     #[clap(subcommand)]
     Chain(Chain),
 
-    /// Create a snapshot of the Indexer store
+    /// Create a snapshot of a mina indexer database
+    #[clap(hide = true)]
     CreateSnapshot {
-        /// Snapshot file
+        /// Full path to the new snapshot file
         #[arg(long, default_value = "./snapshot")]
         output_path: PathBuf,
     },
