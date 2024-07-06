@@ -70,8 +70,11 @@ pub enum ClientCli {
     #[clap(subcommand)]
     InternalCommands(InternalCommands),
 
-    /// Query indexer version info
+    /// Query mina indexer version info
     Version,
+
+    /// Query mina indexer database version info
+    DbVersion,
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]
@@ -411,7 +414,7 @@ impl ClientCli {
         let conn = UnixStream::connect(domain_socket_path)
             .await
             .unwrap_or_else(|e| {
-                eprintln!("Unable to connect to the Unix domain socket server: {}", e);
+                eprintln!("Unable to connect to the Unix domain socket server: {e}");
                 process::exit(111);
             });
         let (reader, mut writer) = conn.into_split();
