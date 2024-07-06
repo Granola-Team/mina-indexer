@@ -142,19 +142,10 @@ idxr_server_start_standard() {
 }
 
 idxr_server_sync() {
-    port=$(ephemeral_port)
-    idxr_server sync --web-port "$port" \
+    idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         "$@"
-}
-
-idxr_server_replay() {
-    port=$(ephemeral_port)
-    idxr_server replay --web-port "$port" \
-        --blocks-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
-        --database-dir ./database
 }
 
 stage_mainnet_blocks() {
@@ -317,7 +308,6 @@ test_server_startup() {
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
     enter_test test_ipc_is_available_immediately
-
     stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard \
@@ -334,18 +324,14 @@ test_startup_dirs_get_created() {
     enter_test test_startup_dirs_get_created
 
     idxr_server_start \
-        --blocks-dir ./startup-blocks \
-        --block-watch-dir ./watch-blocks \
-        --staking-ledgers-dir ./startup-ledgers \
-        --staking-ledger-watch-dir ./watch-ledgers \
-        --database-dir ./database
+        --blocks-dir ./blocks-dir \
+        --staking-ledgers-dir ./staking-ledgers-dir \
+        --database-dir ./database-dir
     wait_for_socket
 
-    assert_directory_exists "./startup-blocks"
-    assert_directory_exists "./watch-blocks"
-    assert_directory_exists "./startup-ledgers"
-    assert_directory_exists "./watch-ledgers"
-    assert_directory_exists "./database"
+    assert_directory_exists "./blocks-dir"
+    assert_directory_exists "./staking-ledgers-dir"
+    assert_directory_exists "./database-dir"
 
     teardown
 }
@@ -379,7 +365,6 @@ test_account_public_key_json() {
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
     enter_test test_canonical_root
-
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -400,7 +385,6 @@ test_canonical_threshold() {
 
     num_seq_blocks=15
     canonical_threshold=2
-
     stage_mainnet_blocks $num_seq_blocks ./blocks
 
     idxr_server_start_standard \
@@ -419,7 +403,6 @@ test_canonical_threshold() {
 # Indexer server returns the correct best tip
 test_best_tip() {
     enter_test test_best_tip
-
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -446,7 +429,6 @@ test_best_tip() {
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
     enter_test test_blocks
-
     stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
@@ -554,7 +536,6 @@ test_blocks() {
 # Indexer handles copied blocks correctly
 test_block_copy() {
     enter_test test_block_copy
-
     stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
@@ -654,9 +635,8 @@ test_missing_blocks() {
 # Indexer server returns the correct best chain
 test_best_chain() {
     enter_test test_best_chain
-
-    mkdir best_chain
     stage_mainnet_blocks 12 ./blocks
+    mkdir best_chain
 
     idxr_server_start_standard
     wait_for_socket
@@ -702,9 +682,8 @@ test_best_chain() {
 # Indexer server returns correct ledgers
 test_ledgers() {
     enter_test test_ledgers
-
-    mkdir ledgers
     stage_mainnet_blocks 15 ./blocks
+    mkdir ledgers
 
     idxr_server_start_standard
     wait_for_socket
@@ -761,7 +740,6 @@ test_ledgers() {
 # Indexer server syncs with existing Speedb
 test_sync() {
     enter_test test_sync
-
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -775,7 +753,7 @@ test_sync() {
     dl_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
-    idxr_server_sync --database-dir ./database
+    idxr_server_start_standard
     wait_for_socket
     idxr summary --verbose
 
@@ -793,7 +771,6 @@ test_sync() {
 # Indexer server replays events
 test_replay() {
     enter_test test_replay
-
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -806,7 +783,7 @@ test_replay() {
     dl_mainnet_range 16 20 ./blocks
 
     # replay events from previous indexer instance & ingest the new blocks
-    idxr_server_replay
+    idxr_server_start_standard --self-check
     wait_for_socket
 
     # post-replay results
@@ -825,9 +802,8 @@ test_replay() {
 # Indexer server returns correct transactions
 test_transactions() {
     enter_test test_transactions
-
-    mkdir transactions
     stage_mainnet_blocks 13 ./blocks
+    mkdir transactions
 
     idxr_server_start_standard
     wait_for_socket
@@ -921,9 +897,8 @@ test_transactions() {
 # Indexer server returns correct SNARK work
 test_snark_work() {
     enter_test test_snark_work
-
-    mkdir snark_work
     stage_mainnet_blocks 120 ./blocks
+    mkdir snark_work
 
     idxr_server_start_standard \
         --canonical-threshold 5
@@ -979,7 +954,6 @@ test_snark_work() {
 # Indexer server correctly creates a db snapshot
 test_snapshot() {
     enter_test test_snapshot
-
     stage_mainnet_blocks 13 ./blocks
 
     idxr_server_start_standard
@@ -1291,13 +1265,12 @@ test_startup_staking_ledgers() {
 test_watch_staking_ledgers() {
     enter_test test_watch_staking_ledgers
 
-    idxr_server_start_standard \
-        --staking-ledger-watch-dir ./staking-ledgers
+    idxr_server_start_standard
     wait_for_socket
 
     # copy epoch 0 staking ledger from data to watched directory
     cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
-    sleep 1
+    sleep 3
 
     # write epoch 0 ledger to file
     idxr staking-ledgers epoch --epoch 0 --path ./epoch_0_ledger.json
@@ -1329,7 +1302,7 @@ test_watch_staking_ledgers() {
     # Move epoch 42 staking ledger to watched directory
     epoch42=jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH
     cp "$STAKING_LEDGERS"/mainnet-42-"$epoch42".json ./staking-ledgers/
-    sleep 1
+    sleep 3
 
     # write epoch 42 ledger to file
     idxr staking-ledgers epoch --epoch 42 --path ./epoch_42_ledger.json
@@ -1470,14 +1443,9 @@ test_internal_commands() {
     teardown
 }
 
-# Indexer correctly starts from config
+# Indexer correctly starts from config file
 test_start_from_config() {
     enter_test test_start_from_config
-
-    idxr_server_start_standard
-    wait_for_socket
-    teardown
-
     stage_mainnet_blocks 15 ./blocks
 
     port=$(ephemeral_port)
@@ -1485,9 +1453,7 @@ test_start_from_config() {
     echo "
     { \"genesis_hash\": \"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ\",
       \"blocks_dir\": \"./blocks\",
-      \"block_watch_dir\": \"./blocks\",
       \"staking_ledgers_dir\": \"./staking-ledgers\",
-      \"staking_ledger_watch_dir\": \"./staking-ledgers\",
       \"database_dir\": \"./database\",
       \"log_level\": \"info\",
       \"ledger_cadence\": 100,
@@ -1497,9 +1463,11 @@ test_start_from_config() {
       \"canonical_update_threshold\": 2,
       \"web_hostname\": \"localhost\",
       \"web_port\": ${port},
-      \"network\": \"mainnet\"
+      \"network\": \"mainnet\",
+      \"self_check\": false
     }" > $file
-    idxr_server start-via-config -p $file
+
+    idxr_server_start --config $file
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1507,68 +1475,6 @@ test_start_from_config() {
 
     assert 15 $length
     assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
-
-    teardown
-}
-
-# Indexer correctly starts without blocks dir
-test_start_without_blocks_dir() {
-    enter_test test_start_without_blocks_dir
-
-    idxr_server_start_standard --block-watch-dir ./blocks
-    wait_for_socket
-
-    stage_mainnet_blocks 15 ./blocks
-    sleep 1
-
-    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-
-    assert 15 $length
-    assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
-
-    teardown
-}
-
-# Indexer correctly starts without staking ledgers dir
-test_start_without_ledgers_dir() {
-    enter_test test_start_without_ledgers_dir
-
-    idxr_server_start \
-        --ledgers-watch-dir ./staking-ledgers \
-        --database-dir ./database
-    wait_for_socket
-
-    # copy epoch 0 staking ledger from data to watched directory
-    cp $STAKING_LEDGERS/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json ./staking-ledgers
-    sleep 1
-
-    # write epoch 0 ledger to file
-    idxr staking-ledgers epoch --epoch 0 --path ./epoch_0_ledger.json
-
-    # check account
-    pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-    epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
-
-    epoch=$(cat ./epoch_0_ledger.json | jq -r .epoch)
-    network=$(cat ./epoch_0_ledger.json | jq -r .network)
-    ledger_hash=$(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
-    token=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
-    public_key=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
-    balance=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
-    delegate=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
-    voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
-    receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
-
-    assert '1' $token
-    assert '0' $epoch
-    assert $pk $delegate
-    assert $pk $public_key
-    assert '1000' $balance
-    assert 'mainnet' $network
-    assert $epoch0 $ledger_hash
-    assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
-    assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
     teardown
 }
@@ -1618,10 +1524,9 @@ test_clean_kill() {
 
 test_block_children() {
     enter_test test_block_children
-
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard --staking-ledger-watch-dir ./staking-ledgers
+    idxr_server_start_standard
     wait_for_socket
 
     block_5_state_hash=3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY
@@ -1726,8 +1631,6 @@ for test_name in "$@"; do
         "test_server_startup") test_server_startup ;;
         "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
         "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
-        "test_start_without_blocks_dir") test_start_without_blocks_dir ;;
-        "test_start_without_ledgers_dir") test_start_without_ledgers_dir ;;
         "test_account_balance_cli") test_account_balance_cli ;;
         "test_account_public_key_json") test_account_public_key_json ;;
         "test_canonical_root") test_canonical_root ;;

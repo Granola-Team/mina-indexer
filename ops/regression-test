@@ -16,7 +16,6 @@ test_names = [
   'server_startup',
   'ipc_is_available_immediately',
   'startup_dirs_get_created',
-  'start_without_blocks_dir',
   'clean_shutdown',
   'clean_kill',
   'account_balance_cli',
