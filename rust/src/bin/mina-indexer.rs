@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use log::{debug, error, info, trace, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use mina_indexer::{
     block::precomputed::PcbVersion,
     chain::Network,
@@ -9,8 +9,10 @@ use mina_indexer::{
         self,
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
-    server::{start_indexer, IndexerConfiguration, InitializationMode},
-    store::{self, version::IndexerStoreVersion, IndexerStore},
+    server::{
+        initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
+    },
+    store::{restore_snapshot, IndexerStore},
     web::start_web_server,
 };
 use std::{
@@ -21,6 +23,7 @@ use std::{
     time::Duration,
 };
 use stderrlog::{ColorChoice, Timestamp};
+use tempfile::TempDir;
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 
 #[derive(Parser, Debug)]
@@ -29,6 +32,7 @@ Efficiently index and query the Mina blockchain"))]
 struct Cli {
     #[command(subcommand)]
     command: IndexerCommand,
+
     /// Path to the Unix domain socket file
     #[arg(long, default_value = "./mina-indexer.sock", num_args = 1)]
     socket: PathBuf,
@@ -42,35 +46,54 @@ enum IndexerCommand {
         #[command(subcommand)]
         server_command: ServerCommand,
     },
+
     /// Client commands
     #[clap(flatten)]
     Client(#[command(subcommand)] client::ClientCli),
-    /// Database version
-    DbVersion,
-    /// Restore a snapshot of the Indexer store
-    RestoreSnapshot {
-        /// Full file path to the compressed snapshot file to restore
-        #[arg(long)]
-        snapshot_file_path: PathBuf,
 
-        /// Full file path to the location to restore to
-        #[arg(long)]
-        restore_dir: PathBuf,
+    /// Database commands
+    Database {
+        #[command(subcommand)]
+        db_command: DatabaseCommand,
     },
 }
 
 #[derive(Subcommand, Debug)]
 enum ServerCommand {
-    /// Start a new mina indexer by passing arguments on the command line
-    Start(ServerArgs),
-    /// Start a new mina indexer via a config file
-    StartViaConfig(ConfigArgs),
-    /// Start a mina indexer by replaying events from an existing indexer store
-    Replay(ServerArgs),
-    /// Start a mina indexer by syncing from events in an existing indexer store
-    Sync(ServerArgs),
+    /// Start a new mina indexer
+    Start(Box<ServerArgs>),
+
     /// Shutdown the server
     Shutdown,
+}
+
+#[derive(Subcommand, Debug)]
+enum DatabaseCommand {
+    /// Create a new mina indexer database to use with `mina-indexer start`
+    Create(Box<ServerArgs>),
+
+    /// Create a snapshot of a mina indexer database
+    Snapshot {
+        /// Full path to the new snapshot file
+        #[arg(long, default_value = "./snapshot")]
+        output_path: PathBuf,
+
+        /// Full path to a mina indexer database directory.
+        /// If null, snapshot a running indexer database.
+        #[arg(long)]
+        database_dir: Option<PathBuf>,
+    },
+
+    /// Restore an indexer database from a compressed snapshot file
+    Restore {
+        /// Full path to the compressed snapshot file
+        #[arg(long, default_value = "./snapshot")]
+        snapshot_file: PathBuf,
+
+        /// Full path to the database directory
+        #[arg(long)]
+        restore_dir: PathBuf,
+    },
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -93,21 +116,13 @@ pub struct ServerArgs {
     /// Override the constraint system digests
     constraint_system_digests: Option<Vec<String>>,
 
-    /// Directory containing the precomputed blocks
-    #[arg(long)]
-    blocks_dir: Option<PathBuf>,
+    /// Directory of precomputed blocks
+    #[arg(long, default_value = "/share/mina-indexer/blocks")]
+    blocks_dir: PathBuf,
 
-    /// Directory to watch for new precomputed blocks
-    #[arg(long)]
-    block_watch_dir: Option<PathBuf>,
-
-    /// Directory containing the staking ledgers
-    #[arg(long)]
-    staking_ledgers_dir: Option<PathBuf>,
-
-    /// Directory to watch for new staking ledgers
-    #[arg(long)]
-    staking_ledger_watch_dir: Option<PathBuf>,
+    /// Directory of staking ledgers
+    #[arg(long, default_value = "/share/mina-indexer/staking-ledgers")]
+    staking_ledgers_dir: PathBuf,
 
     /// Path to directory for speedb
     #[arg(long, default_value = "/var/log/mina-indexer/database")]
@@ -146,6 +161,14 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = 8080)]
     web_port: u16,
 
+    /// Start with data consistency checks
+    #[arg(long, default_value_t = false)]
+    self_check: bool,
+
+    /// Start from a config file (bypasses other args)
+    #[arg(long)]
+    config: Option<PathBuf>,
+
     /// Path to the missing block recovery executable
     #[arg(long)]
     missing_block_recovery_exe: Option<PathBuf>,
@@ -182,57 +205,19 @@ impl ServerArgs {
     }
 }
 
-pub const DEFAULT_BLOCKS_DIR: &str = "/share/mina-indexer/blocks";
-pub const DEFAULT_STAKING_LEDGERS_DIR: &str = "/share/mina-indexer/staking-ledgers";
-
 #[tokio::main]
-#[allow(clippy::unused_unit)]
 pub async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     let domain_socket_path = args.socket;
-
     Toplevel::new(|s| async move {
         s.start(SubsystemBuilder::new("Main", |s| async move {
-            let result: Result<(), _> = match args.command {
+            match args.command {
                 IndexerCommand::Client(cli) => cli.run(domain_socket_path).await,
+                IndexerCommand::Database { db_command } => db_command.run(domain_socket_path).await,
                 IndexerCommand::Server { server_command } => {
                     server_command.run(s, domain_socket_path).await
                 }
-                IndexerCommand::DbVersion => {
-                    let version = IndexerStoreVersion::default();
-                    let msg = serde_json::to_string(&version)?;
-                    println!("{msg}");
-                    return Ok(());
-                }
-                IndexerCommand::RestoreSnapshot {
-                    snapshot_file_path,
-                    restore_dir,
-                } => {
-                    info!("Received restore-snapshot with file {snapshot_file_path:#?} and dir {restore_dir:#?}");
-                    let msg = if !snapshot_file_path.exists() {
-                        let msg = format!("{snapshot_file_path:#?} does not exist");
-                        error!("{msg}");
-                        msg
-                    } else if restore_dir.is_dir() {
-                        // TODO: allow prompting user to overwrite
-                        let msg = format!("{restore_dir:#?} must not exist (but currently does)");
-                        error!("{msg}");
-                        msg
-                    } else {
-                        let result = store::restore_snapshot(&snapshot_file_path, &restore_dir);
-                        if result.is_ok() {
-                            result?
-                        } else {
-                            #[allow(clippy::unnecessary_unwrap)]
-                            let err = result.unwrap_err();
-                            format!("{}: {:#?}", err, err.root_cause().to_string())
-                        }
-                    };
-                    println!("{msg}");
-                    return Ok(());
-                }
-            };
-            result
+            }
         }));
     })
     .catch_signals()
@@ -243,16 +228,16 @@ pub async fn main() -> anyhow::Result<()> {
 
 impl ServerCommand {
     async fn run(self, subsys: SubsystemHandle, domain_socket_path: PathBuf) -> anyhow::Result<()> {
-        use ServerCommand::*;
         let (args, mut mode) = match self {
-            Shutdown => return client::ClientCli::Shutdown.run(domain_socket_path).await,
-            Start(args) => (args, InitializationMode::New),
-            Sync(args) => (args, InitializationMode::Sync),
-            Replay(args) => (args, InitializationMode::Replay),
-            StartViaConfig(args) => {
-                let contents = std::fs::read(args.path.expect("server args config file"))?;
-                let args: ServerArgsJson = serde_json::from_slice(&contents)?;
-                (args.into(), InitializationMode::New)
+            Self::Shutdown => return client::ClientCli::Shutdown.run(domain_socket_path).await,
+            Self::Start(args) => {
+                if let Some(config_path) = args.config {
+                    let contents = std::fs::read(config_path)?;
+                    let args: ServerArgsJson = serde_json::from_slice(&contents)?;
+                    (args.into(), InitializationMode::Sync)
+                } else {
+                    (*args, InitializationMode::New)
+                }
             }
         };
         let args = args.with_dynamic_defaults(std::process::id());
@@ -263,9 +248,11 @@ impl ServerCommand {
         // default to sync if there's a nonempty db dir
         if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
             if matches!(mode, InitializationMode::New) && dir.count() != 0 {
-                // sync from existing db
                 mode = InitializationMode::Sync;
             }
+        }
+        if args.self_check {
+            mode = InitializationMode::Replay;
         }
 
         // initialize logging
@@ -279,36 +266,93 @@ impl ServerCommand {
 
         check_or_write_pid_file(&database_dir);
 
-        debug!("Building an indexer configuration");
+        debug!("Building mina indexer configuration");
         let config = process_indexer_configuration(args, mode, domain_socket_path)?;
 
-        debug!("Creating a new IndexerStore in {}", database_dir.display());
+        debug!("Creating a new mina indexer database in {database_dir:#?}");
         let db = Arc::new(IndexerStore::new(&database_dir)?);
-
-        let state = db.clone();
+        let store = db.clone();
         subsys.start(SubsystemBuilder::new("Indexer", move |s| {
-            start_indexer(s, config, state)
+            start_indexer(s, config, store)
         }));
 
-        info!(
-            "Starting the web server listening on {}:{}",
-            web_hostname, web_port
-        );
-
-        let state = db.clone();
+        info!("Starting the web server listening on {web_hostname}:{web_port}");
+        let store = db.clone();
         subsys.start(SubsystemBuilder::new("Web Server", move |s| {
-            start_web_server(s, state, (web_hostname, web_port))
+            start_web_server(s, store, (web_hostname, web_port))
         }));
-
-        subsys.on_shutdown_requested().await;
 
         info!("Shutting down primary database instance");
+        subsys.on_shutdown_requested().await;
         db.database.cancel_all_background_work(true);
         drop(db);
         Ok(())
     }
 }
 
+impl DatabaseCommand {
+    async fn run(self, domain_socket_path: PathBuf) -> anyhow::Result<()> {
+        // initialize logging
+        stderrlog::new()
+            .module(module_path!())
+            .color(ColorChoice::Never)
+            .timestamp(Timestamp::Microsecond)
+            .verbosity(LevelFilter::Info)
+            .init()
+            .unwrap();
+
+        match self {
+            Self::Snapshot {
+                output_path,
+                database_dir,
+            } => {
+                if let Some(database_dir) = database_dir {
+                    if !database_dir.exists() {
+                        error!("Database dir {database_dir:#?} does not exist");
+                    } else {
+                        info!("Creating snapshot of database dir {database_dir:#?}");
+                        let tmp_dir = TempDir::new()?;
+                        let db = IndexerStore::read_only(&database_dir, tmp_dir.as_ref())?;
+                        db.create_snapshot(&output_path)?;
+                    }
+                } else {
+                    info!("Creating snapshot of running mina indexer");
+                    return client::ClientCli::CreateSnapshot { output_path }
+                        .run(domain_socket_path)
+                        .await;
+                }
+            }
+            Self::Restore {
+                snapshot_file,
+                restore_dir,
+            } => {
+                info!("Restoring mina indexer database from snapshot file {snapshot_file:#?} to {restore_dir:#?}");
+                restore_snapshot(&snapshot_file, &restore_dir).unwrap_or_else(|e| error!("{e}"))
+            }
+            Self::Create(args) => {
+                let database_dir = args.database_dir.clone();
+                info!("Creating mina indexer database in {database_dir:#?}");
+                fs::create_dir_all(database_dir.clone()).ok();
+
+                debug!("Building mina indexer configuration");
+                let config = process_indexer_configuration(
+                    *args,
+                    InitializationMode::New,
+                    domain_socket_path,
+                )?;
+
+                debug!("Creating a new mina indexer database in {database_dir:#?}");
+                let db = Arc::new(IndexerStore::new(&database_dir)?);
+                let store = db.clone();
+                initialize_indexer_database(config, store).await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Creates directories, processes constants & parses genesis ledger.
+/// Returns indexer config.
 fn process_indexer_configuration(
     args: ServerArgs,
     mode: InitializationMode,
@@ -316,15 +360,7 @@ fn process_indexer_configuration(
 ) -> anyhow::Result<IndexerConfiguration> {
     let genesis_hash = args.genesis_hash.into();
     let blocks_dir = args.blocks_dir;
-    let block_watch_dir = args
-        .block_watch_dir
-        .unwrap_or(blocks_dir.clone().unwrap_or(DEFAULT_BLOCKS_DIR.into()));
     let staking_ledgers_dir = args.staking_ledgers_dir;
-    let staking_ledger_watch_dir = args.staking_ledger_watch_dir.unwrap_or(
-        staking_ledgers_dir
-            .clone()
-            .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into()),
-    );
     let prune_interval = args.prune_interval;
     let canonical_threshold = args.canonical_threshold;
     let canonical_update_threshold = args.canonical_update_threshold;
@@ -334,29 +370,24 @@ fn process_indexer_configuration(
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
 
-    // pick up genesis constants from the given file or use defaults
-    let genesis_constants = {
-        let mut constants = GenesisConstants::default();
-        if let Some(path) = args.genesis_constants {
-            if let Ok(ref contents) = std::fs::read(path) {
-                if let Ok(override_constants) = serde_json::from_slice::<GenesisConstants>(contents)
-                {
-                    constants.override_with(override_constants);
-                } else {
-                    error!(
-                        "Error parsing supplied genesis constants. Using default constants:\n{}",
-                        serde_json::to_string_pretty(&constants)?
-                    )
-                }
-            } else {
-                error!(
-                    "Error reading genesis constants file. Using default constants:\n{}",
-                    serde_json::to_string_pretty(&constants)?
-                )
-            }
-        }
-        constants
-    };
+    assert!(
+        // bad things happen if this condition fails
+        canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
+        "canonical update threshold must be strictly less than the transition frontier length!"
+    );
+
+    // create directories
+    if !blocks_dir.exists() {
+        info!("Creating blocks directory {blocks_dir:#?}");
+        fs::create_dir_all(blocks_dir.clone())?;
+    }
+    if !staking_ledgers_dir.exists() {
+        info!("Creating staking ledgers directory {staking_ledgers_dir:#?}");
+        fs::create_dir_all(staking_ledgers_dir.clone())?;
+    }
+
+    // pick up protocol constants from the given file or use defaults
+    let genesis_constants = protocol_constants(args.genesis_constants)?;
     let constraint_system_digests = args.constraint_system_digests.unwrap_or(
         MAINNET_CONSTRAINT_SYSTEM_DIGESTS
             .iter()
@@ -364,62 +395,15 @@ fn process_indexer_configuration(
             .collect(),
     );
 
-    assert!(
-        // bad things happen if this condition fails
-        canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
-        "canonical update threshold must be strictly less than the transition frontier length!"
-    );
-
-    trace!(
-        "Creating block watch directories if missing: {}",
-        block_watch_dir.display()
-    );
-    fs::create_dir_all(block_watch_dir.clone())?;
-
-    trace!(
-        "Creating ledger watch directories if missing: {}",
-        staking_ledger_watch_dir.display()
-    );
-    fs::create_dir_all(staking_ledger_watch_dir.clone())?;
-
-    let genesis_ledger = if let Some(ledger) = args.genesis_ledger {
-        assert!(
-            ledger.is_file(),
-            "Ledger file does not exist at {}",
-            ledger.display()
-        );
-        info!("Parsing ledger file at {}", ledger.display());
-
-        match ledger::genesis::parse_file(&ledger) {
-            Err(err) => {
-                error!("Unable to parse genesis ledger: {err}");
-                std::process::exit(100)
-            }
-            Ok(genesis_root) => {
-                info!(
-                    "Successfully parsed {} genesis ledger",
-                    genesis_root.ledger.name
-                );
-                genesis_root.into()
-            }
-        }
-    } else {
-        let genesis_root =
-            GenesisRoot::from_str(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-        info!("Using default {} genesis ledger", genesis_root.ledger.name);
-        genesis_root.into()
-    };
-
+    let genesis_ledger = parse_genesis_ledger(args.genesis_ledger)?;
     Ok(IndexerConfiguration {
         genesis_ledger,
         genesis_hash,
         genesis_constants,
         constraint_system_digests,
-        version: PcbVersion::V1,
+        version: PcbVersion::default(),
         blocks_dir,
-        block_watch_dir,
         staking_ledgers_dir,
-        staking_ledger_watch_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -433,14 +417,60 @@ fn process_indexer_configuration(
     })
 }
 
+fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> {
+    let genesis_ledger = if let Some(path) = path {
+        assert!(path.is_file(), "Ledger file does not exist at {path:#?}");
+        info!("Parsing ledger file at {path:#?}");
+        match ledger::genesis::parse_file(&path) {
+            Err(err) => {
+                error!("Unable to parse genesis ledger: {err}");
+                std::process::exit(100)
+            }
+            Ok(genesis_root) => {
+                info!(
+                    "Successfully parsed {} genesis ledger",
+                    genesis_root.ledger.name,
+                );
+                genesis_root.into()
+            }
+        }
+    } else {
+        let genesis_root =
+            GenesisRoot::from_str(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+        info!("Using default {} genesis ledger", genesis_root.ledger.name);
+        genesis_root.into()
+    };
+    Ok(genesis_ledger)
+}
+
+fn protocol_constants(path: Option<PathBuf>) -> anyhow::Result<GenesisConstants> {
+    let mut constants = GenesisConstants::default();
+    if let Some(path) = path {
+        if let Ok(ref contents) = std::fs::read(path) {
+            if let Ok(override_constants) = serde_json::from_slice::<GenesisConstants>(contents) {
+                constants.override_with(override_constants);
+            } else {
+                error!(
+                    "Error parsing supplied protocol constants. Using default:\n{}",
+                    serde_json::to_string_pretty(&constants)?
+                )
+            }
+        } else {
+            error!(
+                "Error reading protocol constants file. Using default:\n{}",
+                serde_json::to_string_pretty(&constants)?
+            )
+        }
+    }
+    Ok(constants)
+}
+
 fn check_or_write_pid_file(database_dir: &Path) {
     use mina_indexer::platform;
     use std::{fs::File, io::Write, process};
 
-    let _ = fs::create_dir_all(database_dir);
-
+    fs::create_dir_all(database_dir).ok();
     let pid_path = database_dir.join("PID");
-
     if let Ok(pid) = fs::read_to_string(&pid_path) {
         let pid = pid
             .trim()
@@ -456,13 +486,13 @@ fn check_or_write_pid_file(database_dir: &Path) {
     match File::create(&pid_path) {
         Ok(mut pid_file) => {
             let pid = process::id();
-            if let Err(e) = write!(pid_file, "{}", pid) {
-                eprintln!("Error writing PID ({pid}) to {pid_path:#?}: {}", e);
+            if let Err(e) = write!(pid_file, "{pid}") {
+                eprintln!("Error writing PID ({pid}) to {pid_path:#?}: {e}");
                 process::exit(131);
             }
         }
         Err(e) => {
-            eprintln!("Error writing PID to {pid_path:#?}: {}", e);
+            eprintln!("Error writing PID to {pid_path:#?}: {e}");
             process::exit(131);
         }
     }
@@ -474,10 +504,8 @@ struct ServerArgsJson {
     genesis_hash: String,
     genesis_constants: Option<String>,
     constraint_system_digests: Option<Vec<String>>,
-    blocks_dir: Option<String>,
-    block_watch_dir: String,
-    staking_ledgers_dir: Option<String>,
-    staking_ledger_watch_dir: String,
+    blocks_dir: String,
+    staking_ledgers_dir: String,
     database_dir: String,
     log_level: String,
     ledger_cadence: u32,
@@ -503,18 +531,8 @@ impl From<ServerArgs> for ServerArgsJson {
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.display().to_string()),
             constraint_system_digests: value.constraint_system_digests,
-            blocks_dir: value.blocks_dir.map(|d| d.display().to_string()),
-            block_watch_dir: value
-                .block_watch_dir
-                .unwrap_or(DEFAULT_BLOCKS_DIR.into())
-                .display()
-                .to_string(),
-            staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.display().to_string()),
-            staking_ledger_watch_dir: value
-                .staking_ledger_watch_dir
-                .unwrap_or(DEFAULT_STAKING_LEDGERS_DIR.into())
-                .display()
-                .to_string(),
+            blocks_dir: value.blocks_dir.display().to_string(),
+            staking_ledgers_dir: value.staking_ledgers_dir.display().to_string(),
             database_dir: value.database_dir.display().to_string(),
             log_level: value.log_level.to_string(),
             ledger_cadence: value.ledger_cadence,
@@ -542,10 +560,8 @@ impl From<ServerArgsJson> for ServerArgs {
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.into()),
             constraint_system_digests: value.constraint_system_digests,
-            blocks_dir: value.blocks_dir.map(|d| d.into()),
-            block_watch_dir: Some(value.block_watch_dir.into()),
-            staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
-            staking_ledger_watch_dir: Some(value.staking_ledger_watch_dir.into()),
+            blocks_dir: value.blocks_dir.into(),
+            staking_ledgers_dir: value.staking_ledgers_dir.into(),
             database_dir: value.database_dir.into(),
             log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
             ledger_cadence: value.ledger_cadence,
@@ -555,6 +571,8 @@ impl From<ServerArgsJson> for ServerArgs {
             canonical_update_threshold: value.canonical_update_threshold,
             web_hostname: value.web_hostname,
             web_port: value.web_port,
+            self_check: false,
+            config: None,
             pid: value.pid,
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
