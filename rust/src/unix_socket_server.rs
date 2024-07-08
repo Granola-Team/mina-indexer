@@ -6,7 +6,6 @@ use crate::{
     canonicity::store::CanonicityStore,
     client::*,
     command::{internal::store::InternalCommandStore, signed, store::UserCommandStore, Command},
-    constants::VERSION,
     ledger::{
         self,
         public_key::{self, PublicKey},
@@ -16,7 +15,7 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
-    store::version::{IndexerStoreVersion, VersionStore},
+    store::version::VersionStore,
 };
 use anyhow::{bail, Context};
 use log::{debug, error, info, trace, warn};
@@ -1210,12 +1209,9 @@ pub async fn handle_connection(
                     }
                 }
             },
-            ClientCli::Version => Some(format!(
-                "mina-indexer  v{}\nindexer store v{}",
-                VERSION,
-                db.get_db_version()?
-            )),
-            ClientCli::DbVersion => Some(IndexerStoreVersion::default().major_minor_patch()),
+            ClientCli::DbVersion => {
+                Some(format!("mina-indexer database v{}", db.get_db_version()?))
+            }
         };
 
         let response = if let Some(response_json) = response_json {

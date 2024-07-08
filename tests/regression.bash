@@ -297,6 +297,9 @@ test_indexer_cli_reports() {
 
     idxr database restore --help 2>&1 |
         grep -iq "Usage: mina-indexer database restore"
+
+    idxr database version --help 2>&1 |
+        grep -iq "Usage: mina-indexer database version"
 }
 
 # Indexer server starts up without any precomputed blocks

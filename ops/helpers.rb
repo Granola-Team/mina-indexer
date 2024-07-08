@@ -95,7 +95,7 @@ end
 
 # Database directory
 
-v = JSON.parse(`#{EXE_SRC} db-version`)
+v = JSON.parse(`#{EXE_SRC} database version --json`)
 DB_VERSION_JSON = v
 DB_VERSION = v['major'].to_s + '.' + v['minor'].to_s + '.' + v['patch'].to_s
 
