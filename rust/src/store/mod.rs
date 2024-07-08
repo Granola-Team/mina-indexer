@@ -24,9 +24,9 @@ pub mod version_store_impl;
 
 use self::fixed_keys::FixedKeys;
 use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use log::{debug, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
@@ -190,80 +190,54 @@ impl IndexerStore {
     }
 
     /// Create a snapshot of the Indexer store
-    pub fn create_snapshot(&self, output_file: &Path) -> Result<String, anyhow::Error> {
+    pub fn create_snapshot(&self, output_filepath: &PathBuf) -> Result<String, anyhow::Error> {
         use speedb::checkpoint::Checkpoint;
 
-        let mut snapshot_temp_dir = output_file.to_path_buf();
+        let mut snapshot_temp_dir = output_filepath.clone();
         snapshot_temp_dir.set_extension("tmp-snapshot");
         Checkpoint::new(&self.database)?
             .create_checkpoint(&snapshot_temp_dir)
             .map_err(|e| anyhow!("Error creating database snapshot: {e}"))
             .and_then(|_| {
                 persist_indexer_version(&IndexerStoreVersion::default(), &snapshot_temp_dir)?;
-                compress_directory(&snapshot_temp_dir, output_file)
+                compress_directory(&snapshot_temp_dir, output_filepath)
                     .with_context(|| "Failed to compress database.")
             })
             .and_then(|_| {
+                info!("Finished outputting snapshot to {output_filepath:#?}");
                 fs::remove_dir_all(&snapshot_temp_dir)
                     .with_context(|| format!("Failed to remove directory {snapshot_temp_dir:#?})"))
             })
-            .map(|_| format!("Snapshot created and saved as {output_file:#?}"))
-    }
-
-    /// Create a read-only instance of an indexer store
-    pub fn read_only(primary: &Path, secondary: &Path) -> anyhow::Result<Self> {
-        let mut cf_opts = speedb::Options::default();
-        cf_opts.set_max_write_buffer_number(16);
-        cf_opts.set_compression_type(DBCompressionType::Zstd);
-
-        let mut database_opts = speedb::Options::default();
-        database_opts.set_compression_type(DBCompressionType::Zstd);
-        database_opts.create_missing_column_families(true);
-        database_opts.create_if_missing(true);
-
-        let column_families: Vec<ColumnFamilyDescriptor> = Self::COLUMN_FAMILIES
-            .iter()
-            .map(|cf| ColumnFamilyDescriptor::new(*cf, cf_opts.clone()))
-            .collect();
-        let read_only = Self {
-            is_primary: false,
-            db_path: secondary.into(),
-            database: speedb::DBWithThreadMode::open_cf_descriptors_as_secondary(
-                &database_opts,
-                primary,
-                secondary,
-                column_families,
-            )?,
-        };
-        Ok(read_only)
+            .map(|_| format!("Snapshot created and saved as {output_filepath:#?}"))
     }
 }
 
 /// Restore a snapshot of the Indexer store
-pub fn restore_snapshot(snapshot_file: &PathBuf, restore_dir: &PathBuf) -> anyhow::Result<()> {
-    if !snapshot_file.exists() {
-        bail!("Snapshot file {snapshot_file:#?} does not exist")
+pub fn restore_snapshot(
+    snapshot_file_path: &PathBuf,
+    restore_dir: &PathBuf,
+) -> Result<String, anyhow::Error> {
+    if !snapshot_file_path.exists() {
+        let msg = format!("{snapshot_file_path:#?} does not exist");
+        error!("{msg}");
+        Err(anyhow!(msg))
     } else if restore_dir.is_dir() {
-        bail!("Restore dir {restore_dir:#?} must not exist")
+        let msg = format!("{restore_dir:#?} must not exist (but currently does)");
+        error!("{msg}");
+        Err(anyhow!(msg))
     } else {
-        decompress_file(snapshot_file, restore_dir)
-            .with_context(|| format!("Failed to decompress file {snapshot_file:#?}"))
-            .map(|_| info!(
-                "Snapshot successfully restored. Start mina indexer using `mina-indexer server start --database-dir {}`",
-                restore_dir.display()
+        decompress_file(snapshot_file_path, restore_dir)
+            .with_context(|| format!("Failed to decompress file {snapshot_file_path:#?}"))
+            .map(|_| format!(
+                "Snapshot restored to {restore_dir:#?}.\n\nPlease start server using: `server sync --database-dir {restore_dir:#?}`"
             ))
     }
 }
 
-fn decompress_file(compressed_file: &Path, output_dir: &Path) -> io::Result<()> {
-    debug!(
-        "Decompressing {} to {}",
-        compressed_file.display(),
-        output_dir.display()
-    );
+fn decompress_file(compressed_file_path: &PathBuf, output_dir: &PathBuf) -> io::Result<()> {
     fs::create_dir_all(output_dir)?;
 
-    let compressed_file = File::open(compressed_file)?;
+    let compressed_file = File::open(compressed_file_path)?;
     let mut decoder = GzDecoder::new(compressed_file);
 
     let mut buffer = Vec::new();
@@ -273,24 +247,21 @@ fn decompress_file(compressed_file: &Path, output_dir: &Path) -> io::Result<()> 
     archive.unpack(output_dir)
 }
 
-fn compress_directory(
-    input_dir: impl AsRef<Path>,
-    output_file: impl AsRef<Path>,
-) -> io::Result<()> {
-    debug!(
-        "Compressing {} to {}",
-        input_dir.as_ref().display(),
-        output_file.as_ref().display()
-    );
+fn compress_directory(input_dir: &PathBuf, output_file: &PathBuf) -> io::Result<()> {
+    info!("Starting compression of {input_dir:#?} to {output_file:#?}");
+
     let output_file = File::create(output_file)?;
     let encoder = GzEncoder::new(output_file, Compression::none());
+
     let mut archive = tar::Builder::new(encoder);
     let dir = read_dir(input_dir)?;
+
     for entry in dir {
         let file = entry?.path();
         let file_name = &file.file_name().unwrap().to_str().unwrap();
         archive.append_file(file_name, &mut File::open(&file)?)?;
     }
+
     archive.finish()
 }
 
@@ -430,9 +401,9 @@ pub fn txn_block_key(txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
 
 pub fn persist_indexer_version(
     indexer_version: &IndexerStoreVersion,
-    path: impl AsRef<Path>,
+    path: &Path,
 ) -> anyhow::Result<()> {
-    let mut versioned = path.as_ref().to_path_buf();
+    let mut versioned = path.to_path_buf();
     versioned.push("INDEXER_VERSION");
     if !versioned.exists() {
         debug!("persisting INDEXER_VERSION in the database directory");

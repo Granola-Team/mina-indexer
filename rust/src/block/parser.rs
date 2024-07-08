@@ -284,7 +284,7 @@ impl BlockParser {
             total_num_bytes,
             bytes_processed: 0,
             blocks_processed: 0,
-            version: PcbVersion::default(),
+            version: PcbVersion::V1,
             deep_canonical_bytes: 0,
             num_deep_canonical_blocks: 0,
             total_num_blocks: paths.len() as u32,

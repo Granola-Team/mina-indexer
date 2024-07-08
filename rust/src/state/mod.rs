@@ -39,6 +39,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio_graceful_shutdown::SubsystemHandle;
 
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known
@@ -46,6 +47,9 @@ use std::{
 /// from an unknown ledger state
 #[derive(Debug)]
 pub struct IndexerState {
+    /// Indexer phase
+    pub phase: IndexerPhase,
+
     /// Block representing the best tip of the root branch
     pub best_tip: Tip,
 
@@ -239,6 +243,7 @@ impl IndexerState {
                 genesis_block.state_hash(),
                 LedgerDiff::from_precomputed(&genesis_block),
             )]),
+            phase: IndexerPhase::InitializingFromBlockDir,
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -270,6 +275,7 @@ impl IndexerState {
         Ok(Self {
             ledger: config.genesis_ledger.into(),
             diffs_map: HashMap::new(),
+            phase: IndexerPhase::SyncingFromDB,
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -327,6 +333,7 @@ impl IndexerState {
                 root_block.state_hash(),
                 LedgerDiff::from_precomputed(root_block),
             )]),
+            phase: IndexerPhase::Testing,
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -354,8 +361,8 @@ impl IndexerState {
     pub fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
+        subsys: &SubsystemHandle,
     ) -> anyhow::Result<()> {
-        info!("Initializing indexer with canonical chain discovery");
         let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diff = LedgerDiff::default();
@@ -427,19 +434,24 @@ impl IndexerState {
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks
-        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
+        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()), Some(subsys))
     }
 
     /// Adds blocks to the state according to `block_parser` then changes phase
     /// to Watching
-    pub fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        self.add_blocks_with_time(block_parser, None)
+    pub fn add_blocks(
+        &mut self,
+        block_parser: &mut BlockParser,
+        subsys: Option<&SubsystemHandle>,
+    ) -> anyhow::Result<()> {
+        self.add_blocks_with_time(block_parser, None, subsys)
     }
 
     fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
         elapsed: Option<Duration>,
+        subsys: Option<&SubsystemHandle>,
     ) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
@@ -465,6 +477,10 @@ impl IndexerState {
                     self.bytes_processed += block_bytes;
                     self.add_block_to_store(&block)?;
                 }
+            }
+            if subsys.is_some_and(|s| s.is_shutdown_requested()) {
+                info!("Shutdown requested; exiting early");
+                break;
             }
         }
 
@@ -945,8 +961,8 @@ impl IndexerState {
     /// Sync from an existing db
     ///
     /// Short-circuits adding blocks to the witness tree by rooting the
-    /// witness tree at the most recent deep canonical block and only adding
-    /// the successive blocks
+    /// witness tree at the most recent "canonical" block and only adding
+    /// the succeeding blocks
     pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut witness_tree_blocks = vec![];
@@ -1094,6 +1110,7 @@ impl IndexerState {
                 self.replay_event(event).unwrap_or_else(|e| error!("{e}"));
             });
         }
+
         Ok(min_length_filter)
     }
 
@@ -1568,6 +1585,14 @@ impl IndexerState {
         }
     }
 
+    fn is_initializing(&self) -> bool {
+        self.phase == IndexerPhase::InitializingFromBlockDir
+    }
+
+    fn should_report_from_time(&self, duration: Duration) -> bool {
+        self.is_initializing() && duration.as_secs() > BLOCK_REPORTING_FREQ_SEC
+    }
+
     fn should_report_from_block_count(&self, block_parser: &BlockParser) -> bool {
         self.blocks_processed > 0 && self.blocks_processed % self.reporting_freq == 0
             || self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
@@ -1611,7 +1636,7 @@ impl IndexerState {
         total_time: Instant,
     ) -> anyhow::Result<()> {
         if self.should_report_from_block_count(block_parser)
-            || step_time.elapsed().as_secs() > BLOCK_REPORTING_FREQ_SEC
+            || self.should_report_from_time(step_time.elapsed())
         {
             let elapsed = total_time.elapsed().as_secs();
             let best_tip: BlockWithoutHeight = self.best_tip_block().clone().into();
@@ -1666,6 +1691,19 @@ impl std::fmt::Display for IndexerState {
                 writeln!(f, "{branch}")?;
             }
         }
+
         Ok(())
+    }
+}
+
+impl std::fmt::Display for IndexerPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexerPhase::InitializingFromBlockDir => write!(f, "initializing"),
+            IndexerPhase::SyncingFromDB => write!(f, "syncing"),
+            IndexerPhase::Replaying => write!(f, "replaying"),
+            IndexerPhase::Watching => write!(f, "watching"),
+            IndexerPhase::Testing => write!(f, "testing"),
+        }
     }
 }
