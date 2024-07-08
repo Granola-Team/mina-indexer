@@ -70,7 +70,7 @@ enum ServerCommand {
 #[derive(Subcommand, Debug)]
 enum DatabaseCommand {
     /// Create a new mina indexer database to use with `mina-indexer start`
-    Create(Box<ServerArgs>),
+    Create(Box<DatabaseArgs>),
 
     /// Create a snapshot of a mina indexer database
     Snapshot {
@@ -99,6 +99,41 @@ enum DatabaseCommand {
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
+    #[clap(flatten)]
+    db: DatabaseArgs,
+
+    /// Web server hostname for REST and GraphQL
+    #[arg(long, default_value = DEFAULT_WEB_HOSTNAME)]
+    web_hostname: String,
+
+    /// Web server port for REST and GraphQL
+    #[arg(long, default_value_t = DEFAULT_WEB_PORT)]
+    web_port: u16,
+
+    /// Start with data consistency checks
+    #[arg(long, default_value_t = false)]
+    self_check: bool,
+
+    /// Path to the missing block recovery executable
+    #[arg(long)]
+    missing_block_recovery_exe: Option<PathBuf>,
+
+    /// Delay (sec) in between missing block recovery attempts
+    #[arg(long)]
+    missing_block_recovery_delay: Option<u64>,
+
+    /// Recover all blocks at all missing heights
+    #[arg(long)]
+    missing_block_recovery_batch: Option<bool>,
+
+    /// Indexer process ID
+    #[arg(last = true)]
+    pid: Option<u32>,
+}
+
+#[derive(Parser, Debug, Clone)]
+#[command(author, version, about, long_about = None)]
+pub struct DatabaseArgs {
     /// Path to the genesis ledger (JSON)
     #[arg(long, value_name = "FILE")]
     genesis_ledger: Option<PathBuf>,
@@ -153,41 +188,13 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
     canonical_update_threshold: u32,
 
-    /// Web server hostname for REST and GraphQL
-    #[arg(long, default_value = "localhost")]
-    web_hostname: String,
-
-    /// Web server port for REST and GraphQL
-    #[arg(long, default_value_t = 8080)]
-    web_port: u16,
-
-    /// Start with data consistency checks
-    #[arg(long, default_value_t = false)]
-    self_check: bool,
-
     /// Start from a config file (bypasses other args)
     #[arg(long)]
     config: Option<PathBuf>,
 
-    /// Path to the missing block recovery executable
-    #[arg(long)]
-    missing_block_recovery_exe: Option<PathBuf>,
-
-    /// Delay (sec) in between missing block recovery attempts
-    #[arg(long)]
-    missing_block_recovery_delay: Option<u64>,
-
-    /// Recover all blocks at all missing heights
-    #[arg(long)]
-    missing_block_recovery_batch: Option<bool>,
-
     /// Network name
     #[arg(long, default_value = Network::Mainnet)]
     network: Network,
-
-    /// Indexer process ID
-    #[arg(last = true)]
-    pid: Option<u32>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -231,7 +238,7 @@ impl ServerCommand {
         let (args, mut mode) = match self {
             Self::Shutdown => return client::ClientCli::Shutdown.run(domain_socket_path).await,
             Self::Start(args) => {
-                if let Some(config_path) = args.config {
+                if let Some(config_path) = args.db.config {
                     let contents = std::fs::read(config_path)?;
                     let args: ServerArgsJson = serde_json::from_slice(&contents)?;
                     (args.into(), InitializationMode::Sync)
@@ -241,7 +248,7 @@ impl ServerCommand {
             }
         };
         let args = args.with_dynamic_defaults(std::process::id());
-        let database_dir = args.database_dir.clone();
+        let database_dir = args.db.database_dir.clone();
         let web_hostname = args.web_hostname.clone();
         let web_port = args.web_port;
 
@@ -260,7 +267,7 @@ impl ServerCommand {
             .module(module_path!())
             .color(ColorChoice::Never)
             .timestamp(Timestamp::Microsecond)
-            .verbosity(args.log_level)
+            .verbosity(args.db.log_level)
             .init()
             .unwrap();
 
@@ -337,7 +344,7 @@ impl DatabaseCommand {
 
                 debug!("Building mina indexer configuration");
                 let config = process_indexer_configuration(
-                    *args,
+                    (*args).into(),
                     InitializationMode::New,
                     domain_socket_path,
                 )?;
@@ -359,14 +366,14 @@ fn process_indexer_configuration(
     mode: InitializationMode,
     domain_socket_path: PathBuf,
 ) -> anyhow::Result<IndexerConfiguration> {
-    let genesis_hash = args.genesis_hash.into();
-    let blocks_dir = args.blocks_dir;
-    let staking_ledgers_dir = args.staking_ledgers_dir;
-    let prune_interval = args.prune_interval;
-    let canonical_threshold = args.canonical_threshold;
-    let canonical_update_threshold = args.canonical_update_threshold;
-    let ledger_cadence = args.ledger_cadence;
-    let reporting_freq = args.reporting_freq;
+    let genesis_hash = args.db.genesis_hash.into();
+    let blocks_dir = args.db.blocks_dir;
+    let staking_ledgers_dir = args.db.staking_ledgers_dir;
+    let prune_interval = args.db.prune_interval;
+    let canonical_threshold = args.db.canonical_threshold;
+    let canonical_update_threshold = args.db.canonical_update_threshold;
+    let ledger_cadence = args.db.ledger_cadence;
+    let reporting_freq = args.db.reporting_freq;
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
@@ -388,15 +395,15 @@ fn process_indexer_configuration(
     }
 
     // pick up protocol constants from the given file or use defaults
-    let genesis_constants = protocol_constants(args.genesis_constants)?;
-    let constraint_system_digests = args.constraint_system_digests.unwrap_or(
+    let genesis_constants = protocol_constants(args.db.genesis_constants)?;
+    let constraint_system_digests = args.db.constraint_system_digests.unwrap_or(
         MAINNET_CONSTRAINT_SYSTEM_DIGESTS
             .iter()
             .map(|x| x.to_string())
             .collect(),
     );
 
-    let genesis_ledger = parse_genesis_ledger(args.genesis_ledger)?;
+    let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger)?;
     Ok(IndexerConfiguration {
         genesis_ledger,
         genesis_hash,
@@ -534,19 +541,22 @@ impl From<ServerArgs> for ServerArgsJson {
         let pid = value.pid.unwrap();
         let value = value.with_dynamic_defaults(pid);
         Self {
-            genesis_ledger: value.genesis_ledger.map(|path| path.display().to_string()),
-            genesis_hash: value.genesis_hash,
-            genesis_constants: value.genesis_constants.map(|g| g.display().to_string()),
-            constraint_system_digests: value.constraint_system_digests,
-            blocks_dir: value.blocks_dir.display().to_string(),
-            staking_ledgers_dir: value.staking_ledgers_dir.display().to_string(),
-            database_dir: value.database_dir.display().to_string(),
-            log_level: value.log_level.to_string(),
-            ledger_cadence: value.ledger_cadence,
-            reporting_freq: value.reporting_freq,
-            prune_interval: value.prune_interval,
-            canonical_threshold: value.canonical_threshold,
-            canonical_update_threshold: value.canonical_update_threshold,
+            genesis_ledger: value
+                .db
+                .genesis_ledger
+                .map(|path| path.display().to_string()),
+            genesis_hash: value.db.genesis_hash,
+            genesis_constants: value.db.genesis_constants.map(|g| g.display().to_string()),
+            constraint_system_digests: value.db.constraint_system_digests,
+            blocks_dir: value.db.blocks_dir.display().to_string(),
+            staking_ledgers_dir: value.db.staking_ledgers_dir.display().to_string(),
+            database_dir: value.db.database_dir.display().to_string(),
+            log_level: value.db.log_level.to_string(),
+            ledger_cadence: value.db.ledger_cadence,
+            reporting_freq: value.db.reporting_freq,
+            prune_interval: value.db.prune_interval,
+            canonical_threshold: value.db.canonical_threshold,
+            canonical_update_threshold: value.db.canonical_update_threshold,
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
@@ -555,14 +565,14 @@ impl From<ServerArgs> for ServerArgsJson {
                 .missing_block_recovery_exe
                 .map(|p| p.display().to_string()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
-            network: format!("{}", value.network),
+            network: value.db.network.to_string(),
         }
     }
 }
 
 impl From<ServerArgsJson> for ServerArgs {
     fn from(value: ServerArgsJson) -> Self {
-        Self {
+        let db = DatabaseArgs {
             genesis_ledger: value.genesis_ledger.and_then(|path| path.parse().ok()),
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.into()),
@@ -576,15 +586,36 @@ impl From<ServerArgsJson> for ServerArgs {
             prune_interval: value.prune_interval,
             canonical_threshold: value.canonical_threshold,
             canonical_update_threshold: value.canonical_update_threshold,
+            config: None,
+            network: (&value.network as &str).into(),
+        };
+        Self {
+            db,
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             self_check: false,
-            config: None,
             pid: value.pid,
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
-            network: (&value.network as &str).into(),
         }
     }
 }
+
+impl From<DatabaseArgs> for ServerArgs {
+    fn from(value: DatabaseArgs) -> Self {
+        Self {
+            db: value,
+            web_hostname: DEFAULT_WEB_HOSTNAME.to_string(),
+            web_port: DEFAULT_WEB_PORT,
+            self_check: false,
+            missing_block_recovery_exe: None,
+            missing_block_recovery_delay: None,
+            missing_block_recovery_batch: None,
+            pid: None,
+        }
+    }
+}
+
+const DEFAULT_WEB_HOSTNAME: &str = "localhost";
+const DEFAULT_WEB_PORT: u16 = 8080;
