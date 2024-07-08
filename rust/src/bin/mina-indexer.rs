@@ -12,7 +12,7 @@ use mina_indexer::{
     server::{
         initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
     },
-    store::{restore_snapshot, IndexerStore},
+    store::{restore_snapshot, version::IndexerStoreVersion, IndexerStore},
     web::start_web_server,
 };
 use std::{
@@ -41,6 +41,12 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 enum IndexerCommand {
+    /// Database commands
+    Database {
+        #[command(subcommand)]
+        db_command: DatabaseCommand,
+    },
+
     /// Server commands
     Server {
         #[command(subcommand)]
@@ -51,11 +57,8 @@ enum IndexerCommand {
     #[clap(flatten)]
     Client(#[command(subcommand)] client::ClientCli),
 
-    /// Database commands
-    Database {
-        #[command(subcommand)]
-        db_command: DatabaseCommand,
-    },
+    /// Mina indexer version
+    Version,
 }
 
 #[derive(Subcommand, Debug)]
@@ -93,6 +96,13 @@ enum DatabaseCommand {
         /// Full path to the database directory
         #[arg(long)]
         restore_dir: PathBuf,
+    },
+
+    /// Query mina indexer database version
+    Version {
+        /// Output JSON data
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -224,6 +234,7 @@ pub async fn main() -> anyhow::Result<()> {
                 IndexerCommand::Server { server_command } => {
                     server_command.run(s, domain_socket_path).await
                 }
+                IndexerCommand::Version => Ok(println!("{VERSION}")),
             }
         }));
     })
@@ -310,6 +321,17 @@ impl DatabaseCommand {
             .unwrap();
 
         match self {
+            Self::Version { json } => {
+                let version = IndexerStoreVersion::default();
+                println!(
+                    "{}",
+                    if json {
+                        serde_json::to_string(&version)?
+                    } else {
+                        version.to_string()
+                    }
+                )
+            }
             Self::Snapshot {
                 output_path,
                 database_dir,

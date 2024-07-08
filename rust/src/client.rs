@@ -71,10 +71,7 @@ pub enum ClientCli {
     #[clap(subcommand)]
     InternalCommands(InternalCommands),
 
-    /// Query mina indexer version info
-    Version,
-
-    /// Query mina indexer database version info
+    /// Query running mina indexer for database version
     DbVersion,
 }
 
