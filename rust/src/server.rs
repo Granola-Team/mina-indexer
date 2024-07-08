@@ -16,15 +16,15 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use speedb::checkpoint::Checkpoint;
 use std::{
     collections::HashSet,
     fs,
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 use tokio::{
     runtime::Handle,
@@ -282,6 +282,13 @@ fn matches_event_kind(kind: EventKind) -> bool {
     )
 }
 
+fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
+    match fs::metadata(path) {
+        Ok(metadata) => metadata.nlink() > 1,
+        Err(_) => false,
+    }
+}
+
 /// Starts filesystem watchers & runs the mina indexer
 async fn run_indexer(
     subsys: &SubsystemHandle,
@@ -356,6 +363,19 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
     trace!("Event: {event:?}");
     if matches_event_kind(event.kind) {
         for path in event.paths {
+            if !is_hard_link(&path)
+                && matches!(
+                    event.kind,
+                    EventKind::Create(notify::event::CreateKind::File)
+                )
+            {
+                warn!("Ignore create file event when the file isn't a hard link");
+                // This potentially can cause an EOF when parsing the
+                // files because it many not be fully written
+                // yet. Instead use the close event as a signal to
+                // process
+                continue;
+            }
             if block::is_valid_block_file(&path) {
                 debug!("Valid precomputed block file: {}", path.display());
                 let mut version = state.read().await.version.clone();
@@ -394,9 +414,6 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                     Err(e) => error!("Error parsing precomputed block: {e}"),
                 }
             } else if staking::is_valid_ledger_file(&path) {
-                // small pause while file finishes copying
-                tokio::time::sleep(Duration::from_millis(100)).await;
-
                 // acquire state write lock
                 let version = state.read().await.version.clone();
                 let mut state = state.write().await;
