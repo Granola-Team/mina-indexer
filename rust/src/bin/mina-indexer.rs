@@ -305,6 +305,7 @@ impl ServerCommand {
         info!("Shutting down primary database instance");
         db.database.cancel_all_background_work(true);
         drop(db);
+        remove_pid(&database_dir);
         Ok(())
     }
 }
@@ -431,6 +432,12 @@ fn process_indexer_configuration(
         missing_block_recovery_delay,
         missing_block_recovery_batch,
     })
+}
+
+/// Remove PID file located in the database directory
+fn remove_pid<P: AsRef<Path>>(database_dir: P) {
+    let pid_path = database_dir.as_ref().join("PID");
+    let _ = fs::remove_file(pid_path);
 }
 
 fn check_or_write_pid_file(database_dir: &Path) {

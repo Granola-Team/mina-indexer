@@ -1606,6 +1606,11 @@ test_clean_kill() {
         return 1
     fi
 
+    if [ -S ./database/PID ]; then
+        echo "  The signal handler did not delete the database/PID. Failure."
+        return 1
+    fi
+
     # TODO: robinbb - this is commented out because it does not pass!
     #    # Check for socket deletion.
     #    if [ -S ./mina-indexer.sock ]; then
