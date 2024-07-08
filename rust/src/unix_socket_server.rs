@@ -16,13 +16,13 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
-    store::version::VersionStore,
+    store::version::{IndexerStoreVersion, VersionStore},
 };
 use anyhow::{bail, Context};
 use log::{debug, error, info, trace, warn};
 use std::{
     io::{self, ErrorKind},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 use tokio::{
@@ -33,15 +33,12 @@ use tokio::{
 use tokio_graceful_shutdown::{FutureExt, SubsystemHandle};
 
 /// Create Unix Domain Socket listener
-pub fn create_socket_listener(domain_socket_path: &PathBuf) -> UnixListener {
+pub fn create_socket_listener(domain_socket_path: &Path) -> UnixListener {
     info!("Creating Unix domain socket server at {domain_socket_path:#?}");
-    let listener = UnixListener::bind(domain_socket_path.clone())
+    let listener = UnixListener::bind(domain_socket_path)
         .or_else(|e| try_replace_old_socket(e, domain_socket_path))
         .unwrap_or_else(|e| {
-            panic!(
-                "Unable to bind to Unix domain socket file {:?} due to {}",
-                domain_socket_path, e
-            )
+            panic!("Unable to bind to Unix domain socket file {domain_socket_path:#?} due to {e}")
         });
     info!("Created Unix domain socket server at {domain_socket_path:#?}");
     listener
@@ -93,7 +90,6 @@ pub async fn handle_connection(
         };
 
         let local_addr = &connection.local_addr()?;
-
         let command = parse_conn_to_cli(&connection).await?;
         let (_, mut writer) = connection.into_split();
 
@@ -341,7 +337,6 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received blocks-at-public-key command {pk}");
-
                     if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
                     } else {
@@ -490,9 +485,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received best-chain command");
-
                     let start_state_hash: BlockHash = start_state_hash.into();
-
                     if let Some(best_tip) = db.get_best_block()? {
                         let end_state_hash: String = {
                             if end_state_hash.is_none() {
@@ -597,7 +590,6 @@ pub async fn handle_connection(
             ClientCli::Ledgers(__) => match __ {
                 Ledgers::Best { path } => {
                     info!("Received best-ledger command");
-
                     if let Some(best_tip) = db.get_best_block()? {
                         if let Some(ledger) =
                             db.get_ledger_state_hash(&best_tip.state_hash(), false)?
@@ -1223,6 +1215,7 @@ pub async fn handle_connection(
                 VERSION,
                 db.get_db_version()?
             )),
+            ClientCli::DbVersion => Some(IndexerStoreVersion::default().major_minor_patch()),
         };
 
         let response = if let Some(response_json) = response_json {
@@ -1242,12 +1235,9 @@ fn file_must_not_be_a_directory(path: &std::path::Path) -> Option<String> {
     ))
 }
 
-fn try_replace_old_socket(e: io::Error, unix_socket_path: &PathBuf) -> io::Result<UnixListener> {
+fn try_replace_old_socket(e: io::Error, unix_socket_path: &Path) -> io::Result<UnixListener> {
     if e.kind() == ErrorKind::AddrInUse {
-        warn!(
-            "Unix domain socket: {:?} already in use. Replacing old vestige",
-            unix_socket_path
-        );
+        warn!("Unix domain socket: {unix_socket_path:?} already in use. Replacing old vestige");
         remove_unix_socket(unix_socket_path)?;
         UnixListener::bind(unix_socket_path)
     } else {

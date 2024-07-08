@@ -11,6 +11,7 @@ use crate::{
     },
     mina_blocks::v2::ZkappAccount,
 };
+use anyhow::Context;
 use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
@@ -174,15 +175,17 @@ impl StakingAccount {
 
 impl StakingLedger {
     pub fn parse_file(path: &Path, genesis_state_hash: BlockHash) -> anyhow::Result<StakingLedger> {
-        trace!("Parsing staking ledger");
-
+        trace!(
+            "Parsing staking ledger {}",
+            path.file_stem().unwrap().to_str().unwrap_or_default()
+        );
         let bytes = std::fs::read(path)?;
-        let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)?;
+        let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)
+            .with_context(|| format!("Failed reading staking ledger {}", path.display()))?;
         let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
             .map(|acct| (acct.pk.clone(), acct.into()))
             .collect();
-
         let (network, epoch, ledger_hash) = split_ledger_path(path);
         let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
         Ok(Self {
@@ -208,7 +211,6 @@ impl StakingLedger {
                 if *pk != delegate {
                     delegations.insert(pk.clone(), None);
                 }
-
                 match delegations.insert(
                     delegate.clone(),
                     Some(EpochStakeDelegation {

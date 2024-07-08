@@ -60,8 +60,9 @@ fn berkeley_genesis_timestamp() -> u64 {
     BERKELEY_GENESIS_TIMESTAMP
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PcbVersion {
+    #[default]
     V1,
     V2,
 }
