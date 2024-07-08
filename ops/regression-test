@@ -16,7 +16,6 @@ test_names = [
   'server_startup',
   'ipc_is_available_immediately',
   'startup_dirs_get_created',
-  'start_without_blocks_dir',
   'clean_shutdown',
   'clean_kill',
   'account_balance_cli',
@@ -36,6 +35,8 @@ test_names = [
   'transactions',
   'snark_work',
   'snapshot',
+  'database_create',
+  'snapshot_database_dir',
   'rest_accounts_summary',
   'rest_blocks',
   'genesis_block_creator',
@@ -45,8 +46,8 @@ test_names = [
   'staking_delegations',
   'internal_commands',
   'start_from_config',
-  'hurl',
   'version_file',
+  'hurl',
 ]
 
 # long_test_names = ['test_many_blocks', 'test_release']

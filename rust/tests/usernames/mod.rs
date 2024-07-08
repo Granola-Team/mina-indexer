@@ -35,7 +35,7 @@ fn set_usernames() -> anyhow::Result<()> {
     )?;
 
     // ingest the blocks
-    state.add_blocks(&mut bp, None)?;
+    state.add_blocks(&mut bp)?;
 
     // update usernames
     let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;
