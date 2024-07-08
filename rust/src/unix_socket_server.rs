@@ -16,7 +16,7 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
-    store::version::VersionStore,
+    store::version::{IndexerStoreVersion, VersionStore},
 };
 use anyhow::{bail, Context};
 use log::{debug, error, info, trace, warn};
@@ -1215,7 +1215,7 @@ pub async fn handle_connection(
                 VERSION,
                 db.get_db_version()?
             )),
-            ClientCli::DbVersion => db.get_db_version().ok().map(|v| v.to_string()),
+            ClientCli::DbVersion => Some(IndexerStoreVersion::default().major_minor_patch()),
         };
 
         let response = if let Some(response_json) = response_json {
