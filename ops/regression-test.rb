@@ -4,14 +4,15 @@
 # -*- mode: ruby -*-
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
-BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
+DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
 
-unless File.exist?(BASE_DIR)
-  abort <<-ABORT
-    #{BASE_DIR} must exist to perform regression tests.
-    Failure.
-  ABORT
-end
+abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
+
+require 'fileutils'
+
+REV = `git rev-parse --short=8 HEAD`.chomp
+BASE_DIR = "#{DEV_DIR}/rev-#{REV}"
+FileUtils.mkdir_p BASE_DIR
 
 test_names = %w[
   indexer_cli_reports
@@ -63,8 +64,15 @@ tests = if ARGV.empty?
         else
           ARGV
         end
+
 tests.each do |tn|
-  system(BASH_TEST_DRIVER, EXE, "test_#{tn}") ||
-    abort("Failure from: #{BASH_TEST_DRIVER} #{EXE} test_#{tn}")
+  puts
+  puts "Testing: #{tn}"
+  test_success = system(BASH_TEST_DRIVER, EXE, "test_#{tn}")
+
+  # cleanup
+
+  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{EXE} test_#{tn}")
 end
+
 puts 'Regression testing complete.'

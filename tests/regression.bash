@@ -187,15 +187,7 @@ teardown() {
     rm -f ./mina-indexer.sock
 }
 
-enter_test() {
-  test_name="$1"
-  echo
-  echo "Test: $1"
-}
-
 test_indexer_cli_reports() {
-    enter_test test_indexer_cli_reports
-
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
 
@@ -304,8 +296,6 @@ test_indexer_cli_reports() {
 
 # Indexer server starts up without any precomputed blocks
 test_server_startup() {
-    enter_test test_server_startup
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -317,7 +307,6 @@ test_server_startup() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-    enter_test test_ipc_is_available_immediately
     stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard \
@@ -330,8 +319,6 @@ test_ipc_is_available_immediately() {
 
 # Indexer server starts and creates directories with minimal args
 test_startup_dirs_get_created() {
-    enter_test test_startup_dirs_get_created
-
     idxr_server_start \
         --blocks-dir ./blocks-dir \
         --staking-ledgers-dir ./staking-ledgers-dir \
@@ -347,8 +334,6 @@ test_startup_dirs_get_created() {
 
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
-    enter_test test_account_balance_cli
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -360,8 +345,6 @@ test_account_balance_cli() {
 
 # Indexer server returns the correct account
 test_account_public_key_json() {
-    enter_test test_account_public_key_json
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -373,7 +356,6 @@ test_account_public_key_json() {
 
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
-    enter_test test_canonical_root
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -390,8 +372,6 @@ test_canonical_root() {
 
 # Indexer server handles canonical threshold correctly
 test_canonical_threshold() {
-    enter_test test_canonical_threshold
-
     num_seq_blocks=15
     canonical_threshold=2
     stage_mainnet_blocks $num_seq_blocks ./blocks
@@ -411,7 +391,6 @@ test_canonical_threshold() {
 
 # Indexer server returns the correct best tip
 test_best_tip() {
-    enter_test test_best_tip
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -437,7 +416,6 @@ test_best_tip() {
 
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
-    enter_test test_blocks
     stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
@@ -544,7 +522,6 @@ test_blocks() {
 
 # Indexer handles copied blocks correctly
 test_block_copy() {
-    enter_test test_block_copy
     stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
@@ -581,8 +558,6 @@ test_block_copy() {
 
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
-    enter_test test_missing_blocks
-
     stage_mainnet_blocks 10 ./blocks
     dl_mainnet_range 12 20 ./blocks # missing 11
     dl_mainnet_range 22 30 ./blocks # missing 21
@@ -643,7 +618,6 @@ test_missing_blocks() {
 
 # Indexer server returns the correct best chain
 test_best_chain() {
-    enter_test test_best_chain
     stage_mainnet_blocks 12 ./blocks
     mkdir best_chain
 
@@ -690,7 +664,6 @@ test_best_chain() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
-    enter_test test_ledgers
     stage_mainnet_blocks 15 ./blocks
     mkdir ledgers
 
@@ -748,7 +721,6 @@ test_ledgers() {
 
 # Indexer server syncs with existing Speedb
 test_sync() {
-    enter_test test_sync
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -779,7 +751,6 @@ test_sync() {
 
 # Indexer server replays events
 test_replay() {
-    enter_test test_replay
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard
@@ -810,7 +781,6 @@ test_replay() {
 
 # Indexer server returns correct transactions
 test_transactions() {
-    enter_test test_transactions
     stage_mainnet_blocks 13 ./blocks
     mkdir transactions
 
@@ -905,7 +875,6 @@ test_transactions() {
 
 # Indexer server returns correct SNARK work
 test_snark_work() {
-    enter_test test_snark_work
     stage_mainnet_blocks 120 ./blocks
     mkdir snark_work
 
@@ -962,7 +931,6 @@ test_snark_work() {
 
 # Restart from a snapshot of a running indexer database
 test_snapshot() {
-    enter_test test_snapshot
     stage_mainnet_blocks 13 ./blocks
 
     idxr_server_start_standard
@@ -1010,7 +978,6 @@ test_snapshot() {
 
 # Indexer server starts with many blocks
 test_many_blocks() {
-    enter_test test_many_blocks
     stage_mainnet_blocks 1000 ./blocks
 
     idxr_server_start_standard \
@@ -1043,7 +1010,6 @@ test_many_blocks() {
 }
 
 test_rest_accounts_summary() {
-    enter_test test_rest_accounts_summary
     stage_mainnet_blocks 100 ./blocks
 
     port=$(ephemeral_port)
@@ -1138,7 +1104,6 @@ test_rest_accounts_summary() {
 }
 
 test_rest_blocks() {
-    enter_test test_rest_blocks
     stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard --web-hostname "0.0.0.0"
@@ -1164,7 +1129,6 @@ test_rest_blocks() {
 }
 
 test_release() {
-    enter_test test_release
     stage_mainnet_blocks 9999 ./blocks
 
     idxr_server_start_standard
@@ -1196,8 +1160,6 @@ test_release() {
 }
 
 test_genesis_block_creator() {
-    enter_test test_genesis_block_creator
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -1211,8 +1173,6 @@ test_genesis_block_creator() {
 }
 
 test_txn_nonces() {
-    enter_test test_txn_nonces
-
     stage_mainnet_blocks 100 ./blocks
 
     idxr_server_start_standard
@@ -1234,8 +1194,6 @@ test_txn_nonces() {
 }
 
 test_startup_staking_ledgers() {
-    enter_test test_startup_staking_ledgers
-
     idxr_server_start \
         --blocks-dir ./blocks \
         --database-dir ./database \
@@ -1271,8 +1229,6 @@ test_startup_staking_ledgers() {
 }
 
 test_watch_staking_ledgers() {
-    enter_test test_watch_staking_ledgers
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -1342,8 +1298,6 @@ test_watch_staking_ledgers() {
 }
 
 test_staking_delegations() {
-    enter_test test_staking_delegations
-
     idxr_server_start \
         --blocks-dir ./blocks \
         --database-dir ./database \
@@ -1389,8 +1343,6 @@ test_staking_delegations() {
 }
 
 test_internal_commands() {
-    enter_test test_internal_commands
-
     stage_mainnet_blocks 11 ./blocks
 
     idxr_server_start_standard
@@ -1453,7 +1405,6 @@ test_internal_commands() {
 
 # Indexer correctly starts from config file
 test_start_from_config() {
-    enter_test test_start_from_config
     stage_mainnet_blocks 15 ./blocks
 
     port=$(ephemeral_port)
@@ -1487,8 +1438,6 @@ test_start_from_config() {
 }
 
 test_clean_shutdown() {
-    enter_test test_clean_shutdown
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -1496,8 +1445,6 @@ test_clean_shutdown() {
 }
 
 test_clean_kill() {
-    enter_test test_clean_kill
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -1535,7 +1482,6 @@ test_clean_kill() {
 }
 
 test_block_children() {
-    enter_test test_block_children
     stage_mainnet_blocks 10 ./blocks
 
     idxr_server_start_standard
@@ -1572,7 +1518,6 @@ test_block_children() {
 }
 
 test_hurl() {
-    enter_test test_hurl
     stage_mainnet_blocks 120 ./blocks
 
     port=$(ephemeral_port)
@@ -1590,8 +1535,6 @@ test_hurl() {
 }
 
 test_version_file() {
-    enter_test test_version_file
-
     idxr_server_start_standard
     wait_for_socket
 
@@ -1600,7 +1543,6 @@ test_version_file() {
 }
 
 test_missing_block_recovery() {
-    enter_test test_missing_block_recovery
     stage_mainnet_blocks 5 ./blocks
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
@@ -1634,7 +1576,6 @@ test_missing_block_recovery() {
 
 # Create an indexer database & start indexing
 test_database_create() {
-    enter_test test_database_create
     stage_mainnet_blocks 10 ./blocks
 
     idxr database create \
@@ -1661,7 +1602,6 @@ test_database_create() {
 # Create an indexer database snapshot from a db directory without a running indexer.
 # Restore the database from the snapshot & start indexing
 test_snapshot_database_dir() {
-    enter_test test_database_create_from_dir
     stage_mainnet_blocks 10 ./blocks
 
     # create indexer database
