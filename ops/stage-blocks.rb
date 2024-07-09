@@ -23,7 +23,7 @@ args = [
   block_count.to_s,
   BLOCKS_DIR
 ]
-warn "stage-blocks issuing: #{args}"
+warn "stage-blocks.rb issuing: #{args}"
 system(*args) || abort('Failure of download-mina-blocks')
 
 # Copy (or hard link) the correct block files into the staging directory.

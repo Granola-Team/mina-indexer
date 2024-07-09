@@ -10,7 +10,7 @@ DEST = ARGV[0]
 
 require 'fileutils'
 
-clone_exe = "#{__dir__}/granola-rclone"
+clone_exe = "#{__dir__}/granola-rclone.rb"
 
 FileUtils.mkdir_p(DEST)
 
