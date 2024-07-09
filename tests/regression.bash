@@ -142,15 +142,15 @@ idxr_server_start_standard() {
 }
 
 stage_mainnet_blocks() {
-    "$SRC"/ops/stage-blocks 2 "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks.rb 2 "$1" mainnet "$2"
 }
 
 dl_mainnet_single() {
-    "$SRC"/ops/stage-blocks "$1" "$1" mainnet "$2"
+    "$SRC"/ops/stage-blocks.rb "$1" "$1" mainnet "$2"
 }
 
 dl_mainnet_range() {
-    "$SRC"/ops/stage-blocks "$1" "$2" mainnet "$3"
+    "$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
 }
 
 assert() {
@@ -1669,7 +1669,7 @@ test_snapshot_database_dir() {
         --blocks-dir ./blocks \
         --database-dir ./database \
         --staking-ledgers-dir ./staking-ledgers
-    
+
     # create snapshot & restores
     idxr database snapshot --database-dir ./database
     idxr database restore --restore-dir ./restore-dir

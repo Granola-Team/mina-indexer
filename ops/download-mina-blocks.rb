@@ -14,7 +14,7 @@ FileUtils.mkdir_p(DEST)
 blocks_list = "#{DEST}/../blocks.list"
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
-  cmd = "#{__dir__}/granola-rclone lsf linode:granola-mina-blocks"
+  cmd = "#{__dir__}/granola-rclone.rb lsf linode:granola-mina-blocks"
   warn "download-mina-blocks issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
@@ -51,7 +51,7 @@ else
   # Use 'granola-rclone' to fetch the files.
   File.write('files-to-fetch.list', fetch.join("\n"))
   system(
-    "#{__dir__}/granola-rclone",
+    "#{__dir__}/granola-rclone.rb",
     'sync',
     'linode:granola-mina-blocks',
     '--files-from-raw', 'files-to-fetch.list',

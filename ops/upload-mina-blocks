@@ -23,11 +23,11 @@ MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 #
 
 # Verify that we can connect.
-"$MY_DIR"/granola-rclone lsd linode:
+"$MY_DIR"/granola-rclone.rb lsd linode:
 
 # Perform the download.
 X="$(expr $1 + 1)"
-"$MY_DIR"/granola-rclone \
+"$MY_DIR"/granola-rclone.rb \
   sync \
   "$2" \
   linode:granola-mina-blocks \

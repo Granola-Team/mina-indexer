@@ -42,16 +42,16 @@ audit:
 lint:
   @echo "--- Linting ops scripts"
   ruby -cw \
-    ops/stage-blocks \
-    ops/download-staking-ledgers \
-    ops/granola-rclone \
-    ops/regression-test \
+    ops/stage-blocks.rb \
+    ops/download-staking-ledgers.rb \
+    ops/granola-rclone.rb \
+    ops/regression-test.rb \
     ops/*.rb
   rubocop \
-    ops/stage-blocks \
-    ops/download-staking-ledgers \
-    ops/granola-rclone \
-    ops/regression-test \
+    ops/stage-blocks.rb \
+    ops/download-staking-ledgers.rb \
+    ops/granola-rclone.rb \
+    ops/regression-test.rb \
     ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"
@@ -93,11 +93,11 @@ debug-build:
 
 # Quick debug-build and regression-test
 bt subtest='': debug-build
-  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
 
 # Quick (debug) unit-test and regression-test
 tt subtest='': test-unit
-  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -112,7 +112,7 @@ build-image:
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
   @echo "--- Performing regressions tests subset"
-  time ./ops/regression-test "$TOPLEVEL"/rust/target/debug/mina-indexer \
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer \
     ipc_is_available_immediately \
     clean_shutdown \
     clean_kill \
@@ -125,11 +125,11 @@ tier1: tier1-prereqs check lint test-unit
 # Run the 2nd tier of tests.
 tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
-  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer
+  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer
   @echo "--- Performing many_blocks regression test"
-  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer many_blocks
+  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer many_blocks
   @echo "--- Testing 'release'"
-  time ./ops/regression-test "$TOPLEVEL"/result/bin/mina-indexer release
+  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer release
 
 # Run tier-3 tests.
 tier3 blocks='5000': nix-build

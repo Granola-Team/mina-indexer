@@ -8,8 +8,8 @@ Files in this directory:
 ./calculate_archive_ledgers.sh
 ./correct_file_names
 ./download-mina-blocks.rb
-./download-staking-ledgers
-./granola-rclone
+./download-staking-ledgers.rb
+./granola-rclone.rb
 ./hashes.list
 ./maybe-dups
 ./minaexplorer/download-staking-ledgers
@@ -32,12 +32,12 @@ Files in this directory:
   using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY` etc.). See the
   instructions at the top of the script.
 
-./download-staking-ledgers
+./download-staking-ledgers.rb
   Downloads Mina staking ledgers stored in the Granola cloud object storage
   bucket by using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY`
   etc.). See the instructions at the top of the script.
 
-./granola-rclone
+./granola-rclone.rb
   Utility to wrap `rclone`. (See https://rclone.org)
 
 ./hashes.list
@@ -67,7 +67,7 @@ Files in this directory:
   the instructions in the script.
 
 ./rclone.conf
-  A mandatory config file used by `granola-rclone`.
+  A mandatory config file used by `granola-rclone.rb`.
 
 ./upload-mina-blocks
   Utility to upload precomputed block logs to Granola's object storage.

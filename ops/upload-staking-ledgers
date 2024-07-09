@@ -15,10 +15,10 @@ trap exit_handler EXIT
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
 # Verify that we can connect.
-"$MY_DIR"/granola-rclone lsd linode:
+"$MY_DIR"/granola-rclone.rb lsd linode:
 
 # Perform the upload.
-"$MY_DIR"/granola-rclone \
+"$MY_DIR"/granola-rclone.rb \
   sync \
   --metadata \
   "$1" \
