@@ -2,7 +2,7 @@
   inputs = {
     rust-overlay.url = "github:oxalica/rust-overlay";
     nixpkgs.url =
-      "github:NixOS/nixpkgs?ref=47b604b07d1e8146d5398b42d3306fdebd343986";
+      "github:NixOS/nixpkgs?ref=2e45bfd5361ccdbebe45b68ae2021aea0078eb00";
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
@@ -63,6 +63,7 @@
             procps # For pwait
             rclone
             ruby
+            rubyPackages.rubocop
             rust
             shellcheck
           ] ++ buildDependencies;
