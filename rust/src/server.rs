@@ -24,6 +24,7 @@ use std::{
     fs,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    process,
     sync::Arc,
 };
 use tokio::{
@@ -69,7 +70,11 @@ pub enum InitializationMode {
 }
 
 /// Initializes indexer database
-pub async fn initialize_indexer_database(
+///
+/// The purpose of this mode is to create a known good initial
+/// database so that it may be used and shared with other Mina
+/// Indexers
+pub fn initialize_indexer_database(
     config: IndexerConfiguration,
     store: Arc<IndexerStore>,
 ) -> anyhow::Result<()> {
@@ -159,8 +164,14 @@ fn initialize(
         ..
     } = config;
 
-    fs::create_dir_all(blocks_dir.clone()).ok();
-    fs::create_dir_all(staking_ledgers_dir.clone()).ok();
+    if let Err(e) = fs::create_dir_all(&blocks_dir) {
+        error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
+        process::exit(1);
+    }
+    if let Err(e) = fs::create_dir_all(&staking_ledgers_dir) {
+        error!("Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}");
+        process::exit(1);
+    }
 
     let chain_id = chain_id(
         &genesis_hash.0,
@@ -290,10 +301,10 @@ fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
 }
 
 /// Starts filesystem watchers & runs the mina indexer
-async fn run_indexer(
+async fn run_indexer<P: AsRef<Path>>(
     subsys: &SubsystemHandle,
-    blocks_dir: impl AsRef<Path>,
-    staking_ledgers_dir: impl AsRef<Path>,
+    blocks_dir: P,
+    staking_ledgers_dir: P,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_exe: Option<PathBuf>,
     missing_block_recovery_batch: bool,

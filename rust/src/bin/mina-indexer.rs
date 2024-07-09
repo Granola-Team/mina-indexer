@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use log::{debug, error, info, LevelFilter};
+use log::{debug, error, info, warn, LevelFilter};
 use mina_indexer::{
     block::precomputed::PcbVersion,
     chain::Network,
@@ -16,8 +16,10 @@ use mina_indexer::{
     web::start_web_server,
 };
 use std::{
-    fs,
+    fs::{self, File},
+    io::Write,
     path::{Path, PathBuf},
+    process,
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -361,9 +363,11 @@ impl DatabaseCommand {
             }
             Self::Create(args) => {
                 let database_dir = args.database_dir.clone();
-                info!("Creating mina indexer database in {database_dir:#?}");
-                fs::create_dir_all(database_dir.clone()).ok();
-
+                debug!("Ensuring mina indexer database exists in {database_dir:#?}");
+                if let Err(e) = fs::create_dir_all(&database_dir) {
+                    error!("Failed to create database directory: {e}");
+                    process::exit(1);
+                }
                 debug!("Building mina indexer configuration");
                 let config = process_indexer_configuration(
                     (*args).into(),
@@ -374,7 +378,11 @@ impl DatabaseCommand {
                 debug!("Creating a new mina indexer database in {database_dir:#?}");
                 let db = Arc::new(IndexerStore::new(&database_dir)?);
                 let store = db.clone();
-                initialize_indexer_database(config, store).await?;
+                initialize_indexer_database(config, store).unwrap_or_else(|e| {
+                    error!("Failed to initialize indexer database: {e}");
+                    process::exit(1);
+                });
+                remove_pid(&database_dir);
             }
         }
         Ok(())
@@ -406,14 +414,17 @@ fn process_indexer_configuration(
         "canonical update threshold must be strictly less than the transition frontier length!"
     );
 
-    // create directories
-    if !blocks_dir.exists() {
-        info!("Creating blocks directory {blocks_dir:#?}");
-        fs::create_dir_all(blocks_dir.clone())?;
+    // Ensure blocks and staking ledgers dirs exist
+    debug!("Ensuring blocks directory exists in {blocks_dir:#?}");
+    if let Err(e) = fs::create_dir_all(&blocks_dir) {
+        error!("Failed to create blocks directory: {e}");
+        process::exit(1);
     }
-    if !staking_ledgers_dir.exists() {
-        info!("Creating staking ledgers directory {staking_ledgers_dir:#?}");
-        fs::create_dir_all(staking_ledgers_dir.clone())?;
+
+    debug!("Ensuring staking ledgers directories in {staking_ledgers_dir:#?}");
+    if let Err(e) = fs::create_dir_all(&staking_ledgers_dir) {
+        error!("Failed to create staging ledger directory: {e}");
+        process::exit(1);
     }
 
     // pick up protocol constants from the given file or use defaults
@@ -445,12 +456,6 @@ fn process_indexer_configuration(
         missing_block_recovery_delay,
         missing_block_recovery_batch,
     })
-}
-
-/// Remove PID file located in the database directory
-fn remove_pid<P: AsRef<Path>>(database_dir: P) {
-    let pid_path = database_dir.as_ref().join("PID");
-    fs::remove_file(pid_path).ok();
 }
 
 fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> {
@@ -501,36 +506,63 @@ fn protocol_constants(path: Option<PathBuf>) -> anyhow::Result<GenesisConstants>
     Ok(constants)
 }
 
-fn check_or_write_pid_file(database_dir: &Path) {
-    use mina_indexer::platform;
-    use std::{fs::File, io::Write, process};
+/// Read the pid from a file
+fn read_pid_from_file<P: AsRef<Path>>(pid_path: P) -> anyhow::Result<i32> {
+    let content = fs::read_to_string(pid_path)?;
+    let pid = content.trim().parse()?;
+    Ok(pid)
+}
 
-    fs::create_dir_all(database_dir).ok();
+/// Write the current pid to a file
+fn write_pid_to_file<P: AsRef<Path>>(pid_path: P) -> anyhow::Result<()> {
+    let mut pid_file = File::create(pid_path)?;
+    let pid = process::id();
+    write!(pid_file, "{pid}")?;
+    Ok(())
+}
+
+/// Remove PID file located in the database directory
+fn remove_pid<P: AsRef<Path>>(database_dir: P) {
+    let pid_path = database_dir.as_ref().join("PID");
+    if let Err(e) = fs::remove_file(pid_path) {
+        warn!("Failed to remove PID file: {e}");
+    }
+}
+
+/// Checks if the current process is the owner of the database by verifying the
+/// presence of a PID file. If another process is already running as the owner
+/// of the database, the function stops the indexer. Otherwise, it claims
+/// ownership by writing the current process ID (PID) into the database
+/// directory.
+///
+/// This function ensures that only one process can own and operate on the
+/// database at a time, preventing multiple instances of the indexer from
+/// running concurrently.
+///
+/// # Arguments
+///
+/// * `database_dir` - A reference to the path of the database directory where
+///   the PID file will be located.
+fn check_or_write_pid_file<P: AsRef<Path>>(database_dir: P) {
+    use mina_indexer::platform;
+    let database_dir = database_dir.as_ref();
+    if let Err(e) = fs::create_dir_all(database_dir) {
+        error!("Failed to create database directory in {database_dir:?}: {e}");
+        process::exit(1);
+    }
+
     let pid_path = database_dir.join("PID");
-    if let Ok(pid) = fs::read_to_string(&pid_path) {
-        let pid = pid
-            .trim()
-            .parse::<i32>()
-            .unwrap_or_else(|_| panic!("Expected to find PID in {pid_path:#?}"));
+
+    if let Ok(pid) = read_pid_from_file(&pid_path) {
         if platform::is_process_running(pid) {
-            eprintln!("Will not start due to a running Indexer with PID {pid}");
+            error!("Will not start due to a running Indexer with PID {pid}");
             process::exit(130);
         }
-        return;
-    };
+    }
 
-    match File::create(&pid_path) {
-        Ok(mut pid_file) => {
-            let pid = process::id();
-            if let Err(e) = write!(pid_file, "{pid}") {
-                eprintln!("Error writing PID ({pid}) to {pid_path:#?}: {e}");
-                process::exit(131);
-            }
-        }
-        Err(e) => {
-            eprintln!("Error writing PID to {pid_path:#?}: {e}");
-            process::exit(131);
-        }
+    if let Err(e) = write_pid_to_file(&pid_path) {
+        error!("Error writing PID to {pid_path:?}: {e}");
+        process::exit(131);
     }
 }
 
