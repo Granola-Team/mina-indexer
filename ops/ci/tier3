@@ -3,6 +3,6 @@
 
 ulimit -Sn
 ulimit -Hn
-nix develop --command just tier3 340000
+nix develop --command just tier3 359604
 
 # The argument to "just tier3" is the number of blocks to use.
