@@ -45,7 +45,7 @@ lint:
   ruby -cw ops/granola-rclone
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage-blocks
-  rubocop ops/stage-blocks
+  rubocop ops/stage-blocks ops/download-staking-ledgers
   ruby -cw ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"
