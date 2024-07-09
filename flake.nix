@@ -138,7 +138,13 @@
         devShells.default = mkShell {
           env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
           buildInputs = developmentDependencies;
-          shellHook = "export TMPDIR=/var/tmp";
+          shellHook = ''
+            export TMPDIR=/var/tmp;
+            # Ruby formatting
+            export GEM_HOME="$(ruby -e 'puts Gem.user_dir')";
+            export PATH="$PATH:$GEM_HOME/bin";
+            gem install standardrb;
+          '';
         };
       });
 }

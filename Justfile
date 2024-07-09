@@ -46,6 +46,7 @@ lint:
   ruby -cw ops/download-staking-ledgers
   ruby -cw ops/stage-blocks
   ruby -cw ops/*.rb
+  standardrb --no-fix ops
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
@@ -66,6 +67,7 @@ clean:
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
+  standardrb --fix ops
 
 test-unit:
   @echo "--- Invoking 'cargo nextest'"
