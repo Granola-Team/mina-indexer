@@ -11,14 +11,14 @@ require __dir__ + '/helpers'  # Expects BASE_DIR to be defined
 unless File.exist?(BASE_DIR)
   abort "Error: #{BASE_DIR} must exist to perform the deployment."
 end
+
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
 # Configure the directories as needed.
 #
-createBaseDir
-configExecDir
-configLogDir
-config_snapshots_dir
+config_base_dir
+config_exe_dir
+config_log_dir
 get_blocks BLOCKS_COUNT
 getLedgers
 
@@ -43,26 +43,45 @@ end
 File::write CURRENT, REV
 
 if DEPLOY_TYPE == 'test'
+  unless File.exist?(db_dir(BLOCKS_COUNT))
+    puts 'Initiating database creation...'
+    system(
+      EXE,
+      'database', 'create',
+      '--log-level', 'DEBUG',
+      '--ledger-cadence', '5000',
+      '--database-dir', db_dir(BLOCKS_COUNT),
+      '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+      '--staking-ledgers-dir', LEDGERS_DIR,
+    ) || abort('database creation failed')
+    puts 'Database creation succeeded.'
+  end
+
+  puts 'Restarting server...'
   PORT = randomPort
   pid = spawn EXE +
     " --socket #{SOCKET} " +
     " server start" +
     " --log-level DEBUG" +
     " --ledger-cadence 5000" +
-    " --web-port #{PORT.to_s}" +
-    " --database-dir #{db_dir(BLOCKS_COUNT)}" +
     " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" +
     " --staking-ledgers-dir #{LEDGERS_DIR}" +
+    " --web-port #{PORT.to_s}" +
+    " --database-dir #{db_dir(BLOCKS_COUNT)}" +
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   waitForSocket(10)
+  puts 'Server restarted.'
+
   puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
+  config_snapshots_dir
   system(
     EXE,
     '--socket', SOCKET,
-    'create-snapshot', '--output-path', snapshot_path(BLOCKS_COUNT)
+    'database', 'snapshot',
+    '--output-path', snapshot_path(BLOCKS_COUNT)
   ) || abort('Snapshot creation failed. Aborting.')
   puts 'Snapshot complete.'
-  puts 'Skipping replay. It does not work. See issue #1196.'
+
   puts 'Initiating shutdown...'
   system(
     EXE,
@@ -70,7 +89,33 @@ if DEPLOY_TYPE == 'test'
     "shutdown"
   ) || puts('Shutdown failed after snapshot.')
   Process.wait(pid)
-  puts 'Shutdown complete'
+
+# TODO: make self-check work
+#
+#  puts 'Initiating self-check...'
+#  pid = spawn EXE +
+#    " --socket #{SOCKET} " +
+#    " server start" +
+#    " --self-check" +
+#    " --log-level DEBUG" +
+#    " --ledger-cadence 5000" +
+#    " --web-port #{PORT.to_s}" +
+#    " --database-dir #{db_dir(BLOCKS_COUNT)}" +
+#    " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" +
+#    " --staking-ledgers-dir #{LEDGERS_DIR}" +
+#    " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+#  waitForSocket(10)
+#  puts 'Self-check complete.'
+#
+#  puts 'Initiating shutdown...'
+#  system(
+#    EXE,
+#    "--socket", SOCKET,
+#    "shutdown"
+#  ) || puts('Shutdown failed after snapshot.')
+#  Process.wait(pid)
+#  puts 'Shutdown complete.'
+
   File::delete(CURRENT)
 else
   # Daemonize the EXE.

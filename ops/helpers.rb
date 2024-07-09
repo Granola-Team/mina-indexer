@@ -1,6 +1,8 @@
 require 'fileutils'
 require 'json'
 
+# Note: expects BASE_DIR to be defined.
+
 # Constants
 
 SRC_TOP = `git rev-parse --show-toplevel`.strip
@@ -15,19 +17,15 @@ end
 
 # Base directory
 
-def createBaseDir
+def config_base_dir
   FileUtils.mkdir_p BASE_DIR
-end
-
-def destroyBaseDir
-  FileUtils.rm_rf BASE_DIR
 end
 
 # Logs
 
 LOGS_DIR = BASE_DIR + '/logs/' + REV
 
-def configLogDir
+def config_log_dir
   FileUtils.mkdir_p LOGS_DIR
 end
 
@@ -49,7 +47,7 @@ EXE_DIR = BASE_DIR + '/bin'
 EXE_SRC = SRC_TOP + '/result/bin/mina-indexer'
 EXE = EXE_DIR + '/mina-indexer-' + REV
 
-def configExecDir
+def config_exe_dir
   FileUtils.mkdir_p EXE_DIR
   unless File.exist?(EXE)
     FileUtils.cp EXE_SRC, EXE
