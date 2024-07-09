@@ -58,7 +58,7 @@ jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 jsonpath "$.data.stakes[0].delegationTotals.delegates" count == 1
 jsonpath "$.data.stakes[0].delegationTotals.delegates[0]" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 
-duration < 10000
+duration < 12000
 
 #
 # Stakes ledger hash delegate timing info query

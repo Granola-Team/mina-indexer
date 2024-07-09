@@ -41,11 +41,8 @@ audit:
 
 lint:
   @echo "--- Linting ops scripts"
-  ruby -cw ops/regression-test
-  ruby -cw ops/granola-rclone
-  ruby -cw ops/download-staking-ledgers
-  ruby -cw ops/stage-blocks
-  rubocop ops/stage-blocks ops/download-staking-ledgers ops/granola-rclone
+  ruby -cw ops/regression-test ops/granola-rclone ops/download-staking-ledgers ops/stage-blocks
+  rubocop ops/stage-blocks ops/download-staking-ledgers ops/granola-rclone ops/regression-test
   ruby -cw ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"

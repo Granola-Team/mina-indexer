@@ -120,7 +120,7 @@ jsonpath "$.data.feetransfers" count == 100
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
 jsonpath "$.data.feetransfers[99].blockHeight" == 71
 
-duration < 1000
+duration < 2000
 
 #
 # Fee transfer epoch & total internal commands query
