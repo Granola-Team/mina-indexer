@@ -47,19 +47,18 @@ shutdown_idxr() {
       return 1
     fi
 
-    # Shutdown command succeeded, but PID may still be active.
-    if ! timeout 10s pwait -F ./idxr_pid; then
-      # Either it timed out, or that PID did not exist.
-      if ps -p "$(cat ./idxr_pid)" >/dev/null; then
-        # The process still exists. The pwait must have timed out.
-        echo "  The shutdown command did not kill the process. Failure."
+    # Shutdown command succeeded. Give time to exit cleanly.
+    sleep 2
+
+    # Either it timed out, or that PID did not exist.
+    if ps -p "$(cat ./idxr_pid)" >/dev/null; then
+      echo "  The shutdown command did not kill the process. Failure."
+      return 1
+    else
+      # The process does not exist. Check for socket deletion.
+      if [ -S ./mina-indexer.sock ]; then
+        echo "  The shutdown command did not delete the socket. Failure."
         return 1
-      else
-        # The process does not exist. Check for socket deletion.
-        if [ -S ./mina-indexer.sock ]; then
-          echo "  The shutdown command did not delete the socket. Failure."
-          return 1
-        fi
       fi
     fi
 
@@ -1382,10 +1381,10 @@ test_clean_kill() {
     PID="$(cat ./idxr_pid)"
     kill "$PID"
 
-    # We must give the process a chance to die, with 'pwait'.
-    timeout 10s pwait -F ./idxr_pid || true
+    # We must give the process a chance to die cleanly.
+    sleep 2
 
-    # We waited with pwait. If the process is still there, it's a fail.
+    # If the process is still there, it's a fail.
     if ps -p "$PID" >/dev/null; then
         echo "  The signal did not kill the process. Failure."
         return 1
