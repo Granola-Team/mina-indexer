@@ -382,6 +382,7 @@ impl DatabaseCommand {
                     error!("Failed to initialize indexer database: {e}");
                     process::exit(1);
                 });
+                remove_pid(&database_dir);
             }
         }
         Ok(())
