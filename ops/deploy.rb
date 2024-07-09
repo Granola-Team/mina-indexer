@@ -21,6 +21,22 @@ config_log_dir
 get_blocks BLOCKS_COUNT
 fetch_ledgers
 
+# Create the database, if needed.
+#
+unless File.exist?(db_dir(BLOCKS_COUNT))
+  puts 'Initiating database creation...'
+  system(
+    EXE,
+    'database', 'create',
+    '--log-level', 'DEBUG',
+    '--ledger-cadence', '5000',
+    '--database-dir', db_dir(BLOCKS_COUNT),
+    '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+    '--staking-ledgers-dir', LEDGERS_DIR
+  ) || abort('database creation failed')
+  puts 'Database creation succeeded.'
+end
+
 # Terminate the current version, if any.
 #
 if File.exist? CURRENT
@@ -42,20 +58,6 @@ end
 File.write CURRENT, REV
 
 if DEPLOY_TYPE == 'test'
-  unless File.exist?(db_dir(BLOCKS_COUNT))
-    puts 'Initiating database creation...'
-    system(
-      EXE,
-      'database', 'create',
-      '--log-level', 'DEBUG',
-      '--ledger-cadence', '5000',
-      '--database-dir', db_dir(BLOCKS_COUNT),
-      '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-      '--staking-ledgers-dir', LEDGERS_DIR
-    ) || abort('database creation failed')
-    puts 'Database creation succeeded.'
-  end
-
   puts 'Restarting server...'
   PORT = random_port
   pid = spawn EXE +
