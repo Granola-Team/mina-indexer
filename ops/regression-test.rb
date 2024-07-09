@@ -65,13 +65,50 @@ tests = if ARGV.empty?
           ARGV
         end
 
+def cleanup_socket
+  # Attempt a regular shutdown if the socket is present.
+  socket = "#{BASE_DIR}/mina-indexer.sock"
+  return unless File.exist?(socket)
+
+  system(
+    EXE,
+    '--socket', socket,
+    'server', 'shutdown'
+  ) || warn("Shutdown failed despite #{socket} existing.")
+
+  sleep 1 # Give it a chance to shut down.
+end
+
+def cleanup_idxr_pid
+  pid_file = "#{BASE_DIR}/idxr_pid"
+  return unless File.exist?(pid_file)
+
+  pid = File.read pid_file
+  Process.kill('HUP', pid)
+  File.unlink pid_file
+  sleep 1 # Give it a chance to shut down.
+end
+
+def cleanup_database_pid
+  pid_file = "#{BASE_DIR}/database/PID"
+  return unless File.exist?(pid_file)
+
+  pid = File.read pid_file
+  Process.kill('HUP', pid)
+  sleep 1 # Give it a chance to shut down.
+end
+
+def cleanup
+  cleanup_socket
+  cleanup_idxr_pid
+  cleanup_database_pid
+end
+
 tests.each do |tn|
   puts
   puts "Testing: #{tn}"
   test_success = system(BASH_TEST_DRIVER, EXE, "test_#{tn}")
-
-  # cleanup
-
+  cleanup
   test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{EXE} test_#{tn}")
 end
 

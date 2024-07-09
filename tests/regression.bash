@@ -67,24 +67,6 @@ shutdown_idxr() {
     rm -f ./idxr_pid
 }
 
-# Invoke this function when exiting this script for any reason.
-#
-cleanup() {
-    err=$?
-    if [ $err != 0 ]; then
-        echo "Test failed ($test_name): $err"
-        if ! shutdown_idxr; then
-          # If there is a PID file, try to kill the process forcefully.
-          if [ -e ./idxr_pid ]; then
-            kill "$(cat ./idxr_pid)"
-          fi
-        fi
-    fi
-    exit "$err"
-}
-
-trap cleanup EXIT QUIT INT TERM
-
 ephemeral_port() {
     set +e
     LOW_BOUND=49152
@@ -328,6 +310,9 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./blocks-dir"
     assert_directory_exists "./staking-ledgers-dir"
     assert_directory_exists "./database-dir"
+    rm -fr ./database-dir
+    rm -fr ./staking-ledgers-dir
+    rm -fr ./blocks-dir
 
     teardown
 }
@@ -1633,6 +1618,7 @@ test_snapshot_database_dir() {
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
+    rm -fr ./restore-dir
     teardown
 }
 
