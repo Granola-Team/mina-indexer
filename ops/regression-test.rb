@@ -84,7 +84,11 @@ def cleanup_idxr_pid
   return unless File.exist?(pid_file)
 
   pid = File.read pid_file
-  Process.kill('HUP', pid)
+  begin
+    Process.kill('HUP', pid.to_i)
+  rescue StandardError
+    nil
+  end
   File.unlink pid_file
   sleep 1 # Give it a chance to shut down.
 end
@@ -94,14 +98,31 @@ def cleanup_database_pid
   return unless File.exist?(pid_file)
 
   pid = File.read pid_file
-  Process.kill('HUP', pid)
+  begin
+    Process.kill('HUP', pid.to_i)
+  rescue StandardError
+    nil
+  end
   sleep 1 # Give it a chance to shut down.
+end
+
+def remove_dirs
+  %w[epoch_42_ledger.json epoch_0_staking_delegations.json epoch_0_ledger.json
+     mina-indexer.sock].each do |f|
+    target = "#{BASE_DIR}/#{f}"
+    FileUtils.rm_f target
+  end
+  %w[blocks staking-ledgers database].each do |f|
+    target = "#{BASE_DIR}/#{f}"
+    FileUtils.rm_rf target
+  end
 end
 
 def cleanup
   cleanup_socket
   cleanup_idxr_pid
   cleanup_database_pid
+  remove_dirs
 end
 
 tests.each do |tn|

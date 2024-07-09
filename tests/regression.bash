@@ -158,17 +158,6 @@ assert_directory_exists() {
     fi
 }
 
-teardown() {
-    rm -f ./epoch_42_ledger.json
-    rm -f ./epoch_0_staking_delegations.json
-    rm -f ./epoch_0_ledger.json
-    rm -rf ./blocks
-    rm -rf ./staking-ledgers
-    shutdown_idxr
-    rm -rf ./database
-    rm -f ./mina-indexer.sock
-}
-
 test_indexer_cli_reports() {
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
@@ -283,8 +272,6 @@ test_server_startup() {
 
     result=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
-
-    teardown
 }
 
 # Indexer server ipc is available during initialization
@@ -296,7 +283,6 @@ test_ipc_is_available_immediately() {
     wait_for_socket
 
     idxr summary
-    teardown
 }
 
 # Indexer server starts and creates directories with minimal args
@@ -313,8 +299,6 @@ test_startup_dirs_get_created() {
     rm -fr ./database-dir
     rm -fr ./staking-ledgers-dir
     rm -fr ./blocks-dir
-
-    teardown
 }
 
 # Indexer server reports correct balance for Genesis Ledger Account
@@ -324,8 +308,6 @@ test_account_balance_cli() {
 
     result=$(idxr accounts public-key --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
     assert '148837200000000' $result
-
-    teardown
 }
 
 # Indexer server returns the correct account
@@ -335,8 +317,6 @@ test_account_public_key_json() {
 
     result=$(idxr accounts public-key --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
     assert 'B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk' $result
-
-    teardown
 }
 
 # Indexer summary returns the correct canonical root
@@ -351,8 +331,6 @@ test_canonical_root() {
 
     assert 5 $length
     assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $hash
-
-    teardown
 }
 
 # Indexer server handles canonical threshold correctly
@@ -370,8 +348,6 @@ test_canonical_threshold() {
 
     assert $(( num_seq_blocks - canonical_threshold )) $length
     assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $hash
-
-    teardown
 }
 
 # Indexer server returns the correct best tip
@@ -395,8 +371,6 @@ test_best_tip() {
     assert $wt_length $length
     assert 'Canonical' $canonicity
     assert 'Canonical' $canonicity_v
-
-    teardown
 }
 
 # Indexer server returns the correct blocks for height and slot queries
@@ -501,8 +475,6 @@ test_blocks() {
 
     assert 9 $slot
     assert 10 $height
-
-    teardown
 }
 
 # Indexer handles copied blocks correctly
@@ -537,8 +509,6 @@ test_block_copy() {
     assert 1 $canonical_length
     assert '3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
-
-    teardown
 }
 
 # Indexer handles missing blocks correctly
@@ -597,8 +567,6 @@ test_missing_blocks() {
     assert 20 $canonical_length
     assert '3NLpGhdRifLr31DGc61jUhsAdZiTy7EUw8cap41jrmzbTem5hc3V' $best_hash
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $canonical_hash
-
-    teardown
 }
 
 # Indexer server returns the correct best chain
@@ -644,7 +612,6 @@ test_best_chain() {
     assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
 
     rm -rf best_chain
-    teardown
 }
 
 # Indexer server returns correct ledgers
@@ -701,7 +668,6 @@ test_ledgers() {
     rm -f $file
 
     rm -rf ledgers
-    teardown
 }
 
 # Indexer server syncs with existing Speedb
@@ -730,8 +696,6 @@ test_sync() {
     assert 34 $(idxr summary --json | jq -r .blocks_processed)
     assert 20 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $sync_best_hash
-
-    teardown
 }
 
 # Indexer server replays events
@@ -760,8 +724,6 @@ test_replay() {
     assert 10 $(idxr summary --json | jq -r .witness_tree.canonical_root_length)
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $best_hash_replay
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $root_hash_replay
-
-    teardown
 }
 
 # Indexer server returns correct transactions
@@ -855,7 +817,6 @@ test_transactions() {
     assert '1000' $file_result
 
     rm -rf ./transactions
-    teardown
 }
 
 # Indexer server returns correct SNARK work
@@ -911,7 +872,6 @@ test_snark_work() {
     assert 'B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h' $(idxr snarks top --num 5 | jq -r .[0].prover)
 
     rm -rf ./snark_work
-    teardown
 }
 
 # Restart from a snapshot of a running indexer database
@@ -932,7 +892,11 @@ test_snapshot() {
     idxr database snapshot --output-path ./snapshot
 
     # kill running indexer and remove directories
-    teardown
+    shutdown_idxr
+    rm -rf ./blocks
+    rm -rf ./staking-ledgers
+    rm -rf ./database
+    rm -f ./mina-indexer.sock
 
     # restore the db directory from the snapshot
     idxr database restore --snapshot-file ./snapshot --restore-dir ./restore-path
@@ -958,7 +922,6 @@ test_snapshot() {
     assert $amount $amount_snapshot
 
     rm -rf ./snapshot ./restore-path
-    teardown
 }
 
 # Indexer server starts with many blocks
@@ -990,8 +953,6 @@ test_many_blocks() {
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
     balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
-
-    teardown
 }
 
 test_rest_accounts_summary() {
@@ -1084,8 +1045,6 @@ test_rest_accounts_summary() {
     assert $count $(cat output.json | jq -r .totalNumBlocks)
 
     check-jsonschema --schemafile "$SUMMARY_SCHEMA" output.json
-
-    teardown
 }
 
 test_rest_blocks() {
@@ -1109,8 +1068,6 @@ test_rest_blocks() {
     # /blocks/slot={globl_slot} endpoint
     curl --silent http://localhost:${port}/blocks/slot=145 > output.json
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
-
-    teardown
 }
 
 test_release() {
@@ -1140,8 +1097,6 @@ test_release() {
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
     balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
     assert '502777775000000' $balance
-
-    teardown
 }
 
 test_genesis_block_creator() {
@@ -1153,8 +1108,6 @@ test_genesis_block_creator() {
 
     # verify that the genesis block winner account gets 1000 magic nanomina
     assert '1000' $balance
-
-    teardown
 }
 
 test_txn_nonces() {
@@ -1174,8 +1127,6 @@ test_txn_nonces() {
     # after block 100
     nonce=$(idxr accounts public-key --public-key $pk | jq -r .nonce)
     assert '149' $nonce
-
-    teardown
 }
 
 test_startup_staking_ledgers() {
@@ -1209,8 +1160,6 @@ test_startup_staking_ledgers() {
     max_staking_ledger_hash=$(idxr summary --json | jq -r .max_staking_ledger_hash)
     assert 42 $(idxr summary --json | jq -r .max_staking_ledger_epoch)
     assert 'jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH' $max_staking_ledger_hash
-
-    teardown
 }
 
 test_watch_staking_ledgers() {
@@ -1278,8 +1227,6 @@ test_watch_staking_ledgers() {
     assert $epoch42 $ledger_hash
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
     assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
-
-    teardown
 }
 
 test_staking_delegations() {
@@ -1323,8 +1270,6 @@ test_staking_delegations() {
     assert $network $file_network
     assert $count_delegates $file_count_delegates
     assert $total_delegated $file_total_delegated
-
-    teardown
 }
 
 test_internal_commands() {
@@ -1384,8 +1329,6 @@ test_internal_commands() {
     assert $pk_amount $hash_amount
     assert $pk_receiver $hash_receiver
     assert $pk_state_hash $hash_state_hash
-
-    teardown
 }
 
 # Indexer correctly starts from config file
@@ -1418,15 +1361,12 @@ test_start_from_config() {
 
     assert 15 $length
     assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
-
-    teardown
 }
 
 test_clean_shutdown() {
     idxr_server_start_standard
     wait_for_socket
-
-    teardown  # Calls shutdown_idxr, which checks for clean shutdown.
+    shutdown_idxr
 }
 
 test_clean_kill() {
@@ -1462,8 +1402,6 @@ test_clean_kill() {
     #        echo "  The signal handler did not delete the socket. Failure."
     #        return 1
     #    fi
-
-    teardown
 }
 
 test_block_children() {
@@ -1498,8 +1436,6 @@ test_block_children() {
     assert 5 $(echo "$children" | jq -r .[3].global_slot_since_genesis)
     assert $block_5_state_hash $(echo "$children" | jq -r .[3].parent_hash)
     assert '3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45' $(echo "$children" | jq -r .[3].state_hash)
-
-    teardown
 }
 
 test_hurl() {
@@ -1515,8 +1451,6 @@ test_hurl() {
     wait_for_socket
 
     hurl --variable url=http://localhost:"$port"/graphql --test --parallel "$SRC"/tests/hurl/*.hurl
-
-    teardown
 }
 
 test_version_file() {
@@ -1524,7 +1458,6 @@ test_version_file() {
     wait_for_socket
 
     [ -e "./database/INDEXER_VERSION" ]
-    teardown
 }
 
 test_missing_block_recovery() {
@@ -1555,8 +1488,6 @@ test_missing_block_recovery() {
     assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
     assert 21 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
     assert '3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ' $(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-
-    teardown
 }
 
 # Create an indexer database & start indexing
@@ -1580,8 +1511,6 @@ test_database_create() {
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
-
-    teardown
 }
 
 # Create an indexer database snapshot from a db directory without a running indexer.
@@ -1619,7 +1548,6 @@ test_snapshot_database_dir() {
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     rm -fr ./restore-dir
-    teardown
 }
 
 # ----
