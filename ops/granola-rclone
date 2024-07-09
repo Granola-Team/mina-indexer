@@ -1,7 +1,9 @@
 #! /usr/bin/env -S ruby -w
+# frozen_string_literal: true
+
 # -*- mode: ruby -*-
 
-CONFIG_FILE = __dir__ + '/rclone.conf'
+CONFIG_FILE = "#{__dir__}/rclone.conf"
 
 # It's okay to share these keys publicly, as they are read-only keys for data
 # that we want shared publicly. The data is also available to anyone via HTTPS.
@@ -21,5 +23,5 @@ args = [
   "--s3-secret-access-key=#{secret_key}",
   *ARGV
 ]
-STDERR.puts "granola-rclone issuing: #{args}"
+warn "granola-rclone issuing: #{args}"
 system(*args) || abort('rclone failed')
