@@ -79,7 +79,7 @@ enum DatabaseCommand {
 
     /// Create a snapshot of a mina indexer database
     Snapshot {
-        /// Full path to the new snapshot file
+        /// Full path to the snapshot file to be created
         #[arg(long, default_value = "./snapshot")]
         output_path: PathBuf,
 
@@ -89,9 +89,9 @@ enum DatabaseCommand {
         database_dir: Option<PathBuf>,
     },
 
-    /// Restore an indexer database from a compressed snapshot file
+    /// Restore an indexer database from an archived snapshot file
     Restore {
-        /// Full path to the compressed snapshot file
+        /// Full path to the archive snapshot file
         #[arg(long, default_value = "./snapshot")]
         snapshot_file: PathBuf,
 
