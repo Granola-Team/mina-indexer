@@ -2,7 +2,7 @@
 # shellcheck disable=SC2046,SC2086,SC2002
 
 # To debug, uncomment:
-# set -x
+set -x
 
 set -euo pipefail
 
