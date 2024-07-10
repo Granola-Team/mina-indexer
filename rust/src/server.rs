@@ -318,7 +318,8 @@ async fn run_indexer<P: AsRef<Path>>(
             let tx = tx.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
-                    panic!("Failed to send watcher event, closing: {e}");
+                    error!("Failed to send watcher event, closing: {e}");
+                    drop(tx);
                 }
             });
         },
@@ -347,7 +348,10 @@ async fn run_indexer<P: AsRef<Path>>(
             Some(res) = rx.recv() => {
                 match res {
                     Ok(event) => process_event(event, &state).await?,
-                    Err(e) => error!("Filesystem watcher error: {e}"),
+                    Err(e) => {
+                        error!("Filesystem watcher error: {e}");
+                        break;
+                    }
                 }
             }
 
@@ -360,12 +364,13 @@ async fn run_indexer<P: AsRef<Path>>(
         }
     }
 
-    info!("Filesystem watchers successfully shutdown");
+    info!("Filesystem watchers shutting down..");
     let state = state.write().await;
-    state.indexer_store.iter().for_each(|store| {
+    if let Some(store) = state.indexer_store.as_ref() {
         info!("Canceling db background work");
         store.database.cancel_all_background_work(true)
-    });
+    }
+    info!("Filesystem watchers successfully shutdown");
     Ok(())
 }
 
