@@ -163,16 +163,16 @@ pub struct DatabaseArgs {
     /// Override the constraint system digests
     constraint_system_digests: Option<Vec<String>>,
 
-    /// Directory of precomputed blocks
-    #[arg(long, default_value = "/share/mina-indexer/blocks")]
-    blocks_dir: PathBuf,
+    /// An optional directory to monitor for new precomputed blocks
+    #[arg(long)]
+    blocks_dir: Option<PathBuf>,
 
-    /// Directory of staking ledgers
-    #[arg(long, default_value = "/share/mina-indexer/staking-ledgers")]
-    staking_ledgers_dir: PathBuf,
+    /// An optional directory to monitor for new staking ledgers
+    #[arg(long)]
+    staking_ledgers_dir: Option<PathBuf>,
 
     /// Path to directory for speedb
-    #[arg(long, default_value = "/var/log/mina-indexer/database")]
+    #[arg(long, default_value = "/var/lib/mina-indexer/db")]
     pub database_dir: PathBuf,
 
     /// Max stdout log level
@@ -382,7 +382,6 @@ impl DatabaseCommand {
                     error!("Failed to initialize indexer database: {e}");
                     process::exit(1);
                 });
-                remove_pid(&database_dir);
             }
         }
         Ok(())
@@ -415,18 +414,20 @@ fn process_indexer_configuration(
     );
 
     // Ensure blocks and staking ledgers dirs exist
-    debug!("Ensuring blocks directory exists in {blocks_dir:#?}");
-    if let Err(e) = fs::create_dir_all(&blocks_dir) {
-        error!("Failed to create blocks directory: {e}");
-        process::exit(1);
+    if let Some(blocks_dir) = blocks_dir.as_ref() {
+        debug!("Ensuring blocks directory exists in {blocks_dir:#?}");
+        if let Err(e) = fs::create_dir_all(blocks_dir) {
+            error!("Failed to create blocks directory: {e}");
+            process::exit(1);
+        }
     }
-
-    debug!("Ensuring staking ledgers directories in {staking_ledgers_dir:#?}");
-    if let Err(e) = fs::create_dir_all(&staking_ledgers_dir) {
-        error!("Failed to create staging ledger directory: {e}");
-        process::exit(1);
+    if let Some(staking_ledgers_dir) = staking_ledgers_dir.as_ref() {
+        debug!("Ensuring staking ledgers directories in {staking_ledgers_dir:#?}");
+        if let Err(e) = fs::create_dir_all(staking_ledgers_dir) {
+            error!("Failed to create staging ledger directory: {e}");
+            process::exit(1);
+        }
     }
-
     // pick up protocol constants from the given file or use defaults
     let genesis_constants = protocol_constants(args.db.genesis_constants)?;
     let constraint_system_digests = args.db.constraint_system_digests.unwrap_or(
@@ -572,8 +573,8 @@ struct ServerArgsJson {
     genesis_hash: String,
     genesis_constants: Option<String>,
     constraint_system_digests: Option<Vec<String>>,
-    blocks_dir: String,
-    staking_ledgers_dir: String,
+    blocks_dir: Option<String>,
+    staking_ledgers_dir: Option<String>,
     database_dir: String,
     log_level: String,
     ledger_cadence: u32,
@@ -602,8 +603,16 @@ impl From<ServerArgs> for ServerArgsJson {
             genesis_hash: value.db.genesis_hash,
             genesis_constants: value.db.genesis_constants.map(|g| g.display().to_string()),
             constraint_system_digests: value.db.constraint_system_digests,
-            blocks_dir: value.db.blocks_dir.display().to_string(),
-            staking_ledgers_dir: value.db.staking_ledgers_dir.display().to_string(),
+            blocks_dir: value
+                .db
+                .blocks_dir
+                .as_ref()
+                .map(|x| x.display().to_string()),
+            staking_ledgers_dir: value
+                .db
+                .staking_ledgers_dir
+                .as_ref()
+                .map(|x| x.display().to_string()),
             database_dir: value.db.database_dir.display().to_string(),
             log_level: value.db.log_level.to_string(),
             ledger_cadence: value.db.ledger_cadence,
@@ -631,8 +640,8 @@ impl From<ServerArgsJson> for ServerArgs {
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.into()),
             constraint_system_digests: value.constraint_system_digests,
-            blocks_dir: value.blocks_dir.into(),
-            staking_ledgers_dir: value.staking_ledgers_dir.into(),
+            blocks_dir: value.blocks_dir.as_ref().map(|x| x.into()),
+            staking_ledgers_dir: value.staking_ledgers_dir.as_ref().map(|x| x.into()),
             database_dir: value.database_dir.into(),
             log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
             ledger_cadence: value.ledger_cadence,

@@ -22,10 +22,12 @@ use speedb::checkpoint::Checkpoint;
 use std::{
     collections::HashSet,
     fs,
+    future::Future,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process,
     sync::Arc,
+    time::Duration,
 };
 use tokio::{
     runtime::Handle,
@@ -48,8 +50,8 @@ pub struct IndexerConfiguration {
     pub genesis_constants: GenesisConstants,
     pub constraint_system_digests: Vec<String>,
     pub version: PcbVersion,
-    pub blocks_dir: PathBuf,
-    pub staking_ledgers_dir: PathBuf,
+    pub blocks_dir: Option<PathBuf>,
+    pub staking_ledgers_dir: Option<PathBuf>,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
@@ -98,9 +100,11 @@ pub async fn start_indexer(
 ) -> anyhow::Result<()> {
     let blocks_dir = config.blocks_dir.clone();
     let staking_ledgers_dir = config.staking_ledgers_dir.clone();
+
     let missing_block_recovery_delay = config.missing_block_recovery_delay;
     let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
     let missing_block_recovery_batch = config.missing_block_recovery_batch;
+
     let domain_socket_path = config.domain_socket_path.clone();
 
     // initialize witness tree & connect database
@@ -112,10 +116,9 @@ pub async fn start_indexer(
     // read-only state
     start_uds_server(&subsys, state.clone(), &domain_socket_path).await?;
 
-    // modifies the state
-    run_indexer(
+    start_filesystem_watchers(
         &subsys,
-        blocks_dir,
+        blocks_dir.clone(),
         staking_ledgers_dir,
         missing_block_recovery_delay,
         missing_block_recovery_exe,
@@ -164,15 +167,18 @@ fn initialize(
         ..
     } = config;
 
-    if let Err(e) = fs::create_dir_all(&blocks_dir) {
-        error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
-        process::exit(1);
+    if let Some(blocks_dir) = blocks_dir.as_ref() {
+        if let Err(e) = fs::create_dir_all(blocks_dir) {
+            error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
+            process::exit(1);
+        }
     }
-    if let Err(e) = fs::create_dir_all(&staking_ledgers_dir) {
-        error!("Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}");
-        process::exit(1);
+    if let Some(staking_ledgers_dir) = staking_ledgers_dir.as_ref() {
+        if let Err(e) = fs::create_dir_all(staking_ledgers_dir) {
+            error!("Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}");
+            process::exit(1);
+        }
     }
-
     let chain_id = chain_id(
         &genesis_hash.0,
         &[
@@ -219,47 +225,50 @@ fn initialize(
         }
     };
 
-    // ingest staking ledgers
-    if let Err(e) = state.add_startup_staking_ledgers_to_store(&staking_ledgers_dir) {
-        error!("Failed to ingest staking ledger {staking_ledgers_dir:#?} {e}");
+    // ingest staking ledgers if supplied
+    if let Some(staking_ledgers_dir) = staking_ledgers_dir.as_ref() {
+        if let Err(e) = state.add_startup_staking_ledgers_to_store(staking_ledgers_dir) {
+            error!("Failed to ingest staking ledger {staking_ledgers_dir:#?} {e}");
+        }
     }
-
-    // ingest precomputed blocks
-    match initialization_mode {
-        InitializationMode::New => {
-            let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
-                &blocks_dir,
-                version,
-                canonical_threshold,
-                reporting_freq,
-            )
-            .unwrap_or_else(|e| panic!("Obtaining block parser failed: {e}"));
-            state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
-        }
-        InitializationMode::Replay => {
-            let min_length_filter = state.replay_events()?;
-            let mut block_parser = BlockParser::new_length_sorted_min_filtered(
-                &blocks_dir,
-                version,
-                min_length_filter,
-            )?;
-
-            if block_parser.total_num_blocks > 0 {
-                info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser)?;
+    // ingest precomputed blocks only if there is a provided blocks-dir
+    if let Some(blocks_dir) = blocks_dir.as_ref() {
+        match initialization_mode {
+            InitializationMode::New => {
+                let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+                    blocks_dir,
+                    version,
+                    canonical_threshold,
+                    reporting_freq,
+                )
+                .unwrap_or_else(|e| panic!("Obtaining block parser failed: {e}"));
+                state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
             }
-        }
-        InitializationMode::Sync => {
-            let min_length_filter = state.sync_from_db()?;
-            let mut block_parser = BlockParser::new_length_sorted_min_filtered(
-                &blocks_dir,
-                version,
-                min_length_filter,
-            )?;
+            InitializationMode::Replay => {
+                let min_length_filter = state.replay_events()?;
+                let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                    blocks_dir,
+                    version,
+                    min_length_filter,
+                )?;
 
-            if block_parser.total_num_blocks > 0 {
-                info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser)?;
+                if block_parser.total_num_blocks > 0 {
+                    info!("Adding new blocks from {blocks_dir:#?}");
+                    state.add_blocks(&mut block_parser)?;
+                }
+            }
+            InitializationMode::Sync => {
+                let min_length_filter = state.sync_from_db()?;
+                let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                    blocks_dir,
+                    version,
+                    min_length_filter,
+                )?;
+
+                if block_parser.total_num_blocks > 0 {
+                    info!("Adding new blocks from {blocks_dir:#?}");
+                    state.add_blocks(&mut block_parser)?;
+                }
             }
         }
     }
@@ -301,19 +310,72 @@ fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
 }
 
 /// Starts filesystem watchers & runs the mina indexer
-async fn run_indexer<P: AsRef<Path>>(
+async fn start_filesystem_watchers<P: AsRef<Path>>(
     subsys: &SubsystemHandle,
-    blocks_dir: P,
-    staking_ledgers_dir: P,
+    blocks_dir: Option<P>,
+    staking_ledgers_dir: Option<P>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_exe: Option<PathBuf>,
     missing_block_recovery_batch: bool,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
-    // setup fs-based precomputed block & staking ledger watchers
-    let (tx, mut rx) = mpsc::channel(4096);
+    if blocks_dir.is_none() && staking_ledgers_dir.is_none() {
+        return Ok(());
+    }
+
+    let (mut rx, watcher) = setup_directory_watching(
+        blocks_dir.as_ref().map(|p| p.as_ref()),
+        staking_ledgers_dir.as_ref().map(|p| p.as_ref()),
+    )?;
+
+    run_event_loop(
+        subsys,
+        &mut rx,
+        blocks_dir,
+        missing_block_recovery_delay,
+        missing_block_recovery_exe,
+        missing_block_recovery_batch,
+        &state,
+    )
+    .await?;
+    shutdown_watcher(state).await;
+    // clean up after ourselves
+    drop(watcher);
+    Ok(())
+}
+
+fn setup_directory_watching(
+    blocks_dir: Option<&Path>,
+    staking_ledgers_dir: Option<&Path>,
+) -> anyhow::Result<(
+    mpsc::Receiver<Result<notify::Event, notify::Error>>,
+    RecommendedWatcher,
+)> {
+    let (tx, rx) = mpsc::channel(4096);
     let rt = Handle::current();
-    let mut watcher = RecommendedWatcher::new(
+    let mut watcher = initialize_watcher(tx, rt)?;
+
+    if let Some(blocks_dir) = blocks_dir {
+        watcher.watch(blocks_dir, RecursiveMode::NonRecursive)?;
+        info!("Watching for new blocks in directory: {:?}", blocks_dir);
+    }
+
+    if let Some(staking_ledgers_dir) = staking_ledgers_dir {
+        watcher.watch(staking_ledgers_dir, RecursiveMode::NonRecursive)?;
+        info!(
+            "Watching for staking ledgers in directory: {:?}",
+            staking_ledgers_dir
+        );
+    }
+
+    Ok((rx, watcher))
+}
+
+fn initialize_watcher(
+    tx: mpsc::Sender<Result<notify::Event, notify::Error>>,
+    rt: Handle,
+) -> anyhow::Result<RecommendedWatcher> {
+    let watcher = RecommendedWatcher::new(
         move |result| {
             let tx = tx.clone();
             rt.spawn(async move {
@@ -324,49 +386,55 @@ async fn run_indexer<P: AsRef<Path>>(
         },
         Config::default(),
     )?;
+    Ok(watcher)
+}
+/// Timeout
+async fn timeout(delay: u64) -> impl Future {
+    tokio::time::sleep(Duration::from_secs(delay))
+}
 
-    watcher.watch(blocks_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!(
-        "Watching for new blocks in directory: {}",
-        blocks_dir.as_ref().display()
-    );
-    watcher.watch(staking_ledgers_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!(
-        "Watching for staking ledgers in directory: {}",
-        staking_ledgers_dir.as_ref().display()
-    );
-
+async fn run_event_loop<P: AsRef<Path>>(
+    subsys: &SubsystemHandle,
+    rx: &mut mpsc::Receiver<Result<notify::Event, notify::Error>>,
+    blocks_dir: Option<P>,
+    missing_block_recovery_delay: Option<u64>,
+    missing_block_recovery_exe: Option<PathBuf>,
+    missing_block_recovery_batch: bool,
+    state: &Arc<RwLock<IndexerState>>,
+) -> anyhow::Result<()> {
+    let delay = missing_block_recovery_delay.unwrap_or(180);
     loop {
         tokio::select! {
-            // watch for shutdown signals
             _ = subsys.on_shutdown_requested() => {
                 break;
             }
-
-            // watch for precomputed blocks & staking ledgers
-            Some(res) = rx.recv() => {
-                match res {
-                    Ok(event) => process_event(event, &state).await?,
-                    Err(e) => error!("Filesystem watcher error: {e}"),
+            _ = timeout(delay) => {
+                if blocks_dir.is_some() && missing_block_recovery_exe.is_some() {
+                    let blocks_dir = blocks_dir.as_ref().expect("blocks dir exists");
+                    let executable = missing_block_recovery_exe
+                        .as_ref()
+                        .expect("executable exists");
+                    recover_missing_blocks(state, blocks_dir, executable, missing_block_recovery_batch).await;
                 }
             }
-
-            // recover missing blocks
-            _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
-                if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
-                    recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
+            Some(res) = rx.recv() => {
+                match res {
+                    Ok(event) => process_event(event, state).await?,
+                    Err(e) => error!("Filesystem watcher error: {e}"),
                 }
             }
         }
     }
+    Ok(())
+}
 
+async fn shutdown_watcher(state: Arc<RwLock<IndexerState>>) {
     info!("Filesystem watchers successfully shutdown");
     let state = state.write().await;
     state.indexer_store.iter().for_each(|store| {
         info!("Canceling db background work");
         store.database.cancel_all_background_work(true)
     });
-    Ok(())
 }
 
 /// Precomputed block & staking ledger event handler
@@ -461,7 +529,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
 }
 
 /// Recovers missing blocks
-async fn recover_missing_blocks(
+pub async fn recover_missing_blocks(
     state: &Arc<RwLock<IndexerState>>,
     block_watch_dir: impl AsRef<Path>,
     missing_block_recovery_exe: impl AsRef<Path>,
