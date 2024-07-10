@@ -83,6 +83,17 @@ if DEPLOY_TYPE == 'test'
   ) || abort('Snapshot creation failed. Aborting.')
   puts 'Snapshot complete.'
 
+  puts 'Attempting ledger extraction...'
+  system(
+    EXE,
+    '--socket', SOCKET,
+    'ledgers',
+    'height',
+    '--height', BLOCKS_COUNT.to_s,
+    '--path', "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
+  ) || warn('Ledger extraction failed.')
+  puts 'Ledger extraction complete.'
+
   puts 'Initiating shutdown...'
   system(
     EXE,
