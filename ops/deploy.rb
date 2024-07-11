@@ -13,6 +13,8 @@ abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exi
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
+success = true
+
 # Configure the directories as needed.
 #
 config_base_dir
@@ -84,22 +86,41 @@ if DEPLOY_TYPE == 'test'
   puts 'Snapshot complete.'
 
   puts 'Attempting ledger extraction...'
-  system(
+  unless system(
     EXE,
     '--socket', SOCKET,
     'ledgers',
     'height',
     '--height', BLOCKS_COUNT.to_s,
     '--path', "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
-  ) || warn('Ledger extraction failed.')
+  )
+    warn('Ledger extraction failed.')
+    success = false
+  end
   puts 'Ledger extraction complete.'
 
+  puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
+  restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
+  unless system(
+    EXE,
+    'database', 'restore',
+    '--snapshot-file', snapshot_path(BLOCKS_COUNT),
+    '--restore-dir', restore_path
+  )
+    warn('Snapshot restore failed.')
+    success = false
+  end
+  puts 'Snapshot restore complete.'
+
   puts 'Initiating shutdown...'
-  system(
+  unless system(
     EXE,
     '--socket', SOCKET,
     'shutdown'
-  ) || puts('Shutdown failed after snapshot.')
+  )
+    warn('Shutdown failed after snapshot.')
+    success = false
+  end
   Process.wait(pid)
 
   # TODO: make self-check work
@@ -154,3 +175,5 @@ else
     puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
   end
 end
+
+exit success
