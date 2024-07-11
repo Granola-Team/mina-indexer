@@ -42,11 +42,21 @@ optimized for the Mina ecosystem.
 
 ## Getting Started
 
-### Prerequisites
+### Development Prerequisites
 
 1. Install Nix [here](https://nixos.org/download.html).
 2. Enable Flakes using [this guide](https://nixos.wiki/wiki/Flakes).
 3. Install and configure [Direnv](https://direnv.net).
+
+### Execution Environment
+
+Invoking 'mina-indexer database create' on very large blocks directories will
+ingest the blocks at very high speed. This requires setting 'ulimit -n' to a
+larger-than-default value (for many Linux distros). 1024 is not sufficient. See
+you distro's documentation on how to set 'ulimit -n' (max open files) to 4096
+or more.
+
+Normal operation of the 'mina-indexer' does not require this change.
 
 ### Building the Project
 
