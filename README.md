@@ -44,16 +44,15 @@ optimized for the Mina ecosystem.
 
 ### Development Prerequisites
 
-1. Install Nix [here](https://nixos.org/download.html).
-2. Enable Flakes using [this guide](https://nixos.wiki/wiki/Flakes).
-3. Install and configure [Direnv](https://direnv.net).
+1. Install Nix (with Flakes) using [The Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer#the-determinate-nix-installer).
+2. Install and configure [Direnv](https://direnv.net).
 
 ### Execution Environment
 
 Invoking 'mina-indexer database create' on very large blocks directories will
-ingest the blocks at very high speed. This requires setting 'ulimit -n' to a
+ingest the blocks at very high speed. This requires setting `ulimit -n` to a
 larger-than-default value (for many Linux distros). 1024 is not sufficient. See
-you distro's documentation on how to set 'ulimit -n' (max open files) to 4096
+your distro's documentation on how to set `ulimit -n` (max open files) to 4096
 or more.
 
 Normal operation of the 'mina-indexer' does not require this change.
@@ -63,11 +62,20 @@ Normal operation of the 'mina-indexer' does not require this change.
 Run `just check` to verify that the project compiles. This will compile the
 `mina-indexer` binary in debug mode.
 
+### Storage
+
+The default storage location is on `/mnt` because the testing code may download
+large volumes of test data, and placing on `/mnt` gives an opportunity to use 
+different storage volumes from one's build directory.
+
+Set the `VOLUMES_DIR` environment variable if you want to replace `/mnt` with 
+another path.
+
 ### Testing
 
 #### Unit Tests
 
-Execute unit tests to validate code functionality with:
+Execute [unit tests](/rust/tests) to validate code functionality with:
 
 ```bash
 just test-unit
@@ -75,13 +83,8 @@ just test-unit
 
 #### Regression Tests
 
-To invoke the regression test suite, the directory '/mnt/mina-indexer-dev' must
+To invoke the [regression test suite](/tests/regression.bash), the directory `/mnt/mina-indexer-dev` must
 exist.
-
-This is on '/mnt' because the testing code may download large volumes of test
-data, and placing on '/mnt' gives an opportunity to use different storage
-volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
-you want to replace '/mnt' with another path.)
 
 To quickly perform regression tests, which check for new bugs in existing
 features after updates, use:
@@ -90,13 +93,13 @@ features after updates, use:
 just bt
 ```
 
-To perform the unit tests in additon to that, use:
+To perform the unit tests in addition to that, use:
 
 ```bash
-just bt
+just tt
 ```
 
-To perform the test battery that the (tier-1) CI runs, use:
+To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
 
 ```bash
 just tier1
@@ -105,12 +108,7 @@ just tier1
 #### More Tests
 
 To invoke a more comprehensive regression test suite, the directory
-'/mnt/mina-indexer-test' must exist.
-
-This is on '/mnt' because the testing code may download large volumes of test
-data, and placing on '/mnt' gives an opportunity to use different storage
-volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
-you want to replace '/mnt' with another path.)
+`/mnt/mina-indexer-test` must exist.
 
 Invoke:
 
@@ -126,12 +124,8 @@ just tier3
 
 ### Deployment
 
-To deploy a mina-indexer locally, '/mnt/mina-indexer-prod' must exist.
-
-This is on '/mnt' because the testing code may download large volumes of test
-data, and placing on '/mnt' gives an opportunity to use different storage
-volumes from one's build directory. (Set `VOLUMES_DIR` environment variable if
-you want to replace '/mnt' with another path.)
+To deploy a mina-indexer locally, the directory `/mnt/mina-indexer-prod`
+must exist.
 
 Run `just deploy-local-prod` to start an instance.
 
