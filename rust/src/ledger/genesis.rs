@@ -25,7 +25,7 @@ pub struct GenesisRoot {
 pub struct GenesisAccount {
     pub pk: String,
     pub balance: String,
-    pub nonce: Option<u32>,
+    pub nonce: Option<Nonce>,
     pub delegate: Option<String>,
     pub token: Option<u64>,
     pub token_permissions: Option<TokenPermissions>,

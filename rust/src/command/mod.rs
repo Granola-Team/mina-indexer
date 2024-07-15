@@ -5,7 +5,10 @@ pub mod store;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::{SignedCommand, SignedCommandWithKind},
-    ledger::{account::Amount, public_key::PublicKey},
+    ledger::{
+        account::{Amount, Nonce},
+        public_key::PublicKey,
+    },
     protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
 use log::trace;
@@ -34,7 +37,7 @@ pub struct CommandWithStateHash {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Payment {
     pub source: PublicKey,
-    pub nonce: u32,
+    pub nonce: Nonce,
     pub amount: Amount,
     pub receiver: PublicKey,
 }
@@ -42,7 +45,7 @@ pub struct Payment {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Delegation {
     pub delegator: PublicKey,
-    pub nonce: u32,
+    pub nonce: Nonce,
     pub delegate: PublicKey,
 }
 
@@ -144,7 +147,7 @@ pub trait UserCommandWithStatusT {
 
     fn receiver(&self) -> PublicKey;
 
-    fn nonce(&self) -> u32;
+    fn nonce(&self) -> Nonce;
 
     fn amount(&self) -> u64;
 
@@ -246,7 +249,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         }
     }
 
-    fn nonce(&self) -> u32 {
+    fn nonce(&self) -> Nonce {
         self.to_command().nonce()
     }
 
@@ -343,7 +346,7 @@ impl Command {
             .collect()
     }
 
-    pub fn nonce(&self) -> u32 {
+    pub fn nonce(&self) -> Nonce {
         match self {
             Self::Delegation(Delegation { nonce, .. }) => *nonce,
             Self::Payment(Payment { nonce, .. }) => *nonce,
