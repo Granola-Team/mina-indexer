@@ -105,8 +105,8 @@ impl SignedCommand {
         }
     }
 
-    pub fn source_nonce(&self) -> u32 {
-        self.payload_common().nonce.t.t as u32
+    pub fn source_nonce(&self) -> Nonce {
+        Nonce(self.payload_common().nonce.t.t as u32)
     }
 
     pub fn payload_body(&self) -> mina_rs::SignedCommandPayloadBody {

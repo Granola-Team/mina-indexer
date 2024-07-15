@@ -361,7 +361,7 @@ impl
         Self {
             chain_id: StakingAccount::chain_id(),
             balance,
-            nonce,
+            nonce: nonce.0,
             delegate,
             pk,
             public_key,

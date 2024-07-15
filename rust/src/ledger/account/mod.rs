@@ -6,6 +6,11 @@ use crate::{
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_json::Number;
+use std::{
+    fmt::{self, Display},
+    ops::{Add, Sub},
+};
 
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
@@ -18,7 +23,7 @@ impl ToString for Amount {
     }
 }
 
-impl std::ops::Add<Amount> for Amount {
+impl Add<Amount> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: Amount) -> Self::Output {
@@ -26,7 +31,7 @@ impl std::ops::Add<Amount> for Amount {
     }
 }
 
-impl std::ops::Sub<Amount> for Amount {
+impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
@@ -34,8 +39,36 @@ impl std::ops::Sub<Amount> for Amount {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize)]
+#[derive(
+    PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize, PartialOrd, Ord, Hash,
+)]
 pub struct Nonce(pub u32);
+
+impl Add<i32> for Nonce {
+    type Output = Nonce;
+
+    fn add(self, other: i32) -> Nonce {
+        Nonce(self.0.wrapping_add(other as u32))
+    }
+}
+
+impl From<String> for Nonce {
+    fn from(s: String) -> Self {
+        Nonce(s.parse::<u32>().expect("nonce is u32"))
+    }
+}
+
+impl From<Nonce> for serde_json::value::Number {
+    fn from(n: Nonce) -> Self {
+        Number::from(n.0)
+    }
+}
+
+impl Display for Nonce {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Account {
@@ -148,13 +181,13 @@ impl Account {
         }
     }
 
-    fn from_debit(pre: Self, amount: Amount, nonce: Option<u32>) -> Option<Self> {
+    fn from_debit(pre: Self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
         if amount > pre.balance {
             None
         } else {
             Some(Account {
                 balance: pre.balance - amount,
-                nonce: Nonce(nonce.unwrap_or(pre.nonce.0)),
+                nonce: nonce.unwrap_or(pre.nonce),
                 ..pre
             })
         }
@@ -177,9 +210,9 @@ impl Account {
         }
     }
 
-    pub fn from_failed_transaction(pre: Self, nonce: u32) -> Self {
+    pub fn from_failed_transaction(pre: Self, nonce: Nonce) -> Self {
         Account {
-            nonce: Nonce(nonce + 1),
+            nonce: nonce + 1,
             ..pre
         }
     }

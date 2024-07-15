@@ -90,7 +90,7 @@ async fn account_diffs() {
                             *balance -= amount.0 as i64;
 
                             if let Some(new_nonce) = new_nonce {
-                                *nonce = new_nonce;
+                                *nonce = new_nonce.0;
                             }
                         }
                     }
@@ -133,7 +133,7 @@ async fn account_diffs() {
                 println!("nonce:      {new_nonce}");
 
                 if let Some((_, nonce)) = ledger.get_mut(&public_key) {
-                    *nonce += new_nonce;
+                    *nonce += new_nonce.0;
                 } else {
                     ledger.insert(public_key, (0, 0));
                 }

@@ -1,5 +1,6 @@
 pub mod parser;
 
+use super::account::Nonce;
 use crate::{
     block::BlockHash,
     chain::Network,
@@ -38,7 +39,7 @@ pub struct StakingAccount {
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
     pub permissions: Permissions,
-    pub nonce: Option<u32>,
+    pub nonce: Option<Nonce>,
     pub timing: Option<Timing>,
     pub zkapp: Option<ZkappAccount>,
 }
@@ -98,9 +99,7 @@ pub struct AggregatedEpochStakeDelegation {
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
         let token = Some(value.token.parse().expect("token is u32"));
-        let nonce = value
-            .nonce
-            .map(|nonce| nonce.parse().expect("nonce is u32"));
+        let nonce = value.nonce.map(|nonce| nonce.into());
         let balance = match value.balance.parse::<Decimal>() {
             Ok(amt) => (amt * dec!(1_000_000_000))
                 .to_u64()

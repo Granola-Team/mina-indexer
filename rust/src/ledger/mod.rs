@@ -349,7 +349,7 @@ mod tests {
         public_key::PublicKey,
         Ledger, LedgerHash,
     };
-    use crate::block::BlockHash;
+    use crate::{block::BlockHash, ledger::account::Nonce};
     use std::collections::{BTreeMap, HashMap};
 
     #[test]
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn apply_diff_delegation() {
-        let nonce = 42;
+        let nonce = Nonce(42);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
             PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");

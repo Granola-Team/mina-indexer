@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
-    ledger::{coinbase::Coinbase, Amount, PublicKey},
+    ledger::{account::Nonce, coinbase::Coinbase, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum UpdateType {
     /// Carries Some(nonce) for a user command, None for internal command
-    Debit(Option<u32>),
+    Debit(Option<Nonce>),
     Credit,
 }
 
@@ -23,7 +23,7 @@ pub struct PaymentDiff {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct DelegationDiff {
-    pub nonce: u32,
+    pub nonce: Nonce,
     pub delegator: PublicKey,
     pub delegate: PublicKey,
 }
@@ -37,7 +37,7 @@ pub struct CoinbaseDiff {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct FailedTransactionNonceDiff {
     pub public_key: PublicKey,
-    pub nonce: u32,
+    pub nonce: Nonce,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -213,7 +213,7 @@ impl AccountDiff {
                 Self::Payment(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
-                    update_type: UpdateType::Debit(Some(nonce)),
+                    update_type: UpdateType::Debit(Some(Nonce(nonce))),
                 }),
                 Self::Payment(PaymentDiff {
                     public_key: receiver.into(),
@@ -224,7 +224,7 @@ impl AccountDiff {
             AccountDiffType::Delegation(nonce) => vec![Self::Delegation(DelegationDiff {
                 delegate: sender.into(),
                 delegator: receiver.into(),
-                nonce,
+                nonce: Nonce(nonce),
             })],
             AccountDiffType::Coinbase => vec![Self::Coinbase(CoinbaseDiff {
                 public_key: sender.into(),
@@ -342,7 +342,7 @@ mod tests {
     use crate::{
         command::{Command, Delegation, Payment},
         ledger::{
-            account::Amount,
+            account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
             PublicKey,
         },
@@ -391,7 +391,7 @@ mod tests {
         let source_public_key = PublicKey::new(source_str);
         let receiver_str = "B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs";
         let receiver_public_key = PublicKey::new(receiver_str);
-        let nonce = 5;
+        let nonce = Nonce(5);
 
         let payment_command = Command::Payment(Payment {
             source: source_public_key.clone(),
@@ -421,7 +421,7 @@ mod tests {
         let delegator_public_key = PublicKey::new(delegator_str);
         let delegate_str = "B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz";
         let delegate_public_key = PublicKey::new(delegate_str);
-        let nonce = 42;
+        let nonce = Nonce(42);
 
         let delegation_command = Command::Delegation(Delegation {
             delegator: delegator_public_key.clone(),
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_public_key_payment() {
-        let nonce = 42;
+        let nonce = Nonce(42);
         let payment_diff = PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: 536900000000.into(),
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_public_key_delegation() {
-        let nonce = 42;
+        let nonce = Nonce(42);
         let delegation_diff = DelegationDiff {
             delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi"),
             delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
