@@ -180,7 +180,6 @@ impl BlockStore for IndexerStore {
 
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Setting best block {state_hash}");
-
         if let Some(old) = self.get_best_block_hash()? {
             if old == *state_hash {
                 return Ok(());

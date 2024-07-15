@@ -29,7 +29,7 @@ use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
-    fs::{self, read_dir, DirEntry, File},
+    fs::{self, read_dir, File},
     io::{self, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
@@ -261,9 +261,7 @@ fn extract_archive_file(archive_file: &Path, output_dir: &Path) -> io::Result<()
     );
     fs::create_dir_all(output_dir)?;
 
-    let archive = BufReader::new(File::open(archive_file)?);
-
-    let mut archive = tar::Archive::new(archive);
+    let mut archive = tar::Archive::new(BufReader::new(File::open(archive_file)?));
     archive.unpack(output_dir)
 }
 
@@ -275,15 +273,14 @@ fn archive_directory(input_dir: impl AsRef<Path>, output_file: impl AsRef<Path>)
     );
 
     let mut archive = tar::Builder::new(BufWriter::new(File::create(output_file)?));
-
-    let files = read_dir(input_dir)?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().map(|ft| ft.is_file()).unwrap_or(false))
-        .collect::<Vec<DirEntry>>();
-
-    for file in files {
-        archive.append_path_with_name(file.path(), file.file_name())?;
-    }
+    read_dir(input_dir)?
+        .flatten()
+        .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
+        .for_each(|file| {
+            archive
+                .append_path_with_name(file.path(), file.file_name())
+                .ok();
+        });
 
     archive.finish()
 }
