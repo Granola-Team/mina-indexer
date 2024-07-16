@@ -25,7 +25,6 @@ impl StakingLedgerParser {
             .filter_map(|path| path.ok())
             .filter(|path| is_valid_ledger_file(path))
             .collect();
-
         Ok(Self {
             ledgers_dir: ledgers_dir.to_path_buf(),
             ledger_paths: ledger_paths.into_iter(),
@@ -33,7 +32,7 @@ impl StakingLedgerParser {
     }
 
     /// Only parse the staking ledger if it's not already in the db
-    pub fn next_ledger(
+    pub async fn next_ledger(
         &mut self,
         store: Option<&std::sync::Arc<IndexerStore>>,
     ) -> anyhow::Result<Option<StakingLedger>> {
@@ -44,6 +43,7 @@ impl StakingLedgerParser {
                     if store.get_ledger_hash(epoch)? != Some(hash) {
                         // add the missing staking ledger
                         return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
+                            .await
                             .map(Some);
                     } else {
                         continue;
@@ -52,7 +52,9 @@ impl StakingLedgerParser {
             }
 
             // parse all staking ledgers if no store
-            return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into()).map(Some);
+            return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
+                .await
+                .map(Some);
         }
         Ok(None)
     }
@@ -81,8 +83,8 @@ mod tests {
     use super::StakingLedgerParser;
     use std::path::PathBuf;
 
-    #[test]
-    fn parser() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn parser() -> anyhow::Result<()> {
         let ledgers_dir: PathBuf = "./tests/data/staking_ledgers".into();
         let mut n = 0;
         let mut ledger_parser = StakingLedgerParser::new(&ledgers_dir)?;
@@ -97,12 +99,11 @@ mod tests {
             ),
         ];
 
-        while let Some(staking_ledger) = ledger_parser.next_ledger(None)? {
+        while let Some(staking_ledger) = ledger_parser.next_ledger(None).await? {
             assert_eq!(staking_ledger.epoch, expect[n].0);
             assert_eq!(staking_ledger.ledger_hash.0, expect[n].1);
             n += 1;
         }
-
         Ok(())
     }
 }

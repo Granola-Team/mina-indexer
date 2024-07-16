@@ -20,14 +20,18 @@ impl LedgerStore for IndexerStore {
     // Staged ledgers //
     ////////////////////
 
-    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<()> {
+    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<bool> {
         trace!("Adding staged ledger\nstate_hash: {state_hash}\nledger_hash: {ledger_hash}");
+        let is_new = self
+            .database
+            .get_cf(self.ledgers_cf(), ledger_hash.0.as_bytes())?
+            .is_none();
         self.database.put_cf(
             self.ledgers_cf(),
             ledger_hash.0.as_bytes(),
             state_hash.0.as_bytes(),
         )?;
-        Ok(())
+        Ok(is_new)
     }
 
     fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
@@ -50,26 +54,31 @@ impl LedgerStore for IndexerStore {
             .get_known_genesis_prev_state_hashes()?
             .contains(state_hash)
         {
-            self.add_ledger(&LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()), state_hash)?;
-            self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                DbLedgerEvent::NewLedger {
-                    blockchain_length: 0,
-                    state_hash: state_hash.clone(),
-                    ledger_hash: LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
-                },
-            )))?;
+            if self
+                .add_ledger(&LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()), state_hash)
+                .unwrap_or(false)
+            {
+                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                    DbLedgerEvent::NewLedger {
+                        blockchain_length: 0,
+                        state_hash: state_hash.clone(),
+                        ledger_hash: LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
+                    },
+                )))?;
+            }
         } else {
             match self.get_block(state_hash)? {
                 Some(block) => {
                     let ledger_hash = block.staged_ledger_hash();
-                    self.add_ledger(&ledger_hash, state_hash)?;
-                    self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                        DbLedgerEvent::NewLedger {
-                            ledger_hash,
-                            state_hash: block.state_hash(),
-                            blockchain_length: block.blockchain_length(),
-                        },
-                    )))?;
+                    if self.add_ledger(&ledger_hash, state_hash).unwrap_or(false) {
+                        self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                            DbLedgerEvent::NewLedger {
+                                ledger_hash,
+                                state_hash: block.state_hash(),
+                                blockchain_length: block.blockchain_length(),
+                            },
+                        )))?;
+                    }
                 }
                 None => {
                     if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
@@ -129,7 +138,6 @@ impl LedgerStore for IndexerStore {
         }
 
         trace!("Found staged ledger state hash {curr_state_hash}");
-
         if let Some(mut ledger) = self
             .database
             .get_pinned_cf(self.ledgers_cf(), curr_state_hash.0.as_bytes())?
@@ -143,15 +151,6 @@ impl LedgerStore for IndexerStore {
             if memoize {
                 trace!("Memoizing ledger for block {state_hash}");
                 self.add_ledger_state_hash(state_hash, ledger.clone())?;
-                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                    DbLedgerEvent::NewLedger {
-                        state_hash: state_hash.clone(),
-                        ledger_hash: diff.staged_ledger_hash,
-                        blockchain_length: self
-                            .get_block_height(state_hash)?
-                            .expect("length indexed"),
-                    },
-                )))?;
             }
             return Ok(Some(ledger));
         }

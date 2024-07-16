@@ -16,7 +16,7 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use speedb::checkpoint::Checkpoint;
 use std::{
@@ -48,8 +48,8 @@ pub struct IndexerConfiguration {
     pub genesis_constants: GenesisConstants,
     pub constraint_system_digests: Vec<String>,
     pub version: PcbVersion,
-    pub blocks_dir: PathBuf,
-    pub staking_ledgers_dir: PathBuf,
+    pub blocks_dir: Option<PathBuf>,
+    pub staking_ledgers_dir: Option<PathBuf>,
     pub prune_interval: u32,
     pub canonical_threshold: u32,
     pub canonical_update_threshold: u32,
@@ -74,17 +74,16 @@ pub enum InitializationMode {
 /// The purpose of this mode is to create a known good initial
 /// database so that it may be used and shared with other Mina
 /// Indexers
-pub fn initialize_indexer_database(
+pub async fn initialize_indexer_database(
     config: IndexerConfiguration,
-    store: Arc<IndexerStore>,
+    store: &Arc<IndexerStore>,
 ) -> anyhow::Result<()> {
-    let state = initialize(config, store).unwrap_or_else(|e| {
+    let state = initialize(config, store).await.unwrap_or_else(|e| {
         error!("Failed to initialize mina indexer state: {e}");
         std::process::exit(1);
     });
-    if let Some(indexer_store) = state.indexer_store {
+    if let Some(indexer_store) = state.indexer_store.as_ref() {
         indexer_store.database.cancel_all_background_work(true);
-        drop(indexer_store);
     }
     Ok(())
 }
@@ -104,10 +103,12 @@ pub async fn start_indexer(
     let domain_socket_path = config.domain_socket_path.clone();
 
     // initialize witness tree & connect database
-    let state = Arc::new(RwLock::new(initialize(config, store).unwrap_or_else(|e| {
-        error!("Failed to initialize mina indexer state: {e}");
-        std::process::exit(1);
-    })));
+    let state = Arc::new(RwLock::new(
+        initialize(config, &store).await.unwrap_or_else(|e| {
+            error!("Failed to initialize mina indexer state: {e}");
+            std::process::exit(1);
+        }),
+    ));
 
     // read-only state
     start_uds_server(&subsys, state.clone(), &domain_socket_path).await?;
@@ -141,9 +142,9 @@ async fn start_uds_server(
     Ok(())
 }
 
-fn initialize(
+async fn initialize(
     config: IndexerConfiguration,
-    store: Arc<IndexerStore>,
+    store: &Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
     info!("Initializing new mina indexer");
     let db_path = store.db_path.clone();
@@ -164,13 +165,17 @@ fn initialize(
         ..
     } = config;
 
-    if let Err(e) = fs::create_dir_all(&blocks_dir) {
-        error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
-        process::exit(1);
+    if let Some(ref blocks_dir) = blocks_dir {
+        if let Err(e) = fs::create_dir_all(blocks_dir) {
+            error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
+            process::exit(1);
+        }
     }
-    if let Err(e) = fs::create_dir_all(&staking_ledgers_dir) {
-        error!("Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}");
-        process::exit(1);
+    if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
+        if let Err(e) = fs::create_dir_all(staking_ledgers_dir) {
+            error!("Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}");
+            process::exit(1);
+        }
     }
 
     let chain_id = chain_id(
@@ -190,9 +195,9 @@ fn initialize(
     );
     let indexer_version = IndexerVersion::new(&Network::Mainnet, &chain_id, &genesis_hash);
     let state_config = IndexerStateConfig {
-        genesis_hash,
-        indexer_store: store,
-        version: indexer_version,
+        genesis_hash: genesis_hash.clone(),
+        indexer_store: store.clone(),
+        version: indexer_version.clone(),
         genesis_ledger: genesis_ledger.clone(),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
         prune_interval,
@@ -204,9 +209,7 @@ fn initialize(
 
     let mut state = match initialization_mode {
         InitializationMode::New => {
-            info!(
-                "Initializing indexer from blocks in {blocks_dir:#?} and staking ledgers in {staking_ledgers_dir:#?}"
-            );
+            log_dirs_msg(blocks_dir.as_ref(), staking_ledgers_dir.as_ref());
             IndexerState::new_from_config(state_config)?
         }
         InitializationMode::Replay => {
@@ -220,46 +223,71 @@ fn initialize(
     };
 
     // ingest staking ledgers
-    if let Err(e) = state.add_startup_staking_ledgers_to_store(&staking_ledgers_dir) {
-        error!("Failed to ingest staking ledger {staking_ledgers_dir:#?} {e}");
+    if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
+        if let Err(e) = state
+            .add_startup_staking_ledgers_to_store(staking_ledgers_dir)
+            .await
+        {
+            error!("Failed to ingest staking ledger {staking_ledgers_dir:#?}: {e}");
+        }
     }
 
     // ingest precomputed blocks
-    match initialization_mode {
-        InitializationMode::New => {
-            let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
-                &blocks_dir,
-                version,
-                canonical_threshold,
-                reporting_freq,
-            )
-            .unwrap_or_else(|e| panic!("Obtaining block parser failed: {e}"));
-            state.initialize_with_canonical_chain_discovery(&mut block_parser)?;
-        }
-        InitializationMode::Replay => {
-            let min_length_filter = state.replay_events()?;
-            let mut block_parser = BlockParser::new_length_sorted_min_filtered(
-                &blocks_dir,
-                version,
-                min_length_filter,
-            )?;
-
-            if block_parser.total_num_blocks > 0 {
-                info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser)?;
+    if let Some(ref blocks_dir) = blocks_dir {
+        match initialization_mode {
+            InitializationMode::New => {
+                let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
+                    blocks_dir,
+                    version,
+                    canonical_threshold,
+                    reporting_freq,
+                )
+                .await
+                .unwrap_or_else(|e| panic!("Obtaining block parser failed: {e}"));
+                state
+                    .initialize_with_canonical_chain_discovery(&mut block_parser)
+                    .await?;
             }
-        }
-        InitializationMode::Sync => {
-            let min_length_filter = state.sync_from_db()?;
-            let mut block_parser = BlockParser::new_length_sorted_min_filtered(
-                &blocks_dir,
-                version,
-                min_length_filter,
-            )?;
+            InitializationMode::Replay => {
+                if let Ok(ref replay_state) =
+                    IndexerState::new_without_genesis_events(IndexerStateConfig {
+                        genesis_hash: genesis_hash.clone(),
+                        indexer_store: store.clone(),
+                        version: indexer_version.clone(),
+                        genesis_ledger: genesis_ledger.clone(),
+                        transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
+                        prune_interval,
+                        canonical_threshold,
+                        canonical_update_threshold,
+                        ledger_cadence,
+                        reporting_freq,
+                    })
+                {
+                    let min_length_filter = state.replay_events(replay_state)?;
+                    let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                        blocks_dir,
+                        version,
+                        min_length_filter,
+                    )?;
 
-            if block_parser.total_num_blocks > 0 {
-                info!("Adding new blocks from {blocks_dir:#?}");
-                state.add_blocks(&mut block_parser)?;
+                    if block_parser.total_num_blocks > 0 {
+                        info!("Adding new blocks from {blocks_dir:#?}");
+                        state.add_blocks(&mut block_parser).await?;
+                    }
+                }
+            }
+            InitializationMode::Sync => {
+                let min_length_filter = state.sync_from_db()?;
+                let mut block_parser = BlockParser::new_length_sorted_min_filtered(
+                    blocks_dir,
+                    version,
+                    min_length_filter,
+                )?;
+
+                if block_parser.total_num_blocks > 0 {
+                    info!("Adding new blocks from {blocks_dir:#?}");
+                    state.add_blocks(&mut block_parser).await?;
+                }
             }
         }
     }
@@ -303,8 +331,8 @@ fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
 /// Starts filesystem watchers & runs the mina indexer
 async fn run_indexer<P: AsRef<Path>>(
     subsys: &SubsystemHandle,
-    blocks_dir: P,
-    staking_ledgers_dir: P,
+    blocks_dir: Option<P>,
+    staking_ledgers_dir: Option<P>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_exe: Option<PathBuf>,
     missing_block_recovery_batch: bool,
@@ -326,16 +354,21 @@ async fn run_indexer<P: AsRef<Path>>(
         Config::default(),
     )?;
 
-    watcher.watch(blocks_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!(
-        "Watching for new blocks in directory: {}",
-        blocks_dir.as_ref().display()
-    );
-    watcher.watch(staking_ledgers_dir.as_ref(), RecursiveMode::NonRecursive)?;
-    info!(
-        "Watching for staking ledgers in directory: {}",
-        staking_ledgers_dir.as_ref().display()
-    );
+    if let Some(ref blocks_dir) = blocks_dir {
+        watcher.watch(blocks_dir.as_ref(), RecursiveMode::NonRecursive)?;
+        info!(
+            "Watching for precomputed blocks in directory: {:#?}",
+            blocks_dir.as_ref()
+        );
+    }
+
+    if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
+        watcher.watch(staking_ledgers_dir.as_ref(), RecursiveMode::NonRecursive)?;
+        info!(
+            "Watching for staking ledgers in directory: {:#?}",
+            staking_ledgers_dir.as_ref()
+        );
+    }
 
     loop {
         tokio::select! {
@@ -357,14 +390,15 @@ async fn run_indexer<P: AsRef<Path>>(
 
             // recover missing blocks
             _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
-                if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
-                    recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
+                if let Some(ref blocks_dir) = blocks_dir {
+                    if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
+                        recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
+                    }
                 }
             }
         }
     }
 
-    info!("Filesystem watchers shutting down..");
     let state = state.write().await;
     if let Some(store) = state.indexer_store.as_ref() {
         info!("Canceling db background work");
@@ -385,7 +419,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                     EventKind::Create(notify::event::CreateKind::File)
                 )
             {
-                warn!("Ignore create file event when the file isn't a hard link");
+                debug!("Ignore create file event when the file isn't a hard link");
                 // This potentially can cause an EOF when parsing the
                 // files because it many not be fully written
                 // yet. Instead use the close event as a signal to
@@ -409,7 +443,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                         }
 
                         // if the block isn't in the witness tree, pipeline it
-                        match state.block_pipeline(&block, path.metadata()?.len()) {
+                        match state.block_pipeline(&block, Some(path.metadata()?.len())) {
                             Ok(is_added) => {
                                 if is_added {
                                     info!("Added block {}", block.summary())
@@ -434,7 +468,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let version = state.read().await.version.clone();
                 let mut state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()) {
+                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()).await
+                    {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();
@@ -541,5 +576,20 @@ impl IndexerVersion {
             MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
         );
         Self::new(&Network::Mainnet, &chain_id, &MAINNET_GENESIS_HASH.into())
+    }
+}
+
+fn log_dirs_msg(blocks_dir: Option<&PathBuf>, staking_ledgers_dir: Option<&PathBuf>) {
+    match (blocks_dir, staking_ledgers_dir) {
+        (Some(blocks_dir), Some(staking_ledgers_dir)) => info!(
+            "Initializing indexer from blocks in {blocks_dir:#?} and staking ledgers in {staking_ledgers_dir:#?}"
+        ),
+        (Some(blocks_dir), None) => info!(
+            "Initializing indexer from blocks in {blocks_dir:#?}"
+        ),
+        (None, Some(staking_ledgers_dir)) => info!(
+            "Initializing indexer from staking ledgers in {staking_ledgers_dir:#?}"
+        ),
+        (None, None) => info!("Initializing indexer without blocks and staking ledgers"),
     }
 }

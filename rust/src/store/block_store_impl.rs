@@ -126,7 +126,6 @@ impl BlockStore for IndexerStore {
             blockchain_length: block.blockchain_length(),
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
-
         Ok(Some(db_event))
     }
 

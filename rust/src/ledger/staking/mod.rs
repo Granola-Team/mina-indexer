@@ -17,7 +17,10 @@ use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
@@ -82,7 +85,7 @@ pub struct EpochStakeDelegation {
     pub pk: PublicKey,
     pub count_delegates: Option<u32>,
     pub total_delegated: Option<u64>,
-    pub delegates: Vec<PublicKey>,
+    pub delegates: HashSet<PublicKey>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -173,7 +176,10 @@ impl StakingAccount {
 }
 
 impl StakingLedger {
-    pub fn parse_file(path: &Path, genesis_state_hash: BlockHash) -> anyhow::Result<StakingLedger> {
+    pub async fn parse_file(
+        path: &Path,
+        genesis_state_hash: BlockHash,
+    ) -> anyhow::Result<StakingLedger> {
         trace!(
             "Parsing staking ledger {}",
             path.file_stem().unwrap().to_str().unwrap_or_default()
@@ -216,7 +222,7 @@ impl StakingLedger {
                         pk: delegate.clone(),
                         total_delegated: Some(balance),
                         count_delegates: Some(1),
-                        delegates: vec![pk.clone()],
+                        delegates: HashSet::from([pk.clone(); 1]),
                     }),
                 ) {
                     None => (), // first delegation
@@ -231,7 +237,7 @@ impl StakingLedger {
                         mut delegates,
                     })) => {
                         // accumulate delegation
-                        delegates.push(pk.clone());
+                        delegates.insert(pk.clone());
                         delegations.insert(
                             delegate.clone(),
                             Some(EpochStakeDelegation {
@@ -300,12 +306,12 @@ mod tests {
         chain::Network, constants::MAINNET_GENESIS_HASH,
         ledger::staking::AggregatedEpochStakeDelegations,
     };
-    use std::path::PathBuf;
+    use std::{collections::HashSet, path::PathBuf};
 
-    #[test]
-    fn parse_file() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into()).await?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, Network::Mainnet);
@@ -316,12 +322,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn calculate_delegations() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn calculate_delegations() -> anyhow::Result<()> {
         use crate::ledger::public_key::PublicKey;
 
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into())?;
+        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into()).await?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
@@ -339,16 +345,14 @@ mod tests {
         );
 
         let pk = PublicKey::from("B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4");
-        let mut pk_delegations = delegations.get(&pk).cloned().unwrap();
-        pk_delegations.delegates.sort();
-
+        let pk_delegations = delegations.get(&pk).cloned().unwrap();
         assert_eq!(pk_delegations.pk, pk);
         assert_eq!(pk_delegations.count_delegates, Some(25));
         assert_eq!(pk_delegations.total_delegated, Some(13277838425206999));
         assert_eq!(total_delegations, 794268782956784283);
         assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
 
-        let mut expected_delegates: Vec<PublicKey> = [
+        let expected_delegates: HashSet<PublicKey> = [
             "B62qmCwouxG2UzH6zEYGFWFFzUuSv9sbLnr96VJWDX3paSSucX7jAJN",
             "B62qpz34iGX2eaRDyHmHbq3v1SnUgzounhudGZRfNUDh79JuTstPNy1",
             "B62qjUut7tByYkosrfLDC5aKLSLQ2JxTbkBcfF3em3HwiyNkEsQmwfM",
@@ -378,7 +382,6 @@ mod tests {
         .into_iter()
         .map(PublicKey::from)
         .collect();
-        expected_delegates.sort();
         assert_eq!(pk_delegations.delegates, expected_delegates);
 
         Ok(())

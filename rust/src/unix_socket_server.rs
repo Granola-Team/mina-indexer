@@ -33,7 +33,6 @@ use tokio_graceful_shutdown::{FutureExt, SubsystemHandle};
 
 /// Create Unix Domain Socket listener
 pub fn create_socket_listener(domain_socket_path: &Path) -> UnixListener {
-    info!("Creating Unix domain socket server at {domain_socket_path:#?}");
     let listener = UnixListener::bind(domain_socket_path)
         .or_else(|e| try_replace_old_socket(e, domain_socket_path))
         .unwrap_or_else(|e| {
@@ -828,7 +827,9 @@ pub async fn handle_connection(
                         let delegates = aggregated_delegations
                             .delegations
                             .get(&pk)
-                            .map_or(vec![], |agg_del| agg_del.delegates.clone());
+                            .map_or(vec![], |agg_del| {
+                                agg_del.delegates.iter().cloned().collect()
+                            });
                         Some(serde_json::to_string_pretty(
                             &AggregatedEpochStakeDelegation {
                                 pk,

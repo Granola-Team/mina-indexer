@@ -123,31 +123,29 @@ if DEPLOY_TYPE == 'test'
   end
   Process.wait(pid)
 
-  # TODO: make self-check work
-  #
-  #  puts 'Initiating self-check...'
-  #  pid = spawn EXE +
-  #    " --socket #{SOCKET} " +
-  #    " server start" +
-  #    " --self-check" +
-  #    " --log-level DEBUG" +
-  #    " --ledger-cadence 5000" +
-  #    " --web-port #{PORT.to_s}" +
-  #    " --database-dir #{db_dir(BLOCKS_COUNT)}" +
-  #    " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" +
-  #    " --staking-ledgers-dir #{LEDGERS_DIR}" +
-  #    " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  #  wait_for_socket(10)
-  #  puts 'Self-check complete.'
-  #
-  #  puts 'Initiating shutdown...'
-  #  system(
-  #    EXE,
-  #    "--socket", SOCKET,
-  #    "shutdown"
-  #  ) || puts('Shutdown failed after snapshot.')
-  #  Process.wait(pid)
-  #  puts 'Shutdown complete.'
+  puts 'Initiating self-check...'
+  pid = spawn EXE +
+              " --socket #{SOCKET}" \
+              ' server start' \
+              ' --self-check' \
+              ' --log-level DEBUG' \
+              ' --ledger-cadence 5000' \
+              " --web-port #{PORT}" \
+              " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+              " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" \
+              " --staking-ledgers-dir #{LEDGERS_DIR}" \
+              " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+  wait_for_socket(10)
+  puts 'Self-check complete.'
+
+  puts 'Initiating shutdown...'
+  system(
+    EXE,
+    '--socket', SOCKET,
+    'shutdown'
+  ) || puts('Shutdown failed after snapshot.')
+  Process.wait(pid)
+  puts 'Shutdown complete.'
 
   File.delete(CURRENT)
 else

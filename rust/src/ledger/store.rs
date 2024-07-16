@@ -15,8 +15,9 @@ pub trait LedgerStore {
     // Staged ledgers //
     ////////////////////
 
-    /// Add a ledger with assoociated hash
-    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<()>;
+    /// Add a ledger with assoociated hashes
+    /// Returns true if ledger already present
+    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<bool>;
 
     /// Add a ledger associated with a canonical block
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()>;

@@ -13,7 +13,7 @@ pub const BUFFER_SIZE: usize = 1024;
 #[derive(Parser, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum ClientCli {
-    /// Query accounts
+    /// Query best ledger accounts
     #[clap(subcommand)]
     Accounts(Accounts),
 
@@ -25,7 +25,7 @@ pub enum ClientCli {
     #[clap(subcommand)]
     Chain(Chain),
 
-    /// Create a snapshot of a mina indexer database
+    /// Create a snapshot of a running mina indexer database
     #[clap(hide = true)]
     CreateSnapshot {
         /// Full path to the new snapshot file
@@ -33,7 +33,7 @@ pub enum ClientCli {
         output_path: PathBuf,
     },
 
-    /// Query ledgers
+    /// Query staged ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),
 
@@ -48,7 +48,7 @@ pub enum ClientCli {
     #[clap(subcommand)]
     Snarks(Snarks),
 
-    /// Show a summary of the state
+    /// Show the summary of a runnning mina indexer state
     Summary {
         /// Path to write the summary [default: stdout]
         #[arg(long)]
@@ -63,7 +63,7 @@ pub enum ClientCli {
         json: bool,
     },
 
-    /// Query transactions
+    /// Query transactions (user commands)
     #[clap(subcommand)]
     Transactions(Transactions),
 
@@ -71,14 +71,14 @@ pub enum ClientCli {
     #[clap(subcommand)]
     InternalCommands(InternalCommands),
 
-    /// Query running mina indexer for database version
+    /// Query a running mina indexer for database version
     DbVersion,
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
-/// Query accounts
 pub enum Accounts {
+    /// Query accounts by public key
     PublicKey {
         /// Retrieve public key's account info
         #[arg(long)]
@@ -88,9 +88,8 @@ pub enum Accounts {
 
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
-/// Query blocks
 pub enum Blocks {
-    /// Query block by state hash
+    /// Query blocks by state hash
     StateHash {
         /// Retrieve the block with given state hash
         #[arg(long)]
@@ -104,6 +103,7 @@ pub enum Blocks {
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
     /// Query the best tip block
     BestTip {
         /// Path to write the best tip [default: stdout]
@@ -179,7 +179,7 @@ pub enum Blocks {
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Chain {
-    /// Query the best chain
+    /// Query the canonical chain
     Best {
         /// Number of blocks to include in this suffix
         #[arg(long, default_value_t = 10)]
@@ -213,7 +213,7 @@ pub enum Ledgers {
         path: Option<PathBuf>,
     },
 
-    /// Query ledger by hash (state or ledger)
+    /// Query staged ledgers by (state or ledger) hash
     Hash {
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
@@ -224,7 +224,7 @@ pub enum Ledgers {
         hash: String,
     },
 
-    /// Query ledger by height
+    /// Query canonical staged ledgers by height
     Height {
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
@@ -239,7 +239,7 @@ pub enum Ledgers {
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum StakingLedgers {
-    /// Query staking ledger by hash
+    /// Query staking ledgers by ledger hash
     Hash {
         /// Ledger hash corresponding to the staking ledger
         #[arg(long)]
@@ -250,7 +250,7 @@ pub enum StakingLedgers {
         path: Option<PathBuf>,
     },
 
-    /// Query staking ledger at epoch
+    /// Query staking ledgers by epoch
     Epoch {
         /// Epoch number of the staking ledger
         #[arg(long)]
@@ -280,7 +280,7 @@ pub enum StakingLedgers {
         path: Option<PathBuf>,
     },
 
-    /// Query staking ledger by public key
+    /// Query staking ledgers by public key
     PublicKey {
         /// Epoch to aggregate staking delegations
         #[arg(long)]
@@ -321,6 +321,7 @@ pub enum Snarks {
         public_key: String,
     },
 
+    /// Query top SNARK workers by total fees
     Top {
         /// Number of SNARK rovers to include in list
         #[arg(long, default_value_t = 10)]
@@ -331,7 +332,7 @@ pub enum Snarks {
 #[derive(Subcommand, Debug, Encode, Decode)]
 #[command(author, version, about, long_about = None)]
 pub enum Transactions {
-    /// Query transactions by their hash
+    /// Query transactions by hash
     Hash {
         /// Hash of the transaction
         #[arg(long)]

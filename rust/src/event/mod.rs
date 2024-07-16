@@ -33,13 +33,17 @@ impl IndexerEvent {
 
     pub const NEW_BLOCK_KIND: u8 = 0;
     pub const NEW_BEST_TIP_KIND: u8 = 1;
+    pub const NEW_CANONICAL_BLOCK_KIND: u8 = 2;
 
     pub fn kind(&self) -> u8 {
         use db::*;
         match self {
             Self::Db(DbEvent::Block(DbBlockEvent::NewBlock { .. })) => Self::NEW_BLOCK_KIND,
             Self::Db(DbEvent::Block(DbBlockEvent::NewBestTip { .. })) => Self::NEW_BEST_TIP_KIND,
-            _ => 2,
+            Self::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock { .. })) => {
+                Self::NEW_CANONICAL_BLOCK_KIND
+            }
+            _ => 3,
         }
     }
 }
