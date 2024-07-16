@@ -7,6 +7,7 @@ BLOCKS_COUNT = ARGV[1]  #  number of blocks to deploy
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 
+require 'fileutils'
 require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
 
 abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exist?(BASE_DIR)
@@ -66,9 +67,6 @@ if DEPLOY_TYPE == 'test'
               " --socket #{SOCKET} " \
               ' server start' \
               ' --log-level DEBUG' \
-              ' --ledger-cadence 5000' \
-              " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" \
-              " --staking-ledgers-dir #{LEDGERS_DIR}" \
               " --web-port #{PORT}" \
               " --database-dir #{db_dir(BLOCKS_COUNT)}" \
               " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
@@ -123,17 +121,19 @@ if DEPLOY_TYPE == 'test'
   end
   Process.wait(pid)
 
+  # Delete the snapshot and the database directory restored to.
+  #
+  FileUtils.rm_rf(restore_path)
+  File.unlink(snapshot_path(BLOCKS_COUNT))
+
   puts 'Initiating self-check...'
   pid = spawn EXE +
               " --socket #{SOCKET}" \
               ' server start' \
               ' --self-check' \
               ' --log-level DEBUG' \
-              ' --ledger-cadence 5000' \
               " --web-port #{PORT}" \
               " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-              " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" \
-              " --staking-ledgers-dir #{LEDGERS_DIR}" \
               " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   wait_for_socket(10)
   puts 'Self-check complete.'
@@ -163,11 +163,8 @@ else
                 " --socket #{SOCKET} " \
                 ' server start' \
                 ' --log-level DEBUG' \
-                ' --ledger-cadence 5000' \
                 ' --web-hostname 0.0.0.0' \
                 " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-                " --blocks-dir #{blocks_dir(BLOCKS_COUNT)}" \
-                " --staking-ledgers-dir #{LEDGERS_DIR}" \
                 " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     Process.detach pid
     puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
