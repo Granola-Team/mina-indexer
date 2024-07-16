@@ -112,8 +112,12 @@ tier1: tier1-prereqs check lint test-unit
     rest_accounts_summary \
     hurl
 
+load:
+  @echo "--- Performing a simple load test'"
+  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer load
+
 # Run the 2nd tier of tests.
-tier2: tier2-prereqs test-unit-mina-rs nix-build && build-image
+tier2: tier2-prereqs test-unit-mina-rs nix-build load && build-image
   @echo "--- Performing regressions test(s) with Nix-built binary"
   time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer
   @echo "--- Performing many_blocks regression test"

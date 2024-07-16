@@ -1437,6 +1437,10 @@ test_block_children() {
     assert '3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45' $(echo "$children" | jq -r .[3].state_hash)
 }
 
+test_load() {
+    test_hurl true
+}
+
 test_hurl() {
     stage_mainnet_blocks 120 ./blocks
 
@@ -1449,7 +1453,12 @@ test_hurl() {
         --web-hostname "0.0.0.0"
     wait_for_socket
 
-    hurl --variable url=http://localhost:"$port"/graphql --test --parallel "$SRC"/tests/hurl/*.hurl
+    local parallel_flag=""
+    if [[ "${1:-}" == "true" ]]; then
+        parallel_flag="--parallel"
+    fi
+
+    hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$SRC"/tests/hurl/*.hurl
 }
 
 test_version_file() {
@@ -1592,6 +1601,7 @@ for test_name in "$@"; do
         "test_version_file") test_version_file ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
+        "test_load") test_load ;;
         "test_release") test_release ;;
         *) echo "Unknown test: $test_name"
            exit 1
