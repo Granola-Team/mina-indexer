@@ -14,6 +14,7 @@ use crate::{
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
+use signed::SignedCommandWithCreationData;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 pub enum CommandType {
@@ -40,6 +41,7 @@ pub struct Payment {
     pub nonce: Nonce,
     pub amount: Amount,
     pub receiver: PublicKey,
+    pub is_new_receiver_account: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -152,11 +154,19 @@ pub trait UserCommandWithStatusT {
     fn amount(&self) -> u64;
 
     fn memo(&self) -> String;
+
+    fn receiver_account_creation_fee_paid(&self) -> bool;
 }
 
 impl UserCommandWithStatusT for UserCommandWithStatus {
     fn is_applied(&self) -> bool {
         self.status_data().is_applied()
+    }
+
+    fn receiver_account_creation_fee_paid(&self) -> bool {
+        self.status_data()
+            .receiver_account_creation_fee_paid()
+            .is_some()
     }
 
     fn status_data(&self) -> CommandStatusData {
@@ -198,6 +208,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         receiver: receiver_pk.into(),
                         nonce: SignedCommand(v1.clone()).source_nonce(),
                         amount: amount.inner().inner().into(),
+                        is_new_receiver_account: self.receiver_account_creation_fee_paid(),
                     })
                 }
                 mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
@@ -306,16 +317,13 @@ impl Command {
                             let receiver: PublicKey =
                                 payment_payload.clone().inner().inner().receiver_pk.into();
                             let amount = payment_payload.inner().inner().amount.inner().inner();
-                            trace!(
-                                "Payment {{ source: {}, receiver: {}, amount: {amount} }}",
-                                source.to_address(),
-                                receiver.to_address()
-                            );
+                            trace!("Payment {{ source: {source}, receiver: {receiver}, amount: {amount} }}");
                             Self::Payment(Payment {
                                 source,
                                 receiver,
                                 nonce: SignedCommand(signed_command).source_nonce(),
                                 amount: amount.into(),
+                                is_new_receiver_account: command.receiver_account_creation_fee_paid(),
                             })
                         }
                         mina_rs::SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
@@ -327,11 +335,7 @@ impl Command {
                                     let delegator: PublicKey = delegator.into();
                                     let new_delegate: PublicKey = new_delegate.into();
                                     let nonce = SignedCommand(signed_command).source_nonce();
-                                    trace!(
-                                        "Delegation {{ delegator: {}, new_delegate: {}, nonce: {nonce} }}",
-                                        delegator.to_address(),
-                                        new_delegate.to_address()
-                                    );
+                                    trace!("Delegation {{ delegator: {delegator}, new_delegate: {new_delegate}, nonce: {nonce} }}");
                                     Self::Delegation(Delegation {
                                         delegate: new_delegate,
                                         delegator,
@@ -399,13 +403,13 @@ impl From<UserCommandWithStatus> for mina_rs::UserCommandWithStatus {
 
 impl From<UserCommandWithStatus> for Command {
     fn from(value: UserCommandWithStatus) -> Self {
-        value.data().into()
+        (value.data(), value.receiver_account_creation_fee_paid()).into()
     }
 }
 
-impl From<mina_rs::UserCommand> for Command {
-    fn from(value: mina_rs::UserCommand) -> Self {
-        let value: SignedCommand = value.into();
+impl From<(mina_rs::UserCommand, bool)> for Command {
+    fn from(value: (mina_rs::UserCommand, bool)) -> Self {
+        let value: SignedCommandWithCreationData = value.into();
         value.into()
     }
 }
@@ -468,6 +472,7 @@ impl From<Command> for serde_json::Value {
                 receiver,
                 nonce,
                 amount,
+                is_new_receiver_account: _,
             }) => {
                 let mut payment = Map::new();
                 payment.insert("source".into(), Value::String(source.to_address()));
@@ -634,6 +639,7 @@ mod test {
                     receiver,
                     nonce,
                     amount,
+                    is_new_receiver_account: _,
                 }) => {
                     println!("s: {source:?}");
                     println!("r: {receiver:?}");

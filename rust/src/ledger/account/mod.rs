@@ -172,7 +172,6 @@ impl Account {
 
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
         use super::UpdateType;
-
         match payment_diff.update_type {
             UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
             UpdateType::Debit(nonce) => {

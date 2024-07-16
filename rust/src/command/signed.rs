@@ -14,9 +14,16 @@ use std::io::Write;
 pub struct SignedCommand(pub mina_rs::SignedCommandV1);
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SignedCommandWithCreationData {
+    pub signed_command: SignedCommand,
+    pub is_new_receiver_account: bool,
+}
+
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithStateHash {
     pub command: SignedCommand,
     pub state_hash: BlockHash,
+    pub is_new_receiver_account: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -139,16 +146,28 @@ impl SignedCommand {
             .into_string())
     }
 
-    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        block.commands().into_iter().map(Self::from).collect()
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<SignedCommandWithCreationData> {
+        block
+            .commands()
+            .into_iter()
+            .map(|u| SignedCommandWithCreationData {
+                is_new_receiver_account: u.receiver_account_creation_fee_paid(),
+                signed_command: Self::from(u),
+            })
+            .collect()
     }
 }
 
 impl SignedCommandWithStateHash {
-    pub fn from(signed_cmd: &SignedCommand, state_hash: &str) -> Self {
+    pub fn from(
+        signed_cmd: &SignedCommand,
+        state_hash: &str,
+        is_new_receiver_account: bool,
+    ) -> Self {
         Self {
             command: signed_cmd.clone(),
             state_hash: state_hash.into(),
+            is_new_receiver_account,
         }
     }
 }
@@ -192,10 +211,13 @@ impl SignedCommandWithData {
     }
 }
 
-impl From<mina_rs::UserCommand> for SignedCommand {
-    fn from(value: mina_rs::UserCommand) -> Self {
-        let mina_rs::UserCommand::SignedCommand(v1) = value;
-        Self(v1)
+impl From<(mina_rs::UserCommand, bool)> for SignedCommandWithCreationData {
+    fn from(value: (mina_rs::UserCommand, bool)) -> Self {
+        let mina_rs::UserCommand::SignedCommand(v1) = value.0;
+        Self {
+            signed_command: v1.into(),
+            is_new_receiver_account: value.1,
+        }
     }
 }
 
@@ -212,9 +234,10 @@ impl From<UserCommandWithStatus> for SignedCommand {
     }
 }
 
-impl From<SignedCommand> for Command {
-    fn from(value: SignedCommand) -> Command {
-        match value.payload_body() {
+impl From<SignedCommandWithCreationData> for Command {
+    fn from(value: SignedCommandWithCreationData) -> Command {
+        let signed = value.signed_command;
+        match signed.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
                 let mina_rs::PaymentPayload {
                     source_pk,
@@ -226,7 +249,8 @@ impl From<SignedCommand> for Command {
                     source: source_pk.into(),
                     receiver: receiver_pk.into(),
                     amount: amount.inner().inner().into(),
-                    nonce: value.source_nonce(),
+                    nonce: signed.source_nonce(),
+                    is_new_receiver_account: value.is_new_receiver_account,
                 })
             }
             mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
@@ -237,7 +261,7 @@ impl From<SignedCommand> for Command {
                 Command::Delegation(Delegation {
                     delegate: new_delegate.into(),
                     delegator: delegator.into(),
-                    nonce: value.source_nonce(),
+                    nonce: signed.source_nonce(),
                 })
             }
         }
@@ -252,22 +276,26 @@ impl From<SignedCommandWithStateHash> for SignedCommand {
 
 impl From<SignedCommandWithStateHash> for Command {
     fn from(value: SignedCommandWithStateHash) -> Self {
-        value.command.into()
+        SignedCommandWithCreationData {
+            signed_command: value.command,
+            is_new_receiver_account: value.is_new_receiver_account,
+        }
+        .into()
     }
 }
 
 impl From<SignedCommandWithStateHash> for CommandWithStateHash {
     fn from(value: SignedCommandWithStateHash) -> Self {
         Self {
-            command: value.command.into(),
-            state_hash: value.state_hash,
+            state_hash: value.state_hash.clone(),
+            command: value.into(),
         }
     }
 }
 
 impl From<Versioned2<mina_rs::SignedCommand, 1, 1>> for SignedCommand {
     fn from(value: Versioned2<mina_rs::SignedCommand, 1, 1>) -> Self {
-        SignedCommand(value)
+        Self(value)
     }
 }
 
@@ -336,7 +364,11 @@ impl From<SignedCommandWithData> for SignedCommand {
 
 impl From<SignedCommandWithData> for Command {
     fn from(value: SignedCommandWithData) -> Self {
-        value.command.into()
+        SignedCommandWithCreationData {
+            signed_command: value.command,
+            is_new_receiver_account: value.status.receiver_account_creation_fee_paid().is_some(),
+        }
+        .into()
     }
 }
 

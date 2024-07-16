@@ -9,6 +9,7 @@ pub mod username;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
+    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::{Account, Amount, Nonce},
         diff::{
@@ -144,6 +145,10 @@ impl Ledger {
                             AccountDiff::Payment(payment_diff) => {
                                 Account::from_payment(account_before, payment_diff)
                             }
+                            AccountDiff::AccountCreationFee(_) => Account {
+                                balance: account_before.balance.sub(&MAINNET_ACCOUNT_CREATION_FEE),
+                                ..account_before
+                            },
                             AccountDiff::Delegation(delegation_diff) => {
                                 assert_eq!(account_before.public_key, delegation_diff.delegator);
                                 Account::from_delegation(
@@ -171,6 +176,7 @@ impl Ledger {
                         AccountDiff::Coinbase(_) => Ok(()),
                         AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
                         AccountDiff::Payment(_)
+                        | AccountDiff::AccountCreationFee(_)
                         | AccountDiff::FeeTransfer(_)
                         | AccountDiff::FeeTransferViaCoinbase(_)
                         | AccountDiff::FailedTransactionNonce(_) => {

@@ -1086,7 +1086,7 @@ pub async fn handle_connection(
                             if verbose {
                                 format!("{cmd:?}")
                             } else {
-                                let cmd: Command = cmd.command.into();
+                                let cmd: Command = cmd.into();
                                 format!("{cmd:?}")
                             }
                         })
