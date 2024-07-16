@@ -58,7 +58,7 @@ impl BlockParser {
     }
 
     /// Returns a new block parser which employs canonical chain discovery
-    pub fn new_with_canonical_chain_discovery(
+    pub async fn new_with_canonical_chain_discovery(
         blocks_dir: &Path,
         version: PcbVersion,
         canonical_threshold: u32,
@@ -72,11 +72,12 @@ impl BlockParser {
             canonical_threshold,
             reporting_freq,
         )
+        .await
     }
 
     /// Returns a new [Self::new_with_canonical_chain_discovery] block parser
     /// with paths additionally filtered by max length `block_length`
-    pub fn new_with_canonical_chain_discovery_filtered(
+    pub async fn new_with_canonical_chain_discovery_filtered(
         blocks_dir: &Path,
         version: PcbVersion,
         block_length: u32,
@@ -91,6 +92,7 @@ impl BlockParser {
             canonical_threshold,
             reporting_freq,
         )
+        .await
     }
 
     /// Returns a new length-sorted block parser with paths filtered by a min
@@ -172,7 +174,7 @@ impl BlockParser {
     /// discovery_ separating the block paths into two categories:
     /// - blocks known to be _canonical_
     /// - blocks that are higher than the _canonical root_
-    fn with_canonical_chain_discovery(
+    async fn with_canonical_chain_discovery(
         blocks_dir: &Path,
         version: PcbVersion,
         min_len_filter: Option<u32>,
@@ -239,7 +241,7 @@ impl BlockParser {
     /// - deep canonical
     /// - recent
     /// - orphaned
-    pub fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
+    pub async fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         if let Some(next_path) = self.canonical_paths.next() {
             return self.consume_block(&next_path, &ParsedBlock::DeepCanonical);
         }
@@ -262,13 +264,15 @@ impl BlockParser {
         state_hash: &str,
     ) -> anyhow::Result<(PrecomputedBlock, u64)> {
         let mut next_block: (PrecomputedBlock, u64) = self
-            .next_block()?
+            .next_block()
+            .await?
             .map(|p| (p.0.into(), p.1))
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.0.state_hash().0 != state_hash {
             next_block = self
-                .next_block()?
+                .next_block()
+                .await?
                 .map(|p| (p.0.into(), p.1))
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }

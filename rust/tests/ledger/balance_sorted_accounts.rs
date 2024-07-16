@@ -13,8 +13,8 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, sync::Arc};
 
-#[test]
-fn check_balance() -> anyhow::Result<()> {
+#[tokio::test]
+async fn check_balance() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("balance-sorted-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
@@ -33,10 +33,11 @@ fn check_balance() -> anyhow::Result<()> {
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
     // ingest the blocks
-    state.add_blocks(&mut bp)?;
+    state.add_blocks(&mut bp).await?;
 
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;

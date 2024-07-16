@@ -2,6 +2,7 @@ use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
+    constants::MAINNET_GENESIS_HASH,
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
     store::{to_be_bytes, DBUpdate, IndexerStore},
@@ -150,10 +151,9 @@ impl CanonicityStore for IndexerStore {
         let b_length = self.get_block_height(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
-        let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
         for _ in 0..(b_length - a_length) {
             // check if there's a previous block
-            if genesis_state_hashes.contains(&b) {
+            if b.0 == MAINNET_GENESIS_HASH {
                 break;
             }
 
@@ -172,7 +172,7 @@ impl CanonicityStore for IndexerStore {
         let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-        while a != b && !genesis_state_hashes.contains(&a) {
+        while a != b && a.0 != MAINNET_GENESIS_HASH {
             // collect canonicity diffs
             unapply.push(CanonicityDiff {
                 state_hash: a.clone(),

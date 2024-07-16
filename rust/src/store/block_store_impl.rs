@@ -126,7 +126,6 @@ impl BlockStore for IndexerStore {
             blockchain_length: block.blockchain_length(),
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
-
         Ok(Some(db_event))
     }
 
@@ -180,7 +179,6 @@ impl BlockStore for IndexerStore {
 
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
         trace!("Setting best block {state_hash}");
-
         if let Some(old) = self.get_best_block_hash()? {
             if old == *state_hash {
                 return Ok(());

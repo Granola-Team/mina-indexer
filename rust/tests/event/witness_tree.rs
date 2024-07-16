@@ -11,29 +11,26 @@ use mina_indexer::{
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
-async fn test() {
-    let store_dir = setup_new_db_dir("event-witness-tree").unwrap();
+async fn test() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("event-witness-tree")?;
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
+    let mut block_parser = BlockParser::new_testing(&log_dir)?;
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
-    )
-    .unwrap();
+    )?;
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser).unwrap();
-
-    let event_log = indexer_store.get_event_log().unwrap();
+    state.add_blocks(&mut block_parser).await?;
 
     // last update best tip
+    let event_log = indexer_store.get_event_log()?;
     let last_best_tip = event_log
         .iter()
         .filter_map(|event| match event {
@@ -77,4 +74,5 @@ async fn test() {
             (11, "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA"),
         ]
     );
+    Ok(())
 }

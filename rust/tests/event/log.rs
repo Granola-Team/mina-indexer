@@ -24,7 +24,8 @@ async fn test() -> anyhow::Result<()> {
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
     let store_dir1 = setup_new_db_dir("event-log-store1")?;
     let mut block_parser1 = BlockParser::new_with_canonical_chain_discovery(
@@ -32,7 +33,8 @@ async fn test() -> anyhow::Result<()> {
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
     let indexer_store0 = Arc::new(IndexerStore::new(store_dir0.path())?);
     let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path())?);
@@ -56,14 +58,14 @@ async fn test() -> anyhow::Result<()> {
     )?;
 
     // add parser0 blocks to state0
-    state0.add_blocks(&mut block_parser0).unwrap();
+    state0.add_blocks(&mut block_parser0).await?;
 
     // add parser1 blocks to state1
     // - add block to db
     // - add block to witness tree
     // - update best tip
     // - update canonicities
-    while let Some((block, _)) = block_parser1.next_block()? {
+    while let Some((block, _)) = block_parser1.next_block().await? {
         let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store

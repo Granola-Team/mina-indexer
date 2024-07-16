@@ -1,7 +1,12 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
 use crate::{
-    event::{store::EventStore, IndexerEvent},
-    store::IndexerStore,
+    event::{
+        db::{DbBlockEvent, DbEvent},
+        store::EventStore,
+        witness_tree::WitnessTreeEvent,
+        IndexerEvent,
+    },
+    store::{from_be_bytes, to_be_bytes, IndexerStore},
 };
 use log::trace;
 
@@ -10,56 +15,57 @@ impl EventStore for IndexerStore {
         let seq_num = self.get_next_seq_num()?;
         trace!("Adding event {seq_num}: {event:?}");
 
-        if matches!(event, IndexerEvent::WitnessTree(_)) {
+        if matches!(
+            event,
+            IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip { .. })
+        ) {
             return Ok(seq_num);
         }
 
-        // add event to db
-        self.database.put_cf(
-            self.events_cf(),
-            seq_num.to_be_bytes(),
-            serde_json::to_vec(&event)?,
-        )?;
+        // add prefixed event to db
+        let mut value = match event {
+            IndexerEvent::Db(DbEvent::Block(
+                DbBlockEvent::NewBestTip {
+                    blockchain_length, ..
+                }
+                | DbBlockEvent::NewBlock {
+                    blockchain_length, ..
+                },
+            )) => to_be_bytes(*blockchain_length),
+            _ => to_be_bytes(0),
+        };
+        value.push(event.kind());
+        value.append(&mut serde_json::to_vec(&event)?);
+        self.database
+            .put_cf(self.events_cf(), seq_num.to_be_bytes(), value)?;
 
         // increment event sequence number
         let next_seq_num = seq_num + 1;
-        self.database.put_cf(
-            self.events_cf(),
-            Self::NEXT_EVENT_SEQ_NUM_KEY,
-            serde_json::to_vec(&next_seq_num)?,
-        )?;
+        self.database
+            .put(Self::NEXT_EVENT_SEQ_NUM_KEY, next_seq_num.to_be_bytes())?;
 
         // return next event sequence number
         Ok(next_seq_num)
     }
 
     fn get_event(&self, seq_num: u32) -> anyhow::Result<Option<IndexerEvent>> {
-        let event = self
+        trace!("Getting event {seq_num}");
+        Ok(self
             .database
             .get_pinned_cf(self.events_cf(), seq_num.to_be_bytes())?
-            .map(|bytes| serde_json::from_slice(&bytes).unwrap());
-
-        trace!("Getting event {seq_num}: {:?}", event.clone().unwrap());
-        Ok(event)
+            .and_then(|bytes| serde_json::from_slice(&bytes[5..]).ok()))
     }
 
     fn get_next_seq_num(&self) -> anyhow::Result<u32> {
         trace!("Getting next event sequence number");
-        Ok(
-            if let Some(bytes) = self
-                .database
-                .get_pinned_cf(&self.events_cf(), Self::NEXT_EVENT_SEQ_NUM_KEY)?
-            {
-                serde_json::from_slice(&bytes)?
-            } else {
-                0
-            },
-        )
+        Ok(self
+            .database
+            .get(Self::NEXT_EVENT_SEQ_NUM_KEY)?
+            .map_or(0, from_be_bytes))
     }
 
     fn get_event_log(&self) -> anyhow::Result<Vec<IndexerEvent>> {
         trace!("Getting event log");
-
         let mut events = vec![];
         for n in 0..self.get_next_seq_num()? {
             if let Some(event) = self.get_event(n)? {

@@ -12,7 +12,7 @@ async fn representative_benches() -> anyhow::Result<()> {
     let mut block_parser0 = BlockParser::new_testing(&sample_dir0).unwrap();
     let mut logs_processed = 0;
 
-    while let Some((block, _)) = block_parser0.next_block()? {
+    while let Some((block, _)) = block_parser0.next_block().await? {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
         dbg!(block.state_hash());
@@ -28,7 +28,7 @@ async fn representative_benches() -> anyhow::Result<()> {
     let mut block_parser1 = BlockParser::new_testing(&sample_dir1).unwrap();
 
     logs_processed = 0;
-    while let Some((block, _)) = block_parser1.next_block()? {
+    while let Some((block, _)) = block_parser1.next_block().await? {
         let block: PrecomputedBlock = block.into();
         logs_processed += 1;
         dbg!(block.state_hash());
@@ -71,7 +71,7 @@ async fn orphaned_blocks() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )
-    .unwrap();
+    .await?;
 
     assert_eq!(
         block_parser.paths(),
