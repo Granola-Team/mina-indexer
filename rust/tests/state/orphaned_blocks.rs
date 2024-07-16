@@ -14,7 +14,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("orphaned-blocks")?;
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser =
-        BlockParser::new_with_canonical_chain_discovery(&log_dir, PcbVersion::V1, 10, 10)?;
+        BlockParser::new_with_canonical_chain_discovery(&log_dir, PcbVersion::V1, 10, 10).await?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
         serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
@@ -28,7 +28,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
     )?;
 
     // add all blocks to the state
-    state.add_blocks(&mut block_parser)?;
+    state.add_blocks(&mut block_parser).await?;
 
     // This block is deep canonical:
     // 0: mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json

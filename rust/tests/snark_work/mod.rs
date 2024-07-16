@@ -11,21 +11,19 @@ use mina_indexer::{
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
-async fn store() {
-    let store_dir = setup_new_db_dir("snark-store").unwrap();
+async fn store() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("snark-store")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
-
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
-    let genesis_root = parse_file(genesis_ledger_path).unwrap();
+    let genesis_root = parse_file(genesis_ledger_path)?;
     let indexer = IndexerState::new(
         genesis_root.into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-    )
-    .unwrap();
+    )?;
 
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
@@ -33,7 +31,7 @@ async fn store() {
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )
-    .unwrap();
+    .await?;
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
     let (block, _) = bp.get_precomputed_block(state_hash).await.unwrap();
     let block_snarks = SnarkWorkSummary::from_precomputed(&block);
@@ -64,4 +62,5 @@ async fn store() {
             .unwrap_or(vec![]);
         assert_eq!(result_pk_snarks, pk_snarks);
     }
+    Ok(())
 }

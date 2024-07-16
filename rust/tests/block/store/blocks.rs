@@ -10,24 +10,24 @@ use mina_indexer::{
 };
 use std::{collections::HashMap, path::PathBuf, time::Instant};
 
-#[test]
-fn add_and_get() -> anyhow::Result<()> {
+#[tokio::test]
+async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("block-store-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
-
     let db = IndexerStore::new(store_dir.path())?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
     let mut blocks = HashMap::new();
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some((block, _)) = bp.next_block()? {
+    while let Some((block, _)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash();
 

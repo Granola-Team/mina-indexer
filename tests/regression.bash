@@ -264,13 +264,15 @@ test_indexer_cli_reports() {
         grep -iq "Usage: mina-indexer database version"
 }
 
-# Indexer server starts up without any precomputed blocks
+# Indexer server starts up without blocks & staking ledger directories
 test_server_startup() {
-    idxr_server_start_standard
+    idxr_server_start --database-dir ./database-dir
     wait_for_socket
 
-    result=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $result
+    best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    root=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    assert $root $best
+    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $best
 }
 
 # Indexer server ipc is available during initialization

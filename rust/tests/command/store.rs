@@ -28,7 +28,6 @@ async fn add_and_get() -> anyhow::Result<()> {
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path)?;
-
     let indexer = IndexerState::new(
         genesis_root.into(),
         IndexerVersion::new_testing(),
@@ -36,16 +35,16 @@ async fn add_and_get() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )?;
-
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
     // add the first block to the store
-    if let Some((block, _)) = bp.next_block()? {
+    if let Some((block, _)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         indexer.add_block_to_store(&block)?;
     }

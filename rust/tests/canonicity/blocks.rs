@@ -11,24 +11,22 @@ use mina_indexer::{
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
-async fn test() {
-    let store_dir = setup_new_db_dir("canonicity-blocks").unwrap();
+async fn test() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("canonicity-blocks")?;
     let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path()).unwrap());
+    let mut block_parser = BlockParser::new_testing(&log_dir)?;
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut state = IndexerState::new(
         genesis_ledger.into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-    )
-    .unwrap();
+    )?;
 
-    state.add_blocks(&mut block_parser).unwrap();
+    state.add_blocks(&mut block_parser).await?;
 
     println!("CANONICAL ROOT: {:?}", state.canonical_root_block());
     println!("BEST TIP:       {:?}", state.best_tip_block());
@@ -37,7 +35,7 @@ async fn test() {
     assert_eq!(block_parser.total_num_blocks, 20);
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
-    let best_block_height = indexer_store.get_best_block_height().unwrap().unwrap();
+    let best_block_height = indexer_store.get_best_block_height()?.unwrap();
     let canonical_hashes = vec![
         MAINNET_GENESIS_HASH.to_string(),
         "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_string(),
@@ -83,4 +81,5 @@ async fn test() {
                 .unwrap()
         );
     }
+    Ok(())
 }

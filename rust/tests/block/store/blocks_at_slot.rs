@@ -10,8 +10,8 @@ use mina_indexer::{
 };
 use std::path::PathBuf;
 
-#[test]
-fn add_and_get() -> anyhow::Result<()> {
+#[tokio::test]
+async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("blocks-at-slot")?;
     let block_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
@@ -21,9 +21,10 @@ fn add_and_get() -> anyhow::Result<()> {
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
 
-    while let Some((block, _)) = bp.next_block()? {
+    while let Some((block, _)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         db.add_block(&block)?;
     }

@@ -12,8 +12,8 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, sync::Arc};
 
-#[test]
-fn set_usernames() -> anyhow::Result<()> {
+#[tokio::test]
+async fn set_usernames() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("usernames-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let store = Arc::new(IndexerStore::new(store_dir.path())?);
@@ -25,7 +25,8 @@ fn set_usernames() -> anyhow::Result<()> {
         IndexerVersion::new_testing().version,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
-    )?;
+    )
+    .await?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
         IndexerVersion::new_testing(),
@@ -35,7 +36,7 @@ fn set_usernames() -> anyhow::Result<()> {
     )?;
 
     // ingest the blocks
-    state.add_blocks(&mut bp)?;
+    state.add_blocks(&mut bp).await?;
 
     // update usernames
     let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;
