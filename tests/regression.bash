@@ -105,7 +105,7 @@ wait_forever_for_socket() {
 }
 
 idxr_server() {
-    idxr server "$@" &
+    RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock server "$@" &
     echo $! > ./idxr_pid
 }
 
@@ -1384,8 +1384,8 @@ test_clean_kill() {
         return 1
     fi
 
-    echo "  Sending Mina Indexer a SIGTERM"
     PID="$(cat ./idxr_pid)"
+    echo "  Sending Mina Indexer (PID $PID) a SIGTERM"
     kill "$PID"
 
     # We must give the process a chance to die cleanly.
@@ -1402,12 +1402,11 @@ test_clean_kill() {
         return 1
     fi
 
-    # TODO: robinbb - this is commented out because it does not pass!
-    #    # Check for socket deletion.
-    #    if [ -S ./mina-indexer.sock ]; then
-    #        echo "  The signal handler did not delete the socket. Failure."
-    #        return 1
-    #    fi
+    # Check for socket deletion.
+    if [ -S ./mina-indexer.sock ]; then
+        echo "  The signal handler did not delete the socket. Failure."
+        return 1
+    fi
 }
 
 test_block_children() {
