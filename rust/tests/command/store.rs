@@ -84,6 +84,7 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     // check transaction hash key
     for cmd in SignedCommand::from_precomputed(&block) {
+        let cmd = cmd.signed_command;
         let result_cmd: Option<SignedCommand> = indexer_store
             .get_user_command(&cmd.hash_signed_command()?, 0)?
             .map(|c| c.into());

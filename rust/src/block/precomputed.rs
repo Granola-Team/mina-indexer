@@ -589,7 +589,7 @@ impl PrecomputedBlock {
     pub fn command_hashes(&self) -> Vec<String> {
         SignedCommand::from_precomputed(self)
             .iter()
-            .map(|cmd| cmd.hash_signed_command().unwrap())
+            .filter_map(|cmd| cmd.signed_command.hash_signed_command().ok())
             .collect()
     }
 

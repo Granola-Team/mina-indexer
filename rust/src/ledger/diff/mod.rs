@@ -95,7 +95,6 @@ impl LedgerDiff {
 
         let mut account_diffs = Vec::new();
         account_diffs.append(&mut account_diff_txns);
-
         if coinbase.is_coinbase_applied() {
             account_diffs.push(coinbase.as_account_diff()[0].clone());
         }
@@ -214,11 +213,52 @@ mod tests {
     #[test]
     fn fees_from_precomputed_320081() -> anyhow::Result<()> {
         use crate::ledger::diff::account::AccountDiffType::*;
-
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-320081-3NK3bLM3eMyCum34ovAGCUw2GWUqDxkNwiti8XtKBYrocinp8oZM.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let mut ledger_diff = LedgerDiff::from_precomputed(&block);
         let mut expected = LedgerDiff::from(&[
+            (
+                "B62qizEvrYJeK6v5iXCpkvViKAUVpdwwbQ3vx8jkYoD9taUNnFtCxnd",
+                "B62qizEvrYJeK6v5iXCpkvViKAUVpdwwbQ3vx8jkYoD9taUNnFtCxnd",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qjG3yXAR2wqG73ANHsNyFhQLMQyvHqaYMKTuuFnUYa7aNTNQkTh5",
+                "B62qjG3yXAR2wqG73ANHsNyFhQLMQyvHqaYMKTuuFnUYa7aNTNQkTh5",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
+                "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qmde9CNS62zrfyiGXfyZjfig6QtRVpi2uVLR2Az7NVXnqX9S35os",
+                "B62qmde9CNS62zrfyiGXfyZjfig6QtRVpi2uVLR2Az7NVXnqX9S35os",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
+                "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
+                "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
+                AccountCreationFee,
+                0,
+            ),
+            (
+                "B62qqLjG8qFtbXWStm4tdWrcdqgQ7HYkcQEzPRXCoTziR7Gd4fjrMa2",
+                "B62qqLjG8qFtbXWStm4tdWrcdqgQ7HYkcQEzPRXCoTziR7Gd4fjrMa2",
+                AccountCreationFee,
+                0,
+            ),
             (
                 "B62qjBMMMbvj17vc5n6y7839mJr28QLLx8RC3QpKLDbsagtTgQA5sAW",
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
