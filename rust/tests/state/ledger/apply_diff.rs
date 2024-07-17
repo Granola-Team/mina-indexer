@@ -87,7 +87,7 @@ async fn account_diffs() {
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
-            Some(7299),
+            Some(7296),
             None,
         ),
         (
@@ -99,7 +99,7 @@ async fn account_diffs() {
         (
             "B62qqLa7eh6FNPH4hCw2oB7qhA5HuKtMyqnNRnD7KyGR3McaATPjahL",
             1000377787000,
-            Some(1),
+            Some(0),
             None,
         ),
         (
@@ -111,13 +111,13 @@ async fn account_diffs() {
         (
             "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
             1000000002000,
-            Some(2),
+            Some(0),
             None,
         ),
         (
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
             1155800000000,
-            Some(1),
+            Some(0),
             None,
         ),
     ])

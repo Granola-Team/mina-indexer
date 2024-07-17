@@ -196,24 +196,16 @@ impl Account {
         Account {
             public_key: pre.public_key.clone(),
             balance: pre.balance + amount,
-            nonce: Nonce(pre.nonce.0 + 1),
             ..pre
         }
     }
 
     pub fn from_delegation(pre: Self, delegate: PublicKey) -> Self {
-        Account {
-            nonce: Nonce(pre.nonce.0 + 1),
-            delegate,
-            ..pre
-        }
+        Account { delegate, ..pre }
     }
 
     pub fn from_failed_transaction(pre: Self, nonce: Nonce) -> Self {
-        Account {
-            nonce: nonce + 1,
-            ..pre
-        }
+        Account { nonce, ..pre }
     }
 }
 
