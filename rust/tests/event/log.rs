@@ -65,15 +65,15 @@ async fn test() -> anyhow::Result<()> {
     // - add block to witness tree
     // - update best tip
     // - update canonicities
-    while let Some((block, _)) = block_parser1.next_block().await? {
+    while let Some((block, block_bytes)) = block_parser1.next_block().await? {
         let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store
             .as_ref()
-            .map(|store| store.add_block(&block).unwrap())
+            .map(|store| store.add_block(&block, block_bytes).unwrap())
         {
             if db_event.map(|db| db.is_new_block_event()).unwrap_or(false) {
-                if let Some(wt_event) = state1.add_block_to_witness_tree(&block)?.1 {
+                if let Some(wt_event) = state1.add_block_to_witness_tree(&block, false)?.1 {
                     let (best_tip, new_canonical_blocks) = match wt_event {
                         WitnessTreeEvent::UpdateBestTip {
                             best_tip,
@@ -95,7 +95,7 @@ async fn test() -> anyhow::Result<()> {
                                 .unwrap()
                         }
                     });
-                    state1.add_block_to_witness_tree(&block)?;
+                    state1.add_block_to_witness_tree(&block, true)?;
                 }
             }
         }

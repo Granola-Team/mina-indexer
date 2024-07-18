@@ -24,9 +24,9 @@ async fn add_and_get() -> anyhow::Result<()> {
     )
     .await?;
 
-    while let Some((block, _)) = bp.next_block().await? {
+    while let Some((block, block_bytes)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
-        db.add_block(&block)?;
+        db.add_block(&block, block_bytes)?;
         println!("{}", block.summary());
     }
 

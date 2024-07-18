@@ -39,6 +39,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         indexer_store
             .get_block(&state_hash0)?
             .unwrap()
+            .0
             .state_hash()
             .0,
         state_hash0.0
@@ -53,6 +54,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         indexer_store
             .get_block(&state_hash1)?
             .unwrap()
+            .0
             .state_hash()
             .0,
         state_hash1.0
@@ -64,6 +66,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         indexer_store
             .get_block(&state_hash2)?
             .unwrap()
+            .0
             .state_hash()
             .0,
         state_hash2.0

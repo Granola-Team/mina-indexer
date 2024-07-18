@@ -98,14 +98,16 @@ async fn extensions() {
     // add root 0
     // ----------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&root0_block).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&root0_block, true).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ------------
     // add child 10
     // ------------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&child10_block).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&child10_block, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!(
@@ -134,21 +136,25 @@ async fn extensions() {
     // add child 0
     // -----------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&child0_block).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&child0_block, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
     // ----------
     // add root 1
     // ----------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&root1_block).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&root1_block, true).unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // ------------
     // add child 11
     // ------------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&child11_block).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&child11_block, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
     // 2 dangling branches

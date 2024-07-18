@@ -60,7 +60,7 @@ async fn extension() {
         .await
         .unwrap();
     assert!(matches!(
-        state.add_block_to_witness_tree(&child1).unwrap().0,
+        state.add_block_to_witness_tree(&child1, true).unwrap().0,
         ExtensionType::RootSimple(_)
     ));
     assert_eq!(
@@ -94,7 +94,7 @@ async fn extension() {
         .get_precomputed_block("3NKsUS3TtwvXsfFFnRAJ8US8wPLKKaRDTnbv4vzrwCDkb8HNaMWN")
         .await
         .unwrap();
-    let (extension_type, _) = state.add_block_to_witness_tree(&child2).unwrap();
+    let (extension_type, _) = state.add_block_to_witness_tree(&child2, true).unwrap();
 
     assert!(matches!(extension_type, ExtensionType::RootSimple(_)));
     assert_eq!(

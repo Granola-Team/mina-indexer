@@ -87,14 +87,14 @@ async fn merge() -> anyhow::Result<()> {
     // add leaf0
     // ---------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf0_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf0_block, true)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ---------
     // add leaf1
     // ---------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf1_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf1_block, true)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // Root branch
@@ -130,7 +130,7 @@ async fn merge() -> anyhow::Result<()> {
     // add middle block
     // ----------------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block, true)?;
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     println!("=== After state ===");

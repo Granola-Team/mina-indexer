@@ -28,7 +28,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
     let genesis_root = parse_file(genesis_ledger_path)?;
-    let indexer = IndexerState::new(
+    let mut indexer = IndexerState::new(
         genesis_root.into(),
         IndexerVersion::new_testing(),
         indexer_store.clone(),
@@ -44,18 +44,18 @@ async fn add_and_get() -> anyhow::Result<()> {
     .await?;
 
     // add the first block to the store
-    if let Some((block, _)) = bp.next_block().await? {
+    if let Some((block, block_bytes)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
-        indexer.add_block_to_store(&block)?;
+        indexer.add_block_to_store(&block, block_bytes, true)?;
     }
 
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
-    let (block, _) = bp.get_precomputed_block(state_hash).await?;
+    let (block, block_bytes) = bp.get_precomputed_block(state_hash).await?;
     let block_cmds = block.commands();
     let pks = block.all_command_public_keys();
 
     // add another block to the store
-    indexer.add_block_to_store(&block)?;
+    indexer.add_block_to_store(&block, block_bytes, true)?;
 
     // check state hash key
     let result_cmds = indexer_store

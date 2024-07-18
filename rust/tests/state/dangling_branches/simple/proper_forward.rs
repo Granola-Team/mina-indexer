@@ -47,7 +47,7 @@ async fn extension() {
 
     // add dangling_root_block
     let (extension, _) = state
-        .add_block_to_witness_tree(&dangling_root_block)
+        .add_block_to_witness_tree(&dangling_root_block, true)
         .unwrap();
     assert_eq!(extension, ExtensionType::DanglingNew);
 
@@ -110,7 +110,7 @@ async fn extension() {
     // add child block
     // ---------------
     let (extension, _) = state
-        .add_block_to_witness_tree(&dangling_child_block)
+        .add_block_to_witness_tree(&dangling_child_block, true)
         .unwrap();
 
     // after extension quantities

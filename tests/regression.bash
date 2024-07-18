@@ -104,6 +104,14 @@ wait_forever_for_socket() {
     done
 }
 
+idxr_database_create() {
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --staking-ledgers-dir ./staking-ledgers \
+        "$@"
+}
+
 idxr_server() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock server "$@" &
     echo $! > ./idxr_pid
@@ -115,6 +123,10 @@ idxr_server_start() {
 }
 
 idxr_server_start_standard() {
+    echo "Creating mina indexer database"
+    idxr_database_create "$@"
+    
+    echo "Starting mina indexer server from database"
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -161,7 +173,7 @@ test_indexer_cli_reports() {
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
 
-    # Indexer reports usage for client subcommands
+    # Client commands
     idxr accounts --help 2>&1 |
         grep -iq "Usage: mina-indexer accounts"
 
@@ -243,7 +255,7 @@ test_indexer_cli_reports() {
     idxr db-version --help 2>&1 |
         grep -iq "Usage: mina-indexer db-version"
 
-    # Database commands
+    # Server commands
     idxr server start --help 2>&1 |
         grep -iq "Usage: mina-indexer server start"
 
@@ -266,7 +278,8 @@ test_indexer_cli_reports() {
 
 # Indexer server starts up without blocks & staking ledger directories
 test_server_startup() {
-    idxr_server_start --database-dir ./database-dir
+    idxr database create --database-dir ./database
+    idxr_server_start --database-dir ./database
     wait_for_socket
 
     best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -279,20 +292,18 @@ test_server_startup() {
 test_ipc_is_available_immediately() {
     stage_mainnet_blocks 100 ./blocks
 
-    idxr_server_start_standard \
-        --genesis-hash 3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
+    idxr_server_start_standard
     wait_for_socket
 
     idxr summary
 }
 
-# Indexer server starts and creates directories with minimal args
+# Indexer database creates directories with minimal args
 test_startup_dirs_get_created() {
-    idxr_server_start \
+    idxr database create \
         --blocks-dir ./blocks-dir \
         --staking-ledgers-dir ./staking-ledgers-dir \
         --database-dir ./database-dir
-    wait_for_socket
 
     assert_directory_exists "./blocks-dir"
     assert_directory_exists "./staking-ledgers-dir"
@@ -340,8 +351,7 @@ test_canonical_threshold() {
     canonical_threshold=2
     stage_mainnet_blocks $num_seq_blocks ./blocks
 
-    idxr_server_start_standard \
-        --canonical-threshold $canonical_threshold
+    idxr_server_start_standard --canonical-threshold $canonical_threshold
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
@@ -686,7 +696,9 @@ test_sync() {
     dl_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
-    idxr_server_start_standard
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --database-dir ./database
     wait_for_socket
     idxr summary --verbose
 
@@ -712,8 +724,11 @@ test_replay() {
     # add 8 more blocks to the watch dir while not indexing
     dl_mainnet_range 16 20 ./blocks
 
-    # replay events from previous indexer instance & ingest the new blocks
-    idxr_server_start_standard --self-check
+    # replay events from previous indexer db
+    idxr_server_start \
+        --self-check \
+        --blocks-dir ./blocks \
+        --database-dir ./database
     wait_for_socket
 
     # post-replay results
@@ -825,8 +840,7 @@ test_snark_work() {
     stage_mainnet_blocks 120 ./blocks
     mkdir snark_work
 
-    idxr_server_start_standard \
-        --canonical-threshold 5
+    idxr_server_start_standard --canonical-threshold 5
     wait_for_socket
 
     # pk SNARK work queries
@@ -929,8 +943,7 @@ test_snapshot() {
 test_many_blocks() {
     stage_mainnet_blocks 1000 ./blocks
 
-    idxr_server_start_standard \
-        --ledger-cadence 100
+    idxr_server_start_standard --ledger-cadence 100
     wait_forever_for_socket
 
     # results
@@ -960,16 +973,16 @@ test_rest_accounts_summary() {
     stage_mainnet_blocks 100 ./blocks
 
     port=$(ephemeral_port)
+    idxr_database_create
     idxr_server start \
-        --blocks-dir ./blocks \
-        --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
+    sleep 1
 
     # results
-    assert '0' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)
+    assert '0' "$(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)"
     assert '1440050000000' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert 'B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .delegate)
 
@@ -1051,8 +1064,15 @@ test_rest_accounts_summary() {
 test_rest_blocks() {
     stage_mainnet_blocks 100 ./blocks
 
-    idxr_server_start_standard --web-hostname "0.0.0.0"
+    port=$(ephemeral_port)
+    idxr_database_create
+    idxr_server start \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0" \
+        --blocks-dir ./blocks \
+        --database-dir ./database
     wait_for_socket
+    sleep 1
 
     # /blocks endpoint
     curl --silent http://localhost:${port}/blocks > output.json
@@ -1136,10 +1156,10 @@ test_txn_nonces() {
 }
 
 test_startup_staking_ledgers() {
-    idxr_server_start \
-        --blocks-dir ./blocks \
+    idxr database create \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
+    idxr_server start --database-dir ./database
     wait_for_socket
 
     # epoch 0 staking ledger should be in the store, write it to a file
@@ -1236,10 +1256,11 @@ test_watch_staking_ledgers() {
 }
 
 test_staking_delegations() {
-    idxr_server_start \
+    idxr database create \
         --blocks-dir ./blocks \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
+    idxr_server_start --database-dir ./database
     wait_for_socket
 
     # check account
@@ -1359,7 +1380,7 @@ test_start_from_config() {
       \"network\": \"mainnet\"
     }" > $file
 
-    idxr_server_start --config $file
+    idxr_server_start_standard --config $file
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1451,13 +1472,16 @@ test_hurl() {
     stage_mainnet_blocks 120 ./blocks
 
     port=$(ephemeral_port)
-    idxr_server start \
+    idxr database create \
         --blocks-dir ./blocks \
-        --staking-ledgers-dir $STAKING_LEDGERS \
         --database-dir ./database \
+        --staking-ledgers-dir $STAKING_LEDGERS
+    idxr_server start \
         --web-port "$port" \
-        --web-hostname "0.0.0.0"
+        --web-hostname "0.0.0.0" \
+        --database-dir ./database
     wait_for_socket
+    sleep 1
 
     local parallel_flag=""
     if [[ "${1:-}" == "true" ]]; then
@@ -1479,7 +1503,12 @@ test_missing_block_recovery() {
 
     # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
     # wait for 3s in between recovery attempts
-    idxr_server_start_standard \
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database
+    idxr_server start \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
         --missing-block-recovery-exe "$SRC"/tests/recovery.sh \
         --missing-block-recovery-delay 3 \
         --missing-block-recovery-batch true
@@ -1508,10 +1537,6 @@ test_missing_block_recovery() {
 test_database_create() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr database create \
-        --blocks-dir ./blocks \
-        --database-dir ./database \
-        --staking-ledgers-dir ./staking-ledgers
     idxr_server_start_standard
     wait_for_socket
 
@@ -1532,11 +1557,7 @@ test_database_create() {
 test_snapshot_database_dir() {
     stage_mainnet_blocks 10 ./blocks
 
-    # create indexer database
-    idxr database create \
-        --blocks-dir ./blocks \
-        --database-dir ./database \
-        --staking-ledgers-dir ./staking-ledgers
+    idxr_database_create
 
     # create snapshot & restores
     idxr database snapshot --database-dir ./database

@@ -39,7 +39,7 @@ async fn test() -> anyhow::Result<()> {
 
     for n in 1..=3 {
         let state_hash = indexer_store.get_canonical_hash_at_height(n)?.unwrap();
-        let block = indexer_store.get_block(&state_hash)?.unwrap();
+        let block = indexer_store.get_block(&state_hash)?.unwrap().0;
         let ledger = indexer_store
             .get_ledger_state_hash(&state_hash, false)?
             .unwrap();
