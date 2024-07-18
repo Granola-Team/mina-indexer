@@ -57,6 +57,8 @@ pub struct IndexerConfiguration {
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
     pub domain_socket_path: PathBuf,
+    pub fetch_new_blocks_exe: Option<PathBuf>,
+    pub fetch_new_blocks_delay: Option<u64>,
     pub missing_block_recovery_exe: Option<PathBuf>,
     pub missing_block_recovery_delay: Option<u64>,
     pub missing_block_recovery_batch: bool,
@@ -97,6 +99,8 @@ pub async fn start_indexer(
 ) -> anyhow::Result<()> {
     let blocks_dir = config.blocks_dir.clone();
     let staking_ledgers_dir = config.staking_ledgers_dir.clone();
+    let fetch_new_blocks_delay = config.fetch_new_blocks_delay;
+    let fetch_new_blocks_exe = config.fetch_new_blocks_exe.clone();
     let missing_block_recovery_delay = config.missing_block_recovery_delay;
     let missing_block_recovery_exe = config.missing_block_recovery_exe.clone();
     let missing_block_recovery_batch = config.missing_block_recovery_batch;
@@ -114,13 +118,22 @@ pub async fn start_indexer(
     start_uds_server(&subsys, state.clone(), &domain_socket_path).await?;
 
     // modifies the state
+    let missing_block_recovery =
+        missing_block_recovery_exe.map(|exe| MissingBlockRecoveryOptions {
+            exe,
+            batch: missing_block_recovery_batch,
+            delay: missing_block_recovery_delay.unwrap_or(180),
+        });
+    let fetch_new_blocks = fetch_new_blocks_exe.map(|exe| FetchNewBlocksOptions {
+        exe,
+        delay: fetch_new_blocks_delay.unwrap_or(180),
+    });
     run_indexer(
         &subsys,
         blocks_dir,
         staking_ledgers_dir,
-        missing_block_recovery_delay,
-        missing_block_recovery_exe,
-        missing_block_recovery_batch,
+        missing_block_recovery,
+        fetch_new_blocks,
         state.clone(),
     )
     .await?;
@@ -331,14 +344,24 @@ fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
     }
 }
 
+struct MissingBlockRecoveryOptions {
+    pub delay: u64,
+    pub exe: PathBuf,
+    pub batch: bool,
+}
+
+struct FetchNewBlocksOptions {
+    pub delay: u64,
+    pub exe: PathBuf,
+}
+
 /// Starts filesystem watchers & runs the mina indexer
 async fn run_indexer<P: AsRef<Path>>(
     subsys: &SubsystemHandle,
     blocks_dir: Option<P>,
     staking_ledgers_dir: Option<P>,
-    missing_block_recovery_delay: Option<u64>,
-    missing_block_recovery_exe: Option<PathBuf>,
-    missing_block_recovery_batch: bool,
+    missing_block_recovery: Option<MissingBlockRecoveryOptions>,
+    fetch_new_blocks_opts: Option<FetchNewBlocksOptions>,
     state: Arc<RwLock<IndexerState>>,
 ) -> anyhow::Result<()> {
     // setup fs-based precomputed block & staking ledger watchers
@@ -373,6 +396,11 @@ async fn run_indexer<P: AsRef<Path>>(
         );
     }
 
+    let fetch_new_blocks_delay = fetch_new_blocks_opts.as_ref().map(|f| f.delay);
+    let fetch_new_blocks_exe = fetch_new_blocks_opts.as_ref().map(|f| f.exe.clone());
+    let missing_block_recovery_delay = missing_block_recovery.as_ref().map(|m| m.delay);
+    let missing_block_recovery_exe = missing_block_recovery.as_ref().map(|m| m.exe.clone());
+    let missing_block_recovery_batch = missing_block_recovery.map_or(false, |m| m.batch);
     loop {
         tokio::select! {
             // watch for shutdown signals
@@ -387,6 +415,15 @@ async fn run_indexer<P: AsRef<Path>>(
                     Err(e) => {
                         error!("Filesystem watcher error: {e}");
                         break;
+                    }
+                }
+            }
+
+            // fetch new blocks
+            _ = tokio::time::sleep(std::time::Duration::from_secs(fetch_new_blocks_delay.unwrap_or(180))) => {
+                if let Some(ref blocks_dir) = blocks_dir {
+                    if let Some(ref fetch_new_blocks_exe) = fetch_new_blocks_exe {
+                        fetch_new_blocks(&state, &blocks_dir, fetch_new_blocks_exe).await
                     }
                 }
             }
@@ -503,10 +540,41 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
     Ok(())
 }
 
+/// Fetch new blocks
+async fn fetch_new_blocks(
+    state: &Arc<RwLock<IndexerState>>,
+    blocks_dir: impl AsRef<Path>,
+    fetch_new_blocks_exe: impl AsRef<Path>,
+) {
+    let state = state.read().await;
+    let network = state.version.network.clone();
+    let new_block_length = state.best_tip_block().blockchain_length + 1;
+    let mut c = std::process::Command::new(fetch_new_blocks_exe.as_ref().display().to_string());
+    let cmd = c.args([
+        &network.to_string(),
+        &new_block_length.to_string(),
+        &blocks_dir.as_ref().display().to_string(),
+    ]);
+    match cmd.output() {
+        Ok(output) => {
+            use std::io::*;
+            stdout().write_all(&output.stdout).ok();
+            stderr().write_all(&output.stderr).ok();
+        }
+        Err(e) => error!(
+            "Error fetching new blocks: {e}, pgm: {}, args: {:?}",
+            cmd.get_program().to_str().unwrap(),
+            cmd.get_args()
+                .map(|arg| arg.to_str().unwrap())
+                .collect::<Vec<&str>>()
+        ),
+    }
+}
+
 /// Recovers missing blocks
 async fn recover_missing_blocks(
     state: &Arc<RwLock<IndexerState>>,
-    block_watch_dir: impl AsRef<Path>,
+    blocks_dir: impl AsRef<Path>,
     missing_block_recovery_exe: impl AsRef<Path>,
     batch_recovery: bool,
 ) {
@@ -527,7 +595,7 @@ async fn recover_missing_blocks(
         let cmd = c.args([
             &network.to_string(),
             &blockchain_length.to_string(),
-            &block_watch_dir.as_ref().display().to_string(),
+            &blocks_dir.as_ref().display().to_string(),
         ]);
         match cmd.output() {
             Ok(output) => {

@@ -109,7 +109,7 @@ enum DatabaseCommand {
     },
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct ServerArgs {
     #[clap(flatten)]
@@ -126,6 +126,14 @@ pub struct ServerArgs {
     /// Start with data consistency checks
     #[arg(long, default_value_t = false)]
     self_check: bool,
+
+    /// Path to the fetch new blocks executable
+    #[arg(long)]
+    fetch_new_blocks_exe: Option<PathBuf>,
+
+    /// Delay (sec) in between fetch new blocks attempts
+    #[arg(long)]
+    fetch_new_blocks_delay: Option<u64>,
 
     /// Path to the missing block recovery executable
     #[arg(long)]
@@ -144,7 +152,7 @@ pub struct ServerArgs {
     pid: Option<u32>,
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct DatabaseArgs {
     /// Path to the genesis ledger (JSON)
@@ -177,8 +185,8 @@ pub struct DatabaseArgs {
     pub database_dir: PathBuf,
 
     /// Max stdout log level
-    #[arg(long, default_value_t = LevelFilter::Warn)]
-    pub log_level: LevelFilter,
+    #[arg(long, default_value_t = LogLevelFilter::default())]
+    pub log_level: LogLevelFilter,
 
     /// Number of blocks to add to the canonical chain before persisting a
     /// ledger snapshot
@@ -281,7 +289,7 @@ impl ServerCommand {
             .module(module_path!())
             .color(ColorChoice::Never)
             .timestamp(Timestamp::Microsecond)
-            .verbosity(args.db.log_level)
+            .verbosity(args.db.log_level.0)
             .init()
             .unwrap();
 
@@ -416,6 +424,8 @@ fn process_indexer_configuration(
     let canonical_update_threshold = args.db.canonical_update_threshold;
     let ledger_cadence = args.db.ledger_cadence;
     let reporting_freq = args.db.reporting_freq;
+    let fetch_new_blocks_exe = args.fetch_new_blocks_exe;
+    let fetch_new_blocks_delay = args.fetch_new_blocks_delay;
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
@@ -468,6 +478,8 @@ fn process_indexer_configuration(
         ledger_cadence,
         reporting_freq,
         domain_socket_path,
+        fetch_new_blocks_exe,
+        fetch_new_blocks_delay,
         missing_block_recovery_exe,
         missing_block_recovery_delay,
         missing_block_recovery_batch,
@@ -600,6 +612,8 @@ struct ServerArgsJson {
     web_hostname: String,
     web_port: u16,
     pid: Option<u32>,
+    fetch_new_blocks_exe: Option<String>,
+    fetch_new_blocks_delay: Option<u64>,
     missing_block_recovery_exe: Option<String>,
     missing_block_recovery_delay: Option<u64>,
     missing_block_recovery_batch: Option<bool>,
@@ -633,6 +647,8 @@ impl From<ServerArgs> for ServerArgsJson {
             web_hostname: value.web_hostname,
             web_port: value.web_port,
             pid: value.pid,
+            fetch_new_blocks_delay: value.fetch_new_blocks_delay,
+            fetch_new_blocks_exe: value.fetch_new_blocks_exe.map(|p| p.display().to_string()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value
                 .missing_block_recovery_exe
@@ -653,7 +669,7 @@ impl From<ServerArgsJson> for ServerArgs {
             blocks_dir: value.blocks_dir.map(|d| d.into()),
             staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
             database_dir: value.database_dir.into(),
-            log_level: LevelFilter::from_str(&value.log_level).expect("log level"),
+            log_level: LogLevelFilter::from_str(&value.log_level).expect("log level"),
             ledger_cadence: value.ledger_cadence,
             reporting_freq: value.reporting_freq,
             prune_interval: value.prune_interval,
@@ -668,6 +684,8 @@ impl From<ServerArgsJson> for ServerArgs {
             web_port: value.web_port,
             self_check: false,
             pid: value.pid,
+            fetch_new_blocks_delay: value.fetch_new_blocks_delay,
+            fetch_new_blocks_exe: value.fetch_new_blocks_exe.map(|p| p.into()),
             missing_block_recovery_delay: value.missing_block_recovery_delay,
             missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
@@ -681,14 +699,33 @@ impl From<DatabaseArgs> for ServerArgs {
             db: value,
             web_hostname: DEFAULT_WEB_HOSTNAME.to_string(),
             web_port: DEFAULT_WEB_PORT,
-            self_check: false,
-            missing_block_recovery_exe: None,
-            missing_block_recovery_delay: None,
-            missing_block_recovery_batch: None,
-            pid: None,
+            ..Default::default()
         }
     }
 }
 
 const DEFAULT_WEB_HOSTNAME: &str = "localhost";
 const DEFAULT_WEB_PORT: u16 = 8080;
+
+#[derive(Debug, Clone)]
+pub struct LogLevelFilter(LevelFilter);
+
+impl Default for LogLevelFilter {
+    fn default() -> Self {
+        Self(LevelFilter::Warn)
+    }
+}
+
+impl std::fmt::Display for LogLevelFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for LogLevelFilter {
+    type Err = <LevelFilter as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        LevelFilter::from_str(s).map(Self)
+    }
+}

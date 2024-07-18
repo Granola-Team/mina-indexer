@@ -48,9 +48,10 @@ pub fn chain_id(
     ChainId(hasher.finalize_boxed().to_vec().encode_hex())
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Default, Clone, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Network {
+    #[default]
     Mainnet,
     Devnet,
     Testworld,
