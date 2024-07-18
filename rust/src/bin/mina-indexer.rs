@@ -288,7 +288,7 @@ impl ServerCommand {
         check_or_write_pid_file(&database_dir);
 
         debug!("Building mina indexer configuration");
-        let config = process_indexer_configuration(args, mode, domain_socket_path)?;
+        let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
         let db = Arc::new(IndexerStore::new(&database_dir)?);
 
         info!("Starting the mina indexer filesystem watchers & UDS server");
