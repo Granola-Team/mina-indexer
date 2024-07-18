@@ -138,11 +138,11 @@ stage_mainnet_blocks() {
     "$SRC"/ops/stage-blocks.rb 2 "$1" mainnet "$2"
 }
 
-dl_mainnet_single() {
+stage_mainnet_single() {
     "$SRC"/ops/stage-blocks.rb "$1" "$1" mainnet "$2"
 }
 
-dl_mainnet_range() {
+stage_mainnet_range() {
     "$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
 }
 
@@ -507,7 +507,7 @@ test_block_copy() {
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add block 11
-    dl_mainnet_single 11 ./blocks
+    stage_mainnet_single 11 ./blocks
     sleep 1
 
     # check
@@ -525,8 +525,8 @@ test_block_copy() {
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
     stage_mainnet_blocks 10 ./blocks
-    dl_mainnet_range 12 20 ./blocks # missing 11
-    dl_mainnet_range 22 30 ./blocks # missing 21
+    stage_mainnet_range 12 20 ./blocks # missing 11
+    stage_mainnet_range 22 30 ./blocks # missing 21
 
     idxr_server_start_standard
     wait_for_socket
@@ -545,7 +545,7 @@ test_missing_blocks() {
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add missing block which connects the dangling branches
-    dl_mainnet_single 21 ./blocks
+    stage_mainnet_single 21 ./blocks
     sleep 1
 
     # dangling branches combine
@@ -563,7 +563,7 @@ test_missing_blocks() {
     assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
 
     # add remaining missing block
-    dl_mainnet_single 11 ./blocks
+    stage_mainnet_single 11 ./blocks
     sleep 1
 
     # dangling branches move into the root branch
@@ -693,7 +693,7 @@ test_sync() {
     shutdown_idxr
 
     # add more blocks to the watch dir while not indexing
-    dl_mainnet_range 16 20 ./blocks
+    stage_mainnet_range 16 20 ./blocks
 
     # sync from previous indexer db
     idxr_server_start \
@@ -722,7 +722,7 @@ test_replay() {
     shutdown_idxr
 
     # add 8 more blocks to the watch dir while not indexing
-    dl_mainnet_range 16 20 ./blocks
+    stage_mainnet_range 16 20 ./blocks
 
     # replay events from previous indexer db
     idxr_server_start \
@@ -1498,6 +1498,34 @@ test_version_file() {
     [ -e "./database/INDEXER_VERSION" ]
 }
 
+test_fetch_new_blocks() {
+    stage_mainnet_blocks 9 ./blocks
+
+    # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
+    # wait for 3s in between recovery attempts
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database
+    idxr_server start \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --fetch-new-blocks-exe "$SRC"/tests/recovery.sh \
+        --fetch-new-blocks-delay 3
+    wait_for_socket
+
+    # after blocks are added, check dangling branches
+    assert 9 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+
+    # wait for block fetching to work its magic
+    sleep 5
+
+    # check that all dangling branches have resolved & the best block has the right height
+    best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+    assert 10 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_tip_hash
+}
+
 test_missing_block_recovery() {
     stage_mainnet_blocks 5 ./blocks
 
@@ -1515,22 +1543,23 @@ test_missing_block_recovery() {
     wait_for_socket
 
     # miss blocks at heights 6, 8, 11-16, 18-20
-    dl_mainnet_single 7 ./blocks
-    dl_mainnet_range 9 10 ./blocks
-    dl_mainnet_single 17 ./blocks
-    dl_mainnet_single 21 ./blocks
+    stage_mainnet_single 7 ./blocks
+    stage_mainnet_range 9 10 ./blocks
+    stage_mainnet_single 17 ./blocks
+    stage_mainnet_single 21 ./blocks
 
     # after blocks are added, check dangling branches
     sleep 1
     assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
-    sleep 30
+    sleep 20
 
     # check that all dangling branches have resolved & the best block has the right height
+    best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
     assert 21 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    assert '3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ' $(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    assert '3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ' $best_tip_hash
 }
 
 # Create an indexer database & start indexing
@@ -1605,6 +1634,7 @@ for test_name in "$@"; do
         "test_block_copy") test_block_copy ;;
         "test_missing_blocks") test_missing_blocks ;;
         "test_missing_block_recovery") test_missing_block_recovery ;;
+        "test_fetch_new_blocks") test_fetch_new_blocks ;;
         "test_best_chain") test_best_chain ;;
         "test_block_children") test_block_children ;;
         "test_ledgers") test_ledgers ;;
