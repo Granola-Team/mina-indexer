@@ -85,6 +85,7 @@ impl UserCommandStore for IndexerStore {
                 pk_txn_sort_key(
                     command.sender(),
                     block.blockchain_length(),
+                    command.nonce(),
                     &txn_hash,
                     block.state_hash(),
                 ),
@@ -95,6 +96,7 @@ impl UserCommandStore for IndexerStore {
                 pk_txn_sort_key(
                     command.sender(),
                     block.global_slot_since_genesis(),
+                    command.nonce(),
                     &txn_hash,
                     block.state_hash(),
                 ),
@@ -107,6 +109,7 @@ impl UserCommandStore for IndexerStore {
                 pk_txn_sort_key(
                     command.receiver(),
                     block.blockchain_length(),
+                    command.nonce(),
                     &txn_hash,
                     block.state_hash(),
                 ),
@@ -117,6 +120,7 @@ impl UserCommandStore for IndexerStore {
                 pk_txn_sort_key(
                     command.receiver(),
                     block.global_slot_since_genesis(),
+                    command.nonce(),
                     &txn_hash,
                     block.state_hash(),
                 ),

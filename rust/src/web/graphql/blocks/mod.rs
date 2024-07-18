@@ -17,7 +17,8 @@ use crate::{
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, pk_of_key, to_be_bytes, IndexerStore,
+        block_state_hash_from_key, block_u32_prefix_from_key, pk_key_prefix, to_be_bytes,
+        IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -268,7 +269,7 @@ impl BlocksQueryRoot {
                 GlobalSlotDesc => db.coinbase_receiver_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
-                if pk_of_key(&key).0 != coinbase_receiver {
+                if pk_key_prefix(&key).0 != coinbase_receiver {
                     break;
                 }
 
@@ -311,7 +312,7 @@ impl BlocksQueryRoot {
                 GlobalSlotDesc => db.block_creator_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
-                if pk_of_key(&key).0 != creator_account {
+                if pk_key_prefix(&key).0 != creator_account {
                     break;
                 }
 

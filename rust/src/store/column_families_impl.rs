@@ -296,11 +296,12 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {sender}{block_height}{txn_hash}{state_hash}
+    /// - key: {sender}{block_height}{nonce}{txn_hash}{state_hash}
     /// - val: amount
     /// where
     /// - sender:       [PublicKey::LEN] bytes
     /// - block_height: 4 BE bytes
+    /// - nonce:        4 BE bytes
     /// - txn_hash:     [TX_HASH_LEN] bytes
     /// - state_hash:   [BlockHash::LEN] bytes
     /// - amount:       8 BE bytes

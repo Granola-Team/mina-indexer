@@ -23,7 +23,11 @@ pub mod username_store_impl;
 pub mod version_store_impl;
 
 use self::fixed_keys::FixedKeys;
-use crate::{block::BlockHash, command::signed::TXN_HASH_LEN, ledger::public_key::PublicKey};
+use crate::{
+    block::BlockHash,
+    command::signed::TXN_HASH_LEN,
+    ledger::{account::Nonce, public_key::PublicKey},
+};
 use anyhow::{anyhow, bail, Context};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -371,15 +375,25 @@ pub fn txn_sort_key(prefix: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u
 }
 
 /// Key format for sorting txns by sender/receiver:
-/// `{pk}{u32_sort}{txn_hash}{state_hash}`
+/// `{pk}{u32_sort}{nonce}{txn_hash}{state_hash}`
 /// ```
 /// - pk:         [PublicKey::LEN] bytes
 /// - u32_sort:   4 BE bytes
+/// - nonce:      4 BE bytes
 /// - txn_hash:   [TXN_HASH_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
-pub fn pk_txn_sort_key(pk: PublicKey, sort: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
+pub fn pk_txn_sort_key(
+    pk: PublicKey,
+    sort: u32,
+    nonce: Nonce,
+    txn_hash: &str,
+    state_hash: BlockHash,
+) -> Vec<u8> {
     let mut bytes = pk.to_bytes();
-    bytes.append(&mut txn_sort_key(sort, txn_hash, state_hash));
+    bytes.append(&mut to_be_bytes(sort));
+    bytes.append(&mut to_be_bytes(nonce.0));
+    bytes.append(&mut txn_hash.as_bytes().to_vec());
+    bytes.append(&mut state_hash.to_bytes());
     bytes
 }
 
@@ -391,27 +405,32 @@ pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
 }
 
 /// Parse the first [PublicKey::LEN]
-pub fn pk_of_key(key: &[u8]) -> PublicKey {
+pub fn pk_key_prefix(key: &[u8]) -> PublicKey {
     PublicKey::from_bytes(&key[..PublicKey::LEN]).expect("public key")
 }
 
-pub fn balance_of_key(key: &[u8]) -> u64 {
-    let mut balance_bytes = [0; 8];
-    balance_bytes.copy_from_slice(&key[..8]);
-    u64::from_be_bytes(balance_bytes)
+pub fn balance_key_prefix(key: &[u8]) -> u64 {
+    from_u64_be_bytes(key[..size_of::<u64>()].to_vec())
 }
 
-pub fn u32_of_key(key: &[u8]) -> u32 {
-    from_be_bytes(key[PublicKey::LEN..(PublicKey::LEN + 4)].to_vec())
+pub fn pk_txn_sort_key_sort(key: &[u8]) -> u32 {
+    from_be_bytes(key[PublicKey::LEN..][..size_of::<u32>()].to_vec())
+}
+
+pub fn pk_txn_sort_key_nonce(key: &[u8]) -> Nonce {
+    Nonce(from_be_bytes(
+        key[(PublicKey::LEN + size_of::<u32>())..][..size_of::<u32>()].to_vec(),
+    ))
 }
 
 pub fn txn_hash_of_key(key: &[u8]) -> String {
-    String::from_utf8(key[(PublicKey::LEN + 4)..(PublicKey::LEN + 4 + TXN_HASH_LEN)].to_vec())
+    String::from_utf8(key[(PublicKey::LEN + 2 * size_of::<u32>())..][..TXN_HASH_LEN].to_vec())
         .expect("txn hash")
 }
 
 pub fn state_hash_pk_txn_sort_key(key: &[u8]) -> BlockHash {
-    BlockHash::from_bytes(&key[(PublicKey::LEN + 4 + TXN_HASH_LEN)..]).expect("state hash")
+    BlockHash::from_bytes(&key[(PublicKey::LEN + 2 * size_of::<u32>() + TXN_HASH_LEN)..])
+        .expect("state hash")
 }
 
 pub fn block_txn_index_key(state_hash: &BlockHash, index: u32) -> Vec<u8> {

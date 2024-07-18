@@ -14,7 +14,7 @@ use crate::{
         SignedCommandPayloadBody, StakeDelegation,
     },
     store::{
-        pk_of_key, pk_txn_sort_key_prefix, state_hash_pk_txn_sort_key, to_be_bytes,
+        pk_key_prefix, pk_txn_sort_key_prefix, state_hash_pk_txn_sort_key, to_be_bytes,
         txn_hash_of_key, IndexerStore,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
@@ -159,7 +159,7 @@ impl TransactionsQueryRoot {
             };
             for (key, _) in txn_iter {
                 // public key bytes
-                let txn_pk = pk_of_key(&key);
+                let txn_pk = pk_key_prefix(&key);
                 if txn_pk.0 != *pk {
                     break;
                 }
