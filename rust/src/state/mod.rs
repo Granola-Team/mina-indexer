@@ -1536,15 +1536,16 @@ impl IndexerState {
                 "Rate: {block_rate} blocks/s ({}/s)",
                 bytesize::ByteSize::b(bytes_rate)
             );
-            info!(
-                "Estimated rem time: {:?}",
-                Duration::from_secs(
-                    block_parser
-                        .total_num_bytes
-                        .saturating_sub(self.bytes_processed)
-                        / bytes_rate
-                )
+
+            let dur = Duration::from_secs(
+                block_parser
+                    .total_num_bytes
+                    .saturating_sub(self.bytes_processed)
+                    / bytes_rate,
             );
+            if !dur.is_zero() {
+                info!("Estimate rem time: {dur:?}");
+            }
         }
     }
 
@@ -1580,15 +1581,15 @@ impl IndexerState {
                 bytesize::ByteSize::b(bytes_rate)
             );
             info!("Current best tip {}", best_tip.summary());
-            info!(
-                "Estimate rem time: {:?}",
-                Duration::from_secs(
-                    block_parser
-                        .total_num_bytes
-                        .saturating_sub(self.bytes_processed)
-                        / bytes_rate
-                )
+            let dur = Duration::from_secs(
+                block_parser
+                    .total_num_bytes
+                    .saturating_sub(self.bytes_processed)
+                    / bytes_rate,
             );
+            if !dur.is_zero() {
+                info!("Estimate rem time: {dur:?}");
+            }
         }
         Ok(())
     }

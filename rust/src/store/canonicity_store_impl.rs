@@ -151,7 +151,7 @@ impl CanonicityStore for IndexerStore {
         let b_length = self.get_block_height(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
-        for _ in 0..(b_length - a_length) {
+        for _ in 0..b_length.saturating_sub(a_length) {
             // check if there's a previous block
             if b.0 == MAINNET_GENESIS_HASH {
                 break;

@@ -64,7 +64,7 @@ impl UsernameStore for IndexerStore {
 
         // bring b back to the same height as a
         let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
-        for _ in 0..(b_length - a_length) {
+        for _ in 0..b_length.saturating_sub(a_length) {
             // check if there's a previous block
             if genesis_state_hashes.contains(&b) {
                 break;

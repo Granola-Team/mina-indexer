@@ -158,7 +158,7 @@ async fn initialize(
     config: IndexerConfiguration,
     store: &Arc<IndexerStore>,
 ) -> anyhow::Result<IndexerState> {
-    info!("Initializing new mina indexer");
+    info!("Initializing mina indexer database");
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
         genesis_ledger,
