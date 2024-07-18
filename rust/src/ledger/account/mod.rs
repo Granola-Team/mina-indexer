@@ -70,12 +70,13 @@ impl Display for Nonce {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,
     pub nonce: Nonce,
     pub delegate: PublicKey,
+    pub genesis_account: bool,
 
     // optional
     pub token: Option<u64>,
@@ -144,17 +145,8 @@ impl Account {
     pub fn empty(public_key: PublicKey) -> Self {
         Account {
             public_key: public_key.clone(),
-            balance: Amount::default(),
-            nonce: Nonce::default(),
             delegate: public_key,
-            username: None,
-            token: None,
-            token_permissions: None,
-            receipt_chain_hash: None,
-            voting_for: None,
-            permissions: None,
-            timing: None,
-            zkapp: None,
+            ..Default::default()
         }
     }
 
@@ -217,15 +209,8 @@ impl From<GenesisBlock> for Account {
             public_key: block_creator.clone(),
             balance: Amount(1000_u64),
             delegate: block_creator,
-            nonce: Nonce::default(),
-            username: None,
-            token: None,
-            token_permissions: None,
-            receipt_chain_hash: None,
-            voting_for: None,
-            permissions: None,
-            timing: None,
-            zkapp: None,
+            genesis_account: true,
+            ..Default::default()
         }
     }
 }

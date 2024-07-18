@@ -208,22 +208,14 @@ impl Ledger {
         for (pubkey, balance, nonce, delgation) in value {
             let pk = PublicKey::new(pubkey);
             let delegate = delgation.map(PublicKey::new).unwrap_or(pk.clone());
-
             ledger.accounts.insert(
                 pk.clone(),
                 Account {
                     delegate,
                     public_key: pk,
-                    username: None,
                     balance: balance.into(),
                     nonce: Nonce(nonce.unwrap_or_default()),
-                    token: None,
-                    token_permissions: None,
-                    receipt_chain_hash: None,
-                    voting_for: None,
-                    permissions: None,
-                    timing: None,
-                    zkapp: None,
+                    ..Default::default()
                 },
             );
         }
