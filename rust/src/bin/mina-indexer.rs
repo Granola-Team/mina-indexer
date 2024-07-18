@@ -379,11 +379,14 @@ impl DatabaseCommand {
                     process::exit(1);
                 }
                 debug!("Building mina indexer configuration");
-                let config = process_indexer_configuration(
-                    (*args).into(),
-                    InitializationMode::New,
-                    domain_socket_path,
-                )?;
+                let mut mode = InitializationMode::New;
+                if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
+                    if dir.count() != 0 {
+                        mode = InitializationMode::Sync;
+                    }
+                };
+                let config =
+                    process_indexer_configuration((*args).into(), mode, domain_socket_path)?;
 
                 debug!("Creating a new mina indexer database in {database_dir:#?}");
                 let db = Arc::new(IndexerStore::new(&database_dir)?);

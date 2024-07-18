@@ -1614,6 +1614,28 @@ test_snapshot_database_dir() {
     rm -fr ./restore-dir
 }
 
+# Indexer databases can be reused & expanded
+test_reuse_databases() {
+    stage_mainnet_blocks 10 ./blocks
+
+    # create initial db
+    idxr_server_start_standard
+    wait_for_socket
+
+    assert 10 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    shutdown_idxr
+
+    # add more blocks to the watch dir while not indexing
+    stage_mainnet_range 11 12 ./blocks
+
+    # sync from previous indexer db
+    idxr_server_start_standard
+    wait_for_socket
+
+    # includes new blocks
+    assert 12 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+}
+
 # ----
 # Main
 # ----
@@ -1623,6 +1645,7 @@ for test_name in "$@"; do
         "test_server_startup") test_server_startup ;;
         "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
         "test_database_create") test_database_create ;;
+        "test_reuse_databases") test_reuse_databases ;;
         "test_snapshot_database_dir") test_snapshot_database_dir ;;
         "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
         "test_account_balance_cli") test_account_balance_cli ;;
