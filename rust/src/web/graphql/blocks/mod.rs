@@ -87,7 +87,7 @@ impl BlocksQueryRoot {
             }
 
             let pcb = match db.get_block(&state_hash.clone().into())? {
-                Some(pcb) => pcb,
+                Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
             let canonical = get_block_canonicity(db, &state_hash);
@@ -213,7 +213,7 @@ impl BlocksQueryRoot {
             let block = db.get_block(&state_hash.clone().into())?;
             return Ok(block
                 .iter()
-                .filter_map(|b| precomputed_matches_query(db, &query, b, counts))
+                .filter_map(|(b, _)| precomputed_matches_query(db, &query, b, counts))
                 .collect());
         }
 
@@ -463,7 +463,8 @@ impl BlocksQueryRoot {
             let pcb = db
                 .get_block(&state_hash)?
                 .with_context(|| format!("block missing from store hash {state_hash}"))
-                .expect("block");
+                .expect("block")
+                .0;
             let block = Block::from_precomputed(db, &pcb, counts);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
@@ -1148,6 +1149,7 @@ fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock
         .with_context(|| format!("block missing from store {state_hash}"))
         .unwrap()
         .unwrap()
+        .0
 }
 
 fn reorder(db: &Arc<IndexerStore>, blocks: &mut [Block], sort_by: BlockSortByInput) {

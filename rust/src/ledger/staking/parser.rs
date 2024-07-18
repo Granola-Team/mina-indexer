@@ -40,7 +40,7 @@ impl StakingLedgerParser {
             if let Some(store) = store {
                 // extract epoch and ledger hash to check if it's in the db
                 if let Some((epoch, hash)) = extract_epoch_hash(&next_path) {
-                    if store.get_ledger_hash(epoch)? != Some(hash) {
+                    if store.get_staking_ledger_hash_by_epoch(epoch)? != Some(hash) {
                         // add the missing staking ledger
                         return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
                             .await

@@ -27,11 +27,11 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some((block, _)) = bp.next_block().await? {
+    while let Some((block, block_bytes)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash();
 
-        db.add_block(&block)?;
+        db.add_block(&block, block_bytes)?;
         blocks.insert(state_hash.clone(), block);
         println!("Added {:?}", &state_hash);
         n += 1;

@@ -72,7 +72,7 @@ impl TransactionsQueryRoot {
             let mut transactions: Vec<Transaction> = db
                 .get_block(&state_hash.into())?
                 .into_iter()
-                .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                .flat_map(|(b, _)| SignedCommandWithData::from_precomputed(&b))
                 .map(|cmd| {
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 })
@@ -91,7 +91,7 @@ impl TransactionsQueryRoot {
                 transactions = state_hashes
                     .iter()
                     .flat_map(|state_hash| db.get_block(state_hash).expect("block"))
-                    .flat_map(|b| SignedCommandWithData::from_precomputed(&b))
+                    .flat_map(|(b, _)| SignedCommandWithData::from_precomputed(&b))
                     .map(|cmd| {
                         Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                     })
@@ -111,7 +111,8 @@ impl TransactionsQueryRoot {
                     .get_block(&state_hash)
                     .with_context(|| format!("block missing from store {state_hash}"))
                     .unwrap()
-                    .unwrap();
+                    .unwrap()
+                    .0;
                 for cmd in SignedCommandWithData::from_precomputed(&block) {
                     let txn =
                         Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
@@ -226,7 +227,8 @@ impl TransactionsQueryRoot {
                         .get_block(&state_hash)
                         .with_context(|| format!("block missing from store {state_hash}"))
                         .unwrap()
-                        .unwrap();
+                        .unwrap()
+                        .0;
                     for cmd in SignedCommandWithData::from_precomputed(&block) {
                         let txn = Transaction::new(
                             cmd,

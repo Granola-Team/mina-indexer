@@ -93,7 +93,7 @@ impl InternalCommandStore for IndexerStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<InternalCommandWithData>> {
         trace!("Getting internal commands in block {}", state_hash.0);
-        let block = self.get_block(state_hash)?.expect("block to exist");
+        let block = self.get_block(state_hash)?.expect("block to exist").0;
 
         let key = format!("internal-{}", state_hash.0);
         if let Some(commands_bytes) = self

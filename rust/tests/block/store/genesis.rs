@@ -29,7 +29,8 @@ fn block_added() -> anyhow::Result<()> {
             .indexer_store
             .unwrap()
             .get_block(&MAINNET_GENESIS_HASH.into())
-            .unwrap(),
+            .unwrap()
+            .map(|b| b.0),
         Some(GenesisBlock::new().unwrap().to_precomputed())
     );
     Ok(())

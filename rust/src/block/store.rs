@@ -8,10 +8,14 @@ use speedb::{DBIterator, IteratorMode};
 
 pub trait BlockStore {
     /// Add block to the store
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>>;
+    fn add_block(
+        &self,
+        block: &PrecomputedBlock,
+        num_block_bytes: u64,
+    ) -> anyhow::Result<Option<DbEvent>>;
 
     /// Get block from the store
-    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>>;
+    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<(PrecomputedBlock, u64)>>;
 
     //////////////////////////
     // Best block functions //

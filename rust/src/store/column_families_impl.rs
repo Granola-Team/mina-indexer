@@ -34,7 +34,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Block store CFs //
     /////////////////////
 
-    /// `state_hash -> block`
+    /// Blocks CF
+    /// ```
+    /// state_hash -> {num block bytes BE u64 bytes}{serde_json block bytes}
     fn blocks_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-state-hash")

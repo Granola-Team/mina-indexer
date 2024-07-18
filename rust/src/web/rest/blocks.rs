@@ -45,7 +45,7 @@ pub async fn get_blocks(
                 break;
             }
 
-            if let Ok(Some(block)) = db.get_block(&parent_state_hash) {
+            if let Ok(Some((block, _))) = db.get_block(&parent_state_hash) {
                 parent_state_hash = block.previous_state_hash();
                 best_chain.push(block);
             } else {
@@ -77,7 +77,7 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
 
     // via state hash
     if is_valid_state_hash(&input) {
-        if let Ok(Some(ref block)) = db.get_block(&input.clone().into()) {
+        if let Ok(Some((ref block, _))) = db.get_block(&input.clone().into()) {
             let block: BlockWithoutHeight = block.into();
             return HttpResponse::Ok()
                 .content_type(ContentType::json())
@@ -98,7 +98,8 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
                                 .get_block(state_hash)
                                 .with_context(|| format!("block missing from store {state_hash}"))
                                 .unwrap()
-                                .unwrap();
+                                .unwrap()
+                                .0;
                             Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                         } else {
                             None
@@ -125,7 +126,8 @@ pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>)
                                 .get_block(state_hash)
                                 .with_context(|| format!("block missing from store {state_hash}"))
                                 .unwrap()
-                                .unwrap();
+                                .unwrap()
+                                .0;
                             Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                         } else {
                             None

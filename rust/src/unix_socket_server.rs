@@ -164,7 +164,9 @@ pub async fn handle_connection(
                     info!("Received block-state-hash command");
                     if !block::is_valid_state_hash(&state_hash) {
                         invalid_state_hash(&state_hash)
-                    } else if let Ok(Some(ref block)) = db.get_block(&state_hash.clone().into()) {
+                    } else if let Ok(Some((ref block, _))) =
+                        db.get_block(&state_hash.clone().into())
+                    {
                         let block_str = if let Some(canonicity) =
                             db.get_block_canonicity(&block.state_hash())?
                         {
@@ -215,7 +217,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(block.with_canonicity(canonicity))
                                 } else {
                                     None
@@ -234,7 +237,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                                 } else {
                                     None
@@ -281,7 +285,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(block.with_canonicity(canonicity))
                                 } else {
                                     None
@@ -300,7 +305,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                                 } else {
                                     None
@@ -351,7 +357,8 @@ pub async fn handle_connection(
                                                 format!("block missing from store {state_hash}")
                                             })
                                             .unwrap()
-                                            .unwrap();
+                                            .unwrap()
+                                            .0;
                                         Some(block.with_canonicity(canonicity))
                                     } else {
                                         None
@@ -372,7 +379,8 @@ pub async fn handle_connection(
                                                 format!("block missing from store {state_hash}")
                                             })
                                             .unwrap()
-                                            .unwrap();
+                                            .unwrap()
+                                            .0;
                                         Some(BlockWithoutHeight::with_canonicity(
                                             &block, canonicity,
                                         ))
@@ -421,7 +429,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(block.with_canonicity(canonicity))
                                 } else {
                                     None
@@ -440,7 +449,8 @@ pub async fn handle_connection(
                                             format!("block missing from store {state_hash}")
                                         })
                                         .unwrap()
-                                        .unwrap();
+                                        .unwrap()
+                                        .0;
                                     Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
                                 } else {
                                     None
@@ -499,7 +509,7 @@ pub async fn handle_connection(
 
                         if !block::is_valid_state_hash(&start_state_hash.0) {
                             invalid_state_hash(&start_state_hash.0)
-                        } else if let (Some(end_block), Some(start_block)) = (
+                        } else if let (Some((end_block, _)), Some((start_block, _))) = (
                             db.get_block(&end_state_hash.into())?,
                             db.get_block(&start_state_hash)?,
                         ) {
@@ -510,7 +520,7 @@ pub async fn handle_connection(
 
                             // constrain by num and state hash bound
                             for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
-                                if let Some(parent_pcb) = db.get_block(&parent_hash)? {
+                                if let Some((parent_pcb, _)) = db.get_block(&parent_hash)? {
                                     let curr_hash: BlockHash = parent_pcb.state_hash();
                                     parent_hash = parent_pcb.previous_state_hash();
                                     best_chain.push(parent_pcb);
@@ -727,7 +737,7 @@ pub async fn handle_connection(
                         trace!("{hash} is a ledger hash");
 
                         if let Some(staking_ledger) =
-                            db.get_staking_ledger_hash(&hash.clone().into(), None, None)?
+                            db.get_staking_ledger_by_hash(&hash.clone().into(), None, None)?
                         {
                             let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                             if path.is_none() {

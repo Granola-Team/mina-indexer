@@ -88,7 +88,7 @@ impl StakeQueryRoot {
             let opt = if let Some((Some(ledger_hash), query_epoch)) =
                 query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch))
             {
-                db.get_staking_ledger_hash(&ledger_hash.into(), query_epoch, None)?
+                db.get_staking_ledger_by_hash(&ledger_hash.into(), query_epoch, None)?
             } else {
                 db.get_staking_ledger_at_epoch(epoch, None)?
             };

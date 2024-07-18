@@ -231,10 +231,10 @@ async fn initialize(
         }
     }
 
-    // ingest precomputed blocks
-    if let Some(ref blocks_dir) = blocks_dir {
-        match initialization_mode {
-            InitializationMode::New => {
+    // build witness tree & ingest precomputed blocks
+    match initialization_mode {
+        InitializationMode::New => {
+            if let Some(ref blocks_dir) = blocks_dir {
                 let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
                     blocks_dir,
                     version,
@@ -247,22 +247,24 @@ async fn initialize(
                     .initialize_with_canonical_chain_discovery(&mut block_parser)
                     .await?;
             }
-            InitializationMode::Replay => {
-                if let Ok(ref replay_state) =
-                    IndexerState::new_without_genesis_events(IndexerStateConfig {
-                        genesis_hash: genesis_hash.clone(),
-                        indexer_store: store.clone(),
-                        version: indexer_version.clone(),
-                        genesis_ledger: genesis_ledger.clone(),
-                        transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
-                        prune_interval,
-                        canonical_threshold,
-                        canonical_update_threshold,
-                        ledger_cadence,
-                        reporting_freq,
-                    })
-                {
-                    let min_length_filter = state.replay_events(replay_state)?;
+        }
+        InitializationMode::Replay => {
+            if let Ok(ref replay_state) =
+                IndexerState::new_without_genesis_events(IndexerStateConfig {
+                    genesis_hash: genesis_hash.clone(),
+                    indexer_store: store.clone(),
+                    version: indexer_version.clone(),
+                    genesis_ledger: genesis_ledger.clone(),
+                    transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
+                    prune_interval,
+                    canonical_threshold,
+                    canonical_update_threshold,
+                    ledger_cadence,
+                    reporting_freq,
+                })
+            {
+                let min_length_filter = state.replay_events(replay_state)?;
+                if let Some(ref blocks_dir) = blocks_dir {
                     let mut block_parser = BlockParser::new_length_sorted_min_filtered(
                         blocks_dir,
                         version,
@@ -275,8 +277,10 @@ async fn initialize(
                     }
                 }
             }
-            InitializationMode::Sync => {
-                let min_length_filter = state.sync_from_db()?;
+        }
+        InitializationMode::Sync => {
+            let min_length_filter = state.sync_from_db()?;
+            if let Some(ref blocks_dir) = blocks_dir {
                 let mut block_parser = BlockParser::new_length_sorted_min_filtered(
                     blocks_dir,
                     version,
@@ -442,7 +446,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                         }
 
                         // if the block isn't in the witness tree, pipeline it
-                        match state.block_pipeline(&block, Some(path.metadata()?.len())) {
+                        match state.block_pipeline(&block, path.metadata()?.len()) {
                             Ok(is_added) => {
                                 if is_added {
                                     info!("Added block {}", block.summary())

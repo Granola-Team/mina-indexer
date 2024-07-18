@@ -244,7 +244,7 @@ pub async fn main() -> anyhow::Result<()> {
     .catch_signals()
     .handle_shutdown_requests(Duration::from_millis(1000))
     .await
-    .map_err(Into::into)
+    .map_err(anyhow::Error::from)
 }
 
 impl ServerCommand {
@@ -289,9 +289,9 @@ impl ServerCommand {
 
         debug!("Building mina indexer configuration");
         let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
-
-        debug!("Creating a new mina indexer database in {database_dir:#?}");
         let db = Arc::new(IndexerStore::new(&database_dir)?);
+
+        info!("Starting the mina indexer filesystem watchers & UDS server");
         let store = db.clone();
         subsys.start(SubsystemBuilder::new("Indexer", move |s| {
             start_indexer(s, config, store)
@@ -562,12 +562,12 @@ fn remove_pid<P: AsRef<Path>>(database_dir: P) {
 fn check_or_write_pid_file<P: AsRef<Path>>(database_dir: P) {
     use mina_indexer::platform;
     let database_dir = database_dir.as_ref();
+    let pid_path = database_dir.join("PID");
+
     if let Err(e) = fs::create_dir_all(database_dir) {
         error!("Failed to create database directory in {database_dir:?}: {e}");
         process::exit(1);
     }
-
-    let pid_path = database_dir.join("PID");
 
     if let Ok(pid) = read_pid_from_file(&pid_path) {
         if platform::is_process_running(pid) {

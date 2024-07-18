@@ -300,8 +300,8 @@ impl UserCommandStore for IndexerStore {
         start_state_hash: &BlockHash,
         end_state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<SignedCommandWithData>> {
-        let start_block_opt = self.get_block(start_state_hash)?;
-        let end_block_opt = self.get_block(end_state_hash)?;
+        let start_block_opt = self.get_block(start_state_hash)?.map(|b| b.0);
+        let end_block_opt = self.get_block(end_state_hash)?.map(|b| b.0);
         trace!(
             "Getting user commands between {:?} and {:?}",
             start_block_opt.as_ref().map(|b| b.summary()),
@@ -320,7 +320,7 @@ impl UserCommandStore for IndexerStore {
             let mut num = end_height - start_height;
             let mut prev_hash = end_block.previous_state_hash();
             let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash()];
-            while let Some(block) = self.get_block(&prev_hash)? {
+            while let Some((block, _)) = self.get_block(&prev_hash)? {
                 if num == 0 {
                     break;
                 }

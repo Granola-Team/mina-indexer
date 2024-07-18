@@ -31,6 +31,7 @@ use speedb::{ColumnFamilyDescriptor, DBCompressionType, DB};
 use std::{
     fs::{self, read_dir, File},
     io::{self, BufReader, BufWriter, Write},
+    mem::size_of,
     path::{Path, PathBuf},
 };
 use version::{IndexerStoreVersion, VersionStore};
@@ -324,11 +325,17 @@ pub fn to_be_bytes(value: u32) -> Vec<u8> {
 }
 
 pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
-    const SIZE: usize = (u32::BITS / 8) as usize;
+    const SIZE: usize = size_of::<u32>();
     let mut be_bytes = [0; SIZE];
-
     be_bytes[..SIZE].copy_from_slice(&bytes[..SIZE]);
     u32::from_be_bytes(be_bytes)
+}
+
+pub fn from_u64_be_bytes(bytes: Vec<u8>) -> u64 {
+    const SIZE: usize = size_of::<u64>();
+    let mut be_bytes = [0; SIZE];
+    be_bytes[..SIZE].copy_from_slice(&bytes[..SIZE]);
+    u64::from_be_bytes(be_bytes)
 }
 
 /// The first 4 bytes are `prefix` in big endian
