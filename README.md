@@ -65,10 +65,10 @@ Run `just check` to verify that the project compiles. This will compile the
 ### Storage
 
 The default storage location is on `/mnt` because the testing code may download
-large volumes of test data, and placing on `/mnt` gives an opportunity to use 
+large volumes of test data, and placing on `/mnt` gives an opportunity to use
 different storage volumes from one's build directory.
 
-Set the `VOLUMES_DIR` environment variable if you want to replace `/mnt` with 
+Set the `VOLUMES_DIR` environment variable if you want to replace `/mnt` with
 another path.
 
 ### Testing
@@ -131,10 +131,12 @@ Run `just deploy-local-prod` to start an instance.
 
 ## Generating OCI Images With Nix
 
+Note: This requires [the Docker Engine](https://docs.docker.com/engine/install/) to be installed.
+
 Building the OCI (Docker) image from Nix must happen from an `x86-64-linux`
 machine.
 
-Issue the following command to build the image and load it into Docker.
+Issue the following command to build the image and load it into Docker:
 
 ```bash
 just build-image
