@@ -202,7 +202,7 @@ jsonpath "$.data.transactions[0].fee" == 10000000
 # last datum
 jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpYpkePDRfsrWHxpGMMxVfWMy5xnSCjYTcsqyAqgo7keHwWThb8N"
+jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
@@ -255,7 +255,7 @@ jsonpath "$.data.transactions[0].fee" == 10000000
 # last datum
 jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
-jsonpath "$.data.transactions[49].hash" == "CkpYpkePDRfsrWHxpGMMxVfWMy5xnSCjYTcsqyAqgo7keHwWThb8N"
+jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
 jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
@@ -441,5 +441,45 @@ jsonpath "$.data.transactions[2].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyz
 jsonpath "$.data.transactions[3].blockHeight" == 6
 jsonpath "$.data.transactions[3].canonical" == false
 jsonpath "$.data.transactions[3].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyzNvTYMALccvmNcNSN"
+
+duration < 750
+
+#
+# Transactions by hash (block order)
+#
+
+POST {{url}}
+```graphql
+query TransactionsNonce {
+  transactions(query: {canonical: true, from: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}) {
+    nonce
+    blockHeight
+  }  
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 100
+
+# all data
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[0].nonce" == 176
+
+jsonpath "$.data.transactions[1].blockHeight" == 119
+jsonpath "$.data.transactions[1].nonce" == 175
+
+jsonpath "$.data.transactions[2].blockHeight" == 119
+jsonpath "$.data.transactions[2].nonce" == 174
+
+jsonpath "$.data.transactions[3].blockHeight" == 118
+jsonpath "$.data.transactions[3].nonce" == 173
+
+jsonpath "$.data.transactions[4].blockHeight" == 117
+jsonpath "$.data.transactions[4].nonce" == 172
+
+jsonpath "$.data.transactions[5].blockHeight" == 116
+jsonpath "$.data.transactions[5].nonce" == 171
 
 duration < 750
