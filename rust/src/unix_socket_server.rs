@@ -87,7 +87,6 @@ pub async fn handle_connection(
             bail!("Unable to get a handle on indexer store...");
         };
 
-        let local_addr = &connection.local_addr()?;
         let command = parse_conn_to_cli(&connection).await?;
         let (_, mut writer) = connection.into_split();
 
@@ -978,12 +977,6 @@ pub async fn handle_connection(
                     .write_all(b"Shutting down the Mina Indexer daemon...")
                     .await?;
                 subsys.request_shutdown();
-                remove_unix_socket(
-                    local_addr
-                        .as_pathname()
-                        .expect("Unable to locate Unix domain socket file"),
-                )
-                .expect("Unix domain socket file deleted");
                 return Ok(());
             }
             ClientCli::Summary {
@@ -1242,7 +1235,7 @@ fn try_replace_old_socket(e: io::Error, unix_socket_path: &Path) -> io::Result<U
     }
 }
 
-fn remove_unix_socket(unix_socket_path: &Path) -> io::Result<()> {
+pub fn remove_unix_socket(unix_socket_path: &Path) -> io::Result<()> {
     std::fs::remove_file(unix_socket_path)?;
     debug!("Removed Unix domain socket: {:?}", unix_socket_path);
     Ok(())

@@ -125,7 +125,6 @@ pub async fn start_indexer(
     )
     .await?;
 
-    subsys.on_shutdown_requested().await;
     Ok(())
 }
 

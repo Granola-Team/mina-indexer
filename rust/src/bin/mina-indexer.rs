@@ -13,6 +13,7 @@ use mina_indexer::{
         initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
     },
     store::{restore_snapshot, version::IndexerStoreVersion, IndexerStore},
+    unix_socket_server::remove_unix_socket,
     web::start_web_server,
 };
 use std::{
@@ -287,7 +288,7 @@ impl ServerCommand {
         check_or_write_pid_file(&database_dir);
 
         debug!("Building mina indexer configuration");
-        let config = process_indexer_configuration(args, mode, domain_socket_path)?;
+        let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
 
         debug!("Creating a new mina indexer database in {database_dir:#?}");
         let db = Arc::new(IndexerStore::new(&database_dir)?);
@@ -302,11 +303,12 @@ impl ServerCommand {
             start_web_server(s, store, (web_hostname, web_port))
         }));
 
-        info!("Shutting down primary database instance");
         subsys.on_shutdown_requested().await;
+        info!("Shutting down primary database instance");
         db.database.cancel_all_background_work(true);
         remove_pid(&database_dir);
         drop(db);
+        remove_unix_socket(&domain_socket_path)?;
         Ok(())
     }
 }
