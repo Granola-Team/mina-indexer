@@ -163,6 +163,7 @@ impl GenesisLedger {
                     permissions: genesis_account.permissions,
                     timing: genesis_account.timing.map(|t| t.into()),
                     zkapp: genesis_account.zkapp,
+                    genesis_account: true,
                 },
             );
         }

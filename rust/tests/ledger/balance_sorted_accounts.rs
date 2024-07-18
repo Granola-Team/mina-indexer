@@ -9,7 +9,7 @@ use mina_indexer::{
     },
     server::IndexerVersion,
     state::IndexerState,
-    store::{account::AccountStore, balance_of_key, pk_of_key, IndexerStore},
+    store::{account::AccountStore, balance_key_prefix, pk_key_prefix, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -47,8 +47,8 @@ async fn check_balance() -> anyhow::Result<()> {
         .flatten()
         .enumerate()
     {
-        let pk = pk_of_key(&key[8..]);
-        let pk_key_balance = balance_of_key(&key);
+        let pk = pk_key_prefix(&key[8..]);
+        let pk_key_balance = balance_key_prefix(&key);
         let pk_store_balance = indexer_store.get_account_balance(&pk)?.unwrap();
         let pk_ledger_balance = best_ledger
             .accounts

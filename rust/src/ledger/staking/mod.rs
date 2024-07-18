@@ -281,7 +281,10 @@ impl StakingLedger {
     }
 
     pub fn summary(&self) -> String {
-        format!("(epoch {}): {}", self.epoch, self.ledger_hash.0)
+        format!(
+            "{} (epoch {}): {}",
+            self.network, self.epoch, self.ledger_hash
+        )
     }
 }
 

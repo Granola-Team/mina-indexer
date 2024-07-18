@@ -34,6 +34,7 @@ pub struct SignedCommandWithData {
     pub tx_hash: String,
     pub blockchain_length: u32,
     pub date_time: u64,
+    pub nonce: Nonce,
     pub global_slot_since_genesis: u32,
 }
 
@@ -185,6 +186,7 @@ impl SignedCommandWithData {
             date_time,
             blockchain_length,
             global_slot_since_genesis,
+            nonce: command.source_nonce(),
             state_hash: state_hash.into(),
             status: user_cmd.status_data(),
             tx_hash: command
