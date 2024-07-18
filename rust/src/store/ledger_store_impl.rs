@@ -14,6 +14,7 @@ use crate::{
     store::{account::AccountStore, from_be_bytes, to_be_bytes, IndexerStore},
 };
 use log::{error, trace};
+use std::mem::size_of;
 
 impl LedgerStore for IndexerStore {
     ////////////////////
@@ -68,7 +69,7 @@ impl LedgerStore for IndexerStore {
             }
         } else {
             match self.get_block(state_hash)? {
-                Some(block) => {
+                Some((block, _)) => {
                     let ledger_hash = block.staged_ledger_hash();
                     if self.add_ledger(&ledger_hash, state_hash).unwrap_or(false) {
                         self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
@@ -242,12 +243,12 @@ impl LedgerStore for IndexerStore {
         let genesis_state_hash = genesis_state_hash
             .clone()
             .unwrap_or_else(|| self.get_best_block_genesis_hash().ok().flatten().unwrap());
-        if let Some(ledger_hash) = self.get_ledger_hash(epoch)? {
+        if let Some(ledger_hash) = self.get_staking_ledger_hash_by_epoch(epoch)? {
             if let Some(ledger) = self
                 .database
                 .get_pinned_cf(
                     self.staking_ledgers_cf(),
-                    staking_ledger_key(genesis_state_hash, epoch, &ledger_hash),
+                    staking_ledger_epoch_key(genesis_state_hash, epoch, &ledger_hash),
                 )?
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             {
@@ -259,7 +260,7 @@ impl LedgerStore for IndexerStore {
 
     /// If some epoch is given, use it over the ledger hash,
     /// else get the epoch from the ledger hash
-    fn get_staking_ledger_hash(
+    fn get_staking_ledger_by_hash(
         &self,
         ledger_hash: &LedgerHash,
         epoch: Option<u32>,
@@ -275,7 +276,7 @@ impl LedgerStore for IndexerStore {
                 ) {
                     if let Ok(Some(bytes)) = self.database.get_pinned_cf(
                         self.staking_ledgers_cf(),
-                        staking_ledger_key(genesis_state_hash, epoch, ledger_hash),
+                        staking_ledger_epoch_key(genesis_state_hash, epoch, ledger_hash),
                     ) {
                         return Ok(Some(serde_json::from_slice(&bytes)?));
                     }
@@ -304,7 +305,7 @@ impl LedgerStore for IndexerStore {
         trace!("Adding staking ledger {}", staking_ledger.summary());
 
         // add ledger at ledger hash
-        let key = staking_ledger_key(
+        let key = staking_ledger_epoch_key(
             genesis_state_hash.clone(),
             staking_ledger.epoch,
             &staking_ledger.ledger_hash,
@@ -332,7 +333,7 @@ impl LedgerStore for IndexerStore {
         let aggregated_delegations = staking_ledger.aggregate_delegations()?;
         self.database.put_cf(
             self.staking_delegations_cf(),
-            staking_ledger_epoch_key(genesis_state_hash.clone(), epoch),
+            staking_ledger_epoch_key_prefix(genesis_state_hash.clone(), epoch),
             serde_json::to_vec(&aggregated_delegations)?,
         )?;
 
@@ -399,7 +400,7 @@ impl LedgerStore for IndexerStore {
             .unwrap_or_else(|| self.get_best_block_genesis_hash().ok().flatten().unwrap());
         if let Some(bytes) = self.database.get_pinned_cf(
             self.staking_delegations_cf(),
-            staking_ledger_epoch_key(genesis_state_hash, epoch),
+            staking_ledger_epoch_key_prefix(genesis_state_hash, epoch),
         )? {
             return Ok(Some(serde_json::from_slice(&bytes)?));
         }
@@ -417,7 +418,7 @@ impl LedgerStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn get_ledger_hash(&self, epoch: u32) -> anyhow::Result<Option<LedgerHash>> {
+    fn get_staking_ledger_hash_by_epoch(&self, epoch: u32) -> anyhow::Result<Option<LedgerHash>> {
         trace!("Getting ledger hash for epoch {epoch}");
         Ok(self
             .database
@@ -487,6 +488,10 @@ impl LedgerStore for IndexerStore {
             .iterator_cf(self.staking_ledger_stake_cf(), mode)
     }
 
+    fn staking_ledger_epoch_iterator(&self, mode: speedb::IteratorMode) -> speedb::DBIterator<'_> {
+        self.database.iterator_cf(self.staking_ledgers_cf(), mode)
+    }
+
     ////////////////////////////
     // Staking ledger counts //
     ///////////////////////////
@@ -501,7 +506,7 @@ impl LedgerStore for IndexerStore {
             .database
             .get_cf(
                 self.staking_ledger_accounts_epoch_cf(),
-                staking_ledger_epoch_key(genesis_state_hash, epoch),
+                staking_ledger_epoch_key_prefix(genesis_state_hash, epoch),
             )?
             .map_or(0, from_be_bytes))
     }
@@ -512,16 +517,18 @@ impl LedgerStore for IndexerStore {
         genesis_state_hash: BlockHash,
         count: u32,
     ) -> anyhow::Result<()> {
-        trace!("Setting staking ledger accounts count for epoc {epoch} {genesis_state_hash:?}: {count}");
+        trace!("Setting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}: {count}");
         Ok(self.database.put_cf(
             self.staking_ledger_accounts_epoch_cf(),
-            staking_ledger_epoch_key(genesis_state_hash, epoch),
+            staking_ledger_epoch_key_prefix(genesis_state_hash, epoch),
             to_be_bytes(count),
         )?)
     }
 }
 
-/// `{epoch BE}{amount BE}{suffix}`
+/// Staking ledger amount sort key
+/// ```
+/// {epoch BE}{amount BE}{suffix}
 pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8> {
     let mut key = to_be_bytes(epoch);
     key.append(&mut amount.to_be_bytes().to_vec());
@@ -531,33 +538,54 @@ pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8>
 
 /// 4 BE bytes for epoch (u32)
 pub fn staking_ledger_sort_key_epoch(key: &[u8]) -> u32 {
-    from_be_bytes(key[..4].to_vec())
+    from_be_bytes(key[..size_of::<u32>()].to_vec())
 }
 
 /// 8 BE bytes for amount (u64)
 pub fn staking_ledger_sort_key_amount(key: &[u8]) -> u32 {
-    from_be_bytes(key[4..12].to_vec())
+    from_be_bytes(key[size_of::<u32>()..][..size_of::<u64>()].to_vec())
 }
 
 /// Remaining bytes for public key
 pub fn staking_ledger_sort_key_pk(key: &[u8]) -> PublicKey {
-    PublicKey::from_bytes(&key[12..]).expect("public key from bytes")
+    let start_idx = size_of::<u32>() + size_of::<u64>();
+    PublicKey::from_bytes(&key[start_idx..]).expect("public key from bytes")
 }
 
-/// `{genesis_state_hash}{epoch BE}{ledger_hash}`
-fn staking_ledger_key(
+/// Staking ledger epoch key
+/// ```
+/// {genesis state hash}{epoch BE}{ledger hash}
+fn staking_ledger_epoch_key(
     genesis_state_hash: BlockHash,
     epoch: u32,
     ledger_hash: &LedgerHash,
 ) -> Vec<u8> {
-    let mut key = staking_ledger_epoch_key(genesis_state_hash, epoch);
+    let mut key = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
     key.append(&mut ledger_hash.0.clone().into_bytes());
     key
 }
 
-/// `{genesis_state_hash}{epoch BE}`
-fn staking_ledger_epoch_key(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
+/// Prefix of [staking_ledger_epoch_key]
+/// ```
+/// {genesis state hash}{epoch BE}
+fn staking_ledger_epoch_key_prefix(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
     let mut key = genesis_state_hash.to_bytes();
     key.append(&mut to_be_bytes(epoch));
     key
+}
+
+/// Genesis state hash from [staking_ledger_epoch_key] bytes
+pub fn staking_ledger_epoch_key_genesis_state_hash(key: &[u8]) -> BlockHash {
+    BlockHash::from_bytes(&key[..BlockHash::LEN]).expect("genesis state hash from key")
+}
+
+/// Epoch from [staking_ledger_epoch_key] bytes
+pub fn staking_ledger_epoch_key_epoch(key: &[u8]) -> u32 {
+    from_be_bytes(key[BlockHash::LEN..][..size_of::<u32>()].to_vec())
+}
+
+/// Ledger hash from [staking_ledger_epoch_key] bytes
+pub fn staking_ledger_epoch_key_ledger_hash(key: &[u8]) -> LedgerHash {
+    LedgerHash::from_bytes(key[BlockHash::LEN + size_of::<u32>()..].to_vec())
+        .expect("ledger hash from bytes")
 }

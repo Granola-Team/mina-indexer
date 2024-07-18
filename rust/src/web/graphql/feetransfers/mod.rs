@@ -220,7 +220,8 @@ impl FeetransferQueryRoot {
                     let block = db
                         .get_block(state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
-                        .unwrap();
+                        .unwrap()
+                        .0;
                     for internal_cmd in InternalCommandWithData::from_precomputed(&block) {
                         let ft = Feetransfer::from((
                             internal_cmd,
@@ -262,7 +263,8 @@ impl FeetransferQueryRoot {
                     let pcb = db
                         .get_block(&BlockHash::from(state_hash.clone()))
                         .unwrap()
-                        .unwrap();
+                        .unwrap()
+                        .0;
                     let canonical = get_block_canonicity(db, &state_hash);
                     FeetransferWithMeta {
                         canonical,
@@ -314,7 +316,8 @@ fn get_fee_transfers(
         let pcb = db
             .get_block(&BlockHash::from(state_hash.clone()))
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .0;
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
             feetransfer: ft,
@@ -345,7 +348,7 @@ fn get_fee_transfers_for_state_hash(
     total_num_internal_commands: u32,
 ) -> Vec<FeetransferWithMeta> {
     let pcb = match db.get_block(state_hash) {
-        Ok(Some(pcb)) => pcb,
+        Ok(Some(pcb)) => pcb.0,
         _ => return vec![],
     };
     let canonical = match db.get_block_canonicity(state_hash) {

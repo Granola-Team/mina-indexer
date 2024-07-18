@@ -88,7 +88,7 @@ pub trait LedgerStore {
     ) -> anyhow::Result<Option<StakingLedger>>;
 
     /// Get the staking ledger with the given hash
-    fn get_staking_ledger_hash(
+    fn get_staking_ledger_by_hash(
         &self,
         ledger_hash: &LedgerHash,
         epoch: Option<u32>,
@@ -123,7 +123,7 @@ pub trait LedgerStore {
     fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>>;
 
     /// Get the staking ledger hash corresponding to the given epoch
-    fn get_ledger_hash(&self, epoch: u32) -> anyhow::Result<Option<LedgerHash>>;
+    fn get_staking_ledger_hash_by_epoch(&self, epoch: u32) -> anyhow::Result<Option<LedgerHash>>;
 
     /// Get the genesis state hash corresponding to the given staking ledger
     fn get_genesis_state_hash(&self, ledger_hash: &LedgerHash)
@@ -153,4 +153,7 @@ pub trait LedgerStore {
 
     /// Per epoch staking ledger account iterator via stake (total delegations)
     fn staking_ledger_stake_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Per epoch staking ledger iterator via epoch
+    fn staking_ledger_epoch_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }

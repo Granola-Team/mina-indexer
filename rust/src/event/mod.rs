@@ -9,8 +9,6 @@ pub mod witness_tree;
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum IndexerEvent {
     Db(db::DbEvent),
-    BlockWatcher(block::BlockWatcherEvent),
-    StakingLedgerWatcher(ledger::StakingLedgerWatcherEvent),
     WitnessTree(witness_tree::WitnessTreeEvent),
 }
 
@@ -51,9 +49,7 @@ impl IndexerEvent {
 impl std::fmt::Debug for IndexerEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::BlockWatcher(block_event) => write!(f, "{:?}", block_event),
             Self::Db(db_event) => write!(f, "{:?}", db_event),
-            Self::StakingLedgerWatcher(ledger_event) => write!(f, "{:?}", ledger_event),
             Self::WitnessTree(tree_event) => write!(f, "{:?}", tree_event),
         }
     }

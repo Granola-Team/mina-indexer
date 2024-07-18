@@ -12,8 +12,8 @@ use crate::{
     snark_work::store::SnarkStore,
     store::{
         account::{AccountBalanceUpdate, AccountStore},
-        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, to_be_bytes,
-        u32_prefix_key,
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, from_u64_be_bytes,
+        to_be_bytes, u32_prefix_key,
         username::UsernameStore,
         DBUpdate, IndexerStore,
     },
@@ -21,14 +21,22 @@ use crate::{
 use anyhow::{bail, Context};
 use log::{error, trace};
 use speedb::{DBIterator, Direction, IteratorMode};
+use std::mem::size_of;
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
-    fn add_block(&self, block: &PrecomputedBlock) -> anyhow::Result<Option<DbEvent>> {
+    fn add_block(
+        &self,
+        block: &PrecomputedBlock,
+        num_block_bytes: u64,
+    ) -> anyhow::Result<Option<DbEvent>> {
         trace!("Adding block {}", block.summary());
 
-        // add block to db
+        // add block to db - prefix with num bytes (u64) BE bytes
         let state_hash = block.state_hash();
+        let mut value = num_block_bytes.to_be_bytes().to_vec();
+        value.append(&mut serde_json::to_vec(&block)?);
+
         if matches!(
             self.database
                 .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes()),
@@ -37,11 +45,8 @@ impl BlockStore for IndexerStore {
             trace!("Block already present {}", block.summary());
             return Ok(None);
         }
-        self.database.put_cf(
-            self.blocks_cf(),
-            state_hash.0.as_bytes(),
-            serde_json::to_vec(&block)?,
-        )?;
+        self.database
+            .put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value)?;
 
         // add to ledger diff index
         self.set_block_ledger_diff(&state_hash, LedgerDiff::from_precomputed(block))?;
@@ -120,6 +125,16 @@ impl BlockStore for IndexerStore {
         // add block SNARK work
         self.add_snark_work(block)?;
 
+        // increment bytes processed
+        let bytes_processed = self
+            .database
+            .get(Self::NUM_BLOCK_BYTES_PROCESSED)?
+            .map_or(0, from_u64_be_bytes);
+        self.database.put(
+            Self::NUM_BLOCK_BYTES_PROCESSED,
+            (bytes_processed + num_block_bytes).to_be_bytes(),
+        )?;
+
         // add new block db event only after all other data is added
         let db_event = DbEvent::Block(DbBlockEvent::NewBlock {
             state_hash: block.state_hash(),
@@ -129,15 +144,16 @@ impl BlockStore for IndexerStore {
         Ok(Some(db_event))
     }
 
-    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PrecomputedBlock>> {
+    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<(PrecomputedBlock, u64)>> {
         trace!("Getting block {state_hash}");
         Ok(self
             .database
             .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| {
-                serde_json::from_slice::<PrecomputedBlock>(&bytes)
+                serde_json::from_slice::<PrecomputedBlock>(&bytes[size_of::<u64>()..])
                     .with_context(|| format!("{:?}", bytes.to_vec()))
                     .ok()
+                    .map(|block| (block, from_u64_be_bytes(bytes[..size_of::<u64>()].to_vec())))
             }))
     }
 
@@ -145,7 +161,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting best block");
         match self.get_best_block_hash()? {
             None => Ok(None),
-            Some(state_hash) => self.get_block(&state_hash),
+            Some(state_hash) => Ok(self.get_block(&state_hash)?.map(|b| b.0)),
         }
     }
 
@@ -516,7 +532,10 @@ impl BlockStore for IndexerStore {
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting children of block {state_hash}");
 
-        if let Some(height) = self.get_block(state_hash)?.map(|b| b.blockchain_length()) {
+        if let Some(height) = self
+            .get_block(state_hash)?
+            .map(|(b, _)| b.blockchain_length())
+        {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
             let mut children: Vec<BlockHash> = blocks_at_next_height
                 .into_iter()
@@ -852,7 +871,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting blocks via height (mode: {})", display_mode(mode));
         for (key, _) in self.blocks_height_iterator(mode).flatten() {
             let state_hash = block_state_hash_from_key(&key)?;
-            blocks.push(self.get_block(&state_hash)?.expect("PCB"));
+            blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
     }
@@ -888,7 +907,7 @@ impl BlockStore for IndexerStore {
         );
         for (key, _) in self.blocks_global_slot_iterator(mode).flatten() {
             let state_hash = block_state_hash_from_key(&key)?;
-            blocks.push(self.get_block(&state_hash)?.expect("PCB"));
+            blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
     }
