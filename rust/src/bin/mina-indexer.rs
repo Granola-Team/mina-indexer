@@ -257,15 +257,17 @@ pub async fn main() -> anyhow::Result<()> {
 
 impl ServerCommand {
     async fn run(self, subsys: SubsystemHandle, domain_socket_path: PathBuf) -> anyhow::Result<()> {
-        let (args, mut mode) = match self {
+        let (args, mode) = match self {
             Self::Shutdown => return client::ClientCli::Shutdown.run(domain_socket_path).await,
             Self::Start(args) => {
                 if let Some(config_path) = args.db.config {
                     let contents = std::fs::read(config_path)?;
                     let args: ServerArgsJson = serde_json::from_slice(&contents)?;
                     (args.into(), InitializationMode::Sync)
+                } else if args.self_check {
+                    (*args, InitializationMode::Replay)
                 } else {
-                    (*args, InitializationMode::New)
+                    (*args, InitializationMode::Sync)
                 }
             }
         };
@@ -273,16 +275,6 @@ impl ServerCommand {
         let database_dir = args.db.database_dir.clone();
         let web_hostname = args.web_hostname.clone();
         let web_port = args.web_port;
-
-        // default to sync if there's a nonempty db dir
-        if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
-            if matches!(mode, InitializationMode::New) && dir.count() != 0 {
-                mode = InitializationMode::Sync;
-            }
-        }
-        if args.self_check {
-            mode = InitializationMode::Replay;
-        }
 
         // initialize logging
         stderrlog::new()
@@ -379,9 +371,9 @@ impl DatabaseCommand {
                     process::exit(1);
                 }
                 debug!("Building mina indexer configuration");
-                let mut mode = InitializationMode::New;
+                let mut mode = InitializationMode::BuildDB;
                 if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
-                    if dir.count() != 0 {
+                    if dir.count() > 0 {
                         mode = InitializationMode::Sync;
                     }
                 };

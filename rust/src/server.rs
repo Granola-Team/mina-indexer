@@ -66,7 +66,7 @@ pub struct IndexerConfiguration {
 
 #[derive(Debug, Clone)]
 pub enum InitializationMode {
-    New,
+    BuildDB,
     Replay,
     Sync,
 }
@@ -220,7 +220,7 @@ async fn initialize(
     };
 
     let mut state = match initialization_mode {
-        InitializationMode::New => {
+        InitializationMode::BuildDB => {
             log_dirs_msg(blocks_dir.as_ref(), staking_ledgers_dir.as_ref());
             IndexerState::new_from_config(state_config)?
         }
@@ -246,7 +246,7 @@ async fn initialize(
 
     // build witness tree & ingest precomputed blocks
     match initialization_mode {
-        InitializationMode::New => {
+        InitializationMode::BuildDB => {
             if let Some(ref blocks_dir) = blocks_dir {
                 let mut block_parser = BlockParser::new_with_canonical_chain_discovery(
                     blocks_dir,
@@ -653,14 +653,14 @@ impl IndexerVersion {
 fn log_dirs_msg(blocks_dir: Option<&PathBuf>, staking_ledgers_dir: Option<&PathBuf>) {
     match (blocks_dir, staking_ledgers_dir) {
         (Some(blocks_dir), Some(staking_ledgers_dir)) => info!(
-            "Initializing indexer from blocks in {blocks_dir:#?} and staking ledgers in {staking_ledgers_dir:#?}"
+            "Initializing database from blocks in {blocks_dir:#?} and staking ledgers in {staking_ledgers_dir:#?}"
         ),
         (Some(blocks_dir), None) => info!(
-            "Initializing indexer from blocks in {blocks_dir:#?}"
+            "Initializing database from blocks in {blocks_dir:#?}"
         ),
         (None, Some(staking_ledgers_dir)) => info!(
-            "Initializing indexer from staking ledgers in {staking_ledgers_dir:#?}"
+            "Initializing database from staking ledgers in {staking_ledgers_dir:#?}"
         ),
-        (None, None) => info!("Initializing indexer without blocks and staking ledgers"),
+        (None, None) => info!("Initializing database without blocks and staking ledgers"),
     }
 }
