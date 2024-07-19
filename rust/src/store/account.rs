@@ -173,11 +173,6 @@ impl DBAccountBalanceUpdate {
                         nonce: _,
                     }) => vec![
                         AccountBalanceUpdate::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: source.clone(),
-                            amount,
-                        }),
-                        AccountBalanceUpdate::Payment(PaymentDiff {
                             update_type: UpdateType::Credit,
                             public_key: receiver.clone(),
                             amount: if is_new_receiver_account {
@@ -185,6 +180,11 @@ impl DBAccountBalanceUpdate {
                             } else {
                                 amount
                             },
+                        }),
+                        AccountBalanceUpdate::Payment(PaymentDiff {
+                            update_type: UpdateType::Debit(None),
+                            public_key: source.clone(),
+                            amount,
                         }),
                     ],
                     Command::Delegation(_) => vec![],
@@ -210,13 +210,13 @@ impl DBAccountBalanceUpdate {
                         amount,
                     } => vec![
                         AccountBalanceUpdate::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: sender.clone(),
+                            update_type: UpdateType::Credit,
+                            public_key: receiver.clone(),
                             amount: (*amount).into(),
                         }),
                         AccountBalanceUpdate::Payment(PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.clone(),
+                            update_type: UpdateType::Debit(None),
+                            public_key: sender.clone(),
                             amount: (*amount).into(),
                         }),
                     ],

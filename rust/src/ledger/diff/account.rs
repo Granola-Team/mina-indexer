@@ -70,14 +70,14 @@ impl AccountDiff {
             Command::Payment(payment) => {
                 let mut diffs = vec![
                     Self::Payment(PaymentDiff {
-                        public_key: payment.source,
-                        amount: payment.amount,
-                        update_type: UpdateType::Debit(Some(payment.nonce)),
-                    }),
-                    Self::Payment(PaymentDiff {
                         public_key: payment.receiver.clone(),
                         amount: payment.amount,
                         update_type: UpdateType::Credit,
+                    }),
+                    Self::Payment(PaymentDiff {
+                        public_key: payment.source,
+                        amount: payment.amount,
+                        update_type: UpdateType::Debit(Some(payment.nonce)),
                     }),
                 ];
                 if payment.is_new_receiver_account {
@@ -145,14 +145,14 @@ impl AccountDiff {
                 let mut res = vec![];
                 if *fee > 0 {
                     res.push(Self::FeeTransfer(PaymentDiff {
-                        public_key: pk.clone(),
-                        amount: (*fee).into(),
-                        update_type: UpdateType::Debit(None),
-                    }));
-                    res.push(Self::FeeTransfer(PaymentDiff {
                         public_key: coinbase_receiver.clone(),
                         amount: (*fee).into(),
                         update_type: UpdateType::Credit,
+                    }));
+                    res.push(Self::FeeTransfer(PaymentDiff {
+                        public_key: pk.clone(),
+                        amount: (*fee).into(),
+                        update_type: UpdateType::Debit(None),
                     }));
                 }
                 res
@@ -190,14 +190,14 @@ impl AccountDiff {
                 let mut res = vec![];
                 if *total_fee > 0 {
                     res.push(AccountDiff::FeeTransfer(PaymentDiff {
-                        public_key: precomputed_block.coinbase_receiver(),
-                        amount: (*total_fee).into(),
-                        update_type: UpdateType::Debit(None),
-                    }));
-                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
                         public_key: prover.clone(),
                         amount: (*total_fee).into(),
                         update_type: UpdateType::Credit,
+                    }));
+                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
+                        public_key: precomputed_block.coinbase_receiver(),
+                        amount: (*total_fee).into(),
+                        update_type: UpdateType::Debit(None),
                     }));
                 }
                 res
@@ -221,14 +221,14 @@ impl AccountDiff {
         match diff_type {
             AccountDiffType::Payment(nonce) => vec![
                 Self::Payment(PaymentDiff {
-                    public_key: sender.into(),
-                    amount: amount.into(),
-                    update_type: UpdateType::Debit(Some(Nonce(nonce))),
-                }),
-                Self::Payment(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                }),
+                Self::Payment(PaymentDiff {
+                    public_key: sender.into(),
+                    amount: amount.into(),
+                    update_type: UpdateType::Debit(Some(Nonce(nonce))),
                 }),
             ],
             AccountDiffType::AccountCreationFee => vec![Self::AccountCreationFee(receiver.into())],
@@ -243,26 +243,26 @@ impl AccountDiff {
             })],
             AccountDiffType::FeeTransfer => vec![
                 Self::FeeTransfer(PaymentDiff {
-                    public_key: sender.into(),
-                    amount: amount.into(),
-                    update_type: UpdateType::Debit(None),
-                }),
-                Self::FeeTransfer(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                }),
+                Self::FeeTransfer(PaymentDiff {
+                    public_key: sender.into(),
+                    amount: amount.into(),
+                    update_type: UpdateType::Debit(None),
                 }),
             ],
             AccountDiffType::FeeTransferViaCoinbase => vec![
                 Self::FeeTransferViaCoinbase(PaymentDiff {
-                    public_key: sender.into(),
-                    amount: amount.into(),
-                    update_type: UpdateType::Debit(None),
-                }),
-                Self::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                }),
+                Self::FeeTransferViaCoinbase(PaymentDiff {
+                    public_key: sender.into(),
+                    amount: amount.into(),
+                    update_type: UpdateType::Debit(None),
                 }),
             ],
         }
@@ -386,14 +386,14 @@ mod tests {
                 amount: Amount(1439 * (1e9 as u64)),
             }),
             AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
-                public_key: receiver,
-                amount: fee.into(),
-                update_type: UpdateType::Debit(None),
-            }),
-            AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key: snarker,
                 amount: fee.into(),
                 update_type: UpdateType::Credit,
+            }),
+            AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
+                public_key: receiver,
+                amount: fee.into(),
+                update_type: UpdateType::Debit(None),
             }),
         ];
 
@@ -418,14 +418,14 @@ mod tests {
         });
         let expected_result = vec![
             AccountDiff::Payment(PaymentDiff {
-                public_key: source_public_key,
-                amount: 536900000000.into(),
-                update_type: UpdateType::Debit(Some(nonce)),
-            }),
-            AccountDiff::Payment(PaymentDiff {
                 public_key: receiver_public_key.clone(),
                 amount: 536900000000.into(),
                 update_type: UpdateType::Credit,
+            }),
+            AccountDiff::Payment(PaymentDiff {
+                public_key: source_public_key,
+                amount: 536900000000.into(),
+                update_type: UpdateType::Debit(Some(nonce)),
             }),
             AccountDiff::AccountCreationFee(receiver_public_key),
         ];

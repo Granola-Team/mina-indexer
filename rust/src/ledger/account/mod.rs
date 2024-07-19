@@ -163,11 +163,11 @@ impl Account {
     }
 
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
-        use super::UpdateType;
+        use super::UpdateType::*;
         match payment_diff.update_type {
-            UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
-            UpdateType::Debit(nonce) => {
-                Account::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
+            Credit => Self::from_credit(pre.clone(), payment_diff.amount),
+            Debit(nonce) => {
+                Self::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
             }
         }
     }

@@ -122,14 +122,14 @@ impl Coinbase {
                 if let Some(fee_transfer) = fee_transfer {
                     vec![
                         PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: fee_transfer.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                        PaymentDiff {
                             public_key: fee_transfer.receiver_pk.clone(),
                             amount: fee_transfer.fee.into(),
                             update_type: UpdateType::Credit,
+                        },
+                        PaymentDiff {
+                            public_key: self.receiver.clone(),
+                            amount: fee_transfer.fee.into(),
+                            update_type: UpdateType::Debit(None),
                         },
                     ]
                 } else {
@@ -141,28 +141,28 @@ impl Coinbase {
                 if let Some(t0) = fee_transfer0 {
                     res.append(&mut vec![
                         PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: t0.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                        PaymentDiff {
                             public_key: t0.receiver_pk.clone(),
                             amount: t0.fee.into(),
                             update_type: UpdateType::Credit,
+                        },
+                        PaymentDiff {
+                            public_key: self.receiver.clone(),
+                            amount: t0.fee.into(),
+                            update_type: UpdateType::Debit(None),
                         },
                     ]);
                 }
                 if let Some(t1) = fee_transfer1 {
                     res.append(&mut vec![
                         PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: t1.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                        PaymentDiff {
                             public_key: t1.receiver_pk.clone(),
                             amount: t1.fee.into(),
                             update_type: UpdateType::Credit,
+                        },
+                        PaymentDiff {
+                            public_key: self.receiver.clone(),
+                            amount: t1.fee.into(),
+                            update_type: UpdateType::Debit(None),
                         },
                     ]);
                 }
