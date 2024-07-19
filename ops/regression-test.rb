@@ -30,6 +30,7 @@ test_names = %w[
   block_copy
   missing_blocks
   missing_block_recovery
+  fetch_new_blocks
   best_chain
   block_children
   ledgers
@@ -39,6 +40,7 @@ test_names = %w[
   snark_work
   snapshot
   database_create
+  reuse_databases
   snapshot_database_dir
   rest_accounts_summary
   rest_blocks

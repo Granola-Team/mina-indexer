@@ -110,6 +110,7 @@ tier1: tier1-prereqs check lint test-unit
     account_balance_cli \
     best_chain \
     rest_accounts_summary \
+    reuse_databases \
     hurl
 
 load:
