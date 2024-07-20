@@ -56,8 +56,8 @@ pub enum AccountDiff {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum AccountDiffType {
-    Payment(u32),
-    Delegation(u32),
+    Payment(Nonce),
+    Delegation(Nonce),
     AccountCreationFee,
     Coinbase,
     FeeTransfer,
@@ -228,14 +228,14 @@ impl AccountDiff {
                 Self::Payment(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
-                    update_type: UpdateType::Debit(Some(Nonce(nonce))),
+                    update_type: UpdateType::Debit(Some(nonce)),
                 }),
             ],
             AccountDiffType::AccountCreationFee => vec![Self::AccountCreationFee(receiver.into())],
             AccountDiffType::Delegation(nonce) => vec![Self::Delegation(DelegationDiff {
                 delegate: sender.into(),
                 delegator: receiver.into(),
-                nonce: Nonce(nonce),
+                nonce,
             })],
             AccountDiffType::Coinbase => vec![Self::Coinbase(CoinbaseDiff {
                 public_key: sender.into(),
