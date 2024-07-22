@@ -2,7 +2,12 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
-    ledger::{account::Nonce, coinbase::Coinbase, Amount, PublicKey},
+    ledger::{
+        account::Nonce,
+        coinbase::{Coinbase, CoinbaseKind},
+        Amount, PublicKey,
+    },
+    protocol::serialization_types::staged_ledger_diff,
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -199,6 +204,37 @@ impl AccountDiff {
                         amount: (*total_fee).into(),
                         update_type: UpdateType::Debit(None),
                     }));
+                    let coinbase = Coinbase::from_precomputed(precomputed_block);
+                    if let CoinbaseKind::One(Some(coinbase_fee_transfer)) = coinbase.kind {
+                        if coinbase_fee_transfer.fee >= MAINNET_ACCOUNT_CREATION_FEE.0 {
+                            for internal_command_balance in
+                                precomputed_block.internal_command_balances()
+                            {
+                                match internal_command_balance {
+                                    staged_ledger_diff::InternalCommandBalanceData::CoinBase(
+                                        cb,
+                                    ) => {
+                                        if let Some(fee) = cb.t.fee_transfer_receiver_balance {
+                                            let fee_transfer_receiver_balance = fee.t.t.t;
+                                            if (*total_fee)
+                                                .saturating_sub(MAINNET_ACCOUNT_CREATION_FEE.0)
+                                                == fee_transfer_receiver_balance
+                                            {
+                                                res.push(AccountDiff::Payment(PaymentDiff {
+                                                    public_key: prover.clone(),
+                                                    amount: MAINNET_ACCOUNT_CREATION_FEE,
+                                                    update_type: UpdateType::Debit(None),
+                                                }));
+                                            }
+                                        }
+                                    }
+                                    staged_ledger_diff::InternalCommandBalanceData::FeeTransfer(
+                                        _,
+                                    ) => {}
+                                }
+                            }
+                        }
+                    }
                 }
                 res
             })
@@ -357,13 +393,17 @@ impl std::fmt::Debug for UpdateType {
 mod tests {
     use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
     use crate::{
+        block::precomputed::{PcbVersion, PrecomputedBlock},
         command::{Command, Delegation, Payment},
+        constants::MAINNET_ACCOUNT_CREATION_FEE,
         ledger::{
             account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
+            diff::LedgerDiff,
             PublicKey,
         },
     };
+    use std::path::PathBuf;
 
     #[test]
     fn test_fee_transfer_via_coinbase() {
@@ -498,5 +538,58 @@ mod tests {
         let result = account_diff.public_key();
         let expected = PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_snark_account_creation_deduction() -> anyhow::Result<()> {
+        use crate::ledger::diff::AccountDiffType::*;
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let ledger_diff = LedgerDiff::from_precomputed(&block);
+        let actual_diffs = ledger_diff.account_diffs;
+        let mut expected_diffs = LedgerDiff::from(&[
+            (
+                "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                Payment(Nonce(180446)),
+                1000,
+            ),
+            (
+                "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+                Payment(Nonce(180447)),
+                1000,
+            ),
+            (
+                "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
+                "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
+                Coinbase,
+                720000000000,
+            ),
+            (
+                "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+                "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
+                FeeTransfer,
+                2000000,
+            ),
+            (
+                "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
+                "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n",
+                FeeTransferViaCoinbase,
+                1000000000,
+            ),
+        ]);
+
+        expected_diffs.push(AccountDiff::Payment(PaymentDiff {
+            update_type: UpdateType::Debit(None),
+            public_key: "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n".into(),
+            amount: MAINNET_ACCOUNT_CREATION_FEE,
+        }));
+
+        for (i, ac) in actual_diffs.iter().enumerate() {
+            assert_eq!(*ac, expected_diffs[i]);
+        }
+
+        Ok(())
     }
 }
