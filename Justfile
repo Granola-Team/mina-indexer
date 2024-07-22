@@ -68,6 +68,10 @@ test-unit:
   @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run
 
+test-unit-dev: lint
+  @echo "--- Invoking test-unit-dev"
+  cd rust && time cargo nextest run
+
 # Perform a fast verification of whether the source compiles.
 check:
   @echo "--- Invoking 'cargo check'"
