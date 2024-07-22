@@ -12,6 +12,7 @@ query Accounts {
     nonce
     delegate
     timeLocked
+    is_genesis_account
   }
 }
 ```
@@ -27,12 +28,9 @@ jsonpath "$.data.accounts[0].balance" == 720020000000
 jsonpath "$.data.accounts[0].nonce" == 0
 jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].timeLocked" == false
+jsonpath "$.data.accounts[0].is_genesis_account" == true
 
 duration < 750
-
-#
-# Accounts public key timing query
-#
 
 #
 # Account public key timing query
