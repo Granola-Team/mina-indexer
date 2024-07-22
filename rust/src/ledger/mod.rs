@@ -154,6 +154,7 @@ impl Ledger {
                                 Account::from_delegation(
                                     account_before.clone(),
                                     delegation_diff.delegate.clone(),
+                                    delegation_diff.nonce,
                                 )
                             }
                             AccountDiff::Coinbase(coinbase_diff) => {
@@ -408,8 +409,8 @@ mod tests {
         let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
-
         let account_after = ledger.accounts.get(&public_key).expect("account get");
         assert_eq!(account_after.delegate, delegate_key);
+        assert_eq!(43, account_after.nonce.0);
     }
 }

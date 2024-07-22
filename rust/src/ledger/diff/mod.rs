@@ -1136,7 +1136,6 @@ mod tests {
                 33947755,
             ),
         ]);
-
         ledger_diff.account_diffs.sort();
         expected.sort();
 

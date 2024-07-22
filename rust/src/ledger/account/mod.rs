@@ -192,8 +192,12 @@ impl Account {
         }
     }
 
-    pub fn from_delegation(pre: Self, delegate: PublicKey) -> Self {
-        Account { delegate, ..pre }
+    pub fn from_delegation(pre: Self, delegate: PublicKey, nonce: Nonce) -> Self {
+        Account {
+            delegate,
+            nonce: nonce + 1,
+            ..pre
+        }
     }
 
     pub fn from_failed_transaction(pre: Self, nonce: Nonce) -> Self {
