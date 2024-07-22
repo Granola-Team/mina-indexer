@@ -21,6 +21,9 @@ pub struct Account {
     time_locked: bool,
     timing: Option<Timing>,
 
+    #[graphql(name = "is_genesis_account")]
+    is_genesis_account: bool,
+
     #[graphql(name = "pk_epoch_num_blocks")]
     pk_epoch_num_blocks: u32,
 
@@ -284,6 +287,7 @@ impl
             balance: account.0.balance.0,
             time_locked: account.0.timing.is_some(),
             timing: account.0.timing.map(|t| t.into()),
+            is_genesis_account: account.0.genesis_account,
             pk_epoch_num_blocks: account.1,
             pk_total_num_blocks: account.2,
             pk_epoch_num_snarks: account.3,
