@@ -112,7 +112,7 @@ pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> 
         .unwrap_or(false)
 }
 
-#[derive(Clone, Debug, PartialEq, SimpleObject)]
+#[derive(Default, Clone, Debug, PartialEq, SimpleObject)]
 #[graphql(name = "PublicKey")]
 pub(crate) struct PK {
     pub public_key: String,

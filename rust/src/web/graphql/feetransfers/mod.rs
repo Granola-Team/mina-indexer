@@ -90,6 +90,7 @@ impl FeetransferWithMeta {
                 block_num_snarks,
                 block_num_user_commands,
                 block_num_internal_commands,
+                num_unique_block_producers_last_n_blocks: None,
             }))
         } else {
             Ok(None)

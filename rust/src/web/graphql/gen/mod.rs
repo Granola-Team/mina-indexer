@@ -567,6 +567,10 @@ pub struct BlockQueryInput {
     pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
     pub block_height: Option<u32>,
+
+    #[graphql(name = "unique_block_producers_last_n_blocks")]
+    pub unique_block_producers_last_n_blocks: Option<u32>,
+
     #[graphql(name = "global_slot_since_genesis")]
     pub global_slot_since_genesis: Option<u32>,
 
