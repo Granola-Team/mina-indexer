@@ -982,7 +982,7 @@ test_rest_accounts_summary() {
     sleep 1
 
     # results
-    assert '0' "$(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)"
+    assert 'null' "$(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)"
     assert '1440050000000' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert 'B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .delegate)
 
@@ -1139,20 +1139,20 @@ test_txn_nonces() {
 
     # after block 3
     pk0=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
-    assert 3 $(idxr ledgers height --height 3 | jq -r .${pk0}.nonce)
+    assert 4 $(idxr ledgers height --height 3 | jq -r .${pk0}.nonce)
 
     # after block 11
     pk1=B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM
-    assert 0 $(idxr ledgers height --height 11 | jq -r .${pk1}.nonce)
+    assert 'null' $(idxr ledgers height --height 11 | jq -r .${pk1}.nonce)
 
     # after block 100
     ## pk0
-    assert 149 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
-    assert 149 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
+    assert 150 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
+    assert 150 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
 
     ## pk1
-    assert 0 $(idxr ledgers height --height 100 | jq -r .${pk1}.nonce)
-    assert 0 $(idxr accounts public-key --public-key $pk1 | jq -r .nonce)
+    assert 'null' $(idxr ledgers height --height 100 | jq -r .${pk1}.nonce)
+    assert 'null' $(idxr accounts public-key --public-key $pk1 | jq -r .nonce)
 }
 
 test_startup_staking_ledgers() {

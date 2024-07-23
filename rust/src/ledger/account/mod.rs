@@ -74,7 +74,8 @@ impl Display for Nonce {
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,
-    pub nonce: Nonce,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<Nonce>,
     pub delegate: PublicKey,
     pub genesis_account: bool,
 
@@ -178,7 +179,7 @@ impl Account {
         } else {
             Some(Account {
                 balance: pre.balance - amount,
-                nonce: nonce.unwrap_or(pre.nonce),
+                nonce: nonce.or(pre.nonce),
                 ..pre
             })
         }
@@ -195,13 +196,16 @@ impl Account {
     pub fn from_delegation(pre: Self, delegate: PublicKey, nonce: Nonce) -> Self {
         Account {
             delegate,
-            nonce: nonce + 1,
+            nonce: Some(nonce + 1),
             ..pre
         }
     }
 
     pub fn from_failed_transaction(pre: Self, nonce: Nonce) -> Self {
-        Account { nonce, ..pre }
+        Account {
+            nonce: Some(nonce),
+            ..pre
+        }
     }
 }
 

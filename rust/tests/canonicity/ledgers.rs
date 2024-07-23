@@ -70,13 +70,13 @@ async fn test() -> anyhow::Result<()> {
                     ledger
                         .accounts
                         .get(pk)
-                        .map(|acct| (acct.balance.0, acct.nonce.0))
+                        .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
                 };
                 let ledger_diff_balance = |pk: &PublicKey| {
                     ledger_diff
                         .accounts
                         .get(pk)
-                        .map(|acct| (acct.balance.0, acct.nonce.0))
+                        .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
                 };
 
                 if *pk != pk_diff {

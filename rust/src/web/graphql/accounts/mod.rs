@@ -283,7 +283,7 @@ impl
         Self {
             public_key: account.0.public_key.0,
             delegate: account.0.delegate.0,
-            nonce: account.0.nonce.0,
+            nonce: account.0.nonce.map_or(0, |n| n.0),
             balance: account.0.balance.0,
             time_locked: account.0.timing.is_some(),
             timing: account.0.timing.map(|t| t.into()),

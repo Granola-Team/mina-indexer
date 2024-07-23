@@ -149,7 +149,7 @@ impl GenesisLedger {
                 Account {
                     balance,
                     username: None,
-                    nonce: Nonce::default(),
+                    nonce: None,
                     public_key: public_key.clone(),
                     // If delegate is None, delegate to yourself
                     delegate: genesis_account

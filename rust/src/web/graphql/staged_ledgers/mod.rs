@@ -151,7 +151,7 @@ impl From<Account> for StagedLedgerAccount {
         decimal.set_scale(9).ok();
 
         Self {
-            nonce: acct.nonce.0,
+            nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,
             username: acct.username.map(|u| u.0),
