@@ -17,14 +17,16 @@ use crate::{
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, pk_key_prefix, to_be_bytes,
-        IndexerStore,
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, pk_key_prefix,
+        to_be_bytes, IndexerStore,
     },
     web::graphql::gen::BlockQueryInput,
 };
 use anyhow::Context;
 use async_graphql::{self, Enum, Object, Result, SimpleObject};
-use std::sync::Arc;
+use log::error;
+use speedb::{Direction, IteratorMode};
+use std::{collections::HashSet, sync::Arc};
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -76,6 +78,7 @@ impl BlocksQueryRoot {
                             epoch_num_user_commands,
                             total_num_user_commands,
                         ),
+                        num_unique_block_producers_last_n_blocks: None,
                     }
                 })
             })?);
@@ -117,8 +120,8 @@ impl BlocksQueryRoot {
                     epoch_num_user_commands,
                     total_num_user_commands,
                 ),
+                num_unique_block_producers_last_n_blocks: None,
             };
-
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
             }
@@ -158,13 +161,13 @@ impl BlocksQueryRoot {
                     epoch_num_user_commands,
                     total_num_user_commands,
                 ),
+                num_unique_block_producers_last_n_blocks: None,
             };
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 return Ok(Some(block));
             }
         }
-
         Ok(None)
     }
 
@@ -177,8 +180,45 @@ impl BlocksQueryRoot {
     ) -> Result<Vec<Block>> {
         use speedb::{Direction::*, IteratorMode::*};
         use BlockSortByInput::*;
-
         let db = db(ctx);
+
+        // unique block producer query
+        if let Some(mut num_blocks) = query
+            .as_ref()
+            .and_then(|q| q.unique_block_producers_last_n_blocks)
+        {
+            const MAX_NUM_BLOCKS: u32 = 1000;
+            num_blocks = num_blocks.min(MAX_NUM_BLOCKS);
+
+            if let Some(best_height) = db.get_best_block_height()? {
+                let start_height = 1.max(best_height.saturating_sub(num_blocks));
+                let mut producers = HashSet::new();
+                for (key, _) in db
+                    .blocks_height_iterator(IteratorMode::From(
+                        &to_be_bytes(best_height + 1),
+                        Direction::Reverse,
+                    ))
+                    .flatten()
+                {
+                    let height = from_be_bytes(key[..8].to_vec());
+                    if height <= start_height {
+                        break;
+                    }
+
+                    let state_hash = block_state_hash_from_key(&key)?;
+                    if let Some(creator) = db.get_block_creator(&state_hash)? {
+                        producers.insert(creator);
+                        continue;
+                    }
+                    error!("Block creator index missing (length {height}) {state_hash}")
+                }
+                return Ok(vec![Block {
+                    num_unique_block_producers_last_n_blocks: Some(producers.len() as u32),
+                    ..Default::default()
+                }]);
+            }
+        }
+
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
         let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
@@ -205,7 +245,6 @@ impl BlocksQueryRoot {
             epoch_num_internal_commands,
             total_num_internal_commands,
         ];
-
         let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
@@ -272,7 +311,6 @@ impl BlocksQueryRoot {
                 if pk_key_prefix(&key).0 != coinbase_receiver {
                     break;
                 }
-
                 let state_hash = block_state_hash_from_key(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
@@ -315,7 +353,6 @@ impl BlocksQueryRoot {
                 if pk_key_prefix(&key).0 != creator_account {
                     break;
                 }
-
                 let state_hash = block_state_hash_from_key(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
@@ -511,7 +548,7 @@ pub enum BlockSortByInput {
     GlobalSlotDesc,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 pub struct Block {
     /// Value canonical
     pub canonical: bool,
@@ -536,12 +573,16 @@ pub struct Block {
     #[graphql(name = "block_num_internal_commands")]
     pub block_num_internal_commands: u32,
 
+    /// Value
+    #[graphql(name = "num_unique_block_producers_last_n_blocks")]
+    pub num_unique_block_producers_last_n_blocks: Option<u32>,
+
     /// Value block
     #[graphql(flatten)]
     pub block: BlockWithoutCanonicity,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 pub struct BlockWithoutCanonicity {
     /// Value state_hash
     state_hash: String,
@@ -605,7 +646,7 @@ struct SnarkJob {
     prover: String,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct Transactions {
     /// Value coinbase
     coinbase: String,
@@ -620,15 +661,16 @@ struct Transactions {
     user_commands: Vec<TransactionWithoutBlock>,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct BlockFeetransfer {
     pub fee: String,
     pub recipient: String,
+
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct ConsensusState {
     /// Value total currency
     total_currency: u64,
@@ -667,7 +709,7 @@ struct ConsensusState {
     staking_epoch_data: StakingEpochData,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct StakingEpochData {
     /// Value seed
     seed: String,
@@ -685,7 +727,7 @@ struct StakingEpochData {
     ledger: StakingEpochDataLedger,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct NextEpochData {
     /// Value seed
     seed: String,
@@ -703,7 +745,7 @@ struct NextEpochData {
     ledger: NextEpochDataLedger,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct NextEpochDataLedger {
     /// Value hash
     hash: String,
@@ -712,7 +754,7 @@ struct NextEpochDataLedger {
     total_currency: u64,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct StakingEpochDataLedger {
     /// Value hash
     hash: String,
@@ -721,7 +763,7 @@ struct StakingEpochDataLedger {
     total_currency: u64,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct BlockchainState {
     /// Value utc_date as numeric string
     utc_date: String,
@@ -736,7 +778,7 @@ struct BlockchainState {
     staged_ledger_hash: String,
 }
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 struct ProtocolState {
     /// Value parent state hash
     previous_state_hash: String,
@@ -1255,6 +1297,7 @@ impl Block {
                 epoch_num_user_commands,
                 total_num_user_commands,
             ),
+            num_unique_block_producers_last_n_blocks: None,
         }
     }
 }
