@@ -632,3 +632,26 @@ jsonpath "$.data.blocks[8].canonical" == false
 jsonpath "$.data.blocks[9].canonical" == false
 
 duration < 2000
+
+#
+# Unique block producer last n blocks query
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(limit: 10, query: {unique_block_producers_last_n_blocks: 10}) {
+    num_unique_block_producers_last_n_blocks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 1
+
+# only datum
+jsonpath "$.data.blocks[0].num_unique_block_producers_last_n_blocks" == 17
+
+duration < 1000

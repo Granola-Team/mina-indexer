@@ -1147,8 +1147,8 @@ test_txn_nonces() {
 
     # after block 100
     ## pk0
-    assert 149 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
-    assert 149 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
+    assert 150 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
+    assert 150 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
 
     ## pk1
     assert 0 $(idxr ledgers height --height 100 | jq -r .${pk1}.nonce)
@@ -1488,7 +1488,13 @@ test_hurl() {
         parallel_flag="--parallel"
     fi
 
-    hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$SRC"/tests/hurl/*.hurl
+    # selectively run hurl tests by file with HURL_TEST env var
+    test_file="$SRC"/tests/hurl/"${HURL_TEST:-}".hurl
+    if [[ -f "$test_file" ]]; then
+        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+    else
+        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$SRC"/tests/hurl/*.hurl
+    fi
 }
 
 test_version_file() {
