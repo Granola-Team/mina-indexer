@@ -215,7 +215,7 @@ impl Ledger {
                     delegate,
                     public_key: pk,
                     balance: balance.into(),
-                    nonce: Nonce(nonce.unwrap_or_default()),
+                    nonce: nonce.map(Nonce),
                     ..Default::default()
                 },
             );
@@ -411,6 +411,6 @@ mod tests {
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
         assert_eq!(account_after.delegate, delegate_key);
-        assert_eq!(43, account_after.nonce.0);
+        assert_eq!(43, account_after.nonce.unwrap().0);
     }
 }
