@@ -274,7 +274,6 @@ impl FeetransferQueryRoot {
                     }
                 })
                 .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
-                .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
             fee_transfers.truncate(limit);
             return Ok(fee_transfers);
@@ -370,7 +369,6 @@ fn get_fee_transfers_for_state_hash(
                     block: Some(pcb.clone()),
                 })
                 .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
-                .filter(|ft| ft.feetransfer.feetransfer_kind != "Coinbase")
                 .collect();
 
             if let Some(sort_by) = sort_by {
