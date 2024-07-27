@@ -334,6 +334,7 @@ fn matches_event_kind(kind: EventKind) -> bool {
         EventKind::Modify(notify::event::ModifyKind::Data(
             notify::event::DataChange::Content
         )) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+            | EventKind::Create(notify::event::CreateKind::File)
     )
 }
 
