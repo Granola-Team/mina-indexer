@@ -15,7 +15,7 @@ result = {}
 
 accounts.each do |account|
   public_key = account['pk']
-  nonce = account['nonce'] || '0' # Default to 'N/A' if nonce is not present
+  nonce = account['nonce'] || '0'
   balance = account['balance']
 
   result[public_key] = {
