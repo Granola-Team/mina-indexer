@@ -216,9 +216,9 @@ impl AccountDiff {
                                     ) => {
                                         if let Some(fee) = cb.t.fee_transfer_receiver_balance {
                                             let fee_transfer_receiver_balance = fee.t.t.t;
-                                            if (*total_fee)
-                                                .saturating_sub(MAINNET_ACCOUNT_CREATION_FEE.0)
-                                                == fee_transfer_receiver_balance
+                                            if *total_fee >= MAINNET_ACCOUNT_CREATION_FEE.0
+                                                && (*total_fee - MAINNET_ACCOUNT_CREATION_FEE.0)
+                                                    == fee_transfer_receiver_balance
                                             {
                                                 res.push(AccountDiff::Payment(PaymentDiff {
                                                     public_key: prover.clone(),
