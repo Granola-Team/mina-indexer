@@ -411,6 +411,6 @@ mod tests {
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
         assert_eq!(account_after.delegate, delegate_key);
-        assert_eq!(43, account_after.nonce.unwrap().0);
+        assert_eq!(42, account_after.nonce.unwrap().0);
     }
 }

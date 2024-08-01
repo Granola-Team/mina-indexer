@@ -133,17 +133,15 @@ impl AccountDiff {
         user_cmds: Vec<UserCommandWithStatus>,
     ) -> Vec<Self> {
         let mut fee_map = HashMap::new();
-        user_cmds.iter().for_each(|user_cmd| {
+        for user_cmd in user_cmds.iter() {
             let signed_cmd = SignedCommand::from_user_command(user_cmd.clone());
             let fee_payer = signed_cmd.fee_payer_pk();
             let fee = signed_cmd.fee();
-            match fee_map.get_mut(&fee_payer) {
-                None => {
-                    fee_map.insert(fee_payer.clone(), fee);
-                }
-                Some(acc) => *acc += fee,
-            }
-        });
+            fee_map
+                .entry(fee_payer)
+                .and_modify(|acc| *acc += fee)
+                .or_insert(fee);
+        }
         fee_map
             .iter()
             .flat_map(|(pk, fee)| {
@@ -179,20 +177,21 @@ impl AccountDiff {
 
     /// Fees for SNARK work, aggregated per public key
     pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
-        let snark_fees = SnarkWorkSummary::from_precomputed(precomputed_block);
+        let snarks = SnarkWorkSummary::from_precomputed(precomputed_block);
         let mut fee_map = HashMap::new();
-        snark_fees
-            .iter()
-            .for_each(|snark| match fee_map.get_mut(&snark.prover) {
-                None => {
-                    fee_map.insert(snark.prover.clone(), snark.fee);
-                }
-                Some(cum_fee) => *cum_fee += snark.fee,
-            });
+        // SNARK work fees aggregated per public key
+        for snark in snarks {
+            fee_map
+                .entry(snark.prover.clone())
+                .and_modify(|agg_fee| *agg_fee += snark.fee)
+                .or_insert(snark.fee);
+        }
+
         fee_map
             .iter()
             .flat_map(|(prover, total_fee)| {
                 let mut res = vec![];
+                // No need to issue Debits and Credits if the fee is 0
                 if *total_fee > 0 {
                     res.push(AccountDiff::FeeTransfer(PaymentDiff {
                         public_key: prover.clone(),
@@ -204,6 +203,9 @@ impl AccountDiff {
                         amount: (*total_fee).into(),
                         update_type: UpdateType::Debit(None),
                     }));
+
+                    // Check if the coinbase recipient account is new and deduct the account
+                    // creation fee if it is
                     let coinbase = Coinbase::from_precomputed(precomputed_block);
                     if let CoinbaseKind::One(Some(coinbase_fee_transfer)) = coinbase.kind {
                         if coinbase_fee_transfer.fee >= MAINNET_ACCOUNT_CREATION_FEE.0 {
