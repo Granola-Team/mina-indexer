@@ -381,12 +381,13 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
+        assert_eq!(account_after.public_key, public_key);
         assert_eq!(account_after.balance, diff_amount);
     }
 
     #[test]
     fn apply_diff_delegation() {
-        let nonce = Nonce(42);
+        let prev_nonce = Nonce(42);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
             PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
@@ -403,14 +404,15 @@ mod tests {
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
                 delegate: delegate_key.clone(),
-                nonce,
+                nonce: prev_nonce + 1,
             })],
         };
         let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
+        assert_eq!(account_after.public_key, public_key);
         assert_eq!(account_after.delegate, delegate_key);
-        assert_eq!(43, account_after.nonce.unwrap().0);
+        assert_eq!(Nonce(43), account_after.nonce.unwrap_or(Nonce(u32::MAX)));
     }
 }
