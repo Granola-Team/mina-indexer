@@ -3,7 +3,7 @@
 
 DEPLOY_TYPE = ARGV[0]       # 'test', 'prod', or 'ci'
 BLOCKS_COUNT = ARGV[1]      #  number of blocks to deploy
-WEB_PORT = ARGV[2] || 8080  #  optional web port for server 
+WEB_PORT = ARGV[2] || 8080  #  optional web port for server
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
