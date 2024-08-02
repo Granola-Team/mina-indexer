@@ -137,3 +137,7 @@ tier3 blocks='5000': nix-build
 deploy-local-prod blocks='5000': nix-build
   @echo "--- Deploying to production"
   time ./ops/deploy.rb prod {{blocks}}
+
+deploy-local-ci blocks='10000' web_port='8080': nix-build
+  @echo "--- Deploying local CI instance"
+  time ./ops/deploy.rb ci {{blocks}} {{web_port}}
