@@ -1,0 +1,10 @@
+[package]
+name = "mina-db"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+serde_json = "1.0"
+uuid = { version = "0.8", features = ["v4"] }
+mysql = "25.0.1"
+regex = "1.5"
