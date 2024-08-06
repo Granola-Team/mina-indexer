@@ -9,7 +9,6 @@ pub mod username;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::{Account, Amount, Nonce},
         diff::{
@@ -145,10 +144,6 @@ impl Ledger {
                             AccountDiff::Payment(payment_diff) => {
                                 Account::from_payment(account_before, payment_diff)
                             }
-                            AccountDiff::AccountCreationFee(_) => Account {
-                                balance: account_before.balance.sub(&MAINNET_ACCOUNT_CREATION_FEE),
-                                ..account_before
-                            },
                             AccountDiff::Delegation(delegation_diff) => {
                                 assert_eq!(account_before.public_key, delegation_diff.delegator);
                                 Account::from_delegation(
@@ -177,7 +172,6 @@ impl Ledger {
                         AccountDiff::Coinbase(_) => Ok(()),
                         AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
                         AccountDiff::Payment(_)
-                        | AccountDiff::AccountCreationFee(_)
                         | AccountDiff::FeeTransfer(_)
                         | AccountDiff::FeeTransferViaCoinbase(_)
                         | AccountDiff::FailedTransactionNonce(_) => {
@@ -226,7 +220,13 @@ impl Ledger {
     pub fn to_string_pretty(&self) -> String {
         let mut accounts = HashMap::new();
         for (pk, acct) in &self.accounts {
-            accounts.insert(pk.to_address(), acct.clone());
+            let mut acct = acct.clone();
+            if !acct.genesis_account {
+                let mut balance = acct.balance;
+                balance = balance.sub(&Amount(1_000_000_000));
+                acct.balance = balance;
+            }
+            accounts.insert(pk.to_address(), acct);
         }
 
         serde_json::to_string_pretty(&accounts).unwrap()
@@ -239,11 +239,7 @@ impl Ledger {
 
 impl ToString for Ledger {
     fn to_string(&self) -> String {
-        let mut accounts = HashMap::new();
-        for (pk, acct) in &self.accounts {
-            accounts.insert(pk.to_address(), acct.clone());
-        }
-        serde_json::to_string(&accounts).unwrap()
+        self.to_string_pretty()
     }
 }
 
@@ -349,7 +345,7 @@ mod tests {
         Ledger, LedgerHash,
     };
     use crate::{block::BlockHash, ledger::account::Nonce};
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     #[test]
     fn default_ledger_hash_is_valid_public_key() {
@@ -366,8 +362,6 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             state_hash: BlockHash::default(),
-            new_pk_balances: BTreeMap::new(),
-            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
@@ -397,8 +391,6 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             state_hash: BlockHash::default(),
-            new_pk_balances: BTreeMap::new(),
-            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {

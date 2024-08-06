@@ -14,7 +14,6 @@ pub struct Coinbase {
     pub kind: CoinbaseKind,
     pub receiver: PublicKey,
     pub supercharge: bool,
-    pub is_new_account: bool,
     pub receiver_balance: Option<u64>,
 }
 
@@ -88,9 +87,7 @@ impl CoinbaseKind {
 
 impl Coinbase {
     pub fn amount(&self) -> u64 {
-        if self.is_new_account {
-            self.receiver_balance.unwrap_or_default()
-        } else if self.supercharge {
+        if self.supercharge {
             2 * MAINNET_COINBASE_REWARD
         } else {
             MAINNET_COINBASE_REWARD
@@ -108,7 +105,6 @@ impl Coinbase {
             kind,
             receiver: block.coinbase_receiver(),
             receiver_balance: block.coinbase_receiver_balance(),
-            is_new_account: block.accounts_created().1.is_some(),
             supercharge: block.consensus_state().supercharge_coinbase,
         }
     }
