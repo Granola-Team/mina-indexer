@@ -625,6 +625,19 @@ test_best_chain() {
     rm -rf best_chain
 }
 
+# Test for the account creation fee calculation
+test_account_creation_fee() {
+    stage_mainnet_blocks 3 ./blocks
+
+    idxr_server_start_standard
+    wait_for_socket
+
+    pk='B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1'
+
+    balance=$(idxr ledgers height --height 3 | jq -r .${pk}.balance)
+    assert '719120000000' $balance
+}
+
 # Indexer server returns correct ledgers
 test_ledgers() {
     stage_mainnet_blocks 15 ./blocks
@@ -1685,6 +1698,7 @@ for test_name in "$@"; do
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;
+        "test_account_creation_fee") test_account_creation_fee ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
         "test_load") test_load ;;
