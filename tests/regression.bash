@@ -992,7 +992,7 @@ test_rest_accounts_summary() {
         --web-port "$port" \
         --web-hostname "0.0.0.0"
     wait_for_socket
-    sleep 1
+    sleep 3
 
     # results
     assert 'null' "$(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)"
@@ -1085,7 +1085,7 @@ test_rest_blocks() {
         --blocks-dir ./blocks \
         --database-dir ./database
     wait_for_socket
-    sleep 1
+    sleep 3
 
     # /blocks endpoint
     curl --silent http://localhost:${port}/blocks > output.json
@@ -1494,7 +1494,7 @@ test_hurl() {
         --web-hostname "0.0.0.0" \
         --database-dir ./database
     wait_for_socket
-    sleep 1
+    sleep 3
 
     local parallel_flag=""
     if [[ "${1:-}" == "true" ]]; then
@@ -1568,7 +1568,7 @@ test_missing_block_recovery() {
     stage_mainnet_single 21 ./blocks
 
     # after blocks are added, check dangling branches
-    sleep 1
+    sleep 3
     assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
