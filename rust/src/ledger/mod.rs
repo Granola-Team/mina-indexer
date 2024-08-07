@@ -113,12 +113,6 @@ impl Ledger {
         Ok(ledger)
     }
 
-    pub fn _apply_diff_from_precomputed(&mut self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        let diff = LedgerDiff::from_precomputed(block);
-        self._apply_diff(&diff)?;
-        Ok(())
-    }
-
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         let ledger_diff = diff.clone();
