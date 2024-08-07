@@ -175,35 +175,6 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
 
     // println!("inserted epoch_data...............................");
 
-    // Process sub_window_densities
-    for density in consensus_state["sub_window_densities"].as_array().unwrap() {
-        conn.exec_drop(
-            "INSERT INTO sub_window_densities (consensus_state_id, density) VALUES (:consensus_state_id, :density)",
-            params! {
-                "consensus_state_id" => &consensus_state_id,
-                "density" => to_u64(&density),
-            },
-        )?;
-    }
-
-    println!("inserted sub_window_densities...............................");
-
-    // Process constants
-    let constants = &body["constants"];
-    conn.exec_drop(
-        "INSERT INTO constants (k, block_hash, slots_per_epoch, slots_per_sub_window, delta, genesis_state_timestamp) VALUES (:k, :block_hash, :slots_per_epoch, :slots_per_sub_window, :delta, :genesis_state_timestamp)",
-        params! {
-            "k" => to_u64(&constants["k"]),
-            "block_hash" => block_hash,
-            "slots_per_epoch" => to_u64(&constants["slots_per_epoch"]),
-            "slots_per_sub_window" => to_u64(&constants["slots_per_sub_window"]),
-            "delta" => to_u64(&constants["delta"]),
-            "genesis_state_timestamp" => constants["genesis_state_timestamp"].as_str(),
-        },
-    )?;
-
-    println!("inserted constants...............................");
-
     // Process commands and command_status
     for command in json["staged_ledger_diff"]["diff"][0]["commands"]
         .as_array()
@@ -292,7 +263,6 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
 
 fn extract_accounts(value: &Value) -> Vec<String> {
     let mut accounts = Vec::new();
-    let re = Regex::new(r"^B62.{52}$").unwrap();
 
     if let Some(s) = value.as_str() {
         if ACCOUNTS_REGEX.is_match(s) {

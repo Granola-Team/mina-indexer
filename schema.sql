@@ -1,7 +1,5 @@
 DROP TABLE IF EXISTS `command_status`;
 DROP TABLE IF EXISTS `commands`;
-DROP TABLE IF EXISTS `constants`;
-DROP TABLE IF EXISTS `sub_window_densities`;
 DROP TABLE IF EXISTS `staged_ledger_hash`;
 DROP TABLE IF EXISTS `blockchain_state`;
 DROP TABLE IF EXISTS `epoch_data`;
@@ -69,7 +67,7 @@ staged_ledger_hash (
 CREATE TABLE
 epoch_data (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    consensus_state_id VARCHAR(45) NOT NULL,
+    block_hash VARCHAR(45) NOT NULL,
     `type` ENUM('next', 'staking') NOT NULL,
     ledger_hash VARCHAR(52) NOT NULL,
     total_currency BIGINT NOT NULL,
@@ -77,27 +75,7 @@ epoch_data (
     start_checkpoint VARCHAR(52) NOT NULL,
     lock_checkpoint VARCHAR(52) NOT NULL,
     epoch_length INT NOT NULL,
-    UNIQUE (consensus_state_id, type, ledger_hash),
-    FOREIGN KEY (consensus_state_id) REFERENCES consensus_state (id)
-);
-
-CREATE TABLE
-sub_window_densities (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    consensus_state_id VARCHAR(45) NOT NULL,
-    density INT,
-    FOREIGN KEY (consensus_state_id) REFERENCES consensus_state (id)
-);
-
-CREATE TABLE
-constants (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    block_hash VARCHAR(52) NOT NULL,
-    k INT,
-    slots_per_epoch INT,
-    slots_per_sub_window INT,
-    delta INT,
-    genesis_state_timestamp BIGINT,
+    UNIQUE (block_hash, type, ledger_hash),
     FOREIGN KEY (block_hash) REFERENCES protocol_state (block_hash)
 );
 
