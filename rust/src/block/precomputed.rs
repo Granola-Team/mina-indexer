@@ -203,8 +203,9 @@ impl PrecomputedBlock {
     }
 
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
-        let mut commands = self.commands_post_diff();
-        commands.append(&mut self.commands_pre_diff());
+        // This order is the correct order
+        let mut commands = self.commands_pre_diff();
+        commands.append(&mut self.commands_post_diff());
         commands
     }
 
