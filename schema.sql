@@ -35,7 +35,7 @@ protocol_state (
 CREATE TABLE
 blockchain_state (
     id VARCHAR(45) PRIMARY KEY,
-    block_hash VARCHAR(52),
+    block_hash VARCHAR(52) NOT NULL,
     snarked_ledger_hash VARCHAR(52) NOT NULL,
     genesis_ledger_hash VARCHAR(52) NOT NULL,
     snarked_next_available_token INT,
@@ -45,8 +45,7 @@ blockchain_state (
 
 CREATE TABLE
 consensus_state (
-    id VARCHAR(45) PRIMARY KEY,
-    block_hash VARCHAR(52),
+    block_hash VARCHAR(52) PRIMARY KEY,
     epoch_count INT,
     curr_global_slot_slot_number INT,
     curr_global_slot_slots_per_epoch INT,
@@ -67,7 +66,7 @@ staged_ledger_hash (
 CREATE TABLE
 epoch_data (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    block_hash VARCHAR(45) NOT NULL,
+    block_hash VARCHAR(52) NOT NULL,
     `type` ENUM('next', 'staking') NOT NULL,
     ledger_hash VARCHAR(52) NOT NULL,
     total_currency BIGINT NOT NULL,

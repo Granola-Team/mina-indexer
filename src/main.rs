@@ -124,19 +124,15 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
     // println!("inserted blockchain_state...............................");
 
     // Process consensus_state
-    let consensus_state_id = Uuid::new_v4().to_string();
     conn.exec_drop(
-        "INSERT INTO consensus_state (id, block_hash, epoch_count, curr_global_slot_slot_number, curr_global_slot_slots_per_epoch) VALUES (:id, :block_hash, :epoch_count, :curr_global_slot_slot_number, :curr_global_slot_slots_per_epoch)",
+        "INSERT INTO consensus_state (block_hash, epoch_count, curr_global_slot_slot_number, curr_global_slot_slots_per_epoch) VALUES (:block_hash, :epoch_count, :curr_global_slot_slot_number, :curr_global_slot_slots_per_epoch)",
         params! {
-            "id" => &consensus_state_id,
             "block_hash" => block_hash,
             "epoch_count" => to_u64(&consensus_state["epoch_count"]),
             "curr_global_slot_slot_number" => to_u64(&consensus_state["curr_global_slot"]["slot_number"]),
             "curr_global_slot_slots_per_epoch" => to_u64(&consensus_state["curr_global_slot"]["slots_per_epoch"]),
         },
     )?;
-
-    // println!("inserted consensus_state_id...............................");
 
     // Process staged_ledger_hash
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
@@ -159,9 +155,9 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
         let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type)];
         let ledger = &epoch_data["ledger"];
         conn.exec_drop(
-            "INSERT INTO epoch_data (consensus_state_id, type, ledger_hash, total_currency, seed, start_checkpoint, lock_checkpoint, epoch_length) VALUES (:consensus_state_id, :type, :ledger_hash, :total_currency, :seed, :start_checkpoint, :lock_checkpoint, :epoch_length)",
+            "INSERT INTO epoch_data (block_hash, type, ledger_hash, total_currency, seed, start_checkpoint, lock_checkpoint, epoch_length) VALUES (:block_hash, :type, :ledger_hash, :total_currency, :seed, :start_checkpoint, :lock_checkpoint, :epoch_length)",
             params! {
-                "consensus_state_id" => &consensus_state_id,
+                "block_hash" => &block_hash,
                 "type" => epoch_type,
                 "ledger_hash" => ledger["hash"].as_str(),
                 "total_currency" => ledger["total_currency"].as_str(),
