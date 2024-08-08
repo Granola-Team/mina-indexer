@@ -18,18 +18,17 @@ async fn set_usernames() -> anyhow::Result<()> {
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
-        IndexerVersion::new_testing().version,
+        IndexerVersion::default().version,
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,

@@ -17,11 +17,10 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         BlockParser::new_with_canonical_chain_discovery(&log_dir, PcbVersion::V1, 10, 10).await?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,

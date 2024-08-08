@@ -4,7 +4,6 @@ use mina_indexer::{
     canonicity::store::CanonicityStore,
     constants::*,
     ledger::{
-        diff::LedgerDiff,
         genesis::{GenesisLedger, GenesisRoot},
         public_key::PublicKey,
         store::LedgerStore,
@@ -22,11 +21,10 @@ async fn test() -> anyhow::Result<()> {
     let mut block_parser = BlockParser::new_testing(&log_dir)?;
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
@@ -44,9 +42,7 @@ async fn test() -> anyhow::Result<()> {
             .get_ledger_state_hash(&state_hash, false)?
             .unwrap();
 
-        ledger_diff
-            ._apply_diff(&LedgerDiff::from_precomputed(&block))
-            .unwrap();
+        ledger_diff._apply_diff_from_precomputed(&block)?;
 
         if ledger != ledger_diff {
             let mut keys: Vec<&PublicKey> = ledger.accounts.keys().collect();

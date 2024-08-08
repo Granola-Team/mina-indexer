@@ -24,7 +24,6 @@ async fn account_diffs() {
         .await
         .unwrap();
     let diff = LedgerDiff::from_precomputed(&block);
-
     let mut ledger: HashMap<PublicKey, (i64, u32)> = HashMap::from(
         [
             (
@@ -54,7 +53,6 @@ async fn account_diffs() {
         ]
         .map(|(pk, amt)| (PublicKey::new(pk), amt)),
     );
-
     let initial_ledger = ledger.clone();
 
     println!("=== Account diffs ===");
@@ -103,8 +101,8 @@ async fn account_diffs() {
                     }
                 }
             }
-            AccountDiff::AccountCreationFee(pk) => {
-                println!("\n* Creation fee: {pk}");
+            AccountDiff::CreateAccount(pk) => {
+                println!("\n* Create:       {pk}");
             }
             AccountDiff::Delegation(DelegationDiff {
                 delegate,
@@ -120,7 +118,6 @@ async fn account_diffs() {
                 println!("\n* Coinbase");
                 println!("public_key: {public_key}");
                 println!("amount:     {}", amount.0);
-
                 if let Some((balance, _)) = ledger.get_mut(&public_key) {
                     *balance += amount.0 as i64;
                 } else {
@@ -134,11 +131,8 @@ async fn account_diffs() {
                 println!("\n* Failed transaction");
                 println!("public_key: {public_key}");
                 println!("nonce:      {new_nonce}");
-
                 if let Some((_, nonce)) = ledger.get_mut(&public_key) {
                     *nonce += new_nonce.0;
-                } else {
-                    ledger.insert(public_key, (0, 0));
                 }
             }
         }

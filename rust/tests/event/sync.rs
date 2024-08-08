@@ -19,7 +19,7 @@ async fn test() -> anyhow::Result<()> {
         serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
     let mut state = IndexerState::new(
         genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
@@ -31,7 +31,7 @@ async fn test() -> anyhow::Result<()> {
     // fresh state to sync events with no genesis events
     let config = IndexerStateConfig::new(
         genesis_ledger.into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store,
         MAINNET_CANONICAL_THRESHOLD,
         10,
