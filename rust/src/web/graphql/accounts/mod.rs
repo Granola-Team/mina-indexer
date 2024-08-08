@@ -2,7 +2,7 @@ use super::db;
 use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    ledger::{account, public_key::PublicKey, store::LedgerStore},
+    ledger::{account, public_key::PublicKey},
     snark_work::store::SnarkStore,
     store::{account::AccountStore, username::UsernameStore},
     web::graphql::Timing,
@@ -92,20 +92,13 @@ impl AccountQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<Account>> {
         let db = db(ctx);
-        let best_ledger = match db.get_best_ledger() {
-            Ok(Some(ledger)) => ledger,
-            Ok(None) | Err(_) => {
-                return Ok(vec![]);
-            }
-        };
 
         // public key query handler
         if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.clone()) {
             let pk: PublicKey = public_key.into();
-            return Ok(best_ledger
-                .accounts
-                .get(&pk)
-                .into_iter()
+            return Ok(db
+                .get_best_account(&pk)?
+                .iter()
                 .filter_map(|acct| {
                     let username = match db.get_username(&pk) {
                         Ok(None) | Err(_) => None,
@@ -148,7 +141,7 @@ impl AccountQueryRoot {
 
         for (key, _) in db.account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
-            let account = match best_ledger.accounts.get(&pk) {
+            let account = match db.get_best_account(&pk)? {
                 Some(account) => account,
                 None => {
                     warn!("Failed to find public key in best ledger: {pk}");
@@ -162,7 +155,7 @@ impl AccountQueryRoot {
             };
             if query
                 .as_ref()
-                .map_or(true, |q| q.matches(account, username.as_ref()))
+                .map_or(true, |q| q.matches(&account, username.as_ref()))
             {
                 let account = Account::from((
                     account.clone(),
