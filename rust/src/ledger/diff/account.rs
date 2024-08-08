@@ -49,7 +49,20 @@ pub struct FailedTransactionNonceDiff {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub enum AccountDiff {
     Payment(PaymentDiff),
-    AccountCreationFee(PublicKey),
+    CreateAccount(PublicKey),
+    Delegation(DelegationDiff),
+    Coinbase(CoinbaseDiff),
+    FeeTransfer(PaymentDiff),
+    /// Overrides the fee transfer for SNARK work
+    FeeTransferViaCoinbase(PaymentDiff),
+    /// Updates the nonce for a failed txn
+    FailedTransactionNonce(FailedTransactionNonceDiff),
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub enum UnapplyAccountDiff {
+    Payment(PaymentDiff),
+    CreateAccount(PublicKey),
     Delegation(DelegationDiff),
     Coinbase(CoinbaseDiff),
     FeeTransfer(PaymentDiff),
@@ -73,21 +86,20 @@ impl AccountDiff {
     pub fn from_command(command: Command) -> Vec<Self> {
         match command {
             Command::Payment(payment) => {
-                let mut diffs = vec![
-                    Self::Payment(PaymentDiff {
-                        public_key: payment.receiver.clone(),
-                        amount: payment.amount,
-                        update_type: UpdateType::Credit,
-                    }),
-                    Self::Payment(PaymentDiff {
-                        public_key: payment.source,
-                        amount: payment.amount,
-                        update_type: UpdateType::Debit(Some(payment.nonce + 1)),
-                    }),
-                ];
+                let mut diffs = vec![];
                 if payment.is_new_receiver_account {
-                    diffs.push(Self::AccountCreationFee(payment.receiver));
+                    diffs.push(Self::CreateAccount(payment.receiver.clone()));
                 }
+                diffs.push(Self::Payment(PaymentDiff {
+                    public_key: payment.receiver,
+                    amount: payment.amount,
+                    update_type: UpdateType::Credit,
+                }));
+                diffs.push(Self::Payment(PaymentDiff {
+                    public_key: payment.source,
+                    amount: payment.amount,
+                    update_type: UpdateType::Debit(Some(payment.nonce + 1)),
+                }));
                 diffs
             }
             Command::Delegation(delegation) => {
@@ -100,12 +112,27 @@ impl AccountDiff {
         }
     }
 
+    pub fn unapply(self) -> UnapplyAccountDiff {
+        match self {
+            Self::CreateAccount(pk) => UnapplyAccountDiff::CreateAccount(pk),
+            Self::Coinbase(diff) => UnapplyAccountDiff::Coinbase(diff),
+            Self::Payment(diff) => UnapplyAccountDiff::Payment(diff),
+            Self::FeeTransfer(diff) => UnapplyAccountDiff::FeeTransfer(diff),
+            Self::FeeTransferViaCoinbase(diff) => UnapplyAccountDiff::FeeTransferViaCoinbase(diff),
+            Self::Delegation(diff) => UnapplyAccountDiff::Delegation(diff),
+            Self::FailedTransactionNonce(diff) => UnapplyAccountDiff::FailedTransactionNonce(diff),
+        }
+    }
+
     pub fn from_coinbase(coinbase: Coinbase) -> Vec<Self> {
-        let mut res = vec![Self::Coinbase(CoinbaseDiff {
+        let mut res = vec![];
+        if coinbase.is_new_account {
+            res.push(Self::CreateAccount(coinbase.receiver.clone()));
+        }
+        res.push(Self::Coinbase(CoinbaseDiff {
             public_key: coinbase.receiver.clone(),
             amount: coinbase.amount().into(),
-        })];
-
+        }));
         res.append(
             &mut coinbase
                 .fee_transfer()
@@ -119,7 +146,7 @@ impl AccountDiff {
     pub fn public_key(&self) -> PublicKey {
         match self {
             Self::Payment(payment_diff) => payment_diff.public_key.clone(),
-            Self::AccountCreationFee(pk) => pk.clone(),
+            Self::CreateAccount(pk) => pk.clone(),
             Self::Delegation(delegation_diff) => delegation_diff.delegator.clone(),
             Self::Coinbase(coinbase_diff) => coinbase_diff.public_key.clone(),
             Self::FeeTransfer(fee_transfer_diff) => fee_transfer_diff.public_key.clone(),
@@ -222,11 +249,9 @@ impl AccountDiff {
                                                 && (*total_fee - MAINNET_ACCOUNT_CREATION_FEE.0)
                                                     == fee_transfer_receiver_balance
                                             {
-                                                res.push(AccountDiff::Payment(PaymentDiff {
-                                                    public_key: prover.clone(),
-                                                    amount: MAINNET_ACCOUNT_CREATION_FEE,
-                                                    update_type: UpdateType::Debit(None),
-                                                }));
+                                                res.push(AccountDiff::CreateAccount(
+                                                    prover.clone(),
+                                                ));
                                             }
                                         }
                                     }
@@ -250,6 +275,20 @@ impl AccountDiff {
         fees
     }
 
+    pub fn amount(&self) -> i64 {
+        match self {
+            Self::Delegation(_) | Self::FailedTransactionNonce(_) => 0,
+            Self::CreateAccount(_) => 0 - MAINNET_ACCOUNT_CREATION_FEE.0 as i64,
+            Self::Coinbase(diff) => diff.amount.0 as i64,
+            Self::FeeTransfer(diff) | Self::FeeTransferViaCoinbase(diff) | Self::Payment(diff) => {
+                match diff.update_type {
+                    UpdateType::Credit => diff.amount.0 as i64,
+                    UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
+                }
+            }
+        }
+    }
+
     pub fn from(
         sender: &str,
         receiver: &str,
@@ -269,7 +308,7 @@ impl AccountDiff {
                     update_type: UpdateType::Debit(Some(nonce)),
                 }),
             ],
-            AccountDiffType::AccountCreationFee => vec![Self::AccountCreationFee(sender.into())],
+            AccountDiffType::AccountCreationFee => vec![Self::CreateAccount(receiver.into())],
             AccountDiffType::Delegation(nonce) => vec![Self::Delegation(DelegationDiff {
                 delegate: sender.into(),
                 delegator: receiver.into(),
@@ -309,21 +348,34 @@ impl AccountDiff {
 
 impl PaymentDiff {
     pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
+        use AccountDiff::*;
         match diff {
-            AccountDiff::Payment(diff)
-            | AccountDiff::FeeTransfer(diff)
-            | AccountDiff::FeeTransferViaCoinbase(diff) => Some(diff),
-            AccountDiff::Coinbase(cb_diff) => Some(Self {
+            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => Some(diff),
+            Coinbase(cb_diff) => Some(Self {
                 update_type: UpdateType::Credit,
                 public_key: cb_diff.public_key,
                 amount: cb_diff.amount,
             }),
-            AccountDiff::AccountCreationFee(pk) => Some(Self {
+            CreateAccount(pk) => Some(Self {
                 update_type: UpdateType::Debit(None),
                 public_key: pk.clone(),
                 amount: MAINNET_ACCOUNT_CREATION_FEE,
             }),
-            AccountDiff::Delegation(_) | AccountDiff::FailedTransactionNonce(_) => None,
+            Delegation(_) | FailedTransactionNonce(_) => None,
+        }
+    }
+
+    pub fn unapply(self) -> Self {
+        if self.update_type == UpdateType::Credit {
+            Self {
+                update_type: UpdateType::Debit(None),
+                ..self
+            }
+        } else {
+            Self {
+                update_type: UpdateType::Credit,
+                ..self
+            }
         }
     }
 }
@@ -362,16 +414,17 @@ impl std::fmt::Debug for FailedTransactionNonceDiff {
 
 impl std::fmt::Debug for AccountDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use AccountDiff::*;
         match self {
-            AccountDiff::Payment(pay_diff) => write!(f, "Payment:      {pay_diff:?}"),
-            AccountDiff::AccountCreationFee(pk) => write!(f, "Creation fee: {pk}"),
-            AccountDiff::Delegation(del_diff) => write!(f, "Delegation:   {del_diff:?}"),
-            AccountDiff::Coinbase(coin_diff) => write!(f, "Coinbase:     {coin_diff:?}"),
-            AccountDiff::FeeTransfer(pay_diff) => write!(f, "Fee transfer: {pay_diff:?}"),
-            AccountDiff::FeeTransferViaCoinbase(pay_diff) => {
+            Payment(pay_diff) => write!(f, "Payment:      {pay_diff:?}"),
+            CreateAccount(pk) => write!(f, "Create:       {pk}"),
+            Delegation(del_diff) => write!(f, "Delegation:   {del_diff:?}"),
+            Coinbase(coin_diff) => write!(f, "Coinbase:     {coin_diff:?}"),
+            FeeTransfer(pay_diff) => write!(f, "Fee transfer: {pay_diff:?}"),
+            FeeTransferViaCoinbase(pay_diff) => {
                 write!(f, "Fee transfer via coinbase: {pay_diff:?}")
             }
-            AccountDiff::FailedTransactionNonce(failed_diff) => {
+            FailedTransactionNonce(failed_diff) => {
                 write!(f, "Failed transaction: {failed_diff:?}")
             }
         }
@@ -397,7 +450,7 @@ mod tests {
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::{Command, Delegation, Payment},
-        constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE},
+        constants::MAINNET_COINBASE_REWARD,
         ledger::{
             account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
@@ -416,16 +469,17 @@ mod tests {
             supercharge: true,
             is_new_account: true,
             receiver: receiver.clone(),
-            receiver_balance: Some(1439 * (1e9 as u64)),
+            receiver_balance: Some(1440 * (1e9 as u64)),
             kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
                 receiver_pk: snarker.clone(),
                 fee,
             })),
         });
         let expected_account_diff = vec![
+            AccountDiff::CreateAccount(receiver.clone()),
             AccountDiff::Coinbase(CoinbaseDiff {
                 public_key: receiver.clone(),
-                amount: Amount(1439 * (1e9 as u64)),
+                amount: Amount(1440 * (1e9 as u64)),
             }),
             AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key: snarker,
@@ -438,7 +492,6 @@ mod tests {
                 update_type: UpdateType::Debit(None),
             }),
         ];
-
         assert_eq!(account_diff, expected_account_diff);
     }
 
@@ -447,29 +500,29 @@ mod tests {
     #[test]
     fn test_from_command() {
         let source_public_key =
-            PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG");
+            PublicKey::from("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG");
         let receiver_public_key =
-            PublicKey::new("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs");
-        let nonce = Nonce(4);
+            PublicKey::from("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs");
+        let nonce = Nonce(5);
         let payment_command = Command::Payment(Payment {
             source: source_public_key.clone(),
             receiver: receiver_public_key.clone(),
-            amount: 536900000000.into(),
+            amount: Amount(536900000000),
             is_new_receiver_account: true,
             nonce,
         });
         let expected_result = vec![
+            AccountDiff::CreateAccount(receiver_public_key.clone()),
             AccountDiff::Payment(PaymentDiff {
                 public_key: receiver_public_key.clone(),
-                amount: 536900000000.into(),
+                amount: Amount(536900000000),
                 update_type: UpdateType::Credit,
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key,
-                amount: 536900000000.into(),
+                amount: Amount(536900000000),
                 update_type: UpdateType::Debit(Some(nonce + 1)),
             }),
-            AccountDiff::AccountCreationFee(receiver_public_key),
         ];
         assert_eq!(AccountDiff::from_command(payment_command), expected_result);
     }
@@ -477,9 +530,9 @@ mod tests {
     #[test]
     fn test_from_command_delegation() {
         let delegator_public_key =
-            PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
+            PublicKey::from("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
         let delegate_public_key =
-            PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz");
+            PublicKey::from("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz");
         let nonce = Nonce(42);
         let delegation_command = Command::Delegation(Delegation {
             delegator: delegator_public_key.clone(),
@@ -499,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_from_coinbase() {
-        let receiver: PublicKey = "B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw".into();
+        let receiver = PublicKey::from("B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw");
         let account_diff = AccountDiff::from_coinbase(Coinbase {
             supercharge: true,
             is_new_account: false,
@@ -508,8 +561,8 @@ mod tests {
             kind: CoinbaseKind::One(None),
         });
         let expected_account_diff = vec![AccountDiff::Coinbase(CoinbaseDiff {
-            public_key: receiver,
-            amount: Amount(1440 * MINA_SCALE),
+            public_key: receiver.clone(),
+            amount: Amount(1440 * (1e9 as u64)),
         })];
         assert_eq!(account_diff, expected_account_diff);
     }
@@ -519,7 +572,7 @@ mod tests {
         let nonce = Nonce(42);
         let payment_diff = PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
-            amount: 536900000000.into(),
+            amount: Amount(536900000000),
             update_type: UpdateType::Debit(Some(nonce)),
         };
         let account_diff = AccountDiff::Payment(payment_diff);
@@ -530,16 +583,15 @@ mod tests {
 
     #[test]
     fn test_public_key_delegation() {
-        let nonce = Nonce(42);
+        let delegator = PublicKey::from("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
         let delegation_diff = DelegationDiff {
-            delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi"),
-            delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
-            nonce,
+            nonce: Nonce(42),
+            delegator: delegator.clone(),
+            delegate: PublicKey::from("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
         };
         let account_diff = AccountDiff::Delegation(delegation_diff);
         let result = account_diff.public_key();
-        let expected = PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi");
-        assert_eq!(result, expected);
+        assert_eq!(result, delegator);
     }
 
     #[test]
@@ -547,9 +599,8 @@ mod tests {
         use crate::ledger::diff::AccountDiffType::*;
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-        let ledger_diff = LedgerDiff::from_precomputed(&block);
-        let actual_diffs = ledger_diff.account_diffs;
-        let mut expected_diffs = LedgerDiff::from(&[
+        let mut ledger_diff = LedgerDiff::from_precomputed(&block);
+        let mut expect_diffs = LedgerDiff::from(&[
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
                 "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
@@ -566,7 +617,7 @@ mod tests {
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 Coinbase,
-                720000000000,
+                MAINNET_COINBASE_REWARD,
             ),
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
@@ -578,19 +629,26 @@ mod tests {
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n",
                 FeeTransferViaCoinbase,
-                1000000000,
+                1e9 as u64,
+            ),
+            (
+                "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n",
+                "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n",
+                AccountCreationFee,
+                0,
             ),
         ]);
+        expect_diffs.sort();
+        ledger_diff.account_diffs.sort();
 
-        expected_diffs.push(AccountDiff::Payment(PaymentDiff {
-            update_type: UpdateType::Debit(None),
-            public_key: PublicKey::from("B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n"),
-            amount: MAINNET_ACCOUNT_CREATION_FEE,
-        }));
-
-        for (i, ac) in actual_diffs.iter().enumerate() {
-            assert_eq!(*ac, expected_diffs[i]);
+        for (i, diff) in ledger_diff.account_diffs.iter().enumerate() {
+            assert_eq!(
+                *diff, expect_diffs[i],
+                "{i}th diff mismatch\n{:#?}\n{:#?}",
+                ledger_diff.account_diffs, expect_diffs,
+            );
         }
+        assert_eq!(ledger_diff.account_diffs, expect_diffs);
         Ok(())
     }
 }

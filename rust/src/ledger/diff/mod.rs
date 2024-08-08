@@ -9,8 +9,11 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
+    /// Blockchain length
+    pub blockchain_length: u32,
+
     /// State hash of the block
     pub state_hash: BlockHash,
 
@@ -96,7 +99,11 @@ impl LedgerDiff {
         let mut account_diffs = Vec::new();
         account_diffs.append(&mut account_diff_txns);
         if coinbase.is_coinbase_applied() {
-            account_diffs.push(coinbase.as_account_diff()[0].clone());
+            if coinbase.is_new_account {
+                account_diffs.append(&mut coinbase.as_account_diff()[..2].to_vec());
+            } else {
+                account_diffs.push(coinbase.as_account_diff()[0].clone());
+            }
         }
         account_diffs.append(&mut account_diff_fees);
 
@@ -106,6 +113,7 @@ impl LedgerDiff {
             new_pk_balances: accounts_created.0,
             new_coinbase_receiver: accounts_created.1,
             state_hash: precomputed_block.state_hash(),
+            blockchain_length: precomputed_block.blockchain_length(),
             staged_ledger_hash: precomputed_block.staged_ledger_hash(),
             public_keys_seen: precomputed_block.active_public_keys(),
         }
@@ -119,13 +127,19 @@ impl LedgerDiff {
             }
         });
 
-        // add diff
-        other.account_diffs.into_iter().for_each(|update| {
-            self.account_diffs.push(update);
-        });
+        // add account diffs
+        self.account_diffs.append(&mut other.account_diffs.clone());
 
-        // update hash
+        // update hashes
+        self.state_hash = other.state_hash;
         self.staged_ledger_hash = other.staged_ledger_hash;
+
+        // update new data
+        self.blockchain_length = other.blockchain_length;
+        self.new_coinbase_receiver = other.new_coinbase_receiver;
+        for (pk, bal) in other.new_pk_balances {
+            self.new_pk_balances.insert(pk, bal);
+        }
     }
 
     pub fn append_vec(diffs: Vec<Self>) -> Self {
@@ -139,16 +153,6 @@ impl LedgerDiff {
             .iter()
             .flat_map(|(s, r, t, a)| AccountDiff::from(s, r, t.clone(), *a))
             .collect()
-    }
-}
-
-impl std::fmt::Debug for LedgerDiff {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "=== LedgerDiff ===")?;
-        for account_diff in &self.account_diffs {
-            writeln!(f, "{account_diff:?}")?;
-        }
-        Ok(())
     }
 }
 
@@ -189,7 +193,7 @@ mod tests {
             ),
             (
                 "B62qoaMj7u1JzuqXaBByQBL5jzqLguK8e7LHVPdY9LcvvLXK7HPsusD",
-                "",
+                "B62qoaMj7u1JzuqXaBByQBL5jzqLguK8e7LHVPdY9LcvvLXK7HPsusD",
                 Coinbase,
                 720000000000,
             ),
@@ -255,7 +259,7 @@ mod tests {
             ),
             (
                 "B62qqLjG8qFtbXWStm4tdWrcdqgQ7HYkcQEzPRXCoTziR7Gd4fjrMa2",
-                "",
+                "B62qqLjG8qFtbXWStm4tdWrcdqgQ7HYkcQEzPRXCoTziR7Gd4fjrMa2",
                 AccountCreationFee,
                 0,
             ),
@@ -279,7 +283,7 @@ mod tests {
             ),
             (
                 "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
-                "",
+                "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
                 AccountCreationFee,
                 0,
             ),
@@ -735,7 +739,7 @@ mod tests {
             ),
             (
                 "B62qizEvrYJeK6v5iXCpkvViKAUVpdwwbQ3vx8jkYoD9taUNnFtCxnd",
-                "",
+                "B62qizEvrYJeK6v5iXCpkvViKAUVpdwwbQ3vx8jkYoD9taUNnFtCxnd",
                 AccountCreationFee,
                 0,
             ),
@@ -747,7 +751,7 @@ mod tests {
             ),
             (
                 "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
-                "",
+                "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
                 AccountCreationFee,
                 0,
             ),
@@ -759,7 +763,7 @@ mod tests {
             ),
             (
                 "B62qjG3yXAR2wqG73ANHsNyFhQLMQyvHqaYMKTuuFnUYa7aNTNQkTh5",
-                "",
+                "B62qjG3yXAR2wqG73ANHsNyFhQLMQyvHqaYMKTuuFnUYa7aNTNQkTh5",
                 AccountCreationFee,
                 0,
             ),
@@ -783,7 +787,7 @@ mod tests {
             ),
             (
                 "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
-                "",
+                "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
                 AccountCreationFee,
                 0,
             ),
@@ -861,7 +865,7 @@ mod tests {
             ),
             (
                 "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u",
-                "",
+                "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u",
                 Coinbase,
                 1440000000000,
             ),
