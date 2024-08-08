@@ -44,9 +44,7 @@ async fn test() -> anyhow::Result<()> {
             .get_ledger_state_hash(&state_hash, false)?
             .unwrap();
 
-        ledger_diff
-            ._apply_diff(&LedgerDiff::from_precomputed(&block))
-            .unwrap();
+        ledger_diff._apply_diff(&LedgerDiff::from_precomputed(&block))?;
 
         if ledger != ledger_diff {
             let mut keys: Vec<&PublicKey> = ledger.accounts.keys().collect();

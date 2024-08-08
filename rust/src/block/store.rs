@@ -3,6 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
     ledger::public_key::PublicKey,
+    store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
 
@@ -26,6 +27,13 @@ pub trait BlockStore {
 
     /// Get best block from the store
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>>;
+
+    /// Returns the lists of blocks to apply & unapply
+    fn reorg_blocks(
+        &self,
+        old_best_tip: &BlockHash,
+        new_best_tip: &BlockHash,
+    ) -> anyhow::Result<DBUpdate<BlockHash>>;
 
     /// Get best block epoch count without deserializing the PCB
     fn get_current_epoch(&self) -> anyhow::Result<u32>;

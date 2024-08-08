@@ -24,17 +24,7 @@ pub struct ProtocolState {
 pub struct ProtocolStateBody {
     #[serde(deserialize_with = "from_str")]
     pub genesis_state_hash: BlockHash,
-
     pub blockchain_state: BlockchainState,
     pub consensus_state: ConsensusState,
     pub constants: Constants,
 }
-
-// TODO
-// impl From<mina_rs::ProtocolState> for ProtocolState {
-//     fn from(value: mina_rs::ProtocolState) -> Self {
-//         Self {
-
-//         }
-//     }
-// }

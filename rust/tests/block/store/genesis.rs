@@ -18,7 +18,7 @@ fn block_added() -> anyhow::Result<()> {
 
     let indexer = IndexerState::new(
         genesis_root.into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store,
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,

@@ -358,7 +358,7 @@ impl IndexerState {
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             staking_ledgers: HashMap::new(),
-            version: IndexerVersion::new_testing(),
+            version: IndexerVersion::default(),
         })
     }
 
@@ -1010,9 +1010,8 @@ impl IndexerState {
 
     /// Sync from an existing db
     ///
-    /// Short-circuits adding blocks to the witness tree by rooting the
-    /// witness tree at the most recent deep canonical block and only adding
-    /// the successive blocks
+    /// Short-circuits adding all blocks to the witness tree by rooting the
+    /// witness tree `canonical_threshold` blocks behind the current best tip
     pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut witness_tree_blocks = vec![];
@@ -1380,7 +1379,11 @@ impl IndexerState {
                 );
             }
         }
-        self.ledger._apply_diff(&ledger_diff)
+
+        if !ledger_diff.account_diffs.is_empty() {
+            self.ledger._apply_diff(&ledger_diff)?;
+        }
+        Ok(())
     }
 
     /// Add new canonical ledgers to the ledger store
