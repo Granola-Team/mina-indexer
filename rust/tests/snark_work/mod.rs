@@ -19,7 +19,7 @@ async fn store() -> anyhow::Result<()> {
     let genesis_root = parse_file(genesis_ledger_path)?;
     let mut indexer = IndexerState::new(
         genesis_root.into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
