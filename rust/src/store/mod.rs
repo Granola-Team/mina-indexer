@@ -56,11 +56,13 @@ pub struct DBUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 80] = [
+    const COLUMN_FAMILIES: [&'static str; 82] = [
         // accounts
-        "account-balance",
-        "account-balance-sort",
-        "account-balance-updates",
+        "accounts",
+        "accounts-balance-sort",
+        "account-delegations",
+        "account-num-delegations",
+        "blocks-account-updates",
         // blocks
         "blocks-state-hash",
         "blocks-version",

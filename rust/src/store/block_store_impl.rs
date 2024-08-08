@@ -7,15 +7,13 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
+    constants::MAINNET_GENESIS_PREV_STATE_HASH,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{diff::LedgerDiff, public_key::PublicKey, store::LedgerStore},
     snark_work::store::SnarkStore,
     store::{
-        account::{AccountBalanceUpdate, AccountStore},
-        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, from_u64_be_bytes,
-        to_be_bytes, u32_prefix_key,
-        username::UsernameStore,
-        DBUpdate, IndexerStore,
+        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
+        from_u64_be_bytes, to_be_bytes, u32_prefix_key, username::UsernameStore, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -86,12 +84,6 @@ impl BlockStore for IndexerStore {
 
         // add to coinbase receiver index
         self.set_coinbase_receiver(block)?;
-
-        // add to balance update index
-        self.set_block_balance_updates(
-            &state_hash,
-            &<DBUpdate<AccountBalanceUpdate>>::from_precomputed(block),
-        )?;
 
         // add block height/global slot for sorting
         self.database
@@ -206,8 +198,8 @@ impl BlockStore for IndexerStore {
             self.update_canonicity(canonicity_updates)?;
 
             // balance-sorted accounts
-            let balance_updates = self.reorg_account_balance_updates(&old, state_hash)?;
-            self.update_account_balances(state_hash, &balance_updates)?;
+            let balance_updates = self.reorg_account_updates(&old, state_hash)?;
+            self.update_accounts(state_hash, &balance_updates)?;
 
             // usernames
             let username_updates = self.reorg_username_updates(&old, state_hash)?;
@@ -256,6 +248,9 @@ impl BlockStore for IndexerStore {
 
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block height {state_hash}");
+        if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
+            return Ok(Some(0));
+        }
         Ok(self
             .database
             .get_cf(self.block_height_cf(), state_hash.0.as_bytes())?
