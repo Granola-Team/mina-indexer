@@ -1,4 +1,4 @@
-use super::username::Username;
+use super::{diff::account::UpdateType, username::Username};
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
@@ -6,7 +6,6 @@ use crate::{
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use serde_json::Number;
 use std::{
     fmt::{self, Display},
     ops::{Add, Sub},
@@ -23,44 +22,55 @@ impl ToString for Amount {
     }
 }
 
-impl Add<Amount> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: Amount) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Sub<Amount> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
 #[derive(
     PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize, PartialOrd, Ord, Hash,
 )]
 pub struct Nonce(pub u32);
 
+impl Add<u32> for Nonce {
+    type Output = Nonce;
+
+    fn add(self, other: u32) -> Nonce {
+        Self(self.0.saturating_add(other))
+    }
+}
+
+impl Sub<u32> for Nonce {
+    type Output = Nonce;
+
+    fn sub(self, other: u32) -> Nonce {
+        Self(self.0.saturating_sub(other))
+    }
+}
+
 impl Add<i32> for Nonce {
     type Output = Nonce;
 
     fn add(self, other: i32) -> Nonce {
-        Nonce(self.0.wrapping_add(other as u32))
+        let abs = other.unsigned_abs();
+        if other > 0 {
+            Self(self.0.saturating_add(abs))
+        } else {
+            Self(self.0.saturating_sub(abs))
+        }
+    }
+}
+
+impl From<u32> for Nonce {
+    fn from(value: u32) -> Self {
+        Self(value)
     }
 }
 
 impl From<String> for Nonce {
-    fn from(s: String) -> Self {
-        Nonce(s.parse::<u32>().expect("nonce is u32"))
+    fn from(value: String) -> Self {
+        Self(value.parse::<u32>().expect("nonce is u32"))
     }
 }
 
 impl From<Nonce> for serde_json::value::Number {
-    fn from(n: Nonce) -> Self {
-        Number::from(n.0)
+    fn from(value: Nonce) -> Self {
+        Self::from(value.0)
     }
 }
 
@@ -212,12 +222,28 @@ impl Account {
     ///
     /// A new `Account` instance with the updated state.
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
-        use super::UpdateType::*;
         match payment_diff.update_type {
-            Credit => Self::from_credit(pre.clone(), payment_diff.amount),
-            Debit(nonce) => {
-                Self::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
-            }
+            UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
+            UpdateType::Debit(nonce) => Account::from_debit(
+                pre.clone(),
+                payment_diff.amount,
+                nonce.map(|n| if n.0 == 0 { n } else { Nonce(n.0 + 1) }),
+            )
+            .unwrap_or(pre.clone()),
+        }
+    }
+
+    pub fn from_payment_unapply(pre: Self, payment_diff: &PaymentDiff) -> Self {
+        match payment_diff.update_type {
+            UpdateType::Credit => Account {
+                balance: pre.balance.sub(payment_diff.amount),
+                ..pre
+            },
+            UpdateType::Debit(nonce) => Self {
+                balance: pre.balance.add(payment_diff.amount),
+                nonce: nonce.or(pre.nonce),
+                ..pre
+            },
         }
     }
 
@@ -309,6 +335,14 @@ impl Account {
     pub fn from_failed_transaction(pre: Self, updated_nonce: Nonce) -> Self {
         Account {
             nonce: Some(updated_nonce),
+            ..pre
+        }
+    }
+
+    pub fn from_delegation_unapply(pre: Self, delegate: PublicKey, nonce: Option<Nonce>) -> Self {
+        Account {
+            delegate,
+            nonce,
             ..pre
         }
     }

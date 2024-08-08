@@ -88,9 +88,7 @@ impl CoinbaseKind {
 
 impl Coinbase {
     pub fn amount(&self) -> u64 {
-        if self.is_new_account {
-            self.receiver_balance.unwrap_or_default()
-        } else if self.supercharge {
+        if self.supercharge {
             2 * MAINNET_COINBASE_REWARD
         } else {
             MAINNET_COINBASE_REWARD
