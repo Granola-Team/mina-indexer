@@ -6,14 +6,20 @@ pub trait ColumnFamilyHelpers {
     // Account store CFs //
     ///////////////////////
 
-    /// CF for storing account balances (best ledger)
-    fn account_balance_cf(&self) -> &ColumnFamily;
+    /// CF for storing (best ledger) accounts
+    fn accounts_cf(&self) -> &ColumnFamily;
 
     /// CF for sorting accounts by balance
-    fn account_balance_sort_cf(&self) -> &ColumnFamily;
+    fn accounts_balance_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing account balance updates
-    fn account_balance_updates_cf(&self) -> &ColumnFamily;
+    /// CF for storing number of canonical delegations
+    fn account_num_delegations(&self) -> &ColumnFamily;
+
+    /// CF for storing account delegations
+    fn account_delegations(&self) -> &ColumnFamily;
+
+    /// CF for storing block account updates
+    fn blocks_account_updates_cf(&self) -> &ColumnFamily;
 
     /////////////////////
     // Block store CFs //
