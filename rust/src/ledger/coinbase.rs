@@ -43,8 +43,8 @@ impl CoinbaseKind {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let mut res = vec![];
         let pre_diff_coinbase = match precomputed_block.staged_ledger_pre_diff().coinbase.inner() {
-            staged_ledger_diff::CoinBase::Zero => Self::Zero,
-            staged_ledger_diff::CoinBase::One(x) => Self::One(x.map(|cb| {
+            staged_ledger_diff::CoinBase::None => Self::Zero,
+            staged_ledger_diff::CoinBase::Coinbase(x) => Self::One(x.map(|cb| {
                 let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
                     cb.inner().inner();
                 CoinbaseFeeTransfer {
@@ -52,7 +52,7 @@ impl CoinbaseKind {
                     fee: fee.inner().inner(),
                 }
             })),
-            staged_ledger_diff::CoinBase::Two(x, y) => Self::Two(
+            staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y) => Self::Two(
                 x.map(|c| c.inner().inner().into()),
                 y.map(|c| c.inner().inner().into()),
             ),
@@ -62,8 +62,8 @@ impl CoinbaseKind {
             .map(|diff| diff.coinbase.inner())
         {
             None => None,
-            Some(staged_ledger_diff::CoinBase::Zero) => Some(Self::Zero),
-            Some(staged_ledger_diff::CoinBase::One(x)) => Some(Self::One(x.map(|cb| {
+            Some(staged_ledger_diff::CoinBase::None) => Some(Self::Zero),
+            Some(staged_ledger_diff::CoinBase::Coinbase(x)) => Some(Self::One(x.map(|cb| {
                 let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
                     cb.inner().inner();
                 CoinbaseFeeTransfer {
@@ -71,7 +71,7 @@ impl CoinbaseKind {
                     fee: fee.inner().inner(),
                 }
             }))),
-            Some(staged_ledger_diff::CoinBase::Two(x, y)) => Some(Self::Two(
+            Some(staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y)) => Some(Self::Two(
                 x.map(|c| c.inner().inner().into()),
                 y.map(|c| c.inner().inner().into()),
             )),

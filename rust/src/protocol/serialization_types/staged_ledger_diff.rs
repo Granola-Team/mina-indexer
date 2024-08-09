@@ -468,9 +468,12 @@ pub struct TransactionStatusBalanceDataJson {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, SmartDefault)]
 pub enum CoinBase {
     #[default]
-    Zero,
-    One(Option<CoinBaseFeeTransferV1>),
-    Two(Option<CoinBaseFeeTransferV1>, Option<CoinBaseFeeTransferV1>),
+    #[serde(rename = "Zero")]
+    None,
+    #[serde(rename = "One")]
+    Coinbase(Option<CoinBaseFeeTransferV1>),
+    #[serde(rename = "Two")]
+    CoinbaseAndFeeTransferViaCoinbase(Option<CoinBaseFeeTransferV1>, Option<CoinBaseFeeTransferV1>),
 }
 
 pub type CoinBaseV1 = Versioned<CoinBase, 1>;
@@ -478,9 +481,9 @@ pub type CoinBaseV1 = Versioned<CoinBase, 1>;
 #[derive(Clone, Debug, Serialize, Deserialize, SmartDefault)]
 enum CoinBaseJsonProxy {
     #[default]
-    Zero,
-    One(Option<CoinBaseFeeTransferJson>),
-    Two(
+    None,
+    Coinbase(Option<CoinBaseFeeTransferJson>),
+    CoinbaseAndFeeTransferViaCoinbase(
         Option<CoinBaseFeeTransferJson>,
         Option<CoinBaseFeeTransferJson>,
     ),
@@ -491,9 +494,9 @@ enum CoinBaseJsonProxy {
 #[auto_from(CoinBaseJsonProxy)]
 pub enum CoinBaseJson {
     #[default]
-    Zero,
-    One(Option<CoinBaseFeeTransferJson>),
-    Two(
+    None,
+    Coinbase(Option<CoinBaseFeeTransferJson>),
+    CoinbaseAndFeeTransferViaCoinbase(
         Option<CoinBaseFeeTransferJson>,
         Option<CoinBaseFeeTransferJson>,
     ),
