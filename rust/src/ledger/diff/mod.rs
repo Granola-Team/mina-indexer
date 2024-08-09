@@ -4,7 +4,7 @@ use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
 use super::{coinbase::Coinbase, LedgerHash, PublicKey};
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::UserCommandWithStatusT,
+    command::{Command, Payment, UserCommandWithStatusT},
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,22 +28,38 @@ impl LedgerDiff {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
         let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
         // applied user commands
-        let mut account_diff_txns: Vec<AccountDiff> = precomputed_block
+        let mut account_diff_txns: Vec<Command> = precomputed_block
             .commands()
             .into_iter()
-            .flat_map(|user_cmd_with_status| {
-                if user_cmd_with_status.is_applied() {
-                    AccountDiff::from_command(user_cmd_with_status.to_command())
-                } else {
-                    vec![AccountDiff::FailedTransactionNonce(
-                        FailedTransactionNonceDiff {
-                            public_key: user_cmd_with_status.sender(),
-                            nonce: user_cmd_with_status.nonce() + 1,
-                        },
-                    )]
-                }
+            .filter(|txn| txn.is_applied())
+            .map(|txn| txn.to_command())
+            .filter(|cmd| match cmd {
+                Command::Payment(Payment { amount, .. }) => amount.0 > 0,
+                Command::Delegation(_) => true,
             })
             .collect();
+        account_diff_txns.sort();
+
+        let mut account_diff_txns: Vec<AccountDiff> = account_diff_txns
+            .into_iter()
+            .flat_map(AccountDiff::from_command)
+            .collect();
+
+        // failed user commands
+        account_diff_txns.append(
+            &mut precomputed_block
+                .commands()
+                .iter()
+                .filter(|txn| !txn.is_applied())
+                .map(|txn| {
+                    AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+                        public_key: txn.sender(),
+                        nonce: txn.nonce() + 1,
+                    })
+                })
+                .collect(),
+        );
+
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
@@ -758,12 +774,6 @@ mod tests {
                 "B62qmJWjC9V7QxQ8NM9bfo6MeMgNKoUgV3ghkSmBXHF9AygsUeGsgXE",
                 Payment(Nonce(38571)),
                 300280000000,
-            ),
-            (
-                "B62qoXQhp63oNsLSN9Dy7wcF3PzLmdBnnin2rTnNWLbpgF7diABciU6",
-                "B62qkiF5CTjeiuV1HSx4SpEytjiCptApsvmjiHHqkb1xpAgVuZTtR14",
-                Payment(Nonce(206604)),
-                0,
             ),
             (
                 "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
