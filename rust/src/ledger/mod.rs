@@ -12,10 +12,7 @@ use crate::{
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::{Account, Amount, Nonce},
-        diff::{
-            account::{AccountDiff, UpdateType},
-            LedgerDiff,
-        },
+        diff::{account::AccountDiff, LedgerDiff},
         public_key::PublicKey,
     },
     protocol::serialization_types::{
@@ -26,7 +23,11 @@ use crate::{
 use anyhow::bail;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::HashMap,
+    ops::{Add, Sub},
+    str::FromStr,
+};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
@@ -43,12 +44,6 @@ impl Ledger {
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct NonGenesisLedger {
     pub ledger: Ledger,
-}
-
-#[derive(Debug, Clone)]
-pub enum LedgerError {
-    AccountNotFound,
-    InvalidDelegation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -116,21 +111,19 @@ impl Ledger {
 
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
-        let ledger_diff = diff.clone();
-        let keys: Vec<PublicKey> = ledger_diff
+        let keys: Vec<PublicKey> = diff
             .account_diffs
             .iter()
             .map(|diff| diff.public_key())
             .collect();
-
-        keys.into_iter().for_each(|public_key| {
-            if self.accounts.get(&public_key).is_none() {
+        keys.iter().for_each(|public_key| {
+            if self.accounts.get(public_key).is_none() {
                 self.accounts
-                    .insert(public_key.clone(), Account::empty(public_key));
+                    .insert(public_key.clone(), Account::empty(public_key.clone()));
             }
         });
 
-        for diff in ledger_diff.account_diffs {
+        for diff in diff.account_diffs.iter() {
             match self.accounts.remove(&diff.public_key()) {
                 Some(account_before) => {
                     self.accounts.insert(
@@ -139,10 +132,7 @@ impl Ledger {
                             AccountDiff::Payment(payment_diff) => {
                                 Account::from_payment(account_before, payment_diff)
                             }
-                            AccountDiff::AccountCreationFee(_) => Account {
-                                balance: account_before.balance.sub(&MAINNET_ACCOUNT_CREATION_FEE),
-                                ..account_before
-                            },
+                            AccountDiff::CreateAccount(_) => account_before,
                             AccountDiff::Delegation(delegation_diff) => {
                                 assert_eq!(account_before.public_key, delegation_diff.delegator);
                                 Account::from_delegation(
@@ -169,19 +159,103 @@ impl Ledger {
                 None => {
                     return match diff {
                         AccountDiff::Coinbase(_) => Ok(()),
-                        AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
+                        AccountDiff::Delegation(_) => bail!("Invalid delegation"),
                         AccountDiff::Payment(_)
-                        | AccountDiff::AccountCreationFee(_)
+                        | AccountDiff::CreateAccount(_)
                         | AccountDiff::FeeTransfer(_)
                         | AccountDiff::FeeTransferViaCoinbase(_)
                         | AccountDiff::FailedTransactionNonce(_) => {
-                            Err(LedgerError::AccountNotFound.into())
+                            bail!("Account {} not found", diff.public_key())
                         }
                     };
                 }
             }
         }
 
+        // account creation fees
+        for pk in diff.new_pk_balances.keys() {
+            match self.accounts.remove(pk) {
+                Some(account_before) => {
+                    self.accounts.insert(
+                        pk.clone(),
+                        Account {
+                            balance: account_before.balance - MAINNET_ACCOUNT_CREATION_FEE,
+                            ..account_before
+                        },
+                    );
+                }
+                None => unreachable!(),
+            }
+        }
+        Ok(())
+    }
+
+    /// Unapply a ledger diff to a mutable ledger
+    pub fn _unapply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
+        let keys: Vec<PublicKey> = diff
+            .account_diffs
+            .iter()
+            .map(|diff| diff.public_key())
+            .collect();
+        keys.into_iter().for_each(|public_key| {
+            if self.accounts.get(&public_key).is_none() {
+                self.accounts
+                    .insert(public_key.clone(), Account::empty(public_key));
+            }
+        });
+
+        for diff in diff.account_diffs.iter() {
+            match self.accounts.remove(&diff.public_key()) {
+                Some(account_before) => {
+                    self.accounts.insert(
+                        diff.public_key(),
+                        match &diff {
+                            AccountDiff::Payment(payment_diff) => {
+                                Account::from_payment_unapply(account_before, payment_diff)
+                            }
+                            AccountDiff::CreateAccount(pk) => {
+                                assert!(self.accounts.get(pk).is_some());
+                                self.accounts.remove(pk);
+                                continue;
+                            }
+                            AccountDiff::Delegation(delegation_diff) => {
+                                Account::from_delegation_unapply(
+                                    account_before.clone(),
+                                    // TODO get previous delegate?
+                                    delegation_diff.delegate.clone(),
+                                    Some(delegation_diff.nonce),
+                                )
+                            }
+                            AccountDiff::Coinbase(coinbase_diff) => {
+                                Account::from_coinbase(account_before, coinbase_diff.amount)
+                            }
+                            AccountDiff::FeeTransfer(fee_transfer_diff) => {
+                                Account::from_payment_unapply(account_before, fee_transfer_diff)
+                            }
+                            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
+                                Account::from_payment_unapply(account_before, fee_transfer_diff)
+                            }
+                            AccountDiff::FailedTransactionNonce(failed_diff) => {
+                                Account::from_failed_transaction(account_before, failed_diff.nonce)
+                            }
+                        },
+                    );
+                }
+                None => {
+                    return match diff {
+                        AccountDiff::Coinbase(_) => Ok(()),
+                        AccountDiff::Delegation(_) => bail!("Invalid delegation"),
+                        AccountDiff::Payment(_)
+                        | AccountDiff::CreateAccount(_)
+                        | AccountDiff::FeeTransfer(_)
+                        | AccountDiff::FeeTransferViaCoinbase(_)
+                        | AccountDiff::FailedTransactionNonce(_) => {
+                            bail!("Account {} not found", diff.public_key())
+                        }
+                    };
+                }
+            }
+        }
         Ok(())
     }
 
@@ -222,7 +296,6 @@ impl Ledger {
         for (pk, acct) in &self.accounts {
             accounts.insert(pk.to_address(), acct.clone());
         }
-
         serde_json::to_string_pretty(&accounts).unwrap()
     }
 
@@ -292,26 +365,48 @@ impl std::fmt::Debug for Ledger {
     }
 }
 
-impl std::fmt::Display for LedgerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LedgerError::AccountNotFound => write!(f, "Account not found in ledger: payment error"),
-            LedgerError::InvalidDelegation => {
-                write!(f, "Invalid data or parameters: delegation error")
-            }
+impl Add<Amount> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Amount) -> Self::Output {
+        Self(self.0.saturating_add(rhs.0))
+    }
+}
+
+impl Add<u64> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0.saturating_add(rhs))
+    }
+}
+
+impl Add<i64> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: i64) -> Self::Output {
+        let abs = rhs.unsigned_abs();
+        if rhs > 0 {
+            Self(self.0.saturating_add(abs))
+        } else {
+            Self(self.0.saturating_sub(abs))
         }
     }
 }
 
-impl std::error::Error for LedgerError {}
+impl Sub<Amount> for Amount {
+    type Output = Amount;
 
-impl Amount {
-    pub fn add(&self, other: &Amount) -> Amount {
-        Self(self.0 + other.0)
+    fn sub(self, rhs: Amount) -> Self::Output {
+        Self(self.0.saturating_sub(rhs.0))
     }
+}
 
-    pub fn sub(&self, other: &Amount) -> Amount {
-        Self(self.0 - other.0)
+impl Sub<u64> for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: u64) -> Self::Output {
+        Self(self.0.saturating_sub(rhs))
     }
 }
 
@@ -359,6 +454,7 @@ mod tests {
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            blockchain_length: 0,
             state_hash: BlockHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,
@@ -390,6 +486,7 @@ mod tests {
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
+            blockchain_length: 0,
             state_hash: BlockHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,

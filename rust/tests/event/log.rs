@@ -44,14 +44,14 @@ async fn test() -> anyhow::Result<()> {
 
     let mut state0 = IndexerState::new(
         genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store0.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
     )?;
     let mut state1 = IndexerState::new(
         genesis_ledger.into(),
-        IndexerVersion::new_testing(),
+        IndexerVersion::default(),
         indexer_store1.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,

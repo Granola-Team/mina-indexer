@@ -640,8 +640,10 @@ impl IndexerVersion {
             genesis_state_hash: genesis_state_hash.clone(),
         }
     }
+}
 
-    pub fn new_testing() -> Self {
+impl Default for IndexerVersion {
+    fn default() -> Self {
         let chain_id = chain_id(
             MAINNET_GENESIS_HASH,
             MAINNET_PROTOCOL_CONSTANTS,

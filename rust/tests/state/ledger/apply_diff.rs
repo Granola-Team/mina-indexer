@@ -79,13 +79,13 @@ async fn account_diffs() -> anyhow::Result<()> {
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             843190000000,
-            Some(42428),
+            Some(42429),
             None,
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
-            Some(7297),
+            Some(7298),
             None,
         ),
         (
@@ -103,7 +103,7 @@ async fn account_diffs() -> anyhow::Result<()> {
         (
             "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
             999997998000,
-            Some(146494),
+            Some(146495),
             None,
         ),
         (
@@ -126,20 +126,12 @@ async fn account_diffs() -> anyhow::Result<()> {
     println!("=== Final ===");
     println!("{ledger:?}");
 
-    println!("Nonce ledger:");
-    for (pk, account) in &ledger.accounts {
-        println!("{pk}: {}", account.nonce.map_or(0, |n| n.0));
-    }
-
-    println!("Nonce expected:");
-    for (pk, account) in &expected.accounts {
-        println!("{pk}: {}", account.nonce.map_or(0, |n| n.0));
-    }
-
-    for (pk, actual_acct) in &ledger.accounts {
-        let expect_acct = expected.accounts.get(pk).unwrap();
-        if actual_acct != expect_acct {
-            println!("diff account: {actual_acct} != {expect_acct}");
+    for (pk, account) in ledger.accounts.iter() {
+        if Some(account) != expected.accounts.get(pk) {
+            println!(
+                "ledger != expect\n{account}\n{}",
+                expected.accounts.get(pk).unwrap()
+            );
         }
     }
     assert_eq!(ledger, expected);

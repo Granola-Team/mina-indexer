@@ -19,11 +19,11 @@ async fn check_balance() -> anyhow::Result<()> {
     let blocks_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)
-            .unwrap();
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+    let genesis_ledger: GenesisLedger = genesis_ledger.into();
     let mut state = IndexerState::new(
-        genesis_ledger.clone().into(),
-        IndexerVersion::new_testing(),
+        genesis_ledger.clone(),
+        IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
@@ -49,39 +49,34 @@ async fn check_balance() -> anyhow::Result<()> {
     {
         let pk = pk_key_prefix(&key[8..]);
         let pk_key_balance = balance_key_prefix(&key);
-        let pk_store_balance = indexer_store.get_account_balance(&pk)?.unwrap();
-        let pk_ledger_balance = best_ledger
+        let pk_store_account = indexer_store.get_best_account(&pk)?.unwrap();
+        let pk_best_account = best_ledger
             .accounts
             .get(&pk)
             .with_context(|| format!("pk: {pk}"))
-            .unwrap()
-            .balance
-            .0;
+            .unwrap();
 
-        if pk_store_balance != pk_ledger_balance || pk_store_balance != pk_key_balance {
+        if pk_store_account != *pk_best_account || pk_store_account.balance.0 != pk_key_balance {
             println!(
-                "(n: {n}) {pk}: {pk_store_balance} (store), {pk_ledger_balance} (ledger), {pk_key_balance} (key)"
+                "(n: {n}) {pk}: {} (store), {} (ledger), {pk_key_balance} (key)",
+                pk_store_account.balance.0, pk_best_account.balance.0
             );
         }
 
         // store balance coincides with best ledger balance
-        assert_eq!(pk_store_balance, pk_ledger_balance);
+        assert_eq!(pk_store_account, *pk_best_account);
 
         // store balance coincides with key balance
-        assert_eq!(pk_store_balance, pk_key_balance);
+        assert_eq!(pk_store_account.balance.0, pk_key_balance);
 
         // best ledger balances decreasing
-        assert!(curr_ledger_balance.unwrap_or(u64::MAX) >= pk_ledger_balance);
-        curr_ledger_balance = Some(pk_ledger_balance);
+        assert!(curr_ledger_balance.unwrap_or(u64::MAX) >= pk_best_account.balance.0);
+        curr_ledger_balance = Some(pk_best_account.balance.0);
     }
 
     // check best ledger balances equal sorted store balances
     for (pk, acct) in best_ledger.accounts {
-        assert_eq!(
-            acct.balance.0,
-            indexer_store.get_account_balance(&pk)?.unwrap()
-        );
+        assert_eq!(acct, indexer_store.get_best_account(&pk)?.unwrap());
     }
-
     Ok(())
 }
