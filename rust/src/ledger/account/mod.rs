@@ -10,14 +10,7 @@ use serde_json::Number;
 use std::{
     fmt::{self, Display},
     ops::{Add, Sub},
-    sync::atomic::{AtomicUsize, Ordering},
 };
-
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-fn increment_counter() {
-    COUNTER.fetch_add(1, Ordering::SeqCst);
-}
 
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
@@ -163,11 +156,10 @@ impl Account {
     ///
     /// A new `Account` instance with the specified public key and default
     /// values for other fields.
-    pub fn empty(public_key: &PublicKey) -> Self {
-        let key = public_key.clone();
+    pub fn empty(public_key: PublicKey) -> Self {
         Account {
-            public_key: key.clone(),
-            delegate: key,
+            public_key: public_key.clone(),
+            delegate: public_key,
             ..Default::default()
         }
     }
@@ -246,16 +238,9 @@ impl Account {
     /// successful, or `None` if the debit amount exceeds the current
     /// balance.
     fn from_debit(pre: Self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
-        //        assert!(amount <= pre.balance);
+        // TODO: Convert this to use an assert. Note: The assertion will fail
+        // when it originating from a dangling branch.
         if amount > pre.balance {
-            println!("Counter: {}", COUNTER.load(Ordering::SeqCst));
-            println!("Previous Account: {:?}", pre);
-            println!("New Amount: {:?}", amount);
-            println!("Nonce: {:?}", nonce);
-            println!(
-                "================================================================================"
-            );
-            increment_counter();
             None
         } else {
             Some(Account {
