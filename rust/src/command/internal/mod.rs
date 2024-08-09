@@ -76,27 +76,22 @@ impl InternalCommand {
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
-        if coinbase.has_fee_transfer() {
-            let fee_transfer = coinbase.fee_transfer();
-            let idx = account_diff_fees
-                .iter()
-                .enumerate()
-                .position(|(n, diff)| match diff {
-                    AccountDiff::FeeTransfer(fee) => {
-                        *fee == fee_transfer[0]
-                            && match &account_diff_fees[n + 1] {
-                                AccountDiff::FeeTransfer(fee) => *fee == fee_transfer[1],
-                                _ => false,
-                            }
-                    }
-                    _ => false,
-                });
-            idx.iter().for_each(|i| {
-                account_diff_fees[*i] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone());
-                account_diff_fees[*i + 1] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone());
-            });
+        if let [coinbase_transfer, fee_transfer_via_coinbase] = coinbase.fee_transfer()[..] {
+            if let Some(idx) =
+                account_diff_fees
+                    .windows(2)
+                    .position(|pair| match (&pair[0], &pair[1]) {
+                        (AccountDiff::FeeTransfer(fee1), AccountDiff::FeeTransfer(fee2)) => {
+                            *fee1 == coinbase_transfer && *fee2 == fee_transfer_via_coinbase
+                        }
+                        _ => false,
+                    })
+            {
+                account_diff_fees[idx] =
+                    AccountDiff::FeeTransferViaCoinbase(coinbase_transfer.clone());
+                account_diff_fees[idx + 1] =
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer_via_coinbase.clone());
+            }
         }
 
         let mut internal_cmds = vec![];
