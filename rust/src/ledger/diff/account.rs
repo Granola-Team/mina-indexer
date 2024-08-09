@@ -207,7 +207,7 @@ impl AccountDiff {
                     // Check if the coinbase recipient account is new and deduct the account
                     // creation fee if it is
                     let coinbase = Coinbase::from_precomputed(precomputed_block);
-                    if let CoinbaseKind::One(Some(coinbase_fee_transfer)) = coinbase.kind {
+                    if let CoinbaseKind::Coinbase(Some(coinbase_fee_transfer)) = coinbase.kind {
                         if coinbase_fee_transfer.fee >= MAINNET_ACCOUNT_CREATION_FEE.0 {
                             for internal_command_balance in
                                 precomputed_block.internal_command_balances()
