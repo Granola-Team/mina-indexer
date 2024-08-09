@@ -1,23 +1,29 @@
-use super::{account::AccountBalanceUpdate, column_families::ColumnFamilyHelpers, from_be_bytes};
+use super::{column_families::ColumnFamilyHelpers, from_be_bytes};
 use crate::{
     block::{store::BlockStore, BlockHash},
-    constants::MAINNET_GENESIS_HASH,
-    ledger::public_key::PublicKey,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
+    ledger::{
+        account::{Account, Nonce},
+        diff::account::{AccountDiff, UpdateType},
+        public_key::PublicKey,
+        store::LedgerStore,
+    },
     store::{
-        account::{AccountStore, DBAccountBalanceUpdate},
+        account::{AccountStore, DBAccountUpdate},
         fixed_keys::FixedKeys,
-        u64_prefix_key, IndexerStore,
+        to_be_bytes, u64_prefix_key, IndexerStore,
     },
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
+use std::collections::HashSet;
 
 impl AccountStore for IndexerStore {
-    fn reorg_account_balance_updates(
+    fn reorg_account_updates(
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DBAccountBalanceUpdate> {
+    ) -> anyhow::Result<DBAccountUpdate> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
             old_best_tip,
@@ -36,14 +42,13 @@ impl AccountStore for IndexerStore {
         let b_length = self.get_block_height(&b)?.expect("b has a length");
 
         // bring b back to the same height as a
-        let genesis_state_hashes: Vec<BlockHash> = vec![MAINNET_GENESIS_HASH.into()];
         for _ in 0..b_length.saturating_sub(a_length) {
             // check if there's a previous block
-            if genesis_state_hashes.contains(&b) {
+            if b.0 == MAINNET_GENESIS_HASH {
                 break;
             }
 
-            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap());
+            apply.append(&mut self.get_block_account_updates(&b)?.unwrap());
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -51,10 +56,10 @@ impl AccountStore for IndexerStore {
         let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-        while a != b && !genesis_state_hashes.contains(&a) {
+        while a != b && a.0 != MAINNET_GENESIS_HASH {
             // add blocks to appropriate collection
-            unapply.append(&mut self.get_block_balance_updates(&a)?.unwrap());
-            apply.append(&mut self.get_block_balance_updates(&b)?.unwrap());
+            unapply.append(&mut self.get_block_account_updates(&a)?.unwrap());
+            apply.append(&mut self.get_block_account_updates(&b)?.unwrap());
 
             // descend
             a = a_prev;
@@ -65,60 +70,222 @@ impl AccountStore for IndexerStore {
         }
 
         apply.reverse();
-        Ok(<DBAccountBalanceUpdate>::new(apply, unapply))
+        Ok(<DBAccountUpdate>::new(apply, unapply))
     }
 
-    fn get_block_balance_updates(
+    fn get_block_account_updates(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<AccountBalanceUpdate>>> {
+    ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
         trace!("Getting block balance updates for {state_hash}");
         Ok(self
-            .database
-            .get_pinned_cf(self.account_balance_updates_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .get_block_ledger_diff(state_hash)?
+            .map(|diff| diff.account_diffs))
     }
 
-    fn update_account_balances(
+    fn update_accounts(
         &self,
         state_hash: &BlockHash,
-        updates: &DBAccountBalanceUpdate,
+        updates: &DBAccountUpdate,
     ) -> anyhow::Result<()> {
+        use AccountDiff::*;
         trace!("Updating account balances {state_hash}");
+        let apply_acc = updates.apply.iter().fold(0, |acc, update| match update {
+            CreateAccount(_) => acc + 1,
+            _ => acc,
+        });
+        let adjust = updates
+            .unapply
+            .iter()
+            .fold(apply_acc, |acc, update| match update {
+                CreateAccount(_) => acc - 1,
+                _ => acc,
+            });
+        self.update_num_accounts(adjust)?;
 
-        use AccountBalanceUpdate::*;
-        fn count(updates: &[AccountBalanceUpdate]) -> i32 {
-            updates.iter().fold(0, |acc, update| match update {
-                CreateAccount(_) => acc + 1,
-                RemoveAccount(_) => acc - 1,
-                Payment(_) => acc,
-            })
+        // update accounts
+        // unapply
+        for diff in updates.unapply.iter() {
+            let pk: PublicKey = diff.public_key();
+            let acct = self
+                .get_best_account(&pk)?
+                .unwrap_or(Account::empty(pk.clone()));
+            let account = match diff {
+                Payment(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        ..acct
+                    }),
+                    UpdateType::Debit(Some(nonce)) => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        nonce: if acct.nonce.map(|n| n.0) == Some(0) {
+                            None
+                        } else {
+                            Some(nonce - 1)
+                        },
+                        ..acct
+                    }),
+                    UpdateType::Debit(None) => unreachable!(),
+                },
+                Coinbase(diff) => Some(Account {
+                    balance: acct.balance - diff.amount,
+                    ..acct
+                }),
+                CreateAccount(_) => None,
+                Delegation(diff) => Some(Account {
+                    nonce: if acct.nonce.map(|n| n.0) == Some(0) {
+                        None
+                    } else {
+                        Some(diff.nonce - 1)
+                    },
+                    delegate: diff.delegate.clone(),
+                    ..acct
+                }),
+                FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        ..acct
+                    }),
+                    UpdateType::Debit(_) => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        ..acct
+                    }),
+                },
+                FailedTransactionNonce(diff) => Some(Account {
+                    nonce: if acct.nonce.map(|n| n.0) == Some(0) {
+                        None
+                    } else {
+                        Some(diff.nonce - 1)
+                    },
+                    ..acct
+                }),
+            };
+            self.update_account(&pk, account)?;
         }
-        self.update_num_accounts(count(&updates.apply) - count(&updates.unapply))?;
 
-        // update balances
-        for (pk, amount) in <DBAccountBalanceUpdate>::balance_updates(updates) {
-            if let Some(amount) = amount {
-                let balance = self.get_account_balance(&pk)?.unwrap_or_default();
-                let balance = if amount > 0 {
-                    balance + amount.unsigned_abs()
-                } else {
-                    balance.saturating_sub(amount.unsigned_abs())
-                };
+        // apply
+        let mut accounts_created = <HashSet<PublicKey>>::new();
+        for diff in updates.apply.iter() {
+            let pk = diff.public_key();
+            let acct = self
+                .get_best_account(&pk)?
+                .unwrap_or(Account::empty(pk.clone()));
+            let account = match diff {
+                Payment(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        ..acct
+                    }),
+                    UpdateType::Debit(nonce) => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        nonce: acct.nonce.map(|n| nonce.unwrap_or_default().max(n) + 1),
+                        ..acct
+                    }),
+                },
+                Coinbase(diff) => Some(Account {
+                    balance: acct.balance + diff.amount,
+                    ..acct
+                }),
+                CreateAccount(_) => {
+                    accounts_created.insert(pk.clone());
+                    Some(acct)
+                }
+                Delegation(diff) => Some(Account {
+                    nonce: Some(diff.nonce),
+                    delegate: diff.delegate.clone(),
+                    ..acct
+                }),
+                FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        ..acct
+                    }),
+                    UpdateType::Debit(Some(nonce)) => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        nonce: Some(nonce + 1),
+                        ..acct
+                    }),
+                    UpdateType::Debit(None) => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        nonce: Some(Nonce::default()),
+                        ..acct
+                    }),
+                },
+                FailedTransactionNonce(diff) => Some(Account {
+                    nonce: Some(diff.nonce),
+                    ..acct
+                }),
+            };
+            self.update_account(&pk, account)?;
+        }
 
-                // update balance
-                self.update_account_balance(&pk, Some(balance))?;
-            } else {
-                // remove account
-                self.update_account_balance(&pk, None)?;
-            }
+        for pk in accounts_created {
+            let acct = self.get_best_account(&pk)?.unwrap();
+            let account = Account {
+                balance: acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
+                ..acct
+            };
+            self.update_account(&pk, Some(account))?;
+        }
+        Ok(())
+    }
+
+    fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> anyhow::Result<()> {
+        trace!("Adding pk {pk} delegate {delegate}");
+        let num = self.get_num_pk_delegations(pk)?;
+
+        // update num delegations
+        self.database.put_cf(
+            self.account_num_delegations(),
+            pk.0.as_bytes(),
+            to_be_bytes(num + 1),
+        )?;
+
+        // append new delegation
+        let mut key = pk.clone().to_bytes();
+        key.append(&mut to_be_bytes(num));
+        self.database
+            .put_cf(self.account_delegations(), key, delegate.0.as_bytes())?;
+        Ok(())
+    }
+
+    fn get_num_pk_delegations(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+        Ok(self
+            .database
+            .get_cf(self.account_num_delegations(), pk.0.as_bytes())?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
+        let mut key = pk.clone().to_bytes();
+        key.append(&mut to_be_bytes(idx));
+        Ok(self
+            .database
+            .get_cf(self.account_delegations(), key)?
+            .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
+    }
+
+    fn remove_pk_delegate(&self, pk: PublicKey) -> anyhow::Result<()> {
+        trace!("Removing pk {pk} delegate");
+        let idx = self.get_num_pk_delegations(&pk)?;
+        if idx > 0 {
+            // update num delegations
+            self.database.put_cf(
+                self.account_num_delegations(),
+                pk.0.as_bytes(),
+                to_be_bytes(idx - 1),
+            )?;
+
+            // drop delegation
+            let mut key = pk.to_bytes();
+            key.append(&mut to_be_bytes(idx - 1));
+            self.database.delete_cf(self.account_delegations(), key)?;
         }
         Ok(())
     }
 
     fn update_num_accounts(&self, adjust: i32) -> anyhow::Result<()> {
         use std::cmp::Ordering::*;
-
         match adjust.cmp(&0) {
             Equal => (),
             Greater => {
@@ -152,65 +319,53 @@ impl AccountStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn update_account_balance(&self, pk: &PublicKey, balance: Option<u64>) -> anyhow::Result<()> {
-        // delete account when balance is none
-        if balance.is_none() {
+    fn update_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
+        if account.is_none() {
             // delete stale data
-            let b = self.get_account_balance(pk)?.unwrap_or_default();
-            self.database
-                .delete_cf(self.account_balance_cf(), pk.0.as_bytes())?;
-            self.database
-                .delete_cf(self.account_balance_sort_cf(), u64_prefix_key(b, &pk.0))?;
-            return Ok(());
+            if let Some(acct) = self.get_best_account(pk)? {
+                self.database
+                    .delete_cf(self.accounts_cf(), pk.0.as_bytes())?;
+                self.database.delete_cf(
+                    self.accounts_balance_sort_cf(),
+                    u64_prefix_key(acct.balance.0, &pk.0),
+                )?;
+                return Ok(());
+            }
         }
 
-        // update account balance when some
-        let balance = balance.unwrap();
-        if let Some(old) = self.get_account_balance(pk)? {
+        // update account
+        let account = account.unwrap();
+        let balance = account.balance.0;
+        let acct = self.get_best_account(pk)?;
+        if let Some(acct) = acct.as_ref() {
             // delete stale balance sorting data
-            self.database
-                .delete_cf(self.account_balance_sort_cf(), u64_prefix_key(old, &pk.0))?;
+            self.database.delete_cf(
+                self.accounts_balance_sort_cf(),
+                u64_prefix_key(acct.balance.0, &pk.0),
+            )?;
         }
+
         self.database.put_cf(
-            self.account_balance_cf(),
+            self.accounts_cf(),
             pk.0.as_bytes(),
-            balance.to_be_bytes(),
+            serde_json::to_vec(&account)?,
         )?;
 
         // add: {balance}{pk} -> _
         self.database.put_cf(
-            self.account_balance_sort_cf(),
+            self.accounts_balance_sort_cf(),
             u64_prefix_key(balance, &pk.0),
             b"",
         )?;
         Ok(())
     }
 
-    fn set_block_balance_updates(
-        &self,
-        state_hash: &BlockHash,
-        balance_updates: &[AccountBalanceUpdate],
-    ) -> anyhow::Result<()> {
-        trace!("Setting block balance updates for {state_hash}");
-        self.database.put_cf(
-            self.account_balance_updates_cf(),
-            state_hash.0.as_bytes(),
-            serde_json::to_vec(balance_updates)?,
-        )?;
-        Ok(())
-    }
-
-    fn get_account_balance(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
         trace!("Getting account balance {pk}");
-
         Ok(self
             .database
-            .get_pinned_cf(self.account_balance_cf(), pk.0.as_bytes())?
-            .map(|bytes| {
-                let mut be_bytes = [0; 8];
-                be_bytes.copy_from_slice(&bytes[..8]);
-                u64::from_be_bytes(be_bytes)
-            }))
+            .get_cf(self.accounts_cf(), pk.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     ///////////////
@@ -219,6 +374,6 @@ impl AccountStore for IndexerStore {
 
     fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
         self.database
-            .iterator_cf(self.account_balance_sort_cf(), mode)
+            .iterator_cf(self.accounts_balance_sort_cf(), mode)
     }
 }

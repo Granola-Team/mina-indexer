@@ -6,37 +6,70 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Account store CFs //
     ///////////////////////
 
-    /// `pk -> balance`
-    fn account_balance_cf(&self) -> &ColumnFamily {
+    /// CF for storing (best ledger) accounts
+    /// ```
+    /// pk -> account
+    /// where
+    /// - account: best ledger account
+    fn accounts_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("account-balance")
-            .expect("account-balance column family exists")
+            .cf_handle("accounts")
+            .expect("accounts column family exists")
     }
 
-    /// CF for sorting account's by balance
-    /// `{balance}{pk} -> _`
-    ///
-    /// - `balance`: 8 BE bytes
-    fn account_balance_sort_cf(&self) -> &ColumnFamily {
+    /// CF for storing number of canonical account delegations
+    /// ```
+    /// pk -> num
+    /// where
+    /// - pk:  [PublicKey::LEN] bytes
+    /// - num: 4 BE bytes
+    fn account_num_delegations(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("account-balance-sort")
-            .expect("account-balance-sort column family exists")
+            .cf_handle("account-num-delegations")
+            .expect("account-num-delegations column family exists")
     }
 
-    /// 'state_hash -> balance updates`
-    fn account_balance_updates_cf(&self) -> &ColumnFamily {
+    /// CF for storing canonical account delegations
+    /// ```
+    /// {pk}{num} -> delegate
+    /// where
+    /// - pk:  [PublicKey::LEN] bytes
+    /// - num: 4 BE bytes
+    fn account_delegations(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("account-balance-updates")
-            .expect("account-balance-updates column family exists")
+            .cf_handle("account-delegations")
+            .expect("account-delegations column family exists")
+    }
+
+    /// CF for sorting accounts by balance
+    /// ```
+    /// {balance}{pk} -> _
+    /// where
+    /// - balance: 8 BE bytes
+    /// - pk:      [PublicKey::LEN] bytes
+    fn accounts_balance_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("accounts-balance-sort")
+            .expect("accounts-balance-sort column family exists")
+    }
+
+    /// CF for storing block account updates
+    /// ```
+    /// state_hash -> updates
+    fn blocks_account_updates_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-account-updates")
+            .expect("blocks-account-updates column family exists")
     }
 
     /////////////////////
     // Block store CFs //
     /////////////////////
 
-    /// Blocks CF
+    /// CF for storing blocks
     /// ```
-    /// state_hash -> {num block bytes BE u64 bytes}{serde_json block bytes}
+    /// key: state_hash
+    /// val: {num block bytes BE u64 bytes}{serde_json block bytes}
     fn blocks_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-state-hash")

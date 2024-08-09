@@ -98,10 +98,8 @@ impl LedgerStore for IndexerStore {
     ) -> anyhow::Result<()> {
         // initialize account balances for sorting
         for (pk, acct) in &genesis_ledger.accounts {
-            self.update_account_balance(pk, Some(acct.balance.0))?;
+            self.update_account(pk, Some(acct.clone()))?;
         }
-
-        // add the ledger to the db
         self.add_ledger_state_hash(state_hash, genesis_ledger)?;
         Ok(())
     }
@@ -112,7 +110,6 @@ impl LedgerStore for IndexerStore {
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting staged ledger state hash {state_hash}");
-
         let mut curr_state_hash = state_hash.clone();
         let mut diffs = vec![];
 

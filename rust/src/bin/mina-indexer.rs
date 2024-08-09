@@ -379,8 +379,6 @@ impl DatabaseCommand {
                 };
                 let config =
                     process_indexer_configuration((*args).into(), mode, domain_socket_path)?;
-
-                debug!("Creating a new mina indexer database in {database_dir:#?}");
                 let db = Arc::new(IndexerStore::new(&database_dir)?);
                 let store = db.clone();
 
