@@ -360,7 +360,7 @@ mod tests {
             supercharge: true,
             receiver: receiver.clone(),
             receiver_balance: Some(1440_u64 * MINA_SCALE),
-            kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
+            kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
                 receiver_pk: snarker.clone(),
                 fee,
             })),
@@ -446,7 +446,7 @@ mod tests {
             supercharge: true,
             receiver_balance: None,
             receiver: receiver.clone(),
-            kind: CoinbaseKind::One(None),
+            kind: CoinbaseKind::Coinbase(None),
         });
         let expected_account_diff = vec![AccountDiff::Coinbase(CoinbaseDiff {
             public_key: receiver,
