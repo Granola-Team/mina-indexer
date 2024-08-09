@@ -152,7 +152,7 @@ impl Coinbase {
         };
         transfers
             .into_iter()
-            .filter_map(|opt_transfer| opt_transfer)
+            .flatten()
             .collect::<Vec<_>>()
     }
 
@@ -161,7 +161,7 @@ impl Coinbase {
     }
 
     pub fn has_fee_transfer(&self) -> bool {
-        self.get_transfers().len() > 0
+        !self.get_transfers().is_empty()
     }
 
     // only apply if "coinbase" =/= [ "Zero" ]
