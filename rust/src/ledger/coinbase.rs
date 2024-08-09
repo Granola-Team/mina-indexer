@@ -25,6 +25,11 @@ pub enum CoinbaseKind {
     Two(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
 }
 
+pub struct CoinbasePaymentDiff {
+    pub debit: PaymentDiff,
+    pub credit: PaymentDiff,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CoinbaseFeeTransfer {
     pub receiver_pk: PublicKey,
@@ -115,58 +120,57 @@ impl Coinbase {
 
     // For fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK
     // work
-    pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
+    pub fn fee_transfer(&self) -> Option<CoinbasePaymentDiff> {
         match &self.kind {
-            CoinbaseKind::Zero => vec![],
+            CoinbaseKind::Zero => None,
             CoinbaseKind::One(fee_transfer) => {
                 if let Some(fee_transfer) = fee_transfer {
-                    vec![
-                        PaymentDiff {
+                    Some(CoinbasePaymentDiff {
+                        credit: PaymentDiff {
                             public_key: fee_transfer.receiver_pk.clone(),
                             amount: fee_transfer.fee.into(),
                             update_type: UpdateType::Credit,
                         },
-                        PaymentDiff {
+                        debit: PaymentDiff {
                             public_key: self.receiver.clone(),
                             amount: fee_transfer.fee.into(),
                             update_type: UpdateType::Debit(None),
                         },
-                    ]
+                    })
                 } else {
-                    vec![]
+                    None
                 }
             }
             CoinbaseKind::Two(fee_transfer0, fee_transfer1) => {
-                let mut res = vec![];
                 if let Some(t0) = fee_transfer0 {
-                    res.append(&mut vec![
-                        PaymentDiff {
+                    Some(CoinbasePaymentDiff {
+                        credit: PaymentDiff {
                             public_key: t0.receiver_pk.clone(),
                             amount: t0.fee.into(),
                             update_type: UpdateType::Credit,
                         },
-                        PaymentDiff {
+                        debit: PaymentDiff {
                             public_key: self.receiver.clone(),
                             amount: t0.fee.into(),
                             update_type: UpdateType::Debit(None),
                         },
-                    ]);
-                }
-                if let Some(t1) = fee_transfer1 {
-                    res.append(&mut vec![
-                        PaymentDiff {
+                    })
+                } else if let Some(t1) = fee_transfer1 {
+                    Some(CoinbasePaymentDiff {
+                        credit: PaymentDiff {
                             public_key: t1.receiver_pk.clone(),
                             amount: t1.fee.into(),
                             update_type: UpdateType::Credit,
                         },
-                        PaymentDiff {
+                        debit: PaymentDiff {
                             public_key: self.receiver.clone(),
                             amount: t1.fee.into(),
                             update_type: UpdateType::Debit(None),
                         },
-                    ]);
+                    })
+                } else {
+                    None
                 }
-                res
             }
         }
     }

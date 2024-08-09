@@ -106,13 +106,13 @@ impl AccountDiff {
             amount: coinbase.amount().into(),
         })];
 
-        res.append(
-            &mut coinbase
-                .fee_transfer()
-                .into_iter()
-                .map(Self::FeeTransferViaCoinbase)
-                .collect(),
-        );
+        if let Some(fee_transfer) = coinbase.fee_transfer() {
+            res.append(&mut vec![
+                Self::FeeTransferViaCoinbase(fee_transfer.credit),
+                Self::FeeTransferViaCoinbase(fee_transfer.debit),
+            ]);
+        }
+
         res
     }
 

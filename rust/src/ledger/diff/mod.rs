@@ -71,25 +71,26 @@ impl LedgerDiff {
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
-            let fee_transfer = coinbase.fee_transfer();
-            let idx = account_diff_fees
-                .iter()
-                .enumerate()
-                .position(|(n, diff)| match diff {
-                    AccountDiff::FeeTransfer(fee) => {
-                        *fee == fee_transfer[0]
-                            && match &account_diff_fees[n + 1] {
-                                AccountDiff::FeeTransfer(fee) => *fee == fee_transfer[1],
-                                _ => false,
-                            }
-                    }
-                    _ => false,
+            coinbase.fee_transfer().map(|fee_transfer| {
+                let idx = account_diff_fees
+                    .iter()
+                    .enumerate()
+                    .position(|(n, diff)| match diff {
+                        AccountDiff::FeeTransfer(fee) => {
+                            *fee == fee_transfer.credit
+                                && match &account_diff_fees[n + 1] {
+                                    AccountDiff::FeeTransfer(fee) => *fee == fee_transfer.debit,
+                                    _ => false,
+                                }
+                        }
+                        _ => false,
+                    });
+                idx.iter().for_each(|i| {
+                    account_diff_fees[*i] =
+                        AccountDiff::FeeTransferViaCoinbase(fee_transfer.credit.clone());
+                    account_diff_fees[*i + 1] =
+                        AccountDiff::FeeTransferViaCoinbase(fee_transfer.debit.clone());
                 });
-            idx.iter().for_each(|i| {
-                account_diff_fees[*i] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone());
-                account_diff_fees[*i + 1] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone());
             });
         }
 
