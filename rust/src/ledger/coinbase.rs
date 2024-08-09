@@ -150,10 +150,7 @@ impl Coinbase {
                 vec![coinbase.as_ref(), fee_transfer_via_coinbase.as_ref()]
             }
         };
-        transfers
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
+        transfers.into_iter().flatten().collect::<Vec<_>>()
     }
 
     pub fn is_coinbase_applied(&self) -> bool {
