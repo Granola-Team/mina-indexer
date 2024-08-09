@@ -481,8 +481,11 @@ pub type CoinBaseV1 = Versioned<CoinBase, 1>;
 #[derive(Clone, Debug, Serialize, Deserialize, SmartDefault)]
 enum CoinBaseJsonProxy {
     #[default]
+    #[serde(rename = "Zero")]
     None,
+    #[serde(rename = "One")]
     Coinbase(Option<CoinBaseFeeTransferJson>),
+    #[serde(rename = "Two")]
     CoinbaseAndFeeTransferViaCoinbase(
         Option<CoinBaseFeeTransferJson>,
         Option<CoinBaseFeeTransferJson>,
