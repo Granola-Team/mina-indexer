@@ -1,8 +1,9 @@
 #! /usr/bin/env -S ruby -w
 # frozen_string_literal: true
 
-DEPLOY_TYPE = ARGV[0]   # 'test' or 'prod'
-BLOCKS_COUNT = ARGV[1]  #  number of blocks to deploy
+DEPLOY_TYPE = ARGV[0]       # 'test', 'prod', or 'ci'
+BLOCKS_COUNT = ARGV[1]      #  number of blocks to deploy
+WEB_PORT = ARGV[2] || 8080  #  optional web port for server
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
@@ -164,6 +165,7 @@ else
                 ' server start' \
                 ' --log-level DEBUG' \
                 ' --web-hostname 0.0.0.0' \
+                " --web-port #{WEB_PORT}" \
                 " --database-dir #{db_dir(BLOCKS_COUNT)}" \
                 " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     Process.detach pid

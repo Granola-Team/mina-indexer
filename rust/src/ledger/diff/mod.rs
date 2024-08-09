@@ -4,10 +4,9 @@ use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
 use super::{coinbase::Coinbase, LedgerHash, PublicKey};
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{Command, Payment, UserCommandWithStatusT},
+    command::UserCommandWithStatusT,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct LedgerDiff {
@@ -17,15 +16,8 @@ pub struct LedgerDiff {
     /// Staged ledger hash of the resulting ledger
     pub staged_ledger_hash: LedgerHash,
 
-    /// Some(pk) if the coinbase receiver account is new,
-    /// else None
-    pub new_coinbase_receiver: Option<PublicKey>,
-
     /// All pk's involved in the block
     pub public_keys_seen: Vec<PublicKey>,
-
-    /// Map of new pk -> balance (after coinbase, before fee transfers)
-    pub new_pk_balances: BTreeMap<PublicKey, u64>,
 
     /// Account updates
     pub account_diffs: Vec<AccountDiff>,
@@ -36,38 +28,22 @@ impl LedgerDiff {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
         let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
         // applied user commands
-        let mut account_diff_txns: Vec<Command> = precomputed_block
+        let mut account_diff_txns: Vec<AccountDiff> = precomputed_block
             .commands()
             .into_iter()
-            .filter(|txn| txn.is_applied())
-            .map(|txn| txn.to_command())
-            .filter(|cmd| match cmd {
-                Command::Payment(Payment { amount, .. }) => amount.0 > 0,
-                Command::Delegation(_) => true,
+            .flat_map(|user_cmd_with_status| {
+                if user_cmd_with_status.is_applied() {
+                    AccountDiff::from_command(user_cmd_with_status.to_command())
+                } else {
+                    vec![AccountDiff::FailedTransactionNonce(
+                        FailedTransactionNonceDiff {
+                            public_key: user_cmd_with_status.sender(),
+                            nonce: user_cmd_with_status.nonce() + 1,
+                        },
+                    )]
+                }
             })
             .collect();
-        account_diff_txns.sort();
-
-        let mut account_diff_txns: Vec<AccountDiff> = account_diff_txns
-            .into_iter()
-            .flat_map(AccountDiff::from_command)
-            .collect();
-
-        // failed user commands
-        account_diff_txns.append(
-            &mut precomputed_block
-                .commands()
-                .iter()
-                .filter(|txn| !txn.is_applied())
-                .map(|txn| {
-                    AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
-                        public_key: txn.sender(),
-                        nonce: txn.nonce() + 1,
-                    })
-                })
-                .collect(),
-        );
-
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
@@ -100,12 +76,8 @@ impl LedgerDiff {
             account_diffs.push(coinbase.as_account_diff()[0].clone());
         }
         account_diffs.append(&mut account_diff_fees);
-
-        let accounts_created = precomputed_block.accounts_created();
         LedgerDiff {
             account_diffs,
-            new_pk_balances: accounts_created.0,
-            new_coinbase_receiver: accounts_created.1,
             state_hash: precomputed_block.state_hash(),
             staged_ledger_hash: precomputed_block.staged_ledger_hash(),
             public_keys_seen: precomputed_block.active_public_keys(),
@@ -255,12 +227,6 @@ mod tests {
                 1002000000000,
             ),
             (
-                "B62qqLjG8qFtbXWStm4tdWrcdqgQ7HYkcQEzPRXCoTziR7Gd4fjrMa2",
-                "",
-                AccountCreationFee,
-                0,
-            ),
-            (
                 "B62qnEeb4KAp9WxdMxddHVtJ8gwfyJURG5BZZ6e4LsRjQKHNWqmgSWt",
                 "B62qq6PqndihT5uoGAXzndoNgYSUMvUPmVqMQATusaoS1ZmCZRcM1ku",
                 Payment(Nonce(174179)),
@@ -277,12 +243,6 @@ mod tests {
                 "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
                 Payment(Nonce(2)),
                 10000000000,
-            ),
-            (
-                "B62qmsHz2vjanLj3AUdBxwjRjNB5nFvPAAeBMwBU3ZNRGZeAKQvrB9n",
-                "",
-                AccountCreationFee,
-                0,
             ),
             (
                 "B62qnXy1f75qq8c6HS2Am88Gk6UyvTHK3iSYh4Hb3nD6DS2eS6wZ4or",
@@ -735,22 +695,10 @@ mod tests {
                 251100000000,
             ),
             (
-                "B62qizEvrYJeK6v5iXCpkvViKAUVpdwwbQ3vx8jkYoD9taUNnFtCxnd",
-                "",
-                AccountCreationFee,
-                0,
-            ),
-            (
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
                 "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
                 Payment(Nonce(35906)),
                 251100000000,
-            ),
-            (
-                "B62qoo9t8gRqZYP8dxjBVRtzZNZ5MMAwBLKxKj9Bfwo2HRutTkJebnR",
-                "",
-                AccountCreationFee,
-                0,
             ),
             (
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
@@ -759,34 +707,16 @@ mod tests {
                 104100000000,
             ),
             (
-                "B62qjG3yXAR2wqG73ANHsNyFhQLMQyvHqaYMKTuuFnUYa7aNTNQkTh5",
-                "",
-                AccountCreationFee,
-                0,
-            ),
-            (
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
                 "B62qmde9CNS62zrfyiGXfyZjfig6QtRVpi2uVLR2Az7NVXnqX9S35os",
                 Payment(Nonce(35908)),
                 78834800000,
             ),
             (
-                "B62qmde9CNS62zrfyiGXfyZjfig6QtRVpi2uVLR2Az7NVXnqX9S35os",
-                "B62qmde9CNS62zrfyiGXfyZjfig6QtRVpi2uVLR2Az7NVXnqX9S35os",
-                AccountCreationFee,
-                0,
-            ),
-            (
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
                 "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
                 Payment(Nonce(35909)),
                 499695400000,
-            ),
-            (
-                "B62qkAisarqupqnLi2KiboiWenxwtGPQ19uNWvq3bBXen6J5tJNhZH6",
-                "",
-                AccountCreationFee,
-                0,
             ),
             (
                 "B62qouNvgzGaA3fe6G9mKtktCfsEinqj27eqTSvDu4jSKReDEx7A8Vx",
@@ -829,6 +759,12 @@ mod tests {
                 "B62qmJWjC9V7QxQ8NM9bfo6MeMgNKoUgV3ghkSmBXHF9AygsUeGsgXE",
                 Payment(Nonce(38571)),
                 300280000000,
+            ),
+            (
+                "B62qoXQhp63oNsLSN9Dy7wcF3PzLmdBnnin2rTnNWLbpgF7diABciU6",
+                "B62qkiF5CTjeiuV1HSx4SpEytjiCptApsvmjiHHqkb1xpAgVuZTtR14",
+                Payment(Nonce(206604)),
+                0,
             ),
             (
                 "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",

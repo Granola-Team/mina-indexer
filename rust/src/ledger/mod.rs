@@ -9,7 +9,6 @@ pub mod username;
 
 use crate::{
     block::precomputed::PrecomputedBlock,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::{Account, Amount, Nonce},
         diff::{
@@ -114,77 +113,43 @@ impl Ledger {
         Ok(ledger)
     }
 
-    pub fn _apply_diff_from_precomputed(&mut self, block: &PrecomputedBlock) -> anyhow::Result<()> {
-        let diff = LedgerDiff::from_precomputed(block);
-        self._apply_diff(&diff)?;
-        Ok(())
-    }
-
     /// Apply a ledger diff to a mutable ledger
-    pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
-        let ledger_diff = diff.clone();
-        let keys: Vec<PublicKey> = ledger_diff
-            .account_diffs
-            .iter()
-            .map(|diff| diff.public_key())
-            .collect();
+    pub fn _apply_diff(&mut self, ledger_diff: &LedgerDiff) -> anyhow::Result<()> {
+        for diff in &ledger_diff.account_diffs {
+            let public_key = diff.public_key();
+            self.accounts
+                .entry(public_key.clone())
+                .or_insert_with(|| Account::empty(&public_key));
 
-        keys.into_iter().for_each(|public_key| {
-            if self.accounts.get(&public_key).is_none() {
-                self.accounts
-                    .insert(public_key.clone(), Account::empty(public_key));
-            }
-        });
-
-        for diff in ledger_diff.account_diffs {
-            match self.accounts.remove(&diff.public_key()) {
-                Some(account_before) => {
-                    self.accounts.insert(
-                        diff.public_key(),
-                        match &diff {
-                            AccountDiff::Payment(payment_diff) => {
-                                Account::from_payment(account_before, payment_diff)
-                            }
-                            AccountDiff::AccountCreationFee(_) => Account {
-                                balance: account_before.balance.sub(&MAINNET_ACCOUNT_CREATION_FEE),
-                                ..account_before
-                            },
-                            AccountDiff::Delegation(delegation_diff) => {
-                                assert_eq!(account_before.public_key, delegation_diff.delegator);
-                                Account::from_delegation(
-                                    account_before.clone(),
-                                    delegation_diff.delegate.clone(),
-                                    delegation_diff.nonce,
-                                )
-                            }
-                            AccountDiff::Coinbase(coinbase_diff) => {
-                                Account::from_coinbase(account_before, coinbase_diff.amount)
-                            }
-                            AccountDiff::FeeTransfer(fee_transfer_diff) => {
-                                Account::from_payment(account_before, fee_transfer_diff)
-                            }
-                            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                                Account::from_payment(account_before, fee_transfer_diff)
-                            }
-                            AccountDiff::FailedTransactionNonce(failed_diff) => {
-                                Account::from_failed_transaction(account_before, failed_diff.nonce)
-                            }
-                        },
-                    );
-                }
-                None => {
-                    return match diff {
-                        AccountDiff::Coinbase(_) => Ok(()),
-                        AccountDiff::Delegation(_) => Err(LedgerError::InvalidDelegation.into()),
-                        AccountDiff::Payment(_)
-                        | AccountDiff::AccountCreationFee(_)
-                        | AccountDiff::FeeTransfer(_)
-                        | AccountDiff::FeeTransferViaCoinbase(_)
-                        | AccountDiff::FailedTransactionNonce(_) => {
-                            Err(LedgerError::AccountNotFound.into())
-                        }
-                    };
-                }
+            if let Some(account_before) = self.accounts.remove(&public_key) {
+                let updated_account = match diff {
+                    AccountDiff::Payment(payment_diff) => {
+                        Account::from_payment(account_before, payment_diff)
+                    }
+                    AccountDiff::Delegation(delegation_diff) => {
+                        assert_eq!(account_before.public_key, delegation_diff.delegator);
+                        Account::from_delegation(
+                            account_before,
+                            delegation_diff.delegate.clone(),
+                            delegation_diff.nonce,
+                        )
+                    }
+                    AccountDiff::Coinbase(coinbase_diff) => {
+                        Account::from_coinbase(account_before, coinbase_diff.amount)
+                    }
+                    AccountDiff::FeeTransfer(fee_transfer_diff) => {
+                        Account::from_payment(account_before, fee_transfer_diff)
+                    }
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
+                        Account::from_payment(account_before, fee_transfer_diff)
+                    }
+                    AccountDiff::FailedTransactionNonce(failed_diff) => {
+                        Account::from_failed_transaction(account_before, failed_diff.nonce)
+                    }
+                };
+                self.accounts.insert(public_key, updated_account);
+            } else {
+                panic!("The account doesn't exist in the ledger: {:?}", public_key);
             }
         }
 
@@ -226,7 +191,13 @@ impl Ledger {
     pub fn to_string_pretty(&self) -> String {
         let mut accounts = HashMap::new();
         for (pk, acct) in &self.accounts {
-            accounts.insert(pk.to_address(), acct.clone());
+            let mut acct = acct.clone();
+            if !acct.genesis_account {
+                let mut balance = acct.balance;
+                balance = balance.sub(&Amount(1_000_000_000));
+                acct.balance = balance;
+            }
+            accounts.insert(pk.to_address(), acct);
         }
 
         serde_json::to_string_pretty(&accounts).unwrap()
@@ -239,11 +210,7 @@ impl Ledger {
 
 impl ToString for Ledger {
     fn to_string(&self) -> String {
-        let mut accounts = HashMap::new();
-        for (pk, acct) in &self.accounts {
-            accounts.insert(pk.to_address(), acct.clone());
-        }
-        serde_json::to_string(&accounts).unwrap()
+        self.to_string_pretty()
     }
 }
 
@@ -349,7 +316,7 @@ mod tests {
         Ledger, LedgerHash,
     };
     use crate::{block::BlockHash, ledger::account::Nonce};
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     #[test]
     fn default_ledger_hash_is_valid_public_key() {
@@ -360,14 +327,12 @@ mod tests {
     fn apply_diff_payment() {
         let diff_amount = 1.into();
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
-        let account = Account::empty(public_key.clone());
+        let account = Account::empty(&public_key);
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
             state_hash: BlockHash::default(),
-            new_pk_balances: BTreeMap::new(),
-            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Payment(PaymentDiff {
@@ -381,36 +346,36 @@ mod tests {
             .expect("ledger diff application");
 
         let account_after = ledger.accounts.get(&public_key).expect("account get");
+        assert_eq!(account_after.public_key, public_key);
         assert_eq!(account_after.balance, diff_amount);
     }
 
     #[test]
     fn apply_diff_delegation() {
-        let nonce = Nonce(42);
+        let prev_nonce = Nonce(42);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let delegate_key =
             PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
-        let account = Account::empty(public_key.clone());
+        let account = Account::empty(&public_key);
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account);
 
         let ledger_diff = LedgerDiff {
             state_hash: BlockHash::default(),
-            new_pk_balances: BTreeMap::new(),
-            new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
             account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
                 delegate: delegate_key.clone(),
-                nonce,
+                nonce: prev_nonce + 1,
             })],
         };
         let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
+        assert_eq!(account_after.public_key, public_key);
         assert_eq!(account_after.delegate, delegate_key);
-        assert_eq!(43, account_after.nonce.unwrap().0);
+        assert_eq!(Nonce(43), account_after.nonce.unwrap_or(Nonce(u32::MAX)));
     }
 }

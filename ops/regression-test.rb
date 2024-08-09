@@ -15,6 +15,7 @@ BASE_DIR = "#{DEV_DIR}/rev-#{REV}"
 FileUtils.mkdir_p BASE_DIR
 
 test_names = %w[
+  account_creation_fee
   indexer_cli_reports
   server_startup
   ipc_is_available_immediately

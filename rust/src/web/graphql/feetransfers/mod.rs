@@ -451,6 +451,12 @@ impl FeetransferQueryInput {
             }
         }
 
+        if let Some(recipient) = &self.recipient {
+            if &ft.feetransfer.recipient != recipient {
+                return false;
+            }
+        }
+
         let pcb = ft.block.as_ref().expect("block will exist");
         let blockchain_length = pcb.blockchain_length();
 

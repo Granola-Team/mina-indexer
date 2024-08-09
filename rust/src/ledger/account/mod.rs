@@ -10,7 +10,14 @@ use serde_json::Number;
 use std::{
     fmt::{self, Display},
     ops::{Add, Sub},
+    sync::atomic::{AtomicUsize, Ordering},
 };
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn increment_counter() {
+    COUNTER.fetch_add(1, Ordering::SeqCst);
+}
 
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
@@ -143,19 +150,57 @@ impl Account {
         })
     }
 
-    pub fn empty(public_key: PublicKey) -> Self {
+    /// Creates a new empty account with the specified public key.
+    /// This function initializes the account with the given public key and sets
+    /// the delegate to the same public key. Other fields are set to their
+    /// default values.
+    ///
+    /// # Arguments
+    ///
+    /// * `public_key` - The public key to be associated with the new account.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the specified public key and default
+    /// values for other fields.
+    pub fn empty(public_key: &PublicKey) -> Self {
+        let key = public_key.clone();
         Account {
-            public_key: public_key.clone(),
-            delegate: public_key,
+            public_key: key.clone(),
+            delegate: key,
             ..Default::default()
         }
     }
 
+    /// Sets the username for the account.
+    /// This function updates the account's username to the specified value.
+    ///
+    /// # Arguments
+    ///
+    /// * `username` - The new username to be set for the account.
+    ///
+    /// # Returns
+    ///
+    /// An `anyhow::Result<()>` indicating success or failure.
     pub fn set_username(&mut self, username: Username) -> anyhow::Result<()> {
         self.username = Some(username);
         Ok(())
     }
 
+    /// Updates the account's balance based on a coinbase reward.
+    /// This function takes the current account state (`pre`) and a reward
+    /// amount (`amount`), and returns a new account state with the updated
+    /// balance.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `amount` - The coinbase reward amount to be added to the account's
+    ///   balance.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated balance.
     pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
         Account {
             balance: pre.balance + amount,
@@ -163,6 +208,17 @@ impl Account {
         }
     }
 
+    /// Updates the account's state based on the This function handles both
+    /// credit and debit updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `payment_diff` - The `PaymentDiff` containing the update type amount.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated state.
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
         use super::UpdateType::*;
         match payment_diff.update_type {
@@ -173,8 +229,33 @@ impl Account {
         }
     }
 
+    /// Updates the account's balance and nonce based on a User Command.
+    /// If the `nonce` is `None`, the update originates from an internal
+    /// command.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `amount` - The amount to be debited from the account's balance.
+    /// * `nonce` - The new nonce for the account. If `None`, the existing nonce
+    ///   is retained.
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing the new `Account` state if the debit was
+    /// successful, or `None` if the debit amount exceeds the current
+    /// balance.
     fn from_debit(pre: Self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
+        //        assert!(amount <= pre.balance);
         if amount > pre.balance {
+            println!("Counter: {}", COUNTER.load(Ordering::SeqCst));
+            println!("Previous Account: {:?}", pre);
+            println!("New Amount: {:?}", amount);
+            println!("Nonce: {:?}", nonce);
+            println!(
+                "================================================================================"
+            );
+            increment_counter();
             None
         } else {
             Some(Account {
@@ -185,6 +266,18 @@ impl Account {
         }
     }
 
+    /// Updates the account's balance by adding the specified `amount`.
+    /// This function takes the current account state (`pre`) and returns a new
+    /// account state with the updated balance.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `amount` - The amount to be credited to the account's balance.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated balance.
     fn from_credit(pre: Self, amount: Amount) -> Self {
         Account {
             public_key: pre.public_key.clone(),
@@ -193,17 +286,44 @@ impl Account {
         }
     }
 
-    pub fn from_delegation(pre: Self, delegate: PublicKey, nonce: Nonce) -> Self {
+    /// Updates the account's delegate and nonce based on a Stake Delegation
+    /// transaction. This function takes the current account state (`pre`),
+    /// a new delegate (`delegate`), and an updated nonce (`updated_nonce`),
+    /// and returns a new account state with these changes.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `delegate` - The new delegate public key for the account.
+    /// * `updated_nonce` - The new nonce for the account.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated delegate and nonce.
+    pub fn from_delegation(pre: Self, delegate: PublicKey, updated_nonce: Nonce) -> Self {
         Account {
             delegate,
-            nonce: Some(nonce + 1),
+            nonce: Some(updated_nonce),
             ..pre
         }
     }
 
-    pub fn from_failed_transaction(pre: Self, nonce: Nonce) -> Self {
+    /// Updates the account's nonce based on a failed transaction.
+    /// This function takes the current account state (`pre`) and an updated
+    /// nonce (`updated_nonce`), and returns a new account state with the
+    /// updated nonce.
+    ///
+    /// # Arguments
+    ///
+    /// * `pre` - The current state of the account.
+    /// * `updated_nonce` - The new nonce for the account.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated nonce.
+    pub fn from_failed_transaction(pre: Self, updated_nonce: Nonce) -> Self {
         Account {
-            nonce: Some(nonce),
+            nonce: Some(updated_nonce),
             ..pre
         }
     }
@@ -240,21 +360,22 @@ impl Ord for Account {
     }
 }
 
-const MINA_SCALE: u32 = 9;
-
-pub fn nanomina_to_mina(num: u64) -> String {
-    let mut dec = Decimal::from(num);
-    dec.set_scale(MINA_SCALE).unwrap();
-    let mut dec_str = dec.to_string();
-    if dec_str.contains('.') {
-        while dec_str.ends_with('0') {
-            dec_str.pop();
-        }
-        if dec_str.ends_with('.') {
-            dec_str.pop();
-        }
-    }
-    dec_str
+/// Converts Nanomina to Mina, strips any trailing zeros, and converts -0 to 0.
+/// This function takes a value in Nanomina, converts it to Mina by adjusting
+/// the scale, normalizes the decimal representation to remove trailing zeros,
+/// and converts any `-0` representation to `0`.
+///
+/// # Arguments
+///
+/// * `nanomina` - The amount in Nanomina to be converted.
+///
+/// # Returns
+///
+/// A `String` representing the value in Mina with trailing zeros removed.
+pub fn nanomina_to_mina(nanomina: u64) -> String {
+    let mut dec = Decimal::from(nanomina);
+    dec.set_scale(9).unwrap();
+    dec.normalize().to_string()
 }
 
 impl std::fmt::Display for Account {

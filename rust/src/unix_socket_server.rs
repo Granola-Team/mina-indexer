@@ -634,7 +634,6 @@ pub async fn handle_connection(
                     // check if ledger or state hash and use appropriate getter
                     if block::is_valid_state_hash(&hash) {
                         trace!("{hash} is a state hash");
-
                         if let Some(ledger) =
                             db.get_ledger_state_hash(&hash.clone().into(), true)?
                         {
