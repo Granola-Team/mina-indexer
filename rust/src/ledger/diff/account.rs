@@ -234,7 +234,7 @@ impl AccountDiff {
                     // Check if the coinbase recipient account is new and deduct the account
                     // creation fee if it is
                     let coinbase = Coinbase::from_precomputed(precomputed_block);
-                    if let CoinbaseKind::One(Some(coinbase_fee_transfer)) = coinbase.kind {
+                    if let CoinbaseKind::Coinbase(Some(coinbase_fee_transfer)) = coinbase.kind {
                         if coinbase_fee_transfer.fee >= MAINNET_ACCOUNT_CREATION_FEE.0 {
                             for internal_command_balance in
                                 precomputed_block.internal_command_balances()
@@ -470,7 +470,7 @@ mod tests {
             is_new_account: true,
             receiver: receiver.clone(),
             receiver_balance: Some(1440 * (1e9 as u64)),
-            kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
+            kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
                 receiver_pk: snarker.clone(),
                 fee,
             })),
@@ -558,7 +558,7 @@ mod tests {
             is_new_account: false,
             receiver_balance: None,
             receiver: receiver.clone(),
-            kind: CoinbaseKind::One(None),
+            kind: CoinbaseKind::Coinbase(None),
         });
         let expected_account_diff = vec![AccountDiff::Coinbase(CoinbaseDiff {
             public_key: receiver.clone(),

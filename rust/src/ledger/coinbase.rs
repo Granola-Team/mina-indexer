@@ -20,9 +20,9 @@ pub struct Coinbase {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CoinbaseKind {
-    Zero,
-    One(Option<CoinbaseFeeTransfer>),
-    Two(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
+    None,
+    Coinbase(Option<CoinbaseFeeTransfer>),
+    CoinbaseAndFeeTransferViaCoinbase(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -44,8 +44,8 @@ impl CoinbaseKind {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let mut res = vec![];
         let pre_diff_coinbase = match precomputed_block.staged_ledger_pre_diff().coinbase.inner() {
-            staged_ledger_diff::CoinBase::Zero => Self::Zero,
-            staged_ledger_diff::CoinBase::One(x) => Self::One(x.map(|cb| {
+            staged_ledger_diff::CoinBase::None => Self::None,
+            staged_ledger_diff::CoinBase::Coinbase(x) => Self::Coinbase(x.map(|cb| {
                 let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
                     cb.inner().inner();
                 CoinbaseFeeTransfer {
@@ -53,18 +53,20 @@ impl CoinbaseKind {
                     fee: fee.inner().inner(),
                 }
             })),
-            staged_ledger_diff::CoinBase::Two(x, y) => Self::Two(
-                x.map(|c| c.inner().inner().into()),
-                y.map(|c| c.inner().inner().into()),
-            ),
+            staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y) => {
+                Self::CoinbaseAndFeeTransferViaCoinbase(
+                    x.map(|c| c.inner().inner().into()),
+                    y.map(|c| c.inner().inner().into()),
+                )
+            }
         };
         let post_diff_coinbase = match precomputed_block
             .staged_ledger_post_diff()
             .map(|diff| diff.coinbase.inner())
         {
             None => None,
-            Some(staged_ledger_diff::CoinBase::Zero) => Some(Self::Zero),
-            Some(staged_ledger_diff::CoinBase::One(x)) => Some(Self::One(x.map(|cb| {
+            Some(staged_ledger_diff::CoinBase::None) => Some(Self::None),
+            Some(staged_ledger_diff::CoinBase::Coinbase(x)) => Some(Self::Coinbase(x.map(|cb| {
                 let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
                     cb.inner().inner();
                 CoinbaseFeeTransfer {
@@ -72,10 +74,12 @@ impl CoinbaseKind {
                     fee: fee.inner().inner(),
                 }
             }))),
-            Some(staged_ledger_diff::CoinBase::Two(x, y)) => Some(Self::Two(
-                x.map(|c| c.inner().inner().into()),
-                y.map(|c| c.inner().inner().into()),
-            )),
+            Some(staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y)) => {
+                Some(Self::CoinbaseAndFeeTransferViaCoinbase(
+                    x.map(|c| c.inner().inner().into()),
+                    y.map(|c| c.inner().inner().into()),
+                ))
+            }
         };
 
         res.push(pre_diff_coinbase);
@@ -115,8 +119,8 @@ impl Coinbase {
     // work
     pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
         match &self.kind {
-            CoinbaseKind::Zero => vec![],
-            CoinbaseKind::One(fee_transfer) => {
+            CoinbaseKind::None => vec![],
+            CoinbaseKind::Coinbase(fee_transfer) => {
                 if let Some(fee_transfer) = fee_transfer {
                     vec![
                         PaymentDiff {
@@ -134,7 +138,7 @@ impl Coinbase {
                     vec![]
                 }
             }
-            CoinbaseKind::Two(fee_transfer0, fee_transfer1) => {
+            CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(fee_transfer0, fee_transfer1) => {
                 let mut res = vec![];
                 if let Some(t0) = fee_transfer0 {
                     res.append(&mut vec![
@@ -170,15 +174,15 @@ impl Coinbase {
     }
 
     pub fn is_coinbase_applied(&self) -> bool {
-        !matches!(self.kind, CoinbaseKind::Zero)
+        !matches!(self.kind, CoinbaseKind::None)
     }
 
     pub fn has_fee_transfer(&self) -> bool {
         matches!(
             self.kind,
-            CoinbaseKind::One(Some(_))
-                | CoinbaseKind::Two(Some(_), _)
-                | CoinbaseKind::Two(_, Some(_))
+            CoinbaseKind::Coinbase(Some(_))
+                | CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(Some(_), _)
+                | CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(_, Some(_))
         )
     }
 
