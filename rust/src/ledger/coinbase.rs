@@ -118,59 +118,42 @@ impl Coinbase {
     // For fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK
     // work
     pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
-        match &self.kind {
+        self.get_transfers()
+            .into_iter()
+            .flat_map(|transfer| self.create_payment_diffs(transfer))
+            .collect()
+    }
+
+    fn create_payment_diffs(&self, transfer: &CoinbaseFeeTransfer) -> Vec<PaymentDiff> {
+        vec![
+            PaymentDiff {
+                public_key: transfer.receiver_pk.clone(),
+                amount: transfer.fee.into(),
+                update_type: UpdateType::Credit,
+            },
+            PaymentDiff {
+                public_key: self.receiver.clone(),
+                amount: transfer.fee.into(),
+                update_type: UpdateType::Debit(None),
+            },
+        ]
+    }
+
+    fn get_transfers(&self) -> Vec<&CoinbaseFeeTransfer> {
+        let transfers = match &self.kind {
             CoinbaseKind::None => vec![],
-            CoinbaseKind::Coinbase(fee_transfer) => {
-                if let Some(fee_transfer) = fee_transfer {
-                    vec![
-                        PaymentDiff {
-                            public_key: fee_transfer.receiver_pk.clone(),
-                            amount: fee_transfer.fee.into(),
-                            update_type: UpdateType::Credit,
-                        },
-                        PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: fee_transfer.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                    ]
-                } else {
-                    vec![]
-                }
+            CoinbaseKind::Coinbase(coinbase) => vec![coinbase.as_ref()],
+            CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
+                coinbase,
+                fee_transfer_via_coinbase,
+            ) => {
+                vec![coinbase.as_ref(), fee_transfer_via_coinbase.as_ref()]
             }
-            CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(fee_transfer0, fee_transfer1) => {
-                let mut res = vec![];
-                if let Some(t0) = fee_transfer0 {
-                    res.append(&mut vec![
-                        PaymentDiff {
-                            public_key: t0.receiver_pk.clone(),
-                            amount: t0.fee.into(),
-                            update_type: UpdateType::Credit,
-                        },
-                        PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: t0.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                    ]);
-                }
-                if let Some(t1) = fee_transfer1 {
-                    res.append(&mut vec![
-                        PaymentDiff {
-                            public_key: t1.receiver_pk.clone(),
-                            amount: t1.fee.into(),
-                            update_type: UpdateType::Credit,
-                        },
-                        PaymentDiff {
-                            public_key: self.receiver.clone(),
-                            amount: t1.fee.into(),
-                            update_type: UpdateType::Debit(None),
-                        },
-                    ]);
-                }
-                res
-            }
-        }
+        };
+        transfers
+            .into_iter()
+            .filter_map(|opt_transfer| opt_transfer)
+            .collect::<Vec<_>>()
     }
 
     pub fn is_coinbase_applied(&self) -> bool {
@@ -178,12 +161,7 @@ impl Coinbase {
     }
 
     pub fn has_fee_transfer(&self) -> bool {
-        matches!(
-            self.kind,
-            CoinbaseKind::Coinbase(Some(_))
-                | CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(Some(_), _)
-                | CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(_, Some(_))
-        )
+        self.get_transfers().len() > 0
     }
 
     // only apply if "coinbase" =/= [ "Zero" ]
