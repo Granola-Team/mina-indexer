@@ -43,11 +43,12 @@ impl LedgerStore for IndexerStore {
     fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()> {
         trace!("Adding staged ledger state hash {state_hash}");
 
-        let bytes = serde_json::to_string(&ledger.accounts).expect("serializable");
-
         // add ledger to db
-        self.database
-            .put_cf(self.ledgers_cf(), state_hash.0.as_bytes(), bytes)?;
+        self.database.put_cf(
+            self.ledgers_cf(),
+            state_hash.0.as_bytes(),
+            ledger.to_string(),
+        )?;
 
         // index on state hash & add new ledger event
         if self

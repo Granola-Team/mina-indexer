@@ -2,7 +2,7 @@ use super::DBUpdate;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{internal::InternalCommand, Command, Payment},
-    constants::MAINNET_GENESIS_HASH,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
     ledger::{
         coinbase::Coinbase,
         diff::account::{PaymentDiff, UpdateType},
@@ -169,13 +169,17 @@ impl DBAccountBalanceUpdate {
                         source,
                         amount,
                         receiver,
+                        is_new_receiver_account,
                         nonce: _,
-                        ..
                     }) => vec![
                         AccountBalanceUpdate::Payment(PaymentDiff {
                             update_type: UpdateType::Credit,
                             public_key: receiver.clone(),
-                            amount,
+                            amount: if is_new_receiver_account {
+                                amount.sub(&MAINNET_ACCOUNT_CREATION_FEE)
+                            } else {
+                                amount
+                            },
                         }),
                         AccountBalanceUpdate::Payment(PaymentDiff {
                             update_type: UpdateType::Debit(None),
