@@ -76,17 +76,17 @@ impl InternalCommand {
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
-        if let [coinbase_transfer, fee_transfer_via_coinbase] = coinbase.fee_transfer()[..] {
-            if let Some(idx) =
-                account_diff_fees
-                    .windows(2)
-                    .position(|pair| match (&pair[0], &pair[1]) {
-                        (AccountDiff::FeeTransfer(fee1), AccountDiff::FeeTransfer(fee2)) => {
-                            *fee1 == coinbase_transfer && *fee2 == fee_transfer_via_coinbase
-                        }
-                        _ => false,
-                    })
-            {
+
+        if let [coinbase_transfer, fee_transfer_via_coinbase] = &coinbase.fee_transfer()[..] {
+            if let Some(idx) = account_diff_fees.windows(2).position(|pair| {
+                matches!(
+                    (&pair[0], &pair[1]),
+                    (
+                        AccountDiff::FeeTransfer(fee1),
+                        AccountDiff::FeeTransfer(fee2)
+                    ) if *fee1 == *coinbase_transfer && *fee2 == *fee_transfer_via_coinbase
+                )
+            }) {
                 account_diff_fees[idx] =
                     AccountDiff::FeeTransferViaCoinbase(coinbase_transfer.clone());
                 account_diff_fees[idx + 1] =
@@ -94,76 +94,50 @@ impl InternalCommand {
             }
         }
 
-        let mut internal_cmds = vec![];
-        for n in (0..account_diff_fees.len()).step_by(2) {
-            match &account_diff_fees[n] {
-                AccountDiff::FeeTransfer(f) => {
-                    let (ic_sender, ic_receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
+        // Process the account_diff_fees into internal commands
+        let mut internal_commands: Vec<InternalCommand> = account_diff_fees
+            .chunks(2)
+            .filter_map(|chunk| match chunk {
+                [AccountDiff::FeeTransfer(a), b] => Some(Self::FeeTransfer {
+                    sender: if a.update_type == UpdateType::Credit {
+                        b.public_key()
                     } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
-
-                    // aggregate
-                    if let Some((idx, cmd)) =
-                        internal_cmds
-                            .iter()
-                            .enumerate()
-                            .find_map(|(m, cmd)| match cmd {
-                                Self::FeeTransfer {
-                                    sender,
-                                    receiver,
-                                    amount,
-                                } => {
-                                    if *sender == ic_sender && *receiver == ic_receiver {
-                                        return Some((
-                                            m,
-                                            Self::FeeTransfer {
-                                                sender: ic_sender.clone(),
-                                                receiver: ic_receiver.clone(),
-                                                amount: f.amount.0 + *amount,
-                                            },
-                                        ));
-                                    }
-                                    None
-                                }
-                                _ => None,
-                            })
-                    {
-                        internal_cmds.push(cmd);
-                        internal_cmds.swap_remove(idx);
+                        a.public_key.clone()
+                    },
+                    receiver: if a.update_type == UpdateType::Credit {
+                        a.public_key.clone()
                     } else {
-                        internal_cmds.push(Self::FeeTransfer {
-                            sender: ic_sender.clone(),
-                            receiver: ic_receiver.clone(),
-                            amount: f.amount.0,
-                        });
-                    }
-                }
-                AccountDiff::FeeTransferViaCoinbase(f) => {
-                    let (sender, receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
-                    internal_cmds.push(Self::FeeTransferViaCoinbase {
-                        sender,
-                        receiver,
-                        amount: f.amount.0,
-                    });
-                }
-                AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
-                    receiver: c.public_key.clone(),
-                    amount: c.amount.0,
+                        b.public_key()
+                    },
+                    amount: a.amount.0 + u64::try_from(b.amount()).ok().unwrap_or(0),
                 }),
-                _ => (),
-            }
+                [AccountDiff::FeeTransferViaCoinbase(a), b] => Some(Self::FeeTransferViaCoinbase {
+                    sender: if a.update_type == UpdateType::Credit {
+                        b.public_key()
+                    } else {
+                        a.public_key.clone()
+                    },
+                    receiver: if a.update_type == UpdateType::Credit {
+                        a.public_key.clone()
+                    } else {
+                        b.public_key()
+                    },
+                    amount: a.amount.0,
+                }),
+                [AccountDiff::Coinbase(a), _] => Some(Self::Coinbase {
+                    receiver: a.public_key.clone(),
+                    amount: a.amount.0,
+                }),
+                _ => None,
+            })
+            .collect();
+
+        // Optionally add the coinbase command if it was applied
+        if coinbase.is_coinbase_applied() {
+            internal_commands.insert(0, coinbase.as_internal_cmd());
         }
 
-        if coinbase.is_coinbase_applied() {
-            internal_cmds.insert(0, coinbase.as_internal_cmd());
-        }
-        internal_cmds
+        internal_commands
     }
 }
 
