@@ -11,34 +11,30 @@ module default {
       constraint exclusive;
       constraint regexp(r"^3N[A-Za-z].{49}$");
     }
-    required scheduled_time: int64
-  }
-
-  type ProtocolState {
-    required block: Block;
-    required previous_state_hash: str {
+    required previous_hash: str {
         constraint max_len_value(52);
     }
-    required genesis_state_hash: str {
+    required genesis_hash: str {
         constraint max_len_value(52);
     }
     height: int64 {
         constraint min_value(0);
     }
-    min_window_density: int64;
-    total_currency: int64;
     global_slot_since_genesis: int64 {
         constraint min_value(0);
     }
-    has_ancestor_in_same_checkpoint_window: bool;
-    block_stake_winner: Account;
-    block_creator: Account;
+    required scheduled_time: int64;
+    total_currency: int64;
+    stake_winner: Account;
+    creator: Account;
     coinbase_receiver: Account;
     supercharge_coinbase: bool;
+    min_window_density: int64;
+    has_ancestor_in_same_checkpoint_window: bool;
   }
 
   type BlockchainState {
-    required protocol_state: ProtocolState {
+    required block: Block {
       constraint exclusive;
       on target delete restrict;
     }
@@ -53,7 +49,7 @@ module default {
   }
 
   type ConsensusState {
-    required protocol_state: ProtocolState {
+    required block: Block {
       constraint exclusive;
       on target delete restrict;
     }
@@ -73,7 +69,7 @@ module default {
   scalar type EpochDataType extending enum<next, staking>;
 
   type EpochData {
-    required protocol_state: ProtocolState {
+    required block: Block {
       on target delete restrict;
     }
     required type: EpochDataType;
@@ -83,7 +79,7 @@ module default {
     required start_checkpoint: str;
     required lock_checkpoint: str;
     required epoch_length: int64;
-    constraint exclusive on ((.protocol_state, .type, .ledger_hash));
+    constraint exclusive on ((.block, .type, .ledger_hash));
   }
 
   type Command {

@@ -62,23 +62,14 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow::Result<()> {
-    let body = &json["protocol_state"]["body"];
+    let protocol_state = &json["protocol_state"];
+    let body = &protocol_state["body"];
     let consensus_state = &body["consensus_state"];
     let blockchain_state = &body["blockchain_state"];
 
     let height = to_i64(&consensus_state["blockchain_length"]);
 
     println!("Processing block {} at height {}", block_hash, height);
-
-    client
-        .execute(
-            "insert Block {
-                hash := <str>$0,
-                scheduled_time := <int64>$1
-            };",
-            &(block_hash, to_i64(&json["scheduled_time"])),
-        )
-        .await?;
 
     // Process accounts
     let accounts: Vec<String> = json
@@ -97,37 +88,39 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
             .await?;
     }
 
-    // Process protocol_state
     client
         .execute(
-            "
-            insert ProtocolState {
-                block := (select Block filter .hash = <str>$0),
-                previous_state_hash := <str>$1,
-                genesis_state_hash := <str>$2,
-                height := <int64>$3,
-                min_window_density := <int64>$4,
+            format!(
+                "insert Block {{
+                hash := '{}',
+                previous_hash := <str>$0,
+                genesis_hash := <str>$1,
+                height := <int64>$2,
+                global_slot_since_genesis := <int64>$3,
+                scheduled_time := <int64>$4,
                 total_currency := <int64>$5,
-                global_slot_since_genesis := <int64>$6,
-                has_ancestor_in_same_checkpoint_window := <bool>$7,
-                block_stake_winner := (select Account filter .public_key = <str>$8),
-                block_creator := (select Account filter .public_key = <str>$9),
-                coinbase_receiver := (select Account filter .public_key = <str>$10),
-                supercharge_coinbase := <bool>$11
-            };",
+                stake_winner := (select Account filter .public_key = <str>$6),
+                creator := (select Account filter .public_key = <str>$7),
+                coinbase_receiver := (select Account filter .public_key = <str>$8),
+                supercharge_coinbase := <bool>$9,
+                has_ancestor_in_same_checkpoint_window := <bool>$10,
+                min_window_density := <int64>$11
+            }};",
+                block_hash
+            ),
             &(
-                block_hash,
-                json["protocol_state"]["previous_state_hash"].as_str(),
+                protocol_state["previous_state_hash"].as_str(),
                 body["genesis_state_hash"].as_str(),
                 height,
-                to_i64(&consensus_state["min_window_density"]),
-                to_i64(&consensus_state["total_currency"]),
                 to_i64(&consensus_state["global_slot_since_genesis"]),
-                consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
+                to_i64(&json["scheduled_time"]),
+                to_i64(&consensus_state["total_currency"]),
                 consensus_state["block_stake_winner"].as_str(),
                 consensus_state["block_creator"].as_str(),
                 consensus_state["coinbase_receiver"].as_str(),
                 consensus_state["supercharge_coinbase"].as_bool(),
+                consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
+                to_i64(&consensus_state["min_window_density"]),
             ),
         )
         .await?;
@@ -136,9 +129,8 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
     client
         .execute(
             "
-            with block := (select Block filter .hash = <str>$0)
             insert BlockchainState {
-                protocol_state := assert_single((select ProtocolState filter .block = block)),
+                block := (select Block filter .hash = <str>$0),
                 snarked_ledger_hash := <str>$1,
                 genesis_ledger_hash := <str>$2,
                 snarked_next_available_token := <int64>$3,
@@ -158,9 +150,8 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
     client
         .execute(
             "
-            with block := (select Block filter .hash = <str>$0)
             insert ConsensusState {
-                protocol_state := assert_single((select ProtocolState filter .block = block)),
+                block := (select Block filter .hash = <str>$0),
                 epoch_count := <int64>$1,
                 curr_global_slot_slot_number := <int64>$2,
                 curr_global_slot_slots_per_epoch := <int64>$3
@@ -181,10 +172,9 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
         .execute(
             "
             with
-                block := (select Block filter .hash = <str>$0),
-                protocol_state := assert_single((select ProtocolState filter .block = block))
+                block := (select Block filter .hash = <str>$0)
             insert StagedLedgerHash {
-                blockchain_state := assert_single((select BlockchainState filter .protocol_state = protocol_state)),
+                blockchain_state := assert_single((select BlockchainState filter .block = block)),
                 non_snark_ledger_hash := <str>$1,
                 non_snark_aux_hash := <str>$2,
                 non_snark_pending_coinbase_aux := <str>$3,
@@ -195,7 +185,7 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
                 non_snark["ledger_hash"].as_str(),
                 non_snark["aux_hash"].as_str(),
                 non_snark["pending_coinbase_aux"].as_str(),
-                staged_ledger_hash["pending_coinbase_hash"].as_str()
+                staged_ledger_hash["pending_coinbase_hash"].as_str(),
             ),
         )
         .await?;
@@ -207,9 +197,8 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
         client
             .execute(
                 "
-                with block := (select Block filter .hash = <str>$0)
                 insert EpochData {
-                    protocol_state := assert_single((select ProtocolState filter .block = block)),
+                    block := (select Block filter .hash = <str>$0),
                     type := <str>$1,
                     ledger_hash := <str>$2,
                     total_currency := <int64>$3,
