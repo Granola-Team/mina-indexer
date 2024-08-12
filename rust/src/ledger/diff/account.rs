@@ -222,15 +222,18 @@ impl AccountDiff {
                 let mut res = vec![];
                 // No need to issue Debits and Credits if the fee is 0
                 if *total_fee > 0 {
-                    res.push(vec![AccountDiff::FeeTransfer(PaymentDiff {
-                        public_key: prover.clone(),
-                        amount: (*total_fee).into(),
-                        update_type: UpdateType::Credit,
-                    }),AccountDiff::FeeTransfer(PaymentDiff {
-                        public_key: precomputed_block.coinbase_receiver(),
-                        amount: (*total_fee).into(),
-                        update_type: UpdateType::Debit(None),
-                    })]);
+                    res.push(vec![
+                        AccountDiff::FeeTransfer(PaymentDiff {
+                            public_key: prover.clone(),
+                            amount: (*total_fee).into(),
+                            update_type: UpdateType::Credit,
+                        }),
+                        AccountDiff::FeeTransfer(PaymentDiff {
+                            public_key: precomputed_block.coinbase_receiver(),
+                            amount: (*total_fee).into(),
+                            update_type: UpdateType::Debit(None),
+                        }),
+                    ]);
 
                     // Check if the coinbase recipient account is new and deduct the account
                     // creation fee if it is
