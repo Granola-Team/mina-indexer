@@ -5,6 +5,11 @@ edition = "2021"
 
 [dependencies]
 serde_json = "1.0"
-uuid = { version = "0.8", features = ["v4"] }
-mysql = "25.0.1"
 regex = "1.5"
+miette = "5.3.0"
+anyhow = "*"
+tokio = "*"
+bigdecimal = "0.4"
+edgedb-tokio = "*"
+edgedb-protocol = { version = "*", features = ["with-bigdecimal"] }
+rust_decimal="*"

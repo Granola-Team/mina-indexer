@@ -1,15 +1,14 @@
-use mysql::{prelude::*, *};
+use bigdecimal::BigDecimal;
+use edgedb_tokio::Client;
 use regex::Regex;
 use serde_json::Value;
 use std::{fs, sync::LazyLock};
-use uuid::Uuid;
 
 const ACCOUNTS_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"B62.{52}$").expect("Failed to compile accounts regex"));
 
-fn main() -> Result<()> {
-    let mut conn = Pool::new("mysql://root:password@127.0.0.1:3306/blocks-9999")?.get_conn()?;
-
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     let mut paths = fs::read_dir("/Users/jonathan/.mina-indexer/mina-indexer-dev/blocks-9999")?
         .filter_map(Result::ok) // Filter out any errors
         .map(|entry| entry.path())
@@ -18,6 +17,8 @@ fn main() -> Result<()> {
 
     // Sort by filename
     paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+    let client = edgedb_tokio::create_client().await?;
 
     for path in paths {
         // println!("Attempting to read file {:?}", &path);
@@ -35,7 +36,7 @@ fn main() -> Result<()> {
 
                 match serde_json::from_str::<Value>(&contents) {
                     Ok(json) => {
-                        process_file(block_hash, json, &mut conn)?;
+                        process_file(block_hash, json, &client).await?;
                     }
                     Err(e) => {
                         // Handle the error gracefully
@@ -60,14 +61,24 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<()> {
+async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow::Result<()> {
     let body = &json["protocol_state"]["body"];
     let consensus_state = &body["consensus_state"];
     let blockchain_state = &body["blockchain_state"];
 
-    let height = to_u64(&consensus_state["blockchain_length"]);
+    let height = to_i64(&consensus_state["blockchain_length"]);
 
     println!("Processing block {} at height {}", block_hash, height);
+
+    client
+        .execute(
+            "insert Block {
+                hash := <str>$0,
+                scheduled_time := <int64>$1
+            };",
+            &(block_hash, to_i64(&json["scheduled_time"])),
+        )
+        .await?;
 
     // Process accounts
     let accounts: Vec<String> = json
@@ -78,98 +89,148 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
         .collect();
 
     for account in accounts {
-        conn.exec_drop(
-            "INSERT IGNORE INTO accounts (id) VALUES (:id)",
-            params! {
-                "id" => account,
-            },
-        )?;
+        client
+            .execute(
+                "insert Account {public_key := <str>$0} unless conflict;",
+                &(account,),
+            )
+            .await?;
     }
 
     // Process protocol_state
-    conn.exec_drop(
-        "INSERT INTO protocol_state (block_hash, previous_state_hash, genesis_state_hash, blockchain_length, min_window_density, total_currency, global_slot_since_genesis, has_ancestor_in_same_checkpoint_window, block_stake_winner, block_creator, coinbase_receiver, supercharge_coinbase) VALUES (:block_hash, :previous_state_hash, :genesis_state_hash, :blockchain_length, :min_window_density, :total_currency, :global_slot_since_genesis, :has_ancestor_in_same_checkpoint_window, :block_stake_winner, :block_creator, :coinbase_receiver, :supercharge_coinbase)",
-        params! {
-            "block_hash" => block_hash,
-            "previous_state_hash" => json["protocol_state"]["previous_state_hash"].as_str(),
-            "genesis_state_hash" => body["genesis_state_hash"].as_str(),
-            "blockchain_length" => height,
-            "min_window_density" => to_u64(&consensus_state["min_window_density"]),
-            "total_currency" => consensus_state["total_currency"].as_str(),
-            "global_slot_since_genesis" => to_u64(&consensus_state["global_slot_since_genesis"]),
-            "has_ancestor_in_same_checkpoint_window" => consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
-            "block_stake_winner" => consensus_state["block_stake_winner"].as_str(),
-            "block_creator" => consensus_state["block_creator"].as_str(),
-            "coinbase_receiver" => consensus_state["coinbase_receiver"].as_str(),
-            "supercharge_coinbase" => consensus_state["supercharge_coinbase"].as_bool(),
-        },
-    )?;
-
-    // println!("inserted protocol state...............................");
+    client
+        .execute(
+            "
+            insert ProtocolState {
+                block := (select Block filter .hash = <str>$0),
+                previous_state_hash := <str>$1,
+                genesis_state_hash := <str>$2,
+                blockchain_length := <int64>$3,
+                min_window_density := <int64>$4,
+                total_currency := <int64>$5,
+                global_slot_since_genesis := <int64>$6,
+                has_ancestor_in_same_checkpoint_window := <bool>$7,
+                block_stake_winner := (select Account filter .public_key = <str>$8),
+                block_creator := (select Account filter .public_key = <str>$9),
+                coinbase_receiver := (select Account filter .public_key = <str>$10),
+                supercharge_coinbase := <bool>$11
+            };",
+            &(
+                block_hash,
+                json["protocol_state"]["previous_state_hash"].as_str(),
+                body["genesis_state_hash"].as_str(),
+                height,
+                to_i64(&consensus_state["min_window_density"]),
+                to_i64(&consensus_state["total_currency"]),
+                to_i64(&consensus_state["global_slot_since_genesis"]),
+                consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
+                consensus_state["block_stake_winner"].as_str(),
+                consensus_state["block_creator"].as_str(),
+                consensus_state["coinbase_receiver"].as_str(),
+                consensus_state["supercharge_coinbase"].as_bool(),
+            ),
+        )
+        .await?;
 
     // Process blockchain_state
-    let blockchain_state_id = Uuid::new_v4().to_string();
-    conn.exec_drop(
-        "INSERT INTO blockchain_state (id, block_hash, snarked_ledger_hash, genesis_ledger_hash, snarked_next_available_token, timestamp) VALUES (:id, :block_hash, :snarked_ledger_hash, :genesis_ledger_hash, :snarked_next_available_token, :timestamp)",
-        params! {
-            "id" => &blockchain_state_id,
-            "block_hash" => block_hash,
-            "snarked_ledger_hash" => blockchain_state["snarked_ledger_hash"].as_str(),
-            "genesis_ledger_hash" => blockchain_state["genesis_ledger_hash"].as_str(),
-            "snarked_next_available_token" => blockchain_state["snarked_next_available_token"].as_str(),
-            "timestamp" => blockchain_state["timestamp"].as_str(),
-        },
-    )?;
-
-    // println!("inserted blockchain_state...............................");
+    client
+        .execute(
+            "
+            with block := (select Block filter .hash = <str>$0)
+            insert BlockchainState {
+                protocol_state := assert_single((select ProtocolState filter .block = block)),
+                snarked_ledger_hash := <str>$1,
+                genesis_ledger_hash := <str>$2,
+                snarked_next_available_token := <int64>$3,
+                timestamp := <int64>$4
+            };",
+            &(
+                block_hash,
+                blockchain_state["snarked_ledger_hash"].as_str(),
+                blockchain_state["genesis_ledger_hash"].as_str(),
+                to_i64(&blockchain_state["snarked_next_available_token"]),
+                to_i64(&blockchain_state["timestamp"]),
+            ),
+        )
+        .await?;
 
     // Process consensus_state
-    conn.exec_drop(
-        "INSERT INTO consensus_state (block_hash, epoch_count, curr_global_slot_slot_number, curr_global_slot_slots_per_epoch) VALUES (:block_hash, :epoch_count, :curr_global_slot_slot_number, :curr_global_slot_slots_per_epoch)",
-        params! {
-            "block_hash" => block_hash,
-            "epoch_count" => to_u64(&consensus_state["epoch_count"]),
-            "curr_global_slot_slot_number" => to_u64(&consensus_state["curr_global_slot"]["slot_number"]),
-            "curr_global_slot_slots_per_epoch" => to_u64(&consensus_state["curr_global_slot"]["slots_per_epoch"]),
-        },
-    )?;
+    client
+        .execute(
+            "
+            with block := (select Block filter .hash = <str>$0)
+            insert ConsensusState {
+                protocol_state := assert_single((select ProtocolState filter .block = block)),
+                epoch_count := <int64>$1,
+                curr_global_slot_slot_number := <int64>$2,
+                curr_global_slot_slots_per_epoch := <int64>$3
+            };",
+            &(
+                block_hash,
+                to_i64(&consensus_state["epoch_count"]),
+                to_i64(&consensus_state["curr_global_slot"]["slot_number"]),
+                to_i64(&consensus_state["curr_global_slot"]["slots_per_epoch"]),
+            ),
+        )
+        .await?;
 
     // Process staged_ledger_hash
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
-    conn.exec_drop(
-        "INSERT INTO staged_ledger_hash (blockchain_state_id, non_snark_ledger_hash, non_snark_aux_hash, non_snark_pending_coinbase_aux, pending_coinbase_hash) VALUES (:blockchain_state_id, :non_snark_ledger_hash, :non_snark_aux_hash, :non_snark_pending_coinbase_aux, :pending_coinbase_hash)",
-        params! {
-            "blockchain_state_id" => &blockchain_state_id,
-            "non_snark_ledger_hash" => non_snark["ledger_hash"].as_str(),
-            "non_snark_aux_hash" => non_snark["aux_hash"].as_str(),
-            "non_snark_pending_coinbase_aux" => non_snark["pending_coinbase_aux"].as_str(),
-            "pending_coinbase_hash" => staged_ledger_hash["pending_coinbase_hash"].as_str(),
-        },
-    )?;
-
-    // println!("inserted staged_ledger_hash...............................");
+    client
+        .execute(
+            "
+            with
+                block := (select Block filter .hash = <str>$0),
+                protocol_state := assert_single((select ProtocolState filter .block = block))
+            insert StagedLedgerHash {
+                blockchain_state := assert_single((select BlockchainState filter .protocol_state = protocol_state)),
+                non_snark_ledger_hash := <str>$1,
+                non_snark_aux_hash := <str>$2,
+                non_snark_pending_coinbase_aux := <str>$3,
+                pending_coinbase_hash := <str>$4
+            };",
+            &(
+                block_hash,
+                non_snark["ledger_hash"].as_str(),
+                non_snark["aux_hash"].as_str(),
+                non_snark["pending_coinbase_aux"].as_str(),
+                staged_ledger_hash["pending_coinbase_hash"].as_str()
+            ),
+        )
+        .await?;
 
     // Process epoch_data
-    for epoch_type in &["staking", "next"] {
+    for epoch_type in ["staking", "next"] {
         let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type)];
         let ledger = &epoch_data["ledger"];
-        conn.exec_drop(
-            "INSERT INTO epoch_data (block_hash, type, ledger_hash, total_currency, seed, start_checkpoint, lock_checkpoint, epoch_length) VALUES (:block_hash, :type, :ledger_hash, :total_currency, :seed, :start_checkpoint, :lock_checkpoint, :epoch_length)",
-            params! {
-                "block_hash" => &block_hash,
-                "type" => epoch_type,
-                "ledger_hash" => ledger["hash"].as_str(),
-                "total_currency" => ledger["total_currency"].as_str(),
-                "seed" => epoch_data["seed"].as_str(),
-                "start_checkpoint" => epoch_data["start_checkpoint"].as_str(),
-                "lock_checkpoint" => epoch_data["lock_checkpoint"].as_str(),
-                "epoch_length" => to_u64(&epoch_data["epoch_length"]),
-            },
-        )?;
+        client
+            .execute(
+                "
+                with block := (select Block filter .hash = <str>$0)
+                insert EpochData {
+                    protocol_state := assert_single((select ProtocolState filter .block = block)),
+                    type := <str>$1,
+                    ledger_hash := <str>$2,
+                    total_currency := <int64>$3,
+                    seed := <str>$4,
+                    start_checkpoint := <str>$5,
+                    lock_checkpoint := <str>$6,
+                    epoch_length := <int64>$7
+                };",
+                &(
+                    block_hash,
+                    epoch_type,
+                    ledger["hash"].as_str(),
+                    to_i64(&ledger["total_currency"]),
+                    epoch_data["seed"].as_str(),
+                    epoch_data["start_checkpoint"].as_str(),
+                    epoch_data["lock_checkpoint"].as_str(),
+                    to_i64(&epoch_data["epoch_length"]),
+                ),
+            )
+            .await?;
     }
-
-    // println!("inserted epoch_data...............................");
 
     // Process commands and command_status
     for command in json["staged_ledger_diff"]["diff"][0]["commands"]
@@ -180,43 +241,64 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
         let payload = &data1["payload"];
         let common = &payload["common"];
         let body1 = &payload["body"][1];
-        conn.exec_drop(
-            "INSERT INTO commands (fee, fee_token, fee_payer_pk, nonce, valid_until, memo, source_pk, receiver_pk, token_id, amount, signer, signature) VALUES (:fee, :fee_token, :fee_payer_pk, :nonce, :valid_until, :memo, :source_pk, :receiver_pk, :token_id, :amount, :signer, :signature)",
-            params! {
-                "fee" => common["fee"].as_str(),
-                "fee_token" => common["fee_token"].as_str(),
-                "fee_payer_pk" => common["fee_payer_pk"].as_str(),
-                "nonce" => common["nonce"].as_str(),
-                "valid_until" => common["valid_until"].as_str(),
-                "memo" => common["memo"].as_str(),
-                "source_pk" => body1["source_pk"].as_str(),
-                "receiver_pk" => body1["receiver_pk"].as_str(),
-                "token_id" => body1["token_id"].as_str(),
-                "amount" => body1["amount"].as_str(),
-                "signer" => data1["signer"].as_str(),
-                "signature" => data1["signature"].as_str(),
-            },
-        )?;
-
-        // println!("inserted commands...............................");
-
         let status = &command["status"];
         let status_1 = &status[1];
         let status_2 = &status[2];
-        conn.exec_drop(
-            "INSERT INTO command_status (status, fee_payer_account_creation_fee_paid, receiver_account_creation_fee_paid, created_token, fee_payer_balance, source_balance, receiver_balance) VALUES (:status, :fee_payer_account_creation_fee_paid, :receiver_account_creation_fee_paid, :created_token, :fee_payer_balance, :source_balance, :receiver_balance)",
-            params! {
-                "status" => status[0].as_str(),
-                "fee_payer_account_creation_fee_paid" => status_1["fee_payer_account_creation_fee_paid"].as_str(),
-                "receiver_account_creation_fee_paid" => status_1["receiver_account_creation_fee_paid"].as_str(),
-                "created_token" => status_1["created_token"].as_str(),
-                "fee_payer_balance" => status_2["fee_payer_balance"].as_str(),
-                "source_balance" => status_2["source_balance"].as_str(),
-                "receiver_balance" => status_2["receiver_balance"].as_str(),
-            },
-        )?;
 
-        // println!("inserted command_status...............................");
+        // must use format!() since we have more than 12 query params
+        client
+            .execute(
+                format!(
+                    "
+                    insert CommandStatus {{
+                        command := (insert Command {{
+                            block := (select Block filter .hash = '{}'),
+                            fee := <decimal>$0,
+                            fee_token := '{}',
+                            fee_payer := (select Account filter .public_key = '{}'),
+                            nonce := <int64>$1,
+                            valid_until := <int64>$2,
+                            memo := '{}',
+                            source := (select Account filter .public_key = '{}'),
+                            receiver := (select Account filter .public_key = '{}'),
+                            token_id := <int64>$3,
+                            amount := <decimal>$4,
+                            signer := (select Account filter .public_key = '{}'),
+                            signature := '{}'
+                        }}),
+                        status := <str>$5,
+                        fee_payer_account_creation_fee_paid := <optional decimal>$6,
+                        receiver_account_creation_fee_paid := <optional decimal>$7,
+                        created_token := <optional str>$8,
+                        fee_payer_balance := <decimal>$9,
+                        source_balance := <decimal>$10,
+                        receiver_balance := <decimal>$11,
+                        }};",
+                    block_hash,
+                    common["fee_token"].as_str().unwrap(),
+                    common["fee_payer_pk"].as_str().unwrap(),
+                    common["memo"].as_str().unwrap(),
+                    body1["source_pk"].as_str().unwrap(),
+                    body1["receiver_pk"].as_str().unwrap(),
+                    data1["signer"].as_str().unwrap(),
+                    data1["signature"].as_str().unwrap()
+                ),
+                &(
+                    to_decimal(&common["fee"]),
+                    to_i64(&common["nonce"]),
+                    to_i64(&common["valid_until"]),
+                    to_i64(&body1["token_id"]),
+                    to_decimal(&body1["amount"]),
+                    status[0].as_str(),
+                    to_decimal(&status_1["fee_payer_account_creation_fee_paid"]),
+                    to_decimal(&status_1["receiver_account_creation_fee_paid"]),
+                    status_1["created_token"].as_str(),
+                    to_decimal(&status_2["fee_payer_balance"]),
+                    to_decimal(&status_2["source_balance"]),
+                    to_decimal(&status_2["receiver_balance"]),
+                ),
+            )
+            .await?;
     }
 
     // Process coinbase and fee_transfer
@@ -227,33 +309,43 @@ fn process_file(block_hash: &str, json: Value, conn: &mut PooledConn) -> Result<
         let internal_command_1 = &internal_command[1];
         match internal_command[0].as_str().unwrap() {
             "Coinbase" => {
-                conn.exec_drop(
-                    "INSERT INTO coinbase (type, receiver_balance) VALUES (:type, :receiver_balance)",
-                    params! {
-                        "type" => "Coinbase",
-                        "receiver_balance" => internal_command_1["coinbase_receiver_balance"].as_str(),
-                    },
-                )?;
-                // println!("inserted coinbase...............................");
+                client
+                    .execute(
+                        "insert Coinbase {
+                            block := (select Block filter .hash = <str>$0),
+                            receiver_balance := <decimal>$1
+                        };",
+                        &(
+                            block_hash,
+                            to_decimal(&internal_command_1["coinbase_receiver_balance"]),
+                        ),
+                    )
+                    .await?;
             }
             "Fee_transfer" => {
-                conn.exec_drop(
-                    "INSERT INTO fee_transfer (receiver1_balance, receiver2_balance) VALUES (:receiver1_balance, :receiver2_balance)",
-                    params! {
-                        "receiver1_balance" => internal_command_1["receiver1_balance"].as_str(),
-                        "receiver2_balance" => internal_command_1["receiver2_balance"].as_str(),
-                    },
-                )?;
-                // println!("inserted fee_transfer...............................");
+                client
+                    .execute(
+                        "insert FeeTransfer {
+                            block := (select Block filter .hash = <str>$0),
+                            receiver1_balance := <decimal>$1,
+                            receiver2_balance := <optional decimal>$2
+                        };",
+                        &(
+                            block_hash,
+                            to_decimal(&internal_command_1["receiver1_balance"]),
+                            to_decimal(&internal_command_1["receiver2_balance"]),
+                        ),
+                    )
+                    .await?;
             }
             _ => {}
         }
     }
 
-    println!(
-        "Finished processing block {} at height {}...............................",
-        block_hash, height
-    );
+    // println!(
+    //     "Finished processing block {} at height {}...............................",
+    //     block_hash, height
+    // );
     Ok(())
 }
 
@@ -277,6 +369,23 @@ fn extract_accounts(value: &Value) -> Vec<String> {
     accounts
 }
 
-fn to_u64(value: &Value) -> u64 {
+/// These should really all be u64 but the conversion to EdgeDB requires i64
+fn to_i64(value: &Value) -> i64 {
     value.as_str().and_then(|s| s.parse().ok()).unwrap()
+}
+
+fn to_decimal(value: &Value) -> Option<BigDecimal> {
+    match value {
+        Value::Number(num) => {
+            if num.is_i64() {
+                num.as_i64().map(BigDecimal::from)
+            } else if num.is_f64() {
+                num.as_f64().and_then(|n| BigDecimal::try_from(n).ok())
+            } else {
+                None
+            }
+        }
+        Value::String(s) => s.parse::<BigDecimal>().ok(),
+        _ => None,
+    }
 }
