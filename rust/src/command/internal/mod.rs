@@ -2,7 +2,7 @@ pub mod store;
 
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
+    ledger::{account, coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -98,6 +98,11 @@ impl InternalCommand {
         for n in (0..account_diff_fees.len()).step_by(2) {
             match &account_diff_fees[n] {
                 AccountDiff::FeeTransfer(this_account_diff_fee) => {
+                    assert!(
+                        n + 1 < account_diff_fees.len(),
+                        "Missing a debit/credit pair"
+                    );
+
                     let next_account_diff_fee = &account_diff_fees[n + 1];
                     let (ic_sender, ic_receiver) =
                         if this_account_diff_fee.update_type == UpdateType::Credit {
