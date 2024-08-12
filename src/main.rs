@@ -105,7 +105,7 @@ async fn process_file(block_hash: &str, json: Value, client: &Client) -> anyhow:
                 block := (select Block filter .hash = <str>$0),
                 previous_state_hash := <str>$1,
                 genesis_state_hash := <str>$2,
-                blockchain_length := <int64>$3,
+                height := <int64>$3,
                 min_window_density := <int64>$4,
                 total_currency := <int64>$5,
                 global_slot_since_genesis := <int64>$6,

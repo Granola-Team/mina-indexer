@@ -22,7 +22,7 @@ module default {
     required genesis_state_hash: str {
         constraint max_len_value(52);
     }
-    blockchain_length: int64 {
+    height: int64 {
         constraint min_value(0);
     }
     min_window_density: int64;
