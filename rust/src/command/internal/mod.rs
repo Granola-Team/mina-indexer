@@ -76,74 +76,48 @@ impl InternalCommand {
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
-        if coinbase.has_fee_transfer() {
-            let fee_transfer = coinbase.fee_transfer();
-            let idx = account_diff_fees
-                .iter()
-                .enumerate()
-                .position(|(n, diff)| match diff {
-                    AccountDiff::FeeTransfer(fee) => {
-                        *fee == fee_transfer[0]
-                            && match &account_diff_fees[n + 1] {
-                                AccountDiff::FeeTransfer(fee) => *fee == fee_transfer[1],
-                                _ => false,
-                            }
-                    }
-                    _ => false,
-                });
-            idx.iter().for_each(|i| {
-                account_diff_fees[*i] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone());
-                account_diff_fees[*i + 1] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone());
-            });
+        if let [coinbase_transfer, fee_transfer_via_coinbase] = &coinbase.fee_transfer()[..] {
+            if let Some(idx) =
+                account_diff_fees
+                    .windows(2)
+                    .position(|pair| match (&pair[0], &pair[1]) {
+                        (AccountDiff::FeeTransfer(fee1), AccountDiff::FeeTransfer(fee2)) => {
+                            *fee1 == *coinbase_transfer && *fee2 == *fee_transfer_via_coinbase
+                        }
+                        _ => false,
+                    })
+            {
+                account_diff_fees[idx] =
+                    AccountDiff::FeeTransferViaCoinbase(coinbase_transfer.clone());
+                account_diff_fees[idx + 1] =
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer_via_coinbase.clone());
+            }
         }
 
         let mut internal_cmds = vec![];
         for n in (0..account_diff_fees.len()).step_by(2) {
             match &account_diff_fees[n] {
-                AccountDiff::FeeTransfer(f) => {
-                    let (ic_sender, ic_receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
+                AccountDiff::FeeTransfer(this_account_diff_fee) => {
+                    let next_account_diff_fee = &account_diff_fees[n + 1];
+                    let (ic_sender, ic_receiver) =
+                        if this_account_diff_fee.update_type == UpdateType::Credit {
+                            (
+                                next_account_diff_fee.public_key(),
+                                this_account_diff_fee.public_key.clone(),
+                            )
+                        } else {
+                            (
+                                this_account_diff_fee.public_key.clone(),
+                                next_account_diff_fee.public_key(),
+                            )
+                        };
 
-                    // aggregate
-                    if let Some((idx, cmd)) =
-                        internal_cmds
-                            .iter()
-                            .enumerate()
-                            .find_map(|(m, cmd)| match cmd {
-                                Self::FeeTransfer {
-                                    sender,
-                                    receiver,
-                                    amount,
-                                } => {
-                                    if *sender == ic_sender && *receiver == ic_receiver {
-                                        return Some((
-                                            m,
-                                            Self::FeeTransfer {
-                                                sender: ic_sender.clone(),
-                                                receiver: ic_receiver.clone(),
-                                                amount: f.amount.0 + *amount,
-                                            },
-                                        ));
-                                    }
-                                    None
-                                }
-                                _ => None,
-                            })
-                    {
-                        internal_cmds.push(cmd);
-                        internal_cmds.swap_remove(idx);
-                    } else {
-                        internal_cmds.push(Self::FeeTransfer {
-                            sender: ic_sender.clone(),
-                            receiver: ic_receiver.clone(),
-                            amount: f.amount.0,
-                        });
-                    }
+                    internal_cmds.push(Self::FeeTransfer {
+                        sender: ic_sender.clone(),
+                        receiver: ic_receiver.clone(),
+                        amount: this_account_diff_fee.amount.0
+                            + next_account_diff_fee.amount().try_into().ok().unwrap_or(0),
+                    });
                 }
                 AccountDiff::FeeTransferViaCoinbase(f) => {
                     let (sender, receiver) = if f.update_type == UpdateType::Credit {
