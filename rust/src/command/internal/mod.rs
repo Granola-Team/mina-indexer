@@ -2,7 +2,7 @@ pub mod store;
 
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    ledger::{account, coinbase::Coinbase, diff::account::*, public_key::PublicKey},
+    ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
