@@ -181,3 +181,81 @@ impl Coinbase {
         }
     }
 }
+
+#[cfg(test)]
+mod coinbase_tests {
+    use super::*;
+
+    fn sample_public_key() -> PublicKey {
+        PublicKey::default()
+    }
+
+    #[test]
+    fn test_coinbase_fee_transfer() {
+        let transfer = CoinbaseFeeTransfer {
+            receiver_pk: sample_public_key(),
+            fee: 100,
+        };
+
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
+            receiver: sample_public_key(),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: Some(0),
+        };
+
+        let payment_diffs = coinbase.fee_transfer();
+
+        assert_eq!(payment_diffs.len(), 2);
+        assert_eq!(payment_diffs[0].public_key, transfer.receiver_pk);
+        assert_eq!(payment_diffs[0].amount, transfer.fee.into());
+        assert_eq!(payment_diffs[0].update_type, UpdateType::Credit);
+        assert_eq!(payment_diffs[1].public_key, coinbase.receiver);
+        assert_eq!(payment_diffs[1].amount, transfer.fee.into());
+        assert_eq!(payment_diffs[1].update_type, UpdateType::Debit(None));
+    }
+
+    #[test]
+    fn test_coinbase_is_coinbase_applied() {
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::None,
+            receiver: sample_public_key(),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: Some(0),
+        };
+
+        assert!(!coinbase.is_coinbase_applied());
+
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::Coinbase(None),
+            ..coinbase
+        };
+
+        assert!(coinbase.is_coinbase_applied());
+    }
+
+    #[test]
+    fn test_coinbase_has_fee_transfer() {
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::None,
+            receiver: sample_public_key(),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: Some(0),
+        };
+
+        assert!(!coinbase.has_fee_transfer());
+
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
+                receiver_pk: sample_public_key(),
+                fee: 100,
+            })),
+            ..coinbase
+        };
+
+        assert!(coinbase.has_fee_transfer());
+    }
+}
