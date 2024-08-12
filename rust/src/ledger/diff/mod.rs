@@ -37,7 +37,10 @@ pub struct LedgerDiff {
 impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let mut account_diff_fees = AccountDiff::from_block_fees(precomputed_block);
+        let mut account_diff_fees: Vec<AccountDiff> = AccountDiff::from_block_fees(precomputed_block)
+            .into_iter()
+            .flatten()
+            .collect();
         // applied user commands
         let mut account_diff_txns: Vec<Command> = precomputed_block
             .commands()

@@ -205,7 +205,7 @@ impl AccountDiff {
     }
 
     /// Fees for SNARK work, aggregated per public key
-    pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
+    pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Vec<Self>> {
         let snarks = SnarkWorkSummary::from_precomputed(precomputed_block);
         let mut fee_map = HashMap::new();
         // SNARK work fees aggregated per public key
@@ -222,16 +222,15 @@ impl AccountDiff {
                 let mut res = vec![];
                 // No need to issue Debits and Credits if the fee is 0
                 if *total_fee > 0 {
-                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
+                    res.push(vec![AccountDiff::FeeTransfer(PaymentDiff {
                         public_key: prover.clone(),
                         amount: (*total_fee).into(),
                         update_type: UpdateType::Credit,
-                    }));
-                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
+                    }),AccountDiff::FeeTransfer(PaymentDiff {
                         public_key: precomputed_block.coinbase_receiver(),
                         amount: (*total_fee).into(),
                         update_type: UpdateType::Debit(None),
-                    }));
+                    })]);
 
                     // Check if the coinbase recipient account is new and deduct the account
                     // creation fee if it is
@@ -251,9 +250,9 @@ impl AccountDiff {
                                                 && (*total_fee - MAINNET_ACCOUNT_CREATION_FEE.0)
                                                     == fee_transfer_receiver_balance
                                             {
-                                                res.push(AccountDiff::CreateAccount(
+                                                res.push(vec![AccountDiff::CreateAccount(
                                                     prover.clone(),
-                                                ));
+                                                )]);
                                             }
                                         }
                                     }
@@ -271,11 +270,8 @@ impl AccountDiff {
     }
 
     /// User command + SNARK work fees, aggregated per public key
-    pub fn from_block_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
-        let mut fees = Self::from_transaction_fees(precomputed_block)
-            .iter()
-            .flatten()
-            .collect();
+    pub fn from_block_fees(precomputed_block: &PrecomputedBlock) -> Vec<Vec<Self>> {
+        let mut fees = Self::from_transaction_fees(precomputed_block);
         fees.append(&mut Self::from_snark_fees(precomputed_block));
         fees
     }
