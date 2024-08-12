@@ -117,23 +117,47 @@ impl InternalCommand {
                             )
                         };
 
-                    internal_cmds.push(Self::FeeTransfer {
-                        sender: ic_sender.clone(),
-                        receiver: ic_receiver.clone(),
-                        amount: this_account_diff_fee.amount.0
-                            + next_account_diff_fee.amount().try_into().ok().unwrap_or(0),
-                    });
+                    let next_amount_opt: Option<u64> = next_account_diff_fee.amount().try_into().ok();
+                    match next_amount_opt {
+                        Some(next_amount) => {
+                            internal_cmds.push(Self::FeeTransfer {
+                                sender: ic_sender.clone(),
+                                receiver: ic_receiver.clone(),
+                                amount: this_account_diff_fee.amount.0
+                                    + next_amount,
+                            });        
+                        },
+                        None => {
+                            internal_cmds.push(Self::FeeTransfer {
+                                sender: ic_sender.clone(),
+                                receiver: ic_receiver.clone(),
+                                amount: this_account_diff_fee.amount.0,
+                            });
+                        }
+                    }
                 }
-                AccountDiff::FeeTransferViaCoinbase(f) => {
-                    let (sender, receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
+                AccountDiff::FeeTransferViaCoinbase(this_account_diff_fee) => {
+                    assert!(
+                        n + 1 < account_diff_fees.len(),
+                        "Missing a debit/credit pair"
+                    );
+                    let next_account_diff_fee = &account_diff_fees[n + 1];
+                    let (sender, receiver) =
+                        if this_account_diff_fee.update_type == UpdateType::Credit {
+                            (
+                                next_account_diff_fee.public_key(),
+                                this_account_diff_fee.public_key.clone(),
+                            )
+                        } else {
+                            (
+                                this_account_diff_fee.public_key.clone(),
+                                next_account_diff_fee.public_key(),
+                            )
+                        };
                     internal_cmds.push(Self::FeeTransferViaCoinbase {
                         sender,
                         receiver,
-                        amount: f.amount.0,
+                        amount: this_account_diff_fee.amount.0,
                     });
                 }
                 AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
