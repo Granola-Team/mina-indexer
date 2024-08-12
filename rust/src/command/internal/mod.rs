@@ -72,7 +72,10 @@ impl InternalCommand {
     ///
     /// See `LedgerDiff::from_precomputed`
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        let mut account_diff_fees = AccountDiff::from_block_fees(block);
+        let mut account_diff_fees: Vec<AccountDiff> = AccountDiff::from_block_fees(block)
+            .into_iter()
+            .flatten()
+            .collect();
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);

@@ -158,7 +158,7 @@ impl AccountDiff {
     fn transaction_fees(
         coinbase_receiver: &PublicKey,
         user_cmds: Vec<UserCommandWithStatus>,
-    ) -> Vec<Self> {
+    ) -> Vec<Vec<Self>> {
         let mut fee_map = HashMap::new();
         for user_cmd in user_cmds.iter() {
             let signed_cmd = SignedCommand::from_user_command(user_cmd.clone());
@@ -174,16 +174,18 @@ impl AccountDiff {
             .flat_map(|(pk, fee)| {
                 let mut res = vec![];
                 if *fee > 0 {
-                    res.push(Self::FeeTransfer(PaymentDiff {
-                        public_key: coinbase_receiver.clone(),
-                        amount: (*fee).into(),
-                        update_type: UpdateType::Credit,
-                    }));
-                    res.push(Self::FeeTransfer(PaymentDiff {
-                        public_key: pk.clone(),
-                        amount: (*fee).into(),
-                        update_type: UpdateType::Debit(None),
-                    }));
+                    res.push(vec![
+                        Self::FeeTransfer(PaymentDiff {
+                            public_key: coinbase_receiver.clone(),
+                            amount: (*fee).into(),
+                            update_type: UpdateType::Credit,
+                        }),
+                        Self::FeeTransfer(PaymentDiff {
+                            public_key: pk.clone(),
+                            amount: (*fee).into(),
+                            update_type: UpdateType::Debit(None),
+                        }),
+                    ]);
                 }
                 res
             })
@@ -191,7 +193,7 @@ impl AccountDiff {
     }
 
     /// Fees for user commands, applied or failed, aggregated per public key
-    pub fn from_transaction_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
+    fn from_transaction_fees(precomputed_block: &PrecomputedBlock) -> Vec<Vec<Self>> {
         let coinbase_receiver = &precomputed_block.coinbase_receiver();
         let mut fees =
             Self::transaction_fees(coinbase_receiver, precomputed_block.commands_pre_diff());
@@ -203,7 +205,7 @@ impl AccountDiff {
     }
 
     /// Fees for SNARK work, aggregated per public key
-    pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
+    pub fn from_snark_fees(precomputed_block: &PrecomputedBlock) -> Vec<Vec<Self>> {
         let snarks = SnarkWorkSummary::from_precomputed(precomputed_block);
         let mut fee_map = HashMap::new();
         // SNARK work fees aggregated per public key
@@ -216,7 +218,7 @@ impl AccountDiff {
 
         fee_map
             .iter()
-            .flat_map(|(prover, total_fee)| {
+            .map(|(prover, total_fee)| {
                 let mut res = vec![];
                 // No need to issue Debits and Credits if the fee is 0
                 if *total_fee > 0 {
@@ -269,7 +271,7 @@ impl AccountDiff {
     }
 
     /// User command + SNARK work fees, aggregated per public key
-    pub fn from_block_fees(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
+    pub fn from_block_fees(precomputed_block: &PrecomputedBlock) -> Vec<Vec<Self>> {
         let mut fees = Self::from_transaction_fees(precomputed_block);
         fees.append(&mut Self::from_snark_fees(precomputed_block));
         fees
