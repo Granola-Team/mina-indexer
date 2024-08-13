@@ -92,11 +92,9 @@ impl InternalCommand {
         }
 
         let mut internal_cmds: Vec<Self> = Vec::new();
+        let mut unique_fee_transfer_map: HashMap<String, usize> = HashMap::new();
         for account_diff_pairs in all_account_diff_fees {
-            let mut unique_fee_transfer_map: HashMap<String, usize> = HashMap::new();
             if let [credit, debit] = &account_diff_pairs[..] {
-                println!("{:#?} + {:#?}", credit.amount(), debit.amount());
-                println!("{:#?}", block.blockchain_length());
                 assert!(
                     debit.amount() + credit.amount() == 0,
                     "Credit/Debit pairs do no sum to zero"
@@ -150,7 +148,16 @@ impl InternalCommand {
                         receiver: coinbase.public_key.clone(),
                         amount: coinbase.amount.0,
                     }),
-                    _ => panic!("Unrecognized unbalanced credit/debit pair"),
+                    _ => {
+                        println!("*************************");
+                        println!(
+                            "Block: {:#?}, hash: {:#?}, {:#?}",
+                            block.blockchain_length(),
+                            block.state_hash(),
+                            unbalanced_pair
+                        );
+                        panic!("Unrecognized unbalanced credit/debit pair")
+                    }
                 };
             } else {
                 panic!("Unrecognized accounting arrangement")
