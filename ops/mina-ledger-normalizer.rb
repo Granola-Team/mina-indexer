@@ -5,7 +5,7 @@
 
 require 'json'
 
-filename = ARG[0]
+filename = ARGV[0]
 file = File.read(filename)
 data = JSON.parse(file)
 

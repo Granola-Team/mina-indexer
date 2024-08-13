@@ -98,6 +98,28 @@ if DEPLOY_TYPE == 'test'
   end
   puts 'Ledger extraction complete.'
 
+  puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
+
+  IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
+  IDXR_NORM_LEDGER = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-norm-#{REV}.json"
+  MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledger-359604/mina_ledger.json"
+  IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-diff.json"
+
+  unless system(
+    IDXR_NORM_EXE,
+    "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json",
+    out: IDXR_NORM_LEDGER
+  )
+    warn("Normalizing Indexer Ledger at height #{BLOCKS_COUNT} failed.")
+    success = false
+  end
+
+  system(
+    "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
+    out: IDXR_LEDGER_DIFF
+  )
+  system("cat #{IDXR_LEDGER_DIFF}")
+
   puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
   restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
   unless system(
