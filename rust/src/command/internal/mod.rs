@@ -5,7 +5,7 @@ use crate::{
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommandKind {
@@ -67,104 +67,92 @@ pub enum InternalCommandWithData {
     },
 }
 
+trait AccountDiffAggregator {
+    fn aggregate(&self, diff: AccountDiff) -> InternalCommand;
+    fn initialize(diff: AccountDiff) -> InternalCommand;
+}
+
 impl InternalCommand {
     /// Compute the internal commands for the given precomputed block
     ///
     /// See `LedgerDiff::from_precomputed`
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        let mut account_diff_fees: Vec<AccountDiff> = AccountDiff::from_block_fees(block)
-            .into_iter()
-            .flatten()
-            .collect();
+        let mut all_account_diff_fees: Vec<Vec<AccountDiff>> = AccountDiff::from_block_fees(block);
 
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
             let fee_transfer = coinbase.fee_transfer();
-            let idx = account_diff_fees
-                .iter()
-                .enumerate()
-                .position(|(n, diff)| match diff {
-                    AccountDiff::FeeTransfer(fee) => {
-                        *fee == fee_transfer[0]
-                            && match &account_diff_fees[n + 1] {
-                                AccountDiff::FeeTransfer(fee) => *fee == fee_transfer[1],
-                                _ => false,
-                            }
-                    }
-                    _ => false,
-                });
-            idx.iter().for_each(|i| {
-                account_diff_fees[*i] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone());
-                account_diff_fees[*i + 1] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone());
-            });
+            if let [_, _] = &all_account_diff_fees[0][..] {
+                all_account_diff_fees[0] = vec![
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
+                ]
+            }
         }
 
-        let mut internal_cmds = vec![];
-        for n in (0..account_diff_fees.len()).step_by(2) {
-            match &account_diff_fees[n] {
-                AccountDiff::FeeTransfer(f) => {
-                    let (ic_sender, ic_receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
+        let mut internal_cmds: Vec<Self> = Vec::new();
+        for account_diff_pairs in all_account_diff_fees {
+            let mut unique_fee_transfer_map: HashMap<String, usize> = HashMap::new();
+            if let [credit, debit] = &account_diff_pairs[..] {
+                // assert!(
+                //     credit.amount() - debit.amount() == 0,
+                //     "Credit/Debit pairs do no sum to zero"
+                // );
+                match (credit, debit) {
+                    (
+                        AccountDiff::FeeTransfer(fee_transfer_receiver),
+                        AccountDiff::FeeTransfer(fee_transfer_sender),
+                    ) => {
+                        let key = fee_transfer_sender.public_key.0.to_string()
+                            + &fee_transfer_receiver.public_key.0;
 
-                    // aggregate
-                    if let Some((idx, cmd)) =
-                        internal_cmds
-                            .iter()
-                            .enumerate()
-                            .find_map(|(m, cmd)| match cmd {
-                                Self::FeeTransfer {
-                                    sender,
-                                    receiver,
-                                    amount,
-                                } => {
-                                    if *sender == ic_sender && *receiver == ic_receiver {
-                                        return Some((
-                                            m,
-                                            Self::FeeTransfer {
-                                                sender: ic_sender.clone(),
-                                                receiver: ic_receiver.clone(),
-                                                amount: f.amount.0 + *amount,
-                                            },
-                                        ));
-                                    }
-                                    None
+                        if !unique_fee_transfer_map.contains_key(&key) {
+                            internal_cmds.push(Self::FeeTransfer {
+                                sender: fee_transfer_sender.public_key.clone(),
+                                receiver: fee_transfer_receiver.public_key.clone(),
+                                amount: fee_transfer_sender.amount.0,
+                            });
+                            unique_fee_transfer_map
+                                .entry(key)
+                                .or_insert(internal_cmds.len() - 1);
+                        } else {
+                            let internal_commands_i =
+                                unique_fee_transfer_map.get(&key).cloned().unwrap();
+                            if let Self::FeeTransfer {
+                                amount,
+                                sender,
+                                receiver,
+                            } = &internal_cmds[internal_commands_i]
+                            {
+                                internal_cmds[internal_commands_i] = Self::FeeTransfer {
+                                    sender: sender.clone(),
+                                    receiver: receiver.clone(),
+                                    amount: amount + fee_transfer_sender.amount.0,
                                 }
-                                _ => None,
-                            })
-                    {
-                        internal_cmds.push(cmd);
-                        internal_cmds.swap_remove(idx);
-                    } else {
-                        internal_cmds.push(Self::FeeTransfer {
-                            sender: ic_sender.clone(),
-                            receiver: ic_receiver.clone(),
-                            amount: f.amount.0,
-                        });
+                            }
+                        }
                     }
+                    (
+                        AccountDiff::FeeTransferViaCoinbase(fee_transfer_receiver),
+                        AccountDiff::FeeTransferViaCoinbase(fee_transfer_sender),
+                    ) => internal_cmds.push(Self::FeeTransferViaCoinbase {
+                        sender: fee_transfer_sender.public_key.clone(),
+                        receiver: fee_transfer_receiver.public_key.clone(),
+                        amount: fee_transfer_sender.amount.0,
+                    }),
+                    (_, _) => panic!("Unrecognized credit/debit comination"),
                 }
-                AccountDiff::FeeTransferViaCoinbase(f) => {
-                    let (sender, receiver) = if f.update_type == UpdateType::Credit {
-                        (account_diff_fees[n + 1].public_key(), f.public_key.clone())
-                    } else {
-                        (f.public_key.clone(), account_diff_fees[n + 1].public_key())
-                    };
-                    internal_cmds.push(Self::FeeTransferViaCoinbase {
-                        sender,
-                        receiver,
-                        amount: f.amount.0,
-                    });
-                }
-                AccountDiff::Coinbase(c) => internal_cmds.push(Self::Coinbase {
-                    receiver: c.public_key.clone(),
-                    amount: c.amount.0,
-                }),
-                _ => (),
+            } else if let [unbalanced_pair] = &account_diff_pairs[..] {
+                match unbalanced_pair {
+                    AccountDiff::Coinbase(coinbase) => internal_cmds.push(Self::Coinbase {
+                        receiver: coinbase.public_key.clone(),
+                        amount: coinbase.amount.0,
+                    }),
+                    _ => panic!("Unrecognized unbalanced credit/debit pair"),
+                };
+            } else {
+                panic!("Unrecognized accounting arrangement")
             }
         }
 
