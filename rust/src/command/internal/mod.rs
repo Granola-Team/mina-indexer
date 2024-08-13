@@ -86,7 +86,7 @@ impl InternalCommand {
             if let [_, _] = &all_account_diff_fees[0][..] {
                 all_account_diff_fees[0] = vec![
                     AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone()),
                 ]
             }
         }
@@ -95,17 +95,18 @@ impl InternalCommand {
         for account_diff_pairs in all_account_diff_fees {
             let mut unique_fee_transfer_map: HashMap<String, usize> = HashMap::new();
             if let [credit, debit] = &account_diff_pairs[..] {
-                // assert!(
-                //     credit.amount() - debit.amount() == 0,
-                //     "Credit/Debit pairs do no sum to zero"
-                // );
+                println!("{:#?} + {:#?}", credit.amount(), debit.amount());
+                println!("{:#?}", block.blockchain_length());
+                assert!(
+                    debit.amount() + credit.amount() == 0,
+                    "Credit/Debit pairs do no sum to zero"
+                );
                 match (credit, debit) {
                     (
                         AccountDiff::FeeTransfer(fee_transfer_receiver),
                         AccountDiff::FeeTransfer(fee_transfer_sender),
                     ) => {
-                        let key = fee_transfer_sender.public_key.0.to_string()
-                            + &fee_transfer_receiver.public_key.0;
+                        let key = fee_transfer_receiver.public_key.0.to_string();
 
                         if !unique_fee_transfer_map.contains_key(&key) {
                             internal_cmds.push(Self::FeeTransfer {
