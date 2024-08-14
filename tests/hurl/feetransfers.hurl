@@ -40,13 +40,13 @@ jsonpath "$.data.feetransfers[0].canonical" == true
 jsonpath "$.data.feetransfers[0].dateTime" == "2021-03-17T08:39:00.000Z"
 
 # last datum
-jsonpath "$.data.feetransfers[99].stateHash" == "3NKKJqqZovA2TnivikmkZjMtgcewSPBkXsJz5UqvwrFttMhRsztJ"
-jsonpath "$.data.feetransfers[99].recipient" == "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"
-jsonpath "$.data.feetransfers[99].fee" == 1440000000000
-jsonpath "$.data.feetransfers[99].type" == "Coinbase"
-jsonpath "$.data.feetransfers[99].blockHeight" == 71
+jsonpath "$.data.feetransfers[99].stateHash" == "3NK6gZY6xoC98wTJdmfprmfWxeEU2o1mtFgKN9vh8z27LjnowLrz"
+jsonpath "$.data.feetransfers[99].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+jsonpath "$.data.feetransfers[99].fee" == 10000000
+jsonpath "$.data.feetransfers[99].type" == "Fee_transfer"
+jsonpath "$.data.feetransfers[99].blockHeight" == 70
 jsonpath "$.data.feetransfers[99].canonical" == true
-jsonpath "$.data.feetransfers[99].dateTime" == "2021-03-17T04:51:00.000Z"
+jsonpath "$.data.feetransfers[99].dateTime" == "2021-03-17T04:48:00.000Z"
 
 duration < 2000
 
@@ -120,7 +120,7 @@ HTTP 200
 jsonpath "$.data.feetransfers" count == 100
 
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
-jsonpath "$.data.feetransfers[99].blockHeight" == 71
+jsonpath "$.data.feetransfers[99].blockHeight" == 70
 
 duration < 2000
 
@@ -150,8 +150,8 @@ jsonpath "$.data.feetransfers" count == 100
 # first datum
 jsonpath "$.data.feetransfers[0].blockHeight" == 2
 jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH"
-jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 205
-jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 205
+jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 196
+jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 196
 
 duration < 1000
 
