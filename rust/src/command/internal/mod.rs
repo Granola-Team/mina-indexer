@@ -140,7 +140,11 @@ impl InternalCommand {
                         receiver: fee_transfer_receiver.public_key.clone(),
                         amount: fee_transfer_sender.amount.0,
                     }),
-                    (_, _) => panic!("Unrecognized credit/debit comination"),
+                    (_, _) => panic!(
+                        "Unrecognized credit/debit comination. Block: {:#?}, hash: {:#?}",
+                        block.blockchain_length(),
+                        block.state_hash(),
+                    ),
                 }
             } else if let [unbalanced_pair] = &account_diff_pairs[..] {
                 match unbalanced_pair {
@@ -149,18 +153,19 @@ impl InternalCommand {
                         amount: coinbase.amount.0,
                     }),
                     _ => {
-                        println!("*************************");
-                        println!(
-                            "Block: {:#?}, hash: {:#?}, {:#?}",
+                        panic!(
+                            "Unrecognized unbalanced credit/debit pair. Block: {:#?}, hash: {:#?}, {:#?}",
                             block.blockchain_length(),
                             block.state_hash(),
                             unbalanced_pair
                         );
-                        panic!("Unrecognized unbalanced credit/debit pair")
                     }
                 };
             } else {
-                panic!("Unrecognized accounting arrangement")
+                panic!(
+                    "Unrecognized accounting arrangement. {:#?}",
+                    &account_diff_pairs[..]
+                );
             }
         }
 
