@@ -31,10 +31,10 @@ pub trait SnarkStore {
     fn get_top_snark_workers_by_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
 
     /// [DBIterator] over top SNARK producers by accumulated fees
-    fn top_snark_workers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn top_snark_workers_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// [DBIterator] over SNARKs by fee
-    fn snark_fees_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn snark_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Set the SNARK for the prover in `global_slot` at `index`
     fn set_snark_by_prover(
@@ -45,7 +45,7 @@ pub trait SnarkStore {
     ) -> anyhow::Result<()>;
 
     /// Iterator over SNARKs by prover, sorted by global slot & index
-    fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn snark_prover_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Set the SNARK for the prover in `global_slot` at `index`
     fn set_snark_by_prover_height(
@@ -56,7 +56,7 @@ pub trait SnarkStore {
     ) -> anyhow::Result<()>;
 
     /// Iterator over SNARKs by prover, sorted by block height & index
-    fn snark_prover_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn snark_prover_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Increment snarks per epoch count
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;

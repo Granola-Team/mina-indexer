@@ -7,7 +7,7 @@ use mina_indexer::{
         diff::LedgerDiff,
         genesis::{GenesisLedger, GenesisRoot},
         public_key::PublicKey,
-        store::LedgerStore,
+        store::staged::StagedLedgerStore,
     },
     server::IndexerVersion,
     state::IndexerState,
@@ -34,7 +34,7 @@ async fn test() -> anyhow::Result<()> {
     state.add_blocks(&mut block_parser).await?;
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
-    let mut ledger_diff = indexer_store.get_ledger_at_height(1, false)?.unwrap();
+    let mut ledger_diff = indexer_store.get_ledger_block_height(1, false)?.unwrap();
 
     for n in 1..=3 {
         let state_hash = indexer_store.get_canonical_hash_at_height(n)?.unwrap();

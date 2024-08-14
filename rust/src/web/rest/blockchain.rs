@@ -5,11 +5,11 @@ use crate::{
     constants::VERSION,
     ledger::{
         account::{nanomina_to_mina, Amount},
+        store::best::BestLedgerStore,
         LedgerHash,
     },
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore,
         version::{IndexerStoreVersion, VersionStore},
         IndexerStore,
     },

@@ -6,19 +6,24 @@ use crate::{
         account::{Account, Nonce},
         diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
-        store::LedgerStore,
+        store::{
+            best::{BestLedgerStore, DBAccountUpdate},
+            staged::StagedLedgerStore,
+        },
+        Ledger,
     },
-    store::{
-        account::{AccountStore, DBAccountUpdate},
-        fixed_keys::FixedKeys,
-        to_be_bytes, u64_prefix_key, IndexerStore,
-    },
+    store::{fixed_keys::FixedKeys, to_be_bytes, u64_prefix_key, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
-impl AccountStore for IndexerStore {
+impl BestLedgerStore for IndexerStore {
+    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
+        trace!("Getting best ledger");
+        self.get_ledger_state_hash(&self.get_best_block_hash()?.expect("best block"), true)
+    }
+
     fn reorg_account_updates(
         &self,
         old_best_tip: &BlockHash,
@@ -48,7 +53,7 @@ impl AccountStore for IndexerStore {
                 break;
             }
 
-            apply.append(&mut self.get_block_account_updates(&b)?.unwrap());
+            apply.append(&mut self.get_block_account_diffs(&b)?.unwrap());
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -58,8 +63,8 @@ impl AccountStore for IndexerStore {
 
         while a != b && a.0 != MAINNET_GENESIS_HASH {
             // add blocks to appropriate collection
-            unapply.append(&mut self.get_block_account_updates(&a)?.unwrap());
-            apply.append(&mut self.get_block_account_updates(&b)?.unwrap());
+            unapply.append(&mut self.get_block_account_diffs(&a)?.unwrap());
+            apply.append(&mut self.get_block_account_diffs(&b)?.unwrap());
 
             // descend
             a = a_prev;
@@ -73,17 +78,7 @@ impl AccountStore for IndexerStore {
         Ok(<DBAccountUpdate>::new(apply, unapply))
     }
 
-    fn get_block_account_updates(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
-        trace!("Getting block balance updates for {state_hash}");
-        Ok(self
-            .get_block_ledger_diff(state_hash)?
-            .map(|diff| diff.account_diffs))
-    }
-
-    fn update_accounts(
+    fn update_best_accounts(
         &self,
         state_hash: &BlockHash,
         updates: &DBAccountUpdate,
@@ -160,7 +155,7 @@ impl AccountStore for IndexerStore {
                     ..acct
                 }),
             };
-            self.update_account(&pk, account)?;
+            self.update_best_account(&pk, account)?;
         }
 
         // apply
@@ -216,7 +211,7 @@ impl AccountStore for IndexerStore {
                     ..acct
                 }),
             };
-            self.update_account(&pk, account)?;
+            self.update_best_account(&pk, account)?;
         }
 
         for pk in accounts_created {
@@ -225,7 +220,7 @@ impl AccountStore for IndexerStore {
                 balance: acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
                 ..acct
             };
-            self.update_account(&pk, Some(account))?;
+            self.update_best_account(&pk, Some(account))?;
         }
         Ok(())
     }
@@ -319,7 +314,7 @@ impl AccountStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn update_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
+    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
         if account.is_none() {
             // delete stale data
             if let Some(acct) = self.get_best_account(pk)? {
@@ -372,7 +367,7 @@ impl AccountStore for IndexerStore {
     // Iterators //
     ///////////////
 
-    fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.accounts_balance_sort_cf(), mode)
     }
