@@ -2,7 +2,10 @@ use super::{precomputed::PcbVersion, BlockComparison};
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     event::db::DbEvent,
-    ledger::public_key::PublicKey,
+    ledger::{
+        diff::{account::AccountDiff, LedgerDiff},
+        public_key::PublicKey,
+    },
     store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
@@ -53,6 +56,15 @@ pub trait BlockStore {
     /////////////////////////////
     // General block functions //
     /////////////////////////////
+
+    /// Get a block's account diffs
+    fn get_block_account_diffs(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<AccountDiff>>>;
+
+    /// Get a block's ledger diff
+    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
 
     /// Index the block's previous state hash
     fn set_block_parent_hash(
@@ -202,7 +214,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn blocks_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn blocks_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for blocks via global slot
     /// ```
@@ -210,7 +222,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn blocks_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for block creators via block height
     /// ```
@@ -218,7 +230,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn block_creator_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn block_creator_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for block creators via global slot
     /// ```
@@ -226,7 +238,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn block_creator_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn block_creator_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for coinbase receivers via block height
     /// ```
@@ -234,7 +246,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn coinbase_receiver_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn coinbase_receiver_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for coinbase receivers via global slot
     /// ```
@@ -242,7 +254,7 @@ pub trait BlockStore {
     /// val: b""
     /// ```
     /// Use [block_state_hash_from_key] to extract state hash
-    fn coinbase_receiver_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     //////////////////
     // Block counts //

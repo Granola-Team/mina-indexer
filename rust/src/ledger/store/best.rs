@@ -1,4 +1,5 @@
-use super::DBUpdate;
+//! Store of the best ledger
+
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{internal::InternalCommand, Command, Payment},
@@ -8,14 +9,26 @@ use crate::{
         coinbase::Coinbase,
         diff::account::{AccountDiff, PaymentDiff, UpdateType},
         public_key::PublicKey,
+        Ledger,
     },
+    store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
 use std::{collections::HashMap, ops::Sub as _};
 
-pub trait AccountStore {
+pub trait BestLedgerStore {
+    /// Get the best ledger (associated with the best block)
+    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
+
     /// Update pk's account
-    fn update_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()>;
+    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()>;
+
+    /// Updates balance-sorted accounts
+    fn update_best_accounts(
+        &self,
+        state_hash: &BlockHash,
+        updates: &DBAccountUpdate,
+    ) -> anyhow::Result<()>;
 
     /// Generate account balance updates when the best tip changes.
     /// Return with set of coinbase receivers.
@@ -24,19 +37,6 @@ pub trait AccountStore {
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
     ) -> anyhow::Result<DBAccountUpdate>;
-
-    /// Get a block's account updates
-    fn get_block_account_updates(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<AccountDiff>>>;
-
-    /// Updates balance-sorted accounts
-    fn update_accounts(
-        &self,
-        state_hash: &BlockHash,
-        updates: &DBAccountUpdate,
-    ) -> anyhow::Result<()>;
 
     /// Get pk's account balance
     fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
@@ -68,7 +68,7 @@ pub trait AccountStore {
     /// ```
     /// - balance: 8 BE bytes
     /// - pk:      [PublicKey::LEN] bytes
-    fn account_balance_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a>;
+    fn account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
 pub type DBAccountUpdate = DBUpdate<AccountDiff>;

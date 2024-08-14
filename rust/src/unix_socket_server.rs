@@ -10,7 +10,7 @@ use crate::{
         self,
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
-        store::LedgerStore,
+        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         LedgerHash,
     },
     snark_work::store::SnarkStore,
@@ -700,7 +700,7 @@ pub async fn handle_connection(
                             Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {best_tip_height}"))
                         } else {
                             let ledger_str = db
-                                .get_ledger_at_height(height, true)?
+                                .get_ledger_block_height(height, true)?
                                 .unwrap()
                                 .to_string_pretty();
                             if path.is_none() {

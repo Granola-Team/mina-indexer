@@ -5,11 +5,11 @@ use crate::{
     constants::MAINNET_GENESIS_HASH,
     ledger::{
         staking::{AggregatedEpochStakeDelegations, StakingAccount},
-        store::LedgerStore,
+        store::staking::StakingLedgerStore,
     },
     snark_work::store::SnarkStore,
     store::{
-        ledger_store_impl::{staking_ledger_sort_key, staking_ledger_sort_key_epoch},
+        staking_ledger_store_impl::{staking_ledger_sort_key, staking_ledger_sort_key_epoch},
         username::UsernameStore,
         IndexerStore,
     },

@@ -1,76 +1,15 @@
-//! Store of staged ledgers, staking ledgers, and staking delegations
+//! Store of staking ledgers and delegations
 
 use crate::{
     block::BlockHash,
     ledger::{
-        diff::LedgerDiff,
         staking::{AggregatedEpochStakeDelegations, StakingLedger},
-        Ledger, LedgerHash,
+        LedgerHash,
     },
 };
 use speedb::{DBIterator, IteratorMode};
 
-pub trait LedgerStore {
-    ////////////////////
-    // Staged ledgers //
-    ////////////////////
-
-    /// Add a ledger with assoociated hashes
-    /// Returns true if ledger already present
-    fn add_ledger(&self, ledger_hash: &LedgerHash, state_hash: &BlockHash) -> anyhow::Result<bool>;
-
-    /// Add a ledger associated with a canonical block
-    fn add_ledger_state_hash(&self, state_hash: &BlockHash, ledger: Ledger) -> anyhow::Result<()>;
-
-    /// Add a new genesis ledger
-    fn add_genesis_ledger(
-        &self,
-        state_hash: &BlockHash,
-        genesis_ledger: Ledger,
-    ) -> anyhow::Result<()>;
-
-    /// Get a ledger associated with ledger hash
-    fn get_ledger(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<Ledger>>;
-
-    /// Get the best ledger (associated with the best block)
-    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
-
-    /// Get a ledger associated with an arbitrary block
-    fn get_ledger_state_hash(
-        &self,
-        state_hash: &BlockHash,
-        memoize: bool,
-    ) -> anyhow::Result<Option<Ledger>>;
-
-    /// Get a ledger at a specified `blockchain_length`
-    fn get_ledger_at_height(&self, height: u32, memoize: bool) -> anyhow::Result<Option<Ledger>>;
-
-    /// Index the block's ledger diff
-    fn set_block_ledger_diff(
-        &self,
-        state_hash: &BlockHash,
-        ledger_diff: LedgerDiff,
-    ) -> anyhow::Result<()>;
-
-    /// Get block ledger diff
-    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
-
-    /// Index the block's ledger diff
-    fn set_block_staged_ledger_hash(
-        &self,
-        state_hash: &BlockHash,
-        staged_ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<()>;
-
-    fn get_block_staged_ledger_hash(
-        &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<LedgerHash>>;
-
-    /////////////////////
-    // Staking ledgers //
-    /////////////////////
-
+pub trait StakingLedgerStore {
     /// Add a staking ledger
     fn add_staking_ledger(
         &self,

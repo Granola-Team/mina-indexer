@@ -1,5 +1,5 @@
 use super::db;
-use crate::ledger::{account::Account, store::LedgerStore};
+use crate::ledger::{account::Account, store::staged::StagedLedgerStore};
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
@@ -74,7 +74,7 @@ impl StagedLedgerQueryRoot {
         // blockchain length query
         if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
             let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_at_height(blockchain_length, true)?
+                .get_ledger_block_height(blockchain_length, true)?
                 .map_or(vec![], |ledger| {
                     ledger
                         .accounts

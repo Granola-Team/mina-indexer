@@ -2,22 +2,22 @@
 //! [IndexerStore]
 
 // traits
-pub mod account;
 pub mod column_families;
 pub mod fixed_keys;
 pub mod username;
 pub mod version;
 
 // impls
-pub mod account_store_impl;
+pub mod best_ledger_store_impl;
 pub mod block_store_impl;
 pub mod canonicity_store_impl;
 pub mod chain_store_impl;
 pub mod column_families_impl;
 pub mod event_store_impl;
 pub mod internal_command_store_impl;
-pub mod ledger_store_impl;
 pub mod snark_store_impl;
+pub mod staged_ledger_store_impl;
+pub mod staking_ledger_store_impl;
 pub mod user_command_store_impl;
 pub mod username_store_impl;
 pub mod version_store_impl;

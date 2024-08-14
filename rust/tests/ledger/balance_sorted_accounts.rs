@@ -5,11 +5,11 @@ use mina_indexer::{
     constants::*,
     ledger::{
         genesis::{GenesisLedger, GenesisRoot},
-        store::LedgerStore,
+        store::best::BestLedgerStore,
     },
     server::IndexerVersion,
     state::IndexerState,
-    store::{account::AccountStore, balance_key_prefix, pk_key_prefix, IndexerStore},
+    store::{balance_key_prefix, pk_key_prefix, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 

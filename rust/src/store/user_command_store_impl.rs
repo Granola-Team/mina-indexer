@@ -362,32 +362,32 @@ impl UserCommandStore for IndexerStore {
     // Iterators //
     ///////////////
 
-    fn user_commands_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.user_commands_slot_sort_cf(), mode)
     }
 
-    fn user_commands_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.user_commands_height_sort_cf(), mode)
     }
 
-    fn txn_from_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn txn_from_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.txn_from_height_sort_cf(), mode)
     }
 
-    fn txn_from_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn txn_from_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.txn_from_slot_sort_cf(), mode)
     }
 
-    fn txn_to_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn txn_to_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.txn_to_height_sort_cf(), mode)
     }
 
-    fn txn_to_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn txn_to_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.txn_to_slot_sort_cf(), mode)
     }
 

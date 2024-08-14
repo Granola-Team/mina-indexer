@@ -1,7 +1,7 @@
 use super::{is_valid_ledger_file, StakingLedger};
 use crate::{
     constants::MAINNET_GENESIS_HASH,
-    ledger::{store::LedgerStore, LedgerHash},
+    ledger::{store::staking::StakingLedgerStore, LedgerHash},
     store::IndexerStore,
 };
 use glob::glob;

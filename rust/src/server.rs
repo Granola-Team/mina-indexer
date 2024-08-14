@@ -10,7 +10,7 @@ use crate::{
     ledger::{
         genesis::{GenesisConstants, GenesisLedger},
         staking::{self, StakingLedger},
-        store::LedgerStore,
+        store::staking::StakingLedgerStore,
     },
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,

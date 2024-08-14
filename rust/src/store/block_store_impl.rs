@@ -9,12 +9,15 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_PREV_STATE_HASH},
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::{diff::LedgerDiff, public_key::PublicKey, store::LedgerStore},
+    ledger::{
+        diff::{account::AccountDiff, LedgerDiff},
+        public_key::PublicKey,
+        store::{best::BestLedgerStore, staged::StagedLedgerStore},
+    },
     snark_work::store::SnarkStore,
     store::{
-        account::AccountStore, block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes,
-        from_u64_be_bytes, to_be_bytes, u32_prefix_key, username::UsernameStore, DBUpdate,
-        IndexerStore,
+        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, from_u64_be_bytes,
+        to_be_bytes, u32_prefix_key, username::UsernameStore, DBUpdate, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -150,6 +153,10 @@ impl BlockStore for IndexerStore {
             }))
     }
 
+    //////////////////////////
+    // Best block functions //
+    //////////////////////////
+
     fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>> {
         trace!("Getting best block");
         match self.get_best_block_hash()? {
@@ -200,7 +207,7 @@ impl BlockStore for IndexerStore {
 
             // balance-sorted accounts
             let balance_updates = self.reorg_account_updates(&old, state_hash)?;
-            self.update_accounts(state_hash, &balance_updates)?;
+            self.update_best_accounts(state_hash, &balance_updates)?;
 
             // usernames
             let username_updates = self.reorg_username_updates(&old, state_hash)?;
@@ -276,6 +283,35 @@ impl BlockStore for IndexerStore {
 
         apply.reverse();
         Ok(DBUpdate { apply, unapply })
+    }
+
+    fn get_current_epoch(&self) -> anyhow::Result<u32> {
+        Ok(self
+            .get_best_block_hash()?
+            .and_then(|state_hash| self.get_block_epoch(&state_hash).ok().flatten())
+            .unwrap_or_default())
+    }
+
+    /////////////////////////////
+    // General block functions //
+    /////////////////////////////
+
+    fn get_block_account_diffs(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
+        trace!("Getting block account diffs for {state_hash}");
+        Ok(self
+            .get_block_ledger_diff(state_hash)?
+            .map(|diff| diff.account_diffs))
+    }
+
+    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>> {
+        trace!("Getting block ledger diff {state_hash}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_ledger_diff_cf(), state_hash.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>> {
@@ -680,13 +716,6 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn get_current_epoch(&self) -> anyhow::Result<u32> {
-        Ok(self
-            .get_best_block_hash()?
-            .and_then(|state_hash| self.get_block_epoch(&state_hash).ok().flatten())
-            .unwrap_or_default())
-    }
-
     fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()> {
         trace!("Setting block epoch {epoch}: {state_hash}");
         Ok(self.database.put_cf(
@@ -732,32 +761,32 @@ impl BlockStore for IndexerStore {
     // Iterators //
     ///////////////
 
-    fn blocks_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn blocks_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.blocks_height_sort_cf(), mode)
     }
 
-    fn blocks_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn blocks_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.blocks_global_slot_sort_cf(), mode)
     }
 
-    fn block_creator_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn block_creator_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.block_creator_height_sort_cf(), mode)
     }
 
-    fn block_creator_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn block_creator_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.block_creator_slot_sort_cf(), mode)
     }
 
-    fn coinbase_receiver_block_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn coinbase_receiver_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.block_coinbase_height_sort_cf(), mode)
     }
 
-    fn coinbase_receiver_global_slot_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.block_coinbase_slot_sort_cf(), mode)
     }

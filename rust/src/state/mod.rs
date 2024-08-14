@@ -14,9 +14,13 @@ use crate::{
     constants::*,
     event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
-        diff::LedgerDiff, genesis::GenesisLedger, public_key::PublicKey,
-        staking::parser::StakingLedgerParser, store::LedgerStore, username::Username, Ledger,
-        LedgerHash,
+        diff::LedgerDiff,
+        genesis::GenesisLedger,
+        public_key::PublicKey,
+        staking::parser::StakingLedgerParser,
+        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
+        username::Username,
+        Ledger, LedgerHash,
     },
     server::IndexerVersion,
     state::{
@@ -30,7 +34,7 @@ use crate::{
         block_state_hash_from_key, block_u32_prefix_from_key,
         fixed_keys::FixedKeys,
         from_be_bytes, from_u64_be_bytes,
-        ledger_store_impl::{
+        staking_ledger_store_impl::{
             staking_ledger_epoch_key_epoch, staking_ledger_epoch_key_genesis_state_hash,
             staking_ledger_epoch_key_ledger_hash,
         },

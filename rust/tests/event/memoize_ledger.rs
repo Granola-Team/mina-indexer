@@ -9,7 +9,7 @@ use mina_indexer::{
     },
     ledger::{
         genesis::{GenesisLedger, GenesisRoot},
-        store::LedgerStore,
+        store::staged::StagedLedgerStore,
         LedgerHash,
     },
     server::IndexerVersion,
@@ -81,7 +81,7 @@ async fn test() -> anyhow::Result<()> {
     let state_hash = BlockHash("3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG".into());
     let ledger_hash = LedgerHash("jxw3wNhAUhyVT4AK4dGxtn4Kpx6pvk3AXVoi2A6BAEQweyV8Uwe".into());
     assert!(indexer_store
-        .get_ledger_at_height(blockchain_length, true)?
+        .get_ledger_block_height(blockchain_length, true)?
         .is_some());
 
     // don't memoize via height query
@@ -90,7 +90,7 @@ async fn test() -> anyhow::Result<()> {
     let state_hash_no = BlockHash("3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into());
     let ledger_hash_no = LedgerHash("jxZVWjsyuQkPVSj7ZbqC8PPx8FXzHQjxUYA3bhvdnQQZ15jn7mR".into());
     assert!(indexer_store
-        .get_ledger_at_height(blockchain_length_no, false)?
+        .get_ledger_block_height(blockchain_length_no, false)?
         .is_some());
 
     // check the event log for new ledger event

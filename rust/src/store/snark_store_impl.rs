@@ -250,12 +250,12 @@ impl SnarkStore for IndexerStore {
             .collect())
     }
 
-    fn top_snark_workers_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn top_snark_workers_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_top_producers_sort_cf(), mode)
     }
 
-    fn snark_fees_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn snark_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.snark_work_fees_cf(), mode)
     }
 
@@ -281,7 +281,7 @@ impl SnarkStore for IndexerStore {
     /// - slot:   4 BE bytes
     /// - index:  4 BE bytes
     /// - snark:  serde_json encoded
-    fn snark_prover_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn snark_prover_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.snark_work_prover_cf(), mode)
     }
 
@@ -307,7 +307,7 @@ impl SnarkStore for IndexerStore {
     /// - block height:   4 BE bytes
     /// - index:          4 BE bytes
     /// - snark:          serde_json encoded
-    fn snark_prover_height_iterator<'a>(&'a self, mode: IteratorMode) -> DBIterator<'a> {
+    fn snark_prover_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_work_prover_height_cf(), mode)
     }
