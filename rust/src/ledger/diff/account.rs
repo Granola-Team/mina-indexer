@@ -82,24 +82,6 @@ pub enum AccountDiffType {
     FeeTransferViaCoinbase,
 }
 
-pub trait Keyable {
-    fn get_key(&self) -> &'static str;
-}
-
-impl Keyable for AccountDiff {
-    fn get_key(&self) -> &'static str {
-        match self {
-            AccountDiff::Payment(_) => "Payment",
-            AccountDiff::Coinbase(_) => "Coinbase",
-            AccountDiff::FeeTransferViaCoinbase(_) => "FeeTransferViaCoinbase",
-            AccountDiff::CreateAccount(_) => "CreateAccount",
-            AccountDiff::Delegation(_) => "Delegation",
-            AccountDiff::FeeTransfer(_) => "FeeTransfer",
-            AccountDiff::FailedTransactionNonce(_) => "FailedTransactionNonce",
-        }
-    }
-}
-
 impl AccountDiff {
     pub fn from_command(command: Command) -> Vec<Self> {
         match command {
