@@ -218,20 +218,22 @@ impl AccountDiff {
 
         fee_map
             .iter()
-            .map(|(prover, total_fee)| {
+            .flat_map(|(prover, total_fee)| {
                 let mut res = vec![];
                 // No need to issue Debits and Credits if the fee is 0
                 if *total_fee > 0 {
-                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
-                        public_key: prover.clone(),
-                        amount: (*total_fee).into(),
-                        update_type: UpdateType::Credit,
-                    }));
-                    res.push(AccountDiff::FeeTransfer(PaymentDiff {
-                        public_key: precomputed_block.coinbase_receiver(),
-                        amount: (*total_fee).into(),
-                        update_type: UpdateType::Debit(None),
-                    }));
+                    res.push(vec![
+                        AccountDiff::FeeTransfer(PaymentDiff {
+                            public_key: prover.clone(),
+                            amount: (*total_fee).into(),
+                            update_type: UpdateType::Credit,
+                        }),
+                        AccountDiff::FeeTransfer(PaymentDiff {
+                            public_key: precomputed_block.coinbase_receiver(),
+                            amount: (*total_fee).into(),
+                            update_type: UpdateType::Debit(None),
+                        }),
+                    ]);
 
                     // Check if the coinbase recipient account is new and deduct the account
                     // creation fee if it is
@@ -251,9 +253,9 @@ impl AccountDiff {
                                                 && (*total_fee - MAINNET_ACCOUNT_CREATION_FEE.0)
                                                     == fee_transfer_receiver_balance
                                             {
-                                                res.push(AccountDiff::CreateAccount(
+                                                res.push(vec![AccountDiff::CreateAccount(
                                                     prover.clone(),
-                                                ));
+                                                )]);
                                             }
                                         }
                                     }
@@ -267,7 +269,7 @@ impl AccountDiff {
                 }
                 res
             })
-            .collect()
+            .collect::<Vec<_>>()
     }
 
     /// User command + SNARK work fees, aggregated per public key
