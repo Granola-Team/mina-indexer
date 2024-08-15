@@ -124,6 +124,21 @@ impl Coinbase {
             .collect()
     }
 
+    pub fn account_diffs_coinbase_mut(&self, account_diffs: &mut Vec<Vec<AccountDiff>>) {
+        let fee_transfer = self.fee_transfer();
+        if let Some(fee_transfer_pair) = account_diffs.iter_mut().find(|pair| {
+            matches!(pair.as_slice(),
+                [AccountDiff::FeeTransfer(fee_transfer_credit), AccountDiff::FeeTransfer(fee_transfer_debit)]
+                if &fee_transfer[0][0] == fee_transfer_credit
+                && &fee_transfer[0][1] == fee_transfer_debit)
+        }) {
+            fee_transfer_pair[0] =
+                AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][0].clone());
+            fee_transfer_pair[1] =
+                AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][1].clone());
+        }
+    }
+
     fn create_payment_diffs(&self, transfer: &CoinbaseFeeTransfer) -> Vec<PaymentDiff> {
         vec![
             PaymentDiff {
@@ -239,6 +254,39 @@ mod coinbase_tests {
         };
 
         assert!(coinbase.is_coinbase_applied());
+    }
+
+    #[test]
+    fn test_account_diffs_coinbase_mut() {
+        let transfer = CoinbaseFeeTransfer {
+            receiver_pk: sample_public_key(),
+            fee: 100,
+        };
+
+        let coinbase = Coinbase {
+            kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
+            receiver: sample_public_key(),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: Some(0),
+        };
+
+        let fee_transfer_payment_diffs = coinbase.fee_transfer();
+
+        let mut account_diffs = vec![vec![
+            AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][0].clone()),
+            AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][1].clone()),
+        ]];
+
+        coinbase.account_diffs_coinbase_mut(&mut account_diffs);
+
+        assert_eq!(
+            account_diffs[0],
+            vec![
+                AccountDiff::FeeTransferViaCoinbase(fee_transfer_payment_diffs[0][0].clone()),
+                AccountDiff::FeeTransferViaCoinbase(fee_transfer_payment_diffs[0][1].clone())
+            ]
+        );
     }
 
     #[test]

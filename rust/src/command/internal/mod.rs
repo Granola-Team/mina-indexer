@@ -77,13 +77,7 @@ impl InternalCommand {
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
-            let fee_transfer = coinbase.fee_transfer();
-            if let [_, _] = &all_account_diff_fees[0][..] {
-                all_account_diff_fees[0] = vec![
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][0].clone()),
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][1].clone()),
-                ]
-            }
+            coinbase.account_diffs_coinbase_mut(&mut all_account_diff_fees);
         }
 
         let mut internal_cmds: Vec<Self> = Vec::new();
