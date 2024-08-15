@@ -6,22 +6,67 @@ use crate::{
         account::{Account, Nonce},
         diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
-        store::{
-            best::{BestLedgerStore, DBAccountUpdate},
-            staged::StagedLedgerStore,
-        },
+        store::best::{BestLedgerStore, DBAccountUpdate},
         Ledger,
     },
-    store::{fixed_keys::FixedKeys, to_be_bytes, u64_prefix_key, IndexerStore},
+    store::{
+        balance_key_prefix, fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, u64_prefix_key,
+        IndexerStore,
+    },
 };
+use anyhow::Context;
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    mem::size_of,
+};
 
 impl BestLedgerStore for IndexerStore {
-    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
-        trace!("Getting best ledger");
-        self.get_ledger_state_hash(&self.get_best_block_hash()?.expect("best block"), true)
+    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
+        trace!("Getting {pk} best ledger account");
+        Ok(self
+            .database
+            .get_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+    }
+
+    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
+        if account.is_none() {
+            // delete stale data
+            if let Some(acct) = self.get_best_account(pk)? {
+                self.database
+                    .delete_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?;
+                self.database.delete_cf(
+                    self.best_ledger_accounts_balance_sort_cf(),
+                    u64_prefix_key(acct.balance.0, &pk.0),
+                )?;
+                return Ok(());
+            }
+        }
+
+        // update best account
+        let account = account.unwrap();
+        let balance = account.balance.0;
+        let acct = self.get_best_account(pk)?;
+        if let Some(acct) = acct.as_ref() {
+            // delete stale balance sorting data
+            self.database.delete_cf(
+                self.best_ledger_accounts_balance_sort_cf(),
+                u64_prefix_key(acct.balance.0, &pk.0),
+            )?;
+        }
+        self.database.put_cf(
+            self.best_ledger_accounts_cf(),
+            pk.0.as_bytes(),
+            serde_json::to_vec(&account)?,
+        )?;
+        self.database.put_cf(
+            self.best_ledger_accounts_balance_sort_cf(),
+            u64_prefix_key(balance, &pk.0),
+            b"",
+        )?;
+        Ok(())
     }
 
     fn reorg_account_updates(
@@ -84,7 +129,7 @@ impl BestLedgerStore for IndexerStore {
         updates: &DBAccountUpdate,
     ) -> anyhow::Result<()> {
         use AccountDiff::*;
-        trace!("Updating account balances {state_hash}");
+        trace!("Updating accounts {state_hash}");
         let apply_acc = updates.apply.iter().fold(0, |acc, update| match update {
             CreateAccount(_) => acc + 1,
             _ => acc,
@@ -231,7 +276,7 @@ impl BestLedgerStore for IndexerStore {
 
         // update num delegations
         self.database.put_cf(
-            self.account_num_delegations(),
+            self.best_ledger_accounts_num_delegations_cf(),
             pk.0.as_bytes(),
             to_be_bytes(num + 1),
         )?;
@@ -239,15 +284,21 @@ impl BestLedgerStore for IndexerStore {
         // append new delegation
         let mut key = pk.clone().to_bytes();
         key.append(&mut to_be_bytes(num));
-        self.database
-            .put_cf(self.account_delegations(), key, delegate.0.as_bytes())?;
+        self.database.put_cf(
+            self.best_ledger_accounts_delegations_cf(),
+            key,
+            delegate.0.as_bytes(),
+        )?;
         Ok(())
     }
 
     fn get_num_pk_delegations(&self, pk: &PublicKey) -> anyhow::Result<u32> {
         Ok(self
             .database
-            .get_cf(self.account_num_delegations(), pk.0.as_bytes())?
+            .get_cf(
+                self.best_ledger_accounts_num_delegations_cf(),
+                pk.0.as_bytes(),
+            )?
             .map_or(0, from_be_bytes))
     }
 
@@ -256,7 +307,7 @@ impl BestLedgerStore for IndexerStore {
         key.append(&mut to_be_bytes(idx));
         Ok(self
             .database
-            .get_cf(self.account_delegations(), key)?
+            .get_cf(self.best_ledger_accounts_delegations_cf(), key)?
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
@@ -266,7 +317,7 @@ impl BestLedgerStore for IndexerStore {
         if idx > 0 {
             // update num delegations
             self.database.put_cf(
-                self.account_num_delegations(),
+                self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
                 to_be_bytes(idx - 1),
             )?;
@@ -274,7 +325,8 @@ impl BestLedgerStore for IndexerStore {
             // drop delegation
             let mut key = pk.to_bytes();
             key.append(&mut to_be_bytes(idx - 1));
-            self.database.delete_cf(self.account_delegations(), key)?;
+            self.database
+                .delete_cf(self.best_ledger_accounts_delegations_cf(), key)?;
         }
         Ok(())
     }
@@ -314,61 +366,38 @@ impl BestLedgerStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
-        if account.is_none() {
-            // delete stale data
-            if let Some(acct) = self.get_best_account(pk)? {
-                self.database
-                    .delete_cf(self.accounts_cf(), pk.0.as_bytes())?;
-                self.database.delete_cf(
-                    self.accounts_balance_sort_cf(),
-                    u64_prefix_key(acct.balance.0, &pk.0),
-                )?;
-                return Ok(());
+    fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
+        trace!("Building best ledger");
+        if let (Some(best_block_height), Some(best_block_hash)) =
+            (self.get_best_block_height()?, self.get_best_block_hash()?)
+        {
+            trace!("Best ledger (length {best_block_height}): {best_block_hash}");
+            let mut accounts = HashMap::new();
+            for (key, _) in self
+                .best_ledger_account_balance_iterator(IteratorMode::End)
+                .flatten()
+            {
+                let balance = balance_key_prefix(&key);
+                let pk = pk_key_prefix(&key[size_of::<u64>()..]);
+                let account = self
+                    .get_best_account(&pk)?
+                    .with_context(|| format!("account {pk}"))
+                    .expect("best account exists");
+
+                assert_eq!(account.balance.0, balance);
+                accounts.insert(pk, account);
             }
+            return Ok(Some(Ledger { accounts }));
         }
-
-        // update account
-        let account = account.unwrap();
-        let balance = account.balance.0;
-        let acct = self.get_best_account(pk)?;
-        if let Some(acct) = acct.as_ref() {
-            // delete stale balance sorting data
-            self.database.delete_cf(
-                self.accounts_balance_sort_cf(),
-                u64_prefix_key(acct.balance.0, &pk.0),
-            )?;
-        }
-
-        self.database.put_cf(
-            self.accounts_cf(),
-            pk.0.as_bytes(),
-            serde_json::to_vec(&account)?,
-        )?;
-
-        // add: {balance}{pk} -> _
-        self.database.put_cf(
-            self.accounts_balance_sort_cf(),
-            u64_prefix_key(balance, &pk.0),
-            b"",
-        )?;
-        Ok(())
-    }
-
-    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
-        trace!("Getting account balance {pk}");
-        Ok(self
-            .database
-            .get_cf(self.accounts_cf(), pk.0.as_bytes())?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+        Ok(None)
     }
 
     ///////////////
     // Iterators //
     ///////////////
 
-    fn account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+    fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
-            .iterator_cf(self.accounts_balance_sort_cf(), mode)
+            .iterator_cf(self.best_ledger_accounts_balance_sort_cf(), mode)
     }
 }
