@@ -2,25 +2,6 @@
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
-    ///////////////////////
-    // Account store CFs //
-    ///////////////////////
-
-    /// CF for storing (best ledger) accounts
-    fn accounts_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting accounts by balance
-    fn accounts_balance_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for storing number of canonical delegations
-    fn account_num_delegations(&self) -> &ColumnFamily;
-
-    /// CF for storing account delegations
-    fn account_delegations(&self) -> &ColumnFamily;
-
-    /// CF for storing block account updates
-    fn blocks_account_updates_cf(&self) -> &ColumnFamily;
-
     /////////////////////
     // Block store CFs //
     /////////////////////
@@ -48,6 +29,9 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for storing coinbase receivers
     fn block_coinbase_receiver_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing block ledger diffs
+    fn block_ledger_diff_cf(&self) -> &ColumnFamily;
 
     /// CF for storing block PCB versions
     fn block_version_cf(&self) -> &ColumnFamily;
@@ -156,24 +140,60 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting internal commands by global slot
     fn internal_commands_slot_cf(&self) -> &ColumnFamily;
 
-    //////////////////////
-    // Ledger store CFs //
-    //////////////////////
+    ///////////////////////////
+    // Best ledger store CFs //
+    ///////////////////////////
 
-    /// CF for storing staged ledgers
-    fn ledgers_cf(&self) -> &ColumnFamily;
+    /// CF for storing best ledger accounts
+    fn best_ledger_accounts_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing block ledger diffs
-    fn block_ledger_diff_cf(&self) -> &ColumnFamily;
+    /// CF for sorting best ledger accounts by balance
+    fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing number of best ledger delegations
+    fn best_ledger_accounts_num_delegations_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing best ledger account delegations
+    fn best_ledger_accounts_delegations_cf(&self) -> &ColumnFamily;
+
+    /////////////////////////////
+    // Staged ledger store CFs //
+    /////////////////////////////
+
+    /// CF for storing staged ledger accounts
+    fn staged_ledger_accounts_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting staged ledger accounts by balance
+    fn staged_ledger_account_balance_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing number of staged ledger delegations
+    fn staged_ledger_account_num_delegations_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing staged ledger account delegations
+    fn staged_ledger_account_delegations_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing staged ledger hash -> state hash
+    fn staged_ledger_hash_to_block_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing which staged ledgers have been persisted
+    fn staged_ledgers_persisted_cf(&self) -> &ColumnFamily;
 
     /// CF for storing block staged ledger hashes
+    /// state hash -> staged ledger hash
     fn block_staged_ledger_hash_cf(&self) -> &ColumnFamily;
 
+    //////////////////////////////
+    // Staking ledger store CFs //
+    //////////////////////////////
+
     /// CF for storing staking ledgers
-    fn staking_ledgers_cf(&self) -> &ColumnFamily;
+    fn staking_ledger_accounts_cf(&self) -> &ColumnFamily;
 
     /// CF for storing aggregated staking delegations
     fn staking_delegations_cf(&self) -> &ColumnFamily;
+
+    /// CF for tracking persisted staking ledgers
+    fn staking_ledger_persisted_cf(&self) -> &ColumnFamily;
 
     /// CF for storing staking ledger epochs
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily;
@@ -184,11 +204,17 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing staking ledger genesis hashes
     fn staking_ledger_genesis_hash_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing staking ledger total currencies
+    fn staking_ledger_total_currency_cf(&self) -> &ColumnFamily;
+
     /// CF for sorting staking ledger accounts by balance
-    fn staking_ledger_balance_cf(&self) -> &ColumnFamily;
+    fn staking_ledger_balance_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for sorting staking ledger accounts by stake (total delegations)
-    fn staking_ledger_stake_cf(&self) -> &ColumnFamily;
+    fn staking_ledger_stake_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch staking account totals
+    fn staking_ledger_accounts_count_epoch_cf(&self) -> &ColumnFamily;
 
     /////////////////////
     // SNARK store CFs //
@@ -267,9 +293,6 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per epoch snark totals
     fn snarks_epoch_cf(&self) -> &ColumnFamily;
-
-    /// CF for per epoch snark totals
-    fn staking_ledger_accounts_epoch_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch per acccount snark totals
     fn snarks_pk_epoch_cf(&self) -> &ColumnFamily;
