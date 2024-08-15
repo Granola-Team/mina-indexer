@@ -8,13 +8,16 @@ use crate::{
 use speedb::{DBIterator, IteratorMode};
 
 pub trait BestLedgerStore {
-    /// Get the best ledger (associated with the best block)
-    fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
+    /// Get pk's best ledger account
+    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
 
-    /// Update pk's account
+    /// Get the best ledger
+    fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>>;
+
+    /// Update pk's best ledger account
     fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()>;
 
-    /// Updates balance-sorted accounts
+    /// Updates best ledger accounts
     fn update_best_accounts(
         &self,
         state_hash: &BlockHash,
@@ -28,9 +31,6 @@ pub trait BestLedgerStore {
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
     ) -> anyhow::Result<DBAccountUpdate>;
-
-    /// Get pk's account balance
-    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
 
     /// Remove pk delegation
     fn remove_pk_delegate(&self, pk: PublicKey) -> anyhow::Result<()>;
@@ -50,16 +50,20 @@ pub trait BestLedgerStore {
     /// Get best ledger accounts count
     fn get_num_accounts(&self) -> anyhow::Result<Option<u32>>;
 
+    /// Build the best ledger from the CF representation
+    fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
+
     ///////////////
     // Iterators //
     ///////////////
 
-    /// Iterator for balance-sorted accounts
-    /// `{balance}{pk} -> _`
+    /// Iterator for balance-sorted best ledger accounts
     /// ```
+    /// {balance}{pk} -> _
+    /// where
     /// - balance: 8 BE bytes
     /// - pk:      [PublicKey::LEN] bytes
-    fn account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
 pub type DBAccountUpdate = DBUpdate<AccountDiff>;
