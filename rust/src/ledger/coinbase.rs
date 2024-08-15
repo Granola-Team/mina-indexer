@@ -124,7 +124,7 @@ impl Coinbase {
             .collect()
     }
 
-    pub fn account_diffs_coinbase_mut(&self, account_diffs: &mut Vec<Vec<AccountDiff>>) {
+    pub fn account_diffs_coinbase_mut(&self, account_diffs: &mut [Vec<AccountDiff>]) {
         let fee_transfer = self.fee_transfer();
         if let Some(fee_transfer_pair) = account_diffs.iter_mut().find(|pair| {
             matches!(pair.as_slice(),
