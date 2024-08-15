@@ -117,10 +117,10 @@ impl Coinbase {
 
     // For fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK
     // work
-    pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
+    pub fn fee_transfer(&self) -> Vec<Vec<PaymentDiff>> {
         self.get_transfers()
             .into_iter()
-            .flat_map(|transfer| self.create_payment_diffs(transfer))
+            .map(|transfer| self.create_payment_diffs(transfer))
             .collect()
     }
 
@@ -162,7 +162,7 @@ impl Coinbase {
     }
 
     // only apply if "coinbase" =/= [ "Zero" ]
-    pub fn as_account_diff(self) -> Vec<AccountDiff> {
+    pub fn as_account_diff(self) -> Vec<Vec<AccountDiff>> {
         let mut res = vec![];
         if self.is_coinbase_applied() {
             res.append(&mut AccountDiff::from_coinbase(self));
@@ -207,13 +207,18 @@ mod coinbase_tests {
 
         let payment_diffs = coinbase.fee_transfer();
 
-        assert_eq!(payment_diffs.len(), 2);
-        assert_eq!(payment_diffs[0].public_key, transfer.receiver_pk);
-        assert_eq!(payment_diffs[0].amount, transfer.fee.into());
-        assert_eq!(payment_diffs[0].update_type, UpdateType::Credit);
-        assert_eq!(payment_diffs[1].public_key, coinbase.receiver);
-        assert_eq!(payment_diffs[1].amount, transfer.fee.into());
-        assert_eq!(payment_diffs[1].update_type, UpdateType::Debit(None));
+        assert_eq!(payment_diffs[0].len(), 2);
+
+        if let [credit, debit] = &payment_diffs[0][..] {
+            assert_eq!(credit.public_key, transfer.receiver_pk);
+            assert_eq!(credit.amount, transfer.fee.into());
+            assert_eq!(credit.update_type, UpdateType::Credit);
+            assert_eq!(debit.public_key, coinbase.receiver);
+            assert_eq!(debit.amount, transfer.fee.into());
+            assert_eq!(debit.update_type, UpdateType::Debit(None));
+        } else {
+            panic!("Expected debit/credit pair")
+        }
     }
 
     #[test]

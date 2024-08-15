@@ -80,8 +80,8 @@ impl InternalCommand {
             let fee_transfer = coinbase.fee_transfer();
             if let [_, _] = &all_account_diff_fees[0][..] {
                 all_account_diff_fees[0] = vec![
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone()),
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][0].clone()),
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][1].clone()),
                 ]
             }
         }

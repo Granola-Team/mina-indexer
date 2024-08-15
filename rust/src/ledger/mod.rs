@@ -114,6 +114,7 @@ impl Ledger {
         let keys: Vec<PublicKey> = diff
             .account_diffs
             .iter()
+            .flatten()
             .map(|diff| diff.public_key())
             .collect();
         keys.iter().for_each(|public_key| {
@@ -123,7 +124,7 @@ impl Ledger {
             }
         });
 
-        for diff in diff.account_diffs.iter() {
+        for diff in diff.account_diffs.iter().flatten() {
             match self.accounts.remove(&diff.public_key()) {
                 Some(account_before) => {
                     self.accounts.insert(
@@ -195,6 +196,7 @@ impl Ledger {
         let keys: Vec<PublicKey> = diff
             .account_diffs
             .iter()
+            .flatten()
             .map(|diff| diff.public_key())
             .collect();
         keys.into_iter().for_each(|public_key| {
@@ -204,7 +206,7 @@ impl Ledger {
             }
         });
 
-        for diff in diff.account_diffs.iter() {
+        for diff in diff.account_diffs.iter().flatten() {
             match self.accounts.remove(&diff.public_key()) {
                 Some(account_before) => {
                     self.accounts.insert(
@@ -460,11 +462,11 @@ mod tests {
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
-            account_diffs: vec![AccountDiff::Payment(PaymentDiff {
+            account_diffs: vec![vec![AccountDiff::Payment(PaymentDiff {
                 public_key: public_key.clone(),
                 amount: diff_amount,
                 update_type: UpdateType::Credit,
-            })],
+            })]],
         };
         let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)
@@ -492,11 +494,11 @@ mod tests {
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
             public_keys_seen: vec![],
-            account_diffs: vec![AccountDiff::Delegation(DelegationDiff {
+            account_diffs: vec![vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
                 delegate: delegate_key.clone(),
                 nonce: prev_nonce + 1,
-            })],
+            })]],
         };
         let ledger = Ledger { accounts }
             .apply_diff(&ledger_diff)

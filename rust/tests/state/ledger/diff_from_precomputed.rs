@@ -56,7 +56,7 @@ async fn account_diffs() {
     let initial_ledger = ledger.clone();
 
     println!("=== Account diffs ===");
-    for diff in diff.account_diffs {
+    for diff in diff.account_diffs.iter().flatten() {
         match diff {
             AccountDiff::Payment(PaymentDiff {
                 public_key,
@@ -96,7 +96,7 @@ async fn account_diffs() {
                         if let Some((balance, _)) = ledger.get_mut(&public_key) {
                             *balance += amount.0 as i64;
                         } else {
-                            ledger.insert(public_key, (amount.0 as i64, 0));
+                            ledger.insert(public_key.clone(), (amount.0 as i64, 0));
                         }
                     }
                 }
@@ -121,7 +121,7 @@ async fn account_diffs() {
                 if let Some((balance, _)) = ledger.get_mut(&public_key) {
                     *balance += amount.0 as i64;
                 } else {
-                    ledger.insert(public_key, (amount.0 as i64, 0));
+                    ledger.insert(public_key.clone(), (amount.0 as i64, 0));
                 }
             }
             AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
