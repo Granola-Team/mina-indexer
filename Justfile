@@ -9,6 +9,13 @@ export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
+alias c := check
+alias tu := test-unit
+alias tud := test-unit-dev
+alias t1 := tier1
+alias t2 := tier2
+alias t3 := tier3
+
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
 # Non-Nix environment needs nightly toolchain installed and requires +nightly
@@ -64,9 +71,9 @@ clean:
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
-test-unit:
+test-unit test='':
   @echo "--- Invoking 'cargo nextest'"
-  cd rust && time cargo nextest run
+  cd rust && time cargo nextest run {{test}}
 
 test-unit-dev: lint test-unit
 
