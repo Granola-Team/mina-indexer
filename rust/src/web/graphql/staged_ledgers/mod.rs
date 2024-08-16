@@ -1,6 +1,14 @@
 use super::db;
-use crate::ledger::{account::Account, store::staged::StagedLedgerStore};
+use crate::{
+    canonicity::store::CanonicityStore,
+    ledger::{
+        account::Account,
+        store::staged::{split_staged_account_balance_sort_key, StagedLedgerStore},
+    },
+};
+use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use log::error;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
@@ -36,72 +44,59 @@ impl StagedLedgerQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<StagedLedgerAccount>>> {
         let db = db(ctx);
+        let direction = match sort_by {
+            Some(StagedLedgerSortByInput::BalanceDesc) | None => speedb::Direction::Reverse,
+            Some(StagedLedgerSortByInput::BalanceAsc) => speedb::Direction::Forward,
+        };
+        let (ledger_state_hash, iter) = {
+            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
+                if let Some(state_hash) =
+                    db.get_staged_ledger_block_state_hash(&ledger_hash.clone().into())?
+                {
+                    (
+                        state_hash.clone(),
+                        db.staged_ledger_account_balance_iterator(&state_hash, direction),
+                    )
+                } else {
+                    error!("Missing block corresponding to staged ledger {ledger_hash}");
+                    return Ok(None);
+                }
+            } else if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
+                (
+                    state_hash.clone().into(),
+                    db.staged_ledger_account_balance_iterator(&state_hash.into(), direction),
+                )
+            } else if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length)
+            {
+                if let Some(state_hash) = db.get_canonical_hash_at_height(blockchain_length)? {
+                    (
+                        state_hash.clone(),
+                        db.staged_ledger_account_balance_iterator(&state_hash, direction),
+                    )
+                } else {
+                    error!("Missing block at height {blockchain_length}");
+                    return Ok(None);
+                }
+            } else {
+                return Ok(None);
+            }
+        };
 
-        // ledger hash query
-        if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger(&ledger_hash.into())?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
+        let mut accounts = vec![];
+        for (key, _) in iter.flatten() {
+            if let Some((state_hash, _, pk)) = split_staged_account_balance_sort_key(&key) {
+                if ledger_state_hash != state_hash || accounts.len() >= limit {
+                    break;
+                }
 
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
+                let account = db
+                    .get_staged_account(pk.clone(), state_hash.clone())?
+                    .with_context(|| format!("staged account {pk}, state hash {state_hash}"))
+                    .expect("account exists");
+                accounts.push(account.into());
+            }
         }
-
-        // state hash query
-        if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_state_hash(&state_hash.into(), true)?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
-
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
-        }
-
-        // blockchain length query
-        if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_block_height(blockchain_length, true)?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
-
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
-        }
-
-        Ok(None)
-    }
-}
-
-fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
-    match sort_by {
-        Some(StagedLedgerSortByInput::BalanceAsc) => {
-            accts.sort_by_cached_key(|x| (x.balance_nanomina, x.public_key.clone()))
-        }
-        Some(StagedLedgerSortByInput::BalanceDesc) => {
-            reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
-            accts.reverse();
-        }
-        None => (),
+        Ok(Some(accounts))
     }
 }
 
