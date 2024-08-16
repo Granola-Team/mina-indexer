@@ -88,10 +88,7 @@ impl InternalCommand {
                     "Credit/Debit pairs do no sum to zero"
                 );
                 match (credit, debit) {
-                    (
-                        AccountDiff::CreateAccount(account_credit),
-                        AccountDiff::CreateAccount(account_debit),
-                    ) => {
+                    (AccountDiff::CreateAccount(_), AccountDiff::CreateAccount(_)) => {
                         println!(
                             "AccountDiff::CreateAccount credit and debit pairs are present but unhandled"
                         );
