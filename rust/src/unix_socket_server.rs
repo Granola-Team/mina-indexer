@@ -10,7 +10,7 @@ use crate::{
         self,
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
-        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
+        store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         LedgerHash,
     },
     snark_work::store::SnarkStore,
@@ -94,33 +94,16 @@ pub async fn handle_connection(
             ClientCli::Accounts(__) => match __ {
                 Accounts::PublicKey { public_key: pk } => {
                     info!("Received account command for {pk}");
-
-                    if let Some(best_tip) = db.get_best_block()? {
-                        if let Some(ledger) =
-                            db.get_ledger_state_hash(&best_tip.state_hash(), false)?
-                        {
-                            if !public_key::is_valid_public_key(&pk) {
-                                invalid_public_key(&pk)
-                            } else {
-                                let pk: PublicKey = pk.into();
-                                let account = ledger.accounts.get(&pk);
-                                if let Some(account) = account {
-                                    info!("Writing account {pk} to client");
-                                    Some(format!("{account}"))
-                                } else {
-                                    warn!("Account {pk} does not exist");
-                                    Some(format!("Account {pk} does not exist"))
-                                }
-                            }
-                        } else {
-                            error!("Best ledger not in database {}", best_tip.summary());
-                            Some(format!(
-                                "Best ledger not in database {}",
-                                best_tip.summary()
-                            ))
-                        }
+                    if !public_key::is_valid_public_key(&pk) {
+                        invalid_public_key(&pk)
                     } else {
-                        best_tip_missing_from_db()
+                        let pk: PublicKey = pk.into();
+                        if let Some(account) = db.get_best_account(&pk)? {
+                            info!("Writing account {pk} to client");
+                            Some(format!("{account}"))
+                        } else {
+                            account_missing_from_db(&pk)
+                        }
                     }
                 }
             },
@@ -602,7 +585,6 @@ pub async fn handle_connection(
                             db.get_ledger_state_hash(&best_tip.state_hash(), false)?
                         {
                             let ledger = ledger.to_string_pretty();
-
                             if path.is_none() {
                                 debug!("Writing best ledger to stdout");
                                 Some(ledger)
@@ -612,7 +594,6 @@ pub async fn handle_connection(
                                     file_must_not_be_a_directory(&path)
                                 } else {
                                     debug!("Writing best ledger to {}", path.display());
-
                                     std::fs::write(path.clone(), ledger)?;
                                     Some(format!("Best ledger written to {}", path.display()))
                                 }
@@ -634,7 +615,6 @@ pub async fn handle_connection(
                     // check if ledger or state hash and use appropriate getter
                     if block::is_valid_state_hash(&hash) {
                         trace!("{hash} is a state hash");
-
                         if let Some(ledger) =
                             db.get_ledger_state_hash(&hash.clone().into(), true)?
                         {
@@ -732,12 +712,10 @@ pub async fn handle_connection(
             ClientCli::StakingLedgers(__) => match __ {
                 StakingLedgers::Hash { hash, path } => {
                     info!("Received staking-ledgers-hash command for {hash}");
-
                     if ledger::is_valid_ledger_hash(&hash) {
                         trace!("{hash} is a ledger hash");
-
                         if let Some(staking_ledger) =
-                            db.get_staking_ledger_by_hash(&hash.clone().into(), None, None)?
+                            db.get_staking_ledger(&hash.clone().into(), None, &None)?
                         {
                             let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                             if path.is_none() {
@@ -772,11 +750,10 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received staking-ledgers-epoch {epoch} command");
-
                     if !block::is_valid_state_hash(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if let Some(staking_ledger) =
-                        db.get_staking_ledger_at_epoch(epoch, Some(genesis_state_hash.into()))?
+                        db.build_staking_ledger(epoch, &Some(genesis_state_hash.into()))?
                     {
                         let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                         if path.is_none() {
@@ -809,17 +786,13 @@ pub async fn handle_connection(
                     genesis_state_hash,
                     public_key: pk,
                 } => {
-                    info!(
-                        "Received staking-delegations command for pk {} epoch {}",
-                        pk, epoch,
-                    );
-
+                    info!("Received staking ledger account command for pk {pk} epoch {epoch}");
                     if !block::is_valid_state_hash(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
                     } else if let Some(aggregated_delegations) =
-                        db.get_delegations_epoch(epoch, &Some(genesis_state_hash.into()))?
+                        db.build_aggregated_delegations(epoch, &Some(genesis_state_hash.into()))?
                     {
                         let pk: PublicKey = pk.into();
                         let epoch = aggregated_delegations.epoch;
@@ -862,10 +835,9 @@ pub async fn handle_connection(
                     genesis_state_hash,
                     path,
                 } => {
-                    info!("Received staking-delegations command for epoch {}", epoch);
-
+                    info!("Received staking-delegations command for epoch {epoch}");
                     let aggregated_delegations =
-                        db.get_delegations_epoch(epoch, &Some(genesis_state_hash.into()))?;
+                        db.build_aggregated_delegations(epoch, &Some(genesis_state_hash.into()))?;
                     if let Some(agg_del_str) = aggregated_delegations
                         .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
                     {
@@ -879,15 +851,13 @@ pub async fn handle_connection(
                             let path = path.unwrap();
                             if !path.is_dir() {
                                 debug!(
-                                    "Writing aggregated staking delegations epoch {} to {}",
-                                    epoch,
+                                    "Writing aggregated staking delegations epoch {epoch} to {}",
                                     path.display()
                                 );
 
                                 std::fs::write(&path, agg_del_str)?;
                                 Some(format!(
-                                    "Aggregated staking delegations epoch {} written to {}",
-                                    epoch,
+                                    "Aggregated staking delegations epoch {epoch} written to {}",
                                     path.display()
                                 ))
                             } else {
@@ -895,10 +865,9 @@ pub async fn handle_connection(
                             }
                         }
                     } else {
-                        error!("Unable to aggregate staking delegations epoch {}", epoch);
+                        error!("Unable to aggregate staking delegations epoch {epoch}");
                         Some(format!(
-                            "Unable to aggregate staking delegations epoch {}",
-                            epoch
+                            "Unable to aggregate staking delegations epoch {epoch}"
                         ))
                     }
                 }
@@ -1247,7 +1216,7 @@ fn try_replace_old_socket(e: io::Error, unix_socket_path: &Path) -> io::Result<U
 
 pub fn remove_unix_socket(unix_socket_path: &Path) -> io::Result<()> {
     std::fs::remove_file(unix_socket_path)?;
-    debug!("Removed Unix domain socket: {:?}", unix_socket_path);
+    debug!("Removed Unix domain socket: {unix_socket_path:?}");
     Ok(())
 }
 
@@ -1256,25 +1225,31 @@ mod helpers {
 
     pub fn invalid_public_key(input: &str) -> Option<String> {
         let msg = format!("Invalid public key: {input}");
-        error!("Invalid public key: {}", input);
+        error!("Invalid public key: {input}");
         Some(msg)
     }
 
     pub fn invalid_tx_hash(input: &str) -> Option<String> {
         let msg = format!("Invalid transaction hash: {input}");
-        error!("Invalid transaction hash: {}", input);
+        error!("Invalid transaction hash: {input}");
         Some(msg)
     }
 
     pub fn invalid_state_hash(input: &str) -> Option<String> {
         let msg = format!("Invalid state hash: {input}");
-        error!("Invalid state hash: {}", input);
+        error!("Invalid state hash: {input}");
+        Some(msg)
+    }
+
+    pub fn account_missing_from_db(pk: &PublicKey) -> Option<String> {
+        let msg = format!("Account missing from store: {pk}");
+        error!("Account missing from store: {pk}");
         Some(msg)
     }
 
     pub fn block_missing_from_db(state_hash: &str) -> String {
         let msg = format!("Block missing from store: {state_hash}");
-        error!("Block missing from store: {}", state_hash);
+        error!("Block missing from store: {state_hash}");
         msg
     }
 

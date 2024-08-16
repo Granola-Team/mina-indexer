@@ -1246,14 +1246,14 @@ impl IndexerState {
                     genesis_state_hash,
                 }) => {
                     info!("Replaying aggregate delegations epoch {epoch}");
+                    let genesis_state_hash = Some(genesis_state_hash.clone());
                     let indexer_store = self.indexer_store_or_panic();
-                    if let Some(aggregated_delegations) = indexer_store
-                        .get_delegations_epoch(*epoch, &Some(genesis_state_hash.to_owned()))?
+                    if let Some(aggregated_delegations) =
+                        indexer_store.build_aggregated_delegations(*epoch, &genesis_state_hash)?
                     {
-                        if let Some(staking_ledger) = indexer_store.get_staking_ledger_at_epoch(
-                            *epoch,
-                            Some(genesis_state_hash.to_owned()),
-                        )? {
+                        if let Some(staking_ledger) =
+                            indexer_store.build_staking_ledger(*epoch, &genesis_state_hash)?
+                        {
                             // check delegation calculations
                             assert_eq!(
                                 aggregated_delegations,
@@ -1303,7 +1303,7 @@ impl IndexerState {
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
         if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger_at_epoch(*epoch, None)?
+            indexer_store.get_staking_ledger(ledger_hash, None, &None)?
         {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
@@ -1311,9 +1311,9 @@ impl IndexerState {
                 "Invalid ledger hash"
             );
 
-            if let Some(staking_ledger_epoch) = indexer_store.get_staking_ledger_at_epoch(
+            if let Some(staking_ledger_epoch) = indexer_store.build_staking_ledger(
                 *epoch,
-                Some(staking_ledger_hash.genesis_state_hash.clone()),
+                &Some(staking_ledger_hash.genesis_state_hash.clone()),
             )? {
                 assert_eq!(staking_ledger_epoch.epoch, *epoch, "Invalid epoch");
                 assert_eq!(
