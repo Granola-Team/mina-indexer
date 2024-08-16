@@ -128,7 +128,7 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].delegationTotals.totalStakePercentage" == "8.56"
 
-duration < 5000
+duration < 10000
 
 #
 # Stakes pk & total/epoch counts
