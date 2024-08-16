@@ -14,8 +14,8 @@ use mina_indexer::{
 use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
-async fn check_balance() -> anyhow::Result<()> {
-    let store_dir = setup_new_db_dir("balance-sorted-db")?;
+async fn check_best_accounts() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("best-ledger-balance-sorted-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger =
@@ -41,9 +41,9 @@ async fn check_balance() -> anyhow::Result<()> {
 
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
-    let best_ledger = indexer_store.get_best_ledger()?.unwrap();
+    let best_ledger = indexer_store.build_best_ledger()?.unwrap();
     for (n, (key, _)) in indexer_store
-        .account_balance_iterator(speedb::IteratorMode::End)
+        .best_ledger_account_balance_iterator(speedb::IteratorMode::End)
         .flatten()
         .enumerate()
     {
