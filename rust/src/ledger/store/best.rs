@@ -1,20 +1,17 @@
 //! Store of the best ledger
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{internal::InternalCommand, Command, Payment},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
+    block::BlockHash,
     ledger::{
         account::Account,
-        coinbase::Coinbase,
-        diff::account::{AccountDiff, PaymentDiff, UpdateType},
+        diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
         Ledger,
     },
     store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
-use std::{collections::HashMap, ops::Sub as _};
+use std::collections::HashMap;
 
 pub trait BestLedgerStore {
     /// Get the best ledger (associated with the best block)
