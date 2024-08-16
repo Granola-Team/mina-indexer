@@ -132,18 +132,21 @@ impl InternalCommand {
                         block.state_hash(),
                     ),
                 }
-            } else if let [unbalanced_pair] = &account_diff_pairs[..] {
-                match unbalanced_pair {
+            } else if let [imbalanced_diff] = &account_diff_pairs[..] {
+                match imbalanced_diff {
                     AccountDiff::Coinbase(coinbase) => internal_cmds.push(Self::Coinbase {
                         receiver: coinbase.public_key.clone(),
                         amount: coinbase.amount.0,
                     }),
+                    AccountDiff::CreateAccount(create_acct) => {
+                        println!("Ignored AccountDiff: {:#?}", create_acct);
+                    }
                     _ => {
                         panic!(
-                            "Unrecognized unbalanced credit/debit pair. Block: {:#?}, hash: {:#?}, {:#?}",
+                            "Unmatched AccountDiff::{:#?}. (Block: {:#?}, hash: {:#?})",
+                            imbalanced_diff,
                             block.blockchain_length(),
                             block.state_hash(),
-                            unbalanced_pair
                         );
                     }
                 };
