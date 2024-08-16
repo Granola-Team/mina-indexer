@@ -262,9 +262,11 @@ impl AccountDiff {
                                                 && (*total_fee - MAINNET_ACCOUNT_CREATION_FEE.0)
                                                     == fee_transfer_receiver_balance
                                             {
-                                                res.push(Self::account_creation_payment_diff(
-                                                    &prover,
-                                                ));
+                                                res.push(vec![
+                                                    AccountDiff::account_creation_payment_diff(
+                                                        &prover,
+                                                    ),
+                                                ]);
                                             }
                                         }
                                     }
