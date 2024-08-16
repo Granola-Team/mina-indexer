@@ -121,8 +121,8 @@ impl DBAccountUpdate {
                         );
                     }
                 }
-                CreateAccount(pk) => {
-                    res.insert(pk.clone(), None);
+                CreateAccount(diff) => {
+                    res.insert(diff.public_key.clone(), None);
                 }
                 Delegation(diff) => {
                     if let Some((acc_balance, acc_nonce, _)) = res.remove(&pk).unwrap_or_default() {
@@ -201,8 +201,8 @@ impl DBAccountUpdate {
                         );
                     }
                 }
-                CreateAccount(pk) => {
-                    res.insert(pk.clone(), Some((0, 0, None)));
+                CreateAccount(diff) => {
+                    res.insert(diff.public_key.clone(), Some((0, 0, None)));
                 }
                 Delegation(diff) => {
                     if let Some((acc_balance, acc_nonce, _)) = res.remove(&pk).unwrap_or_default() {
@@ -324,8 +324,7 @@ impl DBAccountUpdate {
                 .accounts_created()
                 .0
                 .keys()
-                .cloned()
-                .map(AccountDiff::CreateAccount)
+                .map(AccountDiff::account_creation_payment_diff)
                 .collect(),
         );
         res
