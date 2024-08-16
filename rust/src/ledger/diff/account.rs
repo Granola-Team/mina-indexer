@@ -87,13 +87,13 @@ impl AccountDiff {
         let public_key = new_account.clone();
         vec![
             AccountDiff::CreateAccount(PaymentDiff {
-                public_key,
-                update_type: UpdateType::Debit(None),
+                public_key: PublicKey("void".to_string()),
+                update_type: UpdateType::Credit,
                 amount: Amount(MAINNET_ACCOUNT_CREATION_FEE.0),
             }),
             AccountDiff::CreateAccount(PaymentDiff {
-                public_key: PublicKey("void".to_string()),
-                update_type: UpdateType::Credit,
+                public_key,
+                update_type: UpdateType::Debit(None),
                 amount: Amount(MAINNET_ACCOUNT_CREATION_FEE.0),
             }),
         ]

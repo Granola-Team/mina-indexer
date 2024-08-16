@@ -89,6 +89,14 @@ impl InternalCommand {
                 );
                 match (credit, debit) {
                     (
+                        AccountDiff::CreateAccount(account_credit),
+                        AccountDiff::CreateAccount(account_debit),
+                    ) => {
+                        println!(
+                            "AccountDiff::CreateAccount credit and debit pairs are present but unhandled"
+                        );
+                    }
+                    (
                         AccountDiff::FeeTransfer(fee_transfer_receiver),
                         AccountDiff::FeeTransfer(fee_transfer_sender),
                     ) => {
@@ -132,12 +140,6 @@ impl InternalCommand {
                         receiver: coinbase.public_key.clone(),
                         amount: coinbase.amount.0,
                     }),
-                    AccountDiff::CreateAccount(create_acct) => {
-                        println!(
-                            "InternalCommand::from_precomputed skipped processing of AccountDiff::{:#?}",
-                            create_acct
-                        );
-                    }
                     _ => {
                         panic!(
                             "Unmatched AccountDiff::{:#?}. (Block: {:#?}, hash: {:#?})",
