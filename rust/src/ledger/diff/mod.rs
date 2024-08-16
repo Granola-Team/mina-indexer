@@ -31,57 +31,35 @@ pub struct LedgerDiff {
     pub new_pk_balances: BTreeMap<PublicKey, u64>,
 
     /// Account updates
-    pub account_diffs: Vec<AccountDiff>,
+    pub account_diffs: Vec<Vec<AccountDiff>>,
 }
 
 impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
-        let mut account_diff_fees: Vec<AccountDiff> =
-            AccountDiff::from_block_fees(precomputed_block)
-                .into_iter()
-                .flatten()
-                .collect();
+        let mut account_diff_fees: Vec<Vec<AccountDiff>> =
+            AccountDiff::from_block_fees(precomputed_block);
         // applied user commands
-        let mut account_diff_txns: Vec<AccountDiff> = precomputed_block
+        let mut account_diff_txns: Vec<Vec<AccountDiff>> = precomputed_block
             .commands()
             .into_iter()
             .flat_map(|user_cmd_with_status| {
                 if user_cmd_with_status.is_applied() {
                     AccountDiff::from_command(user_cmd_with_status.to_command())
                 } else {
-                    vec![AccountDiff::FailedTransactionNonce(
+                    vec![vec![AccountDiff::FailedTransactionNonce(
                         FailedTransactionNonceDiff {
                             public_key: user_cmd_with_status.sender(),
                             nonce: user_cmd_with_status.nonce() + 1,
                         },
-                    )]
+                    )]]
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
-            let fee_transfer = coinbase.fee_transfer();
-            let idx = account_diff_fees
-                .iter()
-                .enumerate()
-                .position(|(n, diff)| match diff {
-                    AccountDiff::FeeTransfer(fee) => {
-                        *fee == fee_transfer[0]
-                            && match &account_diff_fees[n + 1] {
-                                AccountDiff::FeeTransfer(fee) => *fee == fee_transfer[1],
-                                _ => false,
-                            }
-                    }
-                    _ => false,
-                });
-            idx.iter().for_each(|i| {
-                account_diff_fees[*i] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone());
-                account_diff_fees[*i + 1] =
-                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone());
-            });
+            coinbase.account_diffs_coinbase_mut(&mut account_diff_fees);
         }
 
         let mut account_diffs = Vec::new();
@@ -136,7 +114,7 @@ impl LedgerDiff {
         acc
     }
 
-    pub fn from(value: &[(&str, &str, AccountDiffType, u64)]) -> Vec<AccountDiff> {
+    pub fn from(value: &[(&str, &str, AccountDiffType, u64)]) -> Vec<Vec<AccountDiff>> {
         value
             .iter()
             .flat_map(|(s, r, t, a)| AccountDiff::from(s, r, t.clone(), *a))
@@ -1136,7 +1114,13 @@ mod tests {
         ]);
         ledger_diff.account_diffs.sort();
         expect_diffs.sort();
-        assert_eq!(ledger_diff.account_diffs, expect_diffs);
+        for (i, diff) in ledger_diff.account_diffs.iter().enumerate() {
+            assert_eq!(
+                *diff, expect_diffs[i],
+                "{i}th diff mismatch\n{:#?}\n{:#?}",
+                ledger_diff.account_diffs, expect_diffs,
+            );
+        }
         Ok(())
     }
 }

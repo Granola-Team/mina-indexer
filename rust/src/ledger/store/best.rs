@@ -324,7 +324,7 @@ impl DBAccountUpdate {
                 .accounts_created()
                 .0
                 .keys()
-                .map(AccountDiff::account_creation_payment_diff)
+                .flat_map(AccountDiff::account_creation_payment_diff)
                 .collect(),
         );
         res

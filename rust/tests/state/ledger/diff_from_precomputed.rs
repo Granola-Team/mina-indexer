@@ -56,7 +56,7 @@ async fn account_diffs() {
     let initial_ledger = ledger.clone();
 
     println!("=== Account diffs ===");
-    for diff in diff.account_diffs {
+    for diff in diff.account_diffs.iter().flatten() {
         match diff {
             AccountDiff::Payment(PaymentDiff {
                 public_key,
@@ -80,7 +80,7 @@ async fn account_diffs() {
 
                 match update_type {
                     UpdateType::Debit(new_nonce) => {
-                        if let Some((balance, nonce)) = ledger.get_mut(&public_key) {
+                        if let Some((balance, nonce)) = ledger.get_mut(public_key) {
                             if amount.0 as i64 > *balance {
                                 println!("Debit amount exceeded balance");
                                 panic!();
@@ -93,10 +93,10 @@ async fn account_diffs() {
                         }
                     }
                     UpdateType::Credit => {
-                        if let Some((balance, _)) = ledger.get_mut(&public_key) {
+                        if let Some((balance, _)) = ledger.get_mut(public_key) {
                             *balance += amount.0 as i64;
                         } else {
-                            ledger.insert(public_key, (amount.0 as i64, 0));
+                            ledger.insert(public_key.clone(), (amount.0 as i64, 0));
                         }
                     }
                 }
@@ -118,10 +118,10 @@ async fn account_diffs() {
                 println!("\n* Coinbase");
                 println!("public_key: {public_key}");
                 println!("amount:     {}", amount.0);
-                if let Some((balance, _)) = ledger.get_mut(&public_key) {
+                if let Some((balance, _)) = ledger.get_mut(public_key) {
                     *balance += amount.0 as i64;
                 } else {
-                    ledger.insert(public_key, (amount.0 as i64, 0));
+                    ledger.insert(public_key.clone(), (amount.0 as i64, 0));
                 }
             }
             AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
@@ -131,7 +131,7 @@ async fn account_diffs() {
                 println!("\n* Failed transaction");
                 println!("public_key: {public_key}");
                 println!("nonce:      {new_nonce}");
-                if let Some((_, nonce)) = ledger.get_mut(&public_key) {
+                if let Some((_, nonce)) = ledger.get_mut(public_key) {
                     *nonce += new_nonce.0;
                 }
             }
