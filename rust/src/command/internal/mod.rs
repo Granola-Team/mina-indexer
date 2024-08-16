@@ -139,7 +139,10 @@ impl InternalCommand {
                         amount: coinbase.amount.0,
                     }),
                     AccountDiff::CreateAccount(create_acct) => {
-                        println!("Ignored AccountDiff: {:#?}", create_acct);
+                        println!(
+                            "InternalCommand::from_precomputed skipped processing of AccountDiff::{:#?}",
+                            create_acct
+                        );
                     }
                     _ => {
                         panic!(
