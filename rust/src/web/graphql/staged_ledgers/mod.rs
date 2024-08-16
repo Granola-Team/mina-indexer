@@ -37,65 +37,38 @@ impl StagedLedgerQueryRoot {
     ) -> Result<Option<Vec<StagedLedgerAccount>>> {
         let db = db(ctx);
 
-        // ledger hash query
-        if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger(&ledger_hash.into())?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
+        // build the staged ledger from:
+        // - block state hash
+        // - staged ledger hash
+        // - canonical block height
+        let staged_ledger =
+            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
+                db.get_staged_ledger_at_state_hash(&state_hash.into(), false)?
+            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
+                db.get_staged_ledger_at_ledger_hash(&ledger_hash.into(), false)?
+            } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
+                db.get_staged_ledger_at_block_height(block_height, false)?
+            } else {
+                return Ok(None);
+            };
+        let mut accounts = staged_ledger.map_or(vec![], |ledger| {
+            ledger
+                .accounts
+                .into_values()
+                .map(StagedLedgerAccount::from)
+                .collect()
+        });
 
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
-        }
-
-        // state hash query
-        if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_state_hash(&state_hash.into(), true)?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
-
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
-        }
-
-        // blockchain length query
-        if let Some(blockchain_length) = query.as_ref().and_then(|q| q.blockchain_length) {
-            let mut accounts: Vec<StagedLedgerAccount> = db
-                .get_ledger_block_height(blockchain_length, true)?
-                .map_or(vec![], |ledger| {
-                    ledger
-                        .accounts
-                        .into_values()
-                        .map(<Account as Into<StagedLedgerAccount>>::into)
-                        .collect()
-                });
-
-            reorder(&mut accounts, sort_by);
-            accounts.truncate(limit);
-            return Ok(Some(accounts));
-        }
-
-        Ok(None)
+        reorder(&mut accounts, sort_by);
+        accounts.truncate(limit);
+        Ok(Some(accounts))
     }
 }
 
 fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
     match sort_by {
         Some(StagedLedgerSortByInput::BalanceAsc) => {
-            accts.sort_by_cached_key(|x| (x.balance_nanomina, x.public_key.clone()))
+            accts.sort_by_cached_key(|x| (x.balance_nanomina, x.nonce, x.public_key.clone()))
         }
         Some(StagedLedgerSortByInput::BalanceDesc) => {
             reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
