@@ -264,7 +264,7 @@ impl AccountDiff {
                                             {
                                                 res.push(vec![
                                                     AccountDiff::account_creation_payment_diff(
-                                                        &prover,
+                                                        prover,
                                                     ),
                                                 ]);
                                             }
