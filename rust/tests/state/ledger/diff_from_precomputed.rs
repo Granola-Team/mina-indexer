@@ -101,8 +101,8 @@ async fn account_diffs() {
                     }
                 }
             }
-            AccountDiff::CreateAccount(pk) => {
-                println!("\n* Create:       {pk}");
+            AccountDiff::CreateAccount(PaymentDiff { public_key, .. }) => {
+                println!("\n* Create:       {public_key}");
             }
             AccountDiff::Delegation(DelegationDiff {
                 delegate,

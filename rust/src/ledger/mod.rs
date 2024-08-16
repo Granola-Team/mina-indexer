@@ -213,9 +213,9 @@ impl Ledger {
                             AccountDiff::Payment(payment_diff) => {
                                 Account::from_payment_unapply(account_before, payment_diff)
                             }
-                            AccountDiff::CreateAccount(pk) => {
-                                assert!(self.accounts.get(pk).is_some());
-                                self.accounts.remove(pk);
+                            AccountDiff::CreateAccount(payment_diff) => {
+                                assert!(self.accounts.get(&payment_diff.public_key).is_some());
+                                self.accounts.remove(&payment_diff.public_key);
                                 continue;
                             }
                             AccountDiff::Delegation(delegation_diff) => {
