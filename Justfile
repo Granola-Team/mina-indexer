@@ -9,7 +9,9 @@ export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
+# Useful aliases
 alias c := check
+alias cd := clean-dev
 alias tu := test-unit
 alias tud := test-unit-dev
 alias t1 := tier1
@@ -68,6 +70,10 @@ clean:
   rm -f result
   @echo "Consider also 'git clean -xdfn'"
 
+clean-dev:
+  @echo "Cleaning dev directory"
+  ./ops/regression-test.rb clean
+
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
@@ -93,6 +99,10 @@ debug-build:
 # Quick debug-build and regression-test
 bt subtest='': debug-build
   time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
+
+# Quick debug-build and continue regression-test
+ct subtest='': debug-build
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer continue {{subtest}}
 
 # Quick (debug) unit-test and regression-test
 tt subtest='': test-unit
