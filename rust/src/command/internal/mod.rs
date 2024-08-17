@@ -77,7 +77,13 @@ impl InternalCommand {
         // replace Fee_transfer with Fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
-            coinbase.account_diffs_coinbase_mut(&mut all_account_diff_fees);
+            let fee_transfer = coinbase.fee_transfer();
+            if let [_, _] = &all_account_diff_fees[0][..] {
+                all_account_diff_fees[0] = vec![
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[0].clone()),
+                    AccountDiff::FeeTransferViaCoinbase(fee_transfer[1].clone()),
+                ]
+            }
         }
 
         let mut internal_cmds: Vec<Self> = Vec::new();
@@ -88,11 +94,6 @@ impl InternalCommand {
                     "Credit/Debit pairs do no sum to zero"
                 );
                 match (credit, debit) {
-                    (AccountDiff::CreateAccount(_), AccountDiff::CreateAccount(_)) => {
-                        println!(
-                            "AccountDiff::CreateAccount credit and debit pairs are present but unhandled"
-                        );
-                    }
                     (
                         AccountDiff::FeeTransfer(fee_transfer_receiver),
                         AccountDiff::FeeTransfer(fee_transfer_sender),
@@ -137,6 +138,12 @@ impl InternalCommand {
                         receiver: coinbase.public_key.clone(),
                         amount: coinbase.amount.0,
                     }),
+                    AccountDiff::CreateAccount(create_acct) => {
+                        println!(
+                            "InternalCommand::from_precomputed skipped processing of AccountDiff::{:#?}",
+                            create_acct
+                        );
+                    }
                     _ => {
                         panic!(
                             "Unmatched AccountDiff::{:#?}. (Block: {:#?}, hash: {:#?})",

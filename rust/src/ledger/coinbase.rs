@@ -117,26 +117,11 @@ impl Coinbase {
 
     // For fee_transfer_via_coinbase, remove the original fee_trasnfer for SNARK
     // work
-    pub fn fee_transfer(&self) -> Vec<Vec<PaymentDiff>> {
+    pub fn fee_transfer(&self) -> Vec<PaymentDiff> {
         self.get_transfers()
             .into_iter()
-            .map(|transfer| self.create_payment_diffs(transfer))
+            .flat_map(|transfer| self.create_payment_diffs(transfer))
             .collect()
-    }
-
-    pub fn account_diffs_coinbase_mut(&self, account_diffs: &mut [Vec<AccountDiff>]) {
-        let fee_transfer = self.fee_transfer();
-        if let Some(fee_transfer_pair) = account_diffs.iter_mut().find(|pair| {
-            matches!(pair.as_slice(),
-                [AccountDiff::FeeTransfer(fee_transfer_credit), AccountDiff::FeeTransfer(fee_transfer_debit)]
-                if &fee_transfer[0][0] == fee_transfer_credit
-                && &fee_transfer[0][1] == fee_transfer_debit)
-        }) {
-            fee_transfer_pair[0] =
-                AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][0].clone());
-            fee_transfer_pair[1] =
-                AccountDiff::FeeTransferViaCoinbase(fee_transfer[0][1].clone());
-        }
     }
 
     fn create_payment_diffs(&self, transfer: &CoinbaseFeeTransfer) -> Vec<PaymentDiff> {
@@ -177,7 +162,7 @@ impl Coinbase {
     }
 
     // only apply if "coinbase" =/= [ "Zero" ]
-    pub fn as_account_diff(self) -> Vec<Vec<AccountDiff>> {
+    pub fn as_account_diff(self) -> Vec<AccountDiff> {
         let mut res = vec![];
         if self.is_coinbase_applied() {
             res.append(&mut AccountDiff::from_coinbase(self));
@@ -222,18 +207,13 @@ mod coinbase_tests {
 
         let payment_diffs = coinbase.fee_transfer();
 
-        assert_eq!(payment_diffs[0].len(), 2);
-
-        if let [credit, debit] = &payment_diffs[0][..] {
-            assert_eq!(credit.public_key, transfer.receiver_pk);
-            assert_eq!(credit.amount, transfer.fee.into());
-            assert_eq!(credit.update_type, UpdateType::Credit);
-            assert_eq!(debit.public_key, coinbase.receiver);
-            assert_eq!(debit.amount, transfer.fee.into());
-            assert_eq!(debit.update_type, UpdateType::Debit(None));
-        } else {
-            panic!("Expected debit/credit pair")
-        }
+        assert_eq!(payment_diffs.len(), 2);
+        assert_eq!(payment_diffs[0].public_key, transfer.receiver_pk);
+        assert_eq!(payment_diffs[0].amount, transfer.fee.into());
+        assert_eq!(payment_diffs[0].update_type, UpdateType::Credit);
+        assert_eq!(payment_diffs[1].public_key, coinbase.receiver);
+        assert_eq!(payment_diffs[1].amount, transfer.fee.into());
+        assert_eq!(payment_diffs[1].update_type, UpdateType::Debit(None));
     }
 
     #[test]
@@ -254,39 +234,6 @@ mod coinbase_tests {
         };
 
         assert!(coinbase.is_coinbase_applied());
-    }
-
-    #[test]
-    fn test_account_diffs_coinbase_mut() {
-        let transfer = CoinbaseFeeTransfer {
-            receiver_pk: sample_public_key(),
-            fee: 100,
-        };
-
-        let coinbase = Coinbase {
-            kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
-            receiver: sample_public_key(),
-            supercharge: false,
-            is_new_account: false,
-            receiver_balance: Some(0),
-        };
-
-        let fee_transfer_payment_diffs = coinbase.fee_transfer();
-
-        let mut account_diffs = vec![vec![
-            AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][0].clone()),
-            AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][1].clone()),
-        ]];
-
-        coinbase.account_diffs_coinbase_mut(&mut account_diffs);
-
-        assert_eq!(
-            account_diffs[0],
-            vec![
-                AccountDiff::FeeTransferViaCoinbase(fee_transfer_payment_diffs[0][0].clone()),
-                AccountDiff::FeeTransferViaCoinbase(fee_transfer_payment_diffs[0][1].clone())
-            ]
-        );
     }
 
     #[test]

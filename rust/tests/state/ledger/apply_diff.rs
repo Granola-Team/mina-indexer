@@ -71,12 +71,6 @@ async fn account_diffs() -> anyhow::Result<()> {
     let ledger = ledger.apply_diff(&diff)?;
     let expected = Ledger::from(vec![
         (
-            "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X",
-            0, // TODO: probably this address should be credited the account creation fee
-            None,
-            None,
-        ),
-        (
             "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
             1000000000000,
             None,
