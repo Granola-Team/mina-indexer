@@ -16,7 +16,7 @@ use crate::{
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use speedb::checkpoint::Checkpoint;
 use std::{
@@ -26,7 +26,6 @@ use std::{
     path::{Path, PathBuf},
     process,
     sync::Arc,
-    time::Duration,
 };
 use tokio::{
     runtime::Handle,
@@ -450,23 +449,6 @@ async fn run_indexer<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn retry_parse_staking_ledger(
-    path: &Path,
-    genesis_state_hash: BlockHash,
-) -> anyhow::Result<StakingLedger> {
-    for attempt in 1..=5 {
-        match StakingLedger::parse_file(path, genesis_state_hash.clone()).await {
-            Ok(ledger) => return Ok(ledger),
-            Err(e) if attempt < 5 => {
-                warn!("Attempt {} failed: {}. Retrying in 1 second...", attempt, e);
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-            Err(e) => panic!("{}", format!("Failed after {} attempts: {}", attempt, e)),
-        }
-    }
-    panic!("All attempts to parse the staking ledger failed.")
-}
-
 /// Precomputed block & staking ledger event handler
 async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyhow::Result<()> {
     trace!("Event: {event:?}");
@@ -527,8 +509,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let version = state.read().await.version.clone();
                 let mut state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match retry_parse_staking_ledger(&path, version.genesis_state_hash.clone())
-                        .await
+                    match StakingLedger::parse_file(&path, version.genesis_state_hash.clone()).await
                     {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
