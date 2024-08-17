@@ -34,13 +34,15 @@ async fn test() -> anyhow::Result<()> {
     state.add_blocks(&mut block_parser).await?;
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
-    let mut ledger_diff = indexer_store.get_ledger_block_height(1, false)?.unwrap();
+    let mut ledger_diff = indexer_store
+        .get_staged_ledger_at_block_height(1, false)?
+        .unwrap();
 
     for n in 1..=3 {
         let state_hash = indexer_store.get_canonical_hash_at_height(n)?.unwrap();
         let block = indexer_store.get_block(&state_hash)?.unwrap().0;
         let ledger = indexer_store
-            .get_ledger_state_hash(&state_hash, false)?
+            .get_staged_ledger_at_state_hash(&state_hash, false)?
             .unwrap();
 
         ledger_diff._apply_diff(&LedgerDiff::from_precomputed(&block))?;

@@ -34,10 +34,13 @@ pub struct Ledger {
     pub accounts: HashMap<PublicKey, Account>,
 }
 
-#[allow(clippy::len_without_is_empty)]
 impl Ledger {
     pub fn len(&self) -> usize {
         self.accounts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -50,6 +53,9 @@ pub struct NonGenesisLedger {
 pub struct LedgerHash(pub String);
 
 impl LedgerHash {
+    /// Prefx is one of {"jx", "jw", "jy", "jz"}
+    pub const LEN: usize = 51;
+
     pub fn from_hashv1(hashv1: HashV1) -> Self {
         let versioned: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
             hashv1.into();
@@ -422,7 +428,7 @@ pub fn is_valid_ledger_hash(input: &str) -> bool {
     let mut chars = input.chars();
     let c0 = chars.next();
     let c1 = chars.next();
-    input.len() == 51
+    input.len() == LedgerHash::LEN
         && c0 == Some('j')
         && (c1 == Some('w') || c1 == Some('x') || c1 == Some('y') || c1 == Some('z'))
 }

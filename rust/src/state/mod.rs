@@ -31,16 +31,9 @@ use crate::{
         },
     },
     store::{
-        block_state_hash_from_key, block_u32_prefix_from_key,
-        fixed_keys::FixedKeys,
-        from_be_bytes, from_u64_be_bytes,
-        staking_ledger_store_impl::{
-            staking_ledger_epoch_key_epoch, staking_ledger_epoch_key_genesis_state_hash,
-            staking_ledger_epoch_key_ledger_hash,
-        },
-        to_be_bytes,
-        username::UsernameStore,
-        IndexerStore,
+        block_state_hash_from_key, block_u32_prefix_from_key, fixed_keys::FixedKeys, from_be_bytes,
+        from_u64_be_bytes, staking_ledger_store_impl::split_staking_ledger_epoch_key, to_be_bytes,
+        username::UsernameStore, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -322,7 +315,7 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
-                    .add_ledger_state_hash(&root_block.state_hash(), ledger)
+                    .add_staged_ledger_at_state_hash(&root_block.state_hash(), ledger)
                     .expect("ledger add succeeds");
                 store
                     .set_best_block(&root_block.state_hash())
@@ -417,7 +410,8 @@ impl IndexerState {
                     if self.blocks_processed % self.ledger_cadence == 0 {
                         self.ledger._apply_diff(&ledger_diff)?;
                         ledger_diff = LedgerDiff::default();
-                        indexer_store.add_ledger_state_hash(&state_hash, self.ledger.clone())?;
+                        indexer_store
+                            .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
                     if self.blocks_processed == block_parser.num_deep_canonical_blocks + 1 {
@@ -1090,12 +1084,14 @@ impl IndexerState {
                         .staking_ledger_epoch_iterator(speedb::IteratorMode::End)
                         .flatten()
                     {
-                        if staking_ledger_epoch_key_genesis_state_hash(&key).0
-                            == MAINNET_GENESIS_HASH
+                        if let Some((genesis_state_hash, epoch, ledger_hash)) =
+                            split_staking_ledger_epoch_key(&key)
                         {
-                            let epoch = staking_ledger_epoch_key_epoch(&key);
-                            let ledger_hash = staking_ledger_epoch_key_ledger_hash(&key);
-                            staking_ledgers.insert(epoch, ledger_hash);
+                            if genesis_state_hash.0 == MAINNET_GENESIS_HASH {
+                                staking_ledgers.insert(epoch, ledger_hash);
+                            } else {
+                                error!("Unrecognized genesis state hash");
+                            }
                         }
                     }
                 } else {
@@ -1130,7 +1126,7 @@ impl IndexerState {
             panic!("Fatal sync error: no indexer store");
         };
 
-        // update witness tree blocks
+        // update witness tree blocks/staking ledgers
         self.staking_ledgers = staking_ledgers;
         for block in witness_tree_blocks {
             debug!("Sync: add block {}", block.summary());
@@ -1221,7 +1217,9 @@ impl IndexerState {
 
                     // check ledger & block are in the store
                     let indexer_store = self.indexer_store_or_panic();
-                    if let Some(_ledger) = indexer_store.get_ledger_state_hash(state_hash, false)? {
+                    if let Some(_ledger) =
+                        indexer_store.get_staged_ledger_at_state_hash(state_hash, false)?
+                    {
                         if let Some((block, _)) = indexer_store.get_block(state_hash)? {
                             assert_eq!(block.state_hash(), *state_hash);
                             return Ok(());
@@ -1246,14 +1244,14 @@ impl IndexerState {
                     genesis_state_hash,
                 }) => {
                     info!("Replaying aggregate delegations epoch {epoch}");
+                    let genesis_state_hash = Some(genesis_state_hash.clone());
                     let indexer_store = self.indexer_store_or_panic();
-                    if let Some(aggregated_delegations) = indexer_store
-                        .get_delegations_epoch(*epoch, &Some(genesis_state_hash.to_owned()))?
+                    if let Some(aggregated_delegations) =
+                        indexer_store.build_aggregated_delegations(*epoch, &genesis_state_hash)?
                     {
-                        if let Some(staking_ledger) = indexer_store.get_staking_ledger_at_epoch(
-                            *epoch,
-                            Some(genesis_state_hash.to_owned()),
-                        )? {
+                        if let Some(staking_ledger) =
+                            indexer_store.build_staking_ledger(*epoch, &genesis_state_hash)?
+                        {
                             // check delegation calculations
                             assert_eq!(
                                 aggregated_delegations,
@@ -1303,7 +1301,7 @@ impl IndexerState {
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
         if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger_at_epoch(*epoch, None)?
+            indexer_store.get_staking_ledger(ledger_hash, None, &None)?
         {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
@@ -1311,9 +1309,9 @@ impl IndexerState {
                 "Invalid ledger hash"
             );
 
-            if let Some(staking_ledger_epoch) = indexer_store.get_staking_ledger_at_epoch(
+            if let Some(staking_ledger_epoch) = indexer_store.build_staking_ledger(
                 *epoch,
-                Some(staking_ledger_hash.genesis_state_hash.clone()),
+                &Some(staking_ledger_hash.genesis_state_hash.clone()),
             )? {
                 assert_eq!(staking_ledger_epoch.epoch, *epoch, "Invalid epoch");
                 assert_eq!(
@@ -1395,8 +1393,10 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             for canonical_block in canonical_blocks {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
-                    indexer_store
-                        .add_ledger_state_hash(&canonical_block.state_hash, self.ledger.clone())?;
+                    indexer_store.add_staged_ledger_at_state_hash(
+                        &canonical_block.state_hash,
+                        self.ledger.clone(),
+                    )?;
                 }
             }
         }
