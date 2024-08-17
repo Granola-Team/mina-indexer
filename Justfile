@@ -11,6 +11,7 @@ IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
 # Useful aliases
 alias c := check
+alias f := format
 alias cd := clean-dev
 alias tu := test-unit
 alias tud := test-unit-dev
