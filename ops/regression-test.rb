@@ -14,13 +14,6 @@ REV = `git rev-parse --short=8 HEAD`.chomp
 BASE_DIR = "#{DEV_DIR}/rev-#{REV}"
 FileUtils.mkdir_p BASE_DIR
 
-# clean up dev directory
-if ARGV == ["clean"]
-  puts "Removing #{DEV_DIR}/rev-*"
-  FileUtils.rm_rf Dir.glob("#{DEV_DIR}/rev-*")
-  exit 0
-end
-
 test_names = %w[
   indexer_cli_reports
   server_startup
@@ -71,12 +64,7 @@ tests = if ARGV.empty?
           # Run all tests, but not the long-running ones.
           test_names
         else
-          # Run the supplied test and remaining
-          if ARGV.length == 2 && ARGV.first == "continue"
-            test_names.drop_while {|test| test != ARGV.last}
-          else
-            ARGV
-          end
+          ARGV
         end
 
 def cleanup_socket
