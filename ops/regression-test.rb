@@ -74,7 +74,12 @@ tests = if ARGV.empty?
           # Run the supplied test and remaining
           test_names.drop_while { |test| test != ARGV.last }
         else
-          ARGV
+          # Run the supplied test and remaining
+          if ARGV.length == 2 && ARGV.first == "continue"
+            test_names.drop_while {|test| test != ARGV.last}
+          else
+            ARGV
+          end
         end
 
 def cleanup_socket
