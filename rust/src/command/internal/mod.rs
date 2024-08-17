@@ -83,10 +83,12 @@ impl InternalCommand {
         let mut internal_cmds: Vec<Self> = Vec::new();
         for account_diff_pairs in all_account_diff_fees {
             if let [credit, debit] = &account_diff_pairs[..] {
-                assert!(
-                    debit.amount() + credit.amount() == 0,
-                    "Credit/Debit pairs do no sum to zero"
-                );
+                if debit.amount() + credit.amount() != 0 {
+                    panic!(
+                        "Credit/Debit pairs do not sum to zero.\nDebit: {:#?}\nCredit: {:#?}\nBlock Height: {:#?}",
+                        debit, credit, block.blockchain_length()
+                    )
+                }
                 match (credit, debit) {
                     (AccountDiff::CreateAccount(_), AccountDiff::CreateAccount(_)) => {
                         println!(
