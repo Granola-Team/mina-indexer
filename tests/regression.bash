@@ -183,14 +183,14 @@ test_indexer_cli_reports() {
     idxr blocks --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks"
 
-    idxr blocks best-tip --help 2>&1 |
-        grep -iq "Usage: mina-indexer blocks best-tip"
+    idxr blocks best --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks best"
 
     idxr blocks height --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks height"
 
-    idxr blocks slot --help 2>&1 |
-        grep -iq "Usage: mina-indexer blocks slot"
+    idxr blocks global-slot --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks global-slot"
 
     idxr blocks public-key --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks public-key"
@@ -369,10 +369,10 @@ test_best_tip() {
     wait_for_socket
 
     # best tip query
-    hash=$(idxr blocks best-tip | jq -r .state_hash)
-    canonicity=$(idxr blocks best-tip | jq -r .canonicity)
-    length=$(idxr blocks best-tip | jq -r .blockchain_length)
-    canonicity_v=$(idxr blocks best-tip --verbose | jq -r .canonicity)
+    hash=$(idxr blocks best | jq -r .state_hash)
+    canonicity=$(idxr blocks best | jq -r .canonicity)
+    length=$(idxr blocks best | jq -r .blockchain_length)
+    canonicity_v=$(idxr blocks best --verbose | jq -r .canonicity)
 
     # witness tree summary
     wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -415,15 +415,15 @@ test_blocks() {
     assert 'Canonical' $canonicity_v
 
     # basic slot query
-    hash=$(idxr blocks slot --slot 9 | jq -r .[0].state_hash)
-    slot=$(idxr blocks slot --slot 9 | jq -r .[0].global_slot_since_genesis)
-    length=$(idxr blocks slot --slot 9 | jq -r .[0].blockchain_length)
-    canonicity=$(idxr blocks slot --slot 9 | jq -r .[0].canonicity)
+    hash=$(idxr blocks global-slot --slot 9 | jq -r .[0].state_hash)
+    slot=$(idxr blocks global-slot --slot 9 | jq -r .[0].global_slot_since_genesis)
+    length=$(idxr blocks global-slot --slot 9 | jq -r .[0].blockchain_length)
+    canonicity=$(idxr blocks global-slot --slot 9 | jq -r .[0].canonicity)
 
     # verbose slot query
-    hash_v=$(idxr blocks slot --slot 9 --verbose | jq -r .[0].state_hash)
-    length_v=$(idxr blocks slot --slot 9 --verbose | jq -r .[0].blockchain_length)
-    canonicity_v=$(idxr blocks slot --slot 9 --verbose | jq -r .[0].canonicity)
+    hash_v=$(idxr blocks global-slot --slot 9 --verbose | jq -r .[0].state_hash)
+    length_v=$(idxr blocks global-slot --slot 9 --verbose | jq -r .[0].blockchain_length)
+    canonicity_v=$(idxr blocks global-slot --slot 9 --verbose | jq -r .[0].canonicity)
 
     assert 9 $slot
     assert $wt_hash $hash
@@ -453,7 +453,7 @@ test_blocks() {
     assert 'Canonical' $canonicity_v
 
     # height 10 = slot 9
-    slot=$(idxr blocks slot --slot 9 | jq -r .)
+    slot=$(idxr blocks global-slot --slot 9 | jq -r .)
     height=$(idxr blocks height --height 10 | jq -r .)
     assert "$slot" "$height"
 
@@ -469,7 +469,7 @@ test_blocks() {
 
     # write at slot to file
     file=./blocks_at_slot.json
-    idxr blocks slot --slot 9 --path $file
+    idxr blocks global-slot --slot 9 --path $file
 
     height=$(cat $file | jq -r .[0].blockchain_length)
     slot=$(cat $file | jq -r .[0].global_slot_since_genesis)
@@ -639,7 +639,7 @@ test_ledgers() {
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_height=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .${pk}.balance)
+    hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .${pk}.balance)
     height_balance=$(idxr ledgers height --height $canonical_height | jq -r .${pk}.balance)
     assert '607904750000000' $hash_balance
     assert '607904750000000' $height_balance
@@ -648,7 +648,7 @@ test_ledgers() {
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    best_result=$(idxr ledgers best | jq -r .${pk}.balance)
+    best_result=$(idxr ledgers best --memoize | jq -r .${pk}.balance)
     hash_result=$(idxr ledgers hash --hash $best_hash | jq -r .${pk}.balance)
     height_balance=$(idxr ledgers height --height $best_height | jq -r .${pk}.balance)
 

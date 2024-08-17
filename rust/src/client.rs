@@ -33,7 +33,7 @@ pub enum ClientCli {
         output_path: PathBuf,
     },
 
-    /// Query staged ledgers
+    /// Query best & staged ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),
 
@@ -105,7 +105,7 @@ pub enum Blocks {
     },
 
     /// Query the best tip block
-    BestTip {
+    Best {
         /// Path to write the best tip [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
@@ -116,7 +116,7 @@ pub enum Blocks {
     },
 
     /// Query blocks by global slot number
-    Slot {
+    GlobalSlot {
         /// Retrieve the blocks in given global slot
         #[arg(long)]
         slot: String,
@@ -211,28 +211,40 @@ pub enum Ledgers {
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
+
+        /// Memoize the best ledger
+        #[arg(long, default_value_t = false)]
+        memoize: bool,
     },
 
     /// Query staged ledgers by (state or ledger) hash
     Hash {
+        /// State or ledger hash corresponding to the ledger
+        #[arg(long)]
+        hash: String,
+
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
 
-        /// State or ledger hash corresponding to the ledger
-        #[arg(long)]
-        hash: String,
+        /// Memoize the staged ledger
+        #[arg(long, default_value_t = false)]
+        memoize: bool,
     },
 
     /// Query canonical staged ledgers by height
     Height {
+        /// Block height of the ledger
+        #[arg(long)]
+        height: u32,
+
         /// Path to write the ledger [default: stdout]
         #[arg(long)]
         path: Option<PathBuf>,
 
-        /// Block height of the ledger
-        #[arg(long)]
-        height: u32,
+        /// Memoize the staged ledger
+        #[arg(long, default_value_t = false)]
+        memoize: bool,
     },
 }
 
