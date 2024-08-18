@@ -324,8 +324,8 @@ impl BestLedgerStore for IndexerStore {
                     self.accounts_balance_sort_cf(),
                     u64_prefix_key(acct.balance.0, &pk.0),
                 )?;
-                return Ok(());
             }
+            return Ok(());
         }
 
         // update account
