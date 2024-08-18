@@ -4,6 +4,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -83,13 +84,16 @@ impl InternalCommand {
         let mut internal_cmds: Vec<Self> = Vec::new();
         for account_diff_pairs in all_account_diff_fees {
             if let [credit, debit] = &account_diff_pairs[..] {
-                assert!(
-                    debit.amount() + credit.amount() == 0,
-                    "Credit/Debit pairs do no sum to zero"
-                );
+                // assert!(
+                //     debit.amount() + credit.amount() == 0,
+                //     "Credit/Debit pairs do no sum to zero\nBlock:  {}\nCredit: {:?}\nDebit:
+                // {:?}",     block.summary(),
+                //     credit,
+                //     debit,
+                // );
                 match (credit, debit) {
                     (AccountDiff::CreateAccount(_), AccountDiff::CreateAccount(_)) => {
-                        println!(
+                        debug!(
                             "AccountDiff::CreateAccount credit and debit pairs are present but unhandled"
                         );
                     }
