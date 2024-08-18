@@ -304,14 +304,14 @@ impl AccountDiff {
     pub fn amount(&self) -> i64 {
         match self {
             Self::Delegation(_) | Self::FailedTransactionNonce(_) => 0,
-            Self::CreateAccount(_) => 0 - MAINNET_ACCOUNT_CREATION_FEE.0 as i64,
             Self::Coinbase(diff) => diff.amount.0 as i64,
-            Self::FeeTransfer(diff) | Self::FeeTransferViaCoinbase(diff) | Self::Payment(diff) => {
-                match diff.update_type {
-                    UpdateType::Credit => diff.amount.0 as i64,
-                    UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
-                }
-            }
+            Self::FeeTransfer(diff)
+            | Self::FeeTransferViaCoinbase(diff)
+            | Self::Payment(diff)
+            | Self::CreateAccount(diff) => match diff.update_type {
+                UpdateType::Credit => diff.amount.0 as i64,
+                UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
+            },
         }
     }
 
