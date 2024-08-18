@@ -1,20 +1,17 @@
 //! Store of the best ledger
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{internal::InternalCommand, Command, Payment},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
+    block::BlockHash,
     ledger::{
         account::Account,
-        coinbase::Coinbase,
-        diff::account::{AccountDiff, PaymentDiff, UpdateType},
+        diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
         Ledger,
     },
     store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
-use std::{collections::HashMap, ops::Sub as _};
+use std::collections::HashMap;
 
 pub trait BestLedgerStore {
     /// Get the best ledger (associated with the best block)
@@ -235,98 +232,6 @@ impl DBAccountUpdate {
                 }
             }
         }
-        res
-    }
-
-    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<AccountDiff> {
-        // magic mina
-        if block.state_hash().0 == MAINNET_GENESIS_HASH {
-            return vec![AccountDiff::Payment(PaymentDiff {
-                update_type: UpdateType::Credit,
-                public_key: block.block_creator(),
-                amount: 1000_u64.into(),
-            })];
-        }
-
-        // otherwise
-        let coinbase = Coinbase::from_precomputed(block);
-        let mut res = [
-            Command::from_precomputed(block)
-                .into_iter()
-                .flat_map(|cmd| match cmd {
-                    Command::Payment(Payment {
-                        source,
-                        amount,
-                        receiver,
-                        is_new_receiver_account,
-                        nonce: _,
-                    }) => vec![
-                        AccountDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: source.clone(),
-                            amount,
-                        }),
-                        AccountDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.clone(),
-                            amount: if is_new_receiver_account {
-                                amount.sub(MAINNET_ACCOUNT_CREATION_FEE)
-                            } else {
-                                amount
-                            },
-                        }),
-                        AccountDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: source.clone(),
-                            amount,
-                        }),
-                    ],
-                    Command::Delegation(_) => vec![],
-                })
-                .collect::<Vec<AccountDiff>>(),
-            vec![AccountDiff::Payment(PaymentDiff {
-                update_type: UpdateType::Credit,
-                public_key: coinbase.receiver.clone(),
-                amount: coinbase.amount().into(),
-            })],
-            InternalCommand::from_precomputed(block)
-                .iter()
-                .flat_map(|cmd| match cmd {
-                    InternalCommand::Coinbase { .. } => vec![],
-                    InternalCommand::FeeTransfer {
-                        sender,
-                        receiver,
-                        amount,
-                    }
-                    | InternalCommand::FeeTransferViaCoinbase {
-                        sender,
-                        receiver,
-                        amount,
-                    } => vec![
-                        AccountDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.clone(),
-                            amount: (*amount).into(),
-                        }),
-                        AccountDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: sender.clone(),
-                            amount: (*amount).into(),
-                        }),
-                    ],
-                })
-                .collect(),
-        ]
-        .concat();
-
-        res.append(
-            &mut block
-                .accounts_created()
-                .0
-                .keys()
-                .flat_map(AccountDiff::account_creation_payment_diff)
-                .collect(),
-        );
         res
     }
 }
