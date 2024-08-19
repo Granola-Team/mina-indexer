@@ -2,12 +2,7 @@
 
 use crate::{
     block::BlockHash,
-    ledger::{
-        account::Account,
-        diff::account::{AccountDiff, UpdateType},
-        public_key::PublicKey,
-        Ledger,
-    },
+    ledger::{account::Account, diff::account::AccountDiff, public_key::PublicKey, Ledger},
     store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
