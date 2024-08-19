@@ -139,7 +139,7 @@ impl AccountQueryRoot {
             Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
         };
 
-        for (key, _) in db.account_balance_iterator(mode).flatten() {
+        for (key, _) in db.best_ledger_account_balance_iterator(mode).flatten() {
             let pk = PublicKey::from_bytes(&key[8..])?;
             let account = match db.get_best_account(&pk)? {
                 Some(account) => account,

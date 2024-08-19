@@ -75,7 +75,12 @@ impl BlockStore for IndexerStore {
         self.set_block_staged_ledger_hash(&state_hash, &block.staged_ledger_hash())?;
 
         // add to genesis state hash index
-        self.set_block_genesis_state_hash(&state_hash, &block.genesis_state_hash())?;
+        let genesis_state_hash = block.genesis_state_hash();
+        if genesis_state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
+            self.set_block_genesis_state_hash(&state_hash, &MAINNET_GENESIS_HASH.into())?;
+        } else {
+            self.set_block_genesis_state_hash(&state_hash, &genesis_state_hash)?;
+        }
 
         // add block height/global slot index
         self.set_block_height_global_slot_pair(

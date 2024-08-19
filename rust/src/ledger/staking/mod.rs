@@ -257,15 +257,6 @@ impl StakingLedger {
                 .map(|x| x.total_delegated.unwrap_or_default())
                 .unwrap_or_default()
         });
-        delegations.iter_mut().for_each(|(pk, delegation)| {
-            if delegation.is_none() {
-                *delegation = Some(EpochStakeDelegation {
-                    pk: pk.clone(),
-                    ..Default::default()
-                });
-            }
-        });
-
         let delegations: HashMap<PublicKey, EpochStakeDelegation> = delegations
             .into_iter()
             .map(|(pk, del)| (pk, del.unwrap_or_default()))

@@ -2,66 +2,6 @@ use crate::store::{column_families::ColumnFamilyHelpers, IndexerStore};
 use speedb::ColumnFamily;
 
 impl ColumnFamilyHelpers for IndexerStore {
-    ///////////////////////
-    // Account store CFs //
-    ///////////////////////
-
-    /// CF for storing (best ledger) accounts
-    /// ```
-    /// pk -> account
-    /// where
-    /// - account: best ledger account
-    fn accounts_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("accounts")
-            .expect("accounts column family exists")
-    }
-
-    /// CF for storing number of canonical account delegations
-    /// ```
-    /// pk -> num
-    /// where
-    /// - pk:  [PublicKey::LEN] bytes
-    /// - num: 4 BE bytes
-    fn account_num_delegations(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("account-num-delegations")
-            .expect("account-num-delegations column family exists")
-    }
-
-    /// CF for storing canonical account delegations
-    /// ```
-    /// {pk}{num} -> delegate
-    /// where
-    /// - pk:  [PublicKey::LEN] bytes
-    /// - num: 4 BE bytes
-    fn account_delegations(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("account-delegations")
-            .expect("account-delegations column family exists")
-    }
-
-    /// CF for sorting accounts by balance
-    /// ```
-    /// {balance}{pk} -> _
-    /// where
-    /// - balance: 8 BE bytes
-    /// - pk:      [PublicKey::LEN] bytes
-    fn accounts_balance_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("accounts-balance-sort")
-            .expect("accounts-balance-sort column family exists")
-    }
-
-    /// CF for storing block account updates
-    /// ```
-    /// state_hash -> updates
-    fn blocks_account_updates_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("blocks-account-updates")
-            .expect("blocks-account-updates column family exists")
-    }
-
     /////////////////////
     // Block store CFs //
     /////////////////////
@@ -76,15 +16,18 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-state-hash column family exists")
     }
 
-    /// `state_hash -> pcb version`
+    /// CF for storing PCB versions
+    /// ```
+    /// key: state hash bytes
+    /// val: pcb version serde bytes
     fn block_version_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-version")
             .expect("blocks-version column family exists")
     }
 
+    /// CF for sorting blocks by global slot
     /// ```
-    /// --------------------------------
     /// - key: {global_slot}{state_hash}
     /// - val: b""
     /// where
@@ -96,8 +39,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-global-slot-sort column family exists")
     }
 
+    /// CF for sorting blocks by block height
     /// ```
-    /// ---------------------------------
     /// - key: {block_height}{state_hash}
     /// - val: b""
     /// where
@@ -408,16 +351,132 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("canonicity-slot column family exists")
     }
 
-    //////////////////////
-    // Ledger store CFs //
-    //////////////////////
+    ///////////////////////////
+    // Best ledger store CFs //
+    ///////////////////////////
 
-    fn ledgers_cf(&self) -> &ColumnFamily {
+    /// CF for storing best ledger accounts
+    /// ```
+    /// key: public key bytes
+    /// val: account serde bytes
+    fn best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("ledgers")
-            .expect("ledgers column family exists")
+            .cf_handle("best-ledger-accounts")
+            .expect("best-ledger-accounts column family exists")
     }
 
+    /// CF for sorting best ledger accounts by balance
+    /// ```
+    /// key: {balance}{pk}
+    /// val: b""
+    /// where
+    /// - balance: 8 BE bytes
+    /// - pk:      [PublicKey::LEN] bytes
+    fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("best-ledger-account-balance-sort")
+            .expect("best-ledger-account-balance-sort column family exists")
+    }
+
+    /// CF for storing number of best ledger account delegations
+    /// ```
+    /// pk -> num
+    /// where
+    /// - pk:  [PublicKey::LEN] bytes
+    /// - num: 4 BE bytes
+    fn best_ledger_accounts_num_delegations_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("best-ledger-account-num-delegations")
+            .expect("best-ledger-account-num-delegations column family exists")
+    }
+
+    /// CF for storing best ledger account delegations
+    /// ```
+    /// {pk}{num} -> delegate
+    /// where
+    /// - pk:  [PublicKey::LEN] bytes
+    /// - num: 4 BE bytes
+    fn best_ledger_accounts_delegations_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("best-ledger-account-delegations")
+            .expect("best-ledger-account-delegations column family exists")
+    }
+
+    /////////////////////////////
+    // Staged ledger store CFs //
+    /////////////////////////////
+
+    /// CF for storing staged ledger accounts
+    /// ```
+    /// {state_hash}{pk} -> account
+    /// where
+    /// - state_hash: [BlockHash::LEN] bytes
+    /// - pk:         [PublicKey::LEN] bytes
+    /// - account:    serde bytes
+    fn staged_ledger_accounts_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-accounts")
+            .expect("staged-ledger-accounts column family exists")
+    }
+
+    /// CF for sorting staged ledger accounts by balance
+    /// ```
+    /// {state_hash}{balance}{pk} -> _
+    /// where
+    /// - state_hash: [BlockHash::LEN] bytes
+    /// - balance:    8 BE bytes
+    /// - pk:         [PublicKey::LEN] bytes
+    fn staged_ledger_account_balance_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-account-balance-sort")
+            .expect("staged-ledger-account-balance-sort column family exists")
+    }
+
+    /// CF for storing number of staged ledger account delegations
+    /// ```
+    /// {state_hash}{pk} -> num
+    /// where
+    /// - state_hash: [BlockHash::LEN] bytes
+    /// - pk:         [PublicKey::LEN] bytes
+    /// - num:        4 BE bytes
+    fn staged_ledger_account_num_delegations_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-account-num-delegations")
+            .expect("staged-ledger-account-num-delegations column family exists")
+    }
+
+    /// CF for storing staged ledger account delegations
+    /// ```
+    /// {state_hash}{pk}{num} -> delegate
+    /// where
+    /// - state_hash: [BlockHash::LEN] bytes
+    /// - pk:         [PublicKey::LEN] bytes
+    /// - num:        4 BE bytes
+    /// - delegate:   serde bytes
+    fn staged_ledger_account_delegations_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-account-delegations")
+            .expect("staged-ledger-account-delegations column family exists")
+    }
+
+    /// CF for storing staged ledger hash -> block state hash
+    fn staged_ledger_hash_to_block_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-hash-to-block")
+            .expect("staged-ledger-hash-to-block column family exists")
+    }
+
+    /// CF for keeping track of which staged ledgers have been persisted
+    fn staged_ledgers_persisted_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-persisted")
+            .expect("staged-ledger-persisted column family exists")
+    }
+
+    /// CF for storing block ledger diffs
+    /// ```
+    /// key: state hash bytes
+    /// val: ledger diff serde bytes
     fn block_ledger_diff_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-ledger-diff")
@@ -430,27 +489,44 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-staged-ledger-hash column family exists")
     }
 
-    /// CF for storing staking ledgers
+    //////////////////////////////
+    // Staking ledger store CFs //
+    //////////////////////////////
+
+    /// CF for storing staking ledger accounts
     /// ```
-    /// - key: {genesis_hash}{epoch}{ledger_hash}
-    /// - val: staking ledger
-    /// where
-    /// - genesis_hash: [BlockHash::LEN] bytes
-    /// - epoch:        4 BE bytes
-    /// - ledger_hash:  [TXN_HASH_LEN] bytes
-    fn staking_ledgers_cf(&self) -> &ColumnFamily {
+    /// - key: [staking_ledger_account_key]
+    /// - val: account serde bytes
+    fn staking_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("staking-ledgers")
-            .expect("staking-ledgers column family exists")
+            .cf_handle("staking-ledger-accounts")
+            .expect("staking-ledger-accounts column family exists")
+    }
+
+    /// CF for storing aggregated staking delegations
+    /// ```
+    /// - key: [staking_ledger_account_key]
+    /// - val: aggregated epoch delegations serde bytes
+    fn staking_delegations_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-delegations")
+            .expect("staking-ledger-delegations column family exists")
+    }
+
+    /// CF for storing aggregated staking delegations
+    /// ```
+    /// - key: [staking_ledger_epoch_key]
+    /// - val: b""
+    fn staking_ledger_persisted_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-persisted")
+            .expect("staking-ledger-persisted column family exists")
     }
 
     /// CF for storing staking ledger hashes
     /// ```
-    /// - key: epoch
-    /// - val: ledger hash
-    /// where
-    /// - epoch:        4 BE bytes
-    /// - ledger hash:  [TXN_HASH_LEN] bytes
+    /// - key: [staking_ledger_epoch_key_prefix]
+    /// - val: ledger hash bytes
     fn staking_ledger_epoch_to_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-epoch-to-hash")
@@ -459,11 +535,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger epochs
     /// ```
-    /// - key: ledger hash
-    /// - val: epoch
-    /// where
-    /// - ledger hash: [TXN_HASH_LEN] bytes
-    /// - epoch:       4 BE bytes
+    /// - key: ledger hash bytes
+    /// - val: epoch BE bytes
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-hash-to-epoch")
@@ -472,54 +545,52 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger genesis state hashes
     /// ```
-    /// - key: ledger_hash
-    /// - val: genesis_hash
-    /// where
-    /// - ledger_hash:  [TXN_HASH_LEN] bytes
-    /// - genesis_hash: [BlockHash::LEN] bytes
+    /// - key: ledger hash bytes
+    /// - val: genesis state hash bytes
     fn staking_ledger_genesis_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-genesis-hash")
             .expect("staking-ledger-genesis-hash column family exists")
     }
 
-    /// CF for storing aggregated staking delegations
+    /// CF for storing staking ledger total currencies
     /// ```
-    /// - key: {genesis_hash}{epoch}
-    /// - val: aggregated epoch delegations
-    /// where
-    /// - genesis_hash: [BlockHash::LEN] bytes
-    /// - epoch:        4 BE bytes
-    fn staking_delegations_cf(&self) -> &ColumnFamily {
+    /// - key: ledger hash bytes
+    /// - val: total currency BE bytes
+    fn staking_ledger_total_currency_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("staking-delegations")
-            .expect("staking-delegations column family exists")
+            .cf_handle("staking-ledger-total-currency")
+            .expect("staking-ledger-total-currency column family exists")
     }
 
-    /// Key-value pairs
+    /// CF for sorting staking ledger accounts by balance
     /// ```
-    /// - key: {balance}{pk}
+    /// - key: [staking_ledger_sort_key]
     /// - val: b""
-    /// where
-    /// - balance: 8 BE bytes
-    /// - pk:      [PublicKey::LEN] bytes
-    fn staking_ledger_balance_cf(&self) -> &ColumnFamily {
+    fn staking_ledger_balance_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("staking-ledger-balance")
-            .expect("staking-ledger-balance column family exists")
+            .cf_handle("staking-ledger-balance-sort")
+            .expect("staking-ledger-balance-sort column family exists")
     }
 
-    /// Key-value pairs
+    /// CF for sorting staking ledger accounts by stake (i.e. total delegations)
     /// ```
-    /// - key: {stake}{pk}
+    /// - key: [staking_ledger_sort_key]
     /// - val: b""
-    /// where
-    /// - stake: 8 BE bytes
-    /// - pk:    [PublicKey::LEN] bytes
-    fn staking_ledger_stake_cf(&self) -> &ColumnFamily {
+    fn staking_ledger_stake_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("staking-ledger-stake")
-            .expect("staking-ledger-stake column family exists")
+            .cf_handle("staking-ledger-stake-sort")
+            .expect("staking-ledger-stake-sort column family exists")
+    }
+
+    /// CF for storing per epoch total number of staking ledger accounts
+    /// ```
+    /// - key: epoch
+    /// - value: number of staking ledger accounts in epoch (4 BE bytes)
+    fn staking_ledger_accounts_count_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staking-ledger-accounts-count-epoch")
+            .expect("staking-ledger-accounts-count-epoch column family exists")
     }
 
     /////////////////////
@@ -552,10 +623,14 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for storing/sorting SNARKs by prover
-    /// `{prover}{slot}{index} -> snark`
+    /// ```
+    /// key: {prover}{slot}{index}
+    /// val: snark
+    /// where
     /// - prover: 55 pk bytes
     /// - slot:   4 BE bytes
     /// - index:  4 BE bytes
+    /// - snark:  SNARK serde bytes
     fn snark_work_prover_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-work-prover")
@@ -563,10 +638,14 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for storing/sorting SNARKs by prover and block height
-    /// `{prover}{block_height}{index} -> snark`
+    /// ```
+    /// key: {prover}{block_height}{index}
+    /// val: snark
+    /// where
     /// - prover:         55 pk bytes
     /// - block height:   4 BE bytes
     /// - index:          4 BE bytes
+    /// - snark:          SNARK serde bytes
     fn snark_work_prover_height_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-work-prover-height")
@@ -620,16 +699,18 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Data count CFs //
     ////////////////////
 
-    /// CF for per epoch per account block prodution info
-    /// - key: `{epoch BE bytes}{pk}`
-    /// - value: number of blocks produced by `pk` in `epoch`
+    /// CF for storing per epoch per account block prodution info
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of blocks produced by pk in epoch
     fn block_production_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-epoch")
             .expect("block-production-pk-epoch column family exists")
     }
 
-    /// CF for per account total block prodution info
+    /// CF for storing per account total block prodution info
+    /// ```
     /// - key: pk
     /// - value: total number of blocks produced by pk
     fn block_production_pk_total_cf(&self) -> &ColumnFamily {
@@ -638,7 +719,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-total column family exists")
     }
 
-    /// CF for per epoch block production counts
+    /// CF for storing per epoch block production totals
+    /// ```
     /// - key: epoch
     /// - value: number of blocks produced in epoch
     fn block_production_epoch_cf(&self) -> &ColumnFamily {
@@ -647,7 +729,7 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-epoch column family exists")
     }
 
-    /// CF for per block SNARK counts
+    /// CF for storing per block SNARK counts
     /// - key: state hash
     /// - value: number of SNARKs in block
     fn block_snark_counts_cf(&self) -> &ColumnFamily {
@@ -656,7 +738,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-snark-counts column family exists")
     }
 
-    /// CF for per block user command counts
+    /// CF for stoing per block user command counts
+    /// ```
     /// - key: state hash
     /// - value: number of user commands in block
     fn block_user_command_counts_cf(&self) -> &ColumnFamily {
@@ -665,7 +748,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-user-command-counts column family exists")
     }
 
-    /// CF for per block internal command counts
+    /// CF for storing per block internal command counts
+    /// ```
     /// - key: state hash
     /// - value: number of internal commands in block
     fn block_internal_command_counts_cf(&self) -> &ColumnFamily {
@@ -674,18 +758,20 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-internal-command-counts column family exists")
     }
 
-    /// CF for per epoch per account user commands
-    /// - key: `{epoch BE bytes}{pk}`
-    /// - value: number of `pk` user commands in `epoch`
+    /// CF for storing per epoch per account user commands
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of pk user commands in epoch
     fn user_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk-epoch")
             .expect("user-commands-pk-epoch column family exists")
     }
 
-    /// CF for per account total user commands
-    /// - key: `pk`
-    /// - value: total number of `pk` user commands
+    /// CF for storing per account total user commands
+    /// ```
+    /// - key: pk
+    /// - value: total number of pk user commands
     fn user_commands_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk-total")
@@ -693,74 +779,72 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for per epoch total user commands
-    /// - key: `epoch`
-    /// - value: number of user commands in `epoch`
+    /// ```
+    /// - key: epoch
+    /// - value: number of user commands in epoch
     fn user_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-epoch")
             .expect("user-commands-epoch column family exists")
     }
 
-    /// CF for per epoch per account internal commands
-    /// - key: `{epoch BE bytes}{pk}`
-    /// - value: number of `pk` internal commands in `epoch`
+    /// CF for storing per epoch per account internal commands
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of pk internal commands in epoch
     fn internal_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-epoch")
             .expect("internal-commands-pk-epoch column family exists")
     }
 
-    /// CF for per account total internal commands
-    /// - key: `pk`
-    /// - value: total number of `pk` internal commands
+    /// CF for storing per account total internal commands
+    /// ```
+    /// - key: pk
+    /// - value: total number of pk internal commands
     fn internal_commands_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-total")
             .expect("internal-commands-pk-total column family exists")
     }
 
-    /// CF for per epoch total internal commands
-    /// - key: `epoch`
-    /// - value: number of internal commands in `epoch`
+    /// CF for storing per epoch total internal commands
+    /// ```
+    /// - key: epoch
+    /// - value: number of internal commands in epoch
     fn internal_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-epoch")
             .expect("internal-commands-epoch column family exists")
     }
 
-    /// CF for per epoch per account SNARKs
-    /// - key: `{epoch BE bytes}{pk}`
-    /// - value: number of `pk` SNARKs in `epoch`
+    /// CF for storing per epoch per account SNARK counts
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of pk SNARKs in epoch
     fn snarks_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-pk-epoch")
             .expect("snarks-pk-epoch column family exists")
     }
 
-    /// CF for per account total SNARKs
-    /// - key: `pk`
-    /// - value: total number of `pk` SNARKs
+    /// CF for storing per account SNARK counts
+    /// ```
+    /// - key: pk
+    /// - value: total number of pk SNARKs
     fn snarks_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-pk-total")
             .expect("snarks-pk-total column family exists")
     }
 
-    /// CF for per epoch total SNARKs
-    /// - key: `epoch`
-    /// - value: number of SNARKs in `epoch`
+    /// CF for storing per epoch SNARK counts
+    /// ```
+    /// - key: epoch
+    /// - value: number of SNARKs in epoch
     fn snarks_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-epoch")
             .expect("snarks-epoch column family exists")
-    }
-
-    /// CF for per epoch total staking ledger accounts
-    /// - key: `epoch`
-    /// - value: number of staking ledgers in `epoch`
-    fn staking_ledger_accounts_epoch_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("staking-ledger-accounts-epoch")
-            .expect("staking-ledger-accounts-epoch column family exists")
     }
 }

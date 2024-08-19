@@ -56,14 +56,10 @@ pub struct DBUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 82] = [
-        // accounts
-        "accounts",
-        "accounts-balance-sort",
-        "account-delegations",
-        "account-num-delegations",
-        "blocks-account-updates",
-        // blocks
+    const COLUMN_FAMILIES: [&'static str; 87] = [
+        //////////////////////
+        // Blocks store CFs //
+        //////////////////////
         "blocks-state-hash",
         "blocks-version",
         "blocks-at-length",
@@ -84,10 +80,14 @@ impl IndexerStore {
         "block-creator-slot-sort",
         "coinbase-receiver-height-sort",
         "coinbase-receiver-slot-sort",
-        // canonicity
+        //////////////////////////
+        // Canonicity store CFs //
+        //////////////////////////
         "canonicity-length",
         "canonicity-slot",
-        // user commands
+        ////////////////////////////
+        // User command store CFs //
+        ////////////////////////////
         "user-commands",
         "user-commands-pk",
         "user-commands-pk-num",
@@ -104,36 +104,62 @@ impl IndexerStore {
         "txn-from-height-sort",
         "txn-to-slot-sort",
         "txn-to-height-sort",
-        // SNARKs
+        ////////////////////////////////
+        // Internal command store CFs //
+        ////////////////////////////////
+        "internal-commands",
+        "internal-commands-global-slot",
+        /////////////////////
+        // SNARK store CFs //
+        /////////////////////
         "snarks",
         "snark-work-top-producers",
         "snark-work-top-producers-sort",
         "snark-work-fees",
         "snark-work-prover",
         "snark-work-prover-height",
-        // internal commands
-        "internal-commands",
-        "internal-commands-global-slot",
-        // indexer store events
+        /////////////////////
+        // Event store CFs //
+        /////////////////////
         "events",
-        // staged ledgers
-        "ledgers",
+        ///////////////////////////
+        // Best ledger store CFs //
+        ///////////////////////////
+        "best-ledger-accounts",
+        "best-ledger-account-balance-sort",
+        "best-ledger-account-num-delegations",
+        "best-ledger-account-delegations",
+        /////////////////////////////
+        // Staged ledger store CFs //
+        /////////////////////////////
+        "staged-ledger-accounts",
+        "staged-ledger-account-balance-sort",
+        "staged-ledger-account-num-delegations",
+        "staged-ledger-account-delegations",
+        "staged-ledger-hash-to-block",
+        "staged-ledger-persisted",
         "blocks-ledger-diff",
         "blocks-staged-ledger-hash",
-        // staking ledgers & delegations
-        "staking-ledgers",
-        "staking-delegations",
-        "staking-ledger-genesis-hash",
+        //////////////////////////////
+        // Staking ledger store CFs //
+        //////////////////////////////
+        "staking-ledger-accounts",
+        "staking-ledger-delegations",
+        "staking-ledger-persisted",
         "staking-ledger-epoch-to-hash",
         "staking-ledger-hash-to-epoch",
-        // sorting staking ledgers
-        "staking-ledger-epoch",
-        "staking-ledger-balance",
-        "staking-ledger-stake",
-        "staking-ledger-accounts-epoch",
-        // chain id
+        "staking-ledger-genesis-hash",
+        "staking-ledger-total-currency",
+        "staking-ledger-balance-sort",
+        "staking-ledger-stake-sort",
+        "staking-ledger-accounts-count-epoch",
+        /////////////////////
+        // Chain store CFs //
+        /////////////////////
         "chain-id-to-network",
-        // usernames
+        ////////////////////////
+        // Username store CFs //
+        ////////////////////////
         "username-pk-num",
         "username-pk-index",
         "usernames-per-block",
@@ -345,7 +371,7 @@ pub fn from_u64_be_bytes(bytes: Vec<u8>) -> u64 {
 }
 
 /// The first 4 bytes are `prefix` in big endian
-/// - `prefix`: global slot, epoch number, etc
+/// - `prefix`: block length, global slot, epoch number, etc
 /// - `suffix`: txn hash, public key, etc
 fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
     let mut bytes = to_be_bytes(prefix);
