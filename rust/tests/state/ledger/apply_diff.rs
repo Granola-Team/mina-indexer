@@ -1,5 +1,6 @@
 use mina_indexer::{
     block::parser::BlockParser,
+    constants::MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS,
     ledger::{diff::LedgerDiff, Ledger},
 };
 use std::path::PathBuf;
@@ -71,7 +72,7 @@ async fn account_diffs() -> anyhow::Result<()> {
     let ledger = ledger.apply_diff(&diff)?;
     let expected = Ledger::from(vec![
         (
-            "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X",
+            MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS,
             0, // TODO: probably this address should be credited the account creation fee
             None,
             None,

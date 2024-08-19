@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS},
     ledger::{
         account::Nonce,
         coinbase::{Coinbase, CoinbaseKind},
@@ -87,9 +87,7 @@ impl AccountDiff {
         let public_key = new_account.clone();
         vec![
             AccountDiff::CreateAccount(PaymentDiff {
-                public_key: PublicKey(
-                    "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X".to_string(),
-                ),
+                public_key: PublicKey(MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS.to_string()),
                 update_type: UpdateType::Credit,
                 amount: Amount(MAINNET_ACCOUNT_CREATION_FEE.0),
             }),

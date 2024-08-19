@@ -299,11 +299,11 @@ impl BlockStore for IndexerStore {
     fn get_block_account_diffs(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
+    ) -> anyhow::Result<Option<Vec<Vec<AccountDiff>>>> {
         trace!("Getting block account diffs for {state_hash}");
         Ok(self
             .get_block_ledger_diff(state_hash)?
-            .map(|diff| diff.account_diffs.into_iter().flatten().collect::<Vec<_>>()))
+            .map(|diff| diff.account_diffs))
     }
 
     fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>> {

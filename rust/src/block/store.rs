@@ -61,7 +61,7 @@ pub trait BlockStore {
     fn get_block_account_diffs(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<Vec<AccountDiff>>>;
+    ) -> anyhow::Result<Option<Vec<Vec<AccountDiff>>>>;
 
     /// Get a block's ledger diff
     fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;

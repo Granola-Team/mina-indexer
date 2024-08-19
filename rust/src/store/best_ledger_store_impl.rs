@@ -1,7 +1,7 @@
 use super::{column_families::ColumnFamilyHelpers, from_be_bytes};
 use crate::{
     block::{store::BlockStore, BlockHash},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
+    constants::MAINNET_GENESIS_HASH,
     ledger::{
         account::{Account, Nonce},
         diff::account::{AccountDiff, UpdateType},
@@ -16,7 +16,6 @@ use crate::{
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashSet;
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
@@ -75,7 +74,10 @@ impl BestLedgerStore for IndexerStore {
         }
 
         apply.reverse();
-        Ok(<DBAccountUpdate>::new(apply, unapply))
+        Ok(<DBAccountUpdate>::new(
+            apply.into_iter().flatten().collect(),
+            unapply.into_iter().flatten().collect(),
+        ))
     }
 
     fn update_best_accounts(
@@ -85,13 +87,16 @@ impl BestLedgerStore for IndexerStore {
     ) -> anyhow::Result<()> {
         use AccountDiff::*;
         trace!("Updating account balances {state_hash}");
-        let apply_acc = updates.apply.iter().fold(0, |acc, update| match update {
+
+        let apply_iter = updates.apply.iter();
+        let unapply_iter = updates.unapply.iter();
+
+        let apply_acc = apply_iter.clone().fold(0, |acc, update| match update {
             CreateAccount(_) => acc + 1,
             _ => acc,
         });
-        let adjust = updates
-            .unapply
-            .iter()
+        let adjust = unapply_iter
+            .clone()
             .fold(apply_acc, |acc, update| match update {
                 CreateAccount(_) => acc - 1,
                 _ => acc,
@@ -100,7 +105,7 @@ impl BestLedgerStore for IndexerStore {
 
         // update accounts
         // unapply
-        for diff in updates.unapply.iter() {
+        for diff in unapply_iter.clone() {
             let pk: PublicKey = diff.public_key();
             let acct = self
                 .get_best_account(&pk)?
@@ -126,7 +131,13 @@ impl BestLedgerStore for IndexerStore {
                     balance: acct.balance - diff.amount,
                     ..acct
                 }),
-                CreateAccount(_) => None,
+                CreateAccount(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        ..acct
+                    }), // decrement balance on the virtual account used for accounting purposes
+                    UpdateType::Debit(_) => None, // uncreate the account
+                },
                 Delegation(diff) => Some(Account {
                     nonce: if acct.nonce.map(|n| n.0) == Some(0) {
                         None
@@ -159,8 +170,7 @@ impl BestLedgerStore for IndexerStore {
         }
 
         // apply
-        let mut accounts_created = <HashSet<PublicKey>>::new();
-        for diff in updates.apply.iter() {
+        for diff in apply_iter.clone() {
             let pk = diff.public_key();
             let acct = self
                 .get_best_account(&pk)?
@@ -181,10 +191,17 @@ impl BestLedgerStore for IndexerStore {
                     balance: acct.balance + diff.amount,
                     ..acct
                 }),
-                CreateAccount(_) => {
-                    accounts_created.insert(pk.clone());
-                    Some(acct)
-                }
+                CreateAccount(diff) => match diff.update_type {
+                    UpdateType::Credit => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        ..acct
+                    }),
+                    UpdateType::Debit(_nonce) => Some(Account {
+                        balance: acct.balance - diff.amount,
+                        nonce: acct.nonce, // no nonce increment?
+                        ..acct
+                    }),
+                },
                 Delegation(diff) => Some(Account {
                     nonce: Some(diff.nonce),
                     delegate: diff.delegate.clone(),
@@ -214,14 +231,6 @@ impl BestLedgerStore for IndexerStore {
             self.update_best_account(&pk, account)?;
         }
 
-        for pk in accounts_created {
-            let acct = self.get_best_account(&pk)?.unwrap();
-            let account = Account {
-                balance: acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
-                ..acct
-            };
-            self.update_best_account(&pk, Some(account))?;
-        }
         Ok(())
     }
 

@@ -48,6 +48,12 @@ async fn check_balance() -> anyhow::Result<()> {
         .enumerate()
     {
         let pk = pk_key_prefix(&key[8..]);
+
+        // this account does not exist on the ledger, but is stored in the
+        // indexer. We skip any assertions on this account for now
+        if pk.0 == *MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS.to_string() {
+            continue;
+        }
         let pk_key_balance = balance_key_prefix(&key);
         let pk_store_account = indexer_store.get_best_account(&pk)?.unwrap();
         let pk_best_account = best_ledger
@@ -76,7 +82,15 @@ async fn check_balance() -> anyhow::Result<()> {
 
     // check best ledger balances equal sorted store balances
     for (pk, acct) in best_ledger.accounts {
-        assert_eq!(acct, indexer_store.get_best_account(&pk)?.unwrap());
+        let best_account = indexer_store.get_best_account(&pk)?.unwrap();
+        if pk.0 == *MINA_ACCOUNT_CREATION_FEE_ACCOUNTING_ADDRESS.to_string() {
+            // This virtual accounting address is not in the ledger, but exists in our
+            // indexer We assert that it is accumulating 1 MINA accounting fees
+            // for each new account created
+            assert_eq!(best_account.balance.0, 8000000000);
+        } else {
+            assert_eq!(acct, best_account);
+        }
     }
     Ok(())
 }
