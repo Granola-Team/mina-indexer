@@ -11,7 +11,6 @@ use crate::{
     store::DBUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashMap;
 
 pub trait BestLedgerStore {
     /// Get the best ledger (associated with the best block)
