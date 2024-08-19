@@ -11,7 +11,7 @@ use crate::{
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
-        LedgerHash,
+        Ledger, LedgerHash,
     },
     snark_work::store::SnarkStore,
     state::{summary::SummaryShort, IndexerState},
@@ -108,9 +108,8 @@ pub async fn handle_connection(
                 }
             },
             ClientCli::Blocks(__) => match __ {
-                Blocks::BestTip { verbose, path } => {
-                    info!("Received best-tip command");
-
+                Blocks::Best { verbose, path } => {
+                    info!("Received best block command");
                     if let Some(best_tip) = db.get_best_block()? {
                         let block_str = if let Some(canonicity) =
                             db.get_block_canonicity(&best_tip.state_hash())?
@@ -249,7 +248,7 @@ pub async fn handle_connection(
                         }
                     }
                 }
-                Blocks::Slot {
+                Blocks::GlobalSlot {
                     slot,
                     verbose,
                     path,
@@ -578,9 +577,9 @@ pub async fn handle_connection(
                 }
             }
             ClientCli::Ledgers(__) => match __ {
-                Ledgers::Best { path } => {
+                Ledgers::Best { path, memoize } => {
                     info!("Received best-ledger command");
-                    if let Some(ledger) = db.get_best_ledger(true)? {
+                    if let Some(ledger) = db.get_best_ledger(memoize)? {
                         let ledger = ledger.to_string_pretty();
                         if path.is_none() {
                             debug!("Writing best ledger to stdout");
@@ -600,33 +599,43 @@ pub async fn handle_connection(
                         Some("Best ledger cannot be calculated".into())
                     }
                 }
-                Ledgers::Hash { hash, path } => {
-                    info!("Received ledger command for {hash}");
+                Ledgers::Hash {
+                    hash,
+                    path,
+                    memoize,
+                } => {
+                    info!("Received staged ledger command for {hash}");
+                    fn write_ledger(
+                        path: Option<std::path::PathBuf>,
+                        ledger: Ledger,
+                        hash: &str,
+                    ) -> Option<String> {
+                        let ledger = ledger.to_string_pretty();
+                        if path.is_none() {
+                            debug!("Writing staged ledger at hash {hash} to stdout");
+                            Some(ledger)
+                        } else {
+                            let path = path.unwrap();
+                            if !path.is_dir() {
+                                debug!("Writing staged ledger at {hash} to {}", path.display());
+                                std::fs::write(path.clone(), ledger).ok();
+                                Some(format!(
+                                    "Ledger at hash {hash} written to {}",
+                                    path.display()
+                                ))
+                            } else {
+                                file_must_not_be_a_directory(&path)
+                            }
+                        }
+                    }
 
                     // check if ledger or state hash and use appropriate getter
                     if block::is_valid_state_hash(&hash) {
                         trace!("{hash} is a state hash");
                         if let Some(ledger) =
-                            db.get_staged_ledger_at_state_hash(&hash.clone().into(), true)?
+                            db.get_staged_ledger_at_state_hash(&hash.clone().into(), memoize)?
                         {
-                            let ledger = ledger.to_string_pretty();
-                            if path.is_none() {
-                                debug!("Writing ledger at state hash {hash} to stdout");
-                                Some(ledger)
-                            } else {
-                                let path = path.unwrap();
-                                if !path.is_dir() {
-                                    debug!("Writing ledger at {hash} to {}", path.display());
-
-                                    std::fs::write(path.clone(), ledger)?;
-                                    Some(format!(
-                                        "Ledger at state hash {hash} written to {}",
-                                        path.display()
-                                    ))
-                                } else {
-                                    file_must_not_be_a_directory(&path)
-                                }
-                            }
+                            write_ledger(path, ledger, &hash)
                         } else {
                             error!("Ledger at state hash {hash} is not in the store");
                             Some(format!("Ledger at state hash {hash} is not in the store"))
@@ -634,44 +643,31 @@ pub async fn handle_connection(
                     } else if ledger::is_valid_ledger_hash(&hash) {
                         trace!("{hash} is a ledger hash");
                         if let Some(ledger) =
-                            db.get_staged_ledger_at_ledger_hash(&LedgerHash(hash.clone()), true)?
+                            db.get_staged_ledger_at_ledger_hash(&LedgerHash(hash.clone()), memoize)?
                         {
-                            let ledger = ledger.to_string_pretty();
-                            if path.is_none() {
-                                debug!("Writing ledger at hash {hash} to stdout");
-                                Some(ledger)
-                            } else {
-                                let path = path.unwrap();
-                                if !path.is_dir() {
-                                    debug!("Writing ledger at {hash} to {}", path.display());
-
-                                    std::fs::write(path.clone(), ledger)?;
-                                    Some(format!(
-                                        "Ledger at hash {hash} written to {}",
-                                        path.display()
-                                    ))
-                                } else {
-                                    file_must_not_be_a_directory(&path)
-                                }
-                            }
+                            write_ledger(path, ledger, &hash)
                         } else {
-                            error!("Ledger at {hash} is not in the store");
-                            Some(format!("Ledger at {hash} is not in the store"))
+                            error!("Ledger at ledger hash {hash} is not in the store");
+                            Some(format!("Ledger at ledger hash {hash} is not in the store"))
                         }
                     } else {
                         error!("Invalid ledger or state hash: {hash}");
                         Some(format!("Invalid ledger or state hash: {hash}"))
                     }
                 }
-                Ledgers::Height { height, path } => {
-                    info!("Received ledger-at-height {height} command");
+                Ledgers::Height {
+                    height,
+                    path,
+                    memoize,
+                } => {
+                    info!("Received staged ledger at height {height} command");
                     if let Ok(Some(best_tip_height)) = db.get_best_block_height() {
                         if height > best_tip_height {
                             // ahead of witness tree - cannot compute
                             Some(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {best_tip_height}"))
                         } else {
                             let ledger_str = db
-                                .get_staged_ledger_at_block_height(height, true)?
+                                .get_staged_ledger_at_block_height(height, memoize)?
                                 .unwrap()
                                 .to_string_pretty();
                             if path.is_none() {
@@ -684,7 +680,6 @@ pub async fn handle_connection(
                                         "Writing ledger at height {height} to {}",
                                         path.display()
                                     );
-
                                     std::fs::write(&path, ledger_str)?;
                                     Some(format!(
                                         "Ledger at height {height} written to {}",
