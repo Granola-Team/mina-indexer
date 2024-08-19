@@ -105,58 +105,54 @@ impl DBAccountUpdate {
                     );
                 }
                 Coinbase(diff) => {
-                    if let Some((acc_balance, acc_nonce, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        res.insert(
-                            pk,
-                            Some((
-                                acc_balance - diff.amount.0 as i64,
-                                acc_nonce,
-                                acc_delegation,
-                            )),
-                        );
-                    }
+                    let (acc_balance, acc_nonce, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+
+                    res.insert(
+                        pk,
+                        Some((
+                            acc_balance - diff.amount.0 as i64,
+                            acc_nonce,
+                            acc_delegation,
+                        )),
+                    );
                 }
                 CreateAccount(diff) => {
                     res.insert(diff.public_key.clone(), None);
                 }
                 Delegation(diff) => {
-                    if let Some((acc_balance, acc_nonce, _)) = res.remove(&pk).unwrap_or_default() {
-                        res.insert(
-                            pk.clone(),
-                            Some((acc_balance, acc_nonce, Some(diff.delegate.clone()))),
-                        );
-                    }
+                    let (acc_balance, acc_nonce, _) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+                    res.insert(
+                        pk.clone(),
+                        Some((acc_balance, acc_nonce, Some(diff.delegate.clone()))),
+                    );
                 }
                 FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                    if let Some((acc_balance, acc_nonce, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        res.insert(
-                            pk.clone(),
-                            match diff.update_type {
-                                UpdateType::Credit => Some((
-                                    acc_balance - diff.amount.0 as i64,
-                                    acc_nonce,
-                                    acc_delegation,
-                                )),
-                                UpdateType::Debit(_) => {
-                                    Some((acc_balance + diff.amount.0 as i64, acc_nonce, None))
-                                }
-                            },
-                        );
-                    }
+                    let (acc_balance, acc_nonce, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+
+                    res.insert(
+                        pk.clone(),
+                        match diff.update_type {
+                            UpdateType::Credit => Some((
+                                acc_balance - diff.amount.0 as i64,
+                                acc_nonce,
+                                acc_delegation,
+                            )),
+                            UpdateType::Debit(_) => {
+                                Some((acc_balance + diff.amount.0 as i64, acc_nonce, None))
+                            }
+                        },
+                    );
                 }
                 FailedTransactionNonce(diff) => {
-                    if let Some((acc_balance, _, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        res.insert(
-                            pk.clone(),
-                            Some((acc_balance, diff.nonce.0 as i32, acc_delegation)),
-                        );
-                    }
+                    let (acc_balance, _, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+                    res.insert(
+                        pk.clone(),
+                        Some((acc_balance, diff.nonce.0 as i32, acc_delegation)),
+                    );
                 }
             }
         }
@@ -185,53 +181,296 @@ impl DBAccountUpdate {
                     );
                 }
                 Coinbase(diff) => {
-                    if let Some((acc_balance, acc_nonce, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        res.insert(
-                            pk,
-                            Some((
-                                acc_balance + diff.amount.0 as i64,
-                                acc_nonce,
-                                acc_delegation,
-                            )),
-                        );
-                    }
+                    let (acc_balance, acc_nonce, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+                    res.insert(
+                        pk,
+                        Some((
+                            acc_balance + diff.amount.0 as i64,
+                            acc_nonce,
+                            acc_delegation,
+                        )),
+                    );
                 }
                 CreateAccount(diff) => {
                     res.insert(diff.public_key.clone(), Some((0, 0, None)));
                 }
                 Delegation(diff) => {
-                    if let Some((acc_balance, acc_nonce, _)) = res.remove(&pk).unwrap_or_default() {
-                        res.insert(
-                            pk.clone(),
-                            Some((acc_balance, acc_nonce, Some(diff.delegate.clone()))),
-                        );
-                    }
+                    let (acc_balance, acc_nonce, _) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+                    res.insert(
+                        pk.clone(),
+                        Some((acc_balance, acc_nonce, Some(diff.delegate.clone()))),
+                    );
                 }
                 FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                    if let Some((acc_balance, acc_nonce, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        let (acc_balance, acc_nonce) = match diff.update_type {
-                            UpdateType::Credit => (acc_balance + diff.amount.0 as i64, acc_nonce),
-                            UpdateType::Debit(_) => (acc_balance - diff.amount.0 as i64, acc_nonce),
-                        };
-                        res.insert(pk.clone(), Some((acc_balance, acc_nonce, acc_delegation)));
-                    }
+                    let (acc_balance, acc_nonce, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+
+                    let (acc_balance, acc_nonce) = match diff.update_type {
+                        UpdateType::Credit => (acc_balance + diff.amount.0 as i64, acc_nonce),
+                        UpdateType::Debit(_) => (acc_balance - diff.amount.0 as i64, acc_nonce),
+                    };
+                    res.insert(pk.clone(), Some((acc_balance, acc_nonce, acc_delegation)));
                 }
                 FailedTransactionNonce(diff) => {
-                    if let Some((acc_balance, _, acc_delegation)) =
-                        res.remove(&pk).unwrap_or_default()
-                    {
-                        res.insert(
-                            pk.clone(),
-                            Some((acc_balance, diff.nonce.0 as i32, acc_delegation)),
-                        );
-                    }
+                    let (acc_balance, _, acc_delegation) =
+                        res.remove(&pk).unwrap_or_default().unwrap_or_default();
+
+                    res.insert(
+                        pk.clone(),
+                        Some((acc_balance, diff.nonce.0 as i32, acc_delegation)),
+                    );
                 }
             }
         }
         res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ledger::{
+        account::{Amount, Nonce},
+        diff::account::{
+            AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, PaymentDiff,
+            UpdateType,
+        },
+        public_key::PublicKey,
+    };
+
+    fn public_key(_n: u8) -> PublicKey {
+        PublicKey::new("B62qj9mXCjVYfsbshbGJsB62qz9mXCjVYfsbshbGJsj9mXCjV")
+    }
+
+    #[test]
+    fn test_account_updates_unapply_payment_credit() {
+        let pk = public_key(1);
+        let account_diff = AccountDiff::Payment(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(100),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((-100, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_unapply_payment_debit() {
+        let pk = public_key(1);
+
+        let account_diff = AccountDiff::Payment(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(50),
+            update_type: UpdateType::Debit(Some(Nonce(2))),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        // Unapply the debit: should revert to balance = 100, nonce = 1
+        assert_eq!(updates.get(&pk), Some(&Some((50, 1, None))));
+    }
+
+    #[test]
+    fn test_account_updates_apply_payment_credit() {
+        let pk = public_key(1);
+        let account_diff = AccountDiff::Payment(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(100),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((100, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_apply_payment_debit() {
+        let pk = public_key(1);
+        let account_diff = AccountDiff::Payment(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(50),
+            update_type: UpdateType::Debit(Some(Nonce(2))),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((-50, 3, None))));
+    }
+
+    #[test]
+    fn test_account_updates_unapply_coinbase() {
+        let pk = public_key(2);
+        let account_diff = AccountDiff::Coinbase(CoinbaseDiff {
+            public_key: pk.clone(),
+            amount: Amount(500),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((-500, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_apply_coinbase() {
+        let pk = public_key(2);
+        let account_diff = AccountDiff::Coinbase(CoinbaseDiff {
+            public_key: pk.clone(),
+            amount: Amount(500),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((500, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_unapply_create_account() {
+        let pk = public_key(3);
+        let account_diff = AccountDiff::CreateAccount(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(0),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&None));
+    }
+
+    #[test]
+    fn test_account_updates_apply_create_account() {
+        let pk = public_key(3);
+        let account_diff = AccountDiff::CreateAccount(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(0),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((0, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_unapply_delegation() {
+        let pk = public_key(4);
+        let delegate_pk = public_key(5);
+        let account_diff = AccountDiff::Delegation(DelegationDiff {
+            nonce: Nonce(0),
+            delegate: delegate_pk.clone(),
+            delegator: pk.clone(),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(
+            updates.get(&pk),
+            Some(&Some((0, 0, Some(delegate_pk.clone()))))
+        );
+    }
+
+    #[test]
+    fn test_account_updates_apply_delegation() {
+        let pk = public_key(4);
+        let delegate_pk = public_key(5);
+        let account_diff = AccountDiff::Delegation(DelegationDiff {
+            nonce: Nonce(0),
+            delegate: delegate_pk.clone(),
+            delegator: pk.clone(),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(
+            updates.get(&pk),
+            Some(&Some((0, 0, Some(delegate_pk.clone()))))
+        );
+    }
+
+    #[test]
+    fn test_account_updates_unapply_fee_transfer() {
+        let pk = public_key(6);
+        let account_diff = AccountDiff::FeeTransfer(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(200),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((-200, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_apply_fee_transfer() {
+        let pk = public_key(6);
+        let account_diff = AccountDiff::FeeTransfer(PaymentDiff {
+            public_key: pk.clone(),
+            amount: Amount(200),
+            update_type: UpdateType::Credit,
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((200, 0, None))));
+    }
+
+    #[test]
+    fn test_account_updates_unapply_failed_transaction_nonce() {
+        let pk = public_key(7);
+        let account_diff = AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+            public_key: pk.clone(),
+            nonce: Nonce(3),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![], vec![account_diff]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((0, 3, None))));
+    }
+
+    #[test]
+    fn test_account_updates_apply_failed_transaction_nonce() {
+        let pk = public_key(7);
+        let account_diff = AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+            public_key: pk.clone(),
+            nonce: Nonce(3),
+        });
+
+        let db_account_update = DBAccountUpdate::new(vec![account_diff], vec![]);
+
+        let updates = db_account_update.account_updates();
+
+        assert_eq!(updates.get(&pk), Some(&Some((0, 3, None))));
     }
 }
