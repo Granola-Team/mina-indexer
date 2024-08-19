@@ -13,11 +13,10 @@ IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 alias c := check
 alias f := format
 alias cd := clean-dev
-alias tu := test-unit
-alias tud := test-unit-dev
+alias tu := test-unit-dev
 alias t1 := tier1
-alias t2 := tier2
-alias t3 := tier3
+alias t2 := tier2-dev
+alias t3 := tier3-dev
 
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
@@ -121,7 +120,7 @@ build-image:
 
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
-  @echo "--- Performing regressions tests subset"
+  @echo "--- Performing tier 1 regression tests"
   time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer \
     ipc_is_available_immediately \
     clean_shutdown \
@@ -134,21 +133,39 @@ tier1: tier1-prereqs check lint test-unit
     hurl
 
 load:
-  @echo "--- Performing a simple load test'"
+  @echo "--- Performing a simple load test with Nix-built binary"
   time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer load
 
-# Run the 2nd tier of tests.
-tier2: tier2-prereqs test-unit-mina-rs nix-build load && build-image
-  @echo "--- Performing regressions test(s) with Nix-built binary"
+load-dev:
+  @echo "--- Performing a simple load test with debug-built binary"
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer load
+
+# Run the 2nd tier of tests with Nix-built binary.
+tier2: tier2-prereqs nix-build load && build-image
+  @echo "--- Performing tier 2 regression tests with Nix-built binary"
   time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer
-  @echo "--- Performing many_blocks regression test"
+  @echo "--- Performing many_blocks regression test with Nix-built binary"
   time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer many_blocks
-  @echo "--- Testing 'release'"
+  @echo "--- Performing release regression test with Nix-built binary"
   time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer release
 
-# Run tier-3 tests.
-tier3 blocks='5000': nix-build
-  @echo "--- Performing tier3 tests"
+# Run the 2nd tier of with debug build.
+tier2-dev: tier2-prereqs debug-build load-dev
+  @echo "--- Performing tier 2 regression tests with debug-built binary"
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer
+  @echo "--- Performing many_blocks regression test with debug-built binary"
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer many_blocks
+  @echo "--- Performing release regression test with debug-built binary"
+  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer release
+
+# Run the 2nd tier of tests with Nix-built binary.
+tier3 blocks='5000': test-unit-mina-rs nix-build
+  @echo "--- Performing tier3 regression tests with Nix-built binary"
+  time ./ops/deploy.rb test {{blocks}}
+
+# Run the 3rd tier of tests with debug build.
+tier3-dev blocks='5000': test-unit-mina-rs debug-build
+  @echo "--- Performing tier3 regression tests with debug-built binary"
   time ./ops/deploy.rb test {{blocks}}
 
 # Run a server as if in production.
