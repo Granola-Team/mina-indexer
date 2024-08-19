@@ -47,8 +47,10 @@ shutdown_idxr() {
       return 1
     fi
 
-    # Shutdown command succeeded. Give time to exit cleanly.
-    sleep 2
+    # The shutdown command succeeded. Give a the process a generous amount of
+    # time to exit cleanly. If this gets too big, then we don't really shut
+    # down correctly.
+    sleep 3
 
     # Either it timed out, or that PID did not exist.
     if ps -p "$(cat ./idxr_pid)" >/dev/null; then
