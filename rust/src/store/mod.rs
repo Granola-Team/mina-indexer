@@ -48,7 +48,7 @@ pub struct IndexerStore {
 }
 
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DBUpdate<T> {
+pub struct DbUpdate<T> {
     pub apply: Vec<T>,
     pub unapply: Vec<T>,
 }
@@ -318,7 +318,7 @@ fn archive_directory(input_dir: impl AsRef<Path>, output_file: impl AsRef<Path>)
     archive.finish()
 }
 
-impl<T> std::fmt::Debug for DBUpdate<T>
+impl<T> std::fmt::Debug for DbUpdate<T>
 where
     T: std::fmt::Debug,
 {

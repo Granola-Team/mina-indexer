@@ -209,7 +209,7 @@ impl BlockParser {
                     blocks_processed: 0,
                     deep_canonical_bytes,
                     num_deep_canonical_blocks: canonical_paths.len() as u32,
-                    total_num_blocks: (canonical_paths.len() + recent_paths.len()) as u32,
+                    total_num_blocks: paths.len() as u32,
                     canonical_paths: canonical_paths.into_iter(),
                     recent_paths: recent_paths.into_iter(),
                     orphaned_paths: orphaned_paths.into_iter(),

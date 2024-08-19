@@ -17,7 +17,7 @@ use crate::{
     snark_work::store::SnarkStore,
     store::{
         block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, from_u64_be_bytes,
-        to_be_bytes, u32_prefix_key, username::UsernameStore, DBUpdate, IndexerStore,
+        to_be_bytes, u32_prefix_key, username::UsernameStore, DbUpdate, IndexerStore,
     },
 };
 use anyhow::{bail, Context};
@@ -206,17 +206,10 @@ impl BlockStore for IndexerStore {
             }
 
             // reorg updates
-            // canonicity
-            let canonicity_updates = self.reorg_canonicity_updates(&old, state_hash)?;
-            self.update_canonicity(canonicity_updates)?;
-
-            // balance-sorted accounts
-            let balance_updates = self.reorg_account_updates(&old, state_hash)?;
-            self.update_best_accounts(state_hash, &balance_updates)?;
-
-            // usernames
-            let username_updates = self.reorg_username_updates(&old, state_hash)?;
-            self.update_usernames(username_updates)?;
+            let reorg_blocks = self.reorg_blocks(&old, state_hash)?;
+            self.update_block_canonicities(&reorg_blocks)?;
+            self.update_block_best_accounts(state_hash, &reorg_blocks)?;
+            self.update_block_usernames(&reorg_blocks)?;
         }
 
         // set new best tip
@@ -242,7 +235,7 @@ impl BlockStore for IndexerStore {
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DBUpdate<BlockHash>> {
+    ) -> anyhow::Result<DbUpdate<(BlockHash, u32)>> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
             old_best_tip,
@@ -266,7 +259,7 @@ impl BlockStore for IndexerStore {
             if b.0 == MAINNET_GENESIS_HASH {
                 break;
             }
-            apply.push(b.clone());
+            apply.push((b.clone(), b_length));
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -276,8 +269,8 @@ impl BlockStore for IndexerStore {
 
         while a != b && a.0 != MAINNET_GENESIS_HASH {
             // add blocks to appropriate collection
-            apply.push(b.clone());
-            unapply.push(a.clone());
+            apply.push((b.clone(), b_length));
+            unapply.push((a.clone(), a_length));
 
             // descend
             a = a_prev;
@@ -287,7 +280,7 @@ impl BlockStore for IndexerStore {
         }
 
         apply.reverse();
-        Ok(DBUpdate { apply, unapply })
+        Ok(DbUpdate { apply, unapply })
     }
 
     fn get_current_epoch(&self) -> anyhow::Result<u32> {

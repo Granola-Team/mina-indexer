@@ -6,9 +6,11 @@ use crate::{
         diff::{account::AccountDiff, LedgerDiff},
         public_key::PublicKey,
     },
-    store::DBUpdate,
+    store::DbUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
+
+pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
 
 pub trait BlockStore {
     /// Add block to the store
@@ -25,7 +27,10 @@ pub trait BlockStore {
     // Best block functions //
     //////////////////////////
 
-    /// Index best block state hash
+    /// Set the best block
+    ///
+    /// This funciton is called every time we learn about a new best block.
+    /// It handles the reorg logic, recomputing several important CFs.
     fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()>;
 
     /// Get best block from the store
@@ -36,7 +41,7 @@ pub trait BlockStore {
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DBUpdate<BlockHash>>;
+    ) -> anyhow::Result<DbBlockUpdate>;
 
     /// Get best block epoch count without deserializing the PCB
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
