@@ -158,15 +158,18 @@ impl BestLedgerStore for IndexerStore {
                     ..acct
                 }),
                 CreateAccount(_) => None,
-                Delegation(diff) => Some(Account {
-                    nonce: if acct.nonce.map(|n| n.0) == Some(0) {
-                        None
-                    } else {
-                        Some(diff.nonce - 1)
-                    },
-                    delegate: diff.delegate.clone(),
-                    ..acct
-                }),
+                Delegation(diff) => {
+                    self.remove_pk_delegate(pk.clone())?;
+                    Some(Account {
+                        nonce: if acct.nonce.map(|n| n.0) == Some(0) {
+                            None
+                        } else {
+                            Some(diff.nonce - 1)
+                        },
+                        delegate: diff.delegate.clone(),
+                        ..acct
+                    })
+                }
                 FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
                     UpdateType::Credit => Some(Account {
                         balance: acct.balance - diff.amount,
@@ -204,7 +207,7 @@ impl BestLedgerStore for IndexerStore {
                     }),
                     UpdateType::Debit(nonce) => Some(Account {
                         balance: acct.balance - diff.amount,
-                        nonce: acct.nonce.map(|n| nonce.unwrap_or_default().max(n) + 1),
+                        nonce: nonce.or(acct.nonce),
                         ..acct
                     }),
                 },

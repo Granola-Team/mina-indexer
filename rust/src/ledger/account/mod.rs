@@ -174,22 +174,13 @@ impl Account {
         }
     }
 
-    /// Sets the username for the account.
-    /// This function updates the account's username to the specified value.
-    ///
-    /// # Arguments
-    ///
-    /// * `username` - The new username to be set for the account.
-    ///
-    /// # Returns
-    ///
-    /// An `anyhow::Result<()>` indicating success or failure.
+    /// Sets the username for the account
     pub fn set_username(&mut self, username: Username) -> anyhow::Result<()> {
         self.username = Some(username);
         Ok(())
     }
 
-    /// Updates the account's balance based on a coinbase reward.
+    /// Updates the account's balance based on applying a coinbase reward.
     /// This function takes the current account state (`pre`) and a reward
     /// amount (`amount`), and returns a new account state with the updated
     /// balance.
@@ -210,8 +201,8 @@ impl Account {
         }
     }
 
-    /// Updates the account's state based on the This function handles both
-    /// credit and debit updates.
+    /// Updates the account's state based on applying a payment.
+    /// This function handles both credit and debit updates.
     ///
     /// # Arguments
     ///
@@ -224,30 +215,38 @@ impl Account {
     pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
-            UpdateType::Debit(nonce) => Account::from_debit(
-                pre.clone(),
-                payment_diff.amount,
-                nonce.map(|n| if n.0 == 0 { n } else { Nonce(n.0 + 1) }),
-            )
-            .unwrap_or(pre.clone()),
+            UpdateType::Debit(nonce) => {
+                Account::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
+            }
         }
     }
 
-    pub fn from_payment_unapply(pre: Self, payment_diff: &PaymentDiff) -> Self {
+    /// Updates the account's state based on unapplying a payment.
+    /// This function handles both credit and debit updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `post` - The current state of the account.
+    /// * `payment_diff` - The `PaymentDiff` containing the update type amount.
+    ///
+    /// # Returns
+    ///
+    /// A new `Account` instance with the updated state.
+    pub fn from_payment_unapply(post: Self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => Account {
-                balance: pre.balance.sub(payment_diff.amount),
-                ..pre
+                balance: post.balance.sub(payment_diff.amount),
+                ..post
             },
             UpdateType::Debit(nonce) => Self {
-                balance: pre.balance.add(payment_diff.amount),
-                nonce: nonce.or(pre.nonce),
-                ..pre
+                balance: post.balance.add(payment_diff.amount),
+                nonce: nonce.or(post.nonce).map(|n| n - 1),
+                ..post
             },
         }
     }
 
-    /// Updates the account's balance and nonce based on a User Command.
+    /// Updates the account's balance and nonce based on applying a debit.
     /// If the `nonce` is `None`, the update originates from an internal
     /// command.
     ///
@@ -264,8 +263,6 @@ impl Account {
     /// successful, or `None` if the debit amount exceeds the current
     /// balance.
     fn from_debit(pre: Self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
-        // TODO: Convert this to use an assert. Note: The assertion will fail
-        // when it originating from a dangling branch.
         if amount > pre.balance {
             None
         } else {
@@ -277,7 +274,7 @@ impl Account {
         }
     }
 
-    /// Updates the account's balance by adding the specified `amount`.
+    /// Updates the account's balance based on applying a credit.
     /// This function takes the current account state (`pre`) and returns a new
     /// account state with the updated balance.
     ///
