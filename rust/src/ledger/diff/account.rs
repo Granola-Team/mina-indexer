@@ -304,14 +304,14 @@ impl AccountDiff {
     pub fn amount(&self) -> i64 {
         match self {
             Self::Delegation(_) | Self::FailedTransactionNonce(_) => 0,
-            Self::CreateAccount(_) => 0 - MAINNET_ACCOUNT_CREATION_FEE.0 as i64,
             Self::Coinbase(diff) => diff.amount.0 as i64,
-            Self::FeeTransfer(diff) | Self::FeeTransferViaCoinbase(diff) | Self::Payment(diff) => {
-                match diff.update_type {
-                    UpdateType::Credit => diff.amount.0 as i64,
-                    UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
-                }
-            }
+            Self::FeeTransfer(diff)
+            | Self::FeeTransferViaCoinbase(diff)
+            | Self::Payment(diff)
+            | Self::CreateAccount(diff) => match diff.update_type {
+                UpdateType::Credit => diff.amount.0 as i64,
+                UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
+            },
         }
     }
 
@@ -472,7 +472,10 @@ impl std::fmt::Debug for UpdateType {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccountDiff, CoinbaseDiff, DelegationDiff, PaymentDiff, UpdateType};
+    use super::{
+        AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, PaymentDiff,
+        UpdateType,
+    };
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::{Command, Delegation, Payment},
@@ -485,6 +488,78 @@ mod tests {
         },
     };
     use std::path::PathBuf;
+
+    #[test]
+    fn test_amount() {
+        let credit_amount = Amount(1000);
+        let debit_amount = Amount(500);
+
+        // Test Credit for PaymentDiff
+        let payment_diff_credit = AccountDiff::Payment(PaymentDiff {
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            amount: credit_amount,
+            update_type: UpdateType::Credit,
+        });
+        assert_eq!(payment_diff_credit.amount(), 1000);
+
+        // Test Debit for PaymentDiff
+        let payment_diff_debit = AccountDiff::Payment(PaymentDiff {
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            amount: debit_amount,
+            update_type: UpdateType::Debit(Some(Nonce(1))),
+        });
+        assert_eq!(payment_diff_debit.amount(), -500);
+
+        // Test Credit for CoinbaseDiff
+        let coinbase_diff = AccountDiff::Coinbase(CoinbaseDiff {
+            public_key: PublicKey::new("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs"),
+            amount: credit_amount,
+        });
+        assert_eq!(coinbase_diff.amount(), 1000);
+
+        // Test Debit for CreateAccount PaymentDiff
+        let create_account_diff = AccountDiff::CreateAccount(PaymentDiff {
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            amount: debit_amount,
+            update_type: UpdateType::Debit(None),
+        });
+        assert_eq!(create_account_diff.amount(), -500);
+
+        // Test Credit for FeeTransfer PaymentDiff
+        let fee_transfer_diff_credit = AccountDiff::FeeTransfer(PaymentDiff {
+            public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u"),
+            amount: credit_amount,
+            update_type: UpdateType::Credit,
+        });
+        assert_eq!(fee_transfer_diff_credit.amount(), 1000);
+
+        // Test Debit for FeeTransferViaCoinbase PaymentDiff
+        let fee_transfer_via_coinbase_diff_debit =
+            AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
+                public_key: PublicKey::new(
+                    "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u",
+                ),
+                amount: debit_amount,
+                update_type: UpdateType::Debit(None),
+            });
+        assert_eq!(fee_transfer_via_coinbase_diff_debit.amount(), -500);
+
+        let delegation_diff = AccountDiff::Delegation(DelegationDiff {
+            nonce: Nonce(42),
+            delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi"),
+            delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
+        });
+        assert_eq!(delegation_diff.amount(), 0);
+
+        let failed_tx_nonce_diff =
+            AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+                public_key: PublicKey::new(
+                    "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi",
+                ),
+                nonce: Nonce(10),
+            });
+        assert_eq!(failed_tx_nonce_diff.amount(), 0);
+    }
 
     #[test]
     fn test_fee_transfer_via_coinbase() {
