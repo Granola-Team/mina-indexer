@@ -384,20 +384,19 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
     }
 }
 
-pub fn extract_block_height(path: &Path) -> Option<u32> {
-    let filename = path.file_name().and_then(|x| x.to_str()).unwrap();
-    let first_dash = filename.find('-');
-    let second_dash =
-        first_dash.and_then(|index| filename[index + 1..].find('-').map(|i| i + index + 1));
-    if let (Some(first_dash_pos), Some(second_dash_pos)) = (first_dash, second_dash) {
-        let potential_block_height = &filename[first_dash_pos + 1..second_dash_pos];
-        return potential_block_height.parse::<u32>().ok();
-    }
-    None
-}
+pub fn extract_block_height(path: &Path) -> u32 {
+    let filename = path
+        .file_name()
+        .and_then(|x| x.to_str())
+        .expect("Failed to extract filename from path");
 
-pub fn extract_block_height_or_max(path: &Path) -> u32 {
-    extract_block_height(path).unwrap_or(u32::MAX)
+    let parts: Vec<&str> = filename.split('-').collect();
+
+    parts
+        .get(1)
+        .expect("Failed to find the second part of the filename")
+        .parse::<u32>()
+        .expect("Failed to parse block height as u32")
 }
 
 pub fn extract_state_hash(path: &Path) -> String {
@@ -417,7 +416,7 @@ pub fn extract_network(path: &Path) -> Network {
 #[cfg(test)]
 mod tests {
     use super::{
-        extract_block_height_or_max, extract_state_hash, is_valid_state_hash,
+        extract_block_height, extract_state_hash, is_valid_state_hash,
         precomputed::PrecomputedBlock, Block, BlockHash,
     };
     use crate::block::precomputed::PcbVersion;
@@ -453,18 +452,15 @@ mod tests {
     }
 
     #[test]
-    fn extract_block_height_or_max_test() {
-        let filename1 =
-            &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
+    fn extract_block_height_test() {
         let filename2 =
             &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
         let filename3 = &Path::new(
             "/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
         );
 
-        assert_eq!(u32::MAX, extract_block_height_or_max(filename1));
-        assert_eq!(2, extract_block_height_or_max(filename2));
-        assert_eq!(3, extract_block_height_or_max(filename3));
+        assert_eq!(2, extract_block_height(filename2));
+        assert_eq!(3, extract_block_height(filename3));
     }
 
     #[test]

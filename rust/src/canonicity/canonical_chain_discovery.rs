@@ -1,6 +1,4 @@
-use crate::block::{
-    extract_block_height, extract_block_height_or_max, extract_state_hash, previous_state_hash::*,
-};
+use crate::block::{extract_block_height, extract_state_hash, previous_state_hash::*};
 use log::{debug, info};
 use std::{
     collections::HashSet,
@@ -27,7 +25,7 @@ pub fn discovery(
         info!("Sorting precomputed blocks by length");
 
         let time = Instant::now();
-        paths.sort_by_cached_key(|x| extract_block_height_or_max(x));
+        paths.sort_by_cached_key(|x| extract_block_height(x));
 
         info!(
             "{} blocks sorted by length in {:?}",
@@ -37,12 +35,12 @@ pub fn discovery(
 
         if let Some(blockchain_length) = max_len_filter {
             debug!("Applying max length block filter: blockchain_length < {blockchain_length}");
-            paths.retain(|p| extract_block_height_or_max(p) <= blockchain_length);
+            paths.retain(|p| extract_block_height(p) <= blockchain_length);
         }
 
         if let Some(blockchain_length) = min_len_filter {
             debug!("Applying min length block filter: blockchain_length > {blockchain_length}");
-            paths.retain(|p| extract_block_height_or_max(p) >= blockchain_length);
+            paths.retain(|p| extract_block_height(p) >= blockchain_length);
         }
 
         if paths.is_empty() {
@@ -56,11 +54,11 @@ pub fn discovery(
 
         let mut length_start_indices_and_diffs = vec![];
         // paths will always have at least 1 item
-        let mut curr_length = extract_block_height_or_max(paths.first().unwrap());
+        let mut curr_length = extract_block_height(paths.first().unwrap());
 
         info!("Searching for deep canonical blocks in blocks directory");
         for (idx, path) in paths.iter().enumerate() {
-            let length = extract_block_height_or_max(path);
+            let length = extract_block_height(path);
             if length > curr_length || idx == 0 {
                 length_start_indices_and_diffs.push((idx, length - curr_length));
                 curr_length = length;
@@ -104,7 +102,7 @@ pub fn discovery(
 
         info!(
             "Found witness tree root (length {}): {}",
-            extract_block_height(curr_path).unwrap_or(0),
+            extract_block_height(curr_path),
             extract_state_hash(curr_path),
         );
 
@@ -171,7 +169,7 @@ pub fn discovery(
             if !parent_found {
                 info!(
                     "Unable to locate parent block: mainnet-{}-{parent_hash}.json",
-                    extract_block_height_or_max(curr_path) - 1,
+                    extract_block_height(curr_path) - 1,
                 );
                 return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
             }
@@ -200,16 +198,13 @@ pub fn discovery(
 
     let max_canonical_length = deep_canonical_paths
         .last()
-        .and_then(|p| extract_block_height(p))
+        .and_then(|p| Some(extract_block_height(p)))
         .unwrap_or(1);
     let orphaned_paths: Vec<PathBuf> = paths
         .into_iter()
         .filter(|p| {
-            if let Some(length) = extract_block_height(p) {
-                return length <= max_canonical_length
-                    && !deep_canonical_state_hashes.contains(&extract_state_hash(p));
-            }
-            false
+            extract_block_height(p) <= max_canonical_length
+                && !deep_canonical_state_hashes.contains(&extract_state_hash(p))
         })
         .cloned()
         .collect();
@@ -232,9 +227,9 @@ fn is_parent(path: &Path, curr_path: &Path) -> bool {
 
 /// Returns the start index of the paths with next higher length.
 fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize> {
-    let length = extract_block_height_or_max(paths[path_idx]);
+    let length = extract_block_height(paths[path_idx]);
     for (n, path) in paths[path_idx..].iter().enumerate() {
-        if extract_block_height_or_max(path) > length {
+        if extract_block_height(path) > length {
             return Some(path_idx + n);
         }
     }

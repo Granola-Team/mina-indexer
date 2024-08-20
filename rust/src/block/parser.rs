@@ -123,11 +123,11 @@ impl BlockParser {
                 .fold(0, |acc, p| acc + p.metadata().unwrap().len());
 
             if min_length.is_some() {
-                paths.retain(|p| extract_block_height(p) > min_length)
+                paths.retain(|p| extract_block_height(p) > min_length.unwrap())
             }
 
             if max_length.is_some() {
-                paths.retain(|p| extract_block_height(p) < max_length)
+                paths.retain(|p| extract_block_height(p) < max_length.unwrap())
             }
 
             paths.sort_by_cached_key(|path| extract_block_height(path));
