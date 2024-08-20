@@ -81,11 +81,15 @@ module default {
 
   type StakingEpochData extending EpochData {}
   type NextEpochData extending EpochData {}
+
+  abstract type Command {
     required block: Block {
       on target delete restrict;
     }
     required status: str;
+    source: Account;
     source_balance: decimal;
+    receiver: Account;
     receiver_balance: decimal;
     fee: decimal;
     fee_payer: Account;
@@ -101,19 +105,12 @@ module default {
     created_token: str;
   }
 
-  type Payment {
-    required command: Command;
-    source: Account;
-    receiver: Account;
+  type Payment extending Command {
     token_id: int64;
     amount: decimal;
   }
 
-  type StakingDelegation {
-    required command: Command;
-    source: Account;
-    receiver: Account;
-  }
+  type StakingDelegation extending Command {}
 
   type Coinbase {
     required block: Block {
