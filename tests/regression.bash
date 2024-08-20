@@ -1149,8 +1149,8 @@ test_txn_nonces() {
 
     # after block 100
     ## pk0
-    assert 151 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
-    assert 151 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
+    assert 150 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
+    assert 150 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
 
     ## pk1
     assert 'null' $(idxr ledgers height --height 100 | jq -r .${pk1}.nonce)

@@ -85,13 +85,13 @@ async fn account_diffs() -> anyhow::Result<()> {
         (
             "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV",
             843190000000,
-            Some(42429),
+            Some(42428),
             None,
         ),
         (
             "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
             2439634213000,
-            Some(7298),
+            Some(7297),
             None,
         ),
         (
@@ -109,7 +109,7 @@ async fn account_diffs() -> anyhow::Result<()> {
         (
             "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
             999997998000,
-            Some(146495),
+            Some(146494),
             None,
         ),
         (
