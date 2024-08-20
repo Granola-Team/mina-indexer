@@ -1,3 +1,4 @@
+use glob::glob;
 use mina_indexer::{
     block::{
         parser::BlockParser,
@@ -74,7 +75,12 @@ async fn missing_parent() -> anyhow::Result<()> {
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
     // and the best canonical consists of blocks with lengths 105487, 105488,
     // 105489, 105490.
-    assert_eq!(block_parser.total_num_blocks, 35);
+    assert_eq!(
+        block_parser.total_num_blocks,
+        glob(&format!("{}/*-*-*.json", blocks_dir.display()))
+            .unwrap()
+            .count() as u32
+    );
     assert_eq!(block_parser.num_deep_canonical_blocks, 4);
     Ok(())
 }

@@ -184,8 +184,8 @@ impl StagedLedgerStore for IndexerStore {
             )?;
         }
 
-        // initialize account balances for sorting
-        for (pk, acct) in &genesis_ledger.accounts {
+        // initialize account balances for best ledger & sorting
+        for (pk, acct) in genesis_ledger.accounts.iter() {
             self.update_best_account(pk, Some(acct.clone()))?;
         }
         self.add_staged_ledger_at_state_hash(state_hash, genesis_ledger)?;

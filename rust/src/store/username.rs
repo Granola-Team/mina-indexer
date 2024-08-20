@@ -1,6 +1,6 @@
-use super::DBUpdate;
+use super::DbUpdate;
 use crate::{
-    block::BlockHash,
+    block::{store::DbBlockUpdate, BlockHash},
     ledger::{public_key::PublicKey, username::Username},
 };
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(Default, Serialize, Deserialize)]
 pub struct UsernameUpdate(pub HashMap<PublicKey, Username>);
 
-pub type UsernameAccountUpdate = DBUpdate<UsernameUpdate>;
+pub type UsernameAccountUpdate = DbUpdate<UsernameUpdate>;
 
 pub trait UsernameStore {
     /// Get the username associated with `pk`
@@ -33,12 +33,8 @@ pub trait UsernameStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>>;
 
-    /// Generate account username updates when the best tip changes
-    fn reorg_username_updates(
-        &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<UsernameAccountUpdate>;
+    /// Update block usernames
+    fn update_block_usernames(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()>;
 
     /// Update usernames
     fn update_usernames(&self, update: UsernameAccountUpdate) -> anyhow::Result<()>;

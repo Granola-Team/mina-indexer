@@ -1,6 +1,7 @@
 use crate::{
     block::BlockHash,
     canonicity::{Canonicity, CanonicityUpdate},
+    store::DbUpdate,
 };
 
 pub trait CanonicityStore {
@@ -15,14 +16,9 @@ pub trait CanonicityStore {
     ) -> anyhow::Result<()>;
 
     /// Update block canonicities
-    fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()>;
+    fn update_block_canonicities(&self, blocks: &DbUpdate<(BlockHash, u32)>) -> anyhow::Result<()>;
 
-    /// Generate canonicity updates when the best tip changes
-    fn reorg_canonicity_updates(
-        &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<CanonicityUpdate>;
+    fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()>;
 
     /// Get the state hash of the canonical block at the given height
     fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>>;

@@ -8,7 +8,7 @@ use mina_indexer::{
     ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
     state::IndexerState,
-    store::{username::UsernameStore, DBUpdate, IndexerStore},
+    store::{username::UsernameStore, DbUpdate, IndexerStore},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -39,7 +39,7 @@ async fn set_usernames() -> anyhow::Result<()> {
 
     // update usernames
     let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;
-    store.update_usernames(DBUpdate {
+    store.update_usernames(DbUpdate {
         apply: vec![block.username_updates()],
         ..Default::default()
     })?;

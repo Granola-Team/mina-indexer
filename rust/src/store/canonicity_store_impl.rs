@@ -1,11 +1,10 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate};
 use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
-    constants::MAINNET_GENESIS_HASH,
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
-    store::{to_be_bytes, DBUpdate, IndexerStore},
+    store::{to_be_bytes, IndexerStore},
 };
 use anyhow::Context;
 use log::trace;
@@ -132,67 +131,36 @@ impl CanonicityStore for IndexerStore {
         Ok(None)
     }
 
-    fn reorg_canonicity_updates(
-        &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<CanonicityUpdate> {
-        trace!("Getting reorg canonicity updates:\n  old: {old_best_tip}\n  new: {new_best_tip}");
-
-        // follows the old best tip back to the common ancestor
-        let mut a = old_best_tip.clone();
-        let mut unapply = vec![];
-
-        // follows the new best tip back to the common ancestor
-        let mut b = new_best_tip.clone();
-        let mut apply = vec![];
-
-        let a_length = self.get_block_height(&a)?.expect("a has a length");
-        let b_length = self.get_block_height(&b)?.expect("b has a length");
-
-        // bring b back to the same height as a
-        for _ in 0..b_length.saturating_sub(a_length) {
-            // check if there's a previous block
-            if b.0 == MAINNET_GENESIS_HASH {
-                break;
-            }
-
-            apply.push(CanonicityDiff {
-                state_hash: b.clone(),
-                blockchain_length: b_length,
-                global_slot: self
-                    .get_block_global_slot(&b)?
-                    .with_context(|| format!("(length {b_length}): {b}"))
-                    .unwrap(),
-            });
-            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-
-        // find the common ancestor
-        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-
-        while a != b && a.0 != MAINNET_GENESIS_HASH {
-            // collect canonicity diffs
-            unapply.push(CanonicityDiff {
-                state_hash: a.clone(),
-                blockchain_length: self.get_block_height(&a)?.unwrap(),
-                global_slot: self.get_block_global_slot(&a)?.unwrap(),
-            });
-            apply.push(CanonicityDiff {
-                state_hash: b.clone(),
-                blockchain_length: self.get_block_height(&b)?.unwrap(),
-                global_slot: self.get_block_global_slot(&b)?.unwrap(),
-            });
-
-            // descend
-            a = a_prev;
-            b = b_prev;
-
-            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-        Ok(DBUpdate { apply, unapply })
+    fn update_block_canonicities(&self, blocks: &DbUpdate<(BlockHash, u32)>) -> anyhow::Result<()> {
+        let canonicity_updates = DbUpdate {
+            apply: blocks
+                .apply
+                .iter()
+                .map(|(a, h)| CanonicityDiff {
+                    state_hash: a.clone(),
+                    blockchain_length: *h,
+                    global_slot: self
+                        .get_block_global_slot(a)
+                        .unwrap()
+                        .with_context(|| format!("(length {h}): {a}"))
+                        .expect("block global slot exists"),
+                })
+                .collect(),
+            unapply: blocks
+                .unapply
+                .iter()
+                .map(|(u, h)| CanonicityDiff {
+                    state_hash: u.clone(),
+                    blockchain_length: *h,
+                    global_slot: self
+                        .get_block_global_slot(u)
+                        .unwrap()
+                        .with_context(|| format!("(length {h}): {u}"))
+                        .expect("block global slot exists"),
+                })
+                .collect(),
+        };
+        self.update_canonicity(canonicity_updates)
     }
 
     fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()> {
@@ -210,7 +178,7 @@ impl CanonicityStore for IndexerStore {
 
         // apply canonicities
         for apply in updates.apply.iter() {
-            // remove from canonicity sets
+            // put into canonicity sets
             self.database.put_cf(
                 self.canonicity_length_cf(),
                 to_be_bytes(apply.blockchain_length),

@@ -367,7 +367,7 @@ impl IndexerState {
         &mut self,
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
-        info!("Initializing indexer with canonical chain discovery");
+        info!("Initializing indexer with canonical chain blocks");
         let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diff = LedgerDiff::default();
@@ -414,7 +414,7 @@ impl IndexerState {
                             .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
-                    if self.blocks_processed == block_parser.num_deep_canonical_blocks + 1 {
+                    if self.blocks_processed > block_parser.num_deep_canonical_blocks {
                         // update root branch on last deep canonical block
                         self.root_branch = Branch::new(&block)?;
                         self.ledger._apply_diff(&ledger_diff)?;
@@ -493,7 +493,7 @@ impl IndexerState {
                         }
                         Ok(None) => {
                             info!(
-                                "Ingested and applied {} blocks ({}) to the witness tree in {:?}",
+                                "Finished ingesting and applying {} blocks ({}) to the witness tree in {:?}",
                                 self.blocks_processed,
                                 bytesize::ByteSize::b(self.bytes_processed),
                                 total_time.elapsed() + offset,
@@ -1574,7 +1574,7 @@ impl IndexerState {
                 u64::MAX
             };
             info!(
-                "Parsed and added {} blocks of {} ({:?} of {:?}) to the witness tree in {:?}",
+                "Parsed and added {}/{} blocks ({:?}/{:?}) to the witness tree in {:?}",
                 self.blocks_processed,
                 block_parser.total_num_blocks + 1,
                 bytesize::ByteSize::b(self.bytes_processed),

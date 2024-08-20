@@ -1,9 +1,12 @@
-use super::{column_families::ColumnFamilyHelpers, from_be_bytes};
+use super::{column_families::ColumnFamilyHelpers, from_be_bytes, DbUpdate};
 use crate::{
-    block::{store::BlockStore, BlockHash},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_GENESIS_HASH},
+    block::{
+        store::{BlockStore, DbBlockUpdate},
+        BlockHash,
+    },
+    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
-        account::{Account, Nonce},
+        account::Account,
         diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
         store::{
@@ -17,7 +20,6 @@ use crate::{
         IndexerStore,
     },
 };
-use anyhow::Context;
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::{
@@ -80,63 +82,31 @@ impl BestLedgerStore for IndexerStore {
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
             u64_prefix_key(balance, &pk.0),
-            b"",
+            serde_json::to_vec(&account)?,
         )?;
         Ok(())
     }
 
-    fn reorg_account_updates(
+    fn update_block_best_accounts(
         &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DBAccountUpdate> {
-        trace!(
-            "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
-            old_best_tip,
-            new_best_tip
-        );
-
-        // follows the old best tip back to the common ancestor
-        let mut a = old_best_tip.clone();
-        let mut unapply = vec![];
-
-        // follows the new best tip back to the common ancestor
-        let mut b = new_best_tip.clone();
-        let mut apply = vec![];
-
-        let a_length = self.get_block_height(&a)?.expect("a has a length");
-        let b_length = self.get_block_height(&b)?.expect("b has a length");
-
-        // bring b back to the same height as a
-        for _ in 0..b_length.saturating_sub(a_length) {
-            // check if there's a previous block
-            if b.0 == MAINNET_GENESIS_HASH {
-                break;
-            }
-
-            apply.append(&mut self.get_block_account_diffs(&b)?.unwrap());
-            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-
-        // find the common ancestor
-        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-
-        while a != b && a.0 != MAINNET_GENESIS_HASH {
-            // add blocks to appropriate collection
-            unapply.append(&mut self.get_block_account_diffs(&a)?.unwrap());
-            apply.append(&mut self.get_block_account_diffs(&b)?.unwrap());
-
-            // descend
-            a = a_prev;
-            b = b_prev;
-
-            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-
-        apply.reverse();
-        Ok(<DBAccountUpdate>::new(apply, unapply))
+        state_hash: &BlockHash,
+        blocks: &DbBlockUpdate,
+    ) -> anyhow::Result<()> {
+        let account_updates = DbUpdate {
+            apply: blocks
+                .apply
+                .iter()
+                .flat_map(|(a, _)| self.get_block_account_diffs(a).unwrap())
+                .flatten()
+                .collect(),
+            unapply: blocks
+                .unapply
+                .iter()
+                .flat_map(|(u, _)| self.get_block_account_diffs(u).unwrap())
+                .flatten()
+                .collect(),
+        };
+        self.update_best_accounts(state_hash, &account_updates)
     }
 
     fn update_best_accounts(
@@ -263,7 +233,6 @@ impl BestLedgerStore for IndexerStore {
                     }),
                     UpdateType::Debit(None) => Some(Account {
                         balance: acct.balance - diff.amount,
-                        nonce: Some(Nonce::default()),
                         ..acct
                     }),
                 },
@@ -389,16 +358,13 @@ impl BestLedgerStore for IndexerStore {
         {
             trace!("Best ledger (length {best_block_height}): {best_block_hash}");
             let mut accounts = HashMap::new();
-            for (key, _) in self
+            for (key, value) in self
                 .best_ledger_account_balance_iterator(IteratorMode::End)
                 .flatten()
             {
                 let balance = balance_key_prefix(&key);
                 let pk = pk_key_prefix(&key[size_of::<u64>()..]);
-                let account = self
-                    .get_best_account(&pk)?
-                    .with_context(|| format!("account {pk}"))
-                    .expect("best account exists");
+                let account: Account = serde_json::from_slice(&value)?;
 
                 assert_eq!(account.balance.0, balance);
                 accounts.insert(pk, account);

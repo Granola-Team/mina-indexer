@@ -1,7 +1,7 @@
 pub mod canonical_chain_discovery;
 pub mod store;
 
-use crate::{block::BlockHash, store::DBUpdate};
+use crate::{block::BlockHash, store::DbUpdate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Serialize, Deserialize)]
@@ -11,7 +11,7 @@ pub struct CanonicityDiff {
     pub global_slot: u32,
 }
 
-pub type CanonicityUpdate = DBUpdate<CanonicityDiff>;
+pub type CanonicityUpdate = DbUpdate<CanonicityDiff>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum Canonicity {

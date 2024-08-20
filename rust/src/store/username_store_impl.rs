@@ -1,12 +1,11 @@
 use super::{
     username::{UsernameAccountUpdate, UsernameStore, UsernameUpdate},
-    IndexerStore,
+    DbUpdate, IndexerStore,
 };
 use crate::{
-    block::{store::BlockStore, BlockHash},
-    canonicity::store::CanonicityStore,
+    block::{store::DbBlockUpdate, BlockHash},
     ledger::{public_key::PublicKey, username::Username},
-    store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes, DBUpdate},
+    store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes},
 };
 use log::{error, trace};
 use std::collections::HashMap;
@@ -44,61 +43,24 @@ impl UsernameStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn reorg_username_updates(
-        &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<UsernameAccountUpdate> {
-        trace!("Getting common username updates:\n  old: {old_best_tip}\n  new: {new_best_tip}");
-
-        // follows the old best tip back to the common ancestor
-        let mut a = old_best_tip.clone();
-        let mut unapply = vec![];
-
-        // follows the new best tip back to the common ancestor
-        let mut b = new_best_tip.clone();
-        let mut apply = vec![];
-
-        let a_length = self.get_block_height(&a)?.expect("a has a length");
-        let b_length = self.get_block_height(&b)?.expect("b has a length");
-
-        // bring b back to the same height as a
-        let genesis_state_hashes: Vec<BlockHash> = self.get_known_genesis_state_hashes()?;
-        for _ in 0..b_length.saturating_sub(a_length) {
-            // check if there's a previous block
-            if genesis_state_hashes.contains(&b) {
-                break;
-            }
-
-            apply.push(UsernameUpdate(
-                self.get_block_username_updates(&b)?.unwrap(),
-            ));
-            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-
-        // find the common ancestor
-        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-
-        while a != b && !genesis_state_hashes.contains(&a) {
-            // add blocks to appropriate collection
-            unapply.push(UsernameUpdate(
-                self.get_block_username_updates(&a)?.unwrap(),
-            ));
-            apply.push(UsernameUpdate(
-                self.get_block_username_updates(&b)?.unwrap(),
-            ));
-
-            // descend
-            a = a_prev;
-            b = b_prev;
-
-            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
-        }
-
-        apply.reverse();
-        Ok(DBUpdate { apply, unapply })
+    fn update_block_usernames(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
+        let username_updates = DbUpdate {
+            apply: blocks
+                .apply
+                .iter()
+                .map(|(a, _)| {
+                    UsernameUpdate(self.get_block_username_updates(a).ok().flatten().unwrap())
+                })
+                .collect(),
+            unapply: blocks
+                .unapply
+                .iter()
+                .map(|(u, _)| {
+                    UsernameUpdate(self.get_block_username_updates(u).ok().flatten().unwrap())
+                })
+                .collect(),
+        };
+        self.update_usernames(username_updates)
     }
 
     fn update_usernames(&self, update: UsernameAccountUpdate) -> anyhow::Result<()> {

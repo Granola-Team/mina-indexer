@@ -1,9 +1,9 @@
 //! Store of the best ledger
 
 use crate::{
-    block::BlockHash,
+    block::{store::DbBlockUpdate, BlockHash},
     ledger::{account::Account, diff::account::AccountDiff, public_key::PublicKey, Ledger},
-    store::DBUpdate,
+    store::DbUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
 
@@ -24,13 +24,11 @@ pub trait BestLedgerStore {
         updates: &DBAccountUpdate,
     ) -> anyhow::Result<()>;
 
-    /// Generate account balance updates when the best tip changes.
-    /// Return with set of coinbase receivers.
-    fn reorg_account_updates(
+    fn update_block_best_accounts(
         &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DBAccountUpdate>;
+        state_hash: &BlockHash,
+        blocks: &DbBlockUpdate,
+    ) -> anyhow::Result<()>;
 
     /// Remove pk delegation
     fn remove_pk_delegate(&self, pk: PublicKey) -> anyhow::Result<()>;
@@ -66,7 +64,7 @@ pub trait BestLedgerStore {
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
-pub type DBAccountUpdate = DBUpdate<AccountDiff>;
+pub type DBAccountUpdate = DbUpdate<AccountDiff>;
 
 impl DBAccountUpdate {
     pub fn new(apply: Vec<AccountDiff>, unapply: Vec<AccountDiff>) -> Self {
