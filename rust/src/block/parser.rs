@@ -67,8 +67,6 @@ impl BlockParser {
         Self::with_canonical_chain_discovery(
             blocks_dir,
             version,
-            None,
-            None,
             canonical_threshold,
             reporting_freq,
         )
@@ -157,8 +155,6 @@ impl BlockParser {
     async fn with_canonical_chain_discovery(
         blocks_dir: &Path,
         version: PcbVersion,
-        min_len_filter: Option<u32>,
-        max_len_filter: Option<u32>,
         canonical_threshold: u32,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
@@ -170,13 +166,9 @@ impl BlockParser {
             let total_num_bytes = paths
                 .iter()
                 .fold(0, |acc, p| acc + p.metadata().unwrap().len());
-            if let Ok((canonical_paths, recent_paths, orphaned_paths)) = discovery(
-                min_len_filter,
-                max_len_filter,
-                canonical_threshold,
-                reporting_freq,
-                paths.iter().collect(),
-            ) {
+            if let Ok((canonical_paths, recent_paths, orphaned_paths)) =
+                discovery(canonical_threshold, reporting_freq, paths.iter().collect())
+            {
                 info!("Canonical chain discovery successful...");
                 let deep_canonical_bytes = canonical_paths
                     .iter()

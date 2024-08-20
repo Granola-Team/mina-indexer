@@ -11,8 +11,6 @@ use std::{
 /// - recent blocks (following the witness tree root)
 /// - orphaned blocks (at or below witness tree root)
 pub fn discovery(
-    min_len_filter: Option<u32>,
-    max_len_filter: Option<u32>,
     canonical_threshold: u32,
     reporting_freq: u32,
     mut paths: Vec<&PathBuf>,
@@ -32,16 +30,6 @@ pub fn discovery(
             paths.len() + 1, // +1 genesis
             time.elapsed(),
         );
-
-        if let Some(blockchain_length) = max_len_filter {
-            debug!("Applying max length block filter: blockchain_length < {blockchain_length}");
-            paths.retain(|p| extract_block_height(p) <= blockchain_length);
-        }
-
-        if let Some(blockchain_length) = min_len_filter {
-            debug!("Applying min length block filter: blockchain_length > {blockchain_length}");
-            paths.retain(|p| extract_block_height(p) >= blockchain_length);
-        }
 
         if paths.is_empty() {
             return Ok((vec![], vec![], vec![]));
