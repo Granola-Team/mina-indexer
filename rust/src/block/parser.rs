@@ -122,12 +122,12 @@ impl BlockParser {
                 .iter()
                 .fold(0, |acc, p| acc + p.metadata().unwrap().len());
 
-            if min_length.is_some() {
-                paths.retain(|p| extract_block_height(p) > min_length.unwrap())
+            if let Some(min) = min_length {
+                paths.retain(|p| extract_block_height(p) > min)
             }
 
-            if max_length.is_some() {
-                paths.retain(|p| extract_block_height(p) < max_length.unwrap())
+            if let Some(max) = max_length {
+                paths.retain(|p| extract_block_height(p) < max)
             }
 
             paths.sort_by_cached_key(|path| extract_block_height(path));

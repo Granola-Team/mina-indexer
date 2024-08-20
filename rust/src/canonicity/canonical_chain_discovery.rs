@@ -198,7 +198,7 @@ pub fn discovery(
 
     let max_canonical_length = deep_canonical_paths
         .last()
-        .and_then(|p| Some(extract_block_height(p)))
+        .map(|p| extract_block_height(p))
         .unwrap_or(1);
     let orphaned_paths: Vec<PathBuf> = paths
         .into_iter()
