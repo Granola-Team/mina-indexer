@@ -75,26 +75,6 @@ impl BlockParser {
         .await
     }
 
-    /// Returns a new [Self::new_with_canonical_chain_discovery] block parser
-    /// with paths additionally filtered by max length `block_length`
-    pub async fn new_with_canonical_chain_discovery_filtered(
-        blocks_dir: &Path,
-        version: PcbVersion,
-        block_length: u32,
-        canonical_threshold: u32,
-        reporting_freq: u32,
-    ) -> anyhow::Result<Self> {
-        Self::with_canonical_chain_discovery(
-            blocks_dir,
-            version,
-            None,
-            Some(block_length),
-            canonical_threshold,
-            reporting_freq,
-        )
-        .await
-    }
-
     /// Returns a new length-sorted block parser with paths filtered by a min
     /// length
     pub fn new_length_sorted_min_filtered(
