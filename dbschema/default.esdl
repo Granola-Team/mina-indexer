@@ -66,23 +66,21 @@ module default {
     pending_coinbase_hash: str;
   }
 
-  scalar type EpochDataType extending enum<next, staking>;
-
-  type EpochData {
+  abstract type EpochData {
     required block: Block {
       on target delete restrict;
     }
-    required type: EpochDataType;
     required ledger_hash: str;
     required total_currency: int64;
     required seed: str;
     required start_checkpoint: str;
     required lock_checkpoint: str;
     required epoch_length: int64;
-    constraint exclusive on ((.block, .type, .ledger_hash));
+    constraint exclusive on ((.block, .ledger_hash));
   }
 
-  type Command {
+  type StakingEpochData extending EpochData {}
+  type NextEpochData extending EpochData {}
     required block: Block {
       on target delete restrict;
     }

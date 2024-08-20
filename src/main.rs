@@ -214,8 +214,9 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
         let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type)];
         let ledger = &epoch_data["ledger"];
         db.execute(
-            "
-                insert EpochData {
+            format!(
+                "
+                insert {}EpochData {{
                     block := (select Block filter .hash = <str>$0),
                     type := <str>$1,
                     ledger_hash := <str>$2,
@@ -224,7 +225,9 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
                     start_checkpoint := <str>$5,
                     lock_checkpoint := <str>$6,
                     epoch_length := <int64>$7
-                };",
+                }};",
+                titlecase(epoch_type)
+            ),
             &(
                 block_hash,
                 epoch_type,
@@ -389,6 +392,15 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
     }
 
     Ok(())
+}
+
+fn titlecase(s: &str) -> String {
+    s.chars()
+        .next()
+        .map(|c| c.to_ascii_uppercase())
+        .into_iter()
+        .chain(s.chars().skip(1))
+        .collect()
 }
 
 fn extract_accounts(value: &Value) -> Vec<String> {
