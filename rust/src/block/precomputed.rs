@@ -187,7 +187,7 @@ impl PrecomputedBlock {
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let network = extract_network(path);
-        let blockchain_length = extract_block_height(path).expect("length in filename");
+        let blockchain_length = extract_block_height(path);
         let state_hash = extract_state_hash(path);
         let contents = std::fs::read(path)?;
         let precomputed_block = PrecomputedBlock::from_file_contents(
