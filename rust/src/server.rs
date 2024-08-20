@@ -225,12 +225,8 @@ async fn initialize(
             log_dirs_msg(blocks_dir.as_ref(), staking_ledgers_dir.as_ref());
             IndexerState::new_from_config(state_config)?
         }
-        InitializationMode::Replay => {
+        _ => {
             info!("Replaying indexer events from db at {db_path:#?}");
-            IndexerState::new_without_genesis_events(state_config)?
-        }
-        InitializationMode::Sync => {
-            info!("Syncing indexer state from db at {db_path:#?}");
             IndexerState::new_without_genesis_events(state_config)?
         }
     };
