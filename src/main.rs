@@ -253,81 +253,84 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
 
         // must use format!() since we have more than 12 query params
         // receiver_balance will be null when status == Failed
-        let command: edgedb_protocol::value::Value = db
-            .query_required_single(
-                format!(
-                    "
-                    insert Command {{
-                        block := (select Block filter .hash = '{}'),
-                        status := <str>$0,
-                        source_balance := <decimal>$1,
-                        receiver_balance := <optional decimal>$2,
-                        fee := <decimal>$3,
-                        fee_payer := (select Account filter .public_key = '{}'),
-                        fee_payer_balance := <decimal>$4,
-                        fee_token := '{}',
-                        fee_payer_account_creation_fee_paid := <optional decimal>$5,
-                        receiver_account_creation_fee_paid := <optional decimal>$6,
-                        nonce := <int64>$7,
-                        valid_until := <int64>$8,
-                        memo := <optional str>$9,
-                        signer := (select Account filter .public_key = '{}'),
-                        signature := '{}',
-                        created_token := <optional str>$10,
-                    }};",
-                    block_hash,
-                    common["fee_payer_pk"].as_str().unwrap(),
-                    common["fee_token"].as_str().unwrap(),
-                    data1["signer"].as_str().unwrap(),
-                    data1["signature"].as_str().unwrap()
-                ),
-                &(
-                    status[0].as_str(),
-                    to_decimal(&status_2["source_balance"]),
-                    to_decimal(&status_2["receiver_balance"]),
-                    to_decimal(&common["fee"]),
-                    to_decimal(&status_2["fee_payer_balance"]),
-                    to_decimal(&status_1["fee_payer_account_creation_fee_paid"]),
-                    to_decimal(&status_1["receiver_account_creation_fee_paid"]),
-                    to_i64(&common["nonce"]),
-                    to_i64(&common["valid_until"]),
-                    common["memo"].as_str(),
-                    status_1["created_token"].as_str(),
-                ),
-            )
-            .await?;
-
-        println!("command: {:?}", command);
+        let command = format!(
+            "insert Command {{
+                    block := (select Block filter .hash = '{}'),
+                    status := '{}',
+                    source_balance := {},
+                    receiver_balance := {},
+                    fee := {},
+                    fee_payer := (select Account filter .public_key = '{}'),
+                    fee_payer_balance := {},
+                    fee_token := '{}',
+                    fee_payer_account_creation_fee_paid := '{}',
+                    receiver_account_creation_fee_paid := '{}',
+                    nonce := {},
+                    valid_until := {},
+                    memo := '{}',
+                    signer := (select Account filter .public_key = '{}'),
+                    signature := '{}',
+                    created_token := '{}'
+            }}",
+            block_hash,
+            status[0].as_str().unwrap(),
+            to_decimal(&status_2["source_balance"]).unwrap(),
+            // TODO: or default may be incorrect here since this is optional
+            to_decimal(&status_2["receiver_balance"]).unwrap_or_default(),
+            to_decimal(&common["fee"]).unwrap_or_default(),
+            common["fee_payer_pk"].as_str().unwrap(),
+            to_decimal(&status_2["fee_payer_balance"]).unwrap_or_default(),
+            common["fee_token"].as_str().unwrap(),
+            to_decimal(&status_1["fee_payer_account_creation_fee_paid"]).unwrap_or_default(),
+            to_decimal(&status_1["receiver_account_creation_fee_paid"]).unwrap_or_default(),
+            to_i64(&common["nonce"]),
+            to_i64(&common["valid_until"]),
+            // TODO: or default may be incorrect here since this is optional
+            common["memo"].as_str().unwrap_or_default(),
+            data1["signer"].as_str().unwrap(),
+            data1["signature"].as_str().unwrap(),
+            status_1["created_token"].as_str().unwrap_or_default(),
+        );
 
         match payload["body"][0].as_str().unwrap() {
             "Stake_delegation" => {
                 let delegation = &body1["Set_delegate"];
-                db.execute(
-                    "insert StakingDelegation {
-                            command := <Enum>$0,
+                let a = db
+                    .execute(
+                        "
+                        with command := (<str>$0)
+                        insert StakingDelegation {
+                            command := command,
                             source := <str>$1,
                             receiver := str>$2
                         };",
-                    &(
-                        command,
-                        delegation["delegator"].as_str(),
-                        delegation["new_delegate"].as_str(),
-                    ),
-                )
-                .await?;
+                        &(
+                            &command,
+                            delegation["delegator"].as_str(),
+                            delegation["new_delegate"].as_str(),
+                        ),
+                    )
+                    .await;
+
+                match a {
+                    Ok(_) => println!("delegation was great"),
+                    Err(e) => eprintln!("Uh oh delegation: {:?}", e),
+                }
             }
             "Payment" => {
                 let a = db
                     .execute(
-                        "insert Payment {
-                            command := <Enum>$0,
-                            source := (select Account filter .public_key = <str>$1),
-                            receiver := (select Account filter .public_key = <str>$2),
-                            amount := <decimal>$3,
-                            token_id := <int64>$4,
+                        "
+                            with command := (<str>$0)
+                            insert Payment {
+                                command := command,
+                                source := (select Account filter .public_key = <str>$1),
+                                receiver := (select Account filter .public_key = <str>$2),
+                                amount := <decimal>$3,
+                                token_id := <int64>$4,
                         };",
                         &(
-                            command,
+                            &command,
                             body1["source_pk"].as_str(),
                             body1["receiver_pk"].as_str(),
                             to_decimal(&body1["amount"]),
@@ -337,7 +340,7 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
                     .await;
                 match a {
                     Ok(_) => println!("Payment was great"),
-                    Err(e) => eprintln!("Uh oh: {:?}", e),
+                    Err(e) => eprintln!("Uh oh payment: {:?}", e),
                 }
             }
             _ => {
@@ -385,10 +388,6 @@ async fn process_file(block_hash: &str, json: Value, db: &Arc<Client>) -> anyhow
         }
     }
 
-    // println!(
-    //     "Finished processing block {} at height
-    // {}...............................",     block_hash, height
-    // );
     Ok(())
 }
 

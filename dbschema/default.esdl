@@ -104,9 +104,7 @@ module default {
   }
 
   type Payment {
-    required command: Command {
-      on target delete restrict;
-    }
+    required command: Command;
     source: Account;
     receiver: Account;
     token_id: int64;
@@ -114,9 +112,7 @@ module default {
   }
 
   type StakingDelegation {
-    required command: Command {
-      on target delete restrict;
-    }
+    required command: Command;
     source: Account;
     receiver: Account;
   }
