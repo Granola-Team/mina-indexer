@@ -83,39 +83,55 @@ module default {
   }
 
   type Command {
-    required block: Block;
+    required block: Block {
+      on target delete restrict;
+    }
+    required status: str;
+    source_balance: decimal;
+    receiver_balance: decimal;
     fee: decimal;
-    fee_token: str;
     fee_payer: Account;
+    fee_payer_balance: decimal;
+    fee_token: str;
+    fee_payer_account_creation_fee_paid: decimal;
+    receiver_account_creation_fee_paid: decimal;
     nonce: int64;
     valid_until: int64;
     memo: str;
+    signer: Account;
+    signature: str;
+    created_token: str;
+  }
+
+  type Payment {
+    required command: Command {
+      on target delete restrict;
+    }
     source: Account;
     receiver: Account;
     token_id: int64;
     amount: decimal;
-    signer: Account;
-    signature: str;
   }
 
-  type CommandStatus {
-    command: Command;
-    status: str;
-    fee_payer_account_creation_fee_paid: decimal;
-    receiver_account_creation_fee_paid: decimal;
-    created_token: str;
-    fee_payer_balance: decimal;
-    source_balance: decimal;
-    receiver_balance: decimal;
+  type StakingDelegation {
+    required command: Command {
+      on target delete restrict;
+    }
+    source: Account;
+    receiver: Account;
   }
 
   type Coinbase {
-    required block: Block;
+    required block: Block {
+      on target delete restrict;
+    }
     required receiver_balance: decimal;
   }
 
   type FeeTransfer {
-    required block: Block;
+    required block: Block {
+      on target delete restrict;
+    }
     receiver1_balance: decimal;
     receiver2_balance: decimal;
   }
