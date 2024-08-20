@@ -178,11 +178,10 @@ impl Coinbase {
 
     // only apply if "coinbase" =/= [ "Zero" ]
     pub fn as_account_diff(self) -> Vec<Vec<AccountDiff>> {
-        let mut res = vec![];
         if self.is_coinbase_applied() {
-            res.append(&mut AccountDiff::from_coinbase(self));
+            return AccountDiff::from_coinbase(self);
         }
-        res
+        vec![]
     }
 
     pub fn as_internal_cmd(&self) -> InternalCommand {
