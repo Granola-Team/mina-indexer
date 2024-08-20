@@ -6,10 +6,14 @@ use crate::{
     store::DbUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
+use std::collections::HashSet;
 
 pub trait BestLedgerStore {
     /// Get pk's best ledger account
     fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
+
+    /// Get the display view of pk's account
+    fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
 
     /// Get the best ledger
     fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>>;
@@ -21,7 +25,7 @@ pub trait BestLedgerStore {
     fn update_best_accounts(
         &self,
         state_hash: &BlockHash,
-        updates: &DBAccountUpdate,
+        updates: &DbAccountUpdate,
     ) -> anyhow::Result<()>;
 
     fn update_block_best_accounts(
@@ -64,10 +68,14 @@ pub trait BestLedgerStore {
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
-pub type DBAccountUpdate = DbUpdate<AccountDiff>;
+/// Applied & unapplied block account diffs & new block accounts
+pub type DbAccountUpdate = DbUpdate<(Vec<AccountDiff>, HashSet<PublicKey>)>;
 
-impl DBAccountUpdate {
-    pub fn new(apply: Vec<AccountDiff>, unapply: Vec<AccountDiff>) -> Self {
+impl DbAccountUpdate {
+    pub fn new(
+        apply: Vec<(Vec<AccountDiff>, HashSet<PublicKey>)>,
+        unapply: Vec<(Vec<AccountDiff>, HashSet<PublicKey>)>,
+    ) -> Self {
         Self { apply, unapply }
     }
 }
