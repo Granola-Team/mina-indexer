@@ -1,13 +1,6 @@
-use super::{
-    diff::{
-        account::{AccountDiff, UpdateType},
-        LedgerDiff,
-    },
-    username::Username,
-};
+use super::{diff::account::UpdateType, username::Username};
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE},
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::ZkappAccount,
 };
@@ -22,12 +15,6 @@ use std::{
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
 )]
 pub struct Amount(pub u64);
-
-impl Amount {
-    pub fn new(amount: u64) -> Self {
-        Self(amount * MINA_SCALE)
-    }
-}
 
 impl ToString for Amount {
     fn to_string(&self) -> String {
@@ -151,14 +138,6 @@ pub struct TokenPermissions {}
 pub struct ReceiptChainHash(pub String);
 
 impl Account {
-    /// Display view of account
-    pub fn display(self) -> Self {
-        Self {
-            balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..self
-        }
-    }
-
     /// Time-locked balance (subtracted from circulating supply)
     /// as per https://docs.minaprotocol.com/mina-protocol/time-locked-accounts
     pub fn current_minimum_balance(&self, curr_global_slot: u32) -> u64 {
@@ -208,23 +187,17 @@ impl Account {
     ///
     /// # Arguments
     ///
+    /// * `pre` - The current state of the account.
     /// * `amount` - The coinbase reward amount to be added to the account's
     ///   balance.
     ///
     /// # Returns
     ///
     /// A new `Account` instance with the updated balance.
-    pub fn coinbase(self, amount: Amount) -> Self {
+    pub fn from_coinbase(pre: Self, amount: Amount) -> Self {
         Account {
-            balance: self.balance + amount,
-            ..self
-        }
-    }
-
-    pub fn coinbase_unapply(self, amount: Amount) -> Self {
-        Account {
-            balance: self.balance - amount,
-            ..self
+            balance: pre.balance + amount,
+            ..pre
         }
     }
 
@@ -239,13 +212,12 @@ impl Account {
     /// # Returns
     ///
     /// A new `Account` instance with the updated state.
-    pub fn payment(self, payment_diff: &PaymentDiff) -> Self {
+    pub fn from_payment(pre: Self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
-            UpdateType::Credit => self.credit(payment_diff.amount),
-            UpdateType::Debit(nonce) => self
-                .clone()
-                .debit(payment_diff.amount, nonce)
-                .unwrap_or(self),
+            UpdateType::Credit => Self::from_credit(pre.clone(), payment_diff.amount),
+            UpdateType::Debit(nonce) => {
+                Account::from_debit(pre.clone(), payment_diff.amount, nonce).unwrap_or(pre.clone())
+            }
         }
     }
 
@@ -254,21 +226,22 @@ impl Account {
     ///
     /// # Arguments
     ///
+    /// * `post` - The current state of the account.
     /// * `payment_diff` - The `PaymentDiff` containing the update type amount.
     ///
     /// # Returns
     ///
     /// A new `Account` instance with the updated state.
-    pub fn payment_unapply(self, payment_diff: &PaymentDiff) -> Self {
+    pub fn from_payment_unapply(post: Self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => Account {
-                balance: self.balance.sub(payment_diff.amount),
-                ..self
+                balance: post.balance.sub(payment_diff.amount),
+                ..post
             },
             UpdateType::Debit(nonce) => Self {
-                balance: self.balance.add(payment_diff.amount),
-                nonce: nonce.or(self.nonce).map(|n| n - 1),
-                ..self
+                balance: post.balance.add(payment_diff.amount),
+                nonce: nonce.or(post.nonce).map(|n| n - 1),
+                ..post
             },
         }
     }
@@ -279,6 +252,7 @@ impl Account {
     ///
     /// # Arguments
     ///
+    /// * `pre` - The current state of the account.
     /// * `amount` - The amount to be debited from the account's balance.
     /// * `nonce` - The new nonce for the account. If `None`, the existing nonce
     ///   is retained.
@@ -288,33 +262,35 @@ impl Account {
     /// An `Option` containing the new `Account` state if the debit was
     /// successful, or `None` if the debit amount exceeds the current
     /// balance.
-    fn debit(self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
-        if amount > self.balance {
+    fn from_debit(pre: Self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
+        if amount > pre.balance {
             None
         } else {
             Some(Account {
-                balance: self.balance - amount,
-                nonce: nonce.or(self.nonce),
-                ..self
+                balance: pre.balance - amount,
+                nonce: nonce.or(pre.nonce),
+                ..pre
             })
         }
     }
 
     /// Updates the account's balance based on applying a credit.
-    /// This function takes the current account state and returns a new
+    /// This function takes the current account state (`pre`) and returns a new
     /// account state with the updated balance.
     ///
     /// # Arguments
     ///
+    /// * `pre` - The current state of the account.
     /// * `amount` - The amount to be credited to the account's balance.
     ///
     /// # Returns
     ///
     /// A new `Account` instance with the updated balance.
-    fn credit(self, amount: Amount) -> Self {
+    fn from_credit(pre: Self, amount: Amount) -> Self {
         Account {
-            balance: self.balance + amount,
-            ..self
+            public_key: pre.public_key.clone(),
+            balance: pre.balance + amount,
+            ..pre
         }
     }
 
@@ -325,17 +301,18 @@ impl Account {
     ///
     /// # Arguments
     ///
+    /// * `pre` - The current state of the account.
     /// * `delegate` - The new delegate public key for the account.
     /// * `updated_nonce` - The new nonce for the account.
     ///
     /// # Returns
     ///
     /// A new `Account` instance with the updated delegate and nonce.
-    pub fn delegation(self, delegate: PublicKey, updated_nonce: Nonce) -> Self {
+    pub fn from_delegation(pre: Self, delegate: PublicKey, updated_nonce: Nonce) -> Self {
         Account {
             delegate,
             nonce: Some(updated_nonce),
-            ..self
+            ..pre
         }
     }
 
@@ -346,83 +323,25 @@ impl Account {
     ///
     /// # Arguments
     ///
+    /// * `pre` - The current state of the account.
     /// * `updated_nonce` - The new nonce for the account.
     ///
     /// # Returns
     ///
     /// A new `Account` instance with the updated nonce.
-    pub fn failed_transaction(self, updated_nonce: Nonce) -> Self {
+    pub fn from_failed_transaction(pre: Self, updated_nonce: Nonce) -> Self {
         Account {
             nonce: Some(updated_nonce),
-            ..self
+            ..pre
         }
     }
 
-    pub fn failed_transaction_unapply(self) -> Self {
-        Account {
-            nonce: self.nonce.map(|n| n - 1),
-            ..self
-        }
-    }
-
-    pub fn delegation_unapply(self, delegate: PublicKey, nonce: Option<Nonce>) -> Self {
+    pub fn from_delegation_unapply(pre: Self, delegate: PublicKey, nonce: Option<Nonce>) -> Self {
         Account {
             delegate,
             nonce,
-            ..self
+            ..pre
         }
-    }
-
-    /// Apply an account diff to an account
-    pub fn apply_account_diff(self, diff: &AccountDiff) -> Self {
-        match diff {
-            AccountDiff::Payment(payment_diff) => self.payment(payment_diff),
-            AccountDiff::Delegation(delegation_diff) => {
-                assert_eq!(self.public_key, delegation_diff.delegator);
-                self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
-            }
-            AccountDiff::Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
-            AccountDiff::FeeTransfer(fee_transfer_diff) => self.payment(fee_transfer_diff),
-            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                self.payment(fee_transfer_diff)
-            }
-            AccountDiff::FailedTransactionNonce(failed_diff) => {
-                self.failed_transaction(failed_diff.nonce)
-            }
-        }
-    }
-
-    /// Unapply an account diff to an account
-    pub fn unapply_account_diff(self, diff: &AccountDiff, remove: bool) -> Option<Self> {
-        if remove {
-            return None;
-        }
-
-        Some(match diff {
-            AccountDiff::Payment(payment_diff) => self.payment_unapply(payment_diff),
-            AccountDiff::Delegation(delegation_diff) => {
-                // TODO get previous delegate?
-                self.delegation_unapply(
-                    delegation_diff.delegate.clone(),
-                    Some(delegation_diff.nonce),
-                )
-            }
-            AccountDiff::Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
-            AccountDiff::FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
-            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                self.payment_unapply(fee_transfer_diff)
-            }
-            AccountDiff::FailedTransactionNonce(_) => self.failed_transaction_unapply(),
-        })
-    }
-
-    /// Apply a ledger diff to an account
-    pub fn apply_ledger_diff(self, diff: LedgerDiff) -> Self {
-        let mut acct = self;
-        for acct_diff in diff.account_diffs.iter().flatten() {
-            acct = acct.apply_account_diff(acct_diff);
-        }
-        acct
     }
 }
 
@@ -475,14 +394,9 @@ pub fn nanomina_to_mina(nanomina: u64) -> String {
     dec.normalize().to_string()
 }
 
-/// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let deducted = Account {
-            balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..self.clone()
-        };
-        match serde_json::to_string_pretty(&deducted) {
+        match serde_json::to_string_pretty(self) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),
         }
@@ -492,14 +406,13 @@ impl std::fmt::Display for Account {
 /// Same as display
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self, f)
+        write!(f, "{self}")
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Account, Amount};
-    use crate::{constants::MAINNET_ACCOUNT_CREATION_FEE, ledger::account::nanomina_to_mina};
+    use crate::ledger::account::nanomina_to_mina;
 
     #[test]
     fn test_nanomina_to_mina_conversion() {
@@ -510,31 +423,5 @@ mod test {
         let actual = 1_000_000_000;
         let val = nanomina_to_mina(actual);
         assert_eq!("1", val);
-    }
-
-    #[test]
-    fn test_account_display() -> anyhow::Result<()> {
-        let ledger_account = Account {
-            balance: Amount::new(100),
-            ..Default::default()
-        };
-        let deduct_account = Account {
-            balance: ledger_account.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..ledger_account.clone()
-        };
-
-        // account display & debug => deduct "creation fee"
-        assert_eq!(
-            format!("{ledger_account}"),
-            serde_json::to_string_pretty(&deduct_account)?
-        );
-        assert_eq!(
-            format!("{ledger_account:?}"),
-            serde_json::to_string_pretty(&deduct_account)?
-        );
-
-        // same account display & debug
-        assert_eq!(format!("{ledger_account}"), format!("{ledger_account:?}"));
-        Ok(())
     }
 }

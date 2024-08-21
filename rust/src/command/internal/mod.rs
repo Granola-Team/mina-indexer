@@ -4,6 +4,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -90,6 +91,11 @@ impl InternalCommand {
                     )
                 }
                 match (credit, debit) {
+                    (AccountDiff::CreateAccount(_), AccountDiff::CreateAccount(_)) => {
+                        debug!(
+                            "AccountDiff::CreateAccount credit and debit pairs are present but unhandled"
+                        );
+                    }
                     (
                         AccountDiff::FeeTransfer(fee_transfer_receiver),
                         AccountDiff::FeeTransfer(fee_transfer_sender),

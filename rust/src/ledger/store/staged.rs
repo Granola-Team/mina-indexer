@@ -16,13 +16,6 @@ pub trait StagedLedgerStore {
         state_hash: BlockHash,
     ) -> anyhow::Result<Option<Account>>;
 
-    // Get the display view of `pk`'s `state_hash` staged ledger account
-    fn get_staged_account_display(
-        &self,
-        pk: PublicKey,
-        state_hash: BlockHash,
-    ) -> anyhow::Result<Option<Account>>;
-
     // Get `pk`'s `block_height` (canonical) staged ledger account
     fn get_staged_account_block_height(
         &self,
@@ -57,7 +50,7 @@ pub trait StagedLedgerStore {
         &self,
         pk: PublicKey,
         state_hash: BlockHash,
-        account: &Account,
+        account: Account,
     ) -> anyhow::Result<()>;
 
     /// Add a ledger with assoociated hashes

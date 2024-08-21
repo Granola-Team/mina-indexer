@@ -1,4 +1,4 @@
-use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
+use super::db;
 use crate::ledger::{account::Account, store::staged::StagedLedgerStore};
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -119,8 +119,7 @@ pub struct StagedLedgerAccount {
 
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
-        // deduct fee for display
-        let balance_nanomina = acct.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0;
+        let balance_nanomina = acct.balance.0;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
 
