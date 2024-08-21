@@ -55,7 +55,6 @@ test_names = %w[
   txn_nonces
   startup_staking_ledgers
   watch_staking_ledgers
-  dump_best_ledger
   staking_delegations
   internal_commands
   start_from_config

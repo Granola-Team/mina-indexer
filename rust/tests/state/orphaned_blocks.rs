@@ -24,7 +24,6 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
-        None,
     )?;
 
     // add all blocks to the state

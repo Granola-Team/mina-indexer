@@ -1644,24 +1644,6 @@ test_reuse_databases() {
     assert 12 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
 }
 
-# Indexer dumps best ledger
-test_dump_best_ledger() {
-    stage_mainnet_blocks 10 ./blocks
-
-    dump_best_ledger=./dump-best-ledger.json
-    idxr_server_start_standard --dump-best-ledger $dump_best_ledger
-    wait_for_socket
-
-    # check dumped ledger matches best ledger
-    best_ledger=./best-ledger.json
-    pk=B62qqLFzJe6GjhBzVmpm4VHvFWwFk4n4F5Ci3h4DHVQgfJvkWoe9sYv
-    
-    idxr ledgers best --path $best_ledger
-    assert $(cat $best_ledger | jq -r .${pk}.balance) $(cat $dump_best_ledger | jq -r .${pk}.balance)
-    
-    rm -f $best_ledger $dump_best_ledger
-}
-
 # ----
 # Main
 # ----
@@ -1705,7 +1687,6 @@ for test_name in "$@"; do
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;
-        "test_dump_best_ledger") test_dump_best_ledger ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
         "test_load") test_load ;;
