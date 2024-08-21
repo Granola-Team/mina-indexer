@@ -29,6 +29,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
+        None,
     )?;
 
     state.add_blocks(&mut block_parser).await?;

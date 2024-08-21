@@ -26,6 +26,7 @@ async fn check_staged_accounts() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
+        None,
     )?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,

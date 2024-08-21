@@ -18,7 +18,7 @@ use crate::{
         genesis::GenesisLedger,
         public_key::PublicKey,
         staking::parser::StakingLedgerParser,
-        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
+        store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         username::Username,
         Ledger, LedgerHash,
     },
@@ -41,6 +41,7 @@ use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
     collections::HashMap,
+    path::PathBuf,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
@@ -109,6 +110,9 @@ pub struct IndexerState {
 
     /// Network blocks and staking ledgers to be processed
     pub version: IndexerVersion,
+
+    /// Dump best ledger path
+    dump_best_ledger_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +157,7 @@ pub struct IndexerStateConfig {
     pub canonical_update_threshold: u32,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub dump_best_ledger_path: Option<PathBuf>,
 }
 
 impl IndexerStateConfig {
@@ -162,6 +167,7 @@ impl IndexerStateConfig {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        dump_best_ledger_path: Option<PathBuf>,
     ) -> Self {
         IndexerStateConfig {
             version,
@@ -169,6 +175,7 @@ impl IndexerStateConfig {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            dump_best_ledger_path,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
@@ -185,6 +192,7 @@ impl IndexerState {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        dump_best_ledger_path: Option<PathBuf>,
     ) -> anyhow::Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
@@ -192,6 +200,7 @@ impl IndexerState {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            dump_best_ledger_path,
         ))
     }
 
@@ -265,6 +274,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
+            dump_best_ledger_path: config.dump_best_ledger_path,
         })
     }
 
@@ -297,6 +307,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
+            dump_best_ledger_path: config.dump_best_ledger_path,
         })
     }
 
@@ -356,6 +367,7 @@ impl IndexerState {
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             staking_ledgers: HashMap::new(),
             version: IndexerVersion::default(),
+            dump_best_ledger_path: None,
         })
     }
 
@@ -440,24 +452,26 @@ impl IndexerState {
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks
-        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
+        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()), true)
             .await
     }
 
     /// Adds blocks to the state according to `block_parser` then changes phase
     /// to Watching
     pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
-        self.add_blocks_with_time(block_parser, None).await
+        self.add_blocks_with_time(block_parser, None, false).await
     }
 
     async fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
         elapsed: Option<Duration>,
+        db_creation: bool,
     ) -> anyhow::Result<()> {
         let total_time = Instant::now();
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
         let mut step_time = total_time;
+
         if block_parser.total_num_blocks > self.reporting_freq {
             info!(
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
@@ -484,6 +498,16 @@ impl IndexerState {
                                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
                                     info!("Adding block to witness tree {}", block.summary());
                                     self.block_pipeline(&block, block_bytes)?;
+
+                                    // dump best ledger after adding genesis + canonical blocks
+                                    if let Some(dump_best_ledger_path) = self.dump_best_ledger_path.as_ref() {
+                                        if db_creation && self.blocks_processed > block_parser.num_deep_canonical_blocks + block_parser.num_recent_blocks {
+                                            info!("Dumping the best ledger {} to {dump_best_ledger_path:?}", self.best_tip_block().summary());
+                                            if let Some(best_ledger) = self.indexer_store_or_panic().get_best_ledger(true)? {
+                                                std::fs::write(dump_best_ledger_path, best_ledger.to_string_pretty())?;
+                                            }
+                                        }
+                                    }
                                 }
                                 ParsedBlock::Orphaned(block) => {
                                     trace!("Adding orphaned block to store {}", block.summary());

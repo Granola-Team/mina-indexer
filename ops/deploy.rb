@@ -36,7 +36,8 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
     '--ledger-cadence', '5000',
     '--database-dir', db_dir(BLOCKS_COUNT),
     '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-    '--staking-ledgers-dir', LEDGERS_DIR
+    '--staking-ledgers-dir', LEDGERS_DIR,
+    '--dump-best-ledger', "#{LOGS_DIR}/best-ledger-dump-#{BLOCKS_COUNT}-#{REV}.json"
   ) || abort('database creation failed')
   puts 'Database creation succeeded.'
 end

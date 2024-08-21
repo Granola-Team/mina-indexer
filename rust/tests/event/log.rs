@@ -48,6 +48,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store0.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        None,
     )?;
     let mut state1 = IndexerState::new(
         genesis_ledger.into(),
@@ -55,6 +56,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store1.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        None,
     )?;
 
     // add parser0 blocks to state0

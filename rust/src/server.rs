@@ -58,6 +58,7 @@ pub struct IndexerConfiguration {
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
     pub domain_socket_path: PathBuf,
+    pub dump_best_ledger_path: Option<PathBuf>,
     pub fetch_new_blocks_exe: Option<PathBuf>,
     pub fetch_new_blocks_delay: Option<u64>,
     pub missing_block_recovery_exe: Option<PathBuf>,
@@ -175,6 +176,7 @@ async fn initialize(
         genesis_constants,
         constraint_system_digests,
         version,
+        dump_best_ledger_path,
         ..
     } = config;
 
@@ -213,6 +215,7 @@ async fn initialize(
         version: indexer_version.clone(),
         genesis_ledger: genesis_ledger.clone(),
         transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
+        dump_best_ledger_path: dump_best_ledger_path.clone(),
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
@@ -275,6 +278,7 @@ async fn initialize(
                     canonical_update_threshold,
                     ledger_cadence,
                     reporting_freq,
+                    dump_best_ledger_path,
                 })
             {
                 let min_length_filter = state.replay_events(replay_state)?;
