@@ -163,8 +163,8 @@ tier3 blocks='5000': test-unit-mina-rs nix-build
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time ./ops/deploy.rb test {{blocks}}
 
-# Run the 3rd tier of tests with debug build.
-tier3-dev blocks='5000': test-unit-mina-rs debug-build
+# Run the 3rd tier of tests with debug build & no unit tests.
+tier3-dev blocks='5000': debug-build
   @echo "--- Performing tier3 regression tests with debug-built binary"
   time ./ops/deploy.rb test {{blocks}}
 
