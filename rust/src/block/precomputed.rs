@@ -264,6 +264,24 @@ impl PrecomputedBlock {
             .sum()
     }
 
+    pub fn total_supply(&self) -> u64 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .total_currency
+                    .t
+                    .t
+            }
+            Self::V2(_) => todo!("V2 total_currency {}", self.summary()),
+        }
+    }
+
     /// Returns the pair of
     /// - new pk balances (after applying coinbase, before fee transfers)
     /// - new coinbase receiver option
