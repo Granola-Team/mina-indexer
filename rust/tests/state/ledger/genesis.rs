@@ -1,7 +1,10 @@
 use mina_indexer::{
+    block::genesis::GenesisBlock,
     chain::Network,
+    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         genesis::{self, GenesisLedger},
+        public_key::PublicKey,
         Ledger,
     },
 };
@@ -12,10 +15,9 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     let ledger: Ledger = genesis_ledger.into();
 
     // Ledger account balances are in nanomina
-    let initial_supply = ledger
-        .accounts
-        .values()
-        .fold(0u64, |acc, account| acc + account.balance.0);
+    let total_supply = ledger.accounts.values().fold(0, |acc, account| {
+        acc + account.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0
+    });
 
     assert_eq!(
         Network::Mainnet.to_string(),
@@ -26,13 +28,21 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         "2021-03-17T00:00:00Z", genesis_root.genesis.genesis_state_timestamp,
         "Genesis timestamp"
     );
+
+    // genesis block creator is in genesis ledger
+    assert!(ledger.accounts.contains_key(&PublicKey::from(
+        "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+    )));
     assert_eq!(
-        1675,
-        genesis_root.ledger.accounts.len(),
+        1676,
+        ledger.accounts.len(),
         "Total number of genesis accounts"
     );
+
+    let genesis_block = GenesisBlock::new().unwrap().0;
     assert_eq!(
-        805385692840039233, initial_supply,
+        genesis_block.total_supply(),
+        total_supply,
         "Mina inital distribution"
     );
     Ok(())
