@@ -726,7 +726,7 @@ test_replay() {
     # add 8 more blocks to the watch dir while not indexing
     stage_mainnet_range 16 20 ./blocks
 
-    # replay events from previous indexer db
+    # replay events from previous indexer db + new blocks
     idxr_server_start \
         --self-check \
         --blocks-dir ./blocks \
@@ -1161,7 +1161,7 @@ test_startup_staking_ledgers() {
     idxr database create \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
-    idxr_server start --database-dir ./database
+    idxr_server start --database-dir ./database --self-check
     wait_for_socket
 
     # epoch 0 staking ledger should be in the store, write it to a file
