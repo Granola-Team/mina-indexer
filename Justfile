@@ -169,10 +169,6 @@ tier3-dev blocks='5000': debug-build
   time ./ops/deploy.rb test {{blocks}}
 
 # Run a server as if in production.
-deploy-local-prod blocks='5000': nix-build
+deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying to production"
-  time ./ops/deploy.rb prod {{blocks}}
-
-deploy-local-ci blocks='10000' web_port='8080': nix-build
-  @echo "--- Deploying local CI instance"
-  time ./ops/deploy.rb ci {{blocks}} {{web_port}}
+  time ./ops/deploy.rb prod {{blocks}} {{web_port}}
