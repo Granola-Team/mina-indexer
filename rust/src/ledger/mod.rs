@@ -201,7 +201,6 @@ impl ToString for Ledger {
     fn to_string(&self) -> String {
         let mut accounts = HashMap::new();
         for (pk, acct) in self.accounts.iter() {
-            // deduct fee for display
             accounts.insert(pk.to_address(), acct.clone().display());
         }
         serde_json::to_string(&accounts).unwrap()

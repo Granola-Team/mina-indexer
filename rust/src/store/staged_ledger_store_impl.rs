@@ -82,10 +82,7 @@ impl StagedLedgerStore for IndexerStore {
     ) -> anyhow::Result<Option<Account>> {
         trace!("Display {pk} staged ledger {state_hash} account");
         if let Some(staged_acct) = self.get_staged_account(pk, state_hash)? {
-            return Ok(Some(Account {
-                balance: staged_acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
-                ..staged_acct
-            }));
+            return Ok(Some(staged_acct.display()));
         }
         Ok(None)
     }
@@ -139,10 +136,7 @@ impl StagedLedgerStore for IndexerStore {
                 .collect(),
         );
         let staged_account = staged_account.apply_ledger_diff(diff);
-        Ok(Some(Account {
-            balance: staged_account.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..staged_account
-        }))
+        Ok(Some(staged_account.display()))
     }
 
     fn set_staged_account(
@@ -172,13 +166,13 @@ impl StagedLedgerStore for IndexerStore {
         trace!("Adding staged ledger hash\nstate_hash: {state_hash}\nledger_hash: {ledger_hash}");
         let is_new = self
             .database
-            .get_cf(self.staged_ledgers_persisted_cf(), ledger_hash.0.as_bytes())?
+            .get_cf(self.staged_ledgers_persisted_cf(), state_hash.0.as_bytes())?
             .is_none();
 
         // record persistence
         self.database.put_cf(
             self.staged_ledgers_persisted_cf(),
-            ledger_hash.0.as_bytes(),
+            state_hash.0.as_bytes(),
             b"",
         )?;
 
@@ -197,16 +191,11 @@ impl StagedLedgerStore for IndexerStore {
         ledger: Ledger,
     ) -> anyhow::Result<()> {
         trace!("Adding staged ledger at state hash {state_hash}");
+
+        // add staged accounts
         for (pk, account) in ledger.accounts.iter() {
             self.set_staged_account(pk.clone(), state_hash.clone(), account)?;
         }
-
-        // record persistence
-        self.database.put_cf(
-            self.staged_ledgers_persisted_cf(),
-            state_hash.0.as_bytes(),
-            b"",
-        )?;
 
         // index on state hash & add new ledger event
         if self
@@ -248,11 +237,18 @@ impl StagedLedgerStore for IndexerStore {
                 }
                 None => {
                     if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
-                        error!("Block missing from store: {state_hash}");
+                        bail!("Block missing from store: {state_hash}")
                     }
                 }
             }
         }
+
+        // record persistence
+        self.database.put_cf(
+            self.staged_ledgers_persisted_cf(),
+            state_hash.0.as_bytes(),
+            b"",
+        )?;
         Ok(())
     }
 
@@ -272,12 +268,15 @@ impl StagedLedgerStore for IndexerStore {
         }
 
         // initialize account balances for best ledger & sorting
-        let mut accounts = genesis_ledger.accounts.clone();
-        for (pk, acct) in accounts.iter_mut() {
-            acct.balance = acct.balance + MAINNET_ACCOUNT_CREATION_FEE;
+        for (pk, acct) in genesis_ledger.accounts.iter() {
             self.update_best_account(pk, Some(acct.clone()))?;
         }
-        self.add_staged_ledger_at_state_hash(state_hash, Ledger { accounts })?;
+        self.add_staged_ledger_at_state_hash(
+            state_hash,
+            Ledger {
+                accounts: genesis_ledger.accounts,
+            },
+        )?;
         Ok(())
     }
 
@@ -315,7 +314,7 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
 
-        trace!("Found staged ledger state hash {curr_state_hash}");
+        println!("Found staged ledger state hash {curr_state_hash}");
         if let Ok(Some(mut ledger)) = self.build_staged_ledger(&curr_state_hash) {
             // apply diffs
             diffs.reverse();
@@ -323,7 +322,7 @@ impl StagedLedgerStore for IndexerStore {
             ledger._apply_diff(&diff)?;
 
             if memoize {
-                trace!("Memoizing ledger for block {state_hash}");
+                println!("Memoizing ledger for block {state_hash}");
                 self.add_staged_ledger_at_state_hash(state_hash, ledger.clone())?;
             }
             return Ok(Some(ledger));

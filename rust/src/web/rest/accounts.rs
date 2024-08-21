@@ -1,7 +1,6 @@
 use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{account, public_key::PublicKey, store::best::BestLedgerStore},
     snark_work::store::SnarkStore,
     store::IndexerStore,
@@ -62,11 +61,7 @@ pub async fn get_account(
         };
         return HttpResponse::Ok().content_type(ContentType::json()).body(
             serde_json::to_string_pretty(&Account {
-                account: account::Account {
-                    // deduct fee for display
-                    balance: account.account.balance - MAINNET_ACCOUNT_CREATION_FEE,
-                    ..account.account.clone()
-                },
+                account: account.account.clone().display(),
                 ..account
             })
             .expect("serde account bytes"),

@@ -499,7 +499,7 @@ impl std::fmt::Debug for Account {
 #[cfg(test)]
 mod test {
     use super::{Account, Amount};
-    use crate::{constants::MAINNET_ACCOUNT_CREATION_FEE, ledger::account::nanomina_to_mina};
+    use crate::ledger::account::nanomina_to_mina;
 
     #[test]
     fn test_nanomina_to_mina_conversion() {
@@ -518,10 +518,7 @@ mod test {
             balance: Amount::new(100),
             ..Default::default()
         };
-        let deduct_account = Account {
-            balance: ledger_account.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..ledger_account.clone()
-        };
+        let deduct_account = ledger_account.clone().display();
 
         // account display & debug => deduct "creation fee"
         assert_eq!(

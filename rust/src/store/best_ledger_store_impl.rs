@@ -4,7 +4,6 @@ use crate::{
         store::{BlockStore, DbBlockUpdate},
         BlockHash,
     },
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
         diff::account::{AccountDiff, UpdateType},
@@ -33,10 +32,7 @@ impl BestLedgerStore for IndexerStore {
     fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
         trace!("Display best ledger account {pk}");
         if let Some(best_acct) = self.get_best_account(pk)? {
-            return Ok(Some(Account {
-                balance: best_acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
-                ..best_acct
-            }));
+            return Ok(Some(best_acct.display()));
         }
         Ok(None)
     }
