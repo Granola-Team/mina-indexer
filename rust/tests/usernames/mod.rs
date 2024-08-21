@@ -32,6 +32,7 @@ async fn set_usernames() -> anyhow::Result<()> {
         store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        None,
     )?;
 
     // ingest the blocks
