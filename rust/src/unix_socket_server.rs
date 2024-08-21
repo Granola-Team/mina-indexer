@@ -127,9 +127,9 @@ pub async fn handle_connection(
 
                         if path.is_some() {
                             let path = &path.unwrap();
-                            info!("Writing best tip block to {:?}", path);
+                            info!("Writing best tip block to {path:?}");
                             std::fs::write(path, block_str)?;
-                            Some(format!("Best block written to {}", path.display()))
+                            Some(format!("Best block written to {path:?}"))
                         } else {
                             info!("Writing best tip block to stdout");
                             Some(block_str)
@@ -163,7 +163,7 @@ pub async fn handle_connection(
                         };
                         if path.is_some() {
                             let path = &path.unwrap();
-                            info!("Writing block {state_hash} to {:?}", path);
+                            info!("Writing block {state_hash} to {path:?}");
                             std::fs::write(path, block_str)?;
                             Some(format!(
                                 "Block {} written to {:?}",
@@ -175,7 +175,7 @@ pub async fn handle_connection(
                             Some(block_str)
                         }
                     } else {
-                        error!("Block at state hash not present in store: {}", state_hash);
+                        error!("Block at state hash not present in store: {state_hash}");
                         Some(format!(
                             "Block at state hash not present in store: {state_hash}"
                         ))
@@ -236,13 +236,9 @@ pub async fn handle_connection(
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
-                            info!("Writing blocks at height {height} to {}", path.display());
-
+                            info!("Writing blocks at height {height} to {path:?}");
                             std::fs::write(path.clone(), blocks_str)?;
-                            Some(format!(
-                                "Blocks at height {height} written to {}",
-                                path.display()
-                            ))
+                            Some(format!("Blocks at height {height} written to {path:?}"))
                         } else {
                             file_must_not_be_a_directory(&path)
                         }
@@ -304,13 +300,10 @@ pub async fn handle_connection(
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
-                            info!("Writing blocks at slot {slot} to {}", path.display());
+                            info!("Writing blocks at slot {slot} to {path:?}");
 
                             std::fs::write(path.clone(), blocks_str)?;
-                            Some(format!(
-                                "Blocks at slot {slot} written to {}",
-                                path.display()
-                            ))
+                            Some(format!("Blocks at slot {slot} written to {path:?}"))
                         } else {
                             file_must_not_be_a_directory(&path)
                         }
@@ -380,13 +373,10 @@ pub async fn handle_connection(
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                info!("Writing blocks at public key {pk} to {}", path.display());
+                                info!("Writing blocks at public key {pk} to {path:?}");
 
                                 std::fs::write(path.clone(), blocks_str)?;
-                                Some(format!(
-                                    "Blocks at public key {pk} written to {}",
-                                    path.display()
-                                ))
+                                Some(format!("Blocks at public key {pk} written to {path:?}"))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
@@ -443,21 +433,15 @@ pub async fn handle_connection(
                     };
 
                     if path.is_none() {
-                        info!("Writing children of block {} to stdout", state_hash);
+                        info!("Writing children of block {state_hash} to stdout");
                         Some(blocks_str)
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
-                            info!(
-                                "Writing children of block {} to {}",
-                                state_hash,
-                                path.display()
-                            );
-
+                            info!("Writing children of block {state_hash} to {path:?}");
                             std::fs::write(path.clone(), blocks_str)?;
                             Some(format!(
-                                "Children of block {state_hash} written to {}",
-                                path.display()
+                                "Children of block {state_hash} written to {path:?}"
                             ))
                         } else {
                             file_must_not_be_a_directory(&path)
@@ -553,10 +537,10 @@ pub async fn handle_connection(
                             } else {
                                 let path = path.unwrap();
                                 if !path.is_dir() {
-                                    info!("Writing best chain to {}", path.display());
+                                    info!("Writing best chain to {path:?}");
 
                                     std::fs::write(path.clone(), best_chain_str)?;
-                                    Some(format!("Best chain written to {}", path.display()))
+                                    Some(format!("Best chain written to {path:?}"))
                                 } else {
                                     file_must_not_be_a_directory(&path)
                                 }
@@ -589,9 +573,9 @@ pub async fn handle_connection(
                             if path.is_dir() {
                                 file_must_not_be_a_directory(&path)
                             } else {
-                                debug!("Writing best ledger to {}", path.display());
+                                debug!("Writing best ledger to {path:?}");
                                 std::fs::write(path.clone(), ledger)?;
-                                Some(format!("Best ledger written to {}", path.display()))
+                                Some(format!("Best ledger written to {path:?}"))
                             }
                         }
                     } else {
@@ -617,12 +601,9 @@ pub async fn handle_connection(
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!("Writing staged ledger at {hash} to {}", path.display());
+                                debug!("Writing staged ledger at {hash} to {path:?}");
                                 std::fs::write(path.clone(), ledger).ok();
-                                Some(format!(
-                                    "Ledger at hash {hash} written to {}",
-                                    path.display()
-                                ))
+                                Some(format!("Ledger at hash {hash} written to {path:?}"))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
@@ -676,15 +657,9 @@ pub async fn handle_connection(
                             } else {
                                 let path = path.unwrap();
                                 if !path.is_dir() {
-                                    debug!(
-                                        "Writing ledger at height {height} to {}",
-                                        path.display()
-                                    );
+                                    debug!("Writing ledger at height {height} to {path:?}");
                                     std::fs::write(&path, ledger_str)?;
-                                    Some(format!(
-                                        "Ledger at height {height} written to {}",
-                                        path.display()
-                                    ))
+                                    Some(format!("Ledger at height {height} written to {path:?}"))
                                 } else {
                                     file_must_not_be_a_directory(&path)
                                 }
@@ -710,12 +685,11 @@ pub async fn handle_connection(
                             } else {
                                 let path = path.unwrap();
                                 if !path.is_dir() {
-                                    debug!("Writing ledger at {hash} to {}", path.display());
+                                    debug!("Writing ledger at {hash} to {path:?}");
 
                                     std::fs::write(path.clone(), ledger_json)?;
                                     Some(format!(
-                                        "Staking ledger at hash {hash} written to {}",
-                                        path.display()
+                                        "Staking ledger at hash {hash} written to {path:?}"
                                     ))
                                 } else {
                                     file_must_not_be_a_directory(&path)
@@ -747,14 +721,11 @@ pub async fn handle_connection(
                             Some(ledger_json)
                         } else {
                             let path = path.unwrap();
-
                             if !path.is_dir() {
-                                debug!("Writing ledger at epoch {epoch} to {}", path.display());
-
+                                debug!("Writing ledger at epoch {epoch} to {path:?}");
                                 std::fs::write(path.clone(), ledger_json)?;
                                 Some(format!(
-                                    "Staking ledger at epoch {epoch} written to {}",
-                                    path.display()
+                                    "Staking ledger at epoch {epoch} written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
@@ -829,23 +800,16 @@ pub async fn handle_connection(
                     {
                         if path.is_none() {
                             debug!(
-                                "Writing aggregated staking delegations epoch {} to stdout",
-                                epoch
+                                "Writing aggregated staking delegations epoch {epoch} to stdout"
                             );
                             Some(agg_del_str)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!(
-                                    "Writing aggregated staking delegations epoch {epoch} to {}",
-                                    path.display()
-                                );
-
+                                debug!("Writing aggregated staking delegations epoch {epoch} to {path:?}");
                                 std::fs::write(&path, agg_del_str)?;
                                 Some(format!(
-                                    "Aggregated staking delegations epoch {epoch} written to {}",
-                                    path.display()
-                                ))
+                                    "Aggregated staking delegations epoch {epoch} written to {path:?}"))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
@@ -880,15 +844,10 @@ pub async fn handle_connection(
                             let path = path.unwrap();
 
                             if !path.is_dir() {
-                                debug!(
-                                    "Writing SNARK work for public key {pk} to {}",
-                                    path.display()
-                                );
-
+                                debug!("Writing SNARK work for public key {pk} to {path:?}");
                                 std::fs::write(&path, snarks_str)?;
                                 Some(format!(
-                                    "SNARK work for public key {pk} written to {}",
-                                    path.display()
+                                    "SNARK work for public key {pk} written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
@@ -910,17 +869,13 @@ pub async fn handle_connection(
                                     Some(snarks_str)
                                 } else {
                                     let path = path.unwrap();
-
                                     if !path.is_dir() {
                                         debug!(
-                                            "Writing SNARK work for block {state_hash} to {}",
-                                            path.display()
+                                            "Writing SNARK work for block {state_hash} to {path:?}"
                                         );
-
                                         std::fs::write(&path, snarks_str).unwrap();
                                         Some(format!(
-                                            "SNARK work for block {state_hash} written to {}",
-                                            path.display()
+                                            "SNARK work for block {state_hash} written to {path:?}"
                                         ))
                                     } else {
                                         file_must_not_be_a_directory(&path)
@@ -965,10 +920,9 @@ pub async fn handle_connection(
                 } else {
                     let path = path.unwrap();
                     if !path.is_dir() {
-                        info!("Writing summary to {}", path.display());
-
+                        info!("Writing summary to {path:?}");
                         std::fs::write(&path, summary_str)?;
-                        Some(format!("Summary written to {}", path.display()))
+                        Some(format!("Summary written to {path:?}"))
                     } else {
                         file_must_not_be_a_directory(&path)
                     }
@@ -1022,13 +976,9 @@ pub async fn handle_connection(
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!("Writing transactions for {pk} to {}", path.display());
-
+                                debug!("Writing transactions for {pk} to {path:?}");
                                 std::fs::write(&path, transaction_str)?;
-                                Some(format!(
-                                    "Transactions for {pk} written to {}",
-                                    path.display()
-                                ))
+                                Some(format!("Transactions for {pk} written to {path:?}"))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
@@ -1070,22 +1020,16 @@ pub async fn handle_connection(
                                         cmds.into_iter().map(Command::from).collect();
                                     format_vec_jq_compatible(&cmds)
                                 };
+
                                 if path.is_none() {
                                     debug!("Writing transactions for {state_hash} to stdout");
                                     transaction_str
                                 } else {
                                     let path = path.unwrap();
                                     if !path.is_dir() {
-                                        debug!(
-                                            "Writing transactions for {state_hash} to {}",
-                                            path.display()
-                                        );
-
+                                        debug!("Writing transactions for {state_hash} to {path:?}");
                                         std::fs::write(&path, transaction_str).unwrap();
-                                        format!(
-                                            "Transactions for {state_hash} written to {}",
-                                            path.display()
-                                        )
+                                        format!("Transactions for {state_hash} written to {path:?}")
                                     } else {
                                         file_must_not_be_a_directory(&path).unwrap()
                                     }
@@ -1107,23 +1051,14 @@ pub async fn handle_connection(
                         let internal_cmds_str = serde_json::to_string_pretty(&internal_cmds)?;
 
                         if path.is_none() {
-                            debug!("Writing internal commands for {} to stdout", pk);
+                            debug!("Writing internal commands for {pk} to stdout");
                             Some(internal_cmds_str)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!(
-                                    "Writing internal commands for {} to {}",
-                                    pk,
-                                    path.display()
-                                );
-
+                                debug!("Writing internal commands for {pk} to {path:?}");
                                 std::fs::write(&path, internal_cmds_str)?;
-                                Some(format!(
-                                    "Internal commands for {} written to {}",
-                                    pk,
-                                    path.display()
-                                ))
+                                Some(format!("Internal commands for {pk} written to {path:?}"))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
@@ -1132,7 +1067,6 @@ pub async fn handle_connection(
                 }
                 InternalCommands::StateHash { path, state_hash } => {
                     info!("Received internal-state-hash command for {}", state_hash);
-
                     if !block::is_valid_state_hash(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
@@ -1141,25 +1075,18 @@ pub async fn handle_connection(
                         )?;
 
                         if path.is_none() {
-                            debug!(
-                                "Writing block internal commands for {} to stdout",
-                                state_hash
-                            );
+                            debug!("Writing block internal commands for {state_hash} to stdout");
                             Some(internal_cmds_str)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
                                 debug!(
-                                    "Writing block internal commands for {} to {}",
-                                    state_hash,
-                                    path.display()
+                                    "Writing block internal commands for {state_hash} to {path:?}"
                                 );
 
                                 std::fs::write(&path, internal_cmds_str)?;
                                 Some(format!(
-                                    "Block internal commands for {} written to {}",
-                                    state_hash,
-                                    path.display()
+                                    "Block internal commands for {state_hash} written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
