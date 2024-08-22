@@ -109,6 +109,9 @@ pub struct IndexerState {
 
     /// Network blocks and staking ledgers to be processed
     pub version: IndexerVersion,
+
+    /// Do not ingest orphan blocks
+    do_not_ingest_orphan_blocks: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +156,7 @@ pub struct IndexerStateConfig {
     pub canonical_update_threshold: u32,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub do_not_ingest_orphan_blocks: bool,
 }
 
 impl IndexerStateConfig {
@@ -162,6 +166,7 @@ impl IndexerStateConfig {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        do_not_ingest_orphan_blocks: bool,
     ) -> Self {
         IndexerStateConfig {
             version,
@@ -169,6 +174,7 @@ impl IndexerStateConfig {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            do_not_ingest_orphan_blocks,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
@@ -185,6 +191,7 @@ impl IndexerState {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        do_not_ingest_orphan_blocks: bool,
     ) -> anyhow::Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
@@ -192,6 +199,7 @@ impl IndexerState {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            do_not_ingest_orphan_blocks,
         ))
     }
 
@@ -265,6 +273,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
+            do_not_ingest_orphan_blocks: config.do_not_ingest_orphan_blocks,
         })
     }
 
@@ -297,6 +306,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
+            do_not_ingest_orphan_blocks: config.do_not_ingest_orphan_blocks,
         })
     }
 
@@ -356,6 +366,7 @@ impl IndexerState {
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             staking_ledgers: HashMap::new(),
             version: IndexerVersion::default(),
+            do_not_ingest_orphan_blocks: false,
         })
     }
 
@@ -461,6 +472,7 @@ impl IndexerState {
         let total_time = Instant::now();
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
         let mut step_time = total_time;
+
         if block_parser.total_num_blocks > self.reporting_freq {
             info!(
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",
@@ -482,6 +494,12 @@ impl IndexerState {
                         Ok(Some((parsed_block, block_bytes))) => {
                             self.report_progress(block_parser, step_time, total_time)?;
                             step_time = Instant::now();
+
+                            // if not ingesting orphan blocks, only add canonical + recent blocks
+                            if self.do_not_ingest_orphan_blocks
+                                && self.blocks_processed > block_parser.num_deep_canonical_blocks + block_parser.num_recent_blocks {
+                                    break;
+                            }
 
                             match parsed_block {
                                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
