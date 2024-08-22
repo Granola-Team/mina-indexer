@@ -635,7 +635,8 @@ test_ledgers() {
     idxr_server_start_standard
     wait_for_socket
 
-    pk='B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR'
+    pk=B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR # non-genesis account
+    pk0=B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN # genesis account
 
     # canonical ledgers match
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
@@ -643,41 +644,55 @@ test_ledgers() {
 
     hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .${pk}.balance)
     height_balance=$(idxr ledgers height --height $canonical_height | jq -r .${pk}.balance)
-    assert '607904750000000' $hash_balance
-    assert '607904750000000' $height_balance
+    assert 607904750000000 $hash_balance
+    assert 607904750000000 $height_balance
+
+    # genesis ledger account
+    hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .${pk0}.balance)
+    height_balance=$(idxr ledgers height --height $canonical_height | jq -r .${pk0}.balance)
+    assert 502777775000000 $hash_balance
+    assert 502777775000000 $height_balance
 
     # best ledgers match
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    best_result=$(idxr ledgers best --memoize | jq -r .${pk}.balance)
-    hash_result=$(idxr ledgers hash --hash $best_hash | jq -r .${pk}.balance)
+    best_balance=$(idxr ledgers best --memoize | jq -r .${pk}.balance)
+    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .${pk}.balance)
     height_balance=$(idxr ledgers height --height $best_height | jq -r .${pk}.balance)
 
-    assert '607904750000000' $best_result
-    assert '607904750000000' $hash_result
-    assert '607904750000000' $height_balance
+    assert 607904750000000 $best_balance
+    assert 607904750000000 $hash_balance
+    assert 607904750000000 $height_balance
+
+    # genesis ledger account
+    best_balance=$(idxr ledgers best | jq -r .${pk0}.balance)
+    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .${pk0}.balance)
+    height_balance=$(idxr ledgers height --height $best_height | jq -r .${pk0}.balance)
+    assert 502777775000000 $best_balance
+    assert 502777775000000 $hash_balance
+    assert 502777775000000 $height_balance
 
     # write ledgers to file
     file=./ledgers/best-block-$best_height-$best_hash.json
     idxr ledgers best --path $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
-    assert '607904750000000' $file_result
+    assert 607904750000000 $file_result
     rm -f $file
 
     file=./ledgers/best-ledger-$best_height-$best_hash.json
     idxr ledgers hash --hash $best_hash --path $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
-    assert '607904750000000' $file_result
+    assert 607904750000000 $file_result
     rm -f $file
 
     file=./ledgers/ledger-height-$best_height-$best_hash.json
     idxr ledgers height --height $best_height --path $file
 
     file_result=$(cat $file | jq -r .${pk}.balance)
-    assert '607904750000000' $file_result
+    assert 607904750000000 $file_result
     rm -f $file
 
     rm -rf ledgers
@@ -954,17 +969,17 @@ test_many_blocks() {
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    assert '1000' $best_length
-    assert '990' $canonical_length
-    assert '3NK9aySQJBEgAUKcWGrpbZhA4M8wL2N3cjipq3mEb4HPTuUkowEF' $canonical_hash
-    assert '3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66' $best_hash
+    assert 1000 $best_length
+    assert 990 $canonical_length
+    assert 3NK9aySQJBEgAUKcWGrpbZhA4M8wL2N3cjipq3mEb4HPTuUkowEF $canonical_hash
+    assert 3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66 $best_hash
 
-    pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
+    pk=B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
     balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
-    assert '502777775000000' $balance
+    assert 502777775000000 $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
     balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)

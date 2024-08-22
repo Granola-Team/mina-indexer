@@ -8,7 +8,6 @@ use crate::{
     web::graphql::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
-use log::warn;
 use speedb::IteratorMode;
 
 #[derive(SimpleObject)]
@@ -97,7 +96,7 @@ impl AccountQueryRoot {
         if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.clone()) {
             let pk: PublicKey = public_key.into();
             return Ok(db
-                .get_best_account(&pk)?
+                .get_best_account_display(&pk)?
                 .iter()
                 .filter_map(|acct| {
                     let username = match db.get_username(&pk) {
@@ -139,16 +138,9 @@ impl AccountQueryRoot {
             Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
         };
 
-        for (key, _) in db.best_ledger_account_balance_iterator(mode).flatten() {
-            let pk = PublicKey::from_bytes(&key[8..])?;
-            let account = match db.get_best_account(&pk)? {
-                Some(account) => account,
-                None => {
-                    warn!("Failed to find public key in best ledger: {pk}");
-                    continue;
-                }
-            };
-
+        for (_, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
+            let account = serde_json::from_slice::<account::Account>(&value)?.display();
+            let pk = account.public_key.clone();
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,
                 Ok(Some(username)) => Some(username.0),
@@ -184,7 +176,6 @@ impl AccountQueryRoot {
                 }
             }
         }
-
         Ok(accounts)
     }
 }

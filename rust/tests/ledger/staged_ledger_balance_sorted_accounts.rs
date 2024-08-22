@@ -46,9 +46,12 @@ async fn check_staged_accounts() -> anyhow::Result<()> {
         .unwrap();
 
     if best_ledger != staged_ledger {
-        for (pk, acct) in staged_ledger.accounts.iter() {
-            let best_acct = best_ledger.accounts.get(pk).unwrap();
-            assert_eq!(best_acct, acct)
+        for (pk, staged_acct) in staged_ledger.accounts.iter() {
+            let staged_ledger_acct = indexer_store
+                .get_staged_account(pk.clone(), state_hash.clone())?
+                .unwrap();
+            assert_eq!(*staged_acct, staged_ledger_acct);
+            assert_eq!(staged_acct, best_ledger.accounts.get(pk).unwrap());
         }
         panic!("Ledgers do not match")
     }

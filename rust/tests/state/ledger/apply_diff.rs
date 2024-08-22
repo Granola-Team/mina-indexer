@@ -1,8 +1,8 @@
 use mina_indexer::{
     block::parser::BlockParser,
-    ledger::{diff::LedgerDiff, Ledger},
+    ledger::{diff::LedgerDiff, public_key::PublicKey, Ledger},
 };
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 #[tokio::test]
 async fn account_diffs() -> anyhow::Result<()> {
@@ -65,17 +65,16 @@ async fn account_diffs() -> anyhow::Result<()> {
         ),
     ])?;
 
+    let only_new_pk =
+        PublicKey::from_str("B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy").unwrap();
+    let new_pks = diff.new_pk_balances.keys().collect::<HashSet<&PublicKey>>();
+    assert_eq!(new_pks, HashSet::from([&only_new_pk]));
+
     println!("=== Initial ===");
     println!("{:?}", ledger);
 
     let ledger = ledger.apply_diff(&diff)?;
     let expected = Ledger::from(vec![
-        (
-            "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X",
-            0, // TODO: probably this address should be credited the account creation fee
-            None,
-            None,
-        ),
         (
             "B62qrusueb8gq1RbZWyZG9EN1eCKjbByTQ39fgiGigkvg7nJR3VdGwX",
             1000000000000,
@@ -120,26 +119,20 @@ async fn account_diffs() -> anyhow::Result<()> {
         ),
         (
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
-            1155800000000,
+            1156800000000,
             None,
             None,
         ),
     ])?;
 
     println!("=== Diff ===");
-    println!("{diff:?}");
+    println!("{diff:#?}");
 
     println!("=== Final ===");
     println!("{ledger:?}");
 
-    for (pk, account) in ledger.accounts.iter() {
-        if Some(account) != expected.accounts.get(pk) {
-            println!(
-                "ledger != expect\n{account}\n{}",
-                expected.accounts.get(pk).unwrap()
-            );
-        }
+    for (pk, pk_ledger) in ledger.accounts.iter() {
+        assert_eq!(pk_ledger, expected.accounts.get(pk).unwrap());
     }
-    assert_eq!(ledger, expected);
     Ok(())
 }

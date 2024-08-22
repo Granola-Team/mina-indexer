@@ -406,7 +406,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Staged ledger store CFs //
     /////////////////////////////
 
-    /// CF for storing staged ledger accounts
+    /// CF for storing staged ledger accounts (use [staged_account_key])
     /// ```
     /// {state_hash}{pk} -> account
     /// where

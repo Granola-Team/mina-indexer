@@ -121,7 +121,23 @@ impl From<GenesisRoot> for GenesisLedger {
 
 impl From<GenesisLedger> for Ledger {
     fn from(value: GenesisLedger) -> Self {
-        value.ledger
+        Self {
+            accounts: value
+                .ledger
+                .accounts
+                .into_iter()
+                .map(|(pk, acct)| {
+                    (
+                        pk,
+                        Account {
+                            // add display fee
+                            balance: acct.balance + MAINNET_ACCOUNT_CREATION_FEE,
+                            ..acct
+                        },
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -132,10 +148,12 @@ impl GenesisLedger {
     /// This is the only way to construct a genesis ledger
     pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
         let mut accounts = HashMap::new();
+
         // Add genesis block winner
         let block_creator = Account::from(GenesisBlock::new().unwrap());
         let pk = block_creator.public_key.clone();
         accounts.insert(pk, block_creator);
+
         for genesis_account in genesis.accounts {
             let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
                 Ok(amt) => (amt * dec!(1_000_000_000))

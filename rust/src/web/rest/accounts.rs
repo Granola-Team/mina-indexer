@@ -59,10 +59,13 @@ pub async fn get_account(
                 .get_internal_commands_pk_total_count(&pk)
                 .unwrap_or_default(),
         };
-        let body = serde_json::to_string_pretty(&account).unwrap();
-        return HttpResponse::Ok()
-            .content_type(ContentType::json())
-            .body(body);
+        return HttpResponse::Ok().content_type(ContentType::json()).body(
+            serde_json::to_string_pretty(&Account {
+                account: account.account.clone().display(),
+                ..account
+            })
+            .expect("serde account bytes"),
+        );
     }
     HttpResponse::NotFound().finish()
 }

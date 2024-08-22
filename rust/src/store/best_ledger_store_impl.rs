@@ -4,28 +4,21 @@ use crate::{
         store::{BlockStore, DbBlockUpdate},
         BlockHash,
     },
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
         diff::account::{AccountDiff, UpdateType},
         public_key::PublicKey,
         store::{
-            best::{BestLedgerStore, DBAccountUpdate},
+            best::{BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
         },
         Ledger,
     },
-    store::{
-        balance_key_prefix, fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, u64_prefix_key,
-        IndexerStore,
-    },
+    store::{fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, u64_prefix_key, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::{
-    collections::{HashMap, HashSet},
-    mem::size_of,
-};
+use std::{collections::HashMap, mem::size_of};
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
@@ -33,7 +26,15 @@ impl BestLedgerStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .and_then(|bytes| serde_json::from_slice::<Account>(&bytes).ok()))
+    }
+
+    fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
+        trace!("Display best ledger account {pk}");
+        if let Some(best_acct) = self.get_best_account(pk)? {
+            return Ok(Some(best_acct.display()));
+        }
+        Ok(None)
     }
 
     fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>> {
@@ -96,14 +97,28 @@ impl BestLedgerStore for IndexerStore {
             apply: blocks
                 .apply
                 .iter()
-                .flat_map(|(a, _)| self.get_block_account_diffs(a).unwrap())
-                .flatten()
+                .flat_map(|(a, _)| {
+                    let diff = self.get_block_ledger_diff(a).unwrap();
+                    diff.map(|d| {
+                        (
+                            d.account_diffs.into_iter().flatten().collect(),
+                            d.new_pk_balances.into_keys().collect(),
+                        )
+                    })
+                })
                 .collect(),
             unapply: blocks
                 .unapply
                 .iter()
-                .flat_map(|(u, _)| self.get_block_account_diffs(u).unwrap())
-                .flatten()
+                .flat_map(|(u, _)| {
+                    let diff = self.get_block_ledger_diff(u).unwrap();
+                    diff.map(|d| {
+                        (
+                            d.account_diffs.into_iter().flatten().collect(),
+                            d.new_pk_balances.into_keys().collect(),
+                        )
+                    })
+                })
                 .collect(),
         };
         self.update_best_accounts(state_hash, &account_updates)
@@ -112,148 +127,142 @@ impl BestLedgerStore for IndexerStore {
     fn update_best_accounts(
         &self,
         state_hash: &BlockHash,
-        updates: &DBAccountUpdate,
+        updates: &DbAccountUpdate,
     ) -> anyhow::Result<()> {
         use AccountDiff::*;
-        trace!("Updating accounts {state_hash}");
-        let apply_acc = updates.apply.iter().fold(0, |acc, update| match update {
-            CreateAccount(_) => acc + 1,
-            _ => acc,
-        });
+        trace!("Updating best ledger accounts for block {state_hash}");
+
+        // count newly applied & unapplied accounts
+        let apply_acc = updates
+            .apply
+            .iter()
+            .fold(0, |acc, update| acc + update.1.len() as i32);
         let adjust = updates
             .unapply
             .iter()
-            .fold(apply_acc, |acc, update| match update {
-                CreateAccount(_) => acc - 1,
-                _ => acc,
-            });
+            .fold(apply_acc, |acc, update| acc - update.1.len() as i32);
         self.update_num_accounts(adjust)?;
 
         // update accounts
         // unapply
-        for diff in updates.unapply.iter() {
-            let pk: PublicKey = diff.public_key();
-            let acct = self
-                .get_best_account(&pk)?
-                .unwrap_or(Account::empty(pk.clone()));
-            let account = match diff {
-                Payment(diff) => match diff.update_type {
-                    UpdateType::Credit => Some(Account {
+        for (block_diffs, remove_pks) in updates.unapply.iter() {
+            for diff in block_diffs {
+                let pk: PublicKey = diff.public_key();
+                let acct = self
+                    .get_best_account(&pk)?
+                    .unwrap_or(Account::empty(pk.clone()));
+                let account = match diff {
+                    Payment(diff) => match diff.update_type {
+                        UpdateType::Credit => Some(Account {
+                            balance: acct.balance - diff.amount,
+                            ..acct
+                        }),
+                        UpdateType::Debit(nonce) => Some(Account {
+                            balance: acct.balance + diff.amount,
+                            nonce: nonce.map_or(acct.nonce, |nonce| {
+                                if acct.nonce.map(|n| n.0) == Some(0) {
+                                    None
+                                } else {
+                                    Some(nonce - 1)
+                                }
+                            }),
+                            ..acct
+                        }),
+                    },
+                    Coinbase(diff) => Some(Account {
                         balance: acct.balance - diff.amount,
                         ..acct
                     }),
-                    UpdateType::Debit(Some(nonce)) => Some(Account {
-                        balance: acct.balance + diff.amount,
-                        nonce: if acct.nonce.map(|n| n.0) == Some(0) {
-                            None
-                        } else {
-                            Some(nonce - 1)
-                        },
-                        ..acct
-                    }),
-                    UpdateType::Debit(None) => unreachable!(),
-                },
-                Coinbase(diff) => Some(Account {
-                    balance: acct.balance - diff.amount,
-                    ..acct
-                }),
-                CreateAccount(_) => None,
-                Delegation(diff) => {
-                    self.remove_pk_delegate(pk.clone())?;
-                    Some(Account {
+                    Delegation(diff) => {
+                        self.remove_pk_delegate(pk.clone())?;
+                        Some(Account {
+                            nonce: if acct.nonce.map(|n| n.0) == Some(0) {
+                                None
+                            } else {
+                                Some(diff.nonce - 1)
+                            },
+                            delegate: diff.delegate.clone(),
+                            ..acct
+                        })
+                    }
+                    FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
+                        UpdateType::Credit => Some(Account {
+                            balance: acct.balance - diff.amount,
+                            ..acct
+                        }),
+                        UpdateType::Debit(_) => Some(Account {
+                            balance: acct.balance + diff.amount,
+                            ..acct
+                        }),
+                    },
+                    FailedTransactionNonce(diff) => Some(Account {
                         nonce: if acct.nonce.map(|n| n.0) == Some(0) {
                             None
                         } else {
                             Some(diff.nonce - 1)
                         },
-                        delegate: diff.delegate.clone(),
-                        ..acct
-                    })
-                }
-                FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
-                    UpdateType::Credit => Some(Account {
-                        balance: acct.balance - diff.amount,
                         ..acct
                     }),
-                    UpdateType::Debit(_) => Some(Account {
-                        balance: acct.balance + diff.amount,
-                        ..acct
-                    }),
-                },
-                FailedTransactionNonce(diff) => Some(Account {
-                    nonce: if acct.nonce.map(|n| n.0) == Some(0) {
-                        None
-                    } else {
-                        Some(diff.nonce - 1)
-                    },
-                    ..acct
-                }),
-            };
-            self.update_best_account(&pk, account)?;
+                };
+                self.update_best_account(&pk, account)?;
+            }
+
+            // remove accounts
+            for pk in remove_pks.iter() {
+                self.update_best_account(pk, None)?;
+            }
         }
 
         // apply
-        let mut accounts_created = <HashSet<PublicKey>>::new();
-        for diff in updates.apply.iter() {
-            let pk = diff.public_key();
-            let acct = self
-                .get_best_account(&pk)?
-                .unwrap_or(Account::empty(pk.clone()));
-            let account = match diff {
-                Payment(diff) => match diff.update_type {
-                    UpdateType::Credit => Some(Account {
+        for (block_apply_diffs, _) in updates.apply.iter() {
+            for diff in block_apply_diffs {
+                let pk = diff.public_key();
+                let acct = self
+                    .get_best_account(&pk)?
+                    .unwrap_or(Account::empty(pk.clone()));
+                let account = match diff {
+                    Payment(diff) => match diff.update_type {
+                        UpdateType::Credit => Some(Account {
+                            balance: acct.balance + diff.amount,
+                            ..acct
+                        }),
+                        UpdateType::Debit(nonce) => Some(Account {
+                            balance: acct.balance - diff.amount,
+                            nonce: nonce.or(acct.nonce),
+                            ..acct
+                        }),
+                    },
+                    Coinbase(diff) => Some(Account {
                         balance: acct.balance + diff.amount,
                         ..acct
                     }),
-                    UpdateType::Debit(nonce) => Some(Account {
-                        balance: acct.balance - diff.amount,
-                        nonce: nonce.or(acct.nonce),
+                    Delegation(diff) => Some(Account {
+                        nonce: Some(diff.nonce),
+                        delegate: diff.delegate.clone(),
                         ..acct
                     }),
-                },
-                Coinbase(diff) => Some(Account {
-                    balance: acct.balance + diff.amount,
-                    ..acct
-                }),
-                CreateAccount(_) => {
-                    accounts_created.insert(pk.clone());
-                    Some(acct)
-                }
-                Delegation(diff) => Some(Account {
-                    nonce: Some(diff.nonce),
-                    delegate: diff.delegate.clone(),
-                    ..acct
-                }),
-                FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
-                    UpdateType::Credit => Some(Account {
-                        balance: acct.balance + diff.amount,
+                    FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
+                        UpdateType::Credit => Some(Account {
+                            balance: acct.balance + diff.amount,
+                            ..acct
+                        }),
+                        UpdateType::Debit(Some(nonce)) => Some(Account {
+                            balance: acct.balance - diff.amount,
+                            nonce: Some(nonce + 1),
+                            ..acct
+                        }),
+                        UpdateType::Debit(None) => Some(Account {
+                            balance: acct.balance - diff.amount,
+                            ..acct
+                        }),
+                    },
+                    FailedTransactionNonce(diff) => Some(Account {
+                        nonce: Some(diff.nonce),
                         ..acct
                     }),
-                    UpdateType::Debit(Some(nonce)) => Some(Account {
-                        balance: acct.balance - diff.amount,
-                        nonce: Some(nonce + 1),
-                        ..acct
-                    }),
-                    UpdateType::Debit(None) => Some(Account {
-                        balance: acct.balance - diff.amount,
-                        ..acct
-                    }),
-                },
-                FailedTransactionNonce(diff) => Some(Account {
-                    nonce: Some(diff.nonce),
-                    ..acct
-                }),
-            };
-            self.update_best_account(&pk, account)?;
-        }
-
-        for pk in accounts_created {
-            let acct = self.get_best_account(&pk)?.unwrap();
-            let account = Account {
-                balance: acct.balance - MAINNET_ACCOUNT_CREATION_FEE,
-                ..acct
-            };
-            self.update_best_account(&pk, Some(account))?;
+                };
+                self.update_best_account(&pk, account)?;
+            }
         }
         Ok(())
     }
@@ -365,12 +374,8 @@ impl BestLedgerStore for IndexerStore {
                 .best_ledger_account_balance_iterator(IteratorMode::End)
                 .flatten()
             {
-                let balance = balance_key_prefix(&key);
                 let pk = pk_key_prefix(&key[size_of::<u64>()..]);
-                let account: Account = serde_json::from_slice(&value)?;
-
-                assert_eq!(account.balance.0, balance);
-                accounts.insert(pk, account);
+                accounts.insert(pk, serde_json::from_slice(&value)?);
             }
             return Ok(Some(Ledger { accounts }));
         }
