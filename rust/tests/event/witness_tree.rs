@@ -24,7 +24,6 @@ async fn test() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
-        false,
     )?;
 
     // add all blocks to the state

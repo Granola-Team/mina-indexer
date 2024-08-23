@@ -22,7 +22,6 @@ fn block_added() -> anyhow::Result<()> {
         indexer_store,
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-        false,
     )?;
 
     assert_eq!(

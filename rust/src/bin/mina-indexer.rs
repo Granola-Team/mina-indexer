@@ -216,10 +216,6 @@ pub struct DatabaseArgs {
     /// Network name
     #[arg(long, default_value = Network::Mainnet)]
     network: Network,
-
-    /// Path to dump the best ledger to after ingesting all canonical blocks
-    #[arg(long, default_value_t = false)]
-    do_not_ingest_orphan_blocks: bool,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -421,7 +417,6 @@ fn process_indexer_configuration(
     let canonical_update_threshold = args.db.canonical_update_threshold;
     let ledger_cadence = args.db.ledger_cadence;
     let reporting_freq = args.db.reporting_freq;
-    let do_not_ingest_orphan_blocks = args.db.do_not_ingest_orphan_blocks;
     let fetch_new_blocks_exe = args.fetch_new_blocks_exe;
     let fetch_new_blocks_delay = args.fetch_new_blocks_delay;
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
@@ -481,7 +476,6 @@ fn process_indexer_configuration(
         missing_block_recovery_exe,
         missing_block_recovery_delay,
         missing_block_recovery_batch,
-        do_not_ingest_orphan_blocks,
     })
 }
 
@@ -611,7 +605,6 @@ struct ServerArgsJson {
     web_hostname: String,
     web_port: u16,
     pid: Option<u32>,
-    do_not_ingest_orphan_blocks: bool,
     fetch_new_blocks_exe: Option<String>,
     fetch_new_blocks_delay: Option<u64>,
     missing_block_recovery_exe: Option<String>,
@@ -655,7 +648,6 @@ impl From<ServerArgs> for ServerArgsJson {
                 .map(|p| p.display().to_string()),
             missing_block_recovery_batch: value.missing_block_recovery_batch,
             network: value.db.network.to_string(),
-            do_not_ingest_orphan_blocks: value.db.do_not_ingest_orphan_blocks,
         }
     }
 }
@@ -678,7 +670,6 @@ impl From<ServerArgsJson> for ServerArgs {
             canonical_update_threshold: value.canonical_update_threshold,
             config: None,
             network: (&value.network as &str).into(),
-            do_not_ingest_orphan_blocks: value.do_not_ingest_orphan_blocks,
         };
         Self {
             db,

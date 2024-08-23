@@ -314,7 +314,7 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
 
-        trace!("Found staged ledger state hash {curr_state_hash}");
+        println!("Found staged ledger state hash {curr_state_hash}");
         if let Ok(Some(mut ledger)) = self.build_staged_ledger(&curr_state_hash) {
             // apply diffs
             diffs.reverse();
@@ -322,7 +322,7 @@ impl StagedLedgerStore for IndexerStore {
             ledger._apply_diff(&diff)?;
 
             if memoize {
-                trace!("Memoizing ledger for block {state_hash}");
+                println!("Memoizing ledger for block {state_hash}");
                 self.add_staged_ledger_at_state_hash(state_hash, ledger.clone())?;
             }
             return Ok(Some(ledger));

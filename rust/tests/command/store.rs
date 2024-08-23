@@ -34,7 +34,6 @@ async fn add_and_get() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-        false,
     )?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
