@@ -58,13 +58,14 @@ pub fn discovery(
                         parent_found = true;
                     }
                 }
-                if parent_found
-                    && !recent_canonical_heights
+                if parent_found {
+                    if !recent_canonical_heights
                         .clone()
                         .into_vec()
                         .contains(&next_height)
-                {
-                    recent_canonical_heights.push(next_height);
+                    {
+                        recent_canonical_heights.push(next_height);
+                    }
                     canonical_branch.clear();
                     canonical_branch.extend(branch_candidate);
                 }
