@@ -95,10 +95,10 @@ pub fn discovery(
 }
 
 fn get_orphaned_paths<'a>(
-    canonical_branch: &[&'a PathBuf],
+    deep_canonical_branch: &[&'a PathBuf],
     tree_map: &mut HashMap<u32, Vec<&'a PathBuf>>,
 ) -> Vec<&'a PathBuf> {
-    let canonical_set: HashSet<&PathBuf> = canonical_branch.iter().copied().collect();
+    let canonical_set: HashSet<&PathBuf> = deep_canonical_branch.iter().copied().collect();
     let mut orphaned_paths: Vec<&PathBuf> = tree_map
         .drain()
         .flat_map(|(_, paths)| {
@@ -139,6 +139,102 @@ fn split_off_recent_paths<'a>(
     }));
     sort_by_height_and_lexicographical_order(&mut recent_paths);
     recent_paths
+}
+
+#[cfg(test)]
+mod discovery_algorithm_tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_get_orphaned_paths() {
+        // Prepare the canonical branch
+        let deep_canonical_branch: Vec<PathBuf> = vec![
+            PathBuf::from("mainnet-1-a.json"),
+            PathBuf::from("mainnet-2-b.json"),
+            PathBuf::from("mainnet-3-c.json"),
+        ];
+        let canonical_refs: Vec<&PathBuf> = deep_canonical_branch.iter().collect();
+
+        // Prepare the tree map
+        let binding_1 = PathBuf::from("mainnet-2-d.json");
+        let binding_2 = PathBuf::from("mainnet-3-e.json");
+
+        let mut tree_map: HashMap<u32, Vec<&PathBuf>> = HashMap::new();
+        tree_map.insert(2, vec![&deep_canonical_branch[1], &binding_1]);
+        tree_map.insert(3, vec![&deep_canonical_branch[2], &binding_2]);
+
+        // Expected orphaned paths
+        let expected_orphaned_paths = vec![
+            PathBuf::from("mainnet-2-d.json"),
+            PathBuf::from("mainnet-3-e.json"),
+        ];
+
+        // Get orphaned paths
+        let orphaned_paths = get_orphaned_paths(&canonical_refs, &mut tree_map);
+
+        // Assert that orphaned paths match expected paths
+        assert_eq!(
+            orphaned_paths,
+            expected_orphaned_paths.iter().collect::<Vec<&PathBuf>>()
+        );
+    }
+
+    #[test]
+    fn test_split_off_recent_paths() {
+        // Prepare the canonical branch
+        let branch_with_best_tip: Vec<PathBuf> = vec![
+            PathBuf::from("mainnet-1-a.json"),
+            PathBuf::from("mainnet-2-b.json"),
+            PathBuf::from("mainnet-3-c.json"),
+            PathBuf::from("mainnet-4-d.json"),
+            PathBuf::from("mainnet-5-e.json"),
+        ];
+        let mut canonical_refs: Vec<&PathBuf> = branch_with_best_tip.iter().collect();
+
+        // Prepare the tree map
+        let binding_1 = PathBuf::from("mainnet-4-x.json");
+        let binding_2 = PathBuf::from("mainnet-5-y.json");
+
+        let mut tree_map: HashMap<u32, Vec<&PathBuf>> = HashMap::new();
+        tree_map.insert(4, vec![&branch_with_best_tip[3], &binding_1]);
+        tree_map.insert(5, vec![&branch_with_best_tip[4], &binding_2]);
+
+        // Prepare the recent heights
+        let recent_heights = vec![4, 5];
+
+        // Expected recent paths
+        let expected_recent_paths = vec![
+            PathBuf::from("mainnet-4-d.json"),
+            PathBuf::from("mainnet-4-x.json"),
+            PathBuf::from("mainnet-5-e.json"),
+            PathBuf::from("mainnet-5-y.json"),
+        ];
+
+        // Expected canonical branch after split
+        let expected_canonical_branch = vec![
+            PathBuf::from("mainnet-1-a.json"),
+            PathBuf::from("mainnet-2-b.json"),
+            PathBuf::from("mainnet-3-c.json"),
+        ];
+
+        // Get recent paths
+        let recent_paths =
+            split_off_recent_paths(&mut canonical_refs, &mut tree_map, recent_heights);
+
+        // Assert that recent paths match expected paths
+        assert_eq!(
+            recent_paths,
+            expected_recent_paths.iter().collect::<Vec<&PathBuf>>()
+        );
+
+        // Assert that canonical branch has been correctly mutated
+        assert_eq!(
+            canonical_refs,
+            expected_canonical_branch.iter().collect::<Vec<&PathBuf>>()
+        );
+    }
 }
 
 fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
