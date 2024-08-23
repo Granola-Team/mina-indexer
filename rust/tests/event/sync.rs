@@ -23,6 +23,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
+        false,
     )?;
 
     // add all blocks to the state
@@ -35,6 +36,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store,
         MAINNET_CANONICAL_THRESHOLD,
         10,
+        false,
     );
     let mut state_sync = IndexerState::new_without_genesis_events(config)?;
 

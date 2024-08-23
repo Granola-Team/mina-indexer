@@ -188,6 +188,9 @@ test_indexer_cli_reports() {
     idxr blocks best --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks best"
 
+    idxr blocks state-hash --help 2>&1 |
+        grep -iq "Usage: mina-indexer blocks state-hash"
+
     idxr blocks height --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks height"
 
@@ -1394,7 +1397,8 @@ test_start_from_config() {
       \"canonical_update_threshold\": 2,
       \"web_hostname\": \"localhost\",
       \"web_port\": ${port},
-      \"network\": \"mainnet\"
+      \"network\": \"mainnet\",
+      \"do_not_ingest_orphan_blocks\": false
     }" > $file
 
     idxr_server_start_standard --config $file
@@ -1659,6 +1663,33 @@ test_reuse_databases() {
     assert 12 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
 }
 
+# Indexer doesn't ingest orphan blocks
+test_do_not_ingest_orphan_blocks() {
+    stage_mainnet_blocks 20 ./blocks
+
+    idxr_server_start_standard --do-not-ingest-orphan-blocks
+    wait_for_socket
+
+    orphan_blocks=(
+        "3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45"
+        "3NKvdydTvLVDJ9PKAXrisjsXoZQvUy1V2sbComWyB2uyhARCJZ5M"
+        "3NLM3k3Vk1qs36hZWdbWvi4sqwer3skbgPyHMWrZMBoscNLyjnY2"
+        "3NL7dd6X6316xu6JtJj6cHwAhHrXwZC4SdBU9TUDUUhfAkB8cSoK"
+        "3NKK3QwQbAgMSmrHq4wpgqEwXp5pd9B18CMQjgYsjKTdq8CAsuM6"
+        "3NKYjQ6h8xw8RdYvGk8Rc3NnNQHLXjRczUDDZLCXkTJsZFHDhsH6"
+        "3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL"
+    )
+
+    # check orphan blocks were not ingested
+    # each query should fail with an error
+    echo '========== vvv ERRORS LOGGED vvv =========='
+    for orphan in "${orphan_blocks[@]}"; do
+        result=$(idxr blocks state-hash --state-hash $orphan)
+        assert "Block at state hash not present in store: $orphan" "$result"
+    done
+    echo '========== ^^^ ERRORS LOGGED ^^^ =========='
+}
+
 # ----
 # Main
 # ----
@@ -1702,6 +1733,7 @@ for test_name in "$@"; do
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;
+        "test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
         "test_load") test_load ;;
