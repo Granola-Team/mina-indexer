@@ -42,36 +42,14 @@ pub fn discovery(
     let mut recent_canonical_heights: BoundedStack<u32> =
         BoundedStack::new(canonical_threshold as usize);
 
-    while let Some(branch_candidate) = queue.pop_front() {
-        log_progress(branch_candidate.len() as u32, reporting_freq, &time);
-        if let Some(tip_candidate) = branch_candidate.last() {
-            let (height, state_hash) = extract_height_and_hash(tip_candidate);
-            let next_height = height + 1;
-            if let Some(next_tips) = tree_map.get(&(next_height)) {
-                let mut parent_found = false;
-                for possible_next_tip in next_tips {
-                    let prev_hash = PreviousStateHash::from_path(possible_next_tip)?.0;
-                    if prev_hash == state_hash {
-                        let mut next_branch_candidate = branch_candidate.clone();
-                        next_branch_candidate.push(possible_next_tip);
-                        queue.push_back(next_branch_candidate);
-                        parent_found = true;
-                    }
-                }
-                if parent_found {
-                    if !recent_canonical_heights
-                        .clone()
-                        .into_vec()
-                        .contains(&next_height)
-                    {
-                        recent_canonical_heights.push(next_height);
-                    }
-                    canonical_branch.clear();
-                    canonical_branch.extend(branch_candidate);
-                }
-            }
-        }
-    }
+    find_best_tip(
+        &mut queue,
+        &mut canonical_branch,
+        &mut tree_map,
+        &mut recent_canonical_heights,
+        &time,
+        reporting_freq,
+    );
 
     let recent_paths = split_off_recent_paths(
         &mut canonical_branch,
@@ -92,6 +70,47 @@ pub fn discovery(
         recent_paths.into_iter().cloned().collect::<Vec<_>>(),
         orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
     ))
+}
+
+fn find_best_tip<'a>(
+    queue: &mut VecDeque<Vec<&'a PathBuf>>,
+    canonical_branch: &mut Vec<&'a PathBuf>,
+    tree_map: &mut HashMap<u32, Vec<&'a PathBuf>>,
+    recent_canonical_heights: &mut BoundedStack<u32>,
+    time: &std::time::Instant,
+    reporting_freq: u32,
+) {
+    while let Some(branch_candidate) = queue.pop_front() {
+        log_progress(branch_candidate.len() as u32, reporting_freq, time);
+        if let Some(tip_candidate) = branch_candidate.last() {
+            let (height, state_hash) = extract_height_and_hash(tip_candidate);
+            let next_height = height + 1;
+            if let Some(next_tips) = tree_map.get(&(next_height)) {
+                let mut parent_found = false;
+                for possible_next_tip in next_tips {
+                    if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
+                        if prev_hash.0 == state_hash {
+                            let mut next_branch_candidate = branch_candidate.clone();
+                            next_branch_candidate.push(possible_next_tip);
+                            queue.push_back(next_branch_candidate);
+                            parent_found = true;
+                        }
+                    }
+                }
+                if parent_found {
+                    if !recent_canonical_heights
+                        .clone()
+                        .into_vec()
+                        .contains(&next_height)
+                    {
+                        recent_canonical_heights.push(next_height);
+                    }
+                    canonical_branch.clear();
+                    canonical_branch.extend(branch_candidate);
+                }
+            }
+        }
+    }
 }
 
 fn get_orphaned_paths<'a>(
