@@ -54,7 +54,6 @@ pub fn discovery(
                     if prev_hash == state_hash {
                         let mut next_branch_candidate = branch_candidate.clone();
                         next_branch_candidate.push(possible_next_tip);
-                        canonical_branch = next_branch_candidate.clone();
                         queue.push_back(next_branch_candidate);
                         parent_found = true;
                     }
@@ -66,6 +65,8 @@ pub fn discovery(
                         .contains(&next_height)
                 {
                     recent_canonical_heights.push(next_height);
+                    canonical_branch.clear();
+                    canonical_branch.extend(branch_candidate);
                 }
             }
         }
