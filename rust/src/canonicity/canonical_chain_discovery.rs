@@ -73,42 +73,13 @@ pub fn discovery(
         }
     }
 
-    let recent_heights_vec = recent_canonical_heights.into_vec();
-    let (mut recent_paths, recent_paths_set) =
-        if let Some(&split_height) = recent_heights_vec.first() {
-            if let Some(split_index) = canonical_branch
-                .iter()
-                .rposition(|path| extract_block_height(path) <= split_height)
-            {
-                let recent_paths = canonical_branch.split_off(split_index);
-                let recent_paths_set: HashSet<&PathBuf> = recent_paths.iter().copied().collect();
-                (recent_paths, recent_paths_set)
-            } else {
-                (vec![], HashSet::new())
-            }
-        } else {
-            (vec![], HashSet::new())
-        };
+    let recent_paths = split_off_recent_paths(
+        &mut canonical_branch,
+        &mut tree_map,
+        recent_canonical_heights.into_vec(),
+    );
 
-    recent_paths.extend(recent_heights_vec.iter().flat_map(|&height| {
-        tree_map
-            .remove(&height)
-            .into_iter()
-            .flatten()
-            .filter(|path| !recent_paths_set.contains(path))
-    }));
-    sort_by_height_and_lexicographical_order(&mut recent_paths);
-
-    let canonical_set: HashSet<&PathBuf> = canonical_branch.iter().copied().collect();
-    let mut orphaned_paths: Vec<&PathBuf> = tree_map
-        .drain()
-        .flat_map(|(_, paths)| {
-            paths
-                .into_iter()
-                .filter(|path| !canonical_set.contains(path))
-        })
-        .collect();
-    sort_by_height_and_lexicographical_order(&mut orphaned_paths);
+    let orphaned_paths = get_orphaned_paths(&canonical_branch, &mut tree_map);
 
     info!(
         "Found {} blocks in the canonical chain in {:?}",
@@ -121,6 +92,53 @@ pub fn discovery(
         recent_paths.into_iter().cloned().collect::<Vec<_>>(),
         orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
     ))
+}
+
+fn get_orphaned_paths<'a>(
+    canonical_branch: &[&'a PathBuf],
+    tree_map: &mut HashMap<u32, Vec<&'a PathBuf>>,
+) -> Vec<&'a PathBuf> {
+    let canonical_set: HashSet<&PathBuf> = canonical_branch.iter().copied().collect();
+    let mut orphaned_paths: Vec<&PathBuf> = tree_map
+        .drain()
+        .flat_map(|(_, paths)| {
+            paths
+                .into_iter()
+                .filter(|path| !canonical_set.contains(path))
+        })
+        .collect();
+    sort_by_height_and_lexicographical_order(&mut orphaned_paths);
+    orphaned_paths
+}
+
+fn split_off_recent_paths<'a>(
+    canonical_branch: &mut Vec<&'a PathBuf>,
+    tree_map: &mut HashMap<u32, Vec<&'a PathBuf>>,
+    recent_heights: Vec<u32>,
+) -> Vec<&'a PathBuf> {
+    let (mut recent_paths, recent_paths_set) = if let Some(&split_height) = recent_heights.first() {
+        if let Some(split_index) = canonical_branch
+            .iter()
+            .rposition(|path| extract_block_height(path) <= split_height)
+        {
+            let recent_paths = canonical_branch.split_off(split_index);
+            let recent_paths_set: HashSet<&PathBuf> = recent_paths.iter().copied().collect();
+            (recent_paths, recent_paths_set)
+        } else {
+            (vec![], HashSet::new())
+        }
+    } else {
+        (vec![], HashSet::new())
+    };
+    recent_paths.extend(recent_heights.iter().flat_map(|&height| {
+        tree_map
+            .remove(&height)
+            .into_iter()
+            .flatten()
+            .filter(|path| !recent_paths_set.contains(path))
+    }));
+    sort_by_height_and_lexicographical_order(&mut recent_paths);
+    recent_paths
 }
 
 fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
