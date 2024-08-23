@@ -1,10 +1,13 @@
 use crate::{
-    block::{extract_block_height, extract_height_and_hash, previous_state_hash::*},
+    block::{
+        extract_block_height, extract_height_and_hash, previous_state_hash::*,
+        sort_by_height_and_lexicographical_order,
+    },
     collection::bounded_stack::BoundedStack,
 };
 use log::info;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::PathBuf,
 };
 
@@ -31,48 +34,99 @@ pub fn discovery(
 
     if let Some(root_files) = tree_map.get(&lowest_precomputed_block_height) {
         for root_file in root_files {
-            queue.push_back(vec![root_file.to_owned()]);
+            let branch_candidate = vec![root_file.to_owned()];
+            queue.push_back(branch_candidate);
         }
     }
 
-    let mut orphaned_paths: Vec<&PathBuf> = vec![];
-    let mut recent_paths: BoundedStack<&PathBuf> = BoundedStack::new(canonical_threshold as usize);
+    let mut recent_canonical_heights: BoundedStack<u32> =
+        BoundedStack::new(canonical_threshold as usize);
 
-    while let Some(canonical_branch_copy) = queue.pop_front() {
-        log_progress(canonical_branch.len() as u32, reporting_freq, &time);
-        if let Some(current_tip) = canonical_branch_copy.last() {
-            let (height, state_hash) = extract_height_and_hash(current_tip);
-            if let Some(possible_next_tips) = tree_map.get(&(height + 1)) {
-                for possible_next_tip in possible_next_tips {
+    while let Some(branch_candidate) = queue.pop_front() {
+        log_progress(branch_candidate.len() as u32, reporting_freq, &time);
+        if let Some(tip_candidate) = branch_candidate.last() {
+            let (height, state_hash) = extract_height_and_hash(tip_candidate);
+            let next_height = height + 1;
+            if let Some(next_tips) = tree_map.get(&(next_height)) {
+                let mut parent_found = false;
+                for possible_next_tip in next_tips {
                     let prev_hash = PreviousStateHash::from_path(possible_next_tip)?.0;
                     if prev_hash == state_hash {
-                        let mut next_canonical_branch = canonical_branch_copy.clone();
-                        if let Some(next_confirmed_tip) = recent_paths.push(possible_next_tip) {
-                            next_canonical_branch.push(next_confirmed_tip);
-                        }
-                        canonical_branch = next_canonical_branch.clone();
-                        queue.push_back(next_canonical_branch.clone());
-                    } else {
-                        orphaned_paths.push(possible_next_tip);
+                        let mut next_branch_candidate = branch_candidate.clone();
+                        next_branch_candidate.push(possible_next_tip);
+                        canonical_branch = next_branch_candidate.clone();
+                        queue.push_back(next_branch_candidate);
+                        parent_found = true;
                     }
+                }
+                if parent_found
+                    && !recent_canonical_heights
+                        .clone()
+                        .into_vec()
+                        .contains(&next_height)
+                {
+                    recent_canonical_heights.push(next_height);
                 }
             }
         }
     }
 
+    let recent_heights_vec = recent_canonical_heights.clone().into_vec();
+    let mut recent_paths: Vec<&PathBuf> = vec![];
+    let mut recent_paths_set: HashSet<&PathBuf> = HashSet::new();
+
+    if let Some(split_height) = recent_heights_vec.first() {
+        if let Some(split_index) = canonical_branch
+            .iter()
+            .rposition(|path| &extract_block_height(path) <= split_height)
+        {
+            recent_paths = canonical_branch.split_off(split_index);
+            recent_paths_set = recent_paths.clone().into_iter().collect();
+        }
+    }
+
+    recent_paths.append(
+        &mut recent_heights_vec
+            .iter()
+            .flat_map(|height| {
+                let mut res = vec![];
+                if let Some(paths) = tree_map.remove(height) {
+                    for path in paths {
+                        if !recent_paths_set.contains(path) {
+                            res.push(path);
+                        }
+                    }
+                }
+                res
+            })
+            .collect::<Vec<&PathBuf>>(),
+    );
+    sort_by_height_and_lexicographical_order(&mut recent_paths);
+
+    let canonical_set: HashSet<&PathBuf> = canonical_branch.clone().into_iter().collect();
+    let mut orphaned_paths: Vec<&PathBuf> = tree_map
+        .drain()
+        .flat_map(|(_, paths)| {
+            let mut res = vec![];
+            for path in paths {
+                if !canonical_set.contains(&path) {
+                    res.push(path);
+                }
+            }
+            res
+        })
+        .collect();
+    sort_by_height_and_lexicographical_order(&mut orphaned_paths);
+
     info!(
         "Found {} blocks in the canonical chain in {:?}",
-        canonical_branch.len() + recent_paths.clone().into_vec().len(),
+        canonical_branch.len() + recent_paths.len(),
         time.elapsed(),
     );
 
     Ok((
         canonical_branch.into_iter().cloned().collect::<Vec<_>>(),
-        recent_paths
-            .into_vec()
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>(),
+        recent_paths.into_iter().cloned().collect::<Vec<_>>(),
         orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
     ))
 }
