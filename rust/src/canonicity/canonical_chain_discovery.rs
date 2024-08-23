@@ -141,11 +141,20 @@ fn split_off_recent_paths<'a>(
     recent_paths
 }
 
+fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
+    if length_of_chain % reporting_freq == 0 {
+        info!(
+            "Found {} deep canonical blocks in {:?}",
+            length_of_chain,
+            time.elapsed()
+        );
+    }
+}
+
 #[cfg(test)]
 mod discovery_algorithm_tests {
     use super::*;
-    use std::collections::HashMap;
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
     #[test]
     fn test_get_orphaned_paths() {
@@ -233,16 +242,6 @@ mod discovery_algorithm_tests {
         assert_eq!(
             canonical_refs,
             expected_canonical_branch.iter().collect::<Vec<&PathBuf>>()
-        );
-    }
-}
-
-fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
-    if length_of_chain % reporting_freq == 0 {
-        info!(
-            "Found {} deep canonical blocks in {:?}",
-            length_of_chain,
-            time.elapsed()
         );
     }
 }
