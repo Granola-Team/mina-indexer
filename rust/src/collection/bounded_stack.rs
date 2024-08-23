@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BoundedStack<T> {
     deque: VecDeque<T>,
     capacity: usize,
@@ -112,5 +112,16 @@ mod tests {
         assert_eq!(stack.pop(), Some(4));
         assert_eq!(stack.pop(), Some(3));
         assert_eq!(stack.pop(), None);
+    }
+
+    #[test]
+    fn test_vec_order() {
+        let mut stack = BoundedStack::new(3);
+        stack.push(1);
+        stack.push(2);
+        stack.push(3);
+        assert_eq!(stack.clone().into_vec(), vec![1, 2, 3]);
+        assert_eq!(stack.clone().into_vec().first(), Some(&1));
+        assert_eq!(stack.into_vec().last(), Some(&3));
     }
 }
