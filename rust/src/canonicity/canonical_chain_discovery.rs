@@ -86,18 +86,18 @@ fn find_best_tip<'a>(
             let (height, state_hash) = extract_height_and_hash(tip_candidate);
             let next_height = height + 1;
             if let Some(next_tips) = tree_map.get(&(next_height)) {
-                let mut parent_found = false;
+                let mut child_found = false;
                 for possible_next_tip in next_tips {
                     if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
                         if prev_hash.0 == state_hash {
                             let mut next_branch_candidate = branch_candidate.clone();
                             next_branch_candidate.push(possible_next_tip);
                             queue.push_back(next_branch_candidate);
-                            parent_found = true;
+                            child_found = true;
                         }
                     }
                 }
-                if parent_found {
+                if child_found {
                     if !recent_canonical_heights
                         .clone()
                         .into_vec()
