@@ -39,7 +39,8 @@ pub fn discovery(
         }
     }
 
-    let mut recent_heights: BoundedStack<u32> = BoundedStack::new(canonical_threshold as usize);
+    let mut recent_canonical_heights: BoundedStack<u32> =
+        BoundedStack::new(canonical_threshold as usize);
 
     while let Some(branch_candidate) = queue.pop_front() {
         log_progress(branch_candidate.len() as u32, reporting_freq, &time);
@@ -47,9 +48,7 @@ pub fn discovery(
             let (height, state_hash) = extract_height_and_hash(tip_candidate);
             let next_height = height + 1;
             if let Some(next_tips) = tree_map.get(&(next_height)) {
-                if !recent_heights.clone().into_vec().contains(&next_height) {
-                    recent_heights.push(next_height);
-                }
+                let mut parent_found = false;
                 for possible_next_tip in next_tips {
                     let prev_hash = PreviousStateHash::from_path(possible_next_tip)?.0;
                     if prev_hash == state_hash {
@@ -57,13 +56,22 @@ pub fn discovery(
                         next_branch_candidate.push(possible_next_tip);
                         canonical_branch = next_branch_candidate.clone();
                         queue.push_back(next_branch_candidate);
+                        parent_found = true;
                     }
+                }
+                if parent_found
+                    && !recent_canonical_heights
+                        .clone()
+                        .into_vec()
+                        .contains(&next_height)
+                {
+                    recent_canonical_heights.push(next_height);
                 }
             }
         }
     }
 
-    let recent_heights_vec = recent_heights.clone().into_vec();
+    let recent_heights_vec = recent_canonical_heights.clone().into_vec();
     let mut recent_paths: Vec<&PathBuf> = vec![];
     let mut recent_paths_set: HashSet<&PathBuf> = HashSet::new();
 

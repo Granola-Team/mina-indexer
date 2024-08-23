@@ -63,6 +63,8 @@ async fn missing_parent() -> anyhow::Result<()> {
     )
     .await?;
 
+    println!("{:#?}", block_parser.paths());
+
     while let Some((block, _)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
