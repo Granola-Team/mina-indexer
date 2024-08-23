@@ -71,49 +71,39 @@ pub fn discovery(
         }
     }
 
-    let recent_heights_vec = recent_canonical_heights.clone().into_vec();
-    let mut recent_paths: Vec<&PathBuf> = vec![];
-    let mut recent_paths_set: HashSet<&PathBuf> = HashSet::new();
+    let recent_heights_vec = recent_canonical_heights.into_vec();
+    let (mut recent_paths, recent_paths_set) =
+        if let Some(&split_height) = recent_heights_vec.first() {
+            if let Some(split_index) = canonical_branch
+                .iter()
+                .rposition(|path| extract_block_height(path) <= split_height)
+            {
+                let recent_paths = canonical_branch.split_off(split_index);
+                let recent_paths_set: HashSet<&PathBuf> = recent_paths.iter().copied().collect();
+                (recent_paths, recent_paths_set)
+            } else {
+                (vec![], HashSet::new())
+            }
+        } else {
+            (vec![], HashSet::new())
+        };
 
-    if let Some(split_height) = recent_heights_vec.first() {
-        if let Some(split_index) = canonical_branch
-            .iter()
-            .rposition(|path| &extract_block_height(path) <= split_height)
-        {
-            recent_paths = canonical_branch.split_off(split_index);
-            recent_paths_set = recent_paths.clone().into_iter().collect();
-        }
-    }
-
-    recent_paths.append(
-        &mut recent_heights_vec
-            .iter()
-            .flat_map(|height| {
-                let mut res = vec![];
-                if let Some(paths) = tree_map.remove(height) {
-                    for path in paths {
-                        if !recent_paths_set.contains(path) {
-                            res.push(path);
-                        }
-                    }
-                }
-                res
-            })
-            .collect::<Vec<&PathBuf>>(),
-    );
+    recent_paths.extend(recent_heights_vec.iter().flat_map(|&height| {
+        tree_map
+            .remove(&height)
+            .into_iter()
+            .flatten()
+            .filter(|path| !recent_paths_set.contains(path))
+    }));
     sort_by_height_and_lexicographical_order(&mut recent_paths);
 
-    let canonical_set: HashSet<&PathBuf> = canonical_branch.clone().into_iter().collect();
+    let canonical_set: HashSet<&PathBuf> = canonical_branch.iter().copied().collect();
     let mut orphaned_paths: Vec<&PathBuf> = tree_map
         .drain()
         .flat_map(|(_, paths)| {
-            let mut res = vec![];
-            for path in paths {
-                if !canonical_set.contains(&path) {
-                    res.push(path);
-                }
-            }
-            res
+            paths
+                .into_iter()
+                .filter(|path| !canonical_set.contains(path))
         })
         .collect();
     sort_by_height_and_lexicographical_order(&mut orphaned_paths);
