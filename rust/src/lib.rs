@@ -4,7 +4,6 @@ pub mod block;
 pub mod canonicity;
 pub mod chain;
 pub mod client;
-mod collection;
 pub mod command;
 pub mod constants;
 pub mod event;
