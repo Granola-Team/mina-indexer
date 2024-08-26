@@ -31,7 +31,7 @@ pub fn discovery(
 
     let orphaned_paths = get_orphaned_paths(&canonical_branch, &mut tree_map);
 
-    assert!(tree_map.is_empty(), "Not all paths have been categorized");
+    assert!(tree_map.is_empty(), "Not all paths have been discovered");
 
     info!(
         "Found {} blocks in the canonical chain in {:?}",
