@@ -124,7 +124,6 @@ fn split_off_recent_paths<'a>(
         .map(|p| extract_block_height(p))
         .unwrap_or_default();
     let mut recent_paths = canonical_branch.split_off(split_index);
-    println!("canonical path (recent) {:#?}", recent_paths);
     let mut recent_tree_map = tree_map.split_off(&split_height);
     let recent_paths_set: HashSet<&PathBuf> = recent_paths.clone().into_iter().collect();
     while let Some((_height, paths)) = recent_tree_map.pop_first() {
