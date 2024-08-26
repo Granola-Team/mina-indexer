@@ -24,12 +24,14 @@ pub fn discovery(
         tree_map.entry(height).or_default().push(path);
     }
 
-    let mut canonical_branch: Vec<&PathBuf> = find_best_tip(&mut tree_map, reporting_freq);
+    let mut canonical_branch: Vec<&PathBuf> = find_best_tip(&tree_map, reporting_freq);
 
     let recent_paths =
         split_off_recent_paths(&mut canonical_branch, &mut tree_map, canonical_threshold);
 
     let orphaned_paths = get_orphaned_paths(&canonical_branch, &mut tree_map);
+
+    assert!(tree_map.is_empty(), "Not all paths have been categorized");
 
     info!(
         "Found {} blocks in the canonical chain in {:?}",
@@ -45,7 +47,7 @@ pub fn discovery(
 }
 
 fn find_best_tip<'a>(
-    tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>,
+    tree_map: &BTreeMap<u32, Vec<&'a PathBuf>>,
     reporting_freq: u32,
 ) -> Vec<&'a PathBuf> {
     let time = std::time::Instant::now();
