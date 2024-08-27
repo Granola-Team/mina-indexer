@@ -53,7 +53,8 @@ impl StagedLedgerStore for IndexerStore {
         }
 
         apply_block_diffs.reverse();
-        let staged_account = self
+
+        let mut staged_account = self
             .database
             .get_cf(
                 self.staged_ledger_accounts_cf(),
@@ -62,17 +63,14 @@ impl StagedLedgerStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice::<Account>(&bytes).ok())
             .with_context(|| format!("pk {pk}, state hash {curr_state_hash}"))
             .expect("account exists");
-        let diff = LedgerDiff::append_vec(
-            apply_block_diffs
-                .iter()
-                .flat_map(|state_hash| self.get_block_ledger_diff(state_hash).ok().flatten())
-                .collect(),
-        );
-        let staged_account = staged_account.apply_ledger_diff(diff);
-        Ok(Some(Account {
-            balance: staged_account.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..staged_account
-        }))
+
+        for diff in apply_block_diffs
+            .iter()
+            .flat_map(|state_hash| self.get_block_ledger_diff(state_hash).ok().flatten())
+        {
+            staged_account = staged_account.apply_ledger_diff(&diff);
+        }
+        Ok(Some(staged_account))
     }
 
     fn get_staged_account_display(
@@ -93,50 +91,13 @@ impl StagedLedgerStore for IndexerStore {
         block_height: u32,
     ) -> anyhow::Result<Option<Account>> {
         trace!("Getting {pk} staged ledger account block height {block_height}");
-
-        // calculate account from canonical ancestor if needed
-        let mut curr_state_hash =
-            if let Some(curr_state_hash) = self.get_canonical_hash_at_height(block_height)? {
-                curr_state_hash
+        let state_hash =
+            if let Some(state_hash) = self.get_canonical_hash_at_height(block_height)? {
+                state_hash
             } else {
                 bail!("Missing canonical block at height {block_height}")
             };
-        let mut apply_block_diffs = vec![];
-
-        while self
-            .database
-            .get_cf(
-                self.staged_ledger_accounts_cf(),
-                staged_account_key(curr_state_hash.clone(), pk.clone()),
-            )?
-            .is_none()
-        {
-            if let Some(parent_hash) = self.get_block_parent_hash(&curr_state_hash)? {
-                apply_block_diffs.push(curr_state_hash.clone());
-                curr_state_hash = parent_hash;
-            } else {
-                bail!("Block {curr_state_hash} missing parent from store")
-            }
-        }
-
-        apply_block_diffs.reverse();
-        let staged_account = self
-            .database
-            .get_cf(
-                self.staged_ledger_accounts_cf(),
-                staged_account_key(curr_state_hash.clone(), pk.clone()),
-            )?
-            .and_then(|bytes| serde_json::from_slice::<Account>(&bytes).ok())
-            .with_context(|| format!("pk {pk}, state hash {curr_state_hash}"))
-            .expect("account exists");
-        let diff = LedgerDiff::append_vec(
-            apply_block_diffs
-                .iter()
-                .flat_map(|state_hash| self.get_block_ledger_diff(state_hash).ok().flatten())
-                .collect(),
-        );
-        let staged_account = staged_account.apply_ledger_diff(diff);
-        Ok(Some(staged_account.display()))
+        self.get_staged_account(pk, state_hash)
     }
 
     fn set_staged_account(
@@ -174,13 +135,6 @@ impl StagedLedgerStore for IndexerStore {
             self.staged_ledgers_persisted_cf(),
             state_hash.0.as_bytes(),
             b"",
-        )?;
-
-        // record block state hash
-        self.database.put_cf(
-            self.staged_ledger_hash_to_block_cf(),
-            ledger_hash.0.as_bytes(),
-            state_hash.0.as_bytes(),
         )?;
         Ok(is_new)
     }
@@ -314,7 +268,7 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
 
-        println!("Found staged ledger state hash {curr_state_hash}");
+        trace!("Found staged ledger state hash {curr_state_hash}");
         if let Ok(Some(mut ledger)) = self.build_staged_ledger(&curr_state_hash) {
             // apply diffs
             diffs.reverse();
@@ -322,7 +276,7 @@ impl StagedLedgerStore for IndexerStore {
             ledger._apply_diff(&diff)?;
 
             if memoize {
-                println!("Memoizing ledger for block {state_hash}");
+                trace!("Memoizing ledger for block {state_hash}");
                 self.add_staged_ledger_at_state_hash(state_hash, ledger.clone())?;
             }
             return Ok(Some(ledger));
@@ -380,6 +334,11 @@ impl StagedLedgerStore for IndexerStore {
         staged_ledger_hash: &LedgerHash,
     ) -> anyhow::Result<()> {
         trace!("Setting block staged ledger hash {state_hash}: {staged_ledger_hash}");
+        self.database.put_cf(
+            self.staged_ledger_hash_to_block_cf(),
+            staged_ledger_hash.0.as_bytes(),
+            state_hash.0.as_bytes(),
+        )?;
         Ok(self.database.put_cf(
             self.block_staged_ledger_hash_cf(),
             state_hash.0.as_bytes(),
@@ -405,7 +364,10 @@ impl StagedLedgerStore for IndexerStore {
         trace!("Getting staged ledger {ledger_hash} block state hash");
         Ok(self
             .database
-            .get_cf(self.block_staged_ledger_hash_cf(), ledger_hash.0.as_bytes())?
+            .get_cf(
+                self.staged_ledger_hash_to_block_cf(),
+                ledger_hash.0.as_bytes(),
+            )?
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 

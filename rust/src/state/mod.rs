@@ -370,7 +370,7 @@ impl IndexerState {
         info!("Initializing indexer with canonical chain blocks");
         let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            let mut ledger_diff = LedgerDiff::default();
+            let mut ledger_diffs = vec![];
 
             if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
@@ -392,9 +392,9 @@ impl IndexerState {
                     let state_hash = block.state_hash();
                     self.bytes_processed += block_bytes;
 
-                    // aggregate diffs, apply, and add to db
+                    // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
-                    ledger_diff.append(diff);
+                    ledger_diffs.push(diff.clone());
 
                     indexer_store.add_block(&block, block_bytes)?;
                     indexer_store.set_best_block(&block.state_hash())?;
@@ -408,16 +408,19 @@ impl IndexerState {
 
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
-                        self.ledger._apply_diff(&ledger_diff)?;
-                        ledger_diff = LedgerDiff::default();
+                        for diff in ledger_diffs.iter() {
+                            self.ledger._apply_diff(diff)?;
+                        }
+
+                        ledger_diffs.clear();
                         indexer_store
                             .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
+                    // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
-                        // update root branch on last deep canonical block
                         self.root_branch = Branch::new(&block)?;
-                        self.ledger._apply_diff(&ledger_diff)?;
+                        self.ledger._apply_diff(&diff)?;
                         self.best_tip = Tip {
                             state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
