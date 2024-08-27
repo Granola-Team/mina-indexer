@@ -19,6 +19,7 @@ async fn add_and_get() -> anyhow::Result<()> {
         blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;

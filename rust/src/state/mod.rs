@@ -153,6 +153,7 @@ pub struct IndexerStateConfig {
     pub canonical_update_threshold: u32,
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
+    pub do_not_ingest_orphan_blocks: bool,
 }
 
 impl IndexerStateConfig {
@@ -162,6 +163,7 @@ impl IndexerStateConfig {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        do_not_ingest_orphan_blocks: bool,
     ) -> Self {
         IndexerStateConfig {
             version,
@@ -169,6 +171,7 @@ impl IndexerStateConfig {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            do_not_ingest_orphan_blocks,
             genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
@@ -185,6 +188,7 @@ impl IndexerState {
         indexer_store: Arc<IndexerStore>,
         canonical_threshold: u32,
         transition_frontier_length: u32,
+        do_not_ingest_orphan_blocks: bool,
     ) -> anyhow::Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
@@ -192,6 +196,7 @@ impl IndexerState {
             indexer_store,
             canonical_threshold,
             transition_frontier_length,
+            do_not_ingest_orphan_blocks,
         ))
     }
 
@@ -461,6 +466,7 @@ impl IndexerState {
         let total_time = Instant::now();
         let offset = elapsed.unwrap_or(Duration::new(0, 0));
         let mut step_time = total_time;
+
         if block_parser.total_num_blocks > self.reporting_freq {
             info!(
                 "Reporting every {BLOCK_REPORTING_FREQ_SEC}s or {} blocks",

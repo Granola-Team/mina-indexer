@@ -69,6 +69,7 @@ async fn orphaned_blocks() -> anyhow::Result<()> {
         &log_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         MAINNET_TRANSITION_FRONTIER_K,
     )
     .await?;
