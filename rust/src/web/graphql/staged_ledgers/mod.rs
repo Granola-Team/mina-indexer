@@ -1,5 +1,8 @@
 use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
-use crate::ledger::{account::Account, store::staged::StagedLedgerStore};
+use crate::{
+    canonicity::store::CanonicityStore,
+    ledger::{account::Account, store::staged::StagedLedgerStore},
+};
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 
@@ -7,6 +10,7 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 pub struct StagedLedgerQueryInput {
     ledger_hash: Option<String>,
     state_hash: Option<String>,
+    public_key: Option<String>,
 
     #[graphql(name = "blockchain_length")]
     blockchain_length: Option<u32>,
@@ -37,7 +41,31 @@ impl StagedLedgerQueryRoot {
     ) -> Result<Option<Vec<StagedLedgerAccount>>> {
         let db = db(ctx);
 
-        // build the staged ledger from:
+        // pk staged account query
+        if let Some(pk) = query.as_ref().and_then(|q| q.public_key.clone()) {
+            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
+                return Ok(db
+                    .get_staged_account(pk.into(), state_hash.into())?
+                    .map(|acct| vec![acct.into()]));
+            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
+                if let Some(state_hash) =
+                    db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
+                {
+                    return Ok(db
+                        .get_staged_account(pk.into(), state_hash)?
+                        .map(|acct| vec![acct.into()]));
+                }
+            } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
+                if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
+                    return Ok(db
+                        .get_staged_account(pk.into(), state_hash)?
+                        .map(|acct| vec![acct.into()]));
+                }
+            }
+            return Ok(None);
+        }
+
+        // otherwise build the staged ledger from
         // - block state hash
         // - staged ledger hash
         // - canonical block height
@@ -119,18 +147,18 @@ pub struct StagedLedgerAccount {
 
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
-        // deduct fee for display
+        // deduct 1 MINA fee for display
         let balance_nanomina = acct.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0;
         let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
 
         Self {
+            balance_nanomina,
             nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,
             username: acct.username.map(|u| u.0),
             balance: decimal.to_f64().unwrap_or_default(),
-            balance_nanomina: decimal.to_u64().unwrap_or_default(),
         }
     }
 }

@@ -10,6 +10,37 @@ use crate::{
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::IteratorMode;
 
+#[derive(InputObject)]
+pub struct AccountQueryInput {
+    public_key: Option<String>,
+    username: Option<String>,
+    balance: Option<u64>,
+
+    #[graphql(name = "balance_gt")]
+    balance_gt: Option<u64>,
+
+    #[graphql(name = "balance_gte")]
+    balance_gte: Option<u64>,
+
+    #[graphql(name = "balance_lt")]
+    balance_lt: Option<u64>,
+
+    #[graphql(name = "balance_lte")]
+    balance_lte: Option<u64>,
+
+    #[graphql(name = "balance_ne")]
+    balance_ne: Option<u64>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum AccountSortByInput {
+    BalanceAsc,
+    BalanceDesc,
+}
+
+#[derive(Default)]
+pub struct AccountQueryRoot;
+
 #[derive(SimpleObject)]
 pub struct Account {
     public_key: String,
@@ -47,39 +78,6 @@ pub struct Account {
     #[graphql(name = "pk_total_num_internal_commands")]
     pk_total_num_internal_commands: u32,
 }
-
-#[derive(InputObject)]
-pub struct AccountQueryInput {
-    public_key: Option<String>,
-
-    username: Option<String>,
-
-    balance: Option<u64>,
-
-    #[graphql(name = "balance_gt")]
-    balance_gt: Option<u64>,
-
-    #[graphql(name = "balance_gte")]
-    balance_gte: Option<u64>,
-
-    #[graphql(name = "balance_lt")]
-    balance_lt: Option<u64>,
-
-    #[graphql(name = "balance_lte")]
-    balance_lte: Option<u64>,
-
-    #[graphql(name = "balance_ne")]
-    balance_ne: Option<u64>,
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum AccountSortByInput {
-    BalanceAsc,
-    BalanceDesc,
-}
-
-#[derive(Default)]
-pub struct AccountQueryRoot;
 
 #[Object]
 impl AccountQueryRoot {
