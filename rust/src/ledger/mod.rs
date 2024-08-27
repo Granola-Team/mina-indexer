@@ -21,6 +21,7 @@ use crate::{
     },
 };
 use anyhow::bail;
+use diff::account::AccountDiff;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,6 +42,10 @@ impl Ledger {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn get_account(&mut self, pk: &PublicKey) -> Option<&Account> {
+        self.accounts.get(pk)
     }
 }
 
@@ -118,15 +123,21 @@ impl Ledger {
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
-            let pk = acct_diff.public_key();
-            if let Some(account) = self
-                .accounts
-                .remove(&pk)
-                .or(Some(Account::empty(pk.clone())))
-            {
-                self.accounts
-                    .insert(pk, account.apply_account_diff(acct_diff));
-            }
+            self._apply_account_diff(acct_diff)?;
+        }
+        Ok(())
+    }
+
+    /// Apply an account diff to a mutable ledger
+    pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
+        let pk = acct_diff.public_key();
+        if let Some(account) = self
+            .accounts
+            .remove(&pk)
+            .or(Some(Account::empty(pk.clone())))
+        {
+            self.accounts
+                .insert(pk, account.clone().apply_account_diff(acct_diff));
         }
         Ok(())
     }

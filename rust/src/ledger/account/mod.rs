@@ -262,11 +262,11 @@ impl Account {
     pub fn payment_unapply(self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => Account {
-                balance: self.balance.sub(payment_diff.amount),
+                balance: self.balance - payment_diff.amount,
                 ..self
             },
             UpdateType::Debit(nonce) => Self {
-                balance: self.balance.add(payment_diff.amount),
+                balance: self.balance + payment_diff.amount,
                 nonce: nonce.or(self.nonce).map(|n| n - 1),
                 ..self
             },
@@ -358,11 +358,8 @@ impl Account {
         }
     }
 
-    pub fn failed_transaction_unapply(self) -> Self {
-        Account {
-            nonce: self.nonce.map(|n| n - 1),
-            ..self
-        }
+    pub fn failed_transaction_unapply(self, nonce: Option<Nonce>) -> Self {
+        Account { nonce, ..self }
     }
 
     pub fn delegation_unapply(self, delegate: PublicKey, nonce: Option<Nonce>) -> Self {
@@ -412,15 +409,24 @@ impl Account {
             AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
                 self.payment_unapply(fee_transfer_diff)
             }
-            AccountDiff::FailedTransactionNonce(_) => self.failed_transaction_unapply(),
+            AccountDiff::FailedTransactionNonce(diff) => {
+                self.failed_transaction_unapply(if diff.nonce.0 > 0 {
+                    Some(diff.nonce - 1)
+                } else {
+                    None
+                })
+            }
         })
     }
 
     /// Apply a ledger diff to an account
-    pub fn apply_ledger_diff(self, diff: LedgerDiff) -> Self {
+    pub fn apply_ledger_diff(self, diff: &LedgerDiff) -> Self {
+        let pk = self.public_key.clone();
         let mut acct = self;
         for acct_diff in diff.account_diffs.iter().flatten() {
-            acct = acct.apply_account_diff(acct_diff);
+            if acct_diff.public_key() == pk {
+                acct = acct.apply_account_diff(acct_diff);
+            }
         }
         acct
     }
