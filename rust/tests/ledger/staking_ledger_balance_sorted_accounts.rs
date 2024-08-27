@@ -26,6 +26,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         10,
+        false,
     )?;
     let epoch = 0;
 

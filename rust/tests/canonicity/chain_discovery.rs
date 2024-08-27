@@ -15,6 +15,7 @@ async fn gaps() -> anyhow::Result<()> {
         &blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
@@ -37,6 +38,7 @@ async fn contiguous() -> anyhow::Result<()> {
         &blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
@@ -59,6 +61,7 @@ async fn missing_parent() -> anyhow::Result<()> {
         &blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
@@ -92,6 +95,7 @@ async fn one_block() -> anyhow::Result<()> {
         &blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
@@ -109,6 +113,7 @@ async fn canonical_threshold() -> anyhow::Result<()> {
         &blocks_dir,
         PcbVersion::V1,
         canonical_threshold,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;

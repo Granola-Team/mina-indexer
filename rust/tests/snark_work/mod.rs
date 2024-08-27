@@ -23,12 +23,14 @@ async fn store() -> anyhow::Result<()> {
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        false,
     )?;
 
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;

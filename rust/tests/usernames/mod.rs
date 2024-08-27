@@ -23,6 +23,7 @@ async fn set_usernames() -> anyhow::Result<()> {
         blocks_dir,
         IndexerVersion::default().version,
         MAINNET_CANONICAL_THRESHOLD,
+        false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
@@ -32,6 +33,7 @@ async fn set_usernames() -> anyhow::Result<()> {
         store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        false,
     )?;
 
     // ingest the blocks
