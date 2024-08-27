@@ -7,33 +7,15 @@ use super::{
 };
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE},
-    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
+    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    ledger::{amount::Amount, diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::ZkappAccount,
-    utility::functions::nanomina_to_mina,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
     ops::{Add, Sub},
 };
-
-#[derive(
-    Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
-)]
-pub struct Amount(pub u64);
-
-impl Amount {
-    pub fn new(amount: u64) -> Self {
-        Self(amount * MINA_SCALE)
-    }
-}
-
-impl ToString for Amount {
-    fn to_string(&self) -> String {
-        nanomina_to_mina(self.0)
-    }
-}
 
 #[derive(
     PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize, PartialOrd, Ord, Hash,
@@ -486,7 +468,8 @@ impl std::fmt::Debug for Account {
 
 #[cfg(test)]
 mod test {
-    use super::{Account, Amount};
+    use super::Account;
+    use crate::ledger::amount::Amount;
 
     #[test]
     fn test_account_display() -> anyhow::Result<()> {
