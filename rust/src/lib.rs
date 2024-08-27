@@ -16,7 +16,6 @@ pub mod snark_work;
 pub mod state;
 pub mod store;
 pub mod unix_socket_server;
-pub mod utility;
 pub mod web;
 
 #[cfg(target_family = "unix")]

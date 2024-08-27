@@ -3,13 +3,16 @@ use crate::{
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::VERSION,
-    ledger::{account::Amount, store::best::BestLedgerStore, LedgerHash},
+    ledger::{
+        account::{nanomina_to_mina, Amount},
+        store::best::BestLedgerStore,
+        LedgerHash,
+    },
     snark_work::store::SnarkStore,
     store::{
         version::{IndexerStoreVersion, VersionStore},
         IndexerStore,
     },
-    utility::functions::nanomina_to_mina,
     web::rest::locked_balances::LockedBalances,
 };
 use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};

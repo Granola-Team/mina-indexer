@@ -597,7 +597,7 @@ mod test {
         block::{parser::BlockParser, precomputed::PcbVersion},
         command::decode_memo,
         constants::*,
-        utility::functions::nanomina_to_mina,
+        ledger::account::nanomina_to_mina,
     };
     use std::path::PathBuf;
 

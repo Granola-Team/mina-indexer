@@ -10,8 +10,8 @@ use crate::{
     constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE},
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::ZkappAccount,
-    utility::functions::nanomina_to_mina,
 };
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -463,6 +463,24 @@ impl Ord for Account {
     }
 }
 
+/// Converts Nanomina to Mina, strips any trailing zeros, and converts -0 to 0.
+/// This function takes a value in Nanomina, converts it to Mina by adjusting
+/// the scale, normalizes the decimal representation to remove trailing zeros,
+/// and converts any `-0` representation to `0`.
+///
+/// # Arguments
+///
+/// * `nanomina` - The amount in Nanomina to be converted.
+///
+/// # Returns
+///
+/// A `String` representing the value in Mina with trailing zeros removed.
+pub fn nanomina_to_mina(nanomina: u64) -> String {
+    let mut dec = Decimal::from(nanomina);
+    dec.set_scale(9).unwrap();
+    dec.normalize().to_string()
+}
+
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -487,6 +505,18 @@ impl std::fmt::Debug for Account {
 #[cfg(test)]
 mod test {
     use super::{Account, Amount};
+    use crate::ledger::account::nanomina_to_mina;
+
+    #[test]
+    fn test_nanomina_to_mina_conversion() {
+        let actual = 1_000_000_001;
+        let val = nanomina_to_mina(actual);
+        assert_eq!("1.000000001", val);
+
+        let actual = 1_000_000_000;
+        let val = nanomina_to_mina(actual);
+        assert_eq!("1", val);
+    }
 
     #[test]
     fn test_account_display() -> anyhow::Result<()> {
