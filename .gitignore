@@ -24,3 +24,6 @@ database/
 
 # Emacs project preferences
 .dir-locals.el
+
+# tier3 blocks
+files-to-fetch.list
