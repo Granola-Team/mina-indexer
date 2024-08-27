@@ -14,7 +14,7 @@ use crate::{
         },
         Ledger,
     },
-    store::{fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, u64_prefix_key, IndexerStore},
+    store::{b64_prefix_key, fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
@@ -58,7 +58,7 @@ impl BestLedgerStore for IndexerStore {
                     .delete_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?;
                 self.database.delete_cf(
                     self.best_ledger_accounts_balance_sort_cf(),
-                    u64_prefix_key(acct.balance.0, &pk.0),
+                    b64_prefix_key(acct.balance.0, &pk.0),
                 )?;
             }
             return Ok(());
@@ -72,7 +72,7 @@ impl BestLedgerStore for IndexerStore {
             // delete stale balance sorting data
             self.database.delete_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                u64_prefix_key(acct.balance.0, &pk.0),
+                b64_prefix_key(acct.balance.0, &pk.0),
             )?;
         }
         self.database.put_cf(
@@ -82,7 +82,7 @@ impl BestLedgerStore for IndexerStore {
         )?;
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
-            u64_prefix_key(balance, &pk.0),
+            b64_prefix_key(balance, &pk.0),
             serde_json::to_vec(&account)?,
         )?;
         Ok(())

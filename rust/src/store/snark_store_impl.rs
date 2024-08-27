@@ -5,7 +5,7 @@ use crate::{
     snark_work::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
-    store::{from_be_bytes, to_be_bytes, u32_prefix_key, u64_prefix_key, IndexerStore},
+    store::{b64_prefix_key, from_be_bytes, to_be_bytes, u32_prefix_key, IndexerStore},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
@@ -215,7 +215,7 @@ impl SnarkStore for IndexerStore {
                 // delete the stale data
                 self.database.delete_cf(
                     self.snark_top_producers_sort_cf(),
-                    u64_prefix_key(old_total, &snark.prover.0),
+                    b64_prefix_key(old_total, &snark.prover.0),
                 )?
             }
         }
@@ -223,7 +223,7 @@ impl SnarkStore for IndexerStore {
         // replace stale data with updated
         for (prover, (old_total, new_fees)) in prover_fees.iter() {
             let total_fees = old_total + new_fees;
-            let key = u64_prefix_key(total_fees, &prover.0);
+            let key = b64_prefix_key(total_fees, &prover.0);
             self.database
                 .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
         }
