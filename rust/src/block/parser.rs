@@ -63,12 +63,14 @@ impl BlockParser {
         blocks_dir: &Path,
         version: PcbVersion,
         canonical_threshold: u32,
+        do_not_ingest_orphan_blocks: bool,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         Self::with_canonical_chain_discovery(
             blocks_dir,
             version,
             canonical_threshold,
+            do_not_ingest_orphan_blocks,
             reporting_freq,
         )
         .await
@@ -158,6 +160,7 @@ impl BlockParser {
         blocks_dir: &Path,
         version: PcbVersion,
         canonical_threshold: u32,
+        do_not_ingest_orphan_blocks: bool,
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         info!("Block parser with canonical chain discovery");
@@ -187,7 +190,11 @@ impl BlockParser {
                     total_num_blocks: paths.len() as u32,
                     canonical_paths: canonical_paths.into_iter(),
                     recent_paths: recent_paths.into_iter(),
-                    orphaned_paths: orphaned_paths.into_iter(),
+                    orphaned_paths: if do_not_ingest_orphan_blocks {
+                        vec![].into_iter()
+                    } else {
+                        orphaned_paths.into_iter()
+                    },
                 })
             } else {
                 Ok(Self::empty(&blocks_dir, &paths))

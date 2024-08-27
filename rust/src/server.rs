@@ -256,6 +256,7 @@ async fn initialize(
                     blocks_dir,
                     version,
                     canonical_threshold,
+                    do_not_ingest_orphan_blocks,
                     reporting_freq,
                 )
                 .await

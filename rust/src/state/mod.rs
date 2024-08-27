@@ -109,9 +109,6 @@ pub struct IndexerState {
 
     /// Network blocks and staking ledgers to be processed
     pub version: IndexerVersion,
-
-    /// Do not ingest orphan blocks
-    do_not_ingest_orphan_blocks: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -273,7 +270,6 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
-            do_not_ingest_orphan_blocks: config.do_not_ingest_orphan_blocks,
         })
     }
 
@@ -306,7 +302,6 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashMap::new(),
-            do_not_ingest_orphan_blocks: config.do_not_ingest_orphan_blocks,
         })
     }
 
@@ -366,7 +361,6 @@ impl IndexerState {
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             staking_ledgers: HashMap::new(),
             version: IndexerVersion::default(),
-            do_not_ingest_orphan_blocks: false,
         })
     }
 
@@ -494,12 +488,6 @@ impl IndexerState {
                         Ok(Some((parsed_block, block_bytes))) => {
                             self.report_progress(block_parser, step_time, total_time)?;
                             step_time = Instant::now();
-
-                            // if not ingesting orphan blocks, only add canonical + recent blocks
-                            if self.do_not_ingest_orphan_blocks
-                                && self.blocks_processed > block_parser.num_deep_canonical_blocks + block_parser.num_recent_blocks {
-                                    break;
-                            }
 
                             match parsed_block {
                                 ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
