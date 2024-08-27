@@ -1,6 +1,5 @@
 use super::{
-    account::{Account, Nonce, Permissions, ReceiptChainHash, Timing, TokenPermissions},
-    amount::Amount,
+    account::{Account, Amount, Nonce, Permissions, ReceiptChainHash, Timing, TokenPermissions},
     public_key::PublicKey,
     Ledger,
 };

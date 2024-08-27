@@ -401,8 +401,7 @@ mod tests {
         command::{Command, Delegation, Payment},
         constants::MAINNET_COINBASE_REWARD,
         ledger::{
-            account::Nonce,
-            amount::Amount,
+            account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
             diff::LedgerDiff,
             PublicKey,

@@ -1,4 +1,4 @@
-use crate::ledger::amount::Amount;
+use crate::ledger::account::Amount;
 use chrono::{DateTime, SecondsFormat, Utc};
 
 // version
