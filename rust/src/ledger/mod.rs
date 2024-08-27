@@ -1,4 +1,5 @@
 pub mod account;
+pub mod amount;
 pub mod coinbase;
 pub mod diff;
 pub mod genesis;
@@ -11,7 +12,8 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
-        account::{Account, Amount, Nonce},
+        account::{Account, Nonce},
+        amount::Amount,
         diff::LedgerDiff,
         public_key::PublicKey,
     },
@@ -24,11 +26,7 @@ use anyhow::bail;
 use diff::account::AccountDiff;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    ops::{Add, Sub},
-    str::FromStr,
-};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
@@ -276,57 +274,6 @@ impl std::fmt::Debug for Ledger {
     }
 }
 
-impl Add<Amount> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: Amount) -> Self::Output {
-        Self(self.0.saturating_add(rhs.0))
-    }
-}
-
-impl Add<u64> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: u64) -> Self::Output {
-        Self(self.0.saturating_add(rhs))
-    }
-}
-
-impl Add<i64> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: i64) -> Self::Output {
-        let abs = rhs.unsigned_abs();
-        if rhs > 0 {
-            Self(self.0.saturating_add(abs))
-        } else {
-            Self(self.0.saturating_sub(abs))
-        }
-    }
-}
-
-impl Sub<Amount> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0.saturating_sub(rhs.0))
-    }
-}
-
-impl Sub<u64> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0.saturating_sub(rhs))
-    }
-}
-
-impl From<u64> for Amount {
-    fn from(value: u64) -> Self {
-        Amount(value)
-    }
-}
-
 pub fn is_valid_ledger_hash(input: &str) -> bool {
     let mut chars = input.chars();
     let c0 = chars.next();
@@ -351,7 +298,7 @@ mod tests {
     use crate::{
         block::BlockHash,
         constants::MINA_SCALE,
-        ledger::account::{Amount, Nonce},
+        ledger::{account::Nonce, amount::Amount},
     };
     use std::collections::{BTreeMap, HashMap};
 

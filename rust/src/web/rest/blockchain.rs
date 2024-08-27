@@ -3,7 +3,7 @@ use crate::{
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::VERSION,
-    ledger::{account::Amount, store::best::BestLedgerStore, LedgerHash},
+    ledger::{amount::Amount, store::best::BestLedgerStore, LedgerHash},
     snark_work::store::SnarkStore,
     store::{
         version::{IndexerStoreVersion, VersionStore},
