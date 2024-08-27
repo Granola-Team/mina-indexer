@@ -4,6 +4,7 @@ pub mod coinbase;
 pub mod diff;
 pub mod genesis;
 pub mod public_key;
+pub mod signed_amount;
 pub mod staking;
 pub mod store;
 pub mod username;
@@ -325,11 +326,13 @@ mod tests {
             account_diffs: vec![vec![
                 AccountDiff::Payment(PaymentDiff {
                     amount,
+                    signed_amount: None,
                     public_key: public_key.clone(),
                     update_type: UpdateType::Credit,
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     amount,
+                    signed_amount: None,
                     public_key: PublicKey::default(),
                     update_type: UpdateType::Debit(None),
                 }),
