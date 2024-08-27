@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{signed::SignedCommand, Command, UserCommandWithStatus},
-    ledger::{account::Nonce, coinbase::Coinbase, Amount, PublicKey},
+    ledger::{account::Nonce, coinbase::Coinbase, signed_amount::SignedAmount, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,8 @@ pub enum UpdateType {
 pub struct PaymentDiff {
     pub update_type: UpdateType,
     pub public_key: PublicKey,
-    pub amount: Amount,
+    pub amount: Amount, // deprecated
+    pub signed_amount: Option<SignedAmount>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -81,11 +82,13 @@ impl AccountDiff {
                     Self::Payment(PaymentDiff {
                         public_key: payment.receiver,
                         amount: payment.amount,
+                        signed_amount: None,
                         update_type: UpdateType::Credit,
                     }),
                     Self::Payment(PaymentDiff {
                         public_key: payment.source,
                         amount: payment.amount,
+                        signed_amount: None,
                         update_type: UpdateType::Debit(Some(payment.nonce + 1)),
                     }),
                 ]]
@@ -160,11 +163,13 @@ impl AccountDiff {
                         Self::FeeTransfer(PaymentDiff {
                             public_key: coinbase_receiver.clone(),
                             amount: (*fee).into(),
+                            signed_amount: None,
                             update_type: UpdateType::Credit,
                         }),
                         Self::FeeTransfer(PaymentDiff {
                             public_key: pk.clone(),
                             amount: (*fee).into(),
+                            signed_amount: None,
                             update_type: UpdateType::Debit(None),
                         }),
                     ]);
@@ -208,11 +213,13 @@ impl AccountDiff {
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: prover.clone(),
                             amount: (*total_fee).into(),
+                            signed_amount: None,
                             update_type: UpdateType::Credit,
                         }),
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: precomputed_block.coinbase_receiver(),
                             amount: (*total_fee).into(),
+                            signed_amount: None,
                             update_type: UpdateType::Debit(None),
                         }),
                     ]);
@@ -253,11 +260,13 @@ impl AccountDiff {
                 Self::Payment(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Credit,
                 }),
                 Self::Payment(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Debit(Some(nonce)),
                 }),
             ]],
@@ -274,11 +283,13 @@ impl AccountDiff {
                 Self::FeeTransfer(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Credit,
                 }),
                 Self::FeeTransfer(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Debit(None),
                 }),
             ]],
@@ -286,11 +297,13 @@ impl AccountDiff {
                 Self::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Credit,
                 }),
                 Self::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Debit(None),
                 }),
             ]],
@@ -307,6 +320,7 @@ impl PaymentDiff {
                 update_type: UpdateType::Credit,
                 public_key: cb_diff.public_key,
                 amount: cb_diff.amount,
+                signed_amount: None,
             }),
             Delegation(_) | FailedTransactionNonce(_) => None,
         }
@@ -419,6 +433,7 @@ mod tests {
         let payment_diff_credit = AccountDiff::Payment(PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: credit_amount,
+            signed_amount: None,
             update_type: UpdateType::Credit,
         });
         assert_eq!(payment_diff_credit.amount(), 1000);
@@ -427,6 +442,7 @@ mod tests {
         let payment_diff_debit = AccountDiff::Payment(PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: debit_amount,
+            signed_amount: None,
             update_type: UpdateType::Debit(Some(Nonce(1))),
         });
         assert_eq!(payment_diff_debit.amount(), -500);
@@ -442,6 +458,7 @@ mod tests {
         let fee_transfer_diff_credit = AccountDiff::FeeTransfer(PaymentDiff {
             public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u"),
             amount: credit_amount,
+            signed_amount: None,
             update_type: UpdateType::Credit,
         });
         assert_eq!(fee_transfer_diff_credit.amount(), 1000);
@@ -453,6 +470,7 @@ mod tests {
                     "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u",
                 ),
                 amount: debit_amount,
+                signed_amount: None,
                 update_type: UpdateType::Debit(None),
             });
         assert_eq!(fee_transfer_via_coinbase_diff_debit.amount(), -500);
@@ -498,11 +516,13 @@ mod tests {
                 AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: snarker,
                     amount: fee.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Credit,
                 }),
                 AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: receiver,
                     amount: fee.into(),
+                    signed_amount: None,
                     update_type: UpdateType::Debit(None),
                 }),
             ],
@@ -530,11 +550,13 @@ mod tests {
             AccountDiff::Payment(PaymentDiff {
                 public_key: receiver_public_key.clone(),
                 amount: Amount(536900000000),
+                signed_amount: None,
                 update_type: UpdateType::Credit,
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key,
                 amount: Amount(536900000000),
+                signed_amount: None,
                 update_type: UpdateType::Debit(Some(nonce + 1)),
             }),
         ]];
@@ -587,6 +609,7 @@ mod tests {
         let payment_diff = PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: Amount(536900000000),
+            signed_amount: None,
             update_type: UpdateType::Debit(Some(nonce)),
         };
         let account_diff = AccountDiff::Payment(payment_diff);
