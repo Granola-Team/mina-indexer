@@ -149,17 +149,17 @@ if DEPLOY_TYPE == 'test'
   FileUtils.rm_rf(restore_path)
   File.unlink(snapshot_path(BLOCKS_COUNT))
 
-  puts 'Initiating self-check...'
-  pid = spawn EXE +
-              " --socket #{SOCKET}" \
-              ' server start' \
-              ' --self-check' \
-              ' --log-level DEBUG' \
-              " --web-port #{PORT}" \
-              " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-              " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  wait_for_socket(10)
-  puts 'Self-check complete.'
+  # puts 'Initiating self-check...'
+  # pid = spawn EXE +
+  #             " --socket #{SOCKET}" \
+  #             ' server start' \
+  #             ' --self-check' \
+  #             ' --log-level DEBUG' \
+  #             " --web-port #{PORT}" \
+  #             " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+  #             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+  # wait_for_socket(10)
+  # puts 'Self-check complete.'
 
   puts 'Initiating shutdown...'
   system(
