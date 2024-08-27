@@ -61,19 +61,16 @@ async fn account_diffs() {
             AccountDiff::Payment(PaymentDiff {
                 public_key,
                 amount,
-                signed_amount: None,
                 update_type,
             })
             | AccountDiff::FeeTransfer(PaymentDiff {
                 public_key,
                 amount,
-                signed_amount: None,
                 update_type,
             })
             | AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key,
                 amount,
-                signed_amount: None,
                 update_type,
             }) => {
                 println!("\n* Payment");
@@ -135,7 +132,6 @@ async fn account_diffs() {
                     *nonce += new_nonce.0;
                 }
             }
-            _ => {}
         }
     }
 

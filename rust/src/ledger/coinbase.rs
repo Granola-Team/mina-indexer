@@ -144,13 +144,11 @@ impl Coinbase {
             PaymentDiff {
                 public_key: transfer.receiver_pk.clone(),
                 amount: transfer.fee.into(),
-                signed_amount: None,
                 update_type: UpdateType::Credit,
             },
             PaymentDiff {
                 public_key: self.receiver.clone(),
                 amount: transfer.fee.into(),
-                signed_amount: None,
                 update_type: UpdateType::Debit(None),
             },
         ]
