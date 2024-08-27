@@ -384,9 +384,13 @@ fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
 /// - prefix: balance, etc
 /// - suffix: txn hash, public key, etc
 fn b64_prefix_key<T: TryInto<i64>>(prefix: T, suffix: &str) -> Vec<u8> {
-    let mut bytes = prefix.try_into().unwrap_or(0i64).to_be_bytes().to_vec();
-    bytes.append(&mut suffix.as_bytes().to_vec());
-    bytes
+    if let Ok(p) = prefix.try_into() {
+        let mut bytes = p.to_be_bytes().to_vec();
+        bytes.append(&mut suffix.as_bytes().to_vec());
+        bytes
+    } else {
+        panic!("Unable to convert prefix key into i64");
+    }
 }
 
 /// Key format for sorting txns by global slot:
