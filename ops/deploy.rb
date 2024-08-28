@@ -162,14 +162,14 @@ if DEPLOY_TYPE == 'test'
   # wait_for_socket(10)
   # puts 'Self-check complete.'
 
-  puts 'Initiating shutdown...'
-  system(
-    EXE,
-    '--socket', SOCKET,
-    'shutdown'
-  ) || puts('Shutdown failed after snapshot.')
-  Process.wait(pid)
-  puts 'Shutdown complete.'
+  # puts 'Initiating shutdown...'
+  # system(
+  #   EXE,
+  #   '--socket', SOCKET,
+  #   'shutdown'
+  # ) || puts('Shutdown failed after snapshot.')
+  # Process.wait(pid)
+  # puts 'Shutdown complete.'
 
   File.delete(CURRENT)
 else
