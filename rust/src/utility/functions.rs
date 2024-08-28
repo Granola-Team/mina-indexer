@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use rust_decimal::Decimal;
+use std::time::Duration;
 
 /// Pretty print duration for use in logs.
 ///
