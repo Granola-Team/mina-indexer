@@ -35,6 +35,7 @@ use crate::{
         from_u64_be_bytes, staking_ledger_store_impl::split_staking_ledger_epoch_key, to_be_bytes,
         username::UsernameStore, IndexerStore,
     },
+    utility::functions::pretty_print_duration,
 };
 use anyhow::{bail, Context};
 use id_tree::NodeId;
@@ -379,7 +380,7 @@ impl IndexerState {
 
             if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
-                    "Adding blocks to the witness tree, reporting every {}...",
+                    "Adding blocks to the witness tree, reporting every {} ...",
                     self.reporting_freq
                 );
             } else {
@@ -502,10 +503,10 @@ impl IndexerState {
                         }
                         Ok(None) => {
                             info!(
-                                "Finished ingesting and applying {} blocks ({}) to the witness tree in {:?}",
+                                "Finished ingesting and applying {} blocks ({}) to the witness tree in {}",
                                 self.blocks_processed,
                                 bytesize::ByteSize::b(self.bytes_processed),
-                                total_time.elapsed() + offset,
+                                pretty_print_duration(total_time.elapsed() + offset),
                             );
                             break;
                         }
@@ -1544,12 +1545,12 @@ impl IndexerState {
                 u64::MAX
             };
             info!(
-                "{}/{} blocks ({:?}/{:?}) parsed and applied in {:?}",
+                "{}/{} blocks ({:?}/{:?}) parsed and applied in {}",
                 self.blocks_processed,
                 block_parser.total_num_blocks + 1,
                 bytesize::ByteSize::b(self.bytes_processed),
                 bytesize::ByteSize::b(block_parser.total_num_bytes + self.genesis_bytes),
-                total_time.elapsed(),
+                pretty_print_duration(total_time.elapsed()),
             );
             debug!(
                 "Rate: {block_rate} blocks/s ({}/s)",
@@ -1563,7 +1564,7 @@ impl IndexerState {
                     / bytes_rate,
             );
             if !dur.is_zero() {
-                info!("Estimate rem time: {dur:?}");
+                info!("Estimated remaining time: {}", pretty_print_duration(dur));
             }
         }
     }
@@ -1586,12 +1587,12 @@ impl IndexerState {
                 u64::MAX
             };
             info!(
-                "Parsed and added {}/{} blocks ({:?}/{:?}) to the witness tree in {:?}",
+                "Parsed and added {}/{} blocks ({:?}/{:?}) to the witness tree in {}",
                 self.blocks_processed,
                 block_parser.total_num_blocks + 1,
                 bytesize::ByteSize::b(self.bytes_processed),
                 bytesize::ByteSize::b(block_parser.total_num_bytes + self.genesis_bytes),
-                total_time.elapsed(),
+                pretty_print_duration(total_time.elapsed()),
             );
             debug!("Root height:       {}", self.root_branch.height());
             debug!("Root length:       {}", self.root_branch.len());
@@ -1607,7 +1608,7 @@ impl IndexerState {
                     / bytes_rate,
             );
             if !dur.is_zero() {
-                info!("Estimate rem time: {dur:?}");
+                info!("Estimated remaining time: {}", pretty_print_duration(dur));
             }
         }
         Ok(())

@@ -1,4 +1,7 @@
-use crate::block::{extract_block_height, extract_state_hash, previous_state_hash::*};
+use crate::{
+    block::{extract_block_height, extract_state_hash, previous_state_hash::*},
+    utility::functions::pretty_print_duration,
+};
 use log::{debug, info};
 use std::{
     collections::HashSet,
@@ -26,9 +29,9 @@ pub fn discovery(
         paths.sort_by_cached_key(|x| extract_block_height(x));
 
         info!(
-            "{} blocks sorted by length in {:?}",
+            "{} blocks sorted by length in {}",
             paths.len() + 1, // +1 genesis
-            time.elapsed(),
+            pretty_print_duration(time.elapsed()),
         );
 
         if paths.is_empty() {
@@ -129,9 +132,9 @@ pub fn discovery(
         while curr_start_idx > 0 {
             if count % reporting_freq == 0 {
                 info!(
-                    "Found {} deep canonical blocks in {:?}",
+                    "Found {} deep canonical blocks in {}",
                     count,
-                    time.elapsed()
+                    pretty_print_duration(time.elapsed())
                 );
             }
 
@@ -178,9 +181,9 @@ pub fn discovery(
         deep_canonical_paths.reverse();
 
         info!(
-            "Found {} blocks in the canonical chain in {:?}",
+            "Found {} blocks in the canonical chain in {}",
             deep_canonical_paths.len() as u32 + 1 + canonical_threshold,
-            time.elapsed(),
+            pretty_print_duration(time.elapsed()),
         );
     }
 
