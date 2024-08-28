@@ -280,7 +280,7 @@ impl Add<Amount> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: Amount) -> Self::Output {
-        Self(self.0.saturating_add(rhs.0))
+        Self(self.0 + rhs.0)
     }
 }
 
@@ -288,7 +288,7 @@ impl Add<u64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Self(self.0.saturating_add(rhs))
+        Self(self.0 + rhs)
     }
 }
 
@@ -296,12 +296,7 @@ impl Add<i64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: i64) -> Self::Output {
-        let abs = rhs.unsigned_abs();
-        if rhs > 0 {
-            Self(self.0.saturating_add(abs))
-        } else {
-            Self(self.0.saturating_sub(abs))
-        }
+        Self(self.0 + rhs as u64)
     }
 }
 
@@ -309,7 +304,7 @@ impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0.saturating_sub(rhs.0))
+        Self(self.0 - rhs.0)
     }
 }
 
@@ -317,7 +312,7 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0.saturating_sub(rhs))
+        Self(self.0 - rhs)
     }
 }
 
