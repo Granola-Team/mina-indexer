@@ -1,1 +1,826 @@
-{"version":3,"data":{"scheduled_time":"1706912533748","protocol_state":{"previous_state_hash":"3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu","body":{"genesis_state_hash":"3NK512ryRJvj1TUKGgPoGZeHSNbn37e9BbnpyeqHL9tvKLeD8yrY","blockchain_state":{"staged_ledger_hash":{"non_snark":{"ledger_hash":"jwVMGhmVz4TGricGfDUhqpb1KvTazWxDQteLANkUCynxWwwSbsn","aux_hash":"VRRSuxFLR5BSJ8ZBNdYoPNWj6t14V7cUjCa4WwbDYFvCi3CbTa","pending_coinbase_aux":"XH9htC21tQMDKM6hhATkQjecZPRUGpofWATXPkjB5QKxpTBv7H"},"pending_coinbase_hash":"2n1bjeNHcTTodDMgBqPb4EiBoFFHDkHjHTNDh8L6YDJGHyhYLCww"},"genesis_ledger_hash":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","ledger_proof_statement":{"source":{"first_pass_ledger":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","second_pass_ledger":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","pending_coinbase_stack":{"data":"4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un","state":{"init":"4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej","curr":"4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"}},"local_state":{"stack_frame":"0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C","call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","excess":{"magnitude":"0","sgn":["Pos"]},"supply_increase":{"magnitude":"0","sgn":["Pos"]},"ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,"account_update_index":"0","failure_status_tbl":[],"will_succeed":true}},"target":{"first_pass_ledger":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","second_pass_ledger":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","pending_coinbase_stack":{"data":"4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un","state":{"init":"4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej","curr":"4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"}},"local_state":{"stack_frame":"0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C","call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","excess":{"magnitude":"0","sgn":["Pos"]},"supply_increase":{"magnitude":"0","sgn":["Pos"]},"ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,"account_update_index":"0","failure_status_tbl":[],"will_succeed":true}},"connecting_ledger_left":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","connecting_ledger_right":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","supply_increase":{"magnitude":"0","sgn":["Pos"]},"fee_excess":[{"token":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","amount":{"magnitude":"0","sgn":["Pos"]}},{"token":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","amount":{"magnitude":"0","sgn":["Pos"]}}],"sok_digest":null},"timestamp":"1706912521000","body_reference":"1d89bef5714b9ffc562c8291100c4208828438407dc41162596f5d29f57ceb45"},"consensus_state":{"blockchain_length":"10","epoch_count":"0","min_window_density":"77","sub_window_densities":["2","6","0","0","0","0","0","0","0","0","1"],"last_vrf_output":"hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=","total_currency":"1013459001000001000","curr_global_slot_since_hard_fork":{"slot_number":"167","slots_per_epoch":"7140"},"global_slot_since_genesis":"167","staking_epoch_data":{"ledger":{"hash":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","total_currency":"1013459001000001000"},"seed":"2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA","start_checkpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","lock_checkpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","epoch_length":"1"},"next_epoch_data":{"ledger":{"hash":"jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp","total_currency":"1013459001000001000"},"seed":"2vajPBKdG6xtP3mRfiMfADBXtiFfdcEraALFV2XdetZp8p7Aqrid","start_checkpoint":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","lock_checkpoint":"3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu","epoch_length":"11"},"has_ancestor_in_same_checkpoint_window":true,"block_stake_winner":"B62qo6Qdk3a2tgwaYatZ7HQyCB1bkD2QN9HdxrNmGjCEVxfiMYm7aQj","block_creator":"B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A","coinbase_receiver":"B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A","supercharge_coinbase":true},"constants":{"k":"290","slots_per_epoch":"7140","slots_per_sub_window":"7","grace_period_slots":"2160","delta":"0","genesis_state_timestamp":"1706882461000"}}},"protocol_state_proof":"_IARk_QUqlDS_M41W4sjFSaeAPxUcwJzo00rXPzhsbEhk9BJKwD8KFn37uOGayj8MVGO42OG8qEA_G2SEUSvYsFT_J3pZZPgIqToAAAAAAAAAAAAAPwQAxATx3UbPfyvStz1UFq6CwD8Whp67a51iWr8JLo_VE1O3EUA_B51WMvor0te_OAyotoJcaLXAPyIqQxTXmTNHvy8iwfQyytLpwD86tz6IpGm-_j8BOj8uUT83RYA_CPcTli9bmFb_PTyvDjrAoGSAPyzkzMnttHY5PyGlQN3qGyxRQD8jCV9n9hB7HL89ZatS8eSxQgA_KVHzBhhhoAn_EEas1CEUJxjAPxhJAYGYuJQUfy01itfO1Fd9gD8zQ6FRoBKbST8IRrf6CdSPhMA_KyRH4sGG-4t_PE7DQJYcLjFAPyDUWyb1ZCi2fx1P7iiU7JAMgD8F9rhqXGdDkv8m6J71vU4DTAA_IhG9ECjdGnZ_B8_f13pnOMnAPyZtmJCw9Pctvyex0FDBaDUxQAAAhD8zpz9MUmU7pv8Oy_RTXswqHb8QAIE98JXZD78tbrxN0y5CCMA-9Lc0Czhisbkk0z4kZmHbQqsZpqT9tb2AkLNMnwsGQHitD_EGmDvIlFaEnTBlNyQMh5SX5kTTc-Bom0NEo25CPwrDzlSB5BrNPzYUecSSSNNRAD8n0w68GC2loD8VKwVlbXXhwsA_A6o_J3W1FyN_BfEkhIC7B_qAPwrcyd_10oTL_xFWlQ521tMXgD8Nvc3nNhawLD8x7ypjM-thP4A_MAXJinbimrA_Gamt8_ykV4jAPyeUKCxF8-qq_x3ANudfVCWNQD88AFE3LdNKg382KHC7RKmE0IA_LS-oekEtMC8_IK5zAW3280sAPzmgTmgiP0lkPyp7TfgjPKnowD8yAwIM4qwJlf84cZfjWaTYz8A_KFc4pwMyhhy_LVdFqFz3byyAPyPt6wChzoe1vzSWGxtdY6hRwD8qwBj6lmD6J_8G4PDYioFhm0A_Gve72OUVdGz_JEr-MO_fyMeAAD8qCadGZY3fqX8U-uwvwkjYU8A_B1vsQ2GRotz_BVkrC39O01jAPxJ8poWHETUEfyv6VHsJnJoKAD8yRYgqrYcWmT8MYQEKRUbpjkA_DXEWqBVovYV_JKWIISsIWAQAPy3ABJaQ7et8_xzbN9V-GKOJgD82YfykYejUW78TQ05uBGpJhwA_OYe1dMCCUcC_MX-02DD0H6ZAPzIjZXLDYAUVvzx0Q3pq6NRnQD8ZnSP2agvuS38htk77Ce_ajcA_J8-L9hTRkDS_KerEDKQayj5APyUnLe7vq0eE_wpvb2EaqnUcwD84D92FCqcCnX8eezT1hFqCx8A_MVyLKE2_3yz_H8L5BmjtHC4APwDSpCrn-7bd_x6L3siV03tqgAAAAACfbpdOPcbjU1wTzHLuHj8D2FxndhcSSqZidO0bEvoLBmc1fxkppJtwiZr0ZcG8pk4SqtrkjrhtoZGdq-UzK6LHkzzVmHkM5yk4GUdBLFuwU5gEsLYrRCQHp5776VaygEzh3jddAdXNEC5KAVYymTfkrHgaHRE1hBPVsk1VzuA6DcC_Ly5-ckNX3oi_LE2CCx72B2IAPwxebz4rmXcwPw8jHFGqkg9UAD8tdPUrFqTBd7888XFdgEvfEAA_LrTZyFFVLqU_HZxBa5d-3SkAPxFkdC0nttttvxYrSbndU3AZQD8MijykSbGxAX8xTDIXPegmxIA_J4MjewEKgXx_IoCIBfBncvUAPyLJf1bj7zS3vxUixqYJmlEnAD8o9Sc3BK1V-H8vEOc90eR0WsA_CJmF0vrQXte_C5lCeT34HD5APzF24XY4NKvM_wdqEx1WG70PgD8mxOqrcPEGrj8YKFXttWabrcA_NU1Xx8DGuS1_CzfAgNoaJ-EAPzdprIxwERbG_xwzYuGGVNkzAD8J9j20v4FWHX8n9Yb-Y1ObSAA_JL9Wdvgmjon_Flvj8RtyfsWAAD8uSqnVrRwc638_J7x1SP5TzYA_AB8L45iHIdZ_IfMJqJz9secAPyv8raeHYJUI_x-9X320Wu51QD89oaQoND3exT8aCokQM5iXmIA_A6tVjJjG8av_PvhH6EQcoAJAPyRQazKvh5Y-fymybc-mdUeVwD8vcNkzaNQTqr8aMX-wQrnFNgA_G3eXoLfrB2y_KUH28UXogj-APx_qubp1g9Ogvwsf7lOmDr2_AD8ygQbcSuIMcP8KSautsesOZEA_O9Rgf1Hjw_c_IeVO8RDeqkAAPy_MobRHtg4YPyrBaqicLyz-QD8Wkev5eDSdZT89tLDrgKny9EA_AR8Lfn2D3i-_FTi-zKRWD3hAPwTdTG4ErdwxvwIPkiaM8x1FgD80bjKsaKwwUj8zrFxwOMEZhsAAMnnWAOnHMtBY-jess46xEGIttZailVJ4Mms94wwCGEO8vuy0E5jcqt59mCkDSl3NbsrXU9nl08rkBIrIDnOazIBIiEPGqZyOV7sk6Vco_qdNbLo6mu-ycSL4QDYDgvflgYBV6e-Q5NSJuPwDA0hNOt5jTOiGUJfHLG_bjKh7WfNHw4B4Y_F_e5WVdQNR_hMcjYxV8L07GRf9uy4L73x18obbggBdRvpM4fPrLGicIxSKVHh3hVtkHYjR0T9du93D2VWiTYB3QgxnUo-tCxep0TpxOMKmCF87JfWIAaJ1vyesJbRsT0BtLEntgQPLk0oNWG_Hmnt1hn5ZGaEg1tjGXmIGg9aKA4BzuDeH6koco9bjgHs8DZv_vSZuEiUedgQA-sdzqpNRTUBbz7cFcoatdQ1435Y9R4BIk9n7qoTf6cB3R17KrwwODYBat4xwq4fd_if0peE1npqPNvr7bRpoxYc948A6UV8rgsBpCut2umPwI10cDzLOU1a3kCLU6xOgunJXrUDId_qDh0BykvzyW-2AFPKGqEAieFMUtmXA_xV_hvRaVWRZWTrqh8B_H9CXvj7nW5GAq5RGu01IjCtGgjjnMaZM7z0Vp9mFzsBoVmgy_eqV50cIbaNAxMLtnNaUy7EcOXST9wFUZKgNiwBTX5T-cn-0IkcjsNnhWj9sR4SsGvJe4aCP35JE99CNikBm2z2vXkWIj9nmuLsAWNBI035GEpJk7ZIUa2PxlZ7MQ0BwJfq8rb_QVXGtIms_y68wOzVW_jHwfygR0KXEkKyfRwBdSfNqdzCUZyYmy7h9DjZKIhOZst3AxWFSDoPDLiYjyoBi0jEUtZ1kspLHi7aS4o5thPFymlk4h_Qm2ENyD-TMSQBFr6Ea_6WXr4xKMrkr9mP4E8Qn_CctGmuD47bmyOOVwoBFX5fdfoqLdkKDoLePqATomS5wJMSHaZHzdMBiQvTtyYB5beWVYzspl-RMFrfwYPyOGJRe2RdZgJgPOI-RhwdPTABInoUxkvaAyGwfds_HqmxQcfC65Xm6JFGGVuRrt2DgjgBxhl42HIGz0pH4w61Tso43N0O6fGfTdqIyp5v4KVWkysB4NrGXePW3OmZuvZ2ovOe3iD80_jC81Xb04Y9oNpxLw8B7iKDDDlg3YIcH4MqLUhPWMzNUtI7Fx4ctAr6lQAllQUBr1Z2zt9_8TzE0vRG-qY3Psy5np1llhcJzYxxzQBCzA4BA7KEtKeXg1LDp-nXr4cl6FWCJ2qzU4hgXXNUhuLrUhgBdd01B-fVGsgh1rNd_6H3fXY7H9F7aOdPt2VL12IntBMBvsl71evc7Td146THohTTH_bKl-Kbxh5r6jixlp2XFjoByyBk9vuRYLy00ODnW7mh89ng5m7JRRGb7s4EaDX6Uz4AAUXt_8wisjxfrc5uQCV0AFV8uveUrbZKAH1fWoZYNTALAaZPthfeirG6klhXRS7bxxTxMWUVSs5xKaMsUtQ5GM0MAa4DKAW8ofDRPhSUVviPMsXKhZCgZKKM64y0hepUnIYvAWsc4TsQc_DJINQHFZ7GkLsIX_xbWm54CSIXg5K0_uYAAYMpK4tRbosN51wp7zksEqp9M4SDR7u2DimgUDXWtdUTAbOTkzrnBY7sv1R7dLK7uhnd6XyfZ4hLWAIjkijFEAEvAc6RJAwA1KRw_dgy_AO7bTEYwAE5hzjuwIUUBMJin0w-AWHNrNnDbyxXRHo6dEwIaARFh-hVbp3HspJuDfjTg_cVAfl4vueugFOg1CwVesaqtXdE465jHPuX88PgF-en6QE-AeIRzueK8FpaHwkB7WLAlI_cTQng9qzBd0rdRnRKtJgcAcn_C9PfZMnM-rpk0B5ycxdi2CtQ8SSl9RbnbVkOCUkXAdYDufh2ocGZQztKMwSs89KO9CX8vSQ8wWvU1p_O33YdAeEDz3CVU6Jcu-V0uzHwVGUwOxpDwKCP7f2tOyo437AMATU-BknZEYuOS1921mUCtf86HXN6Ccqu7UvgsFQ2C2skAQzeFeXjXZQY89DcPT-x6Lje0-tlmhrTOHi8dKDDN2ERAeZbt-GawdTyV48VyGG7TBvtcxdV9EjQvQFLkYswL4YJATdqs9XydGihyPzN-sxPBn8QBP61LH2OhGSbIckPuxEkAdCBhbo0ZSbCLzhOcF2iL13YC9zzXONEZ1ey-4QxthUhAajJs6YMWenSqNzsiXpkWDDJxfWu-sqO4_mAZuYQGqcTAQpZU56LEIZdl0fCAKTdmNTHU1y8aBhRmDWiCRl4bK8OAV-ZpaeIAu5ET0Cpk5ro5f6mpLwkxwG6PDU1J2Lr8aYfAcfCeIthTJZLtjH3NF3vEZhvRpx7oNat22og2Tp2pUoMARa5i1aeLaerujU0KHg9icAXpnJYqEJOxqLIkxdsezUAAb0OsrdHq6NS_cLiMt-38rIIjo7vr_dnJy4WqXCJvrYEAaSFCnN_MkLSuNZWUD8MJgkTn1Bmmf3w1Fjd_4CcSJ4LASXIYt-EwCCbzS0Z9UXHv13yEi9u6B-QdM3NeRl33GUJAQu1XleyZenbq-cFGeBHT0yzZryRZk9cNKETk3bVHTY5AThGTWNSmOTcdhjJjlGVPxPB06_IuhW9RDRikqpcyhQxAdhnKIOvrzOc1bwdepYDl2QJwvjOUnAdxO6ZxkqjDqQBAZAC4zJBdC-1qFhh-hUmr49cJURwSqE_nxw6bPaeERclAAHAKbOvnF8gtLV2_90Lo8KPGeeeLfje-appHu_lt4uoLAFs59D_FHKI6qOUkqxUqDJS0MSsQclHXRGzWiZcY6mLLgFXJ7AMGaNU9UKl0wXe7GFmjQeHvc-56KnWB5pTYDJwOgF_SaJlLjAtVLghGZrm8k8JgtLWH_fGT_p953sZ-iEKKQHV8QIDteR9pi9bVoSwnWW9BOlb1lTZLPIDVwTTQBi8EAED3nYnwyhjxxh8dQNwR-ChzBIoSyTg_SC3URMlhXslCQGaItlWt4b1NWgADlBxWvvbDtyb3sXYw3vYfKu1ZoyfJQHvdGTzvlayYPQG0G3C8y9L_NJpvvLVqWEV1wHB7w9TLQE1JlZXklifDvEkBsk6MBUo93L6WeTazTybWLjNsDcvGwEvn5x4oxG-HsNFAXH06K34J9KiVS8zKnuB2dsjo2CnLwFqst3cCpLJWfNW5xa4l-BUGpgFyEqOrflqM3bAn17bJwHndvAuOA9nt-ZymMh8-7yw9qRRIm8nJCI31qx5ryiuAQE1qL_8xk7Gx7RoAct-sD4QPJIVi-6DvqFj_uXIX5NtMgH-tFKrN-IWyROTKjdaTqNGSAwvKs0kdp31OLYONj73LgABBbG40vbOvewRA2ExNwq40H2tsVYebz1-5BnQT4H_xg8BRBzDrbu7d64Zvv7RJLD6Qt1sw7Spjw7eDy_dYeDPyzgBAaU3z7Qymxndl0ZnVjrdRJWo1JJ5ZTL0qbg9OX1FMCMBUVqh0vin7imgbRTNIFrGjLWMI2O0swoaA_jDgCUOnT8BTG3huXSPYJoHNy5l680V-a16tW54o4vMghIx2Qes8SEBTtEvb1NNoky8IZp-qeVpB5T5bUdF6cPn6bhCXigWYgcBPbAUuM6Rj5-QRtnP8F4ubPND3q8j-OAhx9fi9nCBxQgBHsv_DFKkbPiREyF_onYqWgVlZnrkAfZrqqsaL-qNsisBTjwaZAsGTMnST6QZidWhEV-u8mNeQiUQZbS77Sa0LgMBVQQ3SMtRHIlaVF6nST7DhRRYkAuYlUS6P9GdUCNk2gEBnKtLFKBjx68iYWWuqysplE-hC1U2gKTInhed05WnzgMBJEkluu38e36PI9H8O8CalNR7tUkGJ3CK79Maf8AO6jkAAAAAAAAAAAAAAAAAAAAAAAAAAL-_BdsoGLGM-9zwJXo33W2m9sA5NKSW_HvoCHBoz2IhrofxLJQEqOAmIjZT5cKWffyywhShLLGZLcQSMCSGQDh4igrH4dQj3HSmNt0rSCmPq1WboJ1DwASvvA715Ww9Ix6F2uAD2khx-hlEqxlth-1PIREx7fidxWckpo9VlAEs5CtyrP0ezljdapQ_ta1Qa1B4n920nJL5H9YIEBKrGz4XMnKQFE3Q_TBDWXo7gtUNi8hXTBEOwlCX3bKYjTolALt4P0M1QtLhOQy4W04xiBTdwsoMhZ7FNJc-gyG-UU4vszxJqE5KruhiqKhr-BNaYcWug1ANKL2RPSvmi4AYSTvT68KGSxp3gZEO53g24DS7GvFSHqD0u7o8lrTF2a1nEzWBQfpiJrmmPCZBnLPDRVh6X1DtqY1mYH52IF7LZ2w41nZ66dcCf16Ali7hA6M-3_vclUyu47nPXsbtvMG15xeqHXk7dt8HMXZKxBAv6jbmq5Y2W9KTLByl7xneg3vsLzJMpvpCaZ4decXBuS3HN_cLMfg3KkI-XQf2EXQQtw021dvMrnrEbbzYvW5nQ1_TTLBHq1zJitcKcXNdFauBcwQ30NX58BEb4H_kmY6JXyjQI7LRXRAxK9MvFrut_gR7K91oB39jsdxNkdgtjxb5t03ASCbUeVJ7pZBVC3GaYY45yM-YFYXs03XTg9p2JMyM6PDdVkrun945MKvcSje4Vh2xHCfP4jSlFgpY5NtVrg-dSO73KOkrVVFIWRfP1DzODgxyQ1z0cNW6E4llC6HO29IcZgjqQUQMLFoi-MJOe7kArVO2Pvbri22V62NfPZU5Jn0Vp5256rxss6gFiWkreySIKulgwFBBkeTMPO3z4NMIEPvFac6cLAItt3ruXSgLIOU9B6yuyMuw28ApZbzSXnGrOWunPY7E0b59JsINCRg63ZumeqhFp9LyJ1j6qoL2vZR2LUKMYS-jZnxTojypijlIAjzUcYSrR-E1yMQYOX6kL_pm8c2kKxL5PKP_naELFzYr90a5xq5M4KBQDgoWtpK-MUiFU-OQ1JMBxsWa-Z4Bxol1NLaXUcH0hpAqx1xE98buc8RqF4tUr9PYriKgyyscrc7MrcIOiBblbuYZKf2u9b3bbTIc7f7yG3LRVlS0DBgK4XPQG8CnBeerh3eP2Mhz8XO-akzrDM1xtm70dQI6ZBj7pz9bXqf0vj2BY5bveG5tUN46MAC2HJP7TSrNazscDzGwSUNBYcztmKJYUapWajU_SOooDntdh9OPxg1jParckPmHfWl3BHUJ8XwXrRSfBQ-MKAmn_NNDlI_efooOADCDQpwhVzEuPD3xg_6g6UVpCF6BRkQqf3WwXjYLV0AuxiCtK9bN1jpIwzH1WPvlu8qjqwkmMDQJxZbXCeew4T2s_XLRXe5QHRxPq7LMJmyUWHyg9grr-p8qQF5YFgioJfQFAT2jTXKkpaPk4llbuTuu3DEEfD7__RtOxULBqOAJNilJ8_Ni4Esqat4l515I-rC4cMZsNXct3cIGsQSvzSchyXZR7h_7iU7I_-7a4J7_hXa3sHjHdTWRU8J6kgMKHaUSegF5-TcmTZRLAElVzkx7-DX6JKokH338iegB41ouzM-wwYAdEYW6ADm3Bq6l0LaDrl1jgOGZKerGDN-etA-6NyVc5WNEnxYMVtPlIMwBwmSFEW3-uJjS_uMW4mMSMziA7oZNORLmcOpQQk5vYj6TiWSNdvojzlpNERSOWfE6Q6J8LBz5wjpjQjO7xsUdzaR0YPABFXVy2o-V1ry_JyO687ZTtJoNcDHmGCPTJ2HHH5QgNrbTFlJ8_vgwH5j6EiIQ01UhnZpdixIAETths0hNLAF1Z4de3uhU4D7wjYgamtHNNYcgtAeEjYtuAvt-S8uawCvc-1MIl0QwaoZEdQ3wfHWQBOzbCr-CpFArQOS3__GehpMlEPMRR_EAv-WwF2HFvU0bmiWe9hrGB_yRB3uH22wTNmbrKtxP2A56-zYrANrWVuQnAQZbOLK_Br0tzm-SGo3ErHyvCpn8fjB3KBoprU_dnE_2djxrrneH_V5OdaAqMuSAbjeLqdF6bN9cMwIfgQkXwy4Xitfw-3u_cOzjWd8hXESmXRRXOWe9GVUVBiNu80ngdSMg3D3mbi6mxkz-jcjdpc7VQXKJ9zapQzsKJMSRq-sn1MemsXkRbxCcjjY9j5ZWLj6SRkt0a9INGQVNK5ZdNMmCvrMBJWkY0aMRqXPIlhf3KlDbBcWWU9nrHect1EeNbRQSgMWGYvxBdYulxQlUo4ZAeZSeCp0pxBIsi9xIEXSpV70WzB2CyIfIPldyQci8IFokeKBVVR29bxp3eP-mC3SpGWWuu8n6tChHTEZyUlef5k-82b7XTKK4Hu2o2tz9paviTTx88GTeJZ12LaR6uZ1cdRz5ETmd6y0bv9NEsl_q-9hLXB5B5N9g8Pdf70xBOW3mQK8ygb7_oA6nnVXrkOfzAWPLlTmHnb0CmO3UKoehsyBerdKd2tsICXA383cbMVZZtJJLGaWNjDLIFAfD_8jY00cUmC4eZlUY8a30FrAMW_rRZzkI990Q14ljc0BOZ_0W7fn-sht2JhXIzMREmJ3nQKO4jBogxDwQCVYCc8dPXc23K3pc80yXE5_sD7t-zP9IC72nDQczaUCmH4EjBSIwQvEk8cwljlIBYf0T03b5AlK-7soNRivpV6FoGlw6ixe_0nfuZzwfbRUkzNLIM9tvKlmSYg1WHt7OIvLzzZQP7ZDUh0OjTYHHKWxCdR3AyrYUzoaYhO6_1LCaErwI-pQd9HrOnqno6Pky9KMQAbp8BFCuoGIdS-4zpxEl1fkWn69IGPz5Xmko0Q2Caeo79B0_SYvouZ1udqGY1JYCo5syOTCkdawYRYCeHUrUAeQ-WoSifu5G3hX4hA9kkIjg8RXpk6hRJSFWaxkx0tEGUGA1QGcTwJ8UdF7WN2ncb9puenXwCkH3Ag0M6S0pwGNg6bytpNLa7kCNqKTOE8YsL-_R_T0GPTJ-wQCJFJPsarR7e-g7RuZsVO-JC6mFHz4IkYNhh4zqkUEDIjob568dT7p72xcfC3iFc0rkifxhcUnY_cH8rvX81GSa2T1gZGnyuWwNcLTjVFofz1uLJUumBbbvL1gYbKiptD2CNikTSWP9bM_riJuWpPgAP_IHHBb6OSuWD8VdfYlhtTgPN_hVCnck_XL91bFpUPTdM6mcmPCqrpR8pvXRoRw03RkFdpmNhBym1mNzF56JA9tipigW9ia9tNM-gw-_4lFzAQABkHgGgiMfRV87hWZ7Ur8wAqE-bX_D_ZGjujMUrZQhE6RcygmlVzznrwzrQDzAzFlxyrzKoHmC55Wg6QauXzgESqpxKDG2E80TBBk5r8jkg1zbckqemf-HkmU5oiPcagS7IVVcE9B0RePVBHS6mGLCS49hHPtMnU0Wcna2ufD7NI6pqnbegH-HuCLeu7dRH3uR4x0oJKSNZOTSnxb9re8BrV9orRL6fTUqKyD2rXKeRbvq_AjhrMCydWAb7wy-RTjudslbGYcFG_tik86iv9mhlkZZCmUyyHyun4R6PrwmDzftWgN2-hkYrpzOvbCbsPVPBlBQ_XLd0TSv7TdjIn0NBoC-l5bOsvHDohbyuechk8-GRbpnd224UwceI-Hu0Sv913rErfSlNn6R2ySfo8KZ_DkTrwYDs7acre8WcI7EFapQF1QVnhWH-x2Ykr1R3Ic5RDqukn0g2QyhKl1wt7kIrw3FR7ql4pkNz87sTKgZNGFhL1tJ2fin5zylHyTuEwBbIKgYiQltNp_U8oDf7gjfPJdQ8X9b9njCXq8X7b96GCRPQi2F5AW2jyzw0mKE5_tjlhZKbgTQFBmEXtmDH7IhzY9TPd7G-ahmbCovFjAl55OgrlWdLwiHVmrE5K6nbhmKbsngX2YTS02TgSGdl9_gA7US0EMBYrZIKXCT4QN2DR_gzRv-i0P1H1IRD6L-pGxNnyH_YEELm5SGSMVOMlQvYaiW-wgapLzkQl0V6sUKlb26n4LanOT-JGA8TU3WaxgfMPwFNk3QRnBn7CwjZuwtNMQNnUr7xfqiDyMI52hOLGstEnyOIOyGnR6c6_Ll7M2wBuS2RUj-u92Vbi0mAiU5ByNycFnuBMqzMaPoECXOQVaRxj8pEo8M0VWDoV4uRD0jANa5O7SdJ-Ln58SyMl1AkR66ubjI1oUGOv91Vom2ARw5GSYyASEV1Emd1mKKXav7Ms_0Pi-fN6wcEMbMxkkcoA2CdUeP3NcOUgB6t67nQ29wlCnqBB1hJBE_mxFBSBY5kI12I_nNeEHSX_ImK6VJSn-1y0yJdiDTuHR2KwwVAnVptQUU5IDlKVTMuVyO-TmxwoQPKeTUiP2US-n2L7o4t7VzO7om64LlMiyVNHqLtehkdQ9vWcjUabnfAfg5DyP6sJkFVKULyEFfEVcYQGBJz3jK2DllK3J5Gy8ftDWnPmcHIOrZU948ZCbveSA-ZOdAgkk3sOJnIZmXz5nNlH80zMx-bKkpLv_bbG-WCAgFUDb_gOG5Eh3BNMMj5LWqtScAD1FcysSk1Y3yTjhKDpGmgMd5uLuDX4ILt0l1MSE09yOlubjNmCmsf4UkKTQlDOLuN7uVvyvSCwFfks88LUMkFzIh9wHnlzkB1Bu97EzddzW3SgbfiXcalRXQ6RsGhOYO01pu2ttTsaiUKYEPcpPzTajwbx8x1_mvg1KxFAQRkQpnzVWm3xOo2n14sP6srn8DJjuT-QAwqhIW3QPiYJYmH2eppIsNrgqL5Ka25TZQNvMnP_9wgDhjvz7_wSo1yUE2EMG_kWF7KtIeagRGIoHXV6y44PQ--Ee9pa_4G-RKnAgnMPGl5OhRTL-5U8FzMcvtM_VJIj-I0A16syP4YeeBPuU9ygoEUdxe3hoEbx-4Y-NKnob6eBTDuJkOG3lZF7A9PuGU_f69E1VcVYEuKG9Nj3MmwEDQvP5nRdpeCTishwTD_FHE6Ec1DdpWTAfU6AjjranmJIRxHw88U1LtzqQaMrt-pDHBwMSd-DUR_d2Om7tfEsxfosqizYoPuDj4g98hcejLwrqPD8cVbwwBzUxjauG6caCykKaBZmPWWV9Ouy6j5DZHfWPFpycbuIefcBZr4jNHHG36F5QM0o6Il5KPOQDsE8-bd8GBtpHB-HRA6fMIZl76dYsJF-0zNbZWh4A_Ajbtu4tCXbuOMYDOfSd0atSYQu8f_DZHX3EriHYb718H3nybbYWBBU3VCW4BKbH3h5fmac1renMZtmib7WTrwQxjS3AR1-jVHGrr2wZUZfmgk9iQd0n4Ccdtu9aoR2R6IHvNnXuavOTbLWHCrFMd_GF03av5qPSE_JY17Q8CiB8DE6i0tINPI_T7VawLIytkXGp3OxndZOl3RcA8TkiHRA8yePgDOKhe1hkVyMbqDYXTAfVw86OBcNolXk7nwXwyEL6jwR_PUix7pSHZIr5r8BA_vsFm9FfDjCV2HiADI7s4k0reSgiU9MGSbcDOTv6IG6alGcLVPAfkXsn-Qj4yCRMO7SYGDDTs1kDjHvPbyTwl-gScPMyQbtPdVWt2jnuKDANRX_4KbiTCV30Y7oAhRZuAsWW9xj17GD295Eza3KITdv8HLSNF-5PunnKet3MRgoSmWNeBiQYyhnVKve9P0xz3Gl7uQUojFI7npTbakMxP67ZX52yJAdEKqKqAmMY5Jg_wtr97jO6D5W2iWkK-WcqoPbEHdabNsnMtQPmHCydlElWQ5qrwcNBjTWsS8ulQjgCh-PWXgBplOnHeqEN0MFsrSRESNJzvd0uzrd85YQkTvlLK7tcDalUOnjm0se2Tth_q1QFo6VFLvAP-8rSdhugeQAPSf44-pIwwq9HJAUBbDgo0oVVu6GrqVTe-1kODYT9RyxnSURVPNGyFqx9YRqQmV_qe7VPivBXSJUJODCvvYCw1fzmc-TqGMyYxKOwkpBFcotA56qHjyOr_-IjD-phw_0yFlp7KpPYBtCCKRrxaPdMYmJ6-l46NBQqqD7BT8v4klvFdkrHl-7b47Zinp8ooej6Ygzoa7twCJoFQE0RQoUWe00_oqadWFsfY1ysBzSxxcUdyP3C4wCgE_BNTkobxQsbmUkVQ0u1dqXVxgUlhOD36WmzAD8gy5GT910DZR1tZBCmWiRVJVpLV37kPYos0fv_cWhO852B_vLr_KQ9txwkWut9JVnx3TD_FQTgGpRe8TEW6SzgytkgX92ij9wShjoa-38yrOdMh9FLVKuhOO4iTmDCLUlv9N4_v9m6C9Qr9t3kOIScYsXo2rY1JxNgpA1hCrdfjBFohRktTN8cbwW_DZSqvsx8Jly69TZGcWTQtBABHAZ1dg22sQTBRWHHyCWQmKVe1oOsZJMtaa9JlD96p6CN4jQkZ61W3oiE3JlyrdBg66eGr_hTaOFImrCo1aV2mRm8N6gtFKnzPgumOa0rDx0QrGpZS2tdnzrUwWQ7h4elf3ZDg1rLqbFAUjVcF5rRtFzBlIg2HayYgsfTZFZF-EyIJ3Q_JIg1AlC2oEJ0pDjTPagg7ChjRW6aGGnUKcXKW_3OgLVD2xsPTuzbxqIJ_0gypZFBopq0cy8vWMR2YYXBcBWpu2BcNKYJ8Rsa7ftQ5xKEjPOxe8SOdkz1aOs0l8WdfdIJUXlRN0o4QRGpiwQydPEBuQ2M9WJnWDoITJnQvmoa6CWkdY7cGM7e5_1EFbVWeOQhToyN6Rftiwgdp6LP1HkGKF1CGO5ypEk8Ovk713o1ALaYtYaAmAujdGuzZjOpQV05IGjXSjNYQeog4loqLzKYsU0pFEb3h3jIq4JT2w6HA4jHtuzuUxPL3j27dysjmfa5SYKZzVDzAEDDEmpdcR3ushWEW80aqLazPGQURlS5OsjgFcsKk7dxuPbVevVD6FKrmAnkdPpe8bFbIbXKylS5b4IsG3HOtVUsOl-qSsNiexzk-p-LhH2-03gyimNFaGTn9yJIgYXUAByDYU-PJkvZwXQ3GnPo_JjBo7Q_wLrX50_pszENl0wM0NKHZRZambxCTxH3EBj37PorIcoAPozPSC2sOTh3S6TYbZSZFdStbOWEJ0Sh3dvI5vcAbzMhdIfjfJBHl_gsrKxOnY4Rd9f31y4h1PxMMnC6GWiAeOXmrQo6AZI5UtdUNC6ZxqH4vLSm5A1aNnANvTTmImrC8lWVr6-og2P2YN9Y_6yhIIKNd16lDk_P05tFjWRnzWF9rVy8t-0uSB1HzDiyNwAVflXctCJOuj_os7KxaOnkIPHC48aD4nLYRjO2NPr8UaKpPEoJc4f9IzLXLL-7yrkjVSjGaV-jEkcKAlUYjjBmdMY-3bCXgP-mY-HEXr7hrXGDa2neKXvu6ZB4IVSilZmDKNpJsiEvzjruf-3qJm9UyCjr8_CJ99wvQ2apdAts_04UMYo-7ldrhTKmRQgjs_hhO2ehX-7lnsbyFUjIjYwZadIIq66PjhBen2kTq0sroNdLniJtGaDs3S8kU2zYQwDT-pDq0ZdG6ZLmZD9drZPy6wxbpXNX6bmIAe9q1GhXWvMrPEExiePbb-0sVWy8rGz7pXZI0cJ4H3Os85x4Kxd3I2cAukIc4C41kzWluNASUiSnoNixLm-wYDhoymA3P6kpn95f064c1__sNL-bT2wNAUhFrFaIbSw2C8P3ACBislisKgK6mZ0qduX8rNwgTQw0pN2gX8DlfJK-0uE4xEmAWM6prHmuiYFMgX5D0bMYqDJ4GuTlJJWMCXcFVVDZC3BTGflW_QMHmvDgq8lwcgGFzSImcnYUdVpjQAHXUGeQ2y4PQrIxXwescB921D8JdXUyLEiWMPqyDgofnkbA6rOxrJceXwFOzsVEUvZokCvTzm4yC98pBGbohwstloBCOVtPW-vIYSMOsWx7G3TYUCuKpLieOKCenyWGSUtjmETxJebEX9F8ciMoUaAcMmuNk8mXrvA_wg3F6X29yDDABMEid4Obkx09QID1BHhvlxrx6QYNqM9PJsGO69l3Y7SgK76KYxGM5ujPv3_xKXUvulE4M18_O6NXH3xZ-vahoJa0bnQai5vZJ2dYcWyfcT-U24VtnZzAEzeHF1TSCdxUPhdZ8mJ6szXZRrUjmrqIqxVNjlCFdXjbYbtcwfMeaPDlajR5gP6MJd0_JFDhP3P7B6eQ68gtYCDy6hD3VahsAG8u39n9spRX2jPmKrs7UwoVTSitkTYIQs7YziktpCm8knKcHQdku44oiPqT_WkYQsNECgXXDPxvw9Fij0hEutxyfxCq7pXKYDK4visggSwmbBxrQAK-Ic3KwCiCxuzFMKOlhI9TY_j5MkJLkvBUm9Tr5diQHOnSHH1FI01RwlHkPcrO44g9gs53xyrI4_Sy_lDj2nLF5m_-b9DQEevUpYjU2EB2QO1ebxBR0yaGDstoWrQUB7THokt6623oYEI2uIGlWdT3IaGx1luOT06FTMQDqx1zQUKrwlRUmCXfsg6wvFVDfr2CWOy6DM_Cligq4yFnqW___N1NUgLj671gcJDI=","staged_ledger_diff":{"diff":[{"completed_works":[],"commands":[{"data":["Signed_command",{"payload":{"common":{"fee":"0.081904336","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"19","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mXHGonMAQxb197cM86zXCeBdppPoRTnG4bYVoDeqKfssQ6SvCzphT9v7e8SWhpyFqZqB4eKdsZrtyH836Q2wKHY3ksCz9Tb"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.099139144","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"20","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mX2etVMqqgtZsJWtSjYQsn6N2Ga24dEgGWhECqzL7ouHACwteJE7DJ95qfvs3PFTJa293WbyoMP8PirLSzoZAuGHDHPeRq7"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.06617985","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"21","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mXNvpekjJMYUutsbXPaFXHHTGTJowVUgdogNgaPhwSmc4HCevdcgxQqLNwQ2AD9vvivZyAcHha2jAP7xBb79JszdxQDQeS2"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.096619897","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"22","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mXUCBmyUJsfE8Mdp4zJe1oXNzz7sbU2JxKVH4SXYu5rN1juEzy4ajLKoU3Gdz3A5GiE3wnGghWF2MxNFvLpRqSbqKXjS9St"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.098217214","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"23","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mXDvadEXmWkmDZhTYU9WsXyzLcL3fuig89pLPGo9ZCakWisL1hQHt3U24qTWcCzD7mzFh2h2EKeMCv8xaQYKNDCdc94DNpn"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.052665658","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"19","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mX8iyBnSBBhG2pPbHKXebEY2kKNcQ1R9Cz4BzaJAh1Wxcfm1zeD9rsZktqQih7uARCawTgn1kZpemd2iGRxB1VTQJLjg9SR"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.069786361","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"20","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mX6oCEsSKxwNjc7BLAVRDks6aYytj4pBxe3XX4Mrw5tjciixH6xFktacjNnsVR4BtEzVr6Y28CC8PV5LECRpZpcaFeDkayw"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.067513786","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"21","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mXXsLrX2nGMAyTeUT7KqAbBit7R22qFxe99WDA1c86bCfjwdWZPa8UWtMdq5YMDCSvvgLrPGVEMQL8WTrixgUy6pQiAhWSQ"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.054389893","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"22","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mX3m6X1qkGHE9HqQA5t63fUmpLiZTv7fLyDGYQEnP4dVXcav1uJYibjYihmDxPKZz369TH7cs3Ju42jvLTLfewqHDdCqWy4"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.06674826","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"23","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mXUi1cTD1bAPYQdEvWx9dBPG49fbiVUyQQ2sLCJozFDc9DGTbkyhWxQW6ppmZvn3UpV39uxyvD7LvYnCeof9PApfU9AjMbF"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.081352622","fee_payer_pk":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","nonce":"24","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3","amount":"1500000"}]},"signer":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","signature":"7mX9eegc6A33Xz2vVX7CqoYrVAKiGKgBG2qFUBEWWD1QJJgsCCnQB3y2GtKGwsKQabuhrQMjNQTZcSFY25creqQDRhDrEsDU"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]},{"data":["Signed_command",{"payload":{"common":{"fee":"0.051064929","fee_payer_pk":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","nonce":"24","valid_until":"4294967295","memo":"E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"},"body":["Payment",{"receiver_pk":"B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo","amount":"1500000"}]},"signer":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","signature":"7mWzqVtQeHTGmuQLjtqwn12PkV2b7B6KDVYLtpQnEfJ6idrpJeqVG226EUfqTeQBcqDXURfnHvzJgkkPP3tR8A8jGiCZT5xx"}],"status":["Failed",[[["Amount_insufficient_to_create_account"]]]]}],"coinbase":["One",null],"internal_command_statuses":[["Applied"],["Applied"]]},null]},"delta_transition_chain_proof":["jwNJ5bLwf5n2vFDcRpHGjwNmQK673sgPhPNJuTV7Aq6R1cp5E3f",[]],"protocol_version":{"transaction":2,"network":0,"patch":0},"accounts_accessed":[[203,{"public_key":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","token_symbol":"","balance":"19998164161434","nonce":"25","receipt_chain_hash":"2n1ChgRAh1NPQt97SX3w4Kwc8nMdZ1ogmJR3nyu19QUZZDwpEQAp","delegate":"B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax","voting_for":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","timing":["Untimed"],"permissions":{"edit_state":["Signature"],"access":["None"],"send":["Signature"],"receive":["None"],"set_delegate":["Signature"],"set_permissions":["Signature"],"set_verification_key":[["Signature"],"2"],"set_zkapp_uri":["Signature"],"edit_action_state":["Signature"],"set_token_symbol":["Signature"],"increment_nonce":["Signature"],"set_voting_for":["Signature"],"set_timing":["Signature"]},"zkapp":null}],[202,{"public_key":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","token_symbol":"","balance":"19998178678461","nonce":"25","receipt_chain_hash":"2n1jYxGVfdnJ421vRDKcoWPFwZjqX9EZLNKsLVRQqsDfofjmRFWE","delegate":"B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t","voting_for":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","timing":["Untimed"],"permissions":{"edit_state":["Signature"],"access":["None"],"send":["Signature"],"receive":["None"],"set_delegate":["Signature"],"set_permissions":["Signature"],"set_verification_key":[["Signature"],"2"],"set_zkapp_uri":["Signature"],"edit_action_state":["Signature"],"set_token_symbol":["Signature"],"increment_nonce":["Signature"],"set_voting_for":["Signature"],"set_timing":["Signature"]},"zkapp":null}],[6199,{"public_key":"B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","token_symbol":"","balance":"84053885581950","nonce":"0","receipt_chain_hash":"2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm","delegate":"B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A","voting_for":"3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x","timing":["Untimed"],"permissions":{"edit_state":["Signature"],"access":["None"],"send":["Signature"],"receive":["None"],"set_delegate":["Signature"],"set_permissions":["Signature"],"set_verification_key":[["Signature"],"2"],"set_zkapp_uri":["Signature"],"edit_action_state":["Signature"],"set_token_symbol":["Signature"],"increment_nonce":["Signature"],"set_voting_for":["Signature"],"set_timing":["Signature"]},"zkapp":null}]],"accounts_created":[],"tokens_used":[["wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",null]]}}
+{
+    "version": 3,
+    "data": {
+        "scheduled_time": "1706912533748",
+        "protocol_state": {
+            "previous_state_hash": "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu",
+            "body": {
+                "genesis_state_hash": "3NK512ryRJvj1TUKGgPoGZeHSNbn37e9BbnpyeqHL9tvKLeD8yrY",
+                "blockchain_state": {
+                    "staged_ledger_hash": {
+                        "non_snark": {
+                            "ledger_hash": "jwVMGhmVz4TGricGfDUhqpb1KvTazWxDQteLANkUCynxWwwSbsn",
+                            "aux_hash": "VRRSuxFLR5BSJ8ZBNdYoPNWj6t14V7cUjCa4WwbDYFvCi3CbTa",
+                            "pending_coinbase_aux": "XH9htC21tQMDKM6hhATkQjecZPRUGpofWATXPkjB5QKxpTBv7H"
+                        },
+                        "pending_coinbase_hash": "2n1bjeNHcTTodDMgBqPb4EiBoFFHDkHjHTNDh8L6YDJGHyhYLCww"
+                    },
+                    "genesis_ledger_hash": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                    "ledger_proof_statement": {
+                        "source": {
+                            "first_pass_ledger": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "second_pass_ledger": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "pending_coinbase_stack": {
+                                "data": "4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un",
+                                "state": {
+                                    "init": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej",
+                                    "curr": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"
+                                }
+                            },
+                            "local_state": {
+                                "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                                "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "excess": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "supply_increase": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                                "success": true,
+                                "account_update_index": "0",
+                                "failure_status_tbl": [],
+                                "will_succeed": true
+                            }
+                        },
+                        "target": {
+                            "first_pass_ledger": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "second_pass_ledger": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "pending_coinbase_stack": {
+                                "data": "4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un",
+                                "state": {
+                                    "init": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej",
+                                    "curr": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"
+                                }
+                            },
+                            "local_state": {
+                                "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                                "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "excess": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "supply_increase": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                                "success": true,
+                                "account_update_index": "0",
+                                "failure_status_tbl": [],
+                                "will_succeed": true
+                            }
+                        },
+                        "connecting_ledger_left": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                        "connecting_ledger_right": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                        "supply_increase": {
+                            "magnitude": "0",
+                            "sgn": [
+                                "Pos"
+                            ]
+                        },
+                        "fee_excess": [
+                            {
+                                "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                "amount": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                }
+                            },
+                            {
+                                "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                "amount": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                }
+                            }
+                        ],
+                        "sok_digest": null
+                    },
+                    "timestamp": "1706912521000",
+                    "body_reference": "1d89bef5714b9ffc562c8291100c4208828438407dc41162596f5d29f57ceb45"
+                },
+                "consensus_state": {
+                    "blockchain_length": "10",
+                    "epoch_count": "0",
+                    "min_window_density": "77",
+                    "sub_window_densities": [
+                        "2",
+                        "6",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "1"
+                    ],
+                    "last_vrf_output": "hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=",
+                    "total_currency": "1013459001000001000",
+                    "curr_global_slot_since_hard_fork": {
+                        "slot_number": "167",
+                        "slots_per_epoch": "7140"
+                    },
+                    "global_slot_since_genesis": "167",
+                    "staking_epoch_data": {
+                        "ledger": {
+                            "hash": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "total_currency": "1013459001000001000"
+                        },
+                        "seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA",
+                        "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "epoch_length": "1"
+                    },
+                    "next_epoch_data": {
+                        "ledger": {
+                            "hash": "jwkqwgAC6MXgfiZmynHRqXV6PGbMbLwFCx56Y2rt5vwdumf6ofp",
+                            "total_currency": "1013459001000001000"
+                        },
+                        "seed": "2vajPBKdG6xtP3mRfiMfADBXtiFfdcEraALFV2XdetZp8p7Aqrid",
+                        "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "lock_checkpoint": "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu",
+                        "epoch_length": "11"
+                    },
+                    "has_ancestor_in_same_checkpoint_window": true,
+                    "block_stake_winner": "B62qo6Qdk3a2tgwaYatZ7HQyCB1bkD2QN9HdxrNmGjCEVxfiMYm7aQj",
+                    "block_creator": "B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A",
+                    "coinbase_receiver": "B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A",
+                    "supercharge_coinbase": true
+                },
+                "constants": {
+                    "k": "290",
+                    "slots_per_epoch": "7140",
+                    "slots_per_sub_window": "7",
+                    "grace_period_slots": "2160",
+                    "delta": "0",
+                    "genesis_state_timestamp": "1706882461000"
+                }
+            }
+        },
+        "protocol_state_proof": "_IARk_QUqlDS_M41W4sjFSaeAPxUcwJzo00rXPzhsbEhk9BJKwD8KFn37uOGayj8MVGO42OG8qEA_G2SEUSvYsFT_J3pZZPgIqToAAAAAAAAAAAAAPwQAxATx3UbPfyvStz1UFq6CwD8Whp67a51iWr8JLo_VE1O3EUA_B51WMvor0te_OAyotoJcaLXAPyIqQxTXmTNHvy8iwfQyytLpwD86tz6IpGm-_j8BOj8uUT83RYA_CPcTli9bmFb_PTyvDjrAoGSAPyzkzMnttHY5PyGlQN3qGyxRQD8jCV9n9hB7HL89ZatS8eSxQgA_KVHzBhhhoAn_EEas1CEUJxjAPxhJAYGYuJQUfy01itfO1Fd9gD8zQ6FRoBKbST8IRrf6CdSPhMA_KyRH4sGG-4t_PE7DQJYcLjFAPyDUWyb1ZCi2fx1P7iiU7JAMgD8F9rhqXGdDkv8m6J71vU4DTAA_IhG9ECjdGnZ_B8_f13pnOMnAPyZtmJCw9Pctvyex0FDBaDUxQAAAhD8zpz9MUmU7pv8Oy_RTXswqHb8QAIE98JXZD78tbrxN0y5CCMA-9Lc0Czhisbkk0z4kZmHbQqsZpqT9tb2AkLNMnwsGQHitD_EGmDvIlFaEnTBlNyQMh5SX5kTTc-Bom0NEo25CPwrDzlSB5BrNPzYUecSSSNNRAD8n0w68GC2loD8VKwVlbXXhwsA_A6o_J3W1FyN_BfEkhIC7B_qAPwrcyd_10oTL_xFWlQ521tMXgD8Nvc3nNhawLD8x7ypjM-thP4A_MAXJinbimrA_Gamt8_ykV4jAPyeUKCxF8-qq_x3ANudfVCWNQD88AFE3LdNKg382KHC7RKmE0IA_LS-oekEtMC8_IK5zAW3280sAPzmgTmgiP0lkPyp7TfgjPKnowD8yAwIM4qwJlf84cZfjWaTYz8A_KFc4pwMyhhy_LVdFqFz3byyAPyPt6wChzoe1vzSWGxtdY6hRwD8qwBj6lmD6J_8G4PDYioFhm0A_Gve72OUVdGz_JEr-MO_fyMeAAD8qCadGZY3fqX8U-uwvwkjYU8A_B1vsQ2GRotz_BVkrC39O01jAPxJ8poWHETUEfyv6VHsJnJoKAD8yRYgqrYcWmT8MYQEKRUbpjkA_DXEWqBVovYV_JKWIISsIWAQAPy3ABJaQ7et8_xzbN9V-GKOJgD82YfykYejUW78TQ05uBGpJhwA_OYe1dMCCUcC_MX-02DD0H6ZAPzIjZXLDYAUVvzx0Q3pq6NRnQD8ZnSP2agvuS38htk77Ce_ajcA_J8-L9hTRkDS_KerEDKQayj5APyUnLe7vq0eE_wpvb2EaqnUcwD84D92FCqcCnX8eezT1hFqCx8A_MVyLKE2_3yz_H8L5BmjtHC4APwDSpCrn-7bd_x6L3siV03tqgAAAAACfbpdOPcbjU1wTzHLuHj8D2FxndhcSSqZidO0bEvoLBmc1fxkppJtwiZr0ZcG8pk4SqtrkjrhtoZGdq-UzK6LHkzzVmHkM5yk4GUdBLFuwU5gEsLYrRCQHp5776VaygEzh3jddAdXNEC5KAVYymTfkrHgaHRE1hBPVsk1VzuA6DcC_Ly5-ckNX3oi_LE2CCx72B2IAPwxebz4rmXcwPw8jHFGqkg9UAD8tdPUrFqTBd7888XFdgEvfEAA_LrTZyFFVLqU_HZxBa5d-3SkAPxFkdC0nttttvxYrSbndU3AZQD8MijykSbGxAX8xTDIXPegmxIA_J4MjewEKgXx_IoCIBfBncvUAPyLJf1bj7zS3vxUixqYJmlEnAD8o9Sc3BK1V-H8vEOc90eR0WsA_CJmF0vrQXte_C5lCeT34HD5APzF24XY4NKvM_wdqEx1WG70PgD8mxOqrcPEGrj8YKFXttWabrcA_NU1Xx8DGuS1_CzfAgNoaJ-EAPzdprIxwERbG_xwzYuGGVNkzAD8J9j20v4FWHX8n9Yb-Y1ObSAA_JL9Wdvgmjon_Flvj8RtyfsWAAD8uSqnVrRwc638_J7x1SP5TzYA_AB8L45iHIdZ_IfMJqJz9secAPyv8raeHYJUI_x-9X320Wu51QD89oaQoND3exT8aCokQM5iXmIA_A6tVjJjG8av_PvhH6EQcoAJAPyRQazKvh5Y-fymybc-mdUeVwD8vcNkzaNQTqr8aMX-wQrnFNgA_G3eXoLfrB2y_KUH28UXogj-APx_qubp1g9Ogvwsf7lOmDr2_AD8ygQbcSuIMcP8KSautsesOZEA_O9Rgf1Hjw_c_IeVO8RDeqkAAPy_MobRHtg4YPyrBaqicLyz-QD8Wkev5eDSdZT89tLDrgKny9EA_AR8Lfn2D3i-_FTi-zKRWD3hAPwTdTG4ErdwxvwIPkiaM8x1FgD80bjKsaKwwUj8zrFxwOMEZhsAAMnnWAOnHMtBY-jess46xEGIttZailVJ4Mms94wwCGEO8vuy0E5jcqt59mCkDSl3NbsrXU9nl08rkBIrIDnOazIBIiEPGqZyOV7sk6Vco_qdNbLo6mu-ycSL4QDYDgvflgYBV6e-Q5NSJuPwDA0hNOt5jTOiGUJfHLG_bjKh7WfNHw4B4Y_F_e5WVdQNR_hMcjYxV8L07GRf9uy4L73x18obbggBdRvpM4fPrLGicIxSKVHh3hVtkHYjR0T9du93D2VWiTYB3QgxnUo-tCxep0TpxOMKmCF87JfWIAaJ1vyesJbRsT0BtLEntgQPLk0oNWG_Hmnt1hn5ZGaEg1tjGXmIGg9aKA4BzuDeH6koco9bjgHs8DZv_vSZuEiUedgQA-sdzqpNRTUBbz7cFcoatdQ1435Y9R4BIk9n7qoTf6cB3R17KrwwODYBat4xwq4fd_if0peE1npqPNvr7bRpoxYc948A6UV8rgsBpCut2umPwI10cDzLOU1a3kCLU6xOgunJXrUDId_qDh0BykvzyW-2AFPKGqEAieFMUtmXA_xV_hvRaVWRZWTrqh8B_H9CXvj7nW5GAq5RGu01IjCtGgjjnMaZM7z0Vp9mFzsBoVmgy_eqV50cIbaNAxMLtnNaUy7EcOXST9wFUZKgNiwBTX5T-cn-0IkcjsNnhWj9sR4SsGvJe4aCP35JE99CNikBm2z2vXkWIj9nmuLsAWNBI035GEpJk7ZIUa2PxlZ7MQ0BwJfq8rb_QVXGtIms_y68wOzVW_jHwfygR0KXEkKyfRwBdSfNqdzCUZyYmy7h9DjZKIhOZst3AxWFSDoPDLiYjyoBi0jEUtZ1kspLHi7aS4o5thPFymlk4h_Qm2ENyD-TMSQBFr6Ea_6WXr4xKMrkr9mP4E8Qn_CctGmuD47bmyOOVwoBFX5fdfoqLdkKDoLePqATomS5wJMSHaZHzdMBiQvTtyYB5beWVYzspl-RMFrfwYPyOGJRe2RdZgJgPOI-RhwdPTABInoUxkvaAyGwfds_HqmxQcfC65Xm6JFGGVuRrt2DgjgBxhl42HIGz0pH4w61Tso43N0O6fGfTdqIyp5v4KVWkysB4NrGXePW3OmZuvZ2ovOe3iD80_jC81Xb04Y9oNpxLw8B7iKDDDlg3YIcH4MqLUhPWMzNUtI7Fx4ctAr6lQAllQUBr1Z2zt9_8TzE0vRG-qY3Psy5np1llhcJzYxxzQBCzA4BA7KEtKeXg1LDp-nXr4cl6FWCJ2qzU4hgXXNUhuLrUhgBdd01B-fVGsgh1rNd_6H3fXY7H9F7aOdPt2VL12IntBMBvsl71evc7Td146THohTTH_bKl-Kbxh5r6jixlp2XFjoByyBk9vuRYLy00ODnW7mh89ng5m7JRRGb7s4EaDX6Uz4AAUXt_8wisjxfrc5uQCV0AFV8uveUrbZKAH1fWoZYNTALAaZPthfeirG6klhXRS7bxxTxMWUVSs5xKaMsUtQ5GM0MAa4DKAW8ofDRPhSUVviPMsXKhZCgZKKM64y0hepUnIYvAWsc4TsQc_DJINQHFZ7GkLsIX_xbWm54CSIXg5K0_uYAAYMpK4tRbosN51wp7zksEqp9M4SDR7u2DimgUDXWtdUTAbOTkzrnBY7sv1R7dLK7uhnd6XyfZ4hLWAIjkijFEAEvAc6RJAwA1KRw_dgy_AO7bTEYwAE5hzjuwIUUBMJin0w-AWHNrNnDbyxXRHo6dEwIaARFh-hVbp3HspJuDfjTg_cVAfl4vueugFOg1CwVesaqtXdE465jHPuX88PgF-en6QE-AeIRzueK8FpaHwkB7WLAlI_cTQng9qzBd0rdRnRKtJgcAcn_C9PfZMnM-rpk0B5ycxdi2CtQ8SSl9RbnbVkOCUkXAdYDufh2ocGZQztKMwSs89KO9CX8vSQ8wWvU1p_O33YdAeEDz3CVU6Jcu-V0uzHwVGUwOxpDwKCP7f2tOyo437AMATU-BknZEYuOS1921mUCtf86HXN6Ccqu7UvgsFQ2C2skAQzeFeXjXZQY89DcPT-x6Lje0-tlmhrTOHi8dKDDN2ERAeZbt-GawdTyV48VyGG7TBvtcxdV9EjQvQFLkYswL4YJATdqs9XydGihyPzN-sxPBn8QBP61LH2OhGSbIckPuxEkAdCBhbo0ZSbCLzhOcF2iL13YC9zzXONEZ1ey-4QxthUhAajJs6YMWenSqNzsiXpkWDDJxfWu-sqO4_mAZuYQGqcTAQpZU56LEIZdl0fCAKTdmNTHU1y8aBhRmDWiCRl4bK8OAV-ZpaeIAu5ET0Cpk5ro5f6mpLwkxwG6PDU1J2Lr8aYfAcfCeIthTJZLtjH3NF3vEZhvRpx7oNat22og2Tp2pUoMARa5i1aeLaerujU0KHg9icAXpnJYqEJOxqLIkxdsezUAAb0OsrdHq6NS_cLiMt-38rIIjo7vr_dnJy4WqXCJvrYEAaSFCnN_MkLSuNZWUD8MJgkTn1Bmmf3w1Fjd_4CcSJ4LASXIYt-EwCCbzS0Z9UXHv13yEi9u6B-QdM3NeRl33GUJAQu1XleyZenbq-cFGeBHT0yzZryRZk9cNKETk3bVHTY5AThGTWNSmOTcdhjJjlGVPxPB06_IuhW9RDRikqpcyhQxAdhnKIOvrzOc1bwdepYDl2QJwvjOUnAdxO6ZxkqjDqQBAZAC4zJBdC-1qFhh-hUmr49cJURwSqE_nxw6bPaeERclAAHAKbOvnF8gtLV2_90Lo8KPGeeeLfje-appHu_lt4uoLAFs59D_FHKI6qOUkqxUqDJS0MSsQclHXRGzWiZcY6mLLgFXJ7AMGaNU9UKl0wXe7GFmjQeHvc-56KnWB5pTYDJwOgF_SaJlLjAtVLghGZrm8k8JgtLWH_fGT_p953sZ-iEKKQHV8QIDteR9pi9bVoSwnWW9BOlb1lTZLPIDVwTTQBi8EAED3nYnwyhjxxh8dQNwR-ChzBIoSyTg_SC3URMlhXslCQGaItlWt4b1NWgADlBxWvvbDtyb3sXYw3vYfKu1ZoyfJQHvdGTzvlayYPQG0G3C8y9L_NJpvvLVqWEV1wHB7w9TLQE1JlZXklifDvEkBsk6MBUo93L6WeTazTybWLjNsDcvGwEvn5x4oxG-HsNFAXH06K34J9KiVS8zKnuB2dsjo2CnLwFqst3cCpLJWfNW5xa4l-BUGpgFyEqOrflqM3bAn17bJwHndvAuOA9nt-ZymMh8-7yw9qRRIm8nJCI31qx5ryiuAQE1qL_8xk7Gx7RoAct-sD4QPJIVi-6DvqFj_uXIX5NtMgH-tFKrN-IWyROTKjdaTqNGSAwvKs0kdp31OLYONj73LgABBbG40vbOvewRA2ExNwq40H2tsVYebz1-5BnQT4H_xg8BRBzDrbu7d64Zvv7RJLD6Qt1sw7Spjw7eDy_dYeDPyzgBAaU3z7Qymxndl0ZnVjrdRJWo1JJ5ZTL0qbg9OX1FMCMBUVqh0vin7imgbRTNIFrGjLWMI2O0swoaA_jDgCUOnT8BTG3huXSPYJoHNy5l680V-a16tW54o4vMghIx2Qes8SEBTtEvb1NNoky8IZp-qeVpB5T5bUdF6cPn6bhCXigWYgcBPbAUuM6Rj5-QRtnP8F4ubPND3q8j-OAhx9fi9nCBxQgBHsv_DFKkbPiREyF_onYqWgVlZnrkAfZrqqsaL-qNsisBTjwaZAsGTMnST6QZidWhEV-u8mNeQiUQZbS77Sa0LgMBVQQ3SMtRHIlaVF6nST7DhRRYkAuYlUS6P9GdUCNk2gEBnKtLFKBjx68iYWWuqysplE-hC1U2gKTInhed05WnzgMBJEkluu38e36PI9H8O8CalNR7tUkGJ3CK79Maf8AO6jkAAAAAAAAAAAAAAAAAAAAAAAAAAL-_BdsoGLGM-9zwJXo33W2m9sA5NKSW_HvoCHBoz2IhrofxLJQEqOAmIjZT5cKWffyywhShLLGZLcQSMCSGQDh4igrH4dQj3HSmNt0rSCmPq1WboJ1DwASvvA715Ww9Ix6F2uAD2khx-hlEqxlth-1PIREx7fidxWckpo9VlAEs5CtyrP0ezljdapQ_ta1Qa1B4n920nJL5H9YIEBKrGz4XMnKQFE3Q_TBDWXo7gtUNi8hXTBEOwlCX3bKYjTolALt4P0M1QtLhOQy4W04xiBTdwsoMhZ7FNJc-gyG-UU4vszxJqE5KruhiqKhr-BNaYcWug1ANKL2RPSvmi4AYSTvT68KGSxp3gZEO53g24DS7GvFSHqD0u7o8lrTF2a1nEzWBQfpiJrmmPCZBnLPDRVh6X1DtqY1mYH52IF7LZ2w41nZ66dcCf16Ali7hA6M-3_vclUyu47nPXsbtvMG15xeqHXk7dt8HMXZKxBAv6jbmq5Y2W9KTLByl7xneg3vsLzJMpvpCaZ4decXBuS3HN_cLMfg3KkI-XQf2EXQQtw021dvMrnrEbbzYvW5nQ1_TTLBHq1zJitcKcXNdFauBcwQ30NX58BEb4H_kmY6JXyjQI7LRXRAxK9MvFrut_gR7K91oB39jsdxNkdgtjxb5t03ASCbUeVJ7pZBVC3GaYY45yM-YFYXs03XTg9p2JMyM6PDdVkrun945MKvcSje4Vh2xHCfP4jSlFgpY5NtVrg-dSO73KOkrVVFIWRfP1DzODgxyQ1z0cNW6E4llC6HO29IcZgjqQUQMLFoi-MJOe7kArVO2Pvbri22V62NfPZU5Jn0Vp5256rxss6gFiWkreySIKulgwFBBkeTMPO3z4NMIEPvFac6cLAItt3ruXSgLIOU9B6yuyMuw28ApZbzSXnGrOWunPY7E0b59JsINCRg63ZumeqhFp9LyJ1j6qoL2vZR2LUKMYS-jZnxTojypijlIAjzUcYSrR-E1yMQYOX6kL_pm8c2kKxL5PKP_naELFzYr90a5xq5M4KBQDgoWtpK-MUiFU-OQ1JMBxsWa-Z4Bxol1NLaXUcH0hpAqx1xE98buc8RqF4tUr9PYriKgyyscrc7MrcIOiBblbuYZKf2u9b3bbTIc7f7yG3LRVlS0DBgK4XPQG8CnBeerh3eP2Mhz8XO-akzrDM1xtm70dQI6ZBj7pz9bXqf0vj2BY5bveG5tUN46MAC2HJP7TSrNazscDzGwSUNBYcztmKJYUapWajU_SOooDntdh9OPxg1jParckPmHfWl3BHUJ8XwXrRSfBQ-MKAmn_NNDlI_efooOADCDQpwhVzEuPD3xg_6g6UVpCF6BRkQqf3WwXjYLV0AuxiCtK9bN1jpIwzH1WPvlu8qjqwkmMDQJxZbXCeew4T2s_XLRXe5QHRxPq7LMJmyUWHyg9grr-p8qQF5YFgioJfQFAT2jTXKkpaPk4llbuTuu3DEEfD7__RtOxULBqOAJNilJ8_Ni4Esqat4l515I-rC4cMZsNXct3cIGsQSvzSchyXZR7h_7iU7I_-7a4J7_hXa3sHjHdTWRU8J6kgMKHaUSegF5-TcmTZRLAElVzkx7-DX6JKokH338iegB41ouzM-wwYAdEYW6ADm3Bq6l0LaDrl1jgOGZKerGDN-etA-6NyVc5WNEnxYMVtPlIMwBwmSFEW3-uJjS_uMW4mMSMziA7oZNORLmcOpQQk5vYj6TiWSNdvojzlpNERSOWfE6Q6J8LBz5wjpjQjO7xsUdzaR0YPABFXVy2o-V1ry_JyO687ZTtJoNcDHmGCPTJ2HHH5QgNrbTFlJ8_vgwH5j6EiIQ01UhnZpdixIAETths0hNLAF1Z4de3uhU4D7wjYgamtHNNYcgtAeEjYtuAvt-S8uawCvc-1MIl0QwaoZEdQ3wfHWQBOzbCr-CpFArQOS3__GehpMlEPMRR_EAv-WwF2HFvU0bmiWe9hrGB_yRB3uH22wTNmbrKtxP2A56-zYrANrWVuQnAQZbOLK_Br0tzm-SGo3ErHyvCpn8fjB3KBoprU_dnE_2djxrrneH_V5OdaAqMuSAbjeLqdF6bN9cMwIfgQkXwy4Xitfw-3u_cOzjWd8hXESmXRRXOWe9GVUVBiNu80ngdSMg3D3mbi6mxkz-jcjdpc7VQXKJ9zapQzsKJMSRq-sn1MemsXkRbxCcjjY9j5ZWLj6SRkt0a9INGQVNK5ZdNMmCvrMBJWkY0aMRqXPIlhf3KlDbBcWWU9nrHect1EeNbRQSgMWGYvxBdYulxQlUo4ZAeZSeCp0pxBIsi9xIEXSpV70WzB2CyIfIPldyQci8IFokeKBVVR29bxp3eP-mC3SpGWWuu8n6tChHTEZyUlef5k-82b7XTKK4Hu2o2tz9paviTTx88GTeJZ12LaR6uZ1cdRz5ETmd6y0bv9NEsl_q-9hLXB5B5N9g8Pdf70xBOW3mQK8ygb7_oA6nnVXrkOfzAWPLlTmHnb0CmO3UKoehsyBerdKd2tsICXA383cbMVZZtJJLGaWNjDLIFAfD_8jY00cUmC4eZlUY8a30FrAMW_rRZzkI990Q14ljc0BOZ_0W7fn-sht2JhXIzMREmJ3nQKO4jBogxDwQCVYCc8dPXc23K3pc80yXE5_sD7t-zP9IC72nDQczaUCmH4EjBSIwQvEk8cwljlIBYf0T03b5AlK-7soNRivpV6FoGlw6ixe_0nfuZzwfbRUkzNLIM9tvKlmSYg1WHt7OIvLzzZQP7ZDUh0OjTYHHKWxCdR3AyrYUzoaYhO6_1LCaErwI-pQd9HrOnqno6Pky9KMQAbp8BFCuoGIdS-4zpxEl1fkWn69IGPz5Xmko0Q2Caeo79B0_SYvouZ1udqGY1JYCo5syOTCkdawYRYCeHUrUAeQ-WoSifu5G3hX4hA9kkIjg8RXpk6hRJSFWaxkx0tEGUGA1QGcTwJ8UdF7WN2ncb9puenXwCkH3Ag0M6S0pwGNg6bytpNLa7kCNqKTOE8YsL-_R_T0GPTJ-wQCJFJPsarR7e-g7RuZsVO-JC6mFHz4IkYNhh4zqkUEDIjob568dT7p72xcfC3iFc0rkifxhcUnY_cH8rvX81GSa2T1gZGnyuWwNcLTjVFofz1uLJUumBbbvL1gYbKiptD2CNikTSWP9bM_riJuWpPgAP_IHHBb6OSuWD8VdfYlhtTgPN_hVCnck_XL91bFpUPTdM6mcmPCqrpR8pvXRoRw03RkFdpmNhBym1mNzF56JA9tipigW9ia9tNM-gw-_4lFzAQABkHgGgiMfRV87hWZ7Ur8wAqE-bX_D_ZGjujMUrZQhE6RcygmlVzznrwzrQDzAzFlxyrzKoHmC55Wg6QauXzgESqpxKDG2E80TBBk5r8jkg1zbckqemf-HkmU5oiPcagS7IVVcE9B0RePVBHS6mGLCS49hHPtMnU0Wcna2ufD7NI6pqnbegH-HuCLeu7dRH3uR4x0oJKSNZOTSnxb9re8BrV9orRL6fTUqKyD2rXKeRbvq_AjhrMCydWAb7wy-RTjudslbGYcFG_tik86iv9mhlkZZCmUyyHyun4R6PrwmDzftWgN2-hkYrpzOvbCbsPVPBlBQ_XLd0TSv7TdjIn0NBoC-l5bOsvHDohbyuechk8-GRbpnd224UwceI-Hu0Sv913rErfSlNn6R2ySfo8KZ_DkTrwYDs7acre8WcI7EFapQF1QVnhWH-x2Ykr1R3Ic5RDqukn0g2QyhKl1wt7kIrw3FR7ql4pkNz87sTKgZNGFhL1tJ2fin5zylHyTuEwBbIKgYiQltNp_U8oDf7gjfPJdQ8X9b9njCXq8X7b96GCRPQi2F5AW2jyzw0mKE5_tjlhZKbgTQFBmEXtmDH7IhzY9TPd7G-ahmbCovFjAl55OgrlWdLwiHVmrE5K6nbhmKbsngX2YTS02TgSGdl9_gA7US0EMBYrZIKXCT4QN2DR_gzRv-i0P1H1IRD6L-pGxNnyH_YEELm5SGSMVOMlQvYaiW-wgapLzkQl0V6sUKlb26n4LanOT-JGA8TU3WaxgfMPwFNk3QRnBn7CwjZuwtNMQNnUr7xfqiDyMI52hOLGstEnyOIOyGnR6c6_Ll7M2wBuS2RUj-u92Vbi0mAiU5ByNycFnuBMqzMaPoECXOQVaRxj8pEo8M0VWDoV4uRD0jANa5O7SdJ-Ln58SyMl1AkR66ubjI1oUGOv91Vom2ARw5GSYyASEV1Emd1mKKXav7Ms_0Pi-fN6wcEMbMxkkcoA2CdUeP3NcOUgB6t67nQ29wlCnqBB1hJBE_mxFBSBY5kI12I_nNeEHSX_ImK6VJSn-1y0yJdiDTuHR2KwwVAnVptQUU5IDlKVTMuVyO-TmxwoQPKeTUiP2US-n2L7o4t7VzO7om64LlMiyVNHqLtehkdQ9vWcjUabnfAfg5DyP6sJkFVKULyEFfEVcYQGBJz3jK2DllK3J5Gy8ftDWnPmcHIOrZU948ZCbveSA-ZOdAgkk3sOJnIZmXz5nNlH80zMx-bKkpLv_bbG-WCAgFUDb_gOG5Eh3BNMMj5LWqtScAD1FcysSk1Y3yTjhKDpGmgMd5uLuDX4ILt0l1MSE09yOlubjNmCmsf4UkKTQlDOLuN7uVvyvSCwFfks88LUMkFzIh9wHnlzkB1Bu97EzddzW3SgbfiXcalRXQ6RsGhOYO01pu2ttTsaiUKYEPcpPzTajwbx8x1_mvg1KxFAQRkQpnzVWm3xOo2n14sP6srn8DJjuT-QAwqhIW3QPiYJYmH2eppIsNrgqL5Ka25TZQNvMnP_9wgDhjvz7_wSo1yUE2EMG_kWF7KtIeagRGIoHXV6y44PQ--Ee9pa_4G-RKnAgnMPGl5OhRTL-5U8FzMcvtM_VJIj-I0A16syP4YeeBPuU9ygoEUdxe3hoEbx-4Y-NKnob6eBTDuJkOG3lZF7A9PuGU_f69E1VcVYEuKG9Nj3MmwEDQvP5nRdpeCTishwTD_FHE6Ec1DdpWTAfU6AjjranmJIRxHw88U1LtzqQaMrt-pDHBwMSd-DUR_d2Om7tfEsxfosqizYoPuDj4g98hcejLwrqPD8cVbwwBzUxjauG6caCykKaBZmPWWV9Ouy6j5DZHfWPFpycbuIefcBZr4jNHHG36F5QM0o6Il5KPOQDsE8-bd8GBtpHB-HRA6fMIZl76dYsJF-0zNbZWh4A_Ajbtu4tCXbuOMYDOfSd0atSYQu8f_DZHX3EriHYb718H3nybbYWBBU3VCW4BKbH3h5fmac1renMZtmib7WTrwQxjS3AR1-jVHGrr2wZUZfmgk9iQd0n4Ccdtu9aoR2R6IHvNnXuavOTbLWHCrFMd_GF03av5qPSE_JY17Q8CiB8DE6i0tINPI_T7VawLIytkXGp3OxndZOl3RcA8TkiHRA8yePgDOKhe1hkVyMbqDYXTAfVw86OBcNolXk7nwXwyEL6jwR_PUix7pSHZIr5r8BA_vsFm9FfDjCV2HiADI7s4k0reSgiU9MGSbcDOTv6IG6alGcLVPAfkXsn-Qj4yCRMO7SYGDDTs1kDjHvPbyTwl-gScPMyQbtPdVWt2jnuKDANRX_4KbiTCV30Y7oAhRZuAsWW9xj17GD295Eza3KITdv8HLSNF-5PunnKet3MRgoSmWNeBiQYyhnVKve9P0xz3Gl7uQUojFI7npTbakMxP67ZX52yJAdEKqKqAmMY5Jg_wtr97jO6D5W2iWkK-WcqoPbEHdabNsnMtQPmHCydlElWQ5qrwcNBjTWsS8ulQjgCh-PWXgBplOnHeqEN0MFsrSRESNJzvd0uzrd85YQkTvlLK7tcDalUOnjm0se2Tth_q1QFo6VFLvAP-8rSdhugeQAPSf44-pIwwq9HJAUBbDgo0oVVu6GrqVTe-1kODYT9RyxnSURVPNGyFqx9YRqQmV_qe7VPivBXSJUJODCvvYCw1fzmc-TqGMyYxKOwkpBFcotA56qHjyOr_-IjD-phw_0yFlp7KpPYBtCCKRrxaPdMYmJ6-l46NBQqqD7BT8v4klvFdkrHl-7b47Zinp8ooej6Ygzoa7twCJoFQE0RQoUWe00_oqadWFsfY1ysBzSxxcUdyP3C4wCgE_BNTkobxQsbmUkVQ0u1dqXVxgUlhOD36WmzAD8gy5GT910DZR1tZBCmWiRVJVpLV37kPYos0fv_cWhO852B_vLr_KQ9txwkWut9JVnx3TD_FQTgGpRe8TEW6SzgytkgX92ij9wShjoa-38yrOdMh9FLVKuhOO4iTmDCLUlv9N4_v9m6C9Qr9t3kOIScYsXo2rY1JxNgpA1hCrdfjBFohRktTN8cbwW_DZSqvsx8Jly69TZGcWTQtBABHAZ1dg22sQTBRWHHyCWQmKVe1oOsZJMtaa9JlD96p6CN4jQkZ61W3oiE3JlyrdBg66eGr_hTaOFImrCo1aV2mRm8N6gtFKnzPgumOa0rDx0QrGpZS2tdnzrUwWQ7h4elf3ZDg1rLqbFAUjVcF5rRtFzBlIg2HayYgsfTZFZF-EyIJ3Q_JIg1AlC2oEJ0pDjTPagg7ChjRW6aGGnUKcXKW_3OgLVD2xsPTuzbxqIJ_0gypZFBopq0cy8vWMR2YYXBcBWpu2BcNKYJ8Rsa7ftQ5xKEjPOxe8SOdkz1aOs0l8WdfdIJUXlRN0o4QRGpiwQydPEBuQ2M9WJnWDoITJnQvmoa6CWkdY7cGM7e5_1EFbVWeOQhToyN6Rftiwgdp6LP1HkGKF1CGO5ypEk8Ovk713o1ALaYtYaAmAujdGuzZjOpQV05IGjXSjNYQeog4loqLzKYsU0pFEb3h3jIq4JT2w6HA4jHtuzuUxPL3j27dysjmfa5SYKZzVDzAEDDEmpdcR3ushWEW80aqLazPGQURlS5OsjgFcsKk7dxuPbVevVD6FKrmAnkdPpe8bFbIbXKylS5b4IsG3HOtVUsOl-qSsNiexzk-p-LhH2-03gyimNFaGTn9yJIgYXUAByDYU-PJkvZwXQ3GnPo_JjBo7Q_wLrX50_pszENl0wM0NKHZRZambxCTxH3EBj37PorIcoAPozPSC2sOTh3S6TYbZSZFdStbOWEJ0Sh3dvI5vcAbzMhdIfjfJBHl_gsrKxOnY4Rd9f31y4h1PxMMnC6GWiAeOXmrQo6AZI5UtdUNC6ZxqH4vLSm5A1aNnANvTTmImrC8lWVr6-og2P2YN9Y_6yhIIKNd16lDk_P05tFjWRnzWF9rVy8t-0uSB1HzDiyNwAVflXctCJOuj_os7KxaOnkIPHC48aD4nLYRjO2NPr8UaKpPEoJc4f9IzLXLL-7yrkjVSjGaV-jEkcKAlUYjjBmdMY-3bCXgP-mY-HEXr7hrXGDa2neKXvu6ZB4IVSilZmDKNpJsiEvzjruf-3qJm9UyCjr8_CJ99wvQ2apdAts_04UMYo-7ldrhTKmRQgjs_hhO2ehX-7lnsbyFUjIjYwZadIIq66PjhBen2kTq0sroNdLniJtGaDs3S8kU2zYQwDT-pDq0ZdG6ZLmZD9drZPy6wxbpXNX6bmIAe9q1GhXWvMrPEExiePbb-0sVWy8rGz7pXZI0cJ4H3Os85x4Kxd3I2cAukIc4C41kzWluNASUiSnoNixLm-wYDhoymA3P6kpn95f064c1__sNL-bT2wNAUhFrFaIbSw2C8P3ACBislisKgK6mZ0qduX8rNwgTQw0pN2gX8DlfJK-0uE4xEmAWM6prHmuiYFMgX5D0bMYqDJ4GuTlJJWMCXcFVVDZC3BTGflW_QMHmvDgq8lwcgGFzSImcnYUdVpjQAHXUGeQ2y4PQrIxXwescB921D8JdXUyLEiWMPqyDgofnkbA6rOxrJceXwFOzsVEUvZokCvTzm4yC98pBGbohwstloBCOVtPW-vIYSMOsWx7G3TYUCuKpLieOKCenyWGSUtjmETxJebEX9F8ciMoUaAcMmuNk8mXrvA_wg3F6X29yDDABMEid4Obkx09QID1BHhvlxrx6QYNqM9PJsGO69l3Y7SgK76KYxGM5ujPv3_xKXUvulE4M18_O6NXH3xZ-vahoJa0bnQai5vZJ2dYcWyfcT-U24VtnZzAEzeHF1TSCdxUPhdZ8mJ6szXZRrUjmrqIqxVNjlCFdXjbYbtcwfMeaPDlajR5gP6MJd0_JFDhP3P7B6eQ68gtYCDy6hD3VahsAG8u39n9spRX2jPmKrs7UwoVTSitkTYIQs7YziktpCm8knKcHQdku44oiPqT_WkYQsNECgXXDPxvw9Fij0hEutxyfxCq7pXKYDK4visggSwmbBxrQAK-Ic3KwCiCxuzFMKOlhI9TY_j5MkJLkvBUm9Tr5diQHOnSHH1FI01RwlHkPcrO44g9gs53xyrI4_Sy_lDj2nLF5m_-b9DQEevUpYjU2EB2QO1ebxBR0yaGDstoWrQUB7THokt6623oYEI2uIGlWdT3IaGx1luOT06FTMQDqx1zQUKrwlRUmCXfsg6wvFVDfr2CWOy6DM_Cligq4yFnqW___N1NUgLj671gcJDI=",
+        "staged_ledger_diff": {
+            "diff": [
+                {
+                    "completed_works": [],
+                    "commands": [
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.081904336",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "19",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mXHGonMAQxb197cM86zXCeBdppPoRTnG4bYVoDeqKfssQ6SvCzphT9v7e8SWhpyFqZqB4eKdsZrtyH836Q2wKHY3ksCz9Tb"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.099139144",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "20",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mX2etVMqqgtZsJWtSjYQsn6N2Ga24dEgGWhECqzL7ouHACwteJE7DJ95qfvs3PFTJa293WbyoMP8PirLSzoZAuGHDHPeRq7"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.06617985",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "21",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mXNvpekjJMYUutsbXPaFXHHTGTJowVUgdogNgaPhwSmc4HCevdcgxQqLNwQ2AD9vvivZyAcHha2jAP7xBb79JszdxQDQeS2"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.096619897",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "22",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mXUCBmyUJsfE8Mdp4zJe1oXNzz7sbU2JxKVH4SXYu5rN1juEzy4ajLKoU3Gdz3A5GiE3wnGghWF2MxNFvLpRqSbqKXjS9St"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.098217214",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "23",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mXDvadEXmWkmDZhTYU9WsXyzLcL3fuig89pLPGo9ZCakWisL1hQHt3U24qTWcCzD7mzFh2h2EKeMCv8xaQYKNDCdc94DNpn"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.052665658",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "19",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mX8iyBnSBBhG2pPbHKXebEY2kKNcQ1R9Cz4BzaJAh1Wxcfm1zeD9rsZktqQih7uARCawTgn1kZpemd2iGRxB1VTQJLjg9SR"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.069786361",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "20",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mX6oCEsSKxwNjc7BLAVRDks6aYytj4pBxe3XX4Mrw5tjciixH6xFktacjNnsVR4BtEzVr6Y28CC8PV5LECRpZpcaFeDkayw"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.067513786",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "21",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mXXsLrX2nGMAyTeUT7KqAbBit7R22qFxe99WDA1c86bCfjwdWZPa8UWtMdq5YMDCSvvgLrPGVEMQL8WTrixgUy6pQiAhWSQ"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.054389893",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "22",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mX3m6X1qkGHE9HqQA5t63fUmpLiZTv7fLyDGYQEnP4dVXcav1uJYibjYihmDxPKZz369TH7cs3Ju42jvLTLfewqHDdCqWy4"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.06674826",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "23",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mXUi1cTD1bAPYQdEvWx9dBPG49fbiVUyQQ2sLCJozFDc9DGTbkyhWxQW6ppmZvn3UpV39uxyvD7LvYnCeof9PApfU9AjMbF"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.081352622",
+                                            "fee_payer_pk": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                            "nonce": "24",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqagfzBGyWB5AVF3q2iH3anNBMweXtpevsiHPfTuEpnMC2HDm6Y3",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                                    "signature": "7mX9eegc6A33Xz2vVX7CqoYrVAKiGKgBG2qFUBEWWD1QJJgsCCnQB3y2GtKGwsKQabuhrQMjNQTZcSFY25creqQDRhDrEsDU"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.051064929",
+                                            "fee_payer_pk": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                            "nonce": "24",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4Yd67s51QN9DZVDy8JKPEoNGykMsYQ5KRiKpZHiLZTjA8dB9SnFT"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qneD7TPvz7PS278Suaj5NcnP8Ks2pvqS2LcczJJiiXVx8u1NszKo",
+                                                "amount": "1500000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                                    "signature": "7mWzqVtQeHTGmuQLjtqwn12PkV2b7B6KDVYLtpQnEfJ6idrpJeqVG226EUfqTeQBcqDXURfnHvzJgkkPP3tR8A8jGiCZT5xx"
+                                }
+                            ],
+                            "status": [
+                                "Failed",
+                                [
+                                    [
+                                        [
+                                            "Amount_insufficient_to_create_account"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        }
+                    ],
+                    "coinbase": [
+                        "One",
+                        null
+                    ],
+                    "internal_command_statuses": [
+                        [
+                            "Applied"
+                        ],
+                        [
+                            "Applied"
+                        ]
+                    ]
+                },
+                null
+            ]
+        },
+        "delta_transition_chain_proof": [
+            "jwNJ5bLwf5n2vFDcRpHGjwNmQK673sgPhPNJuTV7Aq6R1cp5E3f",
+            []
+        ],
+        "protocol_version": {
+            "transaction": 2,
+            "network": 0,
+            "patch": 0
+        },
+        "accounts_accessed": [
+            [
+                203,
+                {
+                    "public_key": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "19998164161434",
+                    "nonce": "25",
+                    "receipt_chain_hash": "2n1ChgRAh1NPQt97SX3w4Kwc8nMdZ1ogmJR3nyu19QUZZDwpEQAp",
+                    "delegate": "B62qnEdPB1V5YPEcGaETb19naLJV6sWdveCZEjSLhcVyrPcPWHkGGax",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                202,
+                {
+                    "public_key": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "19998178678461",
+                    "nonce": "25",
+                    "receipt_chain_hash": "2n1jYxGVfdnJ421vRDKcoWPFwZjqX9EZLNKsLVRQqsDfofjmRFWE",
+                    "delegate": "B62qp3B9VW1ir5qL1MWRwr6ecjC2NZbGr8vysGeme9vXGcFXTMNXb2t",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                6199,
+                {
+                    "public_key": "B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "84053885581950",
+                    "nonce": "0",
+                    "receipt_chain_hash": "2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm",
+                    "delegate": "B62qqYvLLtTMQtHxRfuzZK21AJrqFE8Zq9Cyk3wtjegiTRn5soNQA9A",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ]
+        ],
+        "accounts_created": [],
+        "tokens_used": [
+            [
+                "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                null
+            ]
+        ]
+    }
+}
