@@ -18,6 +18,10 @@ pub fn discovery(
     reporting_freq: u32,
     paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
+    if paths.is_empty() {
+        return Ok((vec![], vec![], vec![]));
+    }
+
     let time = std::time::Instant::now();
     let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
     let mut parent_hash_map: HashMap<String, String> = HashMap::new();
@@ -47,7 +51,7 @@ pub fn discovery(
     info!(
         "Found {} blocks in the canonical chain in {:?}",
         canonical_branch.len() + recent_paths.len(),
-        time.elapsed(),
+        pretty_print_duration(time.elapsed())
     );
 
     Ok((
@@ -120,14 +124,9 @@ fn canonical_branch_from_best_tip<'a>(
     while opt_parent_state_hash.is_some() {
         let parent_state_hash = opt_parent_state_hash.unwrap();
         let paths = tree_map.get_mut(&next_height).unwrap();
-        println!(
-            "Parent state hash: {:#?}. Height: {:#?}",
-            parent_state_hash, next_height
-        );
         let mut i = None;
         for (j, path) in paths.iter().enumerate() {
             let path_str = path.to_str().unwrap();
-            println!("Next path: {:#?}", path_str);
             if path_str.contains(parent_state_hash.as_str()) {
                 next_height -= 1;
                 opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path).as_str());
@@ -140,7 +139,6 @@ fn canonical_branch_from_best_tip<'a>(
             paths.remove(i);
         }
     }
-
     info!(
         "Found canonical branch in {:?}",
         pretty_print_duration(time.elapsed())
@@ -160,7 +158,7 @@ fn get_orphaned_paths<'a>(tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>) -> Vec
     info!(
         "Found {:?} orphaned blocks in {:?}",
         orphaned_paths.len(),
-        time.elapsed()
+        pretty_print_duration(time.elapsed())
     );
     orphaned_paths
 }
@@ -192,7 +190,7 @@ fn split_off_recent_paths<'a>(
     info!(
         "Found {:?} recent blocks in {:?}",
         recent_paths.len(),
-        time.elapsed()
+        pretty_print_duration(time.elapsed())
     );
     recent_paths
 }
