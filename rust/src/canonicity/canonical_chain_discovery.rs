@@ -260,6 +260,7 @@ mod discovery_algorithm_tests {
         assert_eq!(tree_map.get(&105499).unwrap(), &vec![&path_499_extra]);
         assert_eq!(tree_map.get(&105498).unwrap(), &vec![&path_498_extra]);
         assert_eq!(tree_map.get(&105497).unwrap(), &vec![&path_497_extra]);
+        assert_eq!(tree_map.len(), 3);
     }
 
     #[test]
