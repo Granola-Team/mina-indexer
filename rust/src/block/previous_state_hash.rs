@@ -1,10 +1,11 @@
 use crate::block::BlockHash;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
-
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PreviousStateHashBlock {
@@ -24,7 +25,8 @@ impl PreviousStateHash {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        // Read the entire file into a buffer (assuming it's large, but you only need the start)
+        // Read the entire file into a buffer (assuming it's large, but you only need
+        // the start)
         let mut buffer = String::new();
         reader.read_to_string(&mut buffer)?;
 
