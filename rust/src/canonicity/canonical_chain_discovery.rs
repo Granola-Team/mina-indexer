@@ -286,6 +286,8 @@ mod discovery_algorithm_tests {
             orphaned_paths,
             expected_orphaned_paths.iter().collect::<Vec<&PathBuf>>()
         );
+
+        assert!(tree_map.is_empty());
     }
 
     #[test]
@@ -303,11 +305,17 @@ mod discovery_algorithm_tests {
         let mut canonical_refs: Vec<&PathBuf> = branch_with_best_tip.iter().collect();
 
         // Prepare the tree map
+        let binding_a = PathBuf::from("mainnet-1-a.json");
+        let binding_b = PathBuf::from("mainnet-2-b.json");
+        let binding_c = PathBuf::from("mainnet-3-c.json");
         let binding_1 = PathBuf::from("mainnet-4-x.json");
         let binding_2 = PathBuf::from("mainnet-5-y.json");
         let binding_3 = PathBuf::from("mainnet-6-z.json"); // has not parent
 
         let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
+        tree_map.insert(1, vec![&binding_a]);
+        tree_map.insert(2, vec![&binding_b]);
+        tree_map.insert(3, vec![&binding_c]);
         tree_map.insert(4, vec![&branch_with_best_tip[3], &binding_1]);
         tree_map.insert(5, vec![&branch_with_best_tip[4], &binding_2]);
         tree_map.insert(6, vec![&binding_3]);
@@ -338,10 +346,16 @@ mod discovery_algorithm_tests {
             expected_recent_paths.iter().collect::<Vec<&PathBuf>>()
         );
 
-        // // Assert that canonical branch has been correctly mutated
+        // Assert that canonical branch has been correctly mutated
         assert_eq!(
             canonical_refs,
             expected_canonical_branch.iter().collect::<Vec<&PathBuf>>()
         );
+
+        // Assert that tree_map has been correctly mutated
+        assert_eq!(tree_map.get(&1), Some(&vec![&binding_a]));
+        assert_eq!(tree_map.get(&2), Some(&vec![&binding_b]));
+        assert_eq!(tree_map.get(&3), Some(&vec![&binding_c]));
+        assert_eq!(tree_map.len(), 3);
     }
 }
