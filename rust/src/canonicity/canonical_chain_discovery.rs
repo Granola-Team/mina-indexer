@@ -28,14 +28,18 @@ pub fn discovery(
         tree_map.entry(height).or_default().push(path);
     }
 
+    // find the best tip
     let best_tip: PathBuf = find_best_tip(&tree_map, &mut parent_hash_map, reporting_freq);
 
+    // walk back from tip to root of tree
     let mut canonical_branch =
         canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, &best_tip)?;
 
+    // split off recent paths from canonical branch and tree map
     let recent_paths =
         split_off_recent_paths(&mut canonical_branch, &mut tree_map, canonical_threshold);
 
+    // all other paths in the tree map are orphaned
     let orphaned_paths = get_orphaned_paths(&mut tree_map);
 
     assert!(tree_map.is_empty(), "Not all paths have been discovered");
@@ -55,7 +59,7 @@ pub fn discovery(
 
 fn find_best_tip(
     tree_map: &BTreeMap<u32, Vec<&PathBuf>>,
-    mut parent_hash_map: &mut HashMap<String, String>,
+    parent_hash_map: &mut HashMap<String, String>,
     reporting_freq: u32,
 ) -> PathBuf {
     let time = std::time::Instant::now();
@@ -81,7 +85,10 @@ fn find_best_tip(
             for possible_next_tip in next_tips {
                 if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
                     if prev_hash.0 == state_hash {
-                        parent_hash_map.insert(state_hash.to_string(), prev_hash.0);
+                        parent_hash_map.insert(
+                            extract_state_hash(possible_next_tip),
+                            state_hash.to_string(),
+                        );
                         best_tip = possible_next_tip;
                         queue.push_back(best_tip);
                     }
