@@ -50,6 +50,12 @@ pub enum ParsedBlock {
     Orphaned(PrecomputedBlock),
 }
 
+pub enum PathDesignation {
+    DeepCanonical(PathBuf),
+    Recent(PathBuf),
+    Orphaned(PathBuf),
+}
+
 impl BlockParser {
     pub fn paths(&self) -> BlockParserPaths {
         BlockParserPaths {
@@ -230,24 +236,33 @@ impl BlockParser {
             Err(e) => bail!("Block parsing error: {}", e),
         }
     }
-    /// Traverses `self`'s internal paths
-    /// - deep canonical
-    /// - recent
-    /// - orphaned
-    pub async fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
-        if let Some(next_path) = self.canonical_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::DeepCanonical);
-        }
 
-        if let Some(next_path) = self.recent_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::Recent);
-        }
+    pub fn next_path_designation(&mut self) -> Option<PathDesignation> {
+        self.canonical_paths
+            .next()
+            .map(PathDesignation::DeepCanonical)
+            .or_else(|| self.recent_paths.next().map(PathDesignation::Recent))
+            .or_else(|| self.orphaned_paths.next().map(PathDesignation::Orphaned))
+    }
 
-        if let Some(next_path) = self.orphaned_paths.next() {
-            return self.consume_block(&next_path, &ParsedBlock::Orphaned);
-        }
+    pub fn next_block(&mut self) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
+        let next_designation = self.next_path_designation();
 
-        Ok(None)
+        match next_designation {
+            Some(PathDesignation::DeepCanonical(path)) => {
+                let block_result = self.consume_block(&path, &ParsedBlock::DeepCanonical)?;
+                Ok(block_result.map(|p| (p.0, p.1)))
+            }
+            Some(PathDesignation::Recent(path)) => {
+                let block_result = self.consume_block(&path, &ParsedBlock::Recent)?;
+                Ok(block_result.map(|p| (p.0, p.1)))
+            }
+            Some(PathDesignation::Orphaned(path)) => {
+                let block_result = self.consume_block(&path, &ParsedBlock::Orphaned)?;
+                Ok(block_result.map(|p| (p.0, p.1)))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Gets the precomputed block with supplied `state_hash`, it must exist
@@ -257,15 +272,13 @@ impl BlockParser {
         state_hash: &str,
     ) -> anyhow::Result<(PrecomputedBlock, u64)> {
         let mut next_block: (PrecomputedBlock, u64) = self
-            .next_block()
-            .await?
+            .next_block()?
             .map(|p| (p.0.into(), p.1))
             .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
 
         while next_block.0.state_hash().0 != state_hash {
             next_block = self
-                .next_block()
-                .await?
+                .next_block()?
                 .map(|p| (p.0.into(), p.1))
                 .ok_or(anyhow!("Did not find state hash: {state_hash}"))?;
         }

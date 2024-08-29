@@ -393,7 +393,7 @@ impl IndexerState {
                 self.report_from_block_count(block_parser, total_time);
 
                 if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
-                    block_parser.next_block().await?
+                    block_parser.next_block()?
                 {
                     let state_hash = block.state_hash();
                     self.bytes_processed += block_bytes;
@@ -476,48 +476,42 @@ impl IndexerState {
         }
 
         loop {
-            tokio::select! {
-                // wait for SIGINT
-                _ = tokio::signal::ctrl_c() => {
-                    info!("SIGINT received");
-                    break;
-                }
+            // First, handle the non-Future `next_block` call
+            let res = block_parser.next_block();
 
-                // parse the next precomputed block
-                res = block_parser.next_block() => {
-                    match res {
-                        Ok(Some((parsed_block, block_bytes))) => {
-                            self.report_progress(block_parser, step_time, total_time)?;
-                            step_time = Instant::now();
+            // Now handle the result, which is synchronous
+            match res {
+                Ok(Some((parsed_block, block_bytes))) => {
+                    self.report_progress(block_parser, step_time, total_time)?;
+                    step_time = Instant::now();
 
-                            match parsed_block {
-                                ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
-                                    info!("Adding block to witness tree {}", block.summary());
-                                    self.block_pipeline(&block, block_bytes)?;
-                                }
-                                ParsedBlock::Orphaned(block) => {
-                                    trace!("Adding orphaned block to store {}", block.summary());
-                                    self.add_block_to_store(&block, block_bytes, true)?;
-                                }
-                            }
+                    match parsed_block {
+                        ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
+                            info!("Adding block to witness tree {}", block.summary());
+                            self.block_pipeline(&block, block_bytes)?;
                         }
-                        Ok(None) => {
-                            info!(
-                                "Finished ingesting and applying {} blocks ({}) to the witness tree in {}",
-                                self.blocks_processed,
-                                bytesize::ByteSize::b(self.bytes_processed),
-                                pretty_print_duration(total_time.elapsed() + offset),
-                            );
-                            break;
-                        }
-                        Err(e) => {
-                            error!("Block ingestion error: {e}");
-                            break;
+                        ParsedBlock::Orphaned(block) => {
+                            trace!("Adding orphaned block to store {}", block.summary());
+                            self.add_block_to_store(&block, block_bytes, true)?;
                         }
                     }
                 }
+                Ok(None) => {
+                    info!(
+                        "Finished ingesting and applying {} blocks ({}) to the witness tree in {:?}",
+                        self.blocks_processed,
+                        bytesize::ByteSize::b(self.bytes_processed),
+                        total_time.elapsed() + offset,
+                    );
+                    break;
+                }
+                Err(e) => {
+                    error!("Block ingestion error: {e}");
+                    break;
+                }
             }
         }
+
         Ok(())
     }
 
