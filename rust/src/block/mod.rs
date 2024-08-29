@@ -384,6 +384,38 @@ pub fn length_from_path(path: &Path) -> Option<u32> {
     }
 }
 
+pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf]) {
+    paths.sort_by(|a, b| {
+        let (height_a, hash_a) = extract_height_and_hash(a);
+        let (height_b, hash_b) = extract_height_and_hash(b);
+
+        match height_a.cmp(&height_b) {
+            std::cmp::Ordering::Equal => hash_a.cmp(hash_b),
+            other => other,
+        }
+    });
+}
+
+pub fn extract_height_and_hash(path: &std::path::Path) -> (u32, &str) {
+    let filename = path
+        .file_name()
+        .and_then(|x| x.to_str())
+        .expect("Failed to extract filename from path");
+
+    let parts: Vec<&str> = filename.split('-').collect();
+
+    (
+        extract_block_height(path),
+        parts
+            .get(2)
+            .expect("Failed to find the third part of the filename")
+            .split('.')
+            .collect::<Vec<_>>()
+            .first()
+            .expect("Failed to parse the hash from the third part of the filename"),
+    )
+}
+
 pub fn extract_block_height(path: &Path) -> u32 {
     let filename = path
         .file_name()
@@ -417,7 +449,7 @@ pub fn extract_network(path: &Path) -> Network {
 mod tests {
     use super::{
         extract_block_height, extract_state_hash, is_valid_state_hash,
-        precomputed::PrecomputedBlock, Block, BlockHash,
+        precomputed::PrecomputedBlock, sort_by_height_and_lexicographical_order, Block, BlockHash,
     };
     use crate::block::precomputed::PcbVersion;
     use std::path::{Path, PathBuf};
@@ -493,5 +525,22 @@ mod tests {
         assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
         assert_eq!(input, BlockHash::from_bytes(&bytes)?, "from_bytes");
         Ok(())
+    }
+
+    #[test]
+    fn test_sort_by_height_and_lexicographical_order() {
+        let filename1 = PathBuf::from("mainnet-1-abc123.json");
+        let filename2 = PathBuf::from("mainnet-2-def456.json");
+        let filename3 = PathBuf::from("mainnet-2-ghi789.json");
+        let filename4 = PathBuf::from("mainnet-3-jkl012.json");
+
+        let mut paths = [&filename3, &filename1, &filename4, &filename2];
+
+        sort_by_height_and_lexicographical_order(&mut paths);
+
+        assert_eq!(paths[0].file_name().unwrap(), "mainnet-1-abc123.json");
+        assert_eq!(paths[1].file_name().unwrap(), "mainnet-2-def456.json");
+        assert_eq!(paths[2].file_name().unwrap(), "mainnet-2-ghi789.json");
+        assert_eq!(paths[3].file_name().unwrap(), "mainnet-3-jkl012.json");
     }
 }
