@@ -37,8 +37,6 @@ impl PreviousStateHash {
                 let slice = &buffer[actual_start..actual_start + 77];
                 let slice_with_brace = format!("{}{}", slice, "}"); // Add the closing brace manually
 
-                println!("slice with brace: {:#?}", slice_with_brace);
-
                 // Deserialize just this portion
                 let v: Value = serde_json::from_str(&slice_with_brace)?;
 
