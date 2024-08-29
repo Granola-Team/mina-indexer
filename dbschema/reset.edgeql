@@ -1,0 +1,14 @@
+delete FeeTransfer;
+delete Coinbase;
+delete Payment;
+delete StakingDelegation;
+delete StakingEpochData;
+delete NextEpochData;
+delete ConsensusState;
+delete StagedLedgerHash;
+delete BlockchainState;
+delete Block;
+delete Account;
+delete StakingTiming;
+delete StakingLedger;
+delete StakingEpoch;

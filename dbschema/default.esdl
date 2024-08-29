@@ -1,4 +1,5 @@
 module default {
+
   type Account {
     required public_key: str {
       constraint exclusive;
@@ -27,7 +28,7 @@ module default {
     total_currency: int64;
     stake_winner: Account;
     creator: Account;
-    coinbase_receiver: Account;
+    coinbase_target: Account;
     supercharge_coinbase: bool;
     min_window_density: int64;
     has_ancestor_in_same_checkpoint_window: bool;
@@ -76,27 +77,26 @@ module default {
     required start_checkpoint: str;
     required lock_checkpoint: str;
     required epoch_length: int64;
-    constraint exclusive on ((.block, .ledger_hash));
   }
 
   type StakingEpochData extending EpochData {}
   type NextEpochData extending EpochData {}
 
-  abstract type Command {
+  abstract type UserCommand {
     required block: Block {
       on target delete restrict;
     }
     required status: str;
     source: Account;
     source_balance: decimal;
-    receiver: Account;
-    receiver_balance: decimal;
+    target: Account;
+    target_balance: decimal;
     fee: decimal;
     fee_payer: Account;
     fee_payer_balance: decimal;
     fee_token: str;
     fee_payer_account_creation_fee_paid: decimal;
-    receiver_account_creation_fee_paid: decimal;
+    target_account_creation_fee_paid: decimal;
     nonce: int64;
     valid_until: int64;
     memo: str;
@@ -105,25 +105,59 @@ module default {
     created_token: str;
   }
 
-  type Payment extending Command {
+  type Payment extending UserCommand {
     token_id: int64;
     amount: decimal;
   }
 
-  type StakingDelegation extending Command {}
+  type StakingDelegation extending UserCommand {}
 
-  type Coinbase {
+  abstract type InternalCommand {
     required block: Block {
       on target delete restrict;
     }
-    required receiver_balance: decimal;
   }
 
-  type FeeTransfer {
-    required block: Block {
+  type Coinbase extending InternalCommand {
+    required target_balance: decimal;
+  }
+
+  type FeeTransfer extending InternalCommand {
+    required target1_balance: decimal;
+    target2_balance: decimal;
+  }
+
+  type StakingEpoch {
+    required hash: str {
+      constraint regexp(r"^j.{50}$");
+    };
+    required epoch: int64;
+    constraint exclusive on ((.hash, .epoch));
+  }
+
+  type StakingLedger {
+    required epoch: StakingEpoch;
+    required source: Account;
+    required balance: decimal;
+    required target: Account;
+    required token: int64;
+    nonce: int64;
+    required receipt_chain_hash: str {
+      constraint regexp(r"^2.{51}$");
+    };
+    required voting_for: str {
+      constraint regexp(r"^3N[A-Za-z].{49}$");
+    };
+  }
+
+  type StakingTiming {
+    required ledger: StakingLedger {
       on target delete restrict;
     }
-    receiver1_balance: decimal;
-    receiver2_balance: decimal;
+    required initial_minimum_balance: decimal;
+    required cliff_time: int64;
+    required cliff_amount: decimal;
+    required vesting_period: int64;
+    required vesting_increment: decimal;
   }
 }
