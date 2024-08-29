@@ -501,7 +501,7 @@ impl IndexerState {
                         "Finished ingesting and applying {} blocks ({}) to the witness tree in {:?}",
                         self.blocks_processed,
                         bytesize::ByteSize::b(self.bytes_processed),
-                        total_time.elapsed() + offset,
+                        pretty_print_duration(total_time.elapsed() + offset),
                     );
                     break;
                 }
