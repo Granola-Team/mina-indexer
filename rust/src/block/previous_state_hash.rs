@@ -22,7 +22,7 @@ pub struct PreviousStateHash(pub String);
 impl PreviousStateHash {
     pub fn from_path(path: &Path) -> anyhow::Result<Self> {
         let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
+        let reader = BufReader::new(file);
 
         // Create a buffer with a capacity of 1Kb
         let mut buffer = String::with_capacity(1000);
@@ -81,14 +81,12 @@ impl From<PreviousStateHash> for BlockHash {
 mod previous_state_hash_tests {
     use super::*;
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
-    use std::path::PathBuf;
-
-    use std::fs::write;
+    use std::{fs::write, path::PathBuf};
 
     #[test]
     fn previous_state_hash_deserializer_test() -> anyhow::Result<()> {
         // Test cases with different formats
-        let test_cases = vec![
+        let test_cases = [
             (
                 r#"{"protocol_state": {"previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw""#,
                 "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
