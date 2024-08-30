@@ -1,337 +1,362 @@
 use crate::{
-    block::{extract_block_height, extract_state_hash, previous_state_hash::*},
+    block::{
+        extract_block_height, extract_height_and_hash, extract_state_hash, previous_state_hash::*,
+        sort_by_height_and_lexicographical_order,
+    },
     utility::functions::pretty_print_duration,
 };
-use log::{debug, info};
+use log::info;
 use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    time::Instant,
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    path::PathBuf,
 };
 
-/// Separate blocks into 3 length-sorted lists:
-/// - deep canonical blocks (canonical up to root)
-/// - recent blocks (following the witness tree root)
-/// - orphaned blocks (at or below witness tree root)
+// discovers the canonical chain, orphaned blocks, and
+// recent blocks within the canonical threshold
 pub fn discovery(
     canonical_threshold: u32,
     reporting_freq: u32,
-    mut paths: Vec<&PathBuf>,
+    paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
-    let mut deep_canonical_state_hashes = HashSet::new();
-    let mut deep_canonical_paths = vec![];
-    let mut recent_paths = vec![];
-
-    if !paths.is_empty() {
-        info!("Sorting precomputed blocks by length");
-
-        let time = Instant::now();
-        paths.sort_by_cached_key(|x| extract_block_height(x));
-
-        info!(
-            "{} blocks sorted by length in {}",
-            paths.len() + 1, // +1 genesis
-            pretty_print_duration(time.elapsed()),
-        );
-
-        if paths.is_empty() {
-            return Ok((vec![], vec![], vec![]));
-        }
-
-        // keep track of:
-        // - diffs between blocks of recent lengths (to find gaps)
-        // - starting index for each collection of blocks of a fixed length
-        // - length of the current path under investigation
-
-        let mut length_start_indices_and_diffs = vec![];
-        // paths will always have at least 1 item
-        let mut curr_length = extract_block_height(paths.first().unwrap());
-
-        info!("Searching for deep canonical blocks in blocks directory");
-        for (idx, path) in paths.iter().enumerate() {
-            let length = extract_block_height(path);
-            if length > curr_length || idx == 0 {
-                length_start_indices_and_diffs.push((idx, length - curr_length));
-                curr_length = length;
-            }
-        }
-
-        // check that there are enough contiguous blocks for a canonical chain
-        let last_contiguous_first_noncontiguous_start_idx =
-            last_contiguous_first_noncontiguous_start_idx(&length_start_indices_and_diffs);
-        let last_contiguous_start_idx = last_contiguous_first_noncontiguous_start_idx
-            .map(|i| i.0)
-            .unwrap_or(length_start_indices_and_diffs.last().unwrap().0);
-        let last_contiguous_idx = last_contiguous_first_noncontiguous_start_idx
-            .map(|i| i.1.saturating_sub(1))
-            .unwrap_or(paths.len() - 1);
-        let witness_tree_root_opt = find_witness_tree_root(
-            paths.as_slice(),
-            &length_start_indices_and_diffs,
-            length_start_indices_and_diffs
-                .iter()
-                .position(|x| x.0 == last_contiguous_start_idx)
-                .unwrap_or(0),
-            last_contiguous_idx,
-            canonical_threshold,
-        );
-
-        if witness_tree_root_opt.is_none()
-            || max_num_canonical_blocks(&length_start_indices_and_diffs, last_contiguous_start_idx)
-                < canonical_threshold
-        {
-            info!(
-                "No deep canoncial blocks were found other than genesis. Adding all blocks to the witness tree."
-            );
-            return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
-        }
-
-        // backtrack `MAINNET_CANONICAL_THRESHOLD` blocks from
-        // the `last_contiguous_idx` to find the witness tree root
-        let (mut curr_length_idx, mut curr_start_idx) = witness_tree_root_opt.unwrap();
-        let mut curr_path = paths[curr_length_idx];
-
-        info!(
-            "Found witness tree root (length {}): {}",
-            extract_block_height(curr_path),
-            extract_state_hash(curr_path),
-        );
-
-        // handle all blocks that are higher than the witness tree root
-        if let Some(recent_start_idx) = next_length_start_index(paths.as_slice(), curr_length_idx) {
-            if recent_start_idx
-                < length_start_indices_and_diffs
-                    .last()
-                    .map(|(idx, _)| *idx)
-                    .unwrap_or(0)
-            {
-                for path in paths[recent_start_idx..].iter() {
-                    recent_paths.push(path.to_path_buf());
-                }
-            }
-        }
-
-        // collect the deep canonical blocks
-        deep_canonical_paths.push(curr_path.clone());
-        deep_canonical_state_hashes.insert(extract_state_hash(curr_path));
-
-        if deep_canonical_paths.len() < reporting_freq as usize {
-            info!("Walking the canonical chain back to genesis");
-        } else {
-            info!(
-                "Walking the canonical chain back to genesis, reporting every {} blocks",
-                reporting_freq
-            );
-        }
-
-        let time = Instant::now();
-        let mut count = 1;
-
-        // descend from the witness tree root to the lowest block in the dir,
-        // segment by segment, searching for ancestors
-        while curr_start_idx > 0 {
-            if count % reporting_freq == 0 {
-                info!(
-                    "Found {} deep canonical blocks in {}",
-                    count,
-                    pretty_print_duration(time.elapsed())
-                );
-            }
-
-            // search for parent in previous segment's blocks
-            let mut parent_found = false;
-            let prev_length_idx = length_start_indices_and_diffs[curr_start_idx - 1].0;
-            let parent_hash = PreviousStateHash::from_path(curr_path)?.0;
-
-            for path in paths[prev_length_idx..curr_length_idx].iter() {
-                if parent_hash == extract_state_hash(path) {
-                    deep_canonical_paths.push(path.to_path_buf());
-                    deep_canonical_state_hashes.insert(extract_state_hash(path));
-                    curr_path = path;
-                    curr_length_idx = prev_length_idx;
-                    count += 1;
-                    curr_start_idx -= 1;
-                    parent_found = true;
-                    break;
-                }
-            }
-
-            // handle case where we fail to find parent
-            if !parent_found {
-                info!(
-                    "Unable to locate parent block: mainnet-{}-{parent_hash}.json",
-                    extract_block_height(curr_path) - 1,
-                );
-                return Ok((vec![], paths.into_iter().cloned().collect(), vec![]));
-            }
-        }
-
-        // push the lowest canonical block
-        for path in paths[..curr_length_idx].iter() {
-            let prev_hash = PreviousStateHash::from_path(curr_path)?.0;
-            if prev_hash == extract_state_hash(path) {
-                debug!("Lowest canonical block found");
-                deep_canonical_paths.push(path.to_path_buf());
-                deep_canonical_state_hashes.insert(extract_state_hash(path));
-                break;
-            }
-        }
-
-        // sort lowest to highest
-        deep_canonical_paths.reverse();
-
-        info!(
-            "Found {} blocks in the canonical chain in {}",
-            deep_canonical_paths.len() as u32 + 1 + canonical_threshold,
-            pretty_print_duration(time.elapsed()),
-        );
+    if paths.is_empty() {
+        return Ok((vec![], vec![], vec![]));
     }
 
-    let max_canonical_length = deep_canonical_paths
-        .last()
-        .map(|p| extract_block_height(p))
-        .unwrap_or(1);
-    let orphaned_paths: Vec<PathBuf> = paths
-        .into_iter()
-        .filter(|p| {
-            extract_block_height(p) <= max_canonical_length
-                && !deep_canonical_state_hashes.contains(&extract_state_hash(p))
-        })
-        .cloned()
-        .collect();
+    let time = std::time::Instant::now();
+    let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
+    let mut parent_hash_map: HashMap<String, String> = HashMap::new();
+
+    for path in paths {
+        let height = extract_block_height(path);
+        // store multiple paths at a given height
+        tree_map.entry(height).or_default().push(path);
+    }
+
+    // find the best tip
+    let best_tip: PathBuf = find_best_tip(&tree_map, &mut parent_hash_map, reporting_freq);
+
+    // walk back from tip to root of tree
+    let mut canonical_branch =
+        canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, &best_tip)?;
+
+    // split off recent paths from canonical branch and tree map
+    let recent_paths =
+        split_off_recent_paths(&mut canonical_branch, &mut tree_map, canonical_threshold);
+
+    // all other paths in the tree map are orphaned
+    let orphaned_paths = get_orphaned_paths(&mut tree_map);
+
+    assert!(tree_map.is_empty(), "Not all paths have been discovered");
+
+    info!(
+        "Found {} blocks in the canonical chain in {:?}",
+        canonical_branch.len() + recent_paths.len(),
+        pretty_print_duration(time.elapsed())
+    );
 
     Ok((
-        deep_canonical_paths.to_vec(),
-        recent_paths.to_vec(),
-        orphaned_paths,
+        canonical_branch.into_iter().cloned().collect::<Vec<_>>(),
+        recent_paths.into_iter().cloned().collect::<Vec<_>>(),
+        orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
     ))
 }
 
-/// Checks if the block at `curr_path` is the _parent_ of the block at `path`.
-fn is_parent(path: &Path, curr_path: &Path) -> bool {
-    if let Ok(prev_hash) = PreviousStateHash::from_path(curr_path) {
-        let prev_hash: String = prev_hash.into();
-        return prev_hash == extract_state_hash(path);
-    }
-    false
-}
+fn find_best_tip(
+    tree_map: &BTreeMap<u32, Vec<&PathBuf>>,
+    parent_hash_map: &mut HashMap<String, String>,
+    reporting_freq: u32,
+) -> PathBuf {
+    let time = std::time::Instant::now();
 
-/// Returns the start index of the paths with next higher length.
-fn next_length_start_index(paths: &[&PathBuf], path_idx: usize) -> Option<usize> {
-    let length = extract_block_height(paths[path_idx]);
-    for (n, path) in paths[path_idx..].iter().enumerate() {
-        if extract_block_height(path) > length {
-            return Some(path_idx + n);
+    let mut queue: VecDeque<&PathBuf> = VecDeque::new();
+    let mut best_tip: &PathBuf = &PathBuf::new();
+    if let Some((_, root_files)) = tree_map.first_key_value() {
+        for root_file in root_files {
+            best_tip = root_file.to_owned();
+            queue.push_back(best_tip);
         }
     }
-    None
+
+    while let Some(best_tip_canidate) = queue.pop_front() {
+        log_progress(
+            extract_block_height(best_tip_canidate),
+            reporting_freq,
+            &time,
+        );
+        let (height, state_hash) = extract_height_and_hash(best_tip_canidate);
+        let next_height = height + 1;
+        if let Some(next_tips) = tree_map.get(&(next_height)) {
+            for possible_next_tip in next_tips {
+                if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
+                    if prev_hash.0 == state_hash {
+                        parent_hash_map.insert(
+                            extract_state_hash(possible_next_tip),
+                            state_hash.to_string(),
+                        );
+                        best_tip = possible_next_tip;
+                        queue.push_back(best_tip);
+                    }
+                }
+            }
+        }
+    }
+    info!(
+        "Found best tip at block height {:?} in {:?}",
+        extract_block_height(best_tip),
+        pretty_print_duration(time.elapsed())
+    );
+    best_tip.to_owned()
 }
+fn canonical_branch_from_best_tip<'a>(
+    tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>,
+    parent_hash_map: &HashMap<String, String>,
+    best_tip: &'a PathBuf,
+) -> anyhow::Result<Vec<&'a PathBuf>> {
+    let time = &std::time::Instant::now();
 
-/// Finds the root of the witness tree, i.e. the _highest_ block in the
-/// _lowest contiguous chain_ with `canonical_threshold` ancestors.
-/// Unfortunately, the existence of this value does not necessarily imply
-/// the existence of a canonical chain within the collection of blocks.
-///
-/// Returns the index of the witness tree root in `paths` and
-/// the start index of the first "recent" block (these blocks are added to the
-/// witness tree, on top of the root).
-fn find_witness_tree_root(
-    paths: &[&PathBuf],
-    length_start_indices_and_diffs: &[(usize, u32)],
-    mut curr_start_idx: usize,
-    mut curr_length_idx: usize,
-    canonical_threshold: u32,
-) -> Option<(usize, usize)> {
-    if length_start_indices_and_diffs.len() <= canonical_threshold as usize {
-        None
-    } else {
-        let mut offset = 0;
-        let mut curr_path = &paths[curr_length_idx];
+    let mut canonical_branch: Vec<&'a PathBuf> = vec![];
+    canonical_branch.push(best_tip); // Use reference to best_tip
 
-        for n in 1..=canonical_threshold {
-            let mut parent_found = false;
-            let prev_length_start_idx = if curr_start_idx > 0 {
-                length_start_indices_and_diffs[curr_start_idx - 1].0
-            } else {
-                0
-            };
-
-            for (idx, path) in paths[prev_length_start_idx..curr_length_idx]
-                .iter()
-                .enumerate()
-            {
-                // if the parent is found, check that it has a parent, etc
-                if is_parent(path, curr_path) {
-                    debug!(
-                        "{} is the parent of {}",
-                        curr_path
-                            .file_stem()
-                            .unwrap_or_default()
-                            .to_str()
-                            .unwrap_or_default(),
-                        path.file_stem()
-                            .unwrap_or_default()
-                            .to_str()
-                            .unwrap_or_default(),
-                    );
-                    offset = idx;
-                    curr_path = path;
-                    curr_length_idx = prev_length_start_idx;
-                    curr_start_idx = curr_start_idx.saturating_sub(1);
-                    parent_found = true;
-                    continue;
-                }
-            }
-
-            // if a parent was not found
-            if !parent_found {
-                // begin the search again at the previous length
-                if curr_start_idx > canonical_threshold as usize {
-                    return find_witness_tree_root(
-                        paths,
-                        length_start_indices_and_diffs,
-                        curr_start_idx.saturating_sub(1),
-                        prev_length_start_idx,
-                        canonical_threshold,
-                    );
-                } else {
-                    // root cannot be found
-                    return None;
-                }
-            }
-
-            // potential root found
-            if n == canonical_threshold && parent_found {
+    // next iteration
+    let (mut next_height, state_hash) = extract_height_and_hash(best_tip);
+    let mut opt_parent_state_hash = parent_hash_map.get(state_hash);
+    next_height -= 1;
+    while opt_parent_state_hash.is_some() {
+        let parent_state_hash = opt_parent_state_hash.unwrap();
+        let paths = tree_map.get_mut(&next_height).unwrap();
+        let mut i = None;
+        for (j, path) in paths.iter().enumerate() {
+            let path_str = path.to_str().unwrap();
+            if path_str.contains(parent_state_hash.as_str()) {
+                next_height -= 1;
+                opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path).as_str());
+                canonical_branch.push(path); // Push reference, not clone
+                i = Some(j);
                 break;
             }
         }
-        Some((curr_length_idx + offset, curr_start_idx))
-    }
-}
-
-/// Finds the index of the _highest possible block in the lowest contiguous
-/// chain_ and the starting index of the next higher blocks.
-fn last_contiguous_first_noncontiguous_start_idx(
-    length_start_indices_and_diffs: &[(usize, u32)],
-) -> Option<(usize, usize)> {
-    let mut prev = 0;
-    for (idx, diff) in length_start_indices_and_diffs.iter() {
-        if *diff > 1 {
-            return Some((prev, *idx));
-        } else {
-            prev = *idx;
+        if let Some(i) = i {
+            paths.remove(i);
         }
     }
-    None
+    info!(
+        "Found canonical branch in {:?}",
+        pretty_print_duration(time.elapsed())
+    );
+    canonical_branch.reverse(); // Reverse to maintain order
+    Ok(canonical_branch)
 }
 
-fn max_num_canonical_blocks(
-    length_start_indices_and_diffs: &[(usize, u32)],
-    last_contiguous_start_idx: usize,
-) -> u32 {
-    length_start_indices_and_diffs
-        .iter()
-        .position(|x| x.0 == last_contiguous_start_idx)
-        .unwrap_or(0) as u32
-        + 1
+fn get_orphaned_paths<'a>(tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>) -> Vec<&'a PathBuf> {
+    let time = std::time::Instant::now();
+    let mut orphaned_paths: Vec<&PathBuf> = vec![];
+    while let Some((_height, paths)) = tree_map.pop_first() {
+        for path in paths {
+            orphaned_paths.push(path);
+        }
+    }
+    info!(
+        "Found {:?} orphaned blocks in {:?}",
+        orphaned_paths.len(),
+        pretty_print_duration(time.elapsed())
+    );
+    orphaned_paths
+}
+
+fn split_off_recent_paths<'a>(
+    canonical_branch: &mut Vec<&'a PathBuf>,
+    tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>,
+    canonical_threshold: u32,
+) -> Vec<&'a PathBuf> {
+    let time = std::time::Instant::now();
+    let split_index = canonical_branch
+        .len()
+        .saturating_sub(canonical_threshold as usize);
+    let split_height = canonical_branch
+        .get(split_index)
+        .map(|p| extract_block_height(p))
+        .unwrap_or_default();
+    let mut recent_paths = canonical_branch.split_off(split_index);
+    let mut recent_tree_map = tree_map.split_off(&split_height);
+    let recent_paths_set: HashSet<&PathBuf> = recent_paths.clone().into_iter().collect();
+    while let Some((_height, paths)) = recent_tree_map.pop_first() {
+        for path in paths {
+            if !recent_paths_set.contains(path) {
+                recent_paths.push(path);
+            }
+        }
+    }
+    sort_by_height_and_lexicographical_order(&mut recent_paths);
+    info!(
+        "Found {:?} recent blocks in {:?}",
+        recent_paths.len(),
+        pretty_print_duration(time.elapsed())
+    );
+    recent_paths
+}
+
+fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
+    if length_of_chain % reporting_freq == 0 {
+        info!(
+            "Found best tip canidate at height {} in {:?}",
+            length_of_chain,
+            pretty_print_duration(time.elapsed())
+        );
+    }
+}
+
+#[cfg(test)]
+mod discovery_algorithm_tests {
+    use super::*;
+    use std::{collections::BTreeMap, path::PathBuf};
+
+    #[test]
+    fn test_canonical_branch_from_best_tip() {
+        // Prepare the best tip
+        let best_tip = PathBuf::from("tests/data/sequential_blocks/mainnet-105500-3NK73T6brdpBFgjbZKMpfYX596q68sfHx8NtMDYRLJ9ai88WzrKQ.json");
+
+        // Prepare the tree map with blocks that form the canonical branch and extra
+        // entries
+        let path_499_canon = PathBuf::from("tests/data/sequential_blocks/mainnet-105499-3NKEkf29fm6CARN6MAi6ZvmADxEXpu1wUwYfnjsiWCmR5LfCpwSg.json");
+        let path_499_extra = PathBuf::from("tests/data/sequential_blocks/mainnet-105499-3NLmMoYPiS3oc6Vj3etc5xQd5Ny9cjcKCadqRqxeEHSRF5icw3es.json");
+        let path_498_canon = PathBuf::from("tests/data/sequential_blocks/mainnet-105498-3NKbLiBHzQrAimK7AkP8qAfQpHnezkdsSm8mkt2TzsbjsLN8Axmt.json");
+        let path_498_extra = PathBuf::from("tests/data/sequential_blocks/mainnet-105498-3NLmgdEg4HdPNzPNceezVrbahnW3yV2Wo6C8g49AddYUNnHBmd44.json");
+        let path_497_canon = PathBuf::from("tests/data/sequential_blocks/mainnet-105497-3NKjngJTXJzRUXF3uH2nK19iYUVtYBFjLhezSrMMFVQyEGwqEi3c.json");
+        let path_497_extra = PathBuf::from("tests/data/sequential_blocks/mainnet-105497-3NLpfuGk5gvgaQuSQ3WrhXLX9mNJRZ1cNbRUAfCqdLqvVRjj4mL4.json");
+
+        let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
+        tree_map.insert(105499, vec![&path_499_canon, &path_499_extra]);
+        tree_map.insert(105498, vec![&path_498_canon, &path_498_extra]);
+        tree_map.insert(105497, vec![&path_497_canon, &path_497_extra]);
+
+        // Prepare the parent hash map
+        let mut parent_hash_map: HashMap<String, String> = HashMap::new();
+        parent_hash_map.insert(
+            "3NK73T6brdpBFgjbZKMpfYX596q68sfHx8NtMDYRLJ9ai88WzrKQ".into(),
+            "3NKEkf29fm6CARN6MAi6ZvmADxEXpu1wUwYfnjsiWCmR5LfCpwSg".into(),
+        );
+        parent_hash_map.insert(
+            "3NKEkf29fm6CARN6MAi6ZvmADxEXpu1wUwYfnjsiWCmR5LfCpwSg".into(),
+            "3NKbLiBHzQrAimK7AkP8qAfQpHnezkdsSm8mkt2TzsbjsLN8Axmt".into(),
+        );
+        parent_hash_map.insert(
+            "3NKbLiBHzQrAimK7AkP8qAfQpHnezkdsSm8mkt2TzsbjsLN8Axmt".into(),
+            "3NKjngJTXJzRUXF3uH2nK19iYUVtYBFjLhezSrMMFVQyEGwqEi3c".into(),
+        );
+
+        // Expected canonical branch
+        let binding = best_tip.clone();
+        let expected_canonical_branch =
+            vec![&path_497_canon, &path_498_canon, &path_499_canon, &binding];
+
+        // Run the function
+        let canonical_branch =
+            canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, &best_tip).unwrap();
+
+        // Assert that the result matches the expected canonical branch
+        assert_eq!(canonical_branch, expected_canonical_branch);
+
+        // Assert that only extra entries remain in the tree map
+        assert_eq!(tree_map.get(&105499).unwrap(), &vec![&path_499_extra]);
+        assert_eq!(tree_map.get(&105498).unwrap(), &vec![&path_498_extra]);
+        assert_eq!(tree_map.get(&105497).unwrap(), &vec![&path_497_extra]);
+        assert_eq!(tree_map.len(), 3);
+    }
+
+    #[test]
+    fn test_get_orphaned_paths() {
+        // Prepare the tree map
+        let binding_1 = PathBuf::from("mainnet-2-d.json");
+        let binding_2 = PathBuf::from("mainnet-3-e.json");
+
+        let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
+        tree_map.insert(0, vec![&binding_1]);
+        tree_map.insert(1, vec![&binding_2]);
+
+        // Expected orphaned paths
+        let expected_orphaned_paths = vec![
+            PathBuf::from("mainnet-2-d.json"),
+            PathBuf::from("mainnet-3-e.json"),
+        ];
+
+        // Get orphaned paths
+        let orphaned_paths = get_orphaned_paths(&mut tree_map);
+
+        // Assert that orphaned paths match expected paths
+        assert_eq!(
+            orphaned_paths,
+            expected_orphaned_paths.iter().collect::<Vec<&PathBuf>>()
+        );
+
+        assert!(tree_map.is_empty());
+    }
+
+    #[test]
+    fn test_split_off_recent_paths() {
+        let canonical_threshold = 2;
+
+        // Prepare the canonical branch
+        let branch_with_best_tip: Vec<PathBuf> = vec![
+            PathBuf::from("mainnet-1-a.json"),
+            PathBuf::from("mainnet-2-b.json"),
+            PathBuf::from("mainnet-3-c.json"),
+            PathBuf::from("mainnet-4-d.json"),
+            PathBuf::from("mainnet-5-e.json"), // goes to height 5 but not further
+        ];
+        let mut canonical_refs: Vec<&PathBuf> = branch_with_best_tip.iter().collect();
+
+        // Prepare the tree map
+        let binding_a = PathBuf::from("mainnet-1-a.json");
+        let binding_b = PathBuf::from("mainnet-2-b.json");
+        let binding_c = PathBuf::from("mainnet-3-c.json");
+        let binding_1 = PathBuf::from("mainnet-4-x.json");
+        let binding_2 = PathBuf::from("mainnet-5-y.json");
+        let binding_3 = PathBuf::from("mainnet-6-z.json"); // has not parent
+
+        let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
+        tree_map.insert(1, vec![&binding_a]);
+        tree_map.insert(2, vec![&binding_b]);
+        tree_map.insert(3, vec![&binding_c]);
+        tree_map.insert(4, vec![&branch_with_best_tip[3], &binding_1]);
+        tree_map.insert(5, vec![&branch_with_best_tip[4], &binding_2]);
+        tree_map.insert(6, vec![&binding_3]);
+
+        // Expected recent paths
+        let expected_recent_paths = vec![
+            PathBuf::from("mainnet-4-d.json"), // in canonical chain
+            PathBuf::from("mainnet-4-x.json"), // recent, but not canonical
+            PathBuf::from("mainnet-5-e.json"), // best tip
+            PathBuf::from("mainnet-5-y.json"), // recent, but not canonical
+            PathBuf::from("mainnet-6-z.json"), // recent, but not canonical
+        ];
+
+        // Expected canonical branch after split
+        let expected_canonical_branch = vec![
+            PathBuf::from("mainnet-1-a.json"),
+            PathBuf::from("mainnet-2-b.json"),
+            PathBuf::from("mainnet-3-c.json"),
+        ];
+
+        // Get recent paths
+        let recent_paths =
+            split_off_recent_paths(&mut canonical_refs, &mut tree_map, canonical_threshold);
+
+        // Assert that recent paths match expected paths
+        assert_eq!(
+            recent_paths,
+            expected_recent_paths.iter().collect::<Vec<&PathBuf>>()
+        );
+
+        // Assert that canonical branch has been correctly mutated
+        assert_eq!(
+            canonical_refs,
+            expected_canonical_branch.iter().collect::<Vec<&PathBuf>>()
+        );
+
+        // Assert that tree_map has been correctly mutated
+        assert_eq!(tree_map.get(&1), Some(&vec![&binding_a]));
+        assert_eq!(tree_map.get(&2), Some(&vec![&binding_b]));
+        assert_eq!(tree_map.get(&3), Some(&vec![&binding_c]));
+        assert_eq!(tree_map.len(), 3);
+    }
 }
