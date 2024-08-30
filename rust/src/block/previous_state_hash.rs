@@ -1,6 +1,5 @@
 use crate::block::BlockHash;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -25,29 +24,23 @@ impl PreviousStateHash {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        // Read the entire file into a buffer (assuming it's large, but you only need
-        // the start)
-        let mut buffer = String::new();
-        reader.read_to_string(&mut buffer)?;
+        // Create a buffer with a capacity of 1Kb
+        let mut buffer = String::with_capacity(1000);
 
-        // Locate "protocol_state" within the JSON
-        if let Some(start_pos) = buffer.find("\"protocol_state\":") {
-            if let Some(brace_pos) = buffer[start_pos..].find('{') {
-                let actual_start = start_pos + brace_pos;
+        // Limit the reader to read only the first 300 bytes
+        reader.take(1000).read_to_string(&mut buffer)?;
 
-                // Extract a fixed length portion of the buffer after the "protocol_state"
-                let slice = &buffer[actual_start..actual_start + 77];
-                let slice_with_brace = format!("{}{}", slice, "}"); // Add the closing brace manually
-
-                // Deserialize just this portion
-                let v: Value = serde_json::from_str(&slice_with_brace)?;
-
-                // Extract "previous_state_hash"
-                if let Some(previous_state_hash) = v.get("previous_state_hash") {
-                    // Convert to string and return
-                    if let Some(hash_str) = previous_state_hash.as_str() {
-                        return Ok(Self(hash_str.to_string()));
-                    }
+        // Locate "previous_state_hash" within the buffer
+        let prev_state_hash_key = "\"previous_state_hash\"";
+        if let Some(hash_pos) = buffer.find(prev_state_hash_key) {
+            let hash_start = hash_pos + prev_state_hash_key.len();
+            // Find the first quote after the colon
+            if let Some(quote_start) = buffer[hash_start..].find('"') {
+                let actual_start = hash_start + quote_start + 1; // Move to the start of the hash
+                                                                 // Find the ending quote
+                if let Some(quote_end) = buffer[actual_start..].find('"') {
+                    let previous_state_hash = &buffer[actual_start..actual_start + quote_end];
+                    return Ok(Self(previous_state_hash.to_string()));
                 }
             }
         }
@@ -85,13 +78,56 @@ impl From<PreviousStateHash> for BlockHash {
 }
 
 #[cfg(test)]
-mod test {
+mod previous_state_hash_tests {
     use super::*;
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
+    use std::fs::write;
+
     #[test]
     fn previous_state_hash_deserializer_test() -> anyhow::Result<()> {
+        // Test cases with different formats
+        let test_cases = vec![
+            (
+                r#"{"protocol_state": {"previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw""#,
+                "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+            ),
+            (
+                r#"{
+                        "protocol_state": {
+                            "previous_state_hash": "3NKrsmkQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
+                     "#,
+                "3NKrsmkQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+            ),
+            (
+                r#"{"protocol_state":
+                        {    "previous_state_hash"    :    "3NKzQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw""#,
+                "3NKzQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+            ),
+            (
+                r#"{"protocol_state": {
+                            "previous_state_hash":
+                            "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
+                        "#,
+                "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+            ),
+        ];
+
+        for (i, (json_content, expected_hash)) in test_cases.iter().enumerate() {
+            let test_path = format!(
+                "./tests/data/canonical_chain_discovery/contiguous/test_case_{}.json",
+                i
+            );
+            write(&test_path, json_content)?;
+
+            let previous_state_hash = PreviousStateHash::from_path(Path::new(&test_path))?.0;
+            assert_eq!(previous_state_hash, *expected_hash);
+
+            // Cleanup the test file
+            std::fs::remove_file(test_path)?;
+        }
+
         let paths: Vec<PathBuf> =
             glob::glob("./tests/data/canonical_chain_discovery/contiguous/*.json")?
                 .filter_map(|x| x.ok())
