@@ -37,7 +37,7 @@ use crate::{
     },
     utility::functions::pretty_print_duration,
 };
-use anyhow::{bail, Context};
+use anyhow::bail;
 use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
@@ -876,23 +876,6 @@ impl IndexerState {
             }
         }
         best_chain
-    }
-
-    /// Returns the ledger corresponding to the best tip
-    pub fn best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
-        let mut best_ledger = self.ledger.clone();
-        let mut best_chain = self.best_chain();
-        best_chain.reverse();
-
-        for diff in best_chain.iter().map(|b| {
-            self.diffs_map
-                .get(&b.state_hash)
-                .with_context(|| format!("(length {}) {}", b.height, b.state_hash.0))
-                .unwrap()
-        }) {
-            best_ledger._apply_diff(diff)?;
-        }
-        Ok(Some(best_ledger))
     }
 
     /// Get the canonical block at the given height
