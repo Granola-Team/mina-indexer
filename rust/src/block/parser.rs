@@ -2,6 +2,7 @@ use super::precomputed::PcbVersion;
 use crate::{
     block::{extract_block_height, precomputed::PrecomputedBlock},
     canonicity::canonical_chain_discovery::discovery,
+    utility::functions::calculate_total_size,
 };
 use anyhow::{anyhow, bail};
 use glob::glob;
@@ -168,9 +169,6 @@ impl BlockParser {
             let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
             let paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
-            let total_num_bytes = paths
-                .iter()
-                .fold(0, |acc, p| acc + p.metadata().unwrap().len());
             if let Ok((canonical_paths, recent_paths, orphaned_paths)) =
                 discovery(canonical_threshold, reporting_freq, paths.iter().collect())
             {
@@ -178,6 +176,19 @@ impl BlockParser {
                 let deep_canonical_bytes = canonical_paths
                     .iter()
                     .fold(0, |acc, p| acc + p.metadata().unwrap().len());
+
+                let total_num_bytes = if do_not_ingest_orphan_blocks {
+                    calculate_total_size(&canonical_paths) + calculate_total_size(&recent_paths)
+                } else {
+                    calculate_total_size(&paths)
+                };
+
+                let total_num_blocks = if do_not_ingest_orphan_blocks {
+                    canonical_paths.len() + recent_paths.len()
+                } else {
+                    paths.len()
+                };
+
                 Ok(Self {
                     version,
                     blocks_dir,
@@ -187,7 +198,7 @@ impl BlockParser {
                     deep_canonical_bytes,
                     num_deep_canonical_blocks: canonical_paths.len() as u32,
                     num_recent_blocks: recent_paths.len() as u32,
-                    total_num_blocks: paths.len() as u32,
+                    total_num_blocks: total_num_blocks as u32,
                     canonical_paths: canonical_paths.into_iter(),
                     recent_paths: recent_paths.into_iter(),
                     orphaned_paths: if do_not_ingest_orphan_blocks {

@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 /// Pretty print duration for use in logs.
 ///
@@ -51,10 +51,21 @@ pub fn nanomina_to_mina(nanomina: u64) -> String {
     dec.normalize().to_string()
 }
 
+/// Calculate the total size of the file paths
+pub fn calculate_total_size(paths: &[PathBuf]) -> u64 {
+    paths.iter().fold(0, |acc, p| {
+        match p.metadata() {
+            Ok(metadata) => acc + metadata.len(),
+            Err(_) => acc, // Skip files that can't be read
+        }
+    })
+}
+
 #[cfg(test)]
 mod utility_function_tests {
-
     use super::*;
+    use std::{fs::File, io::Write};
+    use tempfile::TempDir;
 
     #[test]
     fn test_nanomina_to_mina_conversion() {
@@ -81,5 +92,57 @@ mod utility_function_tests {
             pretty_print_duration(Duration::from_secs(172800 + 7200 + 120 + 5)),
             "2d 2h 2m 5s"
         );
+    }
+
+    fn create_temp_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
+        let file_path = dir.path().join(name);
+        let mut file = File::create(&file_path).unwrap();
+        file.write_all(content.as_bytes()).unwrap();
+        file_path
+    }
+
+    #[test]
+    fn test_empty_vector() {
+        let paths: Vec<PathBuf> = vec![];
+        assert_eq!(calculate_total_size(&paths), 0);
+    }
+
+    #[test]
+    fn test_single_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = create_temp_file(&temp_dir, "test1.txt", "Hello, World!");
+        let paths = vec![file_path];
+        assert_eq!(calculate_total_size(&paths), 13); // "Hello, World!" is 13
+                                                      // bytes
+    }
+
+    #[test]
+    fn test_multiple_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = create_temp_file(&temp_dir, "test1.txt", "Hello");
+        let file2 = create_temp_file(&temp_dir, "test2.txt", "World");
+        let file3 = create_temp_file(&temp_dir, "test3.txt", "Rust");
+        let paths = vec![file1, file2, file3];
+        assert_eq!(calculate_total_size(&paths), 14); // "Hello" + "World" +
+                                                      // "Rust" = 5 + 5 + 4 = 14
+                                                      // bytes
+    }
+
+    #[test]
+    fn test_nonexistent_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let existing_file = create_temp_file(&temp_dir, "existing.txt", "I exist");
+        let nonexistent_file = temp_dir.path().join("nonexistent.txt");
+        let paths = vec![existing_file, nonexistent_file];
+        assert_eq!(calculate_total_size(&paths), 7); // Only counts "I exist" (7
+                                                     // bytes)
+    }
+
+    #[test]
+    fn test_empty_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let empty_file = create_temp_file(&temp_dir, "empty.txt", "");
+        let paths = vec![empty_file];
+        assert_eq!(calculate_total_size(&paths), 0);
     }
 }
