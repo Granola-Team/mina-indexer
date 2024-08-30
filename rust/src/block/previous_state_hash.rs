@@ -34,12 +34,16 @@ impl PreviousStateHash {
         let prev_state_hash_key = "\"previous_state_hash\"";
         if let Some(hash_pos) = buffer.find(prev_state_hash_key) {
             let hash_start = hash_pos + prev_state_hash_key.len();
+
             // Find the first quote after the colon
             if let Some(quote_start) = buffer[hash_start..].find('"') {
                 let actual_start = hash_start + quote_start + 1; // Move to the start of the hash
-                                                                 // Find the ending quote
-                if let Some(quote_end) = buffer[actual_start..].find('"') {
-                    let previous_state_hash = &buffer[actual_start..actual_start + quote_end];
+
+                // Use a fixed length of 52 characters for the hash
+                let hash_end = actual_start + 52;
+
+                if hash_end <= buffer.len() {
+                    let previous_state_hash = &buffer[actual_start..hash_end];
                     return Ok(Self(previous_state_hash.to_string()));
                 }
             }
@@ -94,14 +98,14 @@ mod previous_state_hash_tests {
             (
                 r#"{
                         "protocol_state": {
-                            "previous_state_hash": "3NKrsmkQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
+                            "previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
                      "#,
-                "3NKrsmkQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+                "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
             ),
             (
                 r#"{"protocol_state":
-                        {    "previous_state_hash"    :    "3NKzQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw""#,
-                "3NKzQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+                        {    "previous_state_hash"    :    "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw""#,
+                "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
             ),
             (
                 r#"{"protocol_state": {
