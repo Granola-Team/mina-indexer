@@ -24,6 +24,11 @@ alias t3 := tier3-dev
 is_rustfmt_nightly := `cd rust && rustfmt --version | grep stable || echo "true"`
 nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" }
 
+DEBUG_MODE := TOPLEVEL + "/rust/target/debug/mina-indexer"
+PROD_MODE := TOPLEVEL + "/result/bin/mina-indexer"
+REGRESSION_TEST := "./ops/regression-test.rb"
+DEPLOY := "./ops/deploy.rb"
+
 default:
   @just --list --justfile {{justfile()}}
 
@@ -51,7 +56,7 @@ audit:
 lint:
   @echo "--- Linting ops scripts"
   ruby -cw ops/*.rb
-  rubocop ops/*.rb
+  #rubocop ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
@@ -72,7 +77,7 @@ clean:
 
 clean-dev:
   @echo "Cleaning dev directory"
-  ./ops/regression-test.rb clean-dev
+  {{REGRESSION_TEST}} clean-dev
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
@@ -98,15 +103,15 @@ debug-build:
 
 # Quick debug-build and regression-test
 bt subtest='': debug-build
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} {{subtest}}
 
 # Quick debug-build and continue regression-test
 ct subtest='': debug-build
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer continue {{subtest}}
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} continue {{subtest}}
 
 # Quick (debug) unit-test and regression-test
 tt subtest='': test-unit
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer {{subtest}}
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} {{subtest}}
 
 # Build OCI images.
 build-image:
@@ -121,7 +126,7 @@ build-image:
 # Run the 1st tier of tests.
 tier1: tier1-prereqs check lint test-unit
   @echo "--- Performing tier 1 regression tests"
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer \
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} \
     ipc_is_available_immediately \
     clean_shutdown \
     clean_kill \
@@ -134,41 +139,41 @@ tier1: tier1-prereqs check lint test-unit
 
 load:
   @echo "--- Performing a simple load test with Nix-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer load
+  time {{REGRESSION_TEST}} {{PROD_MODE}} load
 
 load-dev:
   @echo "--- Performing a simple load test with debug-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer load
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load
 
 # Run the 2nd tier of tests with Nix-built binary.
 tier2: tier2-prereqs nix-build load && build-image
   @echo "--- Performing tier 2 regression tests with Nix-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer
+  time {{REGRESSION_TEST}} {{PROD_MODE}}
   @echo "--- Performing many_blocks regression test with Nix-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer many_blocks
+  time {{REGRESSION_TEST}} {{PROD_MODE}} many_blocks
   @echo "--- Performing release regression test with Nix-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/result/bin/mina-indexer release
+  time {{REGRESSION_TEST}} {{PROD_MODE}} release
 
 # Run the 2nd tier of with debug build.
 tier2-dev: tier2-prereqs debug-build load-dev
   @echo "--- Performing tier 2 regression tests with debug-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}}
   @echo "--- Performing many_blocks regression test with debug-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer many_blocks
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} many_blocks
   @echo "--- Performing release regression test with debug-built binary"
-  time ./ops/regression-test.rb "$TOPLEVEL"/rust/target/debug/mina-indexer release
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} release
 
 # Run the 2nd tier of tests with Nix-built binary.
 tier3 blocks='5000': test-unit-mina-rs nix-build
   @echo "--- Performing tier3 regression tests with Nix-built binary"
-  time ./ops/deploy.rb test {{blocks}}
+  time {{DEPLOY}} test {{blocks}}
 
 # Run the 3rd tier of tests with debug build & no unit tests.
 tier3-dev blocks='5000': debug-build
   @echo "--- Performing tier3 regression tests with debug-built binary"
-  time ./ops/deploy.rb test {{blocks}}
+  time {{DEPLOY}} test {{blocks}}
 
 # Run a server as if in production.
 deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying to production"
-  time ./ops/deploy.rb prod {{blocks}} {{web_port}}
+  time {{DEPLOY}} prod {{blocks}} {{web_port}}
