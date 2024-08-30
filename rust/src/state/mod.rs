@@ -1564,7 +1564,7 @@ impl IndexerState {
                     / bytes_rate,
             );
             if !dur.is_zero() {
-                info!("Estimated remaining time: {}", pretty_print_duration(dur));
+                info!("Estimated time remaining: {}", pretty_print_duration(dur));
             }
         }
     }
@@ -1608,7 +1608,7 @@ impl IndexerState {
                     / bytes_rate,
             );
             if !dur.is_zero() {
-                info!("Estimated remaining time: {}", pretty_print_duration(dur));
+                info!("Estimated time remaining: {}", pretty_print_duration(dur));
             }
         }
         Ok(())
