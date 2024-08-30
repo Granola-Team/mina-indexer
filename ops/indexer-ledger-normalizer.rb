@@ -16,10 +16,11 @@ data.each_value do |value|
   balance_mina = "#{balance_nanomina[0..-10]}.#{balance_nanomina[-9..]}"
   normalized_balance = balance_mina.sub(/\.?0+$/, '')
   nonce = (value['nonce'] || 0).to_s
-
+  delegate = value['delegate'] || value['public_key']
   result[value['public_key']] = {
     'nonce' => nonce,
-    'balance' => normalized_balance
+    'balance' => normalized_balance,
+    'delegate' => delegate
   }
 end
 

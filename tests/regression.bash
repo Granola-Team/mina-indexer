@@ -127,7 +127,7 @@ idxr_server_start() {
 idxr_server_start_standard() {
     echo "Creating mina indexer database"
     idxr_database_create "$@"
-    
+
     echo "Starting mina indexer server from database"
     idxr_server_start \
         --blocks-dir ./blocks \
@@ -588,7 +588,7 @@ test_missing_blocks() {
 # Indexer server returns the correct best chain
 test_best_chain() {
     stage_mainnet_blocks 12 ./blocks
-    mkdir best_chain
+    mkdir -p best_chain
 
     idxr_server_start_standard
     wait_for_socket
@@ -633,7 +633,7 @@ test_best_chain() {
 # Indexer server returns correct ledgers
 test_ledgers() {
     stage_mainnet_blocks 15 ./blocks
-    mkdir ledgers
+    mkdir -p ledgers
 
     idxr_server_start_standard
     wait_for_socket
@@ -765,7 +765,7 @@ test_replay() {
 # Indexer server returns correct transactions
 test_transactions() {
     stage_mainnet_blocks 13 ./blocks
-    mkdir transactions
+    mkdir -p transactions
 
     idxr_server_start_standard
     wait_for_socket
@@ -858,7 +858,7 @@ test_transactions() {
 # Indexer server returns correct SNARK work
 test_snark_work() {
     stage_mainnet_blocks 120 ./blocks
-    mkdir snark_work
+    mkdir -p snark_work
 
     idxr_server_start_standard --canonical-threshold 5
     wait_for_socket

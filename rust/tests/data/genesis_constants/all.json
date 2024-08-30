@@ -1,7 +1,1 @@
-{
-    "k": 275,
-    "delta": 1,
-    "slots_per_epoch": 5000,
-    "slots_per_sub_window": 10,
-    "txpool_max_size": 1000
-}
+{"k":275,"delta":1,"slots_per_epoch":5000,"slots_per_sub_window":10,"txpool_max_size":1000}
