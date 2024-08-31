@@ -65,6 +65,9 @@ pub struct IndexerState {
     /// Cadence for computing and storing new ledgers
     pub ledger_cadence: u32,
 
+    /// Map of ledger diffs following the canonical root
+    pub diffs_map: HashMap<BlockHash, LedgerDiff>,
+
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
 
@@ -247,6 +250,10 @@ impl IndexerState {
         Ok(Self {
             ledger: <GenesisLedger as Into<Ledger>>::into(config.genesis_ledger)
                 .apply_diff_from_precomputed(&genesis_block)?,
+            diffs_map: HashMap::from([(
+                genesis_block.state_hash(),
+                LedgerDiff::from_precomputed(&genesis_block),
+            )]),
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -278,6 +285,7 @@ impl IndexerState {
 
         Ok(Self {
             ledger: config.genesis_ledger.into(),
+            diffs_map: HashMap::new(),
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -332,6 +340,10 @@ impl IndexerState {
             ledger: root_ledger
                 .and_then(|x| x.apply_diff_from_precomputed(root_block).ok())
                 .unwrap_or_default(),
+            diffs_map: HashMap::from([(
+                root_block.state_hash(),
+                LedgerDiff::from_precomputed(root_block),
+            )]),
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
@@ -570,6 +582,11 @@ impl IndexerState {
             return Ok((ExtensionType::BlockNotAdded, None));
         }
 
+        // put the pcb's ledger diff in the map
+        self.diffs_map.insert(
+            precomputed_block.state_hash(),
+            LedgerDiff::from_precomputed(precomputed_block),
+        );
         if incremnet_blocks {
             self.blocks_processed += 1;
         }
@@ -822,8 +839,9 @@ impl IndexerState {
             let old_canonical_root_id = self.canonical_root.node_id.clone();
             let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_root_id)?;
 
-            self.update_ledger()?;
+            self.update_ledger(&new_canonical_blocks)?;
             self.update_ledger_store(&new_canonical_blocks)?;
+            self.prune_diffs_map(&old_canonical_root_id)?;
 
             return Ok(new_canonical_blocks);
         }
@@ -1025,6 +1043,10 @@ impl IndexerState {
                         state_hash: self.root_branch.root_block().state_hash.clone(),
                         node_id: self.root_branch.root.clone(),
                     };
+                    self.diffs_map.insert(
+                        tip.state_hash.clone(),
+                        LedgerDiff::from_precomputed(&root_block),
+                    );
                     self.canonical_root = tip.clone();
                     self.best_tip = tip;
                     debug!("Witness tree root block (length {root_block_height}): {state_hash}");
@@ -1342,9 +1364,19 @@ impl IndexerState {
     }
 
     /// Add new canonical diffs to the ledger
-    fn update_ledger(&mut self) -> anyhow::Result<()> {
+    fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
         // apply the new canonical diffs and store each nth resulting ledger
-        let ledger_diff = LedgerDiff::default();
+        let mut ledger_diff = LedgerDiff::default();
+        for canonical_block in canonical_blocks {
+            if let Some(diff) = self.diffs_map.get(&canonical_block.state_hash) {
+                ledger_diff.append(diff.clone());
+            } else {
+                error!(
+                    "Block not in diffs map (length {}): {}",
+                    canonical_block.blockchain_length, canonical_block.state_hash
+                );
+            }
+        }
 
         if !ledger_diff.account_diffs.is_empty() {
             self.ledger._apply_diff(&ledger_diff)?;
@@ -1362,6 +1394,25 @@ impl IndexerState {
                         self.ledger.clone(),
                     )?;
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Remove diffs corresponding to blocks at or beneath the height of the new
+    /// canonical root
+    fn prune_diffs_map(&mut self, old_canonical_root_id: &NodeId) -> anyhow::Result<()> {
+        for node_id in self
+            .root_branch
+            .branches
+            .traverse_level_order_ids(old_canonical_root_id)
+            .unwrap()
+        {
+            let block = self.get_block_from_id(&node_id);
+            if block != self.canonical_root_block()
+                && block.height <= self.canonical_root_block().height
+            {
+                self.diffs_map.remove(&block.state_hash.clone());
             }
         }
         Ok(())
