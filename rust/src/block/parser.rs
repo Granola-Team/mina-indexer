@@ -221,7 +221,7 @@ impl BlockParser {
         }
     }
 
-    fn consume_block(
+    pub fn consume_block(
         &mut self,
         path: &Path,
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
