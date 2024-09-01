@@ -57,14 +57,6 @@ pub enum PathDesignation {
 }
 
 impl BlockParser {
-    pub fn paths(&self) -> BlockParserPaths {
-        BlockParserPaths {
-            canonical_paths: self.canonical_paths.clone().collect(),
-            recent_paths: self.recent_paths.clone().collect(),
-            orphaned_paths: self.orphaned_paths.clone().collect(),
-        }
-    }
-
     /// Returns a new block parser which employs canonical chain discovery
     pub async fn new_with_canonical_chain_discovery(
         blocks_dir: &Path,
