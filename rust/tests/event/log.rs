@@ -69,7 +69,7 @@ async fn test() -> anyhow::Result<()> {
     // - add block to witness tree
     // - update best tip
     // - update canonicities
-    while let Some((block, block_bytes)) = block_parser1.next_block()? {
+    while let Some((block, block_bytes)) = block_parser1.next_block().await? {
         let block: PrecomputedBlock = block.into();
         if let Some(db_event) = state1
             .indexer_store

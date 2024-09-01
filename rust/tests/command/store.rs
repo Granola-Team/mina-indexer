@@ -46,7 +46,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     .await?;
 
     // add the first block to the store
-    if let Some((block, block_bytes)) = bp.next_block()? {
+    if let Some((block, block_bytes)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         indexer.add_block_to_store(&block, block_bytes, true)?;
     }

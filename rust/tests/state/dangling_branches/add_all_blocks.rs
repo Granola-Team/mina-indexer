@@ -15,13 +15,13 @@ async fn extension() -> anyhow::Result<()> {
     let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
 
     let mut n = 0;
-    if let Some((block, block_bytes)) = block_parser.next_block()? {
+    if let Some((block, block_bytes)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let mut state =
             IndexerState::new_testing(&block, block_bytes, None, None, None, None, None)?;
         n += 1;
 
-        while let Some((block, _)) = block_parser.next_block()? {
+        while let Some((block, _)) = block_parser.next_block().await? {
             let block: PrecomputedBlock = block.into();
             state.add_block_to_witness_tree(&block, true)?;
             n += 1;

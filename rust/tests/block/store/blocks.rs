@@ -28,7 +28,7 @@ async fn add_and_get() -> anyhow::Result<()> {
 
     let mut n = 0;
     let adding = Instant::now();
-    while let Some((block, block_bytes)) = bp.next_block()? {
+    while let Some((block, block_bytes)) = bp.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let state_hash = block.state_hash();
 
