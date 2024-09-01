@@ -4,7 +4,7 @@ pub mod summary;
 use crate::{
     block::{
         genesis::GenesisBlock,
-        parser::{BlockParser, ParsedBlock},
+        parser::{BlockParser, ParsedBlock, PathDesignation},
         precomputed::PrecomputedBlock,
         store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
@@ -392,46 +392,52 @@ impl IndexerState {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
 
-                if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
-                    block_parser.next_block().await?
+                if let Some(PathDesignation::DeepCanonical(path)) =
+                    block_parser.next_path_designation()
                 {
-                    let state_hash = block.state_hash();
-                    self.bytes_processed += block_bytes;
+                    if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
+                        block_parser.consume_block(&path, &ParsedBlock::DeepCanonical)?
+                    {
+                        let state_hash = block.state_hash();
+                        self.bytes_processed += block_bytes;
 
-                    // apply diff + add to db
-                    let diff = LedgerDiff::from_precomputed(&block);
-                    ledger_diffs.push(diff.clone());
+                        // apply diff + add to db
+                        let diff = LedgerDiff::from_precomputed(&block);
+                        ledger_diffs.push(diff.clone());
 
-                    indexer_store.add_block(&block, block_bytes)?;
-                    indexer_store.set_best_block(&block.state_hash())?;
-                    indexer_store.add_canonical_block(
-                        block.blockchain_length(),
-                        block.global_slot_since_genesis(),
-                        &block.state_hash(),
-                        &block.genesis_state_hash(),
-                        None,
-                    )?;
+                        indexer_store.add_block(&block, block_bytes)?;
+                        indexer_store.set_best_block(&block.state_hash())?;
+                        indexer_store.add_canonical_block(
+                            block.blockchain_length(),
+                            block.global_slot_since_genesis(),
+                            &block.state_hash(),
+                            &block.genesis_state_hash(),
+                            None,
+                        )?;
 
-                    // compute and store ledger at specified cadence
-                    if self.blocks_processed % self.ledger_cadence == 0 {
-                        for diff in ledger_diffs.iter() {
-                            self.ledger._apply_diff(diff)?;
+                        // compute and store ledger at specified cadence
+                        if self.blocks_processed % self.ledger_cadence == 0 {
+                            for diff in ledger_diffs.iter() {
+                                self.ledger._apply_diff(diff)?;
+                            }
+
+                            ledger_diffs.clear();
+                            indexer_store.add_staged_ledger_at_state_hash(
+                                &state_hash,
+                                self.ledger.clone(),
+                            )?;
                         }
 
-                        ledger_diffs.clear();
-                        indexer_store
-                            .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
-                    }
-
-                    // update root branch on last deep canonical block
-                    if self.blocks_processed > block_parser.num_deep_canonical_blocks {
-                        self.root_branch = Branch::new(&block)?;
-                        self.ledger._apply_diff(&diff)?;
-                        self.best_tip = Tip {
-                            state_hash: self.root_branch.root_block().state_hash.clone(),
-                            node_id: self.root_branch.root.clone(),
-                        };
-                        self.canonical_root = self.best_tip.clone();
+                        // update root branch on last deep canonical block
+                        if self.blocks_processed > block_parser.num_deep_canonical_blocks {
+                            self.root_branch = Branch::new(&block)?;
+                            self.ledger._apply_diff(&diff)?;
+                            self.best_tip = Tip {
+                                state_hash: self.root_branch.root_block().state_hash.clone(),
+                                node_id: self.root_branch.root.clone(),
+                            };
+                            self.canonical_root = self.best_tip.clone();
+                        }
                     }
                 } else {
                     bail!("Block unexpectedly missing");
@@ -476,48 +482,42 @@ impl IndexerState {
         }
 
         loop {
-            tokio::select! {
-                // wait for SIGINT
-                _ = tokio::signal::ctrl_c() => {
-                    info!("SIGINT received");
-                    break;
-                }
+            // First, handle the non-Future `next_block` call
+            let res = block_parser.next_block();
 
-                // parse the next precomputed block
-                res = block_parser.next_block() => {
-                    match res {
-                        Ok(Some((parsed_block, block_bytes))) => {
-                            self.report_progress(block_parser, step_time, total_time)?;
-                            step_time = Instant::now();
+            // Now handle the result, which is synchronous
+            match res {
+                Ok(Some((parsed_block, block_bytes))) => {
+                    self.report_progress(block_parser, step_time, total_time)?;
+                    step_time = Instant::now();
 
-                            match parsed_block {
-                                ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
-                                    info!("Adding block to witness tree {}", block.summary());
-                                    self.block_pipeline(&block, block_bytes)?;
-                                }
-                                ParsedBlock::Orphaned(block) => {
-                                    trace!("Adding orphaned block to store {}", block.summary());
-                                    self.add_block_to_store(&block, block_bytes, true)?;
-                                }
-                            }
+                    match parsed_block {
+                        ParsedBlock::DeepCanonical(block) | ParsedBlock::Recent(block) => {
+                            info!("Adding block to witness tree {}", block.summary());
+                            self.block_pipeline(&block, block_bytes)?;
                         }
-                        Ok(None) => {
-                            info!(
-                                "Finished ingesting and applying {} blocks ({}) to the witness tree in {}",
-                                self.blocks_processed,
-                                bytesize::ByteSize::b(self.bytes_processed),
-                                pretty_print_duration(total_time.elapsed() + offset),
-                            );
-                            break;
-                        }
-                        Err(e) => {
-                            error!("Block ingestion error: {e}");
-                            break;
+                        ParsedBlock::Orphaned(block) => {
+                            trace!("Adding orphaned block to store {}", block.summary());
+                            self.add_block_to_store(&block, block_bytes, true)?;
                         }
                     }
                 }
+                Ok(None) => {
+                    info!(
+                        "Finished ingesting and applying {} blocks ({}) to the witness tree in {:?}",
+                        self.blocks_processed,
+                        bytesize::ByteSize::b(self.bytes_processed),
+                        pretty_print_duration(total_time.elapsed() + offset),
+                    );
+                    break;
+                }
+                Err(e) => {
+                    error!("Block ingestion error: {e}");
+                    break;
+                }
             }
         }
+
         Ok(())
     }
 

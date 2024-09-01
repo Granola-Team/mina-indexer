@@ -21,7 +21,7 @@ async fn gaps() -> anyhow::Result<()> {
     )
     .await?;
 
-    while let Some((block, _)) = block_parser.next_block().await? {
+    while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -44,7 +44,7 @@ async fn contiguous() -> anyhow::Result<()> {
     )
     .await?;
 
-    while let Some((block, _)) = block_parser.next_block().await? {
+    while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -67,7 +67,7 @@ async fn missing_parent() -> anyhow::Result<()> {
     )
     .await?;
 
-    while let Some((block, _)) = block_parser.next_block().await? {
+    while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
@@ -119,7 +119,7 @@ async fn canonical_threshold() -> anyhow::Result<()> {
     )
     .await?;
 
-    while let Some((block, _)) = block_parser.next_block().await? {
+    while let Some((block, _)) = block_parser.next_block()? {
         let block: PrecomputedBlock = block.into();
         println!("{}", block.summary());
     }
