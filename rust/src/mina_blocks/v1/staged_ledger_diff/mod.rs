@@ -22,9 +22,6 @@ pub struct Diff {
 pub struct CompletedWork {
     pub fee: String,
     pub prover: String,
-
-    #[serde(skip_deserializing)]
-    proofs: serde_json::Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
