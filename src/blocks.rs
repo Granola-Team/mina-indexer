@@ -1,6 +1,6 @@
 use edgedb_tokio::Client;
 use regex::Regex;
-use serde_json::Value;
+use sonic_rs::{JsonContainerTrait, JsonType, JsonValueTrait, Value};
 use std::{
     collections::HashSet,
     sync::{Arc, LazyLock},
@@ -75,13 +75,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
 
     println!("Processing block {} at height {}", block_hash, height);
 
-    let accounts: HashSet<String> = json
-        .as_object()
-        .unwrap()
-        .values()
-        .flat_map(|v| extract_accounts(v))
-        .collect();
-
+    let accounts = extract_accounts(&json);
     insert_accounts(db, accounts).await?;
 
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
@@ -170,7 +164,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
 
     // Process epoch_data
     for epoch_type in ["staking", "next"] {
-        let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type)];
+        let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type).as_str()];
         let ledger = &epoch_data["ledger"];
         db.execute(
             format!(
@@ -359,18 +353,26 @@ const ACCOUNTS_REGEX: LazyLock<Regex> =
 fn extract_accounts(value: &Value) -> HashSet<String> {
     let mut accounts = HashSet::new();
 
-    match value {
-        Value::String(s) if ACCOUNTS_REGEX.is_match(s) => {
-            accounts.insert(s.to_string());
-        }
-        Value::Object(obj) => {
-            for v in obj.values() {
-                accounts.extend(extract_accounts(v));
+    match value.get_type() {
+        JsonType::String => {
+            if let Some(s) = value.as_str() {
+                if ACCOUNTS_REGEX.is_match(s) {
+                    accounts.insert(s.to_string());
+                }
             }
         }
-        Value::Array(arr) => {
-            for v in arr {
-                accounts.extend(extract_accounts(v));
+        JsonType::Object => {
+            if let Some(obj) = value.as_object() {
+                for (_, v) in obj.iter() {
+                    accounts.extend(extract_accounts(v));
+                }
+            }
+        }
+        JsonType::Array => {
+            if let Some(arr) = value.as_array() {
+                for v in arr {
+                    accounts.extend(extract_accounts(v));
+                }
             }
         }
         _ => {}

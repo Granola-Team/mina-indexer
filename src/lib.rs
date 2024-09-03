@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
-use serde_json::Value;
-use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
+use sonic_rs::{JsonType, JsonValueTrait, Value};
+use std::{cmp::Ordering, collections::HashSet, fs, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::{
     fs::File,
     io::{self, AsyncReadExt, BufReader},
@@ -130,17 +130,22 @@ fn to_i64(value: &Value) -> Option<i64> {
 }
 
 fn to_decimal(value: &Value) -> Option<BigDecimal> {
-    match value {
-        Value::Number(num) => {
-            if num.is_i64() {
-                num.as_i64().map(BigDecimal::from)
-            } else if num.is_f64() {
-                num.as_f64().and_then(|n| BigDecimal::try_from(n).ok())
+    match value.get_type() {
+        JsonType::Number => {
+            if let Some(num_str) = value.as_str() {
+                // sonic_rs stores numbers as strings internally
+                if num_str.contains('.') {
+                    // It's a floating-point number
+                    BigDecimal::from_str(num_str).ok()
+                } else {
+                    // It's an integer
+                    num_str.parse::<i64>().ok().map(BigDecimal::from)
+                }
             } else {
                 None
             }
         }
-        Value::String(s) => s.parse::<BigDecimal>().ok(),
+        JsonType::String => value.as_str().and_then(|s| BigDecimal::from_str(s).ok()),
         _ => None,
     }
 }
@@ -152,7 +157,7 @@ async fn to_json(path: &PathBuf) -> io::Result<Value> {
     reader.read_to_end(&mut buffer).await?;
 
     // First, try to parse directly from the buffer
-    match serde_json::from_slice(&buffer) {
+    match sonic_rs::from_slice(&buffer) {
         Ok(value) => Ok(value),
         Err(e) => {
             // It is too slow to try to use `String::from_utf8_lossy(&buffer)`

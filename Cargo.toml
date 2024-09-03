@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-serde_json = "1.0"
+sonic-rs = "0.3"
 regex = "1.5"
 miette = "5.3.0"
 anyhow = "*"

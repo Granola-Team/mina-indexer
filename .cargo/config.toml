@@ -1,0 +1,3 @@
+[build]
+rustflags = ["-g", "-C", "target-cpu=native"]
+rustdocflags = ["-C", "target-cpu=native"]

@@ -1,7 +1,7 @@
-use std::{collections::HashSet, hash::Hash, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use edgedb_tokio::Client;
-use serde_json::Value;
+use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
 use tokio::sync::Semaphore;
 
 use crate::{
