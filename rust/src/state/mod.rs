@@ -11,7 +11,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     chain::store::ChainStore,
-    constants::*,
+    constants::{GIT_COMMIT_HASH, *},
     event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
         diff::LedgerDiff,
@@ -42,6 +42,9 @@ use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
     collections::HashMap,
+    env,
+    fs::OpenOptions,
+    io::Write,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
@@ -387,6 +390,24 @@ impl IndexerState {
                 info!("Adding blocks to the witness tree...");
             }
 
+            let current_dir = env::current_dir().expect("Cannot access current working directory");
+
+            // Specify the file name
+            let mut file_path = current_dir;
+            file_path.push(format!(
+                "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd_diffs_{}.txt",
+                GIT_COMMIT_HASH
+            ));
+
+            let mut file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&file_path)
+                .expect("Cannot open file");
+
+            let pk_of_interest =
+                &PublicKey("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string());
+
             // process deep canonical blocks first bypassing the witness tree
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
@@ -400,6 +421,11 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
+                    if diff.public_keys_seen.contains(pk_of_interest) {
+                        if let Err(e) = writeln!(file, "{:#?}", diff) {
+                            error!("Could not write to file: {}", e);
+                        }
+                    }
                     ledger_diffs.push(diff.clone());
 
                     indexer_store.add_block(&block, block_bytes)?;
