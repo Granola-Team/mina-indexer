@@ -63,12 +63,12 @@ async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Err
             .await?,
     );
 
-    let retry_opts = RetryOptions::default().with_rule::<u8>(
+    let retry_opts = RetryOptions::default().with_rule(
         RetryCondition::TransactionConflict,
         // No. of retries
-        3,
+        5,
         // Retry immediately instead of default with increasing backoff
-        |_| std::time::Duration::from_millis(500),
+        |_| std::time::Duration::from_secs(1),
     );
 
     Ok(Arc::new(db_builder.with_retry_options(retry_opts)))
