@@ -18,9 +18,40 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, std::io::Error> {
         .filter(|path| path.is_file() && path.extension().map_or(false, |ext| ext == "json"))
         .collect::<Vec<_>>();
 
-    // Sort by filename
-    paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    // Sort by filename using natural sort order
+    paths.sort_by(|a, b| {
+        natural_sort(
+            a.file_name().unwrap().to_str().unwrap(),
+            b.file_name().unwrap().to_str().unwrap(),
+        )
+    });
+
     Ok(paths)
+}
+
+fn natural_sort(a: &str, b: &str) -> Ordering {
+    let mut a_parts = a.split(|c: char| !c.is_numeric());
+    let mut b_parts = b.split(|c: char| !c.is_numeric());
+
+    loop {
+        match (a_parts.next(), b_parts.next()) {
+            (Some(a_part), Some(b_part)) => {
+                if let (Ok(a_num), Ok(b_num)) = (a_part.parse::<u32>(), b_part.parse::<u32>()) {
+                    match a_num.cmp(&b_num) {
+                        Ordering::Equal => continue,
+                        other => return other,
+                    }
+                }
+                match a_part.cmp(b_part) {
+                    Ordering::Equal => continue,
+                    other => return other,
+                }
+            }
+            (None, None) => return Ordering::Equal,
+            (None, _) => return Ordering::Less,
+            (_, None) => return Ordering::Greater,
+        }
+    }
 }
 
 /// Get a [database][Client] connection pool
