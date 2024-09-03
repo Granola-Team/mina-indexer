@@ -19,7 +19,7 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
     let mut handles = vec![];
 
-    let db = get_db(CONCURRENT_TASKS * 5).await?;
+    let db = get_db(CONCURRENT_TASKS * CONCURRENT_TASKS).await?;
 
     for path in get_file_paths(blocks_dir)? {
         // clone the Arc to the semaphore for each task
@@ -84,24 +84,83 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
 
     insert_accounts(db, accounts).await?;
 
+    let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
+    let non_snark = &staged_ledger_hash["non_snark"];
+    let global_slot = to_i64(&consensus_state["global_slot_since_genesis"]);
+
     db.execute(
         format!(
-            "insert Block {{
-                hash := '{}',
-                previous_hash := <str>$0,
-                genesis_hash := <str>$1,
-                height := <int64>$2,
-                global_slot_since_genesis := <int64>$3,
-                scheduled_time := <int64>$4,
-                total_currency := <int64>$5,
-                stake_winner := (select Account filter .public_key = <str>$6),
-                creator := (select Account filter .public_key = <str>$7),
-                coinbase_target := (select Account filter .public_key = <str>$8),
-                supercharge_coinbase := <bool>$9,
-                has_ancestor_in_same_checkpoint_window := <bool>$10,
-                min_window_density := <int64>$11
-            }};",
-            block_hash
+            "with
+                block := (
+                    insert Block {{
+                        hash := '{}',
+                        previous_hash := <str>$0,
+                        genesis_hash := <str>$1,
+                        height := <int64>$2,
+                        global_slot_since_genesis := <int64>$3,
+                        scheduled_time := <int64>$4,
+                        total_currency := <int64>$5,
+                        stake_winner := {},
+                        creator := {},
+                        coinbase_target := {},
+                        supercharge_coinbase := <bool>$6,
+                        has_ancestor_in_same_checkpoint_window := <bool>$7,
+                        min_window_density := <int64>$8
+                    }}
+                ),
+                blockchain_state := (
+                    insert BlockchainState {{
+                        block := block,
+                        snarked_ledger_hash := '{}',
+                        genesis_ledger_hash := '{}',
+                        snarked_next_available_token := {},
+                        timestamp := {}
+                    }}
+                ),
+                consensus_state := (
+                    insert ConsensusState {{
+                        block := block,
+                        epoch_count := {},
+                        curr_global_slot_slot_number := {},
+                        curr_global_slot_slots_per_epoch := {}
+                    }}
+                )
+            insert StagedLedgerHash {{
+                blockchain_state := blockchain_state,
+                non_snark_ledger_hash := '{}',
+                non_snark_aux_hash := '{}',
+                non_snark_pending_coinbase_aux := '{}',
+                pending_coinbase_hash := '{}'
+            }}
+            ;",
+            block_hash,
+            account_link(&consensus_state["block_stake_winner"]),
+            account_link(&consensus_state["block_creator"]),
+            account_link(&consensus_state["coinbase_receiver"]),
+            blockchain_state["snarked_ledger_hash"]
+                .as_str()
+                .expect("snarked_ledger_hash is missing"),
+            blockchain_state["genesis_ledger_hash"]
+                .as_str()
+                .expect("genesis_ledger_hash is missing"),
+            to_i64(&blockchain_state["snarked_next_available_token"])
+                .expect("snarked_next_available_token is missing"),
+            to_i64(&blockchain_state["timestamp"]).expect("timestamp is missing"),
+            to_i64(&consensus_state["epoch_count"]).expect("epoch_count is missing"),
+            to_i64(&consensus_state["curr_global_slot"]["slot_number"])
+                .expect("slot_number is missing"),
+            to_i64(&consensus_state["curr_global_slot"]["slots_per_epoch"])
+                .expect("slots_per_epoch is missing"),
+            non_snark["ledger_hash"]
+                .as_str()
+                .expect("ledger_hash is missing"),
+            non_snark["aux_hash"].as_str().expect("aux_hash is missing"),
+            non_snark["pending_coinbase_aux"]
+                .as_str()
+                .expect("pending_coinbase_aux is missing"),
+            staged_ledger_hash["pending_coinbase_hash"]
+                .as_str()
+                .expect("pending_coinbase_hash is missing")
         )
         .as_str(),
         &(
@@ -111,74 +170,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             to_i64(&consensus_state["global_slot_since_genesis"]),
             to_i64(&json["scheduled_time"]),
             to_i64(&consensus_state["total_currency"]),
-            consensus_state["block_stake_winner"].as_str(),
-            consensus_state["block_creator"].as_str(),
-            consensus_state["coinbase_receiver"].as_str(),
             consensus_state["supercharge_coinbase"].as_bool(),
             consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
             to_i64(&consensus_state["min_window_density"]),
-        ),
-    )
-    .await?;
-
-    // Process blockchain_state
-    db.execute(
-        "
-            insert BlockchainState {
-                block := (select Block filter .hash = <str>$0),
-                snarked_ledger_hash := <str>$1,
-                genesis_ledger_hash := <str>$2,
-                snarked_next_available_token := <int64>$3,
-                timestamp := <int64>$4
-            };",
-        &(
-            block_hash,
-            blockchain_state["snarked_ledger_hash"].as_str(),
-            blockchain_state["genesis_ledger_hash"].as_str(),
-            to_i64(&blockchain_state["snarked_next_available_token"]),
-            to_i64(&blockchain_state["timestamp"]),
-        ),
-    )
-    .await?;
-
-    // Process staged_ledger_hash
-    let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
-    let non_snark = &staged_ledger_hash["non_snark"];
-    db.execute(
-        "
-            with
-                block := (select Block filter .hash = <str>$0)
-            insert StagedLedgerHash {
-                blockchain_state := assert_single((select BlockchainState filter .block = block)),
-                non_snark_ledger_hash := <str>$1,
-                non_snark_aux_hash := <str>$2,
-                non_snark_pending_coinbase_aux := <str>$3,
-                pending_coinbase_hash := <str>$4
-            };",
-        &(
-            block_hash,
-            non_snark["ledger_hash"].as_str(),
-            non_snark["aux_hash"].as_str(),
-            non_snark["pending_coinbase_aux"].as_str(),
-            staged_ledger_hash["pending_coinbase_hash"].as_str(),
-        ),
-    )
-    .await?;
-
-    // Process consensus_state
-    db.execute(
-        "
-            insert ConsensusState {
-                block := (select Block filter .hash = <str>$0),
-                epoch_count := <int64>$1,
-                curr_global_slot_slot_number := <int64>$2,
-                curr_global_slot_slots_per_epoch := <int64>$3
-            };",
-        &(
-            block_hash,
-            to_i64(&consensus_state["epoch_count"]),
-            to_i64(&consensus_state["curr_global_slot"]["slot_number"]),
-            to_i64(&consensus_state["curr_global_slot"]["slots_per_epoch"]),
         ),
     )
     .await?;
@@ -191,20 +185,20 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             format!(
                 "
                 insert {}EpochData {{
-                    block := (select Block filter .hash = <str>$0),
-                    ledger_hash := <str>$1,
-                    total_currency := <int64>$2,
-                    seed := <str>$3,
-                    start_checkpoint := <str>$4,
-                    lock_checkpoint := <str>$5,
-                    epoch_length := <int64>$6
+                    block := {},
+                    ledger_hash := <str>$0,
+                    total_currency := <int64>$1,
+                    seed := <str>$2,
+                    start_checkpoint := <str>$3,
+                    lock_checkpoint := <str>$4,
+                    epoch_length := <int64>$5
                 }};",
-                to_titlecase(epoch_type)
+                to_titlecase(epoch_type),
+                block_link(block_hash)
             )
             .as_str(),
             &(
-                block_hash,
-                ledger["hash"].as_str(),
+                ledger["hash"].as_str().expect("ledger_hash is missing"),
                 to_i64(&ledger["total_currency"]),
                 epoch_data["seed"].as_str(),
                 epoch_data["start_checkpoint"].as_str(),
@@ -230,12 +224,12 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         // must use format!() since we have more than 12 query params
         // receiver_balance will be null when status == Failed
         let command = format!(
-            "block := (select Block filter .hash = '{}'),
+            "block := {},
             status := '{}',
             source_balance := {}n,
             target_balance := {}n,
             fee := {}n,
-            fee_payer := (select Account filter .public_key = '{}'),
+            fee_payer := {},
             fee_payer_balance := {}n,
             fee_token := '{}',
             fee_payer_account_creation_fee_paid := {}n,
@@ -243,17 +237,17 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             nonce := {},
             valid_until := {},
             memo := '{}',
-            signer := (select Account filter .public_key = '{}'),
+            signer := {},
             signature := '{}',
             created_token := '{}'
             ",
-            block_hash,
+            block_link(block_hash),
             status[0].as_str().unwrap(),
             to_decimal(&status_2["source_balance"]).unwrap(),
             // TODO: or default may be incorrect here since this is optional
             to_decimal(&status_2["receiver_balance"]).unwrap_or_default(),
             to_decimal(&common["fee"]).unwrap_or_default(),
-            common["fee_payer_pk"].as_str().unwrap(),
+            account_link(&common["fee_payer_pk"]),
             to_decimal(&status_2["fee_payer_balance"]).unwrap_or_default(),
             common["fee_token"].as_str().unwrap(),
             to_decimal(&status_1["fee_payer_account_creation_fee_paid"]).unwrap_or_default(),
@@ -262,7 +256,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             to_i64(&common["valid_until"]).unwrap_or_default(),
             // TODO: or default may be incorrect here since this is optional
             common["memo"].as_str().unwrap_or_default(),
-            data1["signer"].as_str().unwrap(),
+            account_link(&data1["signer"]),
             data1["signature"].as_str().unwrap(),
             status_1["created_token"].as_str().unwrap_or_default(),
         );
@@ -275,16 +269,15 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         "
                         insert StakingDelegation {{
                             {},
-                            source := (select Account filter .public_key = <str>$0),
-                            target := (select Account filter .public_key = <str>$1),
+                            source := {},
+                            target := {},
                         }};",
-                        command
+                        command,
+                        account_link(&delegation["delegator"]),
+                        account_link(&delegation["new_delegate"])
                     )
                     .as_str(),
-                    &(
-                        delegation["delegator"].as_str(),
-                        delegation["new_delegate"].as_str(),
-                    ),
+                    &(),
                 )
                 .await?;
             }
@@ -294,20 +287,17 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         "
                     insert Payment {{
                         {},
-                        source := (select Account filter .public_key = <str>$0),
-                        target := (select Account filter .public_key = <str>$1),
-                        amount := <decimal>$2,
-                        token_id := <int64>$3,
+                        source := {},
+                        target := {},
+                        amount := <decimal>$0,
+                        token_id := <int64>$1,
                     }};",
-                        command
+                        command,
+                        account_link(&body1["source_pk"]),
+                        account_link(&body1["receiver_pk"]),
                     )
                     .as_str(),
-                    &(
-                        body1["source_pk"].as_str(),
-                        body1["receiver_pk"].as_str(),
-                        to_decimal(&body1["amount"]),
-                        to_i64(&body1["token_id"]),
-                    ),
+                    &(to_decimal(&body1["amount"]), to_i64(&body1["token_id"])),
                 )
                 .await?;
             }
@@ -326,26 +316,28 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         match internal_command[0].as_str().unwrap() {
             "Coinbase" => {
                 db.execute(
-                    "insert Coinbase {
-                            block := (select Block filter .hash = <str>$0),
-                            target_balance := <decimal>$1
-                        };",
-                    &(
-                        block_hash,
-                        to_decimal(&internal_command_1["coinbase_receiver_balance"]),
+                    format!(
+                        "insert Coinbase {{
+                            block := {},
+                            target_balance := <decimal>$0
+                        }};",
+                        block_link(block_hash)
                     ),
+                    &(to_decimal(&internal_command_1["coinbase_receiver_balance"]),),
                 )
                 .await?;
             }
             "Fee_transfer" => {
                 db.execute(
-                    "insert FeeTransfer {
-                            block := (select Block filter .hash = <str>$0),
-                            target1_balance := <decimal>$1,
-                            target2_balance := <optional decimal>$2
-                        };",
+                    format!(
+                        "insert FeeTransfer {{
+                            block := {},
+                            target1_balance := <decimal>$0,
+                            target2_balance := <optional decimal>$1
+                        }};",
+                        block_link(block_hash)
+                    ),
                     &(
-                        block_hash,
                         to_decimal(&internal_command_1["receiver1_balance"]),
                         to_decimal(&internal_command_1["receiver2_balance"]),
                     ),
@@ -357,6 +349,17 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
     }
 
     Ok(())
+}
+
+fn account_link(public_key: &Value) -> String {
+    return format!(
+        "(select Account filter .public_key = '{}')",
+        public_key.as_str().unwrap()
+    );
+}
+
+fn block_link(hash: &str) -> String {
+    return format!("(select Block filter .hash = '{}')", hash);
 }
 
 const ACCOUNTS_REGEX: LazyLock<Regex> =

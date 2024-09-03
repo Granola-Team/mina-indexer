@@ -16,7 +16,7 @@ pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
     let mut handles = vec![];
 
-    let db = get_db(CONCURRENT_TASKS * 5).await?;
+    let db = get_db(CONCURRENT_TASKS * CONCURRENT_TASKS).await?;
 
     for path in get_file_paths(staking_ledgers_dir)? {
         // clone the Arc to the semaphore for each task
