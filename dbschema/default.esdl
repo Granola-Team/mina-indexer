@@ -21,9 +21,11 @@ module default {
     height: int64 {
         constraint min_value(0);
     }
+    epoch: int64;
     global_slot_since_genesis: int64 {
         constraint min_value(0);
     }
+    curr_global_slot_number: int64;
     required scheduled_time: int64;
     total_currency: int64;
     stake_winner: Account;
@@ -47,15 +49,6 @@ module default {
     }
     snarked_next_available_token: int64;
     timestamp: int64;
-  }
-
-  type ConsensusState {
-    required block: Block {
-      constraint exclusive;
-      on target delete restrict;
-    }
-    epoch_count: int64;
-    curr_global_slot_slot_number: int64;
   }
 
   type StagedLedgerHash {

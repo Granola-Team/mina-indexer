@@ -86,7 +86,6 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
 
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
-    let global_slot = to_i64(&consensus_state["global_slot_since_genesis"]);
 
     db.execute(
         format!(
@@ -97,7 +96,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         previous_hash := <str>$0,
                         genesis_hash := <str>$1,
                         height := <int64>$2,
+                        epoch := {},
                         global_slot_since_genesis := <int64>$3,
+                        curr_global_slot_number := {},
                         scheduled_time := <int64>$4,
                         total_currency := <int64>$5,
                         stake_winner := {},
@@ -116,13 +117,6 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         snarked_next_available_token := {},
                         timestamp := {}
                     }}
-                ),
-                consensus_state := (
-                    insert ConsensusState {{
-                        block := block,
-                        epoch_count := {},
-                        curr_global_slot_slot_number := {}
-                    }}
                 )
             insert StagedLedgerHash {{
                 blockchain_state := blockchain_state,
@@ -133,6 +127,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             }}
             ;",
             block_hash,
+            to_i64(&consensus_state["epoch_count"]).expect("epoch_count is missing"),
+            to_i64(&consensus_state["curr_global_slot"]["slot_number"])
+                .expect("slot_number is missing"),
             account_link(&consensus_state["block_stake_winner"]),
             account_link(&consensus_state["block_creator"]),
             account_link(&consensus_state["coinbase_receiver"]),
@@ -145,11 +142,6 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             to_i64(&blockchain_state["snarked_next_available_token"])
                 .expect("snarked_next_available_token is missing"),
             to_i64(&blockchain_state["timestamp"]).expect("timestamp is missing"),
-            to_i64(&consensus_state["epoch_count"]).expect("epoch_count is missing"),
-            to_i64(&consensus_state["curr_global_slot"]["slot_number"])
-                .expect("slot_number is missing"),
-            to_i64(&consensus_state["curr_global_slot"]["slots_per_epoch"])
-                .expect("slots_per_epoch is missing"),
             non_snark["ledger_hash"]
                 .as_str()
                 .expect("ledger_hash is missing"),

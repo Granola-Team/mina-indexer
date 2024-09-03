@@ -4,7 +4,6 @@ delete Payment;
 delete StakingDelegation;
 delete StakingEpochData;
 delete NextEpochData;
-delete ConsensusState;
 delete StagedLedgerHash;
 delete BlockchainState;
 delete Block;
