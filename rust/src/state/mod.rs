@@ -400,6 +400,11 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
+                    if diff.public_keys_seen.contains(&PublicKey(
+                        "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string(),
+                    )) {
+                        println!("{:#?}", diff);
+                    }
                     ledger_diffs.push(diff.clone());
 
                     indexer_store.add_block(&block, block_bytes)?;
