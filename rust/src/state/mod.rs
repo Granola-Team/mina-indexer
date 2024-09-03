@@ -40,6 +40,10 @@ use crate::{
 use anyhow::bail;
 use id_tree::NodeId;
 use log::{debug, error, info, trace};
+use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -387,6 +391,18 @@ impl IndexerState {
                 info!("Adding blocks to the witness tree...");
             }
 
+            let current_dir = env::current_dir().expect("Cannot access current working directory");
+
+            // Specify the file name
+            let mut file_path = PathBuf::from(current_dir);
+            file_path.push("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd_diffs.txt");
+
+            let mut file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&file_path)
+                .expect("Cannot open file");
+
             // process deep canonical blocks first bypassing the witness tree
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
@@ -403,7 +419,9 @@ impl IndexerState {
                     if diff.public_keys_seen.contains(&PublicKey(
                         "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string(),
                     )) {
-                        println!("{:#?}", diff);
+                        if let Err(e) = writeln!(file, "{:#?}", diff) {
+                            eprintln!("Could not write to file: {}", e);
+                        }
                     }
                     ledger_diffs.push(diff.clone());
 
