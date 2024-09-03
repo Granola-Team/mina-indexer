@@ -121,8 +121,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                     insert ConsensusState {{
                         block := block,
                         epoch_count := {},
-                        curr_global_slot_slot_number := {},
-                        curr_global_slot_slots_per_epoch := {}
+                        curr_global_slot_slot_number := {}
                     }}
                 )
             insert StagedLedgerHash {{

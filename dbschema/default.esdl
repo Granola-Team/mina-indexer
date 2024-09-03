@@ -56,7 +56,6 @@ module default {
     }
     epoch_count: int64;
     curr_global_slot_slot_number: int64;
-    curr_global_slot_slots_per_epoch: int64;
   }
 
   type StagedLedgerHash {
