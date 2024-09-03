@@ -7,7 +7,7 @@ delete NextEpochData;
 delete StagedLedgerHash;
 delete BlockchainState;
 delete Block;
-delete Account;
 delete StakingTiming;
 delete StakingLedger;
 delete StakingEpoch;
+delete Account;

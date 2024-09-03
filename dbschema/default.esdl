@@ -18,22 +18,22 @@ module default {
     required genesis_hash: str {
         constraint max_len_value(52);
     }
-    height: int64 {
+    required height: int64 {
         constraint min_value(0);
     }
-    epoch: int64;
-    global_slot_since_genesis: int64 {
+    required epoch: int64;
+    required global_slot_since_genesis: int64 {
         constraint min_value(0);
     }
-    curr_global_slot_number: int64;
+    required curr_global_slot_number: int64;
     required scheduled_time: int64;
-    total_currency: int64;
-    stake_winner: Account;
-    creator: Account;
-    coinbase_target: Account;
-    supercharge_coinbase: bool;
-    min_window_density: int64;
-    has_ancestor_in_same_checkpoint_window: bool;
+    required total_currency: int64;
+    required stake_winner: Account;
+    required creator: Account;
+    required coinbase_target: Account;
+    required supercharge_coinbase: bool;
+    required min_window_density: int64;
+    required has_ancestor_in_same_checkpoint_window: bool;
   }
 
   type BlockchainState {
