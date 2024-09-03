@@ -405,6 +405,9 @@ impl IndexerState {
                 .open(&file_path)
                 .expect("Cannot open file");
 
+            let pk_of_interest =
+                &PublicKey("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string());
+
             // process deep canonical blocks first bypassing the witness tree
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
@@ -418,11 +421,9 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
-                    if diff.public_keys_seen.contains(&PublicKey(
-                        "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string(),
-                    )) {
+                    if diff.public_keys_seen.contains(pk_of_interest) {
                         if let Err(e) = writeln!(file, "{:#?}", diff) {
-                            eprintln!("Could not write to file: {}", e);
+                            error!("Could not write to file: {}", e);
                         }
                     }
                     ledger_diffs.push(diff.clone());
