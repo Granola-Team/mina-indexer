@@ -11,7 +11,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     chain::store::ChainStore,
-    constants::*,
+    constants::{GIT_COMMIT_HASH, *},
     event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
         diff::LedgerDiff,
@@ -40,12 +40,11 @@ use crate::{
 use anyhow::bail;
 use id_tree::NodeId;
 use log::{debug, error, info, trace};
-use std::env;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
 use std::{
     collections::HashMap,
+    env,
+    fs::OpenOptions,
+    io::Write,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
@@ -394,8 +393,11 @@ impl IndexerState {
             let current_dir = env::current_dir().expect("Cannot access current working directory");
 
             // Specify the file name
-            let mut file_path = PathBuf::from(current_dir);
-            file_path.push("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd_diffs.txt");
+            let mut file_path = current_dir;
+            file_path.push(format!(
+                "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd_diffs_{}.txt",
+                GIT_COMMIT_HASH
+            ));
 
             let mut file = OpenOptions::new()
                 .append(true)
