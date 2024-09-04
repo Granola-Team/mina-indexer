@@ -129,9 +129,13 @@ pub trait StagedLedgerStore {
 /// where
 /// - state_hash:   [BlockHash::LEN] bytes
 /// - pk:           [PublicKey::LEN] bytes
-pub fn staged_account_key(state_hash: BlockHash, pk: PublicKey) -> Vec<u8> {
-    let mut res = state_hash.to_bytes();
-    res.append(&mut pk.to_bytes());
+pub fn staged_account_key(
+    state_hash: BlockHash,
+    pk: PublicKey,
+) -> [u8; BlockHash::LEN + PublicKey::LEN] {
+    let mut res = [0u8; BlockHash::LEN + PublicKey::LEN]; // Create a fixed-size array using BlockHash::LEN * 2
+    res[..BlockHash::LEN].copy_from_slice(&state_hash.to_bytes()); // Copy the state_hash bytes
+    res[BlockHash::LEN..].copy_from_slice(&pk.to_bytes()); // Copy the public key bytes
     res
 }
 
@@ -162,4 +166,37 @@ pub fn split_staged_account_balance_sort_key(key: &[u8]) -> Option<(BlockHash, u
         return Some((state_hash, balance, pk));
     }
     None
+}
+
+#[cfg(test)]
+mod staged_tests {
+    use super::*;
+    use crate::{block::BlockHash, ledger::public_key::PublicKey};
+
+    #[test]
+    fn test_staged_account_key_length() {
+        // Mock a BlockHash and PublicKey with known sizes
+        let mock_state_hash = BlockHash::default(); // Assuming BlockHash::default() provides a valid instance
+        let mock_pk = PublicKey::default(); // Assuming PublicKey::default() provides a valid instance
+
+        let result = staged_account_key(mock_state_hash, mock_pk);
+
+        // Assert the length of the result is BlockHash::LEN + PublicKey::LEN
+        assert_eq!(result.len(), BlockHash::LEN + PublicKey::LEN);
+    }
+
+    #[test]
+    fn test_staged_account_key_content() {
+        // Mock a BlockHash and PublicKey with specific known values
+        let mock_state_hash = BlockHash::default(); // Simulated hash of all 1s
+        let mock_pk = PublicKey::default(); // Simulated public key of all 2s
+
+        let result = staged_account_key(mock_state_hash.clone(), mock_pk.clone());
+
+        // Assert the first BlockHash::LEN bytes match the state_hash
+        assert_eq!(&result[..BlockHash::LEN], &mock_state_hash.to_bytes()[..]);
+
+        // Assert the remaining bytes match the public key
+        assert_eq!(&result[BlockHash::LEN..], &mock_pk.to_bytes()[..]);
+    }
 }
