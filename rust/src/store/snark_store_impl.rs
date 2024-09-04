@@ -40,8 +40,8 @@ fn snark_fee_prefix_key(
 /// - index:  4 BE bytes
 fn snark_prover_prefix_key(prover: &PublicKey, global_slot: u32, index: u32) -> Vec<u8> {
     let mut bytes = prover.0.as_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(global_slot));
-    bytes.append(&mut to_be_bytes(index));
+    bytes.append(&mut to_be_bytes(global_slot).to_vec());
+    bytes.append(&mut to_be_bytes(index).to_vec());
     bytes
 }
 

@@ -352,8 +352,8 @@ pub fn block_u32_prefix_from_key(key: &[u8]) -> anyhow::Result<u32> {
     Ok(from_be_bytes(key[..4].to_vec()))
 }
 
-pub fn to_be_bytes(value: u32) -> Vec<u8> {
-    value.to_be_bytes().to_vec()
+pub fn to_be_bytes(value: u32) -> [u8; size_of::<u32>()] {
+    value.to_be_bytes()
 }
 
 pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
@@ -374,7 +374,7 @@ pub fn from_u64_be_bytes(bytes: Vec<u8>) -> u64 {
 /// - `prefix`: block length, global slot, epoch number, etc
 /// - `suffix`: txn hash, public key, etc
 fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
-    let mut bytes = to_be_bytes(prefix);
+    let mut bytes = to_be_bytes(prefix).to_vec();
     bytes.append(&mut suffix.as_bytes().to_vec());
     bytes
 }
@@ -396,7 +396,7 @@ fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
 /// - txn_hash:   [TXN_HASH_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
 pub fn txn_sort_key(prefix: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
-    let mut bytes = to_be_bytes(prefix);
+    let mut bytes = to_be_bytes(prefix).to_vec();
     bytes.append(&mut txn_hash.as_bytes().to_vec());
     bytes.append(&mut state_hash.to_bytes().to_vec());
     bytes
@@ -418,8 +418,8 @@ pub fn pk_txn_sort_key(
     state_hash: BlockHash,
 ) -> Vec<u8> {
     let mut bytes = pk.to_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(sort));
-    bytes.append(&mut to_be_bytes(nonce.0));
+    bytes.append(&mut to_be_bytes(sort).to_vec());
+    bytes.append(&mut to_be_bytes(nonce.0).to_vec());
     bytes.append(&mut txn_hash.as_bytes().to_vec());
     bytes.append(&mut state_hash.to_bytes().to_vec());
     bytes
@@ -428,7 +428,7 @@ pub fn pk_txn_sort_key(
 /// Prefix `{pk}{u32_sort}`
 pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
     let mut bytes = public_key.to_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(sort));
+    bytes.append(&mut to_be_bytes(sort).to_vec());
     bytes
 }
 
@@ -463,7 +463,7 @@ pub fn state_hash_pk_txn_sort_key(key: &[u8]) -> BlockHash {
 
 pub fn block_txn_index_key(state_hash: &BlockHash, index: u32) -> Vec<u8> {
     let mut key = state_hash.clone().to_bytes().to_vec();
-    key.append(&mut to_be_bytes(index));
+    key.append(&mut to_be_bytes(index).to_vec());
     key
 }
 

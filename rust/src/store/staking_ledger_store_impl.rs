@@ -550,7 +550,7 @@ pub fn split_staking_ledger_sort_key(key: &[u8]) -> Option<(u32, u64, PublicKey)
 /// - amount: 8 BE bytes
 /// - suffix: [PublicKey::LEN] bytes
 pub fn staking_ledger_sort_key(epoch: u32, amount: u64, suffix: &str) -> Vec<u8> {
-    let mut key = to_be_bytes(epoch);
+    let mut key = to_be_bytes(epoch).to_vec();
     key.append(&mut amount.to_be_bytes().to_vec());
     key.append(&mut suffix.as_bytes().to_vec());
     key
@@ -602,6 +602,6 @@ fn staking_ledger_epoch_key(
 /// - epoch:        4 BE bytes
 fn staking_ledger_epoch_key_prefix(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
     let mut key = genesis_state_hash.to_bytes().to_vec();
-    key.append(&mut to_be_bytes(epoch));
+    key.append(&mut to_be_bytes(epoch).to_vec());
     key
 }

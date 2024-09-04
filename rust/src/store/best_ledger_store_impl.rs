@@ -280,7 +280,7 @@ impl BestLedgerStore for IndexerStore {
 
         // append new delegation
         let mut key = pk.clone().to_bytes().to_vec();
-        key.append(&mut to_be_bytes(num));
+        key.append(&mut to_be_bytes(num).to_vec());
         self.database.put_cf(
             self.best_ledger_accounts_delegations_cf(),
             key,
@@ -301,7 +301,7 @@ impl BestLedgerStore for IndexerStore {
 
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
         let mut key = pk.clone().to_bytes().to_vec();
-        key.append(&mut to_be_bytes(idx));
+        key.append(&mut to_be_bytes(idx).to_vec());
         Ok(self
             .database
             .get_cf(self.best_ledger_accounts_delegations_cf(), key)?
@@ -321,7 +321,7 @@ impl BestLedgerStore for IndexerStore {
 
             // drop delegation
             let mut key = pk.to_bytes().to_vec();
-            key.append(&mut to_be_bytes(idx - 1));
+            key.append(&mut to_be_bytes(idx - 1).to_vec());
             self.database
                 .delete_cf(self.best_ledger_accounts_delegations_cf(), key)?;
         }
