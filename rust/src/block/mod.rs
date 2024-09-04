@@ -17,6 +17,7 @@ use crate::{
         common::{Base58EncodableVersionedType, HashV1},
         version_bytes,
     },
+    utility::functions::is_valid_file_name,
 };
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
@@ -341,37 +342,6 @@ pub fn is_valid_state_hash(input: &str) -> bool {
     input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
 }
 
-pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {
-    if let Some(ext) = path.extension() {
-        // check json extension
-        if ext.to_str() == Some("json") {
-            // check file stem
-            if let Some(file_name) = path.file_stem() {
-                if let Some(parts) = file_name
-                    .to_str()
-                    .map(|name| name.split('-').collect::<Vec<&str>>())
-                {
-                    let is_valid_hash = parts
-                        .last()
-                        .map(|hash| hash_validator(hash))
-                        .unwrap_or(false);
-                    if parts.len() == 2 {
-                        // e.g. mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json
-                        // check 2nd part is a state hash
-                        return is_valid_hash;
-                    } else if parts.len() == 3 {
-                        // e.g. mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json
-                        // check 2nd part is u32 and 3rd part is a state hash
-                        let is_valid_length = parts.get(1).unwrap().parse::<u32>().is_ok();
-                        return is_valid_hash && is_valid_length;
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
 pub fn is_valid_block_file(path: &Path) -> bool {
     is_valid_file_name(path, &is_valid_state_hash)
 }
@@ -448,7 +418,7 @@ pub fn extract_network(path: &Path) -> Network {
 #[cfg(test)]
 mod tests {
     use super::{
-        extract_block_height, extract_state_hash, is_valid_state_hash,
+        extract_block_height, extract_state_hash, is_valid_file_name, is_valid_state_hash,
         precomputed::PrecomputedBlock, sort_by_height_and_lexicographical_order, Block, BlockHash,
     };
     use crate::block::precomputed::PcbVersion;
@@ -542,5 +512,45 @@ mod tests {
         assert_eq!(paths[1].file_name().unwrap(), "mainnet-2-def456.json");
         assert_eq!(paths[2].file_name().unwrap(), "mainnet-2-ghi789.json");
         assert_eq!(paths[3].file_name().unwrap(), "mainnet-3-jkl012.json");
+    }
+
+    #[test]
+    fn test_is_valid_file_name() {
+        // Valid cases
+        assert!(is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.json"),
+            &is_valid_state_hash
+        ));
+
+        assert!(is_valid_file_name(
+            Path::new("mainnet-3Nabcdef12345678901234567890123456789012345678901234.json"),
+            &is_valid_state_hash
+        ));
+
+        // Invalid cases
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-abcdef1234567890123456789012345678901234567890123456.json"), /* Invalid hash (does not start with 3N) */
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef1234.json"), // Hash too short
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42.json"), // Missing hash part
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.txt"), /* Invalid extension */
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234-123.json"), /* Too many parts */
+            &is_valid_state_hash
+        ));
     }
 }

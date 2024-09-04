@@ -145,7 +145,7 @@ impl From<StakingAccountJson> for StakingAccount {
 }
 
 pub fn is_valid_ledger_file(path: &Path) -> bool {
-    crate::block::is_valid_file_name(path, &super::is_valid_ledger_hash)
+    crate::utility::functions::is_valid_file_name(path, &super::is_valid_ledger_hash)
 }
 
 pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {

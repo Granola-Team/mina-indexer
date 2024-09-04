@@ -1,5 +1,8 @@
 use rust_decimal::Decimal;
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 /// Pretty print duration for use in logs.
 ///
@@ -61,10 +64,37 @@ pub fn calculate_total_size(paths: &[PathBuf]) -> u64 {
     })
 }
 
+pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {
+    if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+        if ext != "json" {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    if let Some(file_stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+        let parts: Vec<&str> = file_stem.split('-').collect();
+
+        match parts.as_slice() {
+            // mainnet-<hash>.json
+            [_, hash] => hash_validator(hash),
+
+            // mainnet-<number>-<hash>.json
+            [_, epoch_str, hash] => epoch_str.parse::<u32>().is_ok() && hash_validator(hash),
+
+            _ => false,
+        }
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod utility_function_tests {
     use super::*;
-    use std::{fs::File, io::Write};
+    use crate::block::is_valid_state_hash;
+    use std::{fs::File, io::Write, path::Path};
     use tempfile::TempDir;
 
     #[test]
@@ -144,5 +174,45 @@ mod utility_function_tests {
         let empty_file = create_temp_file(&temp_dir, "empty.txt", "");
         let paths = vec![empty_file];
         assert_eq!(calculate_total_size(&paths), 0);
+    }
+
+    #[test]
+    fn test_is_valid_file_name() {
+        // Valid cases
+        assert!(is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.json"),
+            &is_valid_state_hash
+        ));
+
+        assert!(is_valid_file_name(
+            Path::new("mainnet-3Nabcdef12345678901234567890123456789012345678901234.json"),
+            &is_valid_state_hash
+        ));
+
+        // Invalid cases
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-abcdef1234567890123456789012345678901234567890123456.json"), /* Invalid hash (does not start with 3N) */
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef1234.json"), // Hash too short
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42.json"), // Missing hash part
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.txt"), /* Invalid extension */
+            &is_valid_state_hash
+        ));
+
+        assert!(!is_valid_file_name(
+            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234-123.json"), /* Too many parts */
+            &is_valid_state_hash
+        ));
     }
 }
