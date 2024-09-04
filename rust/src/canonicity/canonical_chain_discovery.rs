@@ -90,7 +90,7 @@ fn find_best_tip(
                 if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
                     if prev_hash.0 == state_hash {
                         parent_hash_map.insert(
-                            extract_state_hash(possible_next_tip),
+                            extract_state_hash(possible_next_tip).to_string(),
                             state_hash.to_string(),
                         );
                         best_tip = possible_next_tip;
@@ -129,7 +129,7 @@ fn canonical_branch_from_best_tip<'a>(
             let path_str = path.to_str().unwrap();
             if path_str.contains(parent_state_hash.as_str()) {
                 next_height -= 1;
-                opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path).as_str());
+                opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path));
                 canonical_branch.push(path); // Push reference, not clone
                 i = Some(j);
                 break;

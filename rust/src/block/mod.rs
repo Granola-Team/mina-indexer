@@ -385,30 +385,16 @@ pub fn extract_height_and_hash(path: &std::path::Path) -> (u32, &str) {
                 .expect("Failed to parse the hash");
             (block_height, hash)
         }
-        _ => panic!("Filename format is invalid"),
+        _ => panic!("Filename format is invalid {}", filename),
     }
 }
 
 pub fn extract_block_height(path: &Path) -> u32 {
-    let filename = path
-        .file_name()
-        .and_then(|x| x.to_str())
-        .expect("Failed to extract filename from path");
-
-    let parts: Vec<&str> = filename.split('-').collect();
-
-    parts
-        .get(1)
-        .expect("Failed to find the second part of the filename")
-        .parse::<u32>()
-        .expect("Failed to parse block height as u32")
+    extract_height_and_hash(path).0
 }
 
-pub fn extract_state_hash(path: &Path) -> String {
-    let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
-    let dash_pos = name.rfind('-').unwrap();
-    let state_hash = &name[dash_pos + 1..];
-    state_hash.to_owned()
+pub fn extract_state_hash(path: &Path) -> &str {
+    extract_height_and_hash(path).1
 }
 
 pub fn extract_network(path: &Path) -> Network {
@@ -431,8 +417,6 @@ mod block_tests {
 
     #[test]
     fn extract_state_hash_test() {
-        let filename1 =
-            &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
         let filename2 =
             &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
         let filename3 = &Path::new(
@@ -440,15 +424,11 @@ mod block_tests {
         );
 
         assert_eq!(
-            "3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8".to_owned(),
-            extract_state_hash(filename1)
-        );
-        assert_eq!(
-            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_owned(),
+            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH",
             extract_state_hash(filename2)
         );
         assert_eq!(
-            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R".to_owned(),
+            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R",
             extract_state_hash(filename3)
         );
     }
