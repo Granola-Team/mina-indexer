@@ -395,10 +395,28 @@ fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
 /// - u32_prefix: 4 BE bytes
 /// - txn_hash:   [TXN_HASH_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
-pub fn txn_sort_key(prefix: u32, txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
-    let mut bytes = to_be_bytes(prefix).to_vec();
-    bytes.append(&mut txn_hash.as_bytes().to_vec());
-    bytes.append(&mut state_hash.to_bytes().to_vec());
+pub fn txn_sort_key(
+    prefix: u32,
+    txn_hash: &str,
+    state_hash: BlockHash,
+) -> [u8; size_of::<u32>() + TXN_HASH_LEN + BlockHash::LEN] {
+    const SIZE_OF_U32: usize = size_of::<u32>();
+
+    // Initialize the byte array with the correct size
+    let mut bytes = [0u8; SIZE_OF_U32 + TXN_HASH_LEN + BlockHash::LEN];
+
+    // Copy prefix (u32) to the first part of the byte array
+    let prefix_bytes = prefix.to_be_bytes();
+    bytes[..SIZE_OF_U32].copy_from_slice(&prefix_bytes);
+
+    // Copy transaction hash to the next part of the byte array
+    let txn_hash_bytes = txn_hash.as_bytes();
+    bytes[SIZE_OF_U32..SIZE_OF_U32 + TXN_HASH_LEN].copy_from_slice(txn_hash_bytes);
+
+    // Copy state hash to the last part of the byte array
+    let state_hash_bytes = state_hash.to_bytes();
+    bytes[SIZE_OF_U32 + TXN_HASH_LEN..].copy_from_slice(&state_hash_bytes);
+
     bytes
 }
 
@@ -526,5 +544,46 @@ impl IndexerStore {
             .property_int_value(speedb::properties::CUR_SIZE_ALL_MEM_TABLES)
             .unwrap()
             .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod store_tests {
+    use super::*;
+
+    #[test]
+    fn test_txn_sort_key_length() {
+        // Mock values
+        let binding = "a".repeat(TXN_HASH_LEN);
+        let txn_hash = binding.as_str();
+        let state_hash = BlockHash::default(); // Mock state_hash
+        let prefix = 42u32; // Example prefix
+
+        // Invoke the function
+        let result = txn_sort_key(prefix, txn_hash, state_hash);
+
+        // Assert the length of the result is correct
+        assert_eq!(
+            result.len(),
+            size_of::<u32>() + TXN_HASH_LEN + BlockHash::LEN
+        );
+    }
+
+    #[test]
+    fn test_txn_sort_key_content() {
+        let binding = "a".repeat(TXN_HASH_LEN);
+        let txn_hash = binding.as_str();
+        let state_hash = BlockHash::default(); // Mock state_hash
+        let prefix = 99u32; // Example prefix
+
+        let result = txn_sort_key(prefix, txn_hash, state_hash.clone());
+
+        assert_eq!(&result[0..4], &prefix.to_be_bytes());
+
+        let txn_hash_bytes = txn_hash.as_bytes();
+        assert_eq!(&result[4..4 + TXN_HASH_LEN], txn_hash_bytes);
+
+        let state_hash_bytes = state_hash.to_bytes();
+        assert_eq!(&result[4 + TXN_HASH_LEN..], &state_hash_bytes);
     }
 }
