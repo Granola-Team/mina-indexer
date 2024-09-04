@@ -17,6 +17,7 @@ alias tu := test-unit
 alias t1 := tier1
 alias t2 := tier2-dev
 alias t3 := tier3-dev
+alias dlp := deploy-local-prod-dev
 
 # Ensure rustfmt works in all environments
 # Nix environment has rustfmt nightly and won't work with +nightly
@@ -173,7 +174,12 @@ tier3-dev blocks='5000': debug-build
   @echo "--- Performing tier3 regression tests with debug-built binary"
   time {{DEPLOY}} test {{blocks}}
 
-# Run a server as if in production.
+# Run a server as if in production with the Nix-built binary.
 deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying to production"
+  time {{DEPLOY}} prod {{blocks}} {{web_port}}
+
+# Run a server as if in production with the debug-built binary.
+deploy-local-prod-dev blocks='5000' web_port='': debug-build
+  @echo "--- Deploying to production dev"
   time {{DEPLOY}} prod {{blocks}} {{web_port}}
