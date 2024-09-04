@@ -475,7 +475,7 @@ mod block_tests {
         let bytes = input.0.as_bytes();
 
         assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
-        assert_eq!(input, BlockHash::from_bytes(&bytes)?, "from_bytes");
+        assert_eq!(input, BlockHash::from_bytes(bytes)?, "from_bytes");
         Ok(())
     }
 
