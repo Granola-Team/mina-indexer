@@ -299,7 +299,7 @@ impl BlocksQueryRoot {
         }) {
             let start = coinbase_receiver.as_bytes().to_vec();
             let mut end = start.clone();
-            end.append(&mut to_be_bytes(u32::MAX));
+            end.append(&mut to_be_bytes(u32::MAX).to_vec());
 
             let iter = match sort_by {
                 BlockHeightAsc => db.coinbase_receiver_block_height_iterator(From(&start, Forward)),
@@ -341,7 +341,7 @@ impl BlocksQueryRoot {
             };
             let start = creator_account.as_bytes().to_vec();
             let mut end = start.clone();
-            end.append(&mut to_be_bytes(upper_bound));
+            end.append(&mut to_be_bytes(upper_bound).to_vec());
 
             let iter = match sort_by {
                 BlockHeightAsc => db.block_creator_block_height_iterator(From(&start, Forward)),

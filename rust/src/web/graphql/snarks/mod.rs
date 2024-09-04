@@ -168,8 +168,8 @@ impl SnarkQueryRoot {
                     speedb::IteratorMode::From(&start, speedb::Direction::Forward)
                 }
                 SnarkSortByInput::BlockHeightDesc => {
-                    start.append(&mut to_be_bytes(block_height_lte));
-                    start.append(&mut to_be_bytes(u32::MAX));
+                    start.append(&mut to_be_bytes(block_height_lte).to_vec());
+                    start.append(&mut to_be_bytes(u32::MAX).to_vec());
                     speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
                 }
             };
@@ -223,7 +223,7 @@ impl SnarkQueryRoot {
                 SnarkSortByInput::BlockHeightDesc => {
                     let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
                     *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
-                    start.append(&mut to_be_bytes(u32::MAX));
+                    start.append(&mut to_be_bytes(u32::MAX).to_vec());
                     start.append(&mut pk_prefix);
                     speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
                 }

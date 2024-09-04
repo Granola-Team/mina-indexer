@@ -78,7 +78,7 @@ impl UsernameStore for IndexerStore {
 
                         // remove pk index
                         let mut key = pk.clone().to_bytes().to_vec();
-                        key.append(&mut to_be_bytes(0));
+                        key.append(&mut to_be_bytes(0).to_vec());
                         self.database.delete_cf(self.username_pk_index_cf(), key)?;
                     }
                     self.database.put_cf(
@@ -89,7 +89,7 @@ impl UsernameStore for IndexerStore {
 
                     // drop last update
                     let mut key = pk.clone().to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(num));
+                    key.append(&mut to_be_bytes(num).to_vec());
                     self.database.delete_cf(self.username_pk_index_cf(), key)?;
                 } else {
                     error!("Invalid username pk num {pk}");
@@ -111,7 +111,7 @@ impl UsernameStore for IndexerStore {
 
                     // add update
                     let mut key = pk.to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(num));
+                    key.append(&mut to_be_bytes(num).to_vec());
                     self.database.put_cf(
                         self.username_pk_index_cf(),
                         key,
@@ -126,7 +126,7 @@ impl UsernameStore for IndexerStore {
 
                     // add update
                     let mut key = pk.to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(0));
+                    key.append(&mut to_be_bytes(0).to_vec());
                     self.database.put_cf(
                         self.username_pk_index_cf(),
                         key,
@@ -141,7 +141,7 @@ impl UsernameStore for IndexerStore {
     fn get_pk_username(&self, pk: &PublicKey, index: u32) -> anyhow::Result<Option<Username>> {
         trace!("Getting pk's {index}th username {pk}");
         let mut key = pk.clone().to_bytes().to_vec();
-        key.append(&mut to_be_bytes(index));
+        key.append(&mut to_be_bytes(index).to_vec());
         Ok(self
             .database
             .get_cf(self.username_pk_index_cf(), key)?

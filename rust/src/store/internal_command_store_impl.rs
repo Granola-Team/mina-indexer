@@ -39,7 +39,7 @@ impl InternalCommandStore for IndexerStore {
         }
 
         fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = to_be_bytes(global_slot);
+            let mut bytes = to_be_bytes(global_slot).to_vec();
             bytes.append(&mut state_hash.as_bytes().to_vec());
             bytes.append(&mut index.to_be_bytes().to_vec());
             bytes

@@ -31,8 +31,8 @@ impl EventStore for IndexerStore {
                 | DbBlockEvent::NewBlock {
                     blockchain_length, ..
                 },
-            )) => to_be_bytes(*blockchain_length),
-            _ => to_be_bytes(0),
+            )) => to_be_bytes(*blockchain_length).to_vec(),
+            _ => to_be_bytes(0).to_vec(),
         };
         value.push(event.kind());
         value.append(&mut serde_json::to_vec(&event)?);
