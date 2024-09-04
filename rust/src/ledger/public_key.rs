@@ -21,8 +21,10 @@ impl PublicKey {
     }
 
     /// Convert to bytes (length [Self::LEN])
-    pub fn to_bytes(self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+    pub fn to_bytes(self) -> [u8; Self::LEN] {
+        let mut res = [0u8; PublicKey::LEN];
+        res.copy_from_slice(self.0.as_bytes());
+        res
     }
 
     /// Convert from bytes (length [Self::LEN])
@@ -124,12 +126,12 @@ mod test {
             "B62qq66ZuaVGxVvNwR752jPoZfN4uyZWrKkLeBS8FxdG9S76dhscRLy",
         ];
         for pk in pks {
-            let bytes = pk.as_bytes().to_vec();
+            let bytes = pk.as_bytes();
 
             assert_eq!(PublicKey(pk.to_owned()).to_bytes(), bytes, "to_bytes");
             assert_eq!(
                 PublicKey(pk.to_owned()),
-                PublicKey::from_bytes(&bytes)?,
+                PublicKey::from_bytes(bytes)?,
                 "from_bytes"
             );
         }

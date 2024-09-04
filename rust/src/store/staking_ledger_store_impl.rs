@@ -572,7 +572,7 @@ fn staking_ledger_account_key(
 ) -> Vec<u8> {
     let mut key = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
     key.append(&mut ledger_hash.0.into_bytes());
-    key.append(&mut pk.to_bytes());
+    key.append(&mut pk.to_bytes().to_vec());
     key
 }
 
