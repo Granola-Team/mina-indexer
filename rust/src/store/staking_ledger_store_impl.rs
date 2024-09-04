@@ -601,7 +601,7 @@ fn staking_ledger_epoch_key(
 /// - genesis_hash: [BlockHash::LEN] bytes
 /// - epoch:        4 BE bytes
 fn staking_ledger_epoch_key_prefix(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
-    let mut key = genesis_state_hash.to_bytes();
+    let mut key = genesis_state_hash.to_bytes().to_vec();
     key.append(&mut to_be_bytes(epoch));
     key
 }

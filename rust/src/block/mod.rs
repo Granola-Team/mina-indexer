@@ -67,8 +67,10 @@ impl BlockHash {
             .map_err(|e| anyhow!("Error converting from hashv1: {e}"))
     }
 
-    pub fn to_bytes(self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+    pub fn to_bytes(self) -> [u8; BlockHash::LEN] {
+        let mut res = [0u8; BlockHash::LEN]; // Pre-allocate the array with the correct size
+        res.copy_from_slice(self.0.as_bytes());
+        res
     }
 }
 
@@ -470,10 +472,10 @@ mod block_tests {
     #[test]
     fn block_hash_roundtrip() -> anyhow::Result<()> {
         let input = BlockHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
-        let bytes = input.0.as_bytes().to_vec();
+        let bytes = input.0.as_bytes();
 
         assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
-        assert_eq!(input, BlockHash::from_bytes(&bytes)?, "from_bytes");
+        assert_eq!(input, BlockHash::from_bytes(bytes)?, "from_bytes");
         Ok(())
     }
 

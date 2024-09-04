@@ -151,7 +151,7 @@ pub fn staged_account_balance_sort_key(
     balance: u64,
     pk: PublicKey,
 ) -> Vec<u8> {
-    let mut res = state_hash.to_bytes();
+    let mut res = state_hash.to_bytes().to_vec();
     res.append(&mut balance.to_be_bytes().to_vec());
     res.append(&mut pk.to_bytes());
     res

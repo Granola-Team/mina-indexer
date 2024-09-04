@@ -991,14 +991,14 @@ impl BlockStore for IndexerStore {
 /// `{block height BE}{state hash}`
 fn block_height_key(block: &PrecomputedBlock) -> Vec<u8> {
     let mut key = to_be_bytes(block.blockchain_length());
-    key.append(&mut block.state_hash().to_bytes());
+    key.append(&mut block.state_hash().to_bytes().to_vec());
     key
 }
 
 /// `{global slot BE}{state hash}`
 fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
     let mut key = to_be_bytes(block.global_slot_since_genesis());
-    key.append(&mut block.state_hash().to_bytes());
+    key.append(&mut block.state_hash().to_bytes().to_vec());
     key
 }
 
@@ -1006,7 +1006,7 @@ fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
 fn pk_block_sort_key(pk: PublicKey, sort_value: u32, state_hash: BlockHash) -> Vec<u8> {
     let mut key = pk.to_bytes();
     key.append(&mut to_be_bytes(sort_value));
-    key.append(&mut state_hash.to_bytes());
+    key.append(&mut state_hash.to_bytes().to_vec());
     key
 }
 
