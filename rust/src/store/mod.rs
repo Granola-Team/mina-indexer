@@ -461,12 +461,6 @@ pub fn state_hash_pk_txn_sort_key(key: &[u8]) -> BlockHash {
         .expect("state hash")
 }
 
-pub fn block_txn_index_key(state_hash: &BlockHash, index: u32) -> Vec<u8> {
-    let mut key = state_hash.clone().to_bytes().to_vec();
-    key.append(&mut to_be_bytes(index).to_vec());
-    key
-}
-
 pub fn txn_block_key(txn_hash: &str, state_hash: BlockHash) -> Vec<u8> {
     let mut bytes = txn_hash.as_bytes().to_vec();
     bytes.append(&mut state_hash.clone().to_bytes().to_vec());
