@@ -77,7 +77,7 @@ impl UsernameStore for IndexerStore {
                             .delete_cf(self.username_pk_num_cf(), pk.0.as_bytes())?;
 
                         // remove pk index
-                        let mut key = pk.clone().to_bytes();
+                        let mut key = pk.clone().to_bytes().to_vec();
                         key.append(&mut to_be_bytes(0));
                         self.database.delete_cf(self.username_pk_index_cf(), key)?;
                     }
@@ -88,7 +88,7 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // drop last update
-                    let mut key = pk.clone().to_bytes();
+                    let mut key = pk.clone().to_bytes().to_vec();
                     key.append(&mut to_be_bytes(num));
                     self.database.delete_cf(self.username_pk_index_cf(), key)?;
                 } else {
@@ -110,7 +110,7 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // add update
-                    let mut key = pk.to_bytes();
+                    let mut key = pk.to_bytes().to_vec();
                     key.append(&mut to_be_bytes(num));
                     self.database.put_cf(
                         self.username_pk_index_cf(),
@@ -125,7 +125,7 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // add update
-                    let mut key = pk.to_bytes();
+                    let mut key = pk.to_bytes().to_vec();
                     key.append(&mut to_be_bytes(0));
                     self.database.put_cf(
                         self.username_pk_index_cf(),
@@ -140,7 +140,7 @@ impl UsernameStore for IndexerStore {
 
     fn get_pk_username(&self, pk: &PublicKey, index: u32) -> anyhow::Result<Option<Username>> {
         trace!("Getting pk's {index}th username {pk}");
-        let mut key = pk.clone().to_bytes();
+        let mut key = pk.clone().to_bytes().to_vec();
         key.append(&mut to_be_bytes(index));
         Ok(self
             .database

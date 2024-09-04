@@ -1004,7 +1004,7 @@ fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
 
 /// `{pk}{height/slot BE}{state hash}`
 fn pk_block_sort_key(pk: PublicKey, sort_value: u32, state_hash: BlockHash) -> Vec<u8> {
-    let mut key = pk.to_bytes();
+    let mut key = pk.to_bytes().to_vec();
     key.append(&mut to_be_bytes(sort_value));
     key.append(&mut state_hash.to_bytes().to_vec());
     key

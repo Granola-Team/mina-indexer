@@ -417,7 +417,7 @@ pub fn pk_txn_sort_key(
     txn_hash: &str,
     state_hash: BlockHash,
 ) -> Vec<u8> {
-    let mut bytes = pk.to_bytes();
+    let mut bytes = pk.to_bytes().to_vec();
     bytes.append(&mut to_be_bytes(sort));
     bytes.append(&mut to_be_bytes(nonce.0));
     bytes.append(&mut txn_hash.as_bytes().to_vec());
@@ -427,7 +427,7 @@ pub fn pk_txn_sort_key(
 
 /// Prefix `{pk}{u32_sort}`
 pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
-    let mut bytes = public_key.to_bytes();
+    let mut bytes = public_key.to_bytes().to_vec();
     bytes.append(&mut to_be_bytes(sort));
     bytes
 }
