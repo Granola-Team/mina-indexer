@@ -18,18 +18,39 @@ use std::collections::HashMap;
 /// pk:   [PublicKey::LEN] bytes
 /// hash: [BlockHash::LEN] bytes
 /// num:  4 BE bytes
-fn snark_fee_prefix_key(
+pub fn snark_fee_prefix_key(
     fee: u64,
     global_slot: u32,
     pk: PublicKey,
     state_hash: BlockHash,
     num: u32,
-) -> Vec<u8> {
-    let mut bytes = fee.to_be_bytes().to_vec();
-    bytes.append(&mut global_slot.to_be_bytes().to_vec());
-    bytes.append(&mut pk.0.as_bytes().to_vec());
-    bytes.append(&mut state_hash.0.as_bytes().to_vec());
-    bytes.append(&mut num.to_be_bytes().to_vec());
+) -> [u8; 4 * 2 + 8 + PublicKey::LEN + BlockHash::LEN] {
+    const SIZE_OF_U32: usize = 4; // u32 is always 4 bytes
+    const SIZE_OF_U64: usize = 8; // u64 is always 8 bytes
+
+    let mut bytes = [0u8; SIZE_OF_U32 * 2 + SIZE_OF_U64 + PublicKey::LEN + BlockHash::LEN];
+
+    let mut start_index = 0;
+
+    // Copy fee (u64) - 8 bytes
+    bytes[start_index..start_index + SIZE_OF_U64].copy_from_slice(&fee.to_be_bytes());
+    start_index += SIZE_OF_U64;
+
+    // Copy global_slot (u32) - 4 bytes
+    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&global_slot.to_be_bytes());
+    start_index += SIZE_OF_U32;
+
+    // Copy pk (PublicKey) - PublicKey::LEN bytes
+    bytes[start_index..start_index + PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+    start_index += PublicKey::LEN;
+
+    // Copy state_hash (BlockHash) - BlockHash::LEN bytes
+    bytes[start_index..start_index + BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
+    start_index += BlockHash::LEN;
+
+    // Copy num (u32) - 4 bytes
+    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&num.to_be_bytes());
+
     bytes
 }
 
@@ -415,5 +436,56 @@ impl SnarkStore for IndexerStore {
         // epoch & total counts
         self.increment_snarks_epoch_count(epoch)?;
         self.increment_snarks_total_count()
+    }
+}
+
+#[cfg(test)]
+mod snark_store_impl_tests {
+    use super::*;
+
+    #[test]
+    fn test_snark_fee_prefix_key_length() {
+        // Mock values for PublicKey and BlockHash
+        let pk = PublicKey::default();
+        let state_hash = BlockHash::default();
+
+        // Invoke the function
+        let result = snark_fee_prefix_key(100u64, 50u32, pk, state_hash, 25u32);
+
+        // Expected size of the result array
+        assert_eq!(result.len(), 4 * 2 + 8 + PublicKey::LEN + BlockHash::LEN);
+    }
+
+    #[test]
+    fn test_snark_fee_prefix_key_content() {
+        // Mock values for PublicKey and BlockHash
+        let pk = PublicKey::default(); // All 1s
+        let state_hash = BlockHash::default(); // All 2s
+
+        // Values for fee, global_slot, and num
+        let fee = 100u64;
+        let global_slot = 50u32;
+        let num = 25u32;
+
+        // Invoke the function
+        let result = snark_fee_prefix_key(fee, global_slot, pk.clone(), state_hash.clone(), num);
+
+        // Assert the fee is correctly copied (big-endian u64)
+        assert_eq!(&result[0..8], &fee.to_be_bytes());
+
+        // Assert the global_slot is correctly copied (big-endian u32)
+        assert_eq!(&result[8..12], &global_slot.to_be_bytes());
+
+        // Assert the PublicKey is correctly copied
+        assert_eq!(&result[12..12 + PublicKey::LEN], &pk.to_bytes());
+
+        // Assert the BlockHash is correctly copied
+        assert_eq!(
+            &result[12 + PublicKey::LEN..12 + PublicKey::LEN + BlockHash::LEN],
+            &state_hash.to_bytes()
+        );
+
+        // Assert the num is correctly copied (big-endian u32)
+        assert_eq!(&result[result.len() - 4..], &num.to_be_bytes());
     }
 }
