@@ -372,40 +372,29 @@ pub fn extract_height_and_hash(path: &std::path::Path) -> (u32, &str) {
         .and_then(|x| x.to_str())
         .expect("Failed to extract filename from path");
 
-    let parts: Vec<&str> = filename.split('-').collect();
+    let mut parts = filename.split('-');
 
-    (
-        extract_block_height(path),
-        parts
-            .get(2)
-            .expect("Failed to find the third part of the filename")
-            .split('.')
-            .collect::<Vec<_>>()
-            .first()
-            .expect("Failed to parse the hash from the third part of the filename"),
-    )
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(_), Some(height_str), Some(hash_part)) => {
+            let block_height = height_str
+                .parse::<u32>()
+                .expect("Failed to parse block height");
+            let hash = hash_part
+                .split('.')
+                .next()
+                .expect("Failed to parse the hash");
+            (block_height, hash)
+        }
+        _ => panic!("Filename format is invalid {}", filename),
+    }
 }
 
 pub fn extract_block_height(path: &Path) -> u32 {
-    let filename = path
-        .file_name()
-        .and_then(|x| x.to_str())
-        .expect("Failed to extract filename from path");
-
-    let parts: Vec<&str> = filename.split('-').collect();
-
-    parts
-        .get(1)
-        .expect("Failed to find the second part of the filename")
-        .parse::<u32>()
-        .expect("Failed to parse block height as u32")
+    extract_height_and_hash(path).0
 }
 
-pub fn extract_state_hash(path: &Path) -> String {
-    let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
-    let dash_pos = name.rfind('-').unwrap();
-    let state_hash = &name[dash_pos + 1..];
-    state_hash.to_owned()
+pub fn extract_state_hash(path: &Path) -> &str {
+    extract_height_and_hash(path).1
 }
 
 pub fn extract_network(path: &Path) -> Network {
@@ -416,11 +405,8 @@ pub fn extract_network(path: &Path) -> Network {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        extract_block_height, extract_state_hash, is_valid_file_name, is_valid_state_hash,
-        precomputed::PrecomputedBlock, sort_by_height_and_lexicographical_order, Block, BlockHash,
-    };
+mod block_tests {
+    use super::*;
     use crate::block::precomputed::PcbVersion;
     use std::path::{Path, PathBuf};
 
@@ -431,8 +417,6 @@ mod tests {
 
     #[test]
     fn extract_state_hash_test() {
-        let filename1 =
-            &Path::new("mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json");
         let filename2 =
             &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
         let filename3 = &Path::new(
@@ -440,15 +424,11 @@ mod tests {
         );
 
         assert_eq!(
-            "3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8".to_owned(),
-            extract_state_hash(filename1)
-        );
-        assert_eq!(
-            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_owned(),
+            "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH",
             extract_state_hash(filename2)
         );
         assert_eq!(
-            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R".to_owned(),
+            "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R",
             extract_state_hash(filename3)
         );
     }
@@ -552,5 +532,42 @@ mod tests {
             Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234-123.json"), /* Too many parts */
             &is_valid_state_hash
         ));
+    }
+
+    #[test]
+    fn test_extract_height_and_hash() {
+        // Valid cases
+        assert_eq!(
+            extract_height_and_hash(Path::new(
+                "mainnet-42-3Nabcdef1234567890123456789012345678901234567890123456.json"
+            )),
+            (42, "3Nabcdef1234567890123456789012345678901234567890123456")
+        );
+
+        assert_eq!(
+            extract_height_and_hash(Path::new(
+                "mainnet-0-3Nabcdef1234567890123456789012345678901234567890123456.json"
+            )),
+            (0, "3Nabcdef1234567890123456789012345678901234567890123456")
+        );
+
+        // Invalid cases (should panic)
+        let result = std::panic::catch_unwind(|| {
+            extract_height_and_hash(Path::new("mainnet-42.json")); // missing hash part
+        });
+        assert!(
+            result.is_err(),
+            "Expected panic for invalid filename format"
+        );
+
+        let result = std::panic::catch_unwind(|| {
+            extract_height_and_hash(Path::new(
+                "mainnet-xyz-3Nabcdef1234567890123456789012345678901234567890123456.json",
+            )); // non-numeric height
+        });
+        assert!(
+            result.is_err(),
+            "Expected panic for non-numeric block height"
+        );
     }
 }
