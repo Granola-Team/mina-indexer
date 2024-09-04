@@ -400,7 +400,7 @@ impl StagedLedgerStore for IndexerStore {
         state_hash: &BlockHash,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let mut start = state_hash.clone().to_bytes();
+        let mut start = state_hash.clone().to_bytes().to_vec();
         let mode = IteratorMode::From(
             match direction {
                 Direction::Forward => start.as_slice(),
