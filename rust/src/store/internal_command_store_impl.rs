@@ -7,6 +7,7 @@ use crate::{
 };
 use log::trace;
 use speedb::DBIterator;
+use std::mem::size_of;
 
 impl InternalCommandStore for IndexerStore {
     /// Index internal commands on public keys & state hash
@@ -38,10 +39,27 @@ impl InternalCommandStore for IndexerStore {
             self.increment_internal_commands_counts(internal_cmd, epoch)?;
         }
 
-        fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = to_be_bytes(global_slot).to_vec();
-            bytes.append(&mut state_hash.as_bytes().to_vec());
-            bytes.append(&mut index.to_be_bytes().to_vec());
+        fn internal_commmand_key(
+            global_slot: u32,
+            state_hash: &str,
+            index: usize,
+        ) -> [u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()] {
+            let mut bytes = [0u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()]; // Array with a fixed size
+            let mut start_index = 0;
+
+            // Copy global_slot bytes (4 bytes)
+            bytes[start_index..start_index + size_of::<u32>()]
+                .copy_from_slice(&global_slot.to_be_bytes());
+            start_index += size_of::<u32>();
+
+            // Copy state_hash bytes (assuming state_hash is exactly 52 bytes)
+            bytes[start_index..start_index + BlockHash::LEN].copy_from_slice(state_hash.as_bytes());
+            start_index += BlockHash::LEN;
+
+            // Copy index bytes
+            bytes[start_index..start_index + size_of::<usize>()]
+                .copy_from_slice(&index.to_be_bytes());
+
             bytes
         }
 
