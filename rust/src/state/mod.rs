@@ -404,7 +404,7 @@ impl IndexerState {
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
                     if diff.public_keys_seen.contains(pk_of_interest) {
-                        println!("{:#?}", diff);
+                        println!("{:?}", diff);
                     }
                     ledger_diffs.push(diff.clone());
 
