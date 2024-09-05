@@ -46,7 +46,11 @@ end
 # Executable
 
 EXE_DIR = "#{BASE_DIR}/bin"
-EXE_SRC = "#{SRC_TOP}/result/bin/mina-indexer"
+EXE_SRC = if BUILD_TYPE == 'nix'
+  "#{SRC_TOP}/result/bin/mina-indexer"
+else
+  "#{SRC_TOP}/rust/target/debug/mina-indexer"
+end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
 def config_exe_dir
