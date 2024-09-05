@@ -120,6 +120,14 @@ module default {
     target2_balance: decimal;
   }
 
+  type SNARKJob {
+    required block: Block {
+      on target delete restrict;
+    }
+    required prover: Account;
+    required fee: decimal;
+  }
+
   type StakingEpoch {
     required hash: str {
       constraint regexp(r"^j.{50}$");

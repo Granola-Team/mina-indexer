@@ -70,6 +70,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
     let body = &protocol_state["body"];
     let consensus_state = &body["consensus_state"];
     let blockchain_state = &body["blockchain_state"];
+    let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
 
     let height = to_i64(&consensus_state["blockchain_length"]).unwrap();
 
@@ -159,7 +160,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             consensus_state["supercharge_coinbase"].as_bool(),
             consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
             to_i64(&consensus_state["min_window_density"]),
-            &consensus_state["last_vrf_output"]).expect("last_vrf_output is missing")
+            consensus_state["last_vrf_output"].as_str(),
         ),
     )
     .await?;
@@ -196,10 +197,25 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         .await?;
     }
 
-    for command in json["staged_ledger_diff"]["diff"][0]["commands"]
-        .as_array()
-        .unwrap()
-    {
+    for command in staged_ledger_diff["completed_works"].as_array().unwrap() {
+        db.execute(
+            format!(
+                "insert SNARKJob {{
+                    block := {},
+                    prover := {},
+                    fee := {:#?}n
+                }}",
+                block_link(block_hash),
+                account_link(&command["prover"]),
+                to_decimal(&command["fee"]),
+            )
+            .as_str(),
+            &(),
+        )
+        .await?;
+    }
+
+    for command in staged_ledger_diff["commands"].as_array().unwrap() {
         let data1 = &command["data"][1];
         let payload = &data1["payload"];
         let common = &payload["common"];
@@ -295,7 +311,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
     }
 
     // Process coinbase and fee_transfer
-    for internal_command in json["staged_ledger_diff"]["diff"][0]["internal_command_balances"]
+    for internal_command in staged_ledger_diff["internal_command_balances"]
         .as_array()
         .unwrap()
     {

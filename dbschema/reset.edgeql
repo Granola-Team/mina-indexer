@@ -6,6 +6,7 @@ delete StakingEpochData;
 delete NextEpochData;
 delete StagedLedgerHash;
 delete BlockchainState;
+delete SNARKJob;
 delete Block;
 delete StakingTiming;
 delete StakingLedger;
