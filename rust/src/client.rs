@@ -373,6 +373,10 @@ pub enum Transactions {
         #[arg(long)]
         end_state_hash: Option<String>,
 
+        /// Format output as CSV
+        #[arg(long, default_value_t = false)]
+        csv: bool,
+
         /// Verbose transaction output
         #[arg(long, default_value_t = false)]
         verbose: bool,

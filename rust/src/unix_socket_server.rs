@@ -935,6 +935,7 @@ pub async fn handle_connection(
                     start_state_hash,
                     end_state_hash,
                     path,
+                    csv,
                 } => {
                     let start_state_hash: BlockHash = start_state_hash.into();
                     let end_state_hash: BlockHash = {
@@ -958,6 +959,15 @@ pub async fn handle_connection(
                         invalid_state_hash(&start_state_hash.0)
                     } else if !block::is_valid_state_hash(&end_state_hash.0) {
                         invalid_state_hash(&end_state_hash.0)
+                    } else if csv {
+                        match db.write_user_commands_csv(&pk.clone().into(), path) {
+                            Ok(path) => Some(format!(
+                                "Successfully wrote user commands CSV for {pk} to {path:?}"
+                            )),
+                            Err(e) => {
+                                Some(format!("Error writing user commands CSV for {pk}: {e}"))
+                            }
+                        }
                     } else {
                         let transactions = db
                             .get_user_commands_for_public_key(&pk.clone().into())?
