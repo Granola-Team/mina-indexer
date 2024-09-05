@@ -465,9 +465,13 @@ pub fn pk_txn_sort_key(
 }
 
 /// Prefix `{pk}{u32_sort}`
-pub fn pk_txn_sort_key_prefix(public_key: PublicKey, sort: u32) -> Vec<u8> {
-    let mut bytes = public_key.to_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(sort).to_vec());
+pub fn pk_txn_sort_key_prefix(
+    public_key: PublicKey,
+    sort: u32,
+) -> [u8; PublicKey::LEN + size_of::<u32>()] {
+    let mut bytes = [0u8; PublicKey::LEN + size_of::<u32>()];
+    bytes[..PublicKey::LEN].copy_from_slice(&public_key.to_bytes());
+    bytes[PublicKey::LEN..].copy_from_slice(&to_be_bytes(sort));
     bytes
 }
 
@@ -669,6 +673,42 @@ mod store_tests {
             &result[PublicKey::LEN + size_of::<u32>() * 2 + TXN_HASH_LEN..],
             &state_hash.to_bytes()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pk_txn_sort_key_prefix_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let pk = PublicKey::default(); // Use default for PublicKey
+        let sort = 42u32; // Mock sort value
+
+        // Generate key
+        let result = pk_txn_sort_key_prefix(pk, sort);
+
+        // Expected length: PublicKey::LEN + u32 (4 bytes)
+        let expected_len = PublicKey::LEN + size_of::<u32>();
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pk_txn_sort_key_prefix_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let pk = PublicKey::default(); // Use default for PublicKey
+        let sort = 12345u32; // Mock sort value
+
+        // Generate key
+        let result = pk_txn_sort_key_prefix(pk.clone(), sort);
+
+        // Check the PublicKey bytes
+        assert_eq!(&result[..PublicKey::LEN], &pk.to_bytes());
+
+        // Check the sort value bytes (u32, big-endian)
+        assert_eq!(&result[PublicKey::LEN..], &sort.to_be_bytes());
 
         Ok(())
     }
