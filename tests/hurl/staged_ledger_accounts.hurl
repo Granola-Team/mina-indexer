@@ -196,3 +196,31 @@ jsonpath "$.data.stagedLedgerAccounts[0].public_key" == "B62qre3erTHfzQckNuibViW
 jsonpath "$.data.stagedLedgerAccounts[0].nonce" == 15
 
 duration < 1000
+
+# 
+# Missing public key query
+# 
+
+POST {{url}}
+```graphql
+query StagedLedgerAccounts($limit: Int, $query: StagedLedgerQueryInput!) {
+  stagedLedgerAccounts(limit: $limit, query: $query) {
+    balance_nanomina
+  }
+}
+
+variables {
+  "limit": 10,
+  "query": {
+    "publicKey": "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd",
+    "ledgerHash": "jwVZUkFNgb5fBf6ZRBtYXrwWs32erEyPTLXzdduGNhH6F71wjan"
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# account
+jsonpath "$.data.stagedLedgerAccounts" == null
+
+duration < 1000
