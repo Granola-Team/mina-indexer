@@ -855,6 +855,32 @@ test_transactions() {
     rm -rf ./transactions
 }
 
+test_transactions_csv() {
+    stage_mainnet_blocks 5 ./blocks
+    
+    idxr_server_start_standard
+    wait_for_socket
+
+    # write transactions to CSV
+    csv_file=./B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy.json
+    idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --csv --path $csv_file
+
+    # check transactions CSV
+    expect="Date,BlockHeight,BlockStateHash,From,To,Nonce,Hash,Fee,Amount,Memo,Kind
+2021-03-17T00:12:00.000Z,5,3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,8,CkpZP9pjDC5qqpHJtSaA6WpoT3GQPNYZJkCLxkERqPSb37brMTAPy,10000000,1000,,PAYMENT
+2021-03-17T00:12:00.000Z,5,3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,7,CkpZSZBvLsgsPnndQKkysZJDJ9gNkSR2oeaTp9grBpcCBamGsg7hV,50000000,10000,,PAYMENT
+2021-03-17T00:12:00.000Z,5,3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,6,CkpYeYaPLcM3JKLySyEcPeeANEVwQ3aTNYzJ9oFxqQamW9kZnFuPU,10000000,1000,,PAYMENT
+2021-03-17T00:09:00.000Z,4,3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,5,CkpZK28AEmzhB8AjsfT6Dd1cKdR5WF2gQw4xqDu4f93ozDX2jekTq,50000000,10000,,PAYMENT
+2021-03-17T00:09:00.000Z,4,3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,4,CkpaDbDiRtzF6AUVrny7VoJKTu1wStBHDEsG9W27UFeoeDwMP8VAc,10000000,1000,,PAYMENT
+2021-03-17T00:06:00.000Z,3,3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,3,CkpZ1u12zrTuEttp7QktfEy7wosHrPV6r3DJkq4sA9f1yKgEqmj5k,50000000,10000,,PAYMENT
+2021-03-17T00:06:00.000Z,3,3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,2,CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ,10000000,1000,,PAYMENT
+2021-03-17T00:06:00.000Z,3,3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,1,CkpZB4WE3wDRJ4CqCXqS4dqF8hoRQDVK8banePKUgTR6kvhTfyjRp,50000000,10000,,PAYMENT
+2021-03-17T00:06:00.000Z,3,3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R,B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy,B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM,0,CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa,10000000,1000,,PAYMENT"
+    assert "$expect" "$(cat $csv_file)"
+
+    rm -f $csv_file
+}
+
 # Indexer server returns correct SNARK work
 test_snark_work() {
     stage_mainnet_blocks 120 ./blocks
@@ -1738,6 +1764,7 @@ for test_name in "$@"; do
         "test_sync") test_sync ;;
         "test_replay") test_replay ;;
         "test_transactions") test_transactions ;;
+        "test_transactions_csv") test_transactions_csv ;;
         "test_snark_work") test_snark_work ;;
         "test_snapshot") test_snapshot ;;
         "test_rest_accounts_summary") test_rest_accounts_summary ;;

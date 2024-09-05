@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode};
+use std::{mem::size_of, path::PathBuf};
 
 /// Store for user commands
 pub trait UserCommandStore {
@@ -71,6 +72,13 @@ pub trait UserCommandStore {
         &self,
         txn_hash: &str,
     ) -> anyhow::Result<Option<u32>>;
+
+    /// Write the account's user commands to a CSV file
+    fn write_user_commands_csv(
+        &self,
+        pk: &PublicKey,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<PathBuf>;
 
     ///////////////
     // Iterators //
@@ -152,11 +160,11 @@ pub trait UserCommandStore {
 }
 
 /// u32 prefix from `key`
-/// - keep the first 4 bytes
+/// - keep the first size_of::<u32>() bytes
 /// - used for global slot & block height
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
-    from_be_bytes(key[..4].to_vec())
+    from_be_bytes(key[..size_of::<u32>()].to_vec())
 }
 
 /// Transaction hash from `key`

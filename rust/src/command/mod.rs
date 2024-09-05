@@ -16,7 +16,7 @@ use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use signed::SignedCommandWithCreationData;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 pub enum CommandType {
     Payment,
     Delegation,
@@ -417,6 +417,21 @@ impl From<(mina_rs::UserCommand, bool)> for Command {
 impl From<UserCommandWithStatus> for CommandStatusData {
     fn from(value: UserCommandWithStatus) -> Self {
         value.status_data()
+    }
+}
+
+impl std::fmt::Debug for CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl ToString for CommandType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Payment => "PAYMENT".into(),
+            Self::Delegation => "STAKE_DELEGATION".into(),
+        }
     }
 }
 

@@ -44,6 +44,7 @@ test_names = %w[
   sync
   replay
   transactions
+  transactions_csv
   snark_work
   snapshot
   database_create

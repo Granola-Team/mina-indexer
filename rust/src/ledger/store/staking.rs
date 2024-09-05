@@ -151,7 +151,7 @@ pub trait StakingLedgerStore {
 
     /// Per epoch staking ledger iterator via epoch
     /// ```
-    /// key: epoch BE bytes
+    /// key: [staking_ledger_epoch_key]
     /// val: b""
     fn staking_ledger_epoch_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
