@@ -1,4 +1,7 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{
+    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, pk_key_prefix,
+    pk_txn_sort_key_nonce, pk_txn_sort_key_prefix, pk_txn_sort_key_sort, txn_hash_of_key,
+};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockComparison, BlockHash},
     command::{
@@ -6,14 +9,17 @@ use crate::{
         store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
+    constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
     store::{
         from_be_bytes, pk_txn_sort_key, to_be_bytes, txn_block_key, txn_sort_key, u32_prefix_key,
         user_command_db_key_pk, username::UsernameStore, IndexerStore,
     },
 };
+use anyhow::bail;
 use log::{trace, warn};
 use speedb::{DBIterator, IteratorMode};
+use std::path::PathBuf;
 
 impl UserCommandStore for IndexerStore {
     fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
@@ -358,6 +364,68 @@ impl UserCommandStore for IndexerStore {
             .map(from_be_bytes))
     }
 
+    fn write_user_commands_csv(
+        &self,
+        pk: &PublicKey,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<PathBuf> {
+        let mut txns = vec![];
+        let start = pk_txn_sort_key_prefix(pk.clone(), u32::MAX);
+        let mode = IteratorMode::From(&start, speedb::Direction::Reverse);
+
+        // from txns
+        for (key, _) in self.txn_from_height_iterator(mode).flatten() {
+            let txn_pk = pk_key_prefix(&key);
+            if txn_pk != *pk {
+                break;
+            }
+            let height = pk_txn_sort_key_sort(&key);
+            let nonce = pk_txn_sort_key_nonce(&key);
+            let txn_hash = txn_hash_of_key(&key);
+            txns.push((height, nonce, txn_hash));
+        }
+
+        // to txns
+        for (key, _) in self.txn_to_height_iterator(mode).flatten() {
+            let txn_pk = pk_key_prefix(&key);
+            if txn_pk != *pk {
+                break;
+            }
+            let height = pk_txn_sort_key_sort(&key);
+            let nonce = pk_txn_sort_key_nonce(&key);
+            let txn_hash = txn_hash_of_key(&key);
+            txns.push((height, nonce, txn_hash));
+        }
+
+        txns.sort();
+        txns.reverse();
+
+        // write txn records to csv
+        let path = if let Some(path) = path {
+            path.display().to_string()
+        } else {
+            let dir = if let Ok(dir) = std::env::var("VOLUMES_DIR") {
+                dir
+            } else {
+                "/mnt".into()
+            };
+            format!("{dir}/mina-indexer-user-commands/{pk}.json")
+        };
+        let mut csv_writer = csv::WriterBuilder::new()
+            .has_headers(true)
+            .from_path(path.clone())?;
+        for (_, _, txn_hash) in txns {
+            if let Ok(Some(cmd)) = self.get_user_command(&txn_hash, 0).as_ref() {
+                csv_writer.serialize(TxnCsvRecord::from_user_command(cmd))?;
+            } else {
+                bail!("User command missing: {txn_hash}")
+            }
+        }
+
+        csv_writer.flush()?;
+        Ok(path.into())
+    }
+
     ///////////////
     // Iterators //
     ///////////////
@@ -532,5 +600,39 @@ impl UserCommandStore for IndexerStore {
         // epoch & total counts
         self.increment_user_commands_epoch_count(epoch)?;
         self.increment_user_commands_total_count()
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct TxnCsvRecord<'a> {
+    date: String,
+    block_height: u32,
+    block_state_hash: &'a str,
+    from: String,
+    to: String,
+    nonce: u32,
+    hash: &'a str,
+    fee: u64,
+    amount: u64,
+    memo: String,
+    kind: String,
+}
+
+impl<'a> TxnCsvRecord<'a> {
+    fn from_user_command(cmd: &'a SignedCommandWithData) -> Self {
+        Self {
+            date: millis_to_iso_date_string(cmd.date_time as i64),
+            block_height: cmd.blockchain_length,
+            block_state_hash: &cmd.state_hash.0,
+            from: cmd.command.source_pk().0,
+            to: cmd.command.receiver_pk().0,
+            nonce: cmd.nonce.0,
+            hash: &cmd.tx_hash,
+            fee: cmd.command.fee(),
+            amount: cmd.command.amount(),
+            memo: cmd.command.memo(),
+            kind: cmd.command.kind().to_string(),
+        }
     }
 }

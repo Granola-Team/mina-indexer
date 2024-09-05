@@ -39,6 +39,18 @@ pub struct SignedCommandWithData {
 }
 
 impl SignedCommand {
+    pub fn amount(&self) -> u64 {
+        use mina_rs::SignedCommandPayloadBody::*;
+        match self.payload_body() {
+            PaymentPayload(payload) => payload.t.t.amount.t.t,
+            StakeDelegation(_) => 0,
+        }
+    }
+
+    pub fn memo(&self) -> String {
+        decode_memo(&self.payload_common().memo.t.0)
+    }
+
     pub fn fee(&self) -> u64 {
         self.payload_common().fee.inner().inner()
     }
@@ -96,11 +108,15 @@ impl SignedCommand {
         self.all_command_public_keys().contains(pk)
     }
 
+    pub fn kind(&self) -> CommandType {
+        match self.payload_body() {
+            mina_rs::SignedCommandPayloadBody::PaymentPayload(_) => CommandType::Payment,
+            mina_rs::SignedCommandPayloadBody::StakeDelegation(_) => CommandType::Delegation,
+        }
+    }
+
     pub fn is_delegation(&self) -> bool {
-        matches!(
-            self.payload_body(),
-            mina_rs::SignedCommandPayloadBody::StakeDelegation(_)
-        )
+        matches!(self.kind(), CommandType::Delegation)
     }
 
     pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
