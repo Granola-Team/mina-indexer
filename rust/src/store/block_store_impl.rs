@@ -1005,10 +1005,26 @@ fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
 }
 
 /// `{pk}{height/slot BE}{state hash}`
-fn pk_block_sort_key(pk: PublicKey, sort_value: u32, state_hash: BlockHash) -> Vec<u8> {
-    let mut key = pk.to_bytes().to_vec();
-    key.append(&mut to_be_bytes(sort_value).to_vec());
-    key.append(&mut state_hash.to_bytes().to_vec());
+fn pk_block_sort_key(
+    pk: PublicKey,
+    sort_value: u32,
+    state_hash: BlockHash,
+) -> [u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN] {
+    let mut key = [0u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN];
+
+    let mut start_index = 0;
+
+    // Copy PublicKey bytes to the key array
+    key[start_index..start_index + PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+    start_index += PublicKey::LEN;
+
+    // Copy sort_value (u32) bytes to the key array
+    key[start_index..start_index + size_of::<u32>()].copy_from_slice(&sort_value.to_be_bytes());
+    start_index += size_of::<u32>();
+
+    // Copy state_hash bytes to the key array
+    key[start_index..start_index + BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
+
     key
 }
 
@@ -1088,5 +1104,46 @@ mod block_store_impl_tests {
         );
 
         Ok(())
+    }
+    #[test]
+    fn test_pk_block_sort_key_length() {
+        let pk = PublicKey::default();
+        let state_hash = BlockHash::default();
+        let sort_value = 100u32;
+
+        // Generate the key
+        let result = pk_block_sort_key(pk, sort_value, state_hash.clone());
+
+        // Expected length: PublicKey::LEN + u32 (4 bytes) + BlockHash::LEN
+        let expected_len = PublicKey::LEN + size_of::<u32>() + BlockHash::LEN;
+
+        // Assert that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+    }
+
+    #[test]
+    fn test_pk_block_sort_key_content() {
+        // Mock inputs
+        let pk = PublicKey::default();
+        let state_hash = BlockHash::default();
+        let sort_value = 500u32;
+
+        // Generate the key
+        let result = pk_block_sort_key(pk.clone(), sort_value, state_hash.clone());
+
+        // Check that the PublicKey bytes are correctly placed
+        assert_eq!(&result[..PublicKey::LEN], &pk.to_bytes());
+
+        // Check that the sort_value bytes (u32, big-endian) are correctly placed
+        assert_eq!(
+            &result[PublicKey::LEN..PublicKey::LEN + size_of::<u32>()],
+            &sort_value.to_be_bytes()
+        );
+
+        // Check that the BlockHash bytes are correctly placed
+        assert_eq!(
+            &result[PublicKey::LEN + size_of::<u32>()..],
+            &state_hash.to_bytes()
+        );
     }
 }
