@@ -60,6 +60,14 @@ pub trait StagedLedgerStore {
         account: &Account,
     ) -> anyhow::Result<()>;
 
+    fn get_pk_min_staged_ledger_block(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
+
+    fn set_pk_min_staged_ledger_block(
+        &self,
+        pk: &PublicKey,
+        block_height: u32,
+    ) -> anyhow::Result<()>;
+
     /// Add a ledger with assoociated hashes
     /// Returns true if ledger already present
     fn add_staged_ledger_hashes(

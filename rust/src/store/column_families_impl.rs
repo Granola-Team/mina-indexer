@@ -473,6 +473,13 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("staged-ledger-persisted column family exists")
     }
 
+    /// CF for tracking when an account was added to the staged ledger
+    fn staged_ledger_accounts_min_block_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("staged-ledger-accounts-min-block")
+            .expect("staged-ledger-accounts-min-block column family exists")
+    }
+
     /// CF for storing block ledger diffs
     /// ```
     /// key: state hash bytes

@@ -56,7 +56,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 87] = [
+    const COLUMN_FAMILIES: [&'static str; 88] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -138,6 +138,7 @@ impl IndexerStore {
         "staged-ledger-account-delegations",
         "staged-ledger-hash-to-block",
         "staged-ledger-persisted",
+        "staged-ledger-accounts-min-block",
         "blocks-ledger-diff",
         "blocks-staged-ledger-hash",
         //////////////////////////////

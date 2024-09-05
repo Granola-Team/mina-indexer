@@ -17,7 +17,7 @@ use crate::{
         },
         Ledger, LedgerHash,
     },
-    store::IndexerStore,
+    store::{from_be_bytes, IndexerStore},
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
@@ -31,6 +31,21 @@ impl StagedLedgerStore for IndexerStore {
         state_hash: BlockHash,
     ) -> anyhow::Result<Option<Account>> {
         trace!("Getting {pk} staged ledger {state_hash} account");
+
+        // check if the account is in a staged ledger
+        match self.get_pk_min_staged_ledger_block(&pk)? {
+            None => {
+                // account is not preset in a staged ledger
+                return Ok(None);
+            }
+            Some(pk_min_block_height) => {
+                if let Some(block_height) = self.get_block_height(&state_hash)? {
+                    if pk_min_block_height > block_height {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
 
         // calculate account from canonical ancestor if needed
         let mut apply_block_diffs = vec![];
@@ -106,6 +121,17 @@ impl StagedLedgerStore for IndexerStore {
         state_hash: BlockHash,
         account: &Account,
     ) -> anyhow::Result<()> {
+        let block_height = match self.get_block_height(&state_hash)? {
+            None => bail!("Block missing from store {state_hash}"),
+            Some(block_height) => block_height,
+        };
+        let block_height = self
+            .get_pk_min_staged_ledger_block(&pk)?
+            .map_or(block_height, |pk_min_block_height| {
+                block_height.min(pk_min_block_height)
+            });
+
+        self.set_pk_min_staged_ledger_block(&pk, block_height)?;
         self.database.put_cf(
             self.staged_ledger_accounts_cf(),
             staged_account_key(state_hash.clone(), pk.clone()),
@@ -117,6 +143,27 @@ impl StagedLedgerStore for IndexerStore {
             serde_json::to_vec(&account)?,
         )?;
         Ok(())
+    }
+
+    fn get_pk_min_staged_ledger_block(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
+        trace!("Getting pk min staged ledger block height {pk}");
+        Ok(self
+            .database
+            .get_cf(self.staged_ledger_accounts_min_block_cf(), pk.0.as_bytes())?
+            .map(from_be_bytes))
+    }
+
+    fn set_pk_min_staged_ledger_block(
+        &self,
+        pk: &PublicKey,
+        block_height: u32,
+    ) -> anyhow::Result<()> {
+        trace!("Setting pk {pk} min staged ledger block height {block_height}");
+        Ok(self.database.put_cf(
+            self.staged_ledger_accounts_min_block_cf(),
+            pk.0.as_bytes(),
+            block_height.to_be_bytes(),
+        )?)
     }
 
     fn add_staged_ledger_hashes(
