@@ -150,10 +150,18 @@ pub fn staged_account_balance_sort_key(
     state_hash: BlockHash,
     balance: u64,
     pk: PublicKey,
-) -> Vec<u8> {
-    let mut res = state_hash.to_bytes().to_vec();
-    res.append(&mut balance.to_be_bytes().to_vec());
-    res.append(&mut pk.to_bytes().to_vec());
+) -> [u8; BlockHash::LEN + size_of::<u64>() + PublicKey::LEN] {
+    let mut res = [0u8; BlockHash::LEN + size_of::<u64>() + PublicKey::LEN];
+
+    // Copy state_hash bytes
+    res[..BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
+
+    // Copy balance bytes (u64, which is 8 bytes)
+    res[BlockHash::LEN..BlockHash::LEN + size_of::<u64>()].copy_from_slice(&balance.to_be_bytes());
+
+    // Copy public key bytes
+    res[BlockHash::LEN + size_of::<u64>()..].copy_from_slice(pk.0.as_bytes());
+
     res
 }
 
@@ -198,5 +206,49 @@ mod staged_tests {
 
         // Assert the remaining bytes match the public key
         assert_eq!(&result[BlockHash::LEN..], &mock_pk.to_bytes()[..]);
+    }
+
+    #[test]
+    fn test_staged_account_balance_sort_key_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let state_hash = BlockHash::default(); // Use default for BlockHash
+        let balance = 123456789u64; // Mock balance
+        let pk = PublicKey::default(); // Use default for PublicKey
+
+        // Generate key
+        let result = staged_account_balance_sort_key(state_hash, balance, pk);
+
+        // Expected length: BlockHash::LEN + u64 (8 bytes) + PublicKey::LEN
+        let expected_len = BlockHash::LEN + size_of::<u64>() + PublicKey::LEN;
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staged_account_balance_sort_key_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let state_hash = BlockHash::default(); // Use default for BlockHash
+        let balance = 987654321u64; // Mock balance
+        let pk = PublicKey::default(); // Use default for PublicKey
+
+        // Generate key
+        let result = staged_account_balance_sort_key(state_hash.clone(), balance, pk.clone());
+
+        // Check the state hash bytes
+        assert_eq!(&result[..BlockHash::LEN], &state_hash.to_bytes());
+
+        // Check the balance bytes (u64, big-endian)
+        assert_eq!(
+            &result[BlockHash::LEN..BlockHash::LEN + size_of::<u64>()],
+            &balance.to_be_bytes()
+        );
+
+        // Check the public key bytes
+        assert_eq!(&result[BlockHash::LEN + size_of::<u64>()..], &pk.to_bytes());
+
+        Ok(())
     }
 }
