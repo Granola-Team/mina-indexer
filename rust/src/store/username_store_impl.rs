@@ -8,7 +8,7 @@ use crate::{
     store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes},
 };
 use log::{error, trace};
-use std::collections::HashMap;
+use std::{collections::HashMap, mem::size_of};
 
 impl UsernameStore for IndexerStore {
     fn get_username(&self, pk: &PublicKey) -> anyhow::Result<Option<Username>> {
@@ -140,8 +140,9 @@ impl UsernameStore for IndexerStore {
 
     fn get_pk_username(&self, pk: &PublicKey, index: u32) -> anyhow::Result<Option<Username>> {
         trace!("Getting pk's {index}th username {pk}");
-        let mut key = pk.clone().to_bytes().to_vec();
-        key.append(&mut to_be_bytes(index).to_vec());
+        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+        key[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(index));
         Ok(self
             .database
             .get_cf(self.username_pk_index_cf(), key)?
