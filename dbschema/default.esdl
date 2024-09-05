@@ -32,6 +32,7 @@ module default {
     required creator: Account;
     required coinbase_target: Account;
     required supercharge_coinbase: bool;
+    required last_vrf_output: str;
     required min_window_density: int64;
     required has_ancestor_in_same_checkpoint_window: bool;
   }

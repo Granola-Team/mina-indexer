@@ -100,7 +100,8 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         coinbase_target := {},
                         supercharge_coinbase := <bool>$6,
                         has_ancestor_in_same_checkpoint_window := <bool>$7,
-                        min_window_density := <int64>$8
+                        min_window_density := <int64>$8,
+                        last_vrf_output := <str>$9
                     }}
                 ),
                 blockchain_state := (
@@ -158,6 +159,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             consensus_state["supercharge_coinbase"].as_bool(),
             consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool(),
             to_i64(&consensus_state["min_window_density"]),
+            &consensus_state["last_vrf_output"]).expect("last_vrf_output is missing")
         ),
     )
     .await?;
