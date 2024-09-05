@@ -1,17 +1,13 @@
 use bigdecimal::BigDecimal;
 use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
 use sonic_rs::{JsonType, JsonValueTrait, Value};
-use std::{cmp::Ordering, collections::HashSet, fs, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::{
-    fs::File,
-    io::{self, AsyncReadExt, BufReader},
-};
+use std::{cmp::Ordering, collections::HashSet, fs, io, path::PathBuf, str::FromStr, sync::Arc};
 
 pub mod blocks;
 pub mod staking;
 
 /// Get (and sort) file paths for a given directory
-fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, std::io::Error> {
+fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     let mut paths = fs::read_dir(dir)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
@@ -151,18 +147,10 @@ fn to_decimal(value: &Value) -> Option<BigDecimal> {
 }
 
 async fn to_json(path: &PathBuf) -> io::Result<Value> {
-    let file = File::open(path).await?;
-    let mut reader = BufReader::new(file);
-    let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).await?;
+    let file_contents = fs::read(path)?;
 
-    // First, try to parse directly from the buffer
-    match sonic_rs::from_slice(&buffer) {
+    match sonic_rs::from_slice(&file_contents) {
         Ok(value) => Ok(value),
-        Err(e) => {
-            // It is too slow to try to use `String::from_utf8_lossy(&buffer)`
-            // So, just throw an `InvalidData`
-            Err(io::Error::new(io::ErrorKind::InvalidData, e))
-        }
+        Err(e) => Err(io::Error::new(io::ErrorKind::InvalidData, e)),
     }
 }
