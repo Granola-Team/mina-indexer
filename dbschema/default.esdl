@@ -18,7 +18,7 @@ module default {
     required genesis_hash: str {
         constraint max_len_value(52);
     }
-    required height: int64 {
+    required blockchain_length: int64 {
         constraint min_value(0);
     }
     required epoch: int64;

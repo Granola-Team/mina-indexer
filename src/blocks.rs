@@ -72,9 +72,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
     let blockchain_state = &body["blockchain_state"];
     let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
 
-    let height = to_i64(&consensus_state["blockchain_length"]).unwrap();
+    let blockchain_length = to_i64(&consensus_state["blockchain_length"]).unwrap();
 
-    println!("Processing block {} at height {}", block_hash, height);
+    println!("Processing block {} at blockchain_length {}", block_hash, blockchain_length);
 
     let accounts = extract_accounts(&json);
     insert_accounts(db, accounts).await?;
@@ -90,7 +90,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         hash := '{}',
                         previous_hash := <str>$0,
                         genesis_hash := <str>$1,
-                        height := <int64>$2,
+                        blockchain_length := <int64>$2,
                         epoch := {},
                         global_slot_since_genesis := <int64>$3,
                         scheduled_time := <int64>$4,
@@ -150,7 +150,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         &(
             protocol_state["previous_state_hash"].as_str(),
             body["genesis_state_hash"].as_str(),
-            height,
+            blockchain_length,
             to_i64(&consensus_state["global_slot_since_genesis"]),
             to_i64(&json["scheduled_time"]),
             to_i64(&consensus_state["total_currency"]),
