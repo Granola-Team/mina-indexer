@@ -300,8 +300,9 @@ impl BestLedgerStore for IndexerStore {
     }
 
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
-        let mut key = pk.clone().to_bytes().to_vec();
-        key.append(&mut to_be_bytes(idx).to_vec());
+        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+        key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(idx));
         Ok(self
             .database
             .get_cf(self.best_ledger_accounts_delegations_cf(), key)?
