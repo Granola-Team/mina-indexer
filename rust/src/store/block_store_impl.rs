@@ -998,9 +998,10 @@ fn block_height_key(block: &PrecomputedBlock) -> [u8; size_of::<u32>() + BlockHa
 }
 
 /// `{global slot BE}{state hash}`
-fn block_global_slot_key(block: &PrecomputedBlock) -> Vec<u8> {
-    let mut key = to_be_bytes(block.global_slot_since_genesis()).to_vec();
-    key.append(&mut block.state_hash().to_bytes().to_vec());
+fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; size_of::<u32>() + BlockHash::LEN] {
+    let mut key = [0u8; size_of::<u32>() + BlockHash::LEN];
+    key[..size_of::<u32>()].copy_from_slice(&to_be_bytes(block.global_slot_since_genesis()));
+    key[size_of::<u32>()..].copy_from_slice(&block.state_hash().to_bytes());
     key
 }
 
@@ -1145,5 +1146,44 @@ mod block_store_impl_tests {
             &result[PublicKey::LEN + size_of::<u32>()..],
             &state_hash.to_bytes()
         );
+    }
+
+    #[test]
+    fn test_block_global_slot_key_length() -> anyhow::Result<()> {
+        // Mock block
+        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        // Generate key
+        let result = block_global_slot_key(&block);
+
+        // Expected length: u32 (4 bytes) + BlockHash::LEN
+        let expected_len = size_of::<u32>() + BlockHash::LEN;
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_global_slot_key_content() -> anyhow::Result<()> {
+        // Mock block
+        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        // Generate key
+        let result = block_global_slot_key(&block);
+
+        // Expected global slot bytes (u32, big-endian)
+        let expected_global_slot_bytes = block.global_slot_since_genesis().to_be_bytes();
+
+        // Check that the first part of the key contains the correct global slot bytes
+        assert_eq!(&result[..size_of::<u32>()], &expected_global_slot_bytes);
+
+        // Check that the second part of the key contains the correct state hash bytes
+        assert_eq!(&result[size_of::<u32>()..], &block.state_hash().to_bytes());
+
+        Ok(())
     }
 }
