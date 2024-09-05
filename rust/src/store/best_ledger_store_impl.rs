@@ -322,8 +322,9 @@ impl BestLedgerStore for IndexerStore {
             )?;
 
             // drop delegation
-            let mut key = pk.to_bytes().to_vec();
-            key.append(&mut to_be_bytes(idx - 1).to_vec());
+            let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+            key[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+            key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(idx - 1));
             self.database
                 .delete_cf(self.best_ledger_accounts_delegations_cf(), key)?;
         }
