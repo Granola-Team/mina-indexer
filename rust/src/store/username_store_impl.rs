@@ -77,8 +77,9 @@ impl UsernameStore for IndexerStore {
                             .delete_cf(self.username_pk_num_cf(), pk.0.as_bytes())?;
 
                         // remove pk index
-                        let mut key = pk.clone().to_bytes().to_vec();
-                        key.append(&mut to_be_bytes(0).to_vec());
+                        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+                        key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+                        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(0u32));
                         self.database.delete_cf(self.username_pk_index_cf(), key)?;
                     }
                     self.database.put_cf(
@@ -88,8 +89,9 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // drop last update
-                    let mut key = pk.clone().to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(num).to_vec());
+                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(num));
                     self.database.delete_cf(self.username_pk_index_cf(), key)?;
                 } else {
                     error!("Invalid username pk num {pk}");
@@ -110,8 +112,9 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // add update
-                    let mut key = pk.to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(num).to_vec());
+                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(num));
                     self.database.put_cf(
                         self.username_pk_index_cf(),
                         key,
@@ -125,8 +128,9 @@ impl UsernameStore for IndexerStore {
                     )?;
 
                     // add update
-                    let mut key = pk.to_bytes().to_vec();
-                    key.append(&mut to_be_bytes(0).to_vec());
+                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
+                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(0u32));
                     self.database.put_cf(
                         self.username_pk_index_cf(),
                         key,
