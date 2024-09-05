@@ -149,7 +149,7 @@ impl StakingLedgerStore for IndexerStore {
         );
         let is_new = self
             .database
-            .get_cf(self.staking_ledger_persisted_cf(), key.clone())?
+            .get_cf(self.staking_ledger_persisted_cf(), key)?
             .is_none();
 
         // persist new staking ledger
@@ -569,10 +569,18 @@ fn staking_ledger_account_key(
     epoch: u32,
     ledger_hash: LedgerHash,
     pk: PublicKey,
-) -> Vec<u8> {
-    let mut key = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
-    key.append(&mut ledger_hash.0.into_bytes());
-    key.append(&mut pk.to_bytes().to_vec());
+) -> [u8; BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN + PublicKey::LEN] {
+    let mut key = [0u8; BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN + PublicKey::LEN];
+
+    let mut start_index = 0;
+    key[start_index..start_index + BlockHash::LEN + size_of::<u32>()]
+        .copy_from_slice(&staking_ledger_epoch_key_prefix(genesis_state_hash, epoch));
+
+    start_index += BlockHash::LEN + size_of::<u32>();
+    key[start_index..start_index + LedgerHash::LEN].copy_from_slice(&ledger_hash.0.into_bytes());
+
+    start_index += LedgerHash::LEN;
+    key[start_index..start_index + PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     key
 }
 
@@ -587,9 +595,11 @@ fn staking_ledger_epoch_key(
     genesis_state_hash: BlockHash,
     epoch: u32,
     ledger_hash: &LedgerHash,
-) -> Vec<u8> {
-    let mut key = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
-    key.append(&mut ledger_hash.0.clone().into_bytes());
+) -> [u8; BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN] {
+    let mut key = [0u8; BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN];
+    let start_index = BlockHash::LEN + size_of::<u32>();
+    key[..start_index].copy_from_slice(&staking_ledger_epoch_key_prefix(genesis_state_hash, epoch));
+    key[start_index..].copy_from_slice(&ledger_hash.0.clone().into_bytes());
     key
 }
 
@@ -600,8 +610,159 @@ fn staking_ledger_epoch_key(
 /// where
 /// - genesis_hash: [BlockHash::LEN] bytes
 /// - epoch:        4 BE bytes
-fn staking_ledger_epoch_key_prefix(genesis_state_hash: BlockHash, epoch: u32) -> Vec<u8> {
-    let mut key = genesis_state_hash.to_bytes().to_vec();
-    key.append(&mut to_be_bytes(epoch).to_vec());
+fn staking_ledger_epoch_key_prefix(
+    genesis_state_hash: BlockHash,
+    epoch: u32,
+) -> [u8; BlockHash::LEN + size_of::<u32>()] {
+    let mut key = [0u8; BlockHash::LEN + size_of::<u32>()];
+    key[..BlockHash::LEN].copy_from_slice(&genesis_state_hash.to_bytes());
+    key[BlockHash::LEN..].copy_from_slice(&to_be_bytes(epoch));
     key
+}
+
+#[cfg(test)]
+mod staking_ledger_store_impl_tests {
+    use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn test_staking_ledger_epoch_key_prefix_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+
+        // Generate key
+        let result = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
+
+        // Expected length: BlockHash::LEN + u32 (4 bytes)
+        let expected_len = BlockHash::LEN + size_of::<u32>();
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staking_ledger_epoch_key_prefix_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+
+        // Generate key
+        let result = staking_ledger_epoch_key_prefix(genesis_state_hash.clone(), epoch);
+
+        // Check the BlockHash bytes
+        assert_eq!(&result[..BlockHash::LEN], &genesis_state_hash.to_bytes());
+
+        // Check the epoch bytes (u32, big-endian)
+        assert_eq!(&result[BlockHash::LEN..], &epoch.to_be_bytes());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staking_ledger_epoch_key_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+        let ledger_hash = LedgerHash::default(); // Use default for LedgerHash
+
+        // Generate key
+        let result = staking_ledger_epoch_key(genesis_state_hash, epoch, &ledger_hash);
+
+        // Expected length: BlockHash::LEN + u32 (4 bytes) + LedgerHash::LEN
+        let expected_len = BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN;
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staking_ledger_epoch_key_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+        let ledger_hash = LedgerHash::default(); // Use default for LedgerHash
+
+        // Generate key
+        let result = staking_ledger_epoch_key(genesis_state_hash.clone(), epoch, &ledger_hash);
+
+        // Check the first part of the key (genesis_state_hash + epoch)
+        let expected_prefix = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
+        assert_eq!(
+            &result[..BlockHash::LEN + size_of::<u32>()],
+            &expected_prefix
+        );
+
+        // Check the ledger hash bytes
+        assert_eq!(
+            &result[BlockHash::LEN + size_of::<u32>()..],
+            &ledger_hash.0.clone().into_bytes()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staking_ledger_account_key_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+        let ledger_hash = LedgerHash::default(); // Use default for LedgerHash
+        let pk = PublicKey::default(); // Use default for PublicKey
+
+        // Generate key
+        let result = staking_ledger_account_key(genesis_state_hash, epoch, ledger_hash, pk);
+
+        // Expected length: BlockHash::LEN + u32 (4 bytes) + LedgerHash::LEN +
+        // PublicKey::LEN
+        let expected_len = BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN + PublicKey::LEN;
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_staking_ledger_account_key_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let genesis_state_hash = BlockHash::default(); // Use default for BlockHash
+        let epoch = 42u32; // Mock epoch
+        let ledger_hash = LedgerHash::default(); // Use default for LedgerHash
+        let pk = PublicKey::default(); // Use default for PublicKey
+
+        // Generate key
+        let result = staking_ledger_account_key(
+            genesis_state_hash.clone(),
+            epoch,
+            ledger_hash.clone(),
+            pk.clone(),
+        );
+
+        // Check the first part of the key (genesis_state_hash + epoch)
+        let expected_prefix = staking_ledger_epoch_key_prefix(genesis_state_hash, epoch);
+        assert_eq!(
+            &result[..BlockHash::LEN + size_of::<u32>()],
+            &expected_prefix
+        );
+
+        // Check the ledger hash bytes
+        assert_eq!(
+            &result[BlockHash::LEN + size_of::<u32>()
+                ..BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN],
+            &ledger_hash.0.into_bytes()
+        );
+
+        // Check the public key bytes
+        assert_eq!(
+            &result[BlockHash::LEN + size_of::<u32>() + LedgerHash::LEN..],
+            &pk.to_bytes()
+        );
+
+        Ok(())
+    }
 }
