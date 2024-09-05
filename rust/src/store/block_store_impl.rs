@@ -989,9 +989,11 @@ impl BlockStore for IndexerStore {
 }
 
 /// `{block height BE}{state hash}`
-fn block_height_key(block: &PrecomputedBlock) -> Vec<u8> {
-    let mut key = to_be_bytes(block.blockchain_length()).to_vec();
-    key.append(&mut block.state_hash().to_bytes().to_vec());
+fn block_height_key(block: &PrecomputedBlock) -> [u8; size_of::<u32>() + BlockHash::LEN] {
+    const SIZE_OF_U32: usize = size_of::<u32>();
+    let mut key = [0u8; SIZE_OF_U32 + BlockHash::LEN];
+    key[..SIZE_OF_U32].copy_from_slice(&to_be_bytes(block.blockchain_length()));
+    key[SIZE_OF_U32..].copy_from_slice(&block.state_hash().to_bytes());
     key
 }
 
@@ -1037,5 +1039,54 @@ fn display_direction(direction: Direction) -> String {
     match direction {
         Direction::Forward => "Forward".to_string(),
         Direction::Reverse => "Reverse".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod block_store_impl_tests {
+    use super::*;
+    use std::{mem::size_of, path::PathBuf};
+
+    #[test]
+    fn test_block_height_key_length() -> anyhow::Result<()> {
+        // Mock block
+        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        // Generate key
+        let result = block_height_key(&block);
+
+        // Check that the key has the correct length
+        assert_eq!(result.len(), size_of::<u32>() + BlockHash::LEN);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_height_key_content() -> anyhow::Result<()> {
+        // Mock block
+        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        // Generate key
+        let result = block_height_key(&block);
+
+        // Expected u32 bytes for the blockchain length (big-endian)
+        let expected_blockchain_length_bytes = 105489u32.to_be_bytes();
+
+        // Check that the first part of the key contains the correct blockchain length
+        // bytes
+        assert_eq!(
+            &result[..size_of::<u32>()],
+            &expected_blockchain_length_bytes
+        );
+
+        // Check that the second part of the key contains the correct state hash bytes
+        assert_eq!(
+            &result[size_of::<u32>()..],
+            "3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh".as_bytes()
+        );
+
+        Ok(())
     }
 }
