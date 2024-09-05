@@ -10,14 +10,13 @@ use std::{
 pub fn pretty_print_duration(duration: Duration) -> String {
     let seconds = duration.as_secs();
     if seconds == 0 {
-        return "0 seconds".to_string();
+        return "0s".to_string();
     }
 
     let days = seconds / 86400;
     let hours = (seconds % 86400) / 3600;
     let minutes = (seconds % 3600) / 60;
     let secs = seconds % 60;
-
     let mut parts = Vec::new();
 
     if days > 0 {
@@ -110,7 +109,7 @@ mod utility_function_tests {
 
     #[test]
     fn test_pretty_print_duration() {
-        assert_eq!(pretty_print_duration(Duration::from_secs(0)), "0 seconds");
+        assert_eq!(pretty_print_duration(Duration::from_secs(0)), "0s");
         assert_eq!(pretty_print_duration(Duration::from_secs(1)), "1s");
         assert_eq!(pretty_print_duration(Duration::from_secs(60)), "1m");
         assert_eq!(pretty_print_duration(Duration::from_secs(3661)), "1h 1m 1s");

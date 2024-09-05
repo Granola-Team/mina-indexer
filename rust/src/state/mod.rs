@@ -455,7 +455,7 @@ impl IndexerState {
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks
-        self.add_blocks_with_time(block_parser, Some(total_time.elapsed()))
+        self.add_blocks_with_time(block_parser, Some(total_time))
             .await
     }
 
@@ -468,10 +468,10 @@ impl IndexerState {
     async fn add_blocks_with_time(
         &mut self,
         block_parser: &mut BlockParser,
-        elapsed: Option<Duration>,
+        start: Option<Instant>,
     ) -> anyhow::Result<()> {
-        let total_time = Instant::now();
-        let offset = elapsed.unwrap_or(Duration::new(0, 0));
+        let total_time = start.unwrap_or(Instant::now());
+        let offset = total_time.elapsed();
         let mut step_time = total_time;
 
         if block_parser.total_num_blocks > self.reporting_freq {

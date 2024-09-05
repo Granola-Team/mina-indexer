@@ -46,15 +46,13 @@ pub fn discovery(
 
     // all other paths in the tree map are orphaned
     let orphaned_paths = get_orphaned_paths(&mut tree_map);
-
     assert!(tree_map.is_empty(), "Not all paths have been discovered");
 
     info!(
-        "Found {} blocks in the canonical chain in {:?}",
+        "Found {} blocks in the canonical chain in {}",
         canonical_branch.len() + recent_paths.len(),
         pretty_print_duration(time.elapsed())
     );
-
     Ok((
         canonical_branch.into_iter().cloned().collect::<Vec<_>>(),
         recent_paths.into_iter().cloned().collect::<Vec<_>>(),
@@ -102,7 +100,7 @@ fn find_best_tip<'a>(
 
     let best_tip = best_tip.expect("No valid best tip found");
     info!(
-        "Found best tip at block height {:?} in {:?}",
+        "Found best tip at block height {} in {}",
         extract_block_height(best_tip),
         pretty_print_duration(time.elapsed())
     );
@@ -143,7 +141,7 @@ fn canonical_branch_from_best_tip<'a>(
         }
     }
     info!(
-        "Found canonical branch in {:?}",
+        "Found canonical branch in {}",
         pretty_print_duration(time.elapsed())
     );
     canonical_branch.reverse(); // Reverse to maintain order
@@ -159,7 +157,7 @@ fn get_orphaned_paths<'a>(tree_map: &mut BTreeMap<u32, Vec<&'a PathBuf>>) -> Vec
         }
     }
     info!(
-        "Found {:?} orphaned blocks in {:?}",
+        "Found {} orphaned blocks in {}",
         orphaned_paths.len(),
         pretty_print_duration(time.elapsed())
     );
@@ -191,7 +189,7 @@ fn split_off_recent_paths<'a>(
     }
     sort_by_height_and_lexicographical_order(&mut recent_paths);
     info!(
-        "Found {:?} recent blocks in {:?}",
+        "Found {:?} recent blocks in {}",
         recent_paths.len(),
         pretty_print_duration(time.elapsed())
     );
@@ -201,7 +199,7 @@ fn split_off_recent_paths<'a>(
 fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
     if length_of_chain % reporting_freq == 0 {
         info!(
-            "Found best tip candidate at height {} in {:?}",
+            "Found best tip candidate at height {} in {}",
             length_of_chain,
             pretty_print_duration(time.elapsed())
         );
