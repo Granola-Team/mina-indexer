@@ -803,7 +803,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_epoch_count(&creator, Some(epoch))?;
         self.database.put_cf(
             self.block_production_pk_epoch_cf(),
-            u32_prefix_key(epoch, &creator.0),
+            u32_prefix_key(epoch, &creator),
             to_be_bytes(acc + 1),
         )?;
 
@@ -842,7 +842,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_pk_epoch_cf(),
-                u32_prefix_key(epoch, &pk.0),
+                u32_prefix_key(epoch, pk),
             )?
             .map_or(0, from_be_bytes))
     }

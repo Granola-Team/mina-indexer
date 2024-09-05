@@ -372,10 +372,12 @@ pub fn from_u64_be_bytes(bytes: Vec<u8>) -> u64 {
 
 /// The first 4 bytes are `prefix` in big endian
 /// - `prefix`: block length, global slot, epoch number, etc
-/// - `suffix`: txn hash, public key, etc
-fn u32_prefix_key(prefix: u32, suffix: &str) -> Vec<u8> {
-    let mut bytes = to_be_bytes(prefix).to_vec();
-    bytes.append(&mut suffix.as_bytes().to_vec());
+/// - `suffix`: public key
+fn u32_prefix_key(prefix: u32, suffix: &PublicKey) -> [u8; PublicKey::LEN + size_of::<u32>()] {
+    let mut bytes = [0u8; PublicKey::LEN + size_of::<u32>()];
+    bytes[..PublicKey::LEN].copy_from_slice(&suffix.clone().to_bytes());
+    // bytes.append(&mut suffix.as_bytes().to_vec());
+    bytes[PublicKey::LEN..].copy_from_slice(&to_be_bytes(prefix));
     bytes
 }
 
@@ -711,5 +713,24 @@ mod store_tests {
         assert_eq!(&result[PublicKey::LEN..], &sort.to_be_bytes());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_u32_prefix_key_with_valid_inputs() {
+        // Prepare a public key with known bytes
+        let public_key = PublicKey::default(); // Public key with all bytes set to 1
+        let prefix = 42u32;
+
+        // Generate the key
+        let key = u32_prefix_key(prefix, &public_key);
+
+        // Ensure the key has the correct length
+        assert_eq!(key.len(), PublicKey::LEN + size_of::<u32>());
+
+        // Check the public key part of the result (first 52 bytes)
+        assert_eq!(&key[..PublicKey::LEN], &public_key.to_bytes());
+
+        // Check the prefix part of the result (last 4 bytes for u32)
+        assert_eq!(&key[PublicKey::LEN..], &prefix.to_be_bytes());
     }
 }

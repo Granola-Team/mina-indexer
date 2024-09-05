@@ -210,7 +210,7 @@ impl InternalCommandStore for IndexerStore {
             .database
             .get_pinned_cf(
                 self.internal_commands_pk_epoch_cf(),
-                u32_prefix_key(epoch, &pk.0),
+                u32_prefix_key(epoch, pk),
             )?
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
@@ -225,7 +225,7 @@ impl InternalCommandStore for IndexerStore {
         let old = self.get_internal_commands_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.internal_commands_pk_epoch_cf(),
-            u32_prefix_key(epoch, &pk.0),
+            u32_prefix_key(epoch, pk),
             to_be_bytes(old + 1),
         )?)
     }

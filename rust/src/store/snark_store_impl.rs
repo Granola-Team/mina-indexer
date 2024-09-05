@@ -374,7 +374,7 @@ impl SnarkStore for IndexerStore {
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
         Ok(self
             .database
-            .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, &pk.0))?
+            .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
@@ -384,7 +384,7 @@ impl SnarkStore for IndexerStore {
         let old = self.get_snarks_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.snarks_pk_epoch_cf(),
-            u32_prefix_key(epoch, &pk.0),
+            u32_prefix_key(epoch, pk),
             to_be_bytes(old + 1),
         )?)
     }

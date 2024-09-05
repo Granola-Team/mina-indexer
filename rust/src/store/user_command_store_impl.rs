@@ -448,10 +448,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command epoch {epoch} num {pk}");
         Ok(self
             .database
-            .get_pinned_cf(
-                self.user_commands_pk_epoch_cf(),
-                u32_prefix_key(epoch, &pk.0),
-            )?
+            .get_pinned_cf(self.user_commands_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
@@ -465,7 +462,7 @@ impl UserCommandStore for IndexerStore {
         let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.user_commands_pk_epoch_cf(),
-            u32_prefix_key(epoch, &pk.0),
+            u32_prefix_key(epoch, pk),
             to_be_bytes(old + 1),
         )?)
     }
