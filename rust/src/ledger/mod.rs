@@ -202,10 +202,6 @@ impl Ledger {
         }
         serde_json::to_string_pretty(&accounts).unwrap()
     }
-
-    pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
-        Self::from_str(&String::from_utf8(bytes.to_vec())?)
-    }
 }
 
 impl ToString for Ledger {
