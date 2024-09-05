@@ -25,7 +25,6 @@ module default {
     required global_slot_since_genesis: int64 {
         constraint min_value(0);
     }
-    required curr_global_slot_number: int64;
     required scheduled_time: int64;
     required total_currency: int64;
     required stake_winner: Account;

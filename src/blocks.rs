@@ -93,7 +93,6 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         height := <int64>$2,
                         epoch := {},
                         global_slot_since_genesis := <int64>$3,
-                        curr_global_slot_number := {},
                         scheduled_time := <int64>$4,
                         total_currency := <int64>$5,
                         stake_winner := {},
@@ -124,8 +123,6 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             ;",
             block_hash,
             to_i64(&consensus_state["epoch_count"]).expect("epoch_count is missing"),
-            to_i64(&consensus_state["curr_global_slot"]["slot_number"])
-                .expect("slot_number is missing"),
             account_link(&consensus_state["block_stake_winner"]),
             account_link(&consensus_state["block_creator"]),
             account_link(&consensus_state["coinbase_receiver"]),
