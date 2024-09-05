@@ -434,12 +434,33 @@ pub fn pk_txn_sort_key(
     nonce: Nonce,
     txn_hash: &str,
     state_hash: BlockHash,
-) -> Vec<u8> {
-    let mut bytes = pk.to_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(sort).to_vec());
-    bytes.append(&mut to_be_bytes(nonce.0).to_vec());
-    bytes.append(&mut txn_hash.as_bytes().to_vec());
-    bytes.append(&mut state_hash.to_bytes().to_vec());
+) -> [u8; PublicKey::LEN + size_of::<u32>() * 2 + TXN_HASH_LEN + BlockHash::LEN] {
+    const SIZE_OF_U32: usize = size_of::<u32>();
+
+    let mut bytes = [0u8; PublicKey::LEN + SIZE_OF_U32 * 2 + TXN_HASH_LEN + BlockHash::LEN];
+
+    let mut start_index = 0;
+
+    // Copy the public key bytes
+    bytes[start_index..start_index + PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+    start_index += PublicKey::LEN;
+
+    // Copy the sort value (u32)
+    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&sort.to_be_bytes());
+    start_index += SIZE_OF_U32;
+
+    // Copy the nonce (u64)
+    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&nonce.0.to_be_bytes());
+    start_index += SIZE_OF_U32;
+
+    // Copy the transaction hash (txn_hash)
+    let txn_hash_bytes = txn_hash.as_bytes();
+    bytes[start_index..start_index + TXN_HASH_LEN].copy_from_slice(txn_hash_bytes);
+    start_index += TXN_HASH_LEN;
+
+    // Copy the state hash
+    bytes[start_index..].copy_from_slice(&state_hash.to_bytes());
+
     bytes
 }
 
@@ -585,5 +606,70 @@ mod store_tests {
 
         let state_hash_bytes = state_hash.to_bytes();
         assert_eq!(&result[4 + TXN_HASH_LEN..], &state_hash_bytes);
+    }
+
+    #[test]
+    fn test_pk_txn_sort_key_length() -> anyhow::Result<()> {
+        // Mock inputs
+        let pk = PublicKey::default(); // Use default for PublicKey
+        let nonce = Nonce(123456789);
+        let txn_hash = "a".repeat(TXN_HASH_LEN); // Create a txn_hash with length TXN_HASH_LEN
+        let state_hash = BlockHash::default(); // Use default for BlockHash
+        let sort = 100u32;
+
+        // Generate key
+        let result = pk_txn_sort_key(pk, sort, nonce, &txn_hash, state_hash);
+
+        // Expected length: PublicKey::LEN + u32 (4 bytes) + u64 (8 bytes) +
+        // TXN_HASH_LEN + BlockHash::LEN
+        let expected_len = PublicKey::LEN + size_of::<u32>() * 2 + TXN_HASH_LEN + BlockHash::LEN;
+
+        // Check that the result has the correct length
+        assert_eq!(result.len(), expected_len);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pk_txn_sort_key_content() -> anyhow::Result<()> {
+        // Mock inputs
+        let pk = PublicKey::default(); // Use default for PublicKey
+        let nonce = Nonce(987654321);
+        let txn_hash = "b".repeat(TXN_HASH_LEN); // Create a txn_hash with length TXN_HASH_LEN
+        let state_hash = BlockHash::default(); // Use default for BlockHash
+        let sort = 500u32;
+
+        // Generate key
+        let result = pk_txn_sort_key(pk.clone(), sort, nonce, &txn_hash, state_hash.clone());
+
+        // Check the PublicKey bytes
+        assert_eq!(&result[..PublicKey::LEN], &pk.to_bytes());
+
+        // Check the sort value bytes (u32, big-endian)
+        assert_eq!(
+            &result[PublicKey::LEN..PublicKey::LEN + size_of::<u32>()],
+            &sort.to_be_bytes()
+        );
+
+        // Check the nonce value bytes (u64, big-endian)
+        assert_eq!(
+            &result[PublicKey::LEN + size_of::<u32>()..PublicKey::LEN + size_of::<u32>() * 2],
+            &nonce.0.to_be_bytes()
+        );
+
+        // Check the transaction hash bytes
+        assert_eq!(
+            &result[PublicKey::LEN + size_of::<u32>() * 2
+                ..PublicKey::LEN + size_of::<u32>() * 2 + TXN_HASH_LEN],
+            txn_hash.as_bytes()
+        );
+
+        // Check the BlockHash bytes
+        assert_eq!(
+            &result[PublicKey::LEN + size_of::<u32>() * 2 + TXN_HASH_LEN..],
+            &state_hash.to_bytes()
+        );
+
+        Ok(())
     }
 }
