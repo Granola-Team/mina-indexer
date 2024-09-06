@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use std::sync::Mutex;
-use std::time::Duration;
+use log::info;
+use std::{sync::Mutex, time::Duration};
 
 // Define the Profiling struct
 struct IngestionProfiling {
@@ -32,9 +32,39 @@ impl IngestionProfiling {
     }
 
     fn report_summary(&self) {
-        println!("Total PCB read time: {:?}", self.pcb_file_read_duration);
-        println!("Total processing time: {:?}", self.processing_duration);
-        println!("Total DB operations time: {:?}", self.db_write_duration);
+        // Calculate total time spent on all operations
+        let total_time =
+            self.pcb_file_read_duration + self.processing_duration + self.db_write_duration;
+
+        // Avoid division by zero in case no time has been recorded
+        if total_time.as_secs_f64() == 0.0 {
+            println!("No time recorded for any operation.");
+            return;
+        }
+
+        // Calculate percentage for each operation
+        let pcb_file_read_percentage =
+            self.pcb_file_read_duration.as_secs_f64() / total_time.as_secs_f64() * 100.0;
+        let processing_percentage =
+            self.processing_duration.as_secs_f64() / total_time.as_secs_f64() * 100.0;
+        let db_write_percentage =
+            self.db_write_duration.as_secs_f64() / total_time.as_secs_f64() * 100.0;
+
+        // Print total times and percentages
+        info!("=== Ingestion Profiling ===");
+        info!(
+            "Total PCB read time: {:?} ({:.2}%)",
+            self.pcb_file_read_duration, pcb_file_read_percentage
+        );
+        info!(
+            "Total processing time: {:?} ({:.2}%)",
+            self.processing_duration, processing_percentage
+        );
+        info!(
+            "Total DB operations time: {:?} ({:.2}%)",
+            self.db_write_duration, db_write_percentage
+        );
+        info!("Total time spent on all operations: {:?}", total_time);
     }
 }
 
@@ -59,7 +89,7 @@ pub fn aggregate_db_operation_duration(duration: Duration) {
     profiling.record_db_write(duration);
 }
 
-pub fn report_summary() {
+pub fn ingestion_profiling_summary() {
     let profiling = GLOBAL_PROFILING.lock().unwrap();
     profiling.report_summary();
 }
