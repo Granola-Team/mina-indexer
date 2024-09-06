@@ -1,4 +1,4 @@
-use super::{column_families::ColumnFamilyHelpers, from_be_bytes, DbUpdate};
+use super::{column_families::ColumnFamilyHelpers, DbUpdate};
 use crate::{
     block::{
         store::{BlockStore, DbBlockUpdate},
@@ -58,7 +58,7 @@ impl BestLedgerStore for IndexerStore {
                     .delete_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?;
                 self.database.delete_cf(
                     self.best_ledger_accounts_balance_sort_cf(),
-                    u64_prefix_key(acct.balance.0, &pk.0),
+                    u64_prefix_key(acct.balance.0, pk),
                 )?;
             }
             return Ok(());
@@ -72,7 +72,7 @@ impl BestLedgerStore for IndexerStore {
             // delete stale balance sorting data
             self.database.delete_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                u64_prefix_key(acct.balance.0, &pk.0),
+                u64_prefix_key(acct.balance.0, pk),
             )?;
         }
         self.database.put_cf(
@@ -82,7 +82,7 @@ impl BestLedgerStore for IndexerStore {
         )?;
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
-            u64_prefix_key(balance, &pk.0),
+            u64_prefix_key(balance, pk),
             serde_json::to_vec(&account)?,
         )?;
         Ok(())
@@ -297,7 +297,13 @@ impl BestLedgerStore for IndexerStore {
                 self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
             )?
-            .map_or(0, from_be_bytes))
+            .map_or(0, |bytes| {
+                u32::from_be_bytes(
+                    bytes[..4]
+                        .try_into()
+                        .expect("Error getting bytes for height of pk delegations"),
+                )
+            }))
     }
 
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
@@ -336,20 +342,14 @@ impl BestLedgerStore for IndexerStore {
         match adjust.cmp(&0) {
             Equal => (),
             Greater => {
-                let old = self
-                    .database
-                    .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
-                    .map_or(0, from_be_bytes);
+                let old = self.get_num_accounts().ok().flatten().unwrap_or(0);
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
                     old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
-                let old = self
-                    .database
-                    .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
-                    .map_or(0, from_be_bytes);
+                let old = self.get_num_accounts().ok().flatten().unwrap_or(0);
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
                     old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
@@ -363,7 +363,13 @@ impl BestLedgerStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
-            .map(from_be_bytes))
+            .map(|bytes| {
+                u32::from_be_bytes(
+                    bytes[..4]
+                        .try_into()
+                        .expect("Error getting bytes for total number of accounts"),
+                )
+            }))
     }
 
     fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {

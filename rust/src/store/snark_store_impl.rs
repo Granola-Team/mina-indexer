@@ -236,7 +236,7 @@ impl SnarkStore for IndexerStore {
                 // delete the stale data
                 self.database.delete_cf(
                     self.snark_top_producers_sort_cf(),
-                    u64_prefix_key(old_total, &snark.prover.0),
+                    u64_prefix_key(old_total, &snark.prover),
                 )?
             }
         }
@@ -244,7 +244,7 @@ impl SnarkStore for IndexerStore {
         // replace stale data with updated
         for (prover, (old_total, new_fees)) in prover_fees.iter() {
             let total_fees = old_total + new_fees;
-            let key = u64_prefix_key(total_fees, &prover.0);
+            let key = u64_prefix_key(total_fees, prover);
             self.database
                 .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
         }
