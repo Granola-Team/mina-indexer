@@ -145,14 +145,17 @@ impl InternalCommandStore for IndexerStore {
     fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
         trace!("Getting pk num internal commands {pk}");
         let key = format!("internal-{}", pk);
-        Ok(self
+        if let Some(bytes) = self
             .database
             .get_pinned_cf(self.internal_commands_cf(), key.as_bytes())?
-            .and_then(|bytes| {
-                String::from_utf8(bytes.to_vec())
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-            }))
+        {
+            if let Ok(s) = std::str::from_utf8(&bytes) {
+                if let Ok(num) = s.parse::<u32>() {
+                    return Ok(Some(num));
+                }
+            }
+        }
+        Ok(None)
     }
 
     fn internal_commands_global_slot_interator(
@@ -168,8 +171,13 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting internal command epoch {epoch}");
         Ok(self
             .database
-            .get_pinned_cf(self.internal_commands_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .get_pinned_cf(self.internal_commands_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, |bytes| {
+                let byte_slice: [u8; 4] = bytes[..4]
+                    .try_into()
+                    .expect("Slice should have exactly 4 bytes");
+                u32::from_be_bytes(byte_slice)
+            }))
     }
 
     fn increment_internal_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -212,7 +220,12 @@ impl InternalCommandStore for IndexerStore {
                 self.internal_commands_pk_epoch_cf(),
                 u32_prefix_key(epoch, pk),
             )?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                let byte_slice: [u8; 4] = bytes[..4]
+                    .try_into()
+                    .expect("Slice should have exactly 4 bytes");
+                u32::from_be_bytes(byte_slice)
+            }))
     }
 
     fn increment_internal_commands_pk_epoch_count(
@@ -235,7 +248,12 @@ impl InternalCommandStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.internal_commands_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                let byte_slice: [u8; 4] = bytes[..4]
+                    .try_into()
+                    .expect("Slice should have exactly 4 bytes");
+                u32::from_be_bytes(byte_slice)
+            }))
     }
 
     fn increment_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
@@ -260,7 +278,12 @@ impl InternalCommandStore for IndexerStore {
                 self.block_internal_command_counts_cf(),
                 state_hash.0.as_bytes(),
             )?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
+            .map(|bytes| {
+                let byte_slice: [u8; 4] = bytes[..4]
+                    .try_into()
+                    .expect("Slice should have exactly 4 bytes");
+                u32::from_be_bytes(byte_slice)
+            }))
     }
 
     fn set_block_internal_commands_count(
