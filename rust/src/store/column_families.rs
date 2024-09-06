@@ -178,6 +178,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing which staged ledgers have been persisted
     fn staged_ledgers_persisted_cf(&self) -> &ColumnFamily;
 
+    /// CF for tracking when an account was added to the staged ledger
+    fn staged_ledger_accounts_min_block_cf(&self) -> &ColumnFamily;
+
     /// CF for storing block staged ledger hashes
     /// state hash -> staged ledger hash
     fn block_staged_ledger_hash_cf(&self) -> &ColumnFamily;
