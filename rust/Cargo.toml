@@ -64,7 +64,6 @@ tokio-graceful-shutdown = "0.15.0"
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.0"
 pretty_assertions = "1.4.0"
-wasm-bindgen-test = "0.3.42"
 lazy_static = "1.4.0"
 serde_stacker = "0.1.11"
 
