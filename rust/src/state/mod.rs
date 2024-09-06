@@ -31,7 +31,7 @@ use crate::{
         },
     },
     store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, fixed_keys::FixedKeys, from_be_bytes,
+        block_state_hash_from_key, block_u32_prefix_from_key, fixed_keys::FixedKeys,
         from_u64_be_bytes, staking_ledger_store_impl::split_staking_ledger_epoch_key, to_be_bytes,
         username::UsernameStore, IndexerStore,
     },
@@ -1025,7 +1025,11 @@ impl IndexerState {
                 .flatten()
                 .find_map(|(_, bytes)| {
                     // value prefix == best block height or 0 BE bytes
-                    let height = from_be_bytes(bytes[..4].to_vec());
+                    let height = u32::from_be_bytes(
+                        bytes[..4]
+                            .try_into()
+                            .expect("Byte length is incorrect. Unable to parse block height"),
+                    );
                     if bytes[4] == IndexerEvent::NEW_BEST_TIP_KIND
                         && height
                             == 1.max(best_block_height.saturating_sub(self.canonical_threshold))
