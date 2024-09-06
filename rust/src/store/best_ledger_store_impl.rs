@@ -58,7 +58,7 @@ impl BestLedgerStore for IndexerStore {
                     .delete_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?;
                 self.database.delete_cf(
                     self.best_ledger_accounts_balance_sort_cf(),
-                    u64_prefix_key(acct.balance.0, &pk.0),
+                    u64_prefix_key(acct.balance.0, pk),
                 )?;
             }
             return Ok(());
@@ -72,7 +72,7 @@ impl BestLedgerStore for IndexerStore {
             // delete stale balance sorting data
             self.database.delete_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                u64_prefix_key(acct.balance.0, &pk.0),
+                u64_prefix_key(acct.balance.0, pk),
             )?;
         }
         self.database.put_cf(
@@ -82,7 +82,7 @@ impl BestLedgerStore for IndexerStore {
         )?;
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
-            u64_prefix_key(balance, &pk.0),
+            u64_prefix_key(balance, pk),
             serde_json::to_vec(&account)?,
         )?;
         Ok(())

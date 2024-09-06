@@ -386,9 +386,10 @@ fn u32_prefix_key(prefix: u32, suffix: &PublicKey) -> [u8; PublicKey::LEN + size
 /// ```
 /// - prefix: balance, etc
 /// - suffix: txn hash, public key, etc
-fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
-    let mut bytes = prefix.to_be_bytes().to_vec();
-    bytes.append(&mut suffix.as_bytes().to_vec());
+fn u64_prefix_key(prefix: u64, suffix: &PublicKey) -> [u8; size_of::<u64>() + PublicKey::LEN] {
+    let mut bytes = [0u8; size_of::<u64>() + PublicKey::LEN];
+    bytes[..size_of::<u64>()].copy_from_slice(&prefix.to_be_bytes());
+    bytes[size_of::<u64>()..].copy_from_slice(&suffix.clone().to_bytes());
     bytes
 }
 
