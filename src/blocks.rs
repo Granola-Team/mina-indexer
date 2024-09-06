@@ -36,7 +36,7 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
                     let a = insert(&db, json, block_hash).await;
                     match a {
                         Ok(_) => (),
-                        Err(e) => panic!("Ruhroh {:?}", e),
+                        Err(e) => panic!("block_hash: {} {:?}", block_hash, e),
                     };
                 }
                 Err(e) => {
