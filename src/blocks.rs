@@ -119,8 +119,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                 non_snark_aux_hash := '{}',
                 non_snark_pending_coinbase_aux := '{}',
                 pending_coinbase_hash := '{}'
-            }}
-            ;",
+            }};",
             block_hash,
             to_i64(&consensus_state["epoch_count"]).expect("epoch_count is missing"),
             account_link(&consensus_state["block_stake_winner"]),
@@ -145,8 +144,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             staged_ledger_hash["pending_coinbase_hash"]
                 .as_str()
                 .expect("pending_coinbase_hash is missing")
-        )
-        .as_str(),
+        ),
         &(
             protocol_state["previous_state_hash"].as_str(),
             body["genesis_state_hash"].as_str(),
@@ -180,8 +178,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                 }};",
                 to_titlecase(epoch_type),
                 block_link(block_hash)
-            )
-            .as_str(),
+            ),
             &(
                 ledger["hash"].as_str().expect("ledger_hash is missing"),
                 to_i64(&ledger["total_currency"]),
@@ -198,16 +195,14 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         db.execute(
             format!(
                 "insert SNARKJob {{
-                    block := {},
-                    prover := {},
-                    fee := {:#?}n
-                }}",
+            block := {},
+            prover := {},
+            fee := <decimal>$0
+        }};",
                 block_link(block_hash),
-                account_link(&command["prover"]),
-                to_decimal(&command["fee"]),
-            )
-            .as_str(),
-            &(),
+                account_link(&command["prover"])
+            ),
+            &(to_decimal(&command["fee"]),),
         )
         .await?;
     }
@@ -243,15 +238,23 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             ",
             block_link(block_hash),
             status[0].as_str().unwrap(),
-            to_decimal(&status_2["source_balance"]).unwrap(),
+            to_decimal(&status_2["source_balance"]).unwrap().to_string(),
             // TODO: or default may be incorrect here since this is optional
-            to_decimal(&status_2["receiver_balance"]).unwrap_or_default(),
-            to_decimal(&common["fee"]).unwrap_or_default(),
+            to_decimal(&status_2["receiver_balance"])
+                .unwrap_or_default()
+                .to_string(),
+            to_decimal(&common["fee"]).unwrap_or_default().to_string(),
             account_link(&common["fee_payer_pk"]),
-            to_decimal(&status_2["fee_payer_balance"]).unwrap_or_default(),
+            to_decimal(&status_2["fee_payer_balance"])
+                .unwrap_or_default()
+                .to_string(),
             common["fee_token"].as_str().unwrap(),
-            to_decimal(&status_1["fee_payer_account_creation_fee_paid"]).unwrap_or_default(),
-            to_decimal(&status_1["receiver_account_creation_fee_paid"]).unwrap_or_default(),
+            to_decimal(&status_1["fee_payer_account_creation_fee_paid"])
+                .unwrap_or_default()
+                .to_string(),
+            to_decimal(&status_1["receiver_account_creation_fee_paid"])
+                .unwrap_or_default()
+                .to_string(),
             to_i64(&common["nonce"]).unwrap_or_default(),
             to_i64(&common["valid_until"]).unwrap_or_default(),
             // TODO: or default may be incorrect here since this is optional
@@ -275,8 +278,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         command,
                         account_link(&delegation["delegator"]),
                         account_link(&delegation["new_delegate"])
-                    )
-                    .as_str(),
+                    ),
                     &(),
                 )
                 .await?;
@@ -295,8 +297,7 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
                         command,
                         account_link(&body1["source_pk"]),
                         account_link(&body1["receiver_pk"]),
-                    )
-                    .as_str(),
+                    ),
                     &(to_decimal(&body1["amount"]), to_i64(&body1["token_id"])),
                 )
                 .await?;
