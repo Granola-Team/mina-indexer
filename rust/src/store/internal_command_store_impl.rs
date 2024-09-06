@@ -7,6 +7,7 @@ use crate::{
 };
 use log::trace;
 use speedb::DBIterator;
+use std::mem::size_of;
 
 impl InternalCommandStore for IndexerStore {
     /// Index internal commands on public keys & state hash
@@ -38,16 +39,22 @@ impl InternalCommandStore for IndexerStore {
             self.increment_internal_commands_counts(internal_cmd, epoch)?;
         }
 
-        fn internal_commmand_key(global_slot: u32, state_hash: &str, index: usize) -> Vec<u8> {
-            let mut bytes = to_be_bytes(global_slot).to_vec();
-            bytes.append(&mut state_hash.as_bytes().to_vec());
-            bytes.append(&mut index.to_be_bytes().to_vec());
+        fn internal_commmand_key(
+            global_slot: u32,
+            state_hash: &BlockHash,
+            index: usize,
+        ) -> [u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()] {
+            let mut bytes = [0u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()];
+            bytes[..size_of::<u32>()].copy_from_slice(&to_be_bytes(global_slot));
+            bytes[size_of::<u32>()..size_of::<u32>() + BlockHash::LEN]
+                .copy_from_slice(&state_hash.clone().to_bytes());
+            bytes[size_of::<u32>() + BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
             bytes
         }
 
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
             let key =
-                internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash().0, i);
+                internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash(), i);
             self.database.put_cf(
                 self.internal_commands_slot_cf(),
                 key,
