@@ -193,7 +193,8 @@ impl PrecomputedBlock {
         let state_hash = extract_state_hash(path);
         let read_time = std::time::Instant::now();
         let contents = std::fs::read(path)?;
-        aggregate_read_duration(read_time.elapsed());
+        let elapsed_read_time = read_time.elapsed();
+        aggregate_read_duration(elapsed_read_time);
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
@@ -203,7 +204,7 @@ impl PrecomputedBlock {
             },
             version,
         )?;
-        aggregate_processing_duration(processing_time.elapsed() - read_time.elapsed());
+        aggregate_processing_duration(processing_time.elapsed() - elapsed_read_time);
         Ok(precomputed_block)
     }
 

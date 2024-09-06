@@ -444,14 +444,15 @@ impl IndexerState {
                         self.root_branch = Branch::new(&block)?;
                         let db_time_2 = std::time::Instant::now();
                         self.ledger._apply_diff(&diff)?;
-                        aggregate_db_operation_duration(db_time_2.elapsed());
+                        let elapsed_db_time = db_time_2.elapsed();
+                        aggregate_db_operation_duration(elapsed_db_time);
                         self.best_tip = Tip {
                             state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
                         };
                         self.canonical_root = self.best_tip.clone();
                         aggregate_processing_duration(
-                            processing_time_2.elapsed() - db_time_2.elapsed(),
+                            processing_time_2.elapsed() - elapsed_db_time,
                         );
                     }
                 } else {
