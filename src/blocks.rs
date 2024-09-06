@@ -66,19 +66,17 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
 
 /// Insert the `json` for a given `block_hash` into the `db`
 async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Result<()> {
+    println!("Processing {}", block_hash);
+
+    let accounts = extract_accounts(&json);
+    insert_accounts(db, accounts).await?;
+
     let protocol_state = &json["protocol_state"];
     let body = &protocol_state["body"];
     let consensus_state = &body["consensus_state"];
     let blockchain_state = &body["blockchain_state"];
     let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
-
     let blockchain_length = to_i64(&consensus_state["blockchain_length"]).unwrap();
-
-    println!("Processing block {} at blockchain_length {}", block_hash, blockchain_length);
-
-    let accounts = extract_accounts(&json);
-    insert_accounts(db, accounts).await?;
-
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
 
