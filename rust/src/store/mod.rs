@@ -735,4 +735,30 @@ mod store_tests {
         // Check the prefix part of the result (last 4 bytes for u32)
         assert_eq!(&key[PublicKey::LEN..], &prefix.to_be_bytes());
     }
+
+    #[test]
+    fn test_u64_prefix_key() {
+        // Test case 1: Check if the prefix and suffix are correctly combined
+        let prefix: u64 = 1234567890;
+        let suffix = PublicKey::default();
+
+        let expected_size = size_of::<u64>() + PublicKey::LEN;
+        let key = u64_prefix_key(prefix, &suffix);
+
+        assert_eq!(key.len(), expected_size);
+        assert_eq!(&key[..size_of::<u64>()], &prefix.to_be_bytes());
+        assert_eq!(&key[size_of::<u64>()..], &suffix.to_bytes());
+    }
+
+    #[test]
+    fn test_u64_prefix_key_with_different_values() {
+        // Test case 2: Use a different prefix and suffix and ensure correctness
+        let prefix: u64 = u64::MAX;
+        let suffix = PublicKey::default();
+
+        let key = u64_prefix_key(prefix, &suffix);
+
+        assert_eq!(&key[..size_of::<u64>()], &prefix.to_be_bytes());
+        assert_eq!(&key[size_of::<u64>()..], &suffix.to_bytes());
+    }
 }
