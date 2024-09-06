@@ -386,9 +386,10 @@ fn u32_prefix_key(prefix: u32, suffix: &PublicKey) -> [u8; PublicKey::LEN + size
 /// ```
 /// - prefix: balance, etc
 /// - suffix: txn hash, public key, etc
-fn u64_prefix_key(prefix: u64, suffix: &str) -> Vec<u8> {
-    let mut bytes = prefix.to_be_bytes().to_vec();
-    bytes.append(&mut suffix.as_bytes().to_vec());
+fn u64_prefix_key(prefix: u64, suffix: &PublicKey) -> [u8; size_of::<u64>() + PublicKey::LEN] {
+    let mut bytes = [0u8; size_of::<u64>() + PublicKey::LEN];
+    bytes[..size_of::<u64>()].copy_from_slice(&prefix.to_be_bytes());
+    bytes[size_of::<u64>()..].copy_from_slice(&suffix.clone().to_bytes());
     bytes
 }
 
@@ -733,5 +734,31 @@ mod store_tests {
 
         // Check the prefix part of the result (last 4 bytes for u32)
         assert_eq!(&key[PublicKey::LEN..], &prefix.to_be_bytes());
+    }
+
+    #[test]
+    fn test_u64_prefix_key() {
+        // Test case 1: Check if the prefix and suffix are correctly combined
+        let prefix: u64 = 1234567890;
+        let suffix = PublicKey::default();
+
+        let expected_size = size_of::<u64>() + PublicKey::LEN;
+        let key = u64_prefix_key(prefix, &suffix);
+
+        assert_eq!(key.len(), expected_size);
+        assert_eq!(&key[..size_of::<u64>()], &prefix.to_be_bytes());
+        assert_eq!(&key[size_of::<u64>()..], &suffix.to_bytes());
+    }
+
+    #[test]
+    fn test_u64_prefix_key_with_different_values() {
+        // Test case 2: Use a different prefix and suffix and ensure correctness
+        let prefix: u64 = u64::MAX;
+        let suffix = PublicKey::default();
+
+        let key = u64_prefix_key(prefix, &suffix);
+
+        assert_eq!(&key[..size_of::<u64>()], &prefix.to_be_bytes());
+        assert_eq!(&key[size_of::<u64>()..], &suffix.to_bytes());
     }
 }
