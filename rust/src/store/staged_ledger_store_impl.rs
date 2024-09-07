@@ -377,22 +377,24 @@ impl StagedLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn set_block_staged_ledger_hash(
+    fn set_block_staged_ledger_hash_batch(
         &self,
         state_hash: &BlockHash,
         staged_ledger_hash: &LedgerHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block staged ledger hash {state_hash}: {staged_ledger_hash}");
-        self.database.put_cf(
+        batch.put_cf(
             self.staged_ledger_hash_to_block_cf(),
             staged_ledger_hash.0.as_bytes(),
             state_hash.0.as_bytes(),
-        )?;
-        Ok(self.database.put_cf(
+        );
+        batch.put_cf(
             self.block_staged_ledger_hash_cf(),
             state_hash.0.as_bytes(),
             staged_ledger_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_staged_ledger_hash(

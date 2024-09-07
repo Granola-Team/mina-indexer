@@ -81,7 +81,11 @@ impl BlockStore for IndexerStore {
         self.set_block_parent_hash_batch(&state_hash, &block.previous_state_hash(), &mut batch)?;
 
         // add to staged ledger hash index
-        self.set_block_staged_ledger_hash(&state_hash, &block.staged_ledger_hash())?;
+        self.set_block_staged_ledger_hash_batch(
+            &state_hash,
+            &block.staged_ledger_hash(),
+            &mut batch,
+        )?;
 
         // add to genesis state hash index
         let genesis_state_hash = block.genesis_state_hash();

@@ -99,10 +99,11 @@ pub trait StagedLedgerStore {
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff
-    fn set_block_staged_ledger_hash(
+    fn set_block_staged_ledger_hash_batch(
         &self,
         state_hash: &BlockHash,
         staged_ledger_hash: &LedgerHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     fn get_block_staged_ledger_hash(
