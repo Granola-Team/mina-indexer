@@ -491,14 +491,19 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
+    fn increment_user_commands_epoch_count_batch(
+        &self,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Incrementing user command epoch {epoch}");
         let old = self.get_user_commands_epoch_count(Some(epoch))?;
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.user_commands_epoch_cf(),
             to_be_bytes(epoch),
             to_be_bytes(old + 1),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_user_commands_total_count(&self) -> anyhow::Result<u32> {
@@ -619,7 +624,7 @@ impl UserCommandStore for IndexerStore {
         }
 
         // epoch & total counts
-        self.increment_user_commands_epoch_count(epoch)?;
+        self.increment_user_commands_epoch_count_batch(epoch, batch)?;
         self.increment_user_commands_total_count()
     }
 }

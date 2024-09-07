@@ -119,7 +119,11 @@ pub trait UserCommandStore {
     fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
     /// Increment user commands per epoch count
-    fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;
+    fn increment_user_commands_epoch_count_batch(
+        &self,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get user commands per epoch count
     fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
