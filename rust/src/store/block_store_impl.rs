@@ -59,7 +59,7 @@ impl BlockStore for IndexerStore {
         )?;
 
         // add to epoch index before setting other indices
-        self.set_block_epoch(&state_hash, block.epoch_count())?;
+        self.set_block_epoch_batch(&state_hash, block.epoch_count(), &mut batch)?;
 
         // increment block production counts
         self.increment_block_production_count(block)?;
@@ -743,13 +743,19 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()> {
+    fn set_block_epoch_batch(
+        &self,
+        state_hash: &BlockHash,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Setting block epoch {epoch}: {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_epoch_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(epoch),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {

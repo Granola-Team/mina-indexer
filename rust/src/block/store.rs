@@ -8,7 +8,7 @@ use crate::{
     },
     store::DbUpdate,
 };
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatchWithTransaction};
 
 pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
 
@@ -99,7 +99,12 @@ pub trait BlockStore {
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's epoch count
-    fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()>;
+    fn set_block_epoch_batch(
+        &self,
+        state_hash: &BlockHash,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block's epoch count without deserializing the PCB
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
