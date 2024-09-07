@@ -132,7 +132,7 @@ impl BlockStore for IndexerStore {
         self.add_block_at_slot_batch(&state_hash, block.global_slot_since_genesis(), &mut batch)?;
 
         // add pcb's version
-        self.set_block_version(&state_hash, block.version())?;
+        self.set_block_version_batch(&state_hash, block.version(), &mut batch)?;
 
         // add block user commands
         self.add_user_commands(block)?;
@@ -707,13 +707,19 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
+    fn set_block_version_batch(
+        &self,
+        state_hash: &BlockHash,
+        version: PcbVersion,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Setting block {state_hash} version to {version}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_version_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&version)?,
-        )?)
+        );
+        Ok(())
     }
 
     fn set_block_height_global_slot_pair_batch(

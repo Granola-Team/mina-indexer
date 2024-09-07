@@ -195,7 +195,12 @@ pub trait BlockStore {
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Index block version
-    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
+    fn set_block_version_batch(
+        &self,
+        state_hash: &BlockHash,
+        version: PcbVersion,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
