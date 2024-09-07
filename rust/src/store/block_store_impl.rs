@@ -62,7 +62,7 @@ impl BlockStore for IndexerStore {
         self.set_block_epoch_batch(&state_hash, block.epoch_count(), &mut batch)?;
 
         // increment block production counts
-        self.increment_block_production_count(block)?;
+        self.increment_block_production_count_batch(block, &mut batch)?;
 
         // add comparison data before user commands, SNARKs, and internal commands
         self.set_block_comparison(&state_hash, &BlockComparison::from(block))?;
@@ -834,7 +834,11 @@ impl BlockStore for IndexerStore {
     // Block counts //
     //////////////////
 
-    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn increment_block_production_count_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
 
         let creator = block.block_creator();
@@ -842,32 +846,31 @@ impl BlockStore for IndexerStore {
 
         // increment pk epoch count
         let acc = self.get_block_production_pk_epoch_count(&creator, Some(epoch))?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_pk_epoch_cf(),
             u32_prefix_key(epoch, &creator),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment pk total count
         let acc = self.get_block_production_pk_total_count(&creator)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_pk_total_cf(),
             creator.to_bytes(),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment epoch count
         let acc = self.get_block_production_epoch_count(Some(epoch))?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_epoch_cf(),
             to_be_bytes(epoch),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment total count
         let acc = self.get_block_production_total_count()?;
-        self.database
-            .put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1))?;
+        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1));
 
         Ok(())
     }

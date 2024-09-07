@@ -271,7 +271,11 @@ pub trait BlockStore {
     //////////////////
 
     /// Increment the epoch & pk block production counts
-    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn increment_block_production_count_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block production count for `pk` in `epoch`
     /// (default: current epoch)
