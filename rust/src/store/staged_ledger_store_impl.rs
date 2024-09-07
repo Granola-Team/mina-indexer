@@ -21,7 +21,7 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
-use speedb::{DBIterator, Direction, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatchWithTransaction};
 use std::collections::HashMap;
 
 impl StagedLedgerStore for IndexerStore {
@@ -362,17 +362,19 @@ impl StagedLedgerStore for IndexerStore {
             })
     }
 
-    fn set_block_ledger_diff(
+    fn set_block_ledger_diff_batch(
         &self,
         state_hash: &BlockHash,
         ledger_diff: LedgerDiff,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block ledger diff {state_hash}: {ledger_diff:?}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_ledger_diff_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&ledger_diff)?,
-        )?)
+        );
+        Ok(())
     }
 
     fn set_block_staged_ledger_hash(

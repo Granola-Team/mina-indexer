@@ -22,7 +22,7 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
-use speedb::{DBIterator, Direction, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatchWithTransaction};
 use std::mem::size_of;
 
 impl BlockStore for IndexerStore {
@@ -47,11 +47,16 @@ impl BlockStore for IndexerStore {
             trace!("Block already present {}", block.summary());
             return Ok(None);
         }
-        self.database
-            .put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value)?;
+
+        let mut batch = WriteBatchWithTransaction::<false>::default();
+        batch.put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value);
 
         // add to ledger diff index
-        self.set_block_ledger_diff(&state_hash, LedgerDiff::from_precomputed(block))?;
+        self.set_block_ledger_diff_batch(
+            &state_hash,
+            LedgerDiff::from_precomputed(block),
+            &mut batch,
+        )?;
 
         // add to epoch index before setting other indices
         self.set_block_epoch(&state_hash, block.epoch_count())?;
