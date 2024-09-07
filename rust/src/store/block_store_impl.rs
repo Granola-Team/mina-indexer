@@ -68,7 +68,7 @@ impl BlockStore for IndexerStore {
         self.set_block_comparison_batch(&state_hash, &BlockComparison::from(block), &mut batch)?;
 
         // add to blockchain length index
-        self.set_block_height(&state_hash, block.blockchain_length())?;
+        self.set_block_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add to block global slot index
         self.set_block_global_slot(&state_hash, block.global_slot_since_genesis())?;
@@ -355,17 +355,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_height(
+    fn set_block_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {state_hash}: {blockchain_length}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_height_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(blockchain_length),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {

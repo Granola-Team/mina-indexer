@@ -82,10 +82,11 @@ pub trait BlockStore {
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
 
     /// Index the block's blockchain length
-    fn set_block_height(
+    fn set_block_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get a block's blockchain length without deserializing the PCB
