@@ -113,13 +113,12 @@ impl BlockStore for IndexerStore {
         self.set_coinbase_receiver_batch(block, &mut batch)?;
 
         // add block height/global slot for sorting
-        self.database
-            .put_cf(self.blocks_height_sort_cf(), block_height_key(block), b"")?;
-        self.database.put_cf(
+        batch.put_cf(self.blocks_height_sort_cf(), block_height_key(block), b"");
+        batch.put_cf(
             self.blocks_global_slot_sort_cf(),
             block_global_slot_key(block),
             b"",
-        )?;
+        );
 
         // add block for each public key
         for pk in block.all_public_keys() {
