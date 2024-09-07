@@ -204,7 +204,11 @@ pub trait BlockStore {
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
     /// Index the coinbase receiver for the given block
-    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_coinbase_receiver_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
     fn set_block_comparison_batch(

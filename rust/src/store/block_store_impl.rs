@@ -110,7 +110,7 @@ impl BlockStore for IndexerStore {
         self.set_block_creator_batch(block, &mut batch)?;
 
         // add to coinbase receiver index
-        self.set_coinbase_receiver(block)?;
+        self.set_coinbase_receiver_batch(block, &mut batch)?;
 
         // add block height/global slot for sorting
         self.database
@@ -466,20 +466,24 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
-    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn set_coinbase_receiver_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let coinbase_receiver = block.coinbase_receiver();
         trace!("Setting coinbase receiver: {state_hash} -> {coinbase_receiver}");
 
         // index
-        self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_receiver_cf(),
             state_hash.0.as_bytes(),
             coinbase_receiver.0.as_bytes(),
-        )?;
+        );
 
         // block height sort
-        self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_height_sort_cf(),
             pk_block_sort_key(
                 coinbase_receiver.clone(),
@@ -487,10 +491,10 @@ impl BlockStore for IndexerStore {
                 state_hash.clone(),
             ),
             b"",
-        )?;
+        );
 
         // global slot sort
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_slot_sort_cf(),
             pk_block_sort_key(
                 coinbase_receiver.clone(),
@@ -498,7 +502,8 @@ impl BlockStore for IndexerStore {
                 state_hash.clone(),
             ),
             b"",
-        )?)
+        );
+        Ok(())
     }
 
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32> {
