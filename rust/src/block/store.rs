@@ -194,7 +194,11 @@ pub trait BlockStore {
     fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
     /// Index the creator for the given block
-    fn set_block_creator(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_block_creator_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the indexed coinbase receiver for the given block
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
