@@ -35,7 +35,7 @@ impl UserCommandStore for IndexerStore {
 
         // per block
         self.set_block_user_commands_batch(block, batch)?;
-        self.set_block_user_commands_count(&state_hash, user_commands.len() as u32)?;
+        self.set_block_user_commands_count_batch(&state_hash, user_commands.len() as u32, batch)?;
         self.set_block_username_updates(&state_hash, &block.username_updates())?;
 
         // per command
@@ -563,17 +563,19 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    fn set_block_user_commands_count(
+    fn set_block_user_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block user command count {state_hash} -> {count}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_user_command_counts_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(count),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {

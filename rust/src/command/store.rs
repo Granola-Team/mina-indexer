@@ -150,10 +150,11 @@ pub trait UserCommandStore {
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Increment user commands per block
-    fn set_block_user_commands_count(
+    fn set_block_user_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per block
