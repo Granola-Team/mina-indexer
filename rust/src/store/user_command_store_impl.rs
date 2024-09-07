@@ -80,7 +80,7 @@ impl UserCommandStore for IndexerStore {
 
             // TODO: Batch this request
             // increment counts
-            self.increment_user_commands_counts(command, epoch)?;
+            self.increment_user_commands_counts_batch(command, epoch, batch)?;
 
             // add: `txn_hash -> global_slot`
             // so we can reconstruct the key
@@ -531,19 +531,21 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_pk_epoch_count(
+    fn increment_user_commands_pk_epoch_count_batch(
         &self,
         pk: &PublicKey,
         epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} user commands count {pk}");
 
         let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.user_commands_pk_epoch_cf(),
             u32_prefix_key(epoch, pk),
             to_be_bytes(old + 1),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
@@ -588,10 +590,11 @@ impl UserCommandStore for IndexerStore {
             .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_counts(
+    fn increment_user_commands_counts_batch(
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!(
             "Incrementing user commands counts {:?}",
@@ -600,13 +603,13 @@ impl UserCommandStore for IndexerStore {
 
         // sender epoch & total
         let sender = command.sender();
-        self.increment_user_commands_pk_epoch_count(&sender, epoch)?;
+        self.increment_user_commands_pk_epoch_count_batch(&sender, epoch, batch)?;
         self.increment_user_commands_pk_total_count(&sender)?;
 
         // receiver epoch & total
         let receiver = command.receiver();
         if sender != receiver {
-            self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
+            self.increment_user_commands_pk_epoch_count_batch(&receiver, epoch, batch)?;
             self.increment_user_commands_pk_total_count(&receiver)?;
         }
 
