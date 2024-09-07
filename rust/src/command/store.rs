@@ -6,17 +6,25 @@ use crate::{
     store::from_be_bytes,
 };
 use anyhow::anyhow;
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatchWithTransaction};
 use std::{mem::size_of, path::PathBuf};
 
 /// Store for user commands
 pub trait UserCommandStore {
     /// Index user commands (transactions) from the given block on:
     /// public keys, transaction hash, and state hashes
-    fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn add_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Set user commands for the given block
-    fn set_block_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_block_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get indexed user commands from the given block
     fn get_block_user_commands(

@@ -18,11 +18,15 @@ use crate::{
 };
 use anyhow::bail;
 use log::{trace, warn};
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatchWithTransaction};
 use std::path::PathBuf;
 
 impl UserCommandStore for IndexerStore {
-    fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
         let epoch = block.epoch_count();
@@ -30,7 +34,7 @@ impl UserCommandStore for IndexerStore {
         let user_commands = block.commands();
 
         // per block
-        self.set_block_user_commands(block)?;
+        self.set_block_user_commands_batch(block, batch)?;
         self.set_block_user_commands_count(&state_hash, user_commands.len() as u32)?;
         self.set_block_username_updates(&state_hash, &block.username_updates())?;
 
@@ -251,14 +255,19 @@ impl UserCommandStore for IndexerStore {
         Ok(())
     }
 
-    fn set_block_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn set_block_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         trace!("Setting block user commands {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.user_commands_per_block_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&block.commands())?,
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_user_commands(
