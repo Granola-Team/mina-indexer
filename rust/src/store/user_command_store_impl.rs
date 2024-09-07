@@ -61,7 +61,7 @@ impl UserCommandStore for IndexerStore {
             self.set_user_command_state_hash_batch(state_hash.clone(), &txn_hash, batch)?;
 
             // add index for global slot sorting
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_slot_sort_cf(),
                 txn_sort_key(
                     block.global_slot_since_genesis(),
@@ -69,28 +69,29 @@ impl UserCommandStore for IndexerStore {
                     state_hash.clone(),
                 ),
                 b"",
-            )?;
+            );
 
             // add index for block height sorting
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_height_sort_cf(),
                 txn_sort_key(block.blockchain_length(), &txn_hash, state_hash.clone()),
                 b"",
-            )?;
+            );
 
+            // TODO: Batch this request
             // increment counts
             self.increment_user_commands_counts(command, epoch)?;
 
             // add: `txn_hash -> global_slot`
             // so we can reconstruct the key
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
                 txn_hash.as_bytes(),
                 to_be_bytes(block.global_slot_since_genesis()),
-            )?;
+            );
 
             // add sender index
-            self.database.put_cf(
+            batch.put_cf(
                 self.txn_from_height_sort_cf(),
                 pk_txn_sort_key(
                     command.sender(),
@@ -100,8 +101,8 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
-            self.database.put_cf(
+            );
+            batch.put_cf(
                 self.txn_from_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.sender(),
@@ -111,10 +112,10 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
+            );
 
             // add receiver index
-            self.database.put_cf(
+            batch.put_cf(
                 self.txn_to_height_sort_cf(),
                 pk_txn_sort_key(
                     command.receiver(),
@@ -124,8 +125,8 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
-            self.database.put_cf(
+            );
+            batch.put_cf(
                 self.txn_to_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.receiver(),
@@ -135,7 +136,7 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
+            );
         }
 
         // per account
@@ -160,18 +161,18 @@ impl UserCommandStore for IndexerStore {
 
             if !block_pk_commands.is_empty() {
                 // write these commands to the next key for pk
-                self.database.put_cf(
+                batch.put_cf(
                     self.user_commands_pk_cf(),
                     user_command_db_key_pk(&pk.0, n),
                     serde_json::to_vec(&block_pk_commands)?,
-                )?;
+                );
 
                 // update pk's num commands
-                self.database.put_cf(
+                batch.put_cf(
                     self.user_commands_pk_num_cf(),
                     pk.0.as_bytes(),
                     to_be_bytes(n + 1),
-                )?;
+                );
             }
         }
         Ok(())
