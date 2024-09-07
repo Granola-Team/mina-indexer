@@ -175,8 +175,12 @@ pub trait BlockStore {
     fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Add block to the given public key's collection
-    fn add_block_at_public_key(&self, pk: &PublicKey, state_hash: &BlockHash)
-        -> anyhow::Result<()>;
+    fn add_block_at_public_key_batch(
+        &self,
+        pk: &PublicKey,
+        state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get blocks for the given public key
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>>;

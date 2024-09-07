@@ -122,7 +122,7 @@ impl BlockStore for IndexerStore {
 
         // add block for each public key
         for pk in block.all_public_keys() {
-            self.add_block_at_public_key(&pk, &state_hash)?;
+            self.add_block_at_public_key_batch(&pk, &state_hash, &mut batch)?;
         }
 
         // add block to height list
@@ -624,28 +624,30 @@ impl BlockStore for IndexerStore {
         )
     }
 
-    fn add_block_at_public_key(
+    fn add_block_at_public_key_batch(
         &self,
         pk: &PublicKey,
         state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at public key {pk}");
 
         // increment num blocks at public key
         let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_cf(),
             pk.to_string().as_bytes(),
             (num_blocks_at_pk + 1).to_string().as_bytes(),
-        )?;
+        );
 
         // add the new key-value pair
         let key = format!("{pk}-{num_blocks_at_pk}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_cf(),
             key.as_bytes(),
             state_hash.to_string().as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>> {
