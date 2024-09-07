@@ -5,7 +5,7 @@ use crate::{
     ledger::{account::Account, diff::LedgerDiff, public_key::PublicKey, Ledger, LedgerHash},
     store::{balance_key_prefix, pk_key_prefix},
 };
-use speedb::{DBIterator, Direction};
+use speedb::{DBIterator, Direction, WriteBatchWithTransaction};
 use std::mem::size_of;
 
 pub trait StagedLedgerStore {
@@ -91,17 +91,19 @@ pub trait StagedLedgerStore {
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff
-    fn set_block_ledger_diff(
+    fn set_block_ledger_diff_batch(
         &self,
         state_hash: &BlockHash,
         ledger_diff: LedgerDiff,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff
-    fn set_block_staged_ledger_hash(
+    fn set_block_staged_ledger_hash_batch(
         &self,
         state_hash: &BlockHash,
         staged_ledger_hash: &LedgerHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     fn get_block_staged_ledger_hash(

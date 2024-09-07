@@ -8,7 +8,7 @@ use crate::{
     },
     store::DbUpdate,
 };
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatchWithTransaction};
 
 pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
 
@@ -72,43 +72,55 @@ pub trait BlockStore {
     fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
 
     /// Index the block's previous state hash
-    fn set_block_parent_hash(
+    fn set_block_parent_hash_batch(
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get a block's parent hash
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
 
     /// Index the block's blockchain length
-    fn set_block_height(
+    fn set_block_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get a block's blockchain length without deserializing the PCB
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's global slot
-    fn set_block_global_slot(&self, state_hash: &BlockHash, global_slot: u32)
-        -> anyhow::Result<()>;
+    fn set_block_global_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get a block's global slot without deserializing the PCB
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's epoch count
-    fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()>;
+    fn set_block_epoch_batch(
+        &self,
+        state_hash: &BlockHash,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block's epoch count without deserializing the PCB
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's genesis state hash
-    fn set_block_genesis_state_hash(
+    fn set_block_genesis_state_hash_batch(
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the given block's genesis state hash without deserializing the PCB
@@ -124,10 +136,11 @@ pub trait BlockStore {
     fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given blockchain length
-    fn add_block_at_height(
+    fn add_block_at_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get number of blocks at the given global slot since genesis
@@ -137,13 +150,19 @@ pub trait BlockStore {
     fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given global slot since genesis
-    fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
+    fn add_block_at_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Include in one another's collection
-    fn set_block_height_global_slot_pair(
+    fn set_block_height_global_slot_pair_batch(
         &self,
         blockchain_length: u32,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the global slots corresponding to the given block height
@@ -162,8 +181,12 @@ pub trait BlockStore {
     fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Add block to the given public key's collection
-    fn add_block_at_public_key(&self, pk: &PublicKey, state_hash: &BlockHash)
-        -> anyhow::Result<()>;
+    fn add_block_at_public_key_batch(
+        &self,
+        pk: &PublicKey,
+        state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get blocks for the given public key
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>>;
@@ -172,7 +195,12 @@ pub trait BlockStore {
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Index block version
-    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()>;
+    fn set_block_version_batch(
+        &self,
+        state_hash: &BlockHash,
+        version: PcbVersion,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block's version
     fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>>;
@@ -181,19 +209,28 @@ pub trait BlockStore {
     fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
     /// Index the creator for the given block
-    fn set_block_creator(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_block_creator_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the indexed coinbase receiver for the given block
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>>;
 
     /// Index the coinbase receiver for the given block
-    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_coinbase_receiver_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
-    fn set_block_comparison(
+    fn set_block_comparison_batch(
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the info needed for block comparison without deserializing the PCB
@@ -266,7 +303,11 @@ pub trait BlockStore {
     //////////////////
 
     /// Increment the epoch & pk block production counts
-    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn increment_block_production_count_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get the block production count for `pk` in `epoch`
     /// (default: current epoch)

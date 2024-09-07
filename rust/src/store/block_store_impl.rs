@@ -22,7 +22,7 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
-use speedb::{DBIterator, Direction, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatchWithTransaction};
 use std::mem::size_of;
 
 impl BlockStore for IndexerStore {
@@ -47,75 +47,96 @@ impl BlockStore for IndexerStore {
             trace!("Block already present {}", block.summary());
             return Ok(None);
         }
-        self.database
-            .put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value)?;
+
+        let mut batch = WriteBatchWithTransaction::<false>::default();
+        batch.put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value);
 
         // add to ledger diff index
-        self.set_block_ledger_diff(&state_hash, LedgerDiff::from_precomputed(block))?;
+        self.set_block_ledger_diff_batch(
+            &state_hash,
+            LedgerDiff::from_precomputed(block),
+            &mut batch,
+        )?;
 
         // add to epoch index before setting other indices
-        self.set_block_epoch(&state_hash, block.epoch_count())?;
+        self.set_block_epoch_batch(&state_hash, block.epoch_count(), &mut batch)?;
 
         // increment block production counts
-        self.increment_block_production_count(block)?;
+        self.increment_block_production_count_batch(block, &mut batch)?;
 
         // add comparison data before user commands, SNARKs, and internal commands
-        self.set_block_comparison(&state_hash, &BlockComparison::from(block))?;
+        self.set_block_comparison_batch(&state_hash, &BlockComparison::from(block), &mut batch)?;
 
         // add to blockchain length index
-        self.set_block_height(&state_hash, block.blockchain_length())?;
+        self.set_block_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add to block global slot index
-        self.set_block_global_slot(&state_hash, block.global_slot_since_genesis())?;
+        self.set_block_global_slot_batch(
+            &state_hash,
+            block.global_slot_since_genesis(),
+            &mut batch,
+        )?;
 
         // add to parent hash index
-        self.set_block_parent_hash(&state_hash, &block.previous_state_hash())?;
+        self.set_block_parent_hash_batch(&state_hash, &block.previous_state_hash(), &mut batch)?;
 
         // add to staged ledger hash index
-        self.set_block_staged_ledger_hash(&state_hash, &block.staged_ledger_hash())?;
+        self.set_block_staged_ledger_hash_batch(
+            &state_hash,
+            &block.staged_ledger_hash(),
+            &mut batch,
+        )?;
 
         // add to genesis state hash index
         let genesis_state_hash = block.genesis_state_hash();
         if genesis_state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
-            self.set_block_genesis_state_hash(&state_hash, &MAINNET_GENESIS_HASH.into())?;
+            self.set_block_genesis_state_hash_batch(
+                &state_hash,
+                &MAINNET_GENESIS_HASH.into(),
+                &mut batch,
+            )?;
         } else {
-            self.set_block_genesis_state_hash(&state_hash, &genesis_state_hash)?;
+            self.set_block_genesis_state_hash_batch(&state_hash, &genesis_state_hash, &mut batch)?;
         }
 
         // add block height/global slot index
-        self.set_block_height_global_slot_pair(
+        self.set_block_height_global_slot_pair_batch(
             block.blockchain_length(),
             block.global_slot_since_genesis(),
+            &mut batch,
         )?;
 
         // add to block creator index
-        self.set_block_creator(block)?;
+        self.set_block_creator_batch(block, &mut batch)?;
 
         // add to coinbase receiver index
-        self.set_coinbase_receiver(block)?;
+        self.set_coinbase_receiver_batch(block, &mut batch)?;
 
         // add block height/global slot for sorting
-        self.database
-            .put_cf(self.blocks_height_sort_cf(), block_height_key(block), b"")?;
-        self.database.put_cf(
+        batch.put_cf(self.blocks_height_sort_cf(), block_height_key(block), b"");
+        batch.put_cf(
             self.blocks_global_slot_sort_cf(),
             block_global_slot_key(block),
             b"",
-        )?;
+        );
 
         // add block for each public key
         for pk in block.all_public_keys() {
-            self.add_block_at_public_key(&pk, &state_hash)?;
+            self.add_block_at_public_key_batch(&pk, &state_hash, &mut batch)?;
         }
 
         // add block to height list
-        self.add_block_at_height(&state_hash, block.blockchain_length())?;
+        self.add_block_at_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add block to slots list
-        self.add_block_at_slot(&state_hash, block.global_slot_since_genesis())?;
+        self.add_block_at_slot_batch(&state_hash, block.global_slot_since_genesis(), &mut batch)?;
 
         // add pcb's version
-        self.set_block_version(&state_hash, block.version())?;
+        self.set_block_version_batch(&state_hash, block.version(), &mut batch)?;
+
+        // if batching is a success, then we should continue with
+        // user command and internal commands below
+        self.database.write(batch)?;
 
         // add block user commands
         self.add_user_commands(block)?;
@@ -320,17 +341,19 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
-    fn set_block_parent_hash(
+    fn set_block_parent_hash_batch(
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block parent hash {state_hash}: {previous_state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_parent_hash_cf(),
             state_hash.0.as_bytes(),
             previous_state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
@@ -350,17 +373,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_height(
+    fn set_block_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {state_hash}: {blockchain_length}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_height_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(blockchain_length),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
@@ -377,17 +402,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_global_slot(
+    fn set_block_global_slot_batch(
         &self,
         state_hash: &BlockHash,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block global slot {state_hash}: {global_slot}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_global_slot_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(global_slot),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
@@ -398,20 +425,24 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
-    fn set_block_creator(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn set_block_creator_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let block_creator = block.block_creator();
         trace!("Setting block creator: {state_hash} -> {block_creator}");
 
         // index
-        self.database.put_cf(
+        batch.put_cf(
             self.block_creator_cf(),
             state_hash.0.as_bytes(),
             block_creator.0.as_bytes(),
-        )?;
+        );
 
         // block height sort
-        self.database.put_cf(
+        batch.put_cf(
             self.block_creator_height_sort_cf(),
             pk_block_sort_key(
                 block_creator.clone(),
@@ -419,14 +450,15 @@ impl BlockStore for IndexerStore {
                 state_hash.clone(),
             ),
             b"",
-        )?;
+        );
 
         // global slot sort
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_creator_slot_sort_cf(),
             pk_block_sort_key(block_creator, block.global_slot_since_genesis(), state_hash),
             b"",
-        )?)
+        );
+        Ok(())
     }
 
     fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
@@ -437,20 +469,24 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
-    fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn set_coinbase_receiver_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let coinbase_receiver = block.coinbase_receiver();
         trace!("Setting coinbase receiver: {state_hash} -> {coinbase_receiver}");
 
         // index
-        self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_receiver_cf(),
             state_hash.0.as_bytes(),
             coinbase_receiver.0.as_bytes(),
-        )?;
+        );
 
         // block height sort
-        self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_height_sort_cf(),
             pk_block_sort_key(
                 coinbase_receiver.clone(),
@@ -458,10 +494,10 @@ impl BlockStore for IndexerStore {
                 state_hash.clone(),
             ),
             b"",
-        )?;
+        );
 
         // global slot sort
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_coinbase_slot_sort_cf(),
             pk_block_sort_key(
                 coinbase_receiver.clone(),
@@ -469,7 +505,8 @@ impl BlockStore for IndexerStore {
                 state_hash.clone(),
             ),
             b"",
-        )?)
+        );
+        Ok(())
     }
 
     fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32> {
@@ -486,27 +523,29 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn add_block_at_height(
+    fn add_block_at_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at height {blockchain_length}");
 
         // increment num blocks at height
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_height_cf(),
             to_be_bytes(blockchain_length),
             to_be_bytes(num_blocks_at_height + 1),
-        )?;
+        );
 
         // add the new key-value pair
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_height_cf(),
             format!("{blockchain_length}-{num_blocks_at_height}"),
             state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>> {
@@ -540,23 +579,29 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()> {
+    fn add_block_at_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at slot {slot}");
 
         // increment num blocks at slot
         let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_global_slot_cf(),
             to_be_bytes(slot),
             to_be_bytes(num_blocks_at_slot + 1),
-        )?;
+        );
 
         // add the new key-value pair
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_global_slot_cf(),
             format!("{slot}-{num_blocks_at_slot}"),
             state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>> {
@@ -591,28 +636,30 @@ impl BlockStore for IndexerStore {
         )
     }
 
-    fn add_block_at_public_key(
+    fn add_block_at_public_key_batch(
         &self,
         pk: &PublicKey,
         state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at public key {pk}");
 
         // increment num blocks at public key
         let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_cf(),
             pk.to_string().as_bytes(),
             (num_blocks_at_pk + 1).to_string().as_bytes(),
-        )?;
+        );
 
         // add the new key-value pair
         let key = format!("{pk}-{num_blocks_at_pk}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_cf(),
             key.as_bytes(),
             state_hash.to_string().as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>> {
@@ -664,19 +711,26 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_block_version(&self, state_hash: &BlockHash, version: PcbVersion) -> anyhow::Result<()> {
+    fn set_block_version_batch(
+        &self,
+        state_hash: &BlockHash,
+        version: PcbVersion,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Setting block {state_hash} version to {version}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_version_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&version)?,
-        )?)
+        );
+        Ok(())
     }
 
-    fn set_block_height_global_slot_pair(
+    fn set_block_height_global_slot_pair_batch(
         &self,
         blockchain_length: u32,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
@@ -687,11 +741,11 @@ impl BlockStore for IndexerStore {
         if !heights.contains(&blockchain_length) {
             heights.push(blockchain_length);
             heights.sort();
-            self.database.put_cf(
+            batch.put_cf(
                 self.block_global_slot_to_heights_cf(),
                 to_be_bytes(global_slot),
                 serde_json::to_vec(&heights)?,
-            )?;
+            );
         }
 
         // add slot to height's "slot collection"
@@ -701,11 +755,11 @@ impl BlockStore for IndexerStore {
         if !slots.contains(&global_slot) {
             slots.push(global_slot);
             slots.sort();
-            self.database.put_cf(
+            batch.put_cf(
                 self.block_height_to_global_slots_cf(),
                 to_be_bytes(blockchain_length),
                 serde_json::to_vec(&slots)?,
-            )?;
+            );
         }
         Ok(())
     }
@@ -738,13 +792,19 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_block_epoch(&self, state_hash: &BlockHash, epoch: u32) -> anyhow::Result<()> {
+    fn set_block_epoch_batch(
+        &self,
+        state_hash: &BlockHash,
+        epoch: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Setting block epoch {epoch}: {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_epoch_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(epoch),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
@@ -761,17 +821,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_genesis_state_hash(
+    fn set_block_genesis_state_hash_batch(
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_genesis_state_hash_cf(),
             state_hash.0.as_bytes(),
             genesis_state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_genesis_state_hash(
@@ -823,7 +885,11 @@ impl BlockStore for IndexerStore {
     // Block counts //
     //////////////////
 
-    fn increment_block_production_count(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn increment_block_production_count_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
 
         let creator = block.block_creator();
@@ -831,32 +897,31 @@ impl BlockStore for IndexerStore {
 
         // increment pk epoch count
         let acc = self.get_block_production_pk_epoch_count(&creator, Some(epoch))?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_pk_epoch_cf(),
             u32_prefix_key(epoch, &creator),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment pk total count
         let acc = self.get_block_production_pk_total_count(&creator)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_pk_total_cf(),
             creator.to_bytes(),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment epoch count
         let acc = self.get_block_production_epoch_count(Some(epoch))?;
-        self.database.put_cf(
+        batch.put_cf(
             self.block_production_epoch_cf(),
             to_be_bytes(epoch),
             to_be_bytes(acc + 1),
-        )?;
+        );
 
         // increment total count
         let acc = self.get_block_production_total_count()?;
-        self.database
-            .put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1))?;
+        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1));
 
         Ok(())
     }
@@ -926,17 +991,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_comparison(
+    fn set_block_comparison_batch(
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block comparison {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_comparison_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(comparison)?,
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_comparison(
