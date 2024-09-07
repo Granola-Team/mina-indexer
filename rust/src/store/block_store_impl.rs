@@ -100,9 +100,10 @@ impl BlockStore for IndexerStore {
         }
 
         // add block height/global slot index
-        self.set_block_height_global_slot_pair(
+        self.set_block_height_global_slot_pair_batch(
             block.blockchain_length(),
             block.global_slot_since_genesis(),
+            &mut batch,
         )?;
 
         // add to block creator index
@@ -696,10 +697,11 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn set_block_height_global_slot_pair(
+    fn set_block_height_global_slot_pair_batch(
         &self,
         blockchain_length: u32,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
@@ -710,11 +712,11 @@ impl BlockStore for IndexerStore {
         if !heights.contains(&blockchain_length) {
             heights.push(blockchain_length);
             heights.sort();
-            self.database.put_cf(
+            batch.put_cf(
                 self.block_global_slot_to_heights_cf(),
                 to_be_bytes(global_slot),
                 serde_json::to_vec(&heights)?,
-            )?;
+            );
         }
 
         // add slot to height's "slot collection"
@@ -724,11 +726,11 @@ impl BlockStore for IndexerStore {
         if !slots.contains(&global_slot) {
             slots.push(global_slot);
             slots.sort();
-            self.database.put_cf(
+            batch.put_cf(
                 self.block_height_to_global_slots_cf(),
                 to_be_bytes(blockchain_length),
                 serde_json::to_vec(&slots)?,
-            )?;
+            );
         }
         Ok(())
     }

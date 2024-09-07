@@ -152,10 +152,11 @@ pub trait BlockStore {
     fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
 
     /// Include in one another's collection
-    fn set_block_height_global_slot_pair(
+    fn set_block_height_global_slot_pair_batch(
         &self,
         blockchain_length: u32,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the global slots corresponding to the given block height
