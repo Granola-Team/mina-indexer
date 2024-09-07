@@ -514,13 +514,15 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_user_commands_total_count(&self) -> anyhow::Result<()> {
+    fn increment_user_commands_total_count_batch(
+        &self,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Incrementing user command total");
 
         let old = self.get_user_commands_total_count()?;
-        Ok(self
-            .database
-            .put(Self::TOTAL_NUM_USER_COMMANDS_KEY, to_be_bytes(old + 1))?)
+        batch.put(Self::TOTAL_NUM_USER_COMMANDS_KEY, to_be_bytes(old + 1));
+        Ok(())
     }
 
     fn get_user_commands_pk_epoch_count(
@@ -625,7 +627,7 @@ impl UserCommandStore for IndexerStore {
 
         // epoch & total counts
         self.increment_user_commands_epoch_count_batch(epoch, batch)?;
-        self.increment_user_commands_total_count()
+        self.increment_user_commands_total_count_batch(batch)
     }
 }
 
