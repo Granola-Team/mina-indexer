@@ -126,7 +126,7 @@ impl BlockStore for IndexerStore {
         }
 
         // add block to height list
-        self.add_block_at_height(&state_hash, block.blockchain_length())?;
+        self.add_block_at_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add block to slots list
         self.add_block_at_slot(&state_hash, block.global_slot_since_genesis())?;
@@ -519,27 +519,29 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn add_block_at_height(
+    fn add_block_at_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at height {blockchain_length}");
 
         // increment num blocks at height
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_height_cf(),
             to_be_bytes(blockchain_length),
             to_be_bytes(num_blocks_at_height + 1),
-        )?;
+        );
 
         // add the new key-value pair
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_height_cf(),
             format!("{blockchain_length}-{num_blocks_at_height}"),
             state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>> {

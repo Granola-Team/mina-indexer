@@ -136,10 +136,11 @@ pub trait BlockStore {
     fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given blockchain length
-    fn add_block_at_height(
+    fn add_block_at_height_batch(
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get number of blocks at the given global slot since genesis
