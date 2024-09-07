@@ -71,10 +71,14 @@ impl BlockStore for IndexerStore {
         self.set_block_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add to block global slot index
-        self.set_block_global_slot(&state_hash, block.global_slot_since_genesis())?;
+        self.set_block_global_slot_batch(
+            &state_hash,
+            block.global_slot_since_genesis(),
+            &mut batch,
+        )?;
 
         // add to parent hash index
-        self.set_block_parent_hash(&state_hash, &block.previous_state_hash())?;
+        self.set_block_parent_hash_batch(&state_hash, &block.previous_state_hash(), &mut batch)?;
 
         // add to staged ledger hash index
         self.set_block_staged_ledger_hash(&state_hash, &block.staged_ledger_hash())?;
@@ -325,17 +329,19 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
-    fn set_block_parent_hash(
+    fn set_block_parent_hash_batch(
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block parent hash {state_hash}: {previous_state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_parent_hash_cf(),
             state_hash.0.as_bytes(),
             previous_state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
@@ -384,17 +390,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_global_slot(
+    fn set_block_global_slot_batch(
         &self,
         state_hash: &BlockHash,
         global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block global slot {state_hash}: {global_slot}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_global_slot_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(global_slot),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {

@@ -72,10 +72,11 @@ pub trait BlockStore {
     fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>>;
 
     /// Index the block's previous state hash
-    fn set_block_parent_hash(
+    fn set_block_parent_hash_batch(
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get a block's parent hash
@@ -93,8 +94,12 @@ pub trait BlockStore {
     fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's global slot
-    fn set_block_global_slot(&self, state_hash: &BlockHash, global_slot: u32)
-        -> anyhow::Result<()>;
+    fn set_block_global_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        global_slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get a block's global slot without deserializing the PCB
     fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
