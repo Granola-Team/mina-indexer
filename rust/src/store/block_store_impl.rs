@@ -136,7 +136,7 @@ impl BlockStore for IndexerStore {
 
         // if batching is a success, then we should continue with
         // user command and internal commands below
-        let _ = self.database.write(batch);
+        self.database.write(batch)?;
 
         // add block user commands
         self.add_user_commands(block)?;
