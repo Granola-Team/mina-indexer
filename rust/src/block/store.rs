@@ -116,10 +116,11 @@ pub trait BlockStore {
     fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Index the block's genesis state hash
-    fn set_block_genesis_state_hash(
+    fn set_block_genesis_state_hash_batch(
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the given block's genesis state hash without deserializing the PCB

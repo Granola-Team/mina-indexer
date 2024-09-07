@@ -90,9 +90,13 @@ impl BlockStore for IndexerStore {
         // add to genesis state hash index
         let genesis_state_hash = block.genesis_state_hash();
         if genesis_state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
-            self.set_block_genesis_state_hash(&state_hash, &MAINNET_GENESIS_HASH.into())?;
+            self.set_block_genesis_state_hash_batch(
+                &state_hash,
+                &MAINNET_GENESIS_HASH.into(),
+                &mut batch,
+            )?;
         } else {
-            self.set_block_genesis_state_hash(&state_hash, &genesis_state_hash)?;
+            self.set_block_genesis_state_hash_batch(&state_hash, &genesis_state_hash, &mut batch)?;
         }
 
         // add block height/global slot index
@@ -786,17 +790,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_genesis_state_hash(
+    fn set_block_genesis_state_hash_batch(
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_genesis_state_hash_cf(),
             state_hash.0.as_bytes(),
             genesis_state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_genesis_state_hash(
