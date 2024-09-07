@@ -65,7 +65,7 @@ impl BlockStore for IndexerStore {
         self.increment_block_production_count_batch(block, &mut batch)?;
 
         // add comparison data before user commands, SNARKs, and internal commands
-        self.set_block_comparison(&state_hash, &BlockComparison::from(block))?;
+        self.set_block_comparison_batch(&state_hash, &BlockComparison::from(block), &mut batch)?;
 
         // add to blockchain length index
         self.set_block_height(&state_hash, block.blockchain_length())?;
@@ -940,17 +940,19 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn set_block_comparison(
+    fn set_block_comparison_batch(
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block comparison {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_comparison_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(comparison)?,
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_comparison(

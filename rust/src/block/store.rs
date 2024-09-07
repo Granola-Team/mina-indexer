@@ -195,10 +195,11 @@ pub trait BlockStore {
     fn set_coinbase_receiver(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
-    fn set_block_comparison(
+    fn set_block_comparison_batch(
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()>;
 
     /// Get the info needed for block comparison without deserializing the PCB
