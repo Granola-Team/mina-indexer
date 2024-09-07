@@ -36,7 +36,7 @@ impl UserCommandStore for IndexerStore {
         // per block
         self.set_block_user_commands_batch(block, batch)?;
         self.set_block_user_commands_count_batch(&state_hash, user_commands.len() as u32, batch)?;
-        self.set_block_username_updates(&state_hash, &block.username_updates())?;
+        self.set_block_username_updates_batch(&state_hash, &block.username_updates(), batch)?;
 
         // per command
         for command in &user_commands {
