@@ -45,7 +45,7 @@ impl UserCommandStore for IndexerStore {
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_cf(),
                 txn_block_key(&txn_hash, state_hash.clone()),
                 serde_json::to_vec(&SignedCommandWithData::from(
@@ -55,10 +55,10 @@ impl UserCommandStore for IndexerStore {
                     block.timestamp(),
                     block.global_slot_since_genesis(),
                 ))?,
-            )?;
+            );
 
             // add state hash index
-            self.set_user_command_state_hash(state_hash.clone(), &txn_hash)?;
+            self.set_user_command_state_hash_batch(state_hash.clone(), &txn_hash, batch)?;
 
             // add index for global slot sorting
             self.database.put_cf(
@@ -220,10 +220,11 @@ impl UserCommandStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_user_command_state_hash(
+    fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
         txn_hash: &str,
+        batch: &mut WriteBatchWithTransaction<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting user command {txn_hash} block {state_hash}");
         let mut blocks = self
@@ -240,18 +241,18 @@ impl UserCommandStore for IndexerStore {
 
         let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         // set num containing blocks
-        self.database.put_cf(
+        batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
             txn_hash.as_bytes(),
             to_be_bytes(blocks.len() as u32),
-        )?;
+        );
 
         // set containing blocks
-        self.database.put_cf(
+        batch.put_cf(
             self.user_command_state_hashes_cf(),
             txn_hash.as_bytes(),
             serde_json::to_vec(&blocks)?,
-        )?;
+        );
         Ok(())
     }
 
