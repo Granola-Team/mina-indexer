@@ -150,7 +150,12 @@ pub trait BlockStore {
     fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>>;
 
     /// Add a block at the given global slot since genesis
-    fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()>;
+    fn add_block_at_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Include in one another's collection
     fn set_block_height_global_slot_pair_batch(

@@ -129,7 +129,7 @@ impl BlockStore for IndexerStore {
         self.add_block_at_height_batch(&state_hash, block.blockchain_length(), &mut batch)?;
 
         // add block to slots list
-        self.add_block_at_slot(&state_hash, block.global_slot_since_genesis())?;
+        self.add_block_at_slot_batch(&state_hash, block.global_slot_since_genesis(), &mut batch)?;
 
         // add pcb's version
         self.set_block_version(&state_hash, block.version())?;
@@ -575,23 +575,29 @@ impl BlockStore for IndexerStore {
             }))
     }
 
-    fn add_block_at_slot(&self, state_hash: &BlockHash, slot: u32) -> anyhow::Result<()> {
+    fn add_block_at_slot_batch(
+        &self,
+        state_hash: &BlockHash,
+        slot: u32,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at slot {slot}");
 
         // increment num blocks at slot
         let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
-        self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_global_slot_cf(),
             to_be_bytes(slot),
             to_be_bytes(num_blocks_at_slot + 1),
-        )?;
+        );
 
         // add the new key-value pair
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.blocks_at_global_slot_cf(),
             format!("{slot}-{num_blocks_at_slot}"),
             state_hash.0.as_bytes(),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>> {
