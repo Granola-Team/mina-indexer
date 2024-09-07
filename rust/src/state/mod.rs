@@ -390,9 +390,6 @@ impl IndexerState {
                 info!("Adding blocks to the witness tree...");
             }
 
-            let pk_of_interest =
-                &PublicKey("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd".to_string());
-
             // process deep canonical blocks first bypassing the witness tree
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
@@ -407,9 +404,6 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
-                    if diff.public_keys_seen.contains(pk_of_interest) {
-                        println!("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd LedgerDiff: {:?}", serde_json::to_string(&diff));
-                    }
                     ledger_diffs.push(diff.clone());
 
                     aggregate_processing_duration(processing_time.elapsed());
