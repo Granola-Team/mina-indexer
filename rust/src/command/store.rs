@@ -146,7 +146,11 @@ pub trait UserCommandStore {
     ) -> anyhow::Result<u32>;
 
     /// Increment user commands per account total
-    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()>;
+    fn increment_user_commands_pk_total_count_batch(
+        &self,
+        pk: &PublicKey,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()>;
 
     /// Get user commands per account total
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;

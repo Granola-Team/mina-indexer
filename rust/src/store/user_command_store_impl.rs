@@ -556,15 +556,20 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
+    fn increment_user_commands_pk_total_count_batch(
+        &self,
+        pk: &PublicKey,
+        batch: &mut WriteBatchWithTransaction<false>,
+    ) -> anyhow::Result<()> {
         trace!("Incrementing user command pk total num {pk}");
 
         let old = self.get_user_commands_pk_total_count(pk)?;
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.user_commands_pk_total_cf(),
             pk.0.as_bytes(),
             to_be_bytes(old + 1),
-        )?)
+        );
+        Ok(())
     }
 
     fn set_block_user_commands_count_batch(
@@ -604,13 +609,13 @@ impl UserCommandStore for IndexerStore {
         // sender epoch & total
         let sender = command.sender();
         self.increment_user_commands_pk_epoch_count_batch(&sender, epoch, batch)?;
-        self.increment_user_commands_pk_total_count(&sender)?;
+        self.increment_user_commands_pk_total_count_batch(&sender, batch)?;
 
         // receiver epoch & total
         let receiver = command.receiver();
         if sender != receiver {
             self.increment_user_commands_pk_epoch_count_batch(&receiver, epoch, batch)?;
-            self.increment_user_commands_pk_total_count(&receiver)?;
+            self.increment_user_commands_pk_total_count_batch(&receiver, batch)?;
         }
 
         // epoch & total counts
