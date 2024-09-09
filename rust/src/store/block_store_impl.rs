@@ -137,7 +137,7 @@ impl BlockStore for IndexerStore {
         // add block user commands
         self.add_user_commands_batch(block, &mut batch)?;
 
-        info!(
+        trace!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
         );
