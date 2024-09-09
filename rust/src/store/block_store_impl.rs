@@ -21,7 +21,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context};
-use log::{error, info, trace};
+use log::{error, trace};
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::mem::size_of;
 
