@@ -8,7 +8,7 @@ use crate::{
     store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes},
 };
 use log::{error, trace};
-use speedb::WriteBatchWithTransaction;
+use speedb::WriteBatch;
 use std::{collections::HashMap, mem::size_of};
 
 impl UsernameStore for IndexerStore {
@@ -24,7 +24,7 @@ impl UsernameStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         username_updates: &UsernameUpdate,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch<false>,
     ) -> anyhow::Result<()> {
         trace!("Setting block username updates {state_hash}");
         batch.put_cf(
