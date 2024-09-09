@@ -21,8 +21,8 @@ use crate::{
     },
 };
 use anyhow::{bail, Context};
-use log::{error, trace};
-use speedb::{DBIterator, Direction, IteratorMode, WriteBatchWithTransaction};
+use log::{error, info, trace};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::mem::size_of;
 
 impl BlockStore for IndexerStore {
@@ -48,7 +48,7 @@ impl BlockStore for IndexerStore {
             return Ok(None);
         }
 
-        let mut batch = WriteBatchWithTransaction::<false>::default();
+        let mut batch = WriteBatch::default();
         batch.put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value);
 
         // add to ledger diff index
@@ -138,6 +138,10 @@ impl BlockStore for IndexerStore {
         self.add_user_commands_batch(block, &mut batch)?;
 
         // if batching is a success, then we should continue
+        info!(
+            "Writing {} bytes to database from batch",
+            batch.size_in_bytes()
+        );
         self.database.write(batch)?;
 
         // add block internal commands
@@ -344,7 +348,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block parent hash {state_hash}: {previous_state_hash}");
         batch.put_cf(
@@ -376,7 +380,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {state_hash}: {blockchain_length}");
         batch.put_cf(
@@ -405,7 +409,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         global_slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block global slot {state_hash}: {global_slot}");
         batch.put_cf(
@@ -427,7 +431,7 @@ impl BlockStore for IndexerStore {
     fn set_block_creator_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let block_creator = block.block_creator();
@@ -471,7 +475,7 @@ impl BlockStore for IndexerStore {
     fn set_coinbase_receiver_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let coinbase_receiver = block.coinbase_receiver();
@@ -526,7 +530,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at height {blockchain_length}");
 
@@ -582,7 +586,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at slot {slot}");
 
@@ -639,7 +643,7 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at public key {pk}");
 
@@ -714,7 +718,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         version: PcbVersion,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block {state_hash} version to {version}");
         batch.put_cf(
@@ -729,7 +733,7 @@ impl BlockStore for IndexerStore {
         &self,
         blockchain_length: u32,
         global_slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
@@ -795,7 +799,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         epoch: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block epoch {epoch}: {state_hash}");
         batch.put_cf(
@@ -824,7 +828,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
         batch.put_cf(
@@ -887,7 +891,7 @@ impl BlockStore for IndexerStore {
     fn increment_block_production_count_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
 
@@ -994,7 +998,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block comparison {state_hash}");
         batch.put_cf(
