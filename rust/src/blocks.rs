@@ -33,7 +33,7 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
                 Ok(json) => {
                     let block_hash = extract_hash_from_file_name(&path);
 
-                    let a = insert(&db, json, block_hash).await;
+                    let a = insert(&db, block_hash, json).await;
                     match a {
                         Ok(_) => (),
                         Err(e) => panic!("block_hash: {} {:?}", block_hash, e),
@@ -65,7 +65,7 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
 }
 
 /// Insert the `json` for a given `block_hash` into the `db`
-async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Result<()> {
+async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Result<()> {
     let protocol_state = &json["protocol_state"];
     let body = &protocol_state["body"];
     let blockchain_state = &body["blockchain_state"];
