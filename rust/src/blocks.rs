@@ -188,11 +188,11 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
         .await?;
     }
 
-    let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
-
-    snark_jobs(db, block_hash, staged_ledger_diff).await?;
-    user_commands(db, block_hash, staged_ledger_diff).await?;
-    internal_commands(db, block_hash, staged_ledger_diff).await?;
+    for diff in (&json["staged_ledger_diff"]["diff"]).as_array().unwrap() {
+        snark_jobs(db, block_hash, diff).await?;
+        user_commands(db, block_hash, diff).await?;
+        internal_commands(db, block_hash, diff).await?;
+    }
 
     Ok(())
 }
