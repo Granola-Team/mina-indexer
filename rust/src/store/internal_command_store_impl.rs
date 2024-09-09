@@ -6,26 +6,34 @@ use crate::{
     store::{from_be_bytes, to_be_bytes, u32_prefix_key, IndexerStore},
 };
 use log::trace;
-use speedb::DBIterator;
+use speedb::{DBIterator, WriteBatch};
 use std::mem::size_of;
 
 impl InternalCommandStore for IndexerStore {
     /// Index internal commands on public keys & state hash
-    fn add_internal_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_internal_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()> {
         let epoch = block.epoch_count();
         trace!("Adding internal commands for block {}", block.summary());
 
         // add internal cmds to state hash
         let key = format!("internal-{}", block.state_hash().0);
         let internal_cmds = InternalCommand::from_precomputed(block);
-        self.database.put_cf(
+        batch.put_cf(
             self.internal_commands_cf(),
             key.as_bytes(),
             serde_json::to_vec(&internal_cmds)?,
-        )?;
+        );
 
         // per block internal command count
-        self.set_block_internal_commands_count(&block.state_hash(), internal_cmds.len() as u32)?;
+        self.set_block_internal_commands_count_batch(
+            &block.state_hash(),
+            internal_cmds.len() as u32,
+            batch,
+        )?;
 
         // add cmds with data to public keys
         let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
@@ -55,11 +63,11 @@ impl InternalCommandStore for IndexerStore {
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
             let key =
                 internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash(), i);
-            self.database.put_cf(
+            batch.put_cf(
                 self.internal_commands_slot_cf(),
                 key,
                 serde_json::to_vec(&int_cmd)?,
-            )?;
+            );
         }
 
         for pk in block.all_public_keys() {
@@ -77,20 +85,20 @@ impl InternalCommandStore for IndexerStore {
                     }
                 })
                 .collect();
-            self.database.put_cf(
+            batch.put_cf(
                 self.internal_commands_cf(),
                 key.as_bytes(),
                 serde_json::to_vec(&pk_internal_cmds_with_data)?,
-            )?;
+            );
 
             // update pk's number of internal cmds
             let key = format!("internal-{}", pk.0);
             let next_n = (n + 1).to_string();
-            self.database.put_cf(
+            batch.put_cf(
                 self.internal_commands_cf(),
                 key.as_bytes(),
                 next_n.as_bytes(),
-            )?;
+            );
         }
         Ok(())
     }
@@ -293,17 +301,19 @@ impl InternalCommandStore for IndexerStore {
             }))
     }
 
-    fn set_block_internal_commands_count(
+    fn set_block_internal_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block internal command count {state_hash} -> {count}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_internal_command_counts_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(count),
-        )?)
+        );
+        Ok(())
     }
 
     fn increment_internal_commands_counts(

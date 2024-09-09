@@ -3,13 +3,17 @@ use crate::{
     command::internal::InternalCommandWithData,
     ledger::public_key::PublicKey,
 };
-use speedb::DBIterator;
+use speedb::{DBIterator, WriteBatch};
 
 /// Store for internal commands
 pub trait InternalCommandStore {
     /// Index internal commands for the given block on:
     /// public keys and state hashes
-    fn add_internal_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn add_internal_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()>;
 
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
@@ -63,10 +67,11 @@ pub trait InternalCommandStore {
     fn get_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Set internal command count for a block
-    fn set_block_internal_commands_count(
+    fn set_block_internal_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get num internal commands in block
