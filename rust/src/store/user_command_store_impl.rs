@@ -25,7 +25,7 @@ impl UserCommandStore for IndexerStore {
     fn add_user_commands_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
@@ -225,7 +225,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         state_hash: BlockHash,
         txn_hash: &str,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting user command {txn_hash} block {state_hash}");
         let mut blocks = self
@@ -260,7 +260,7 @@ impl UserCommandStore for IndexerStore {
     fn set_block_user_commands_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         trace!("Setting block user commands {state_hash}");
@@ -494,7 +494,7 @@ impl UserCommandStore for IndexerStore {
     fn increment_user_commands_epoch_count_batch(
         &self,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing user command epoch {epoch}");
         let old = self.get_user_commands_epoch_count(Some(epoch))?;
@@ -516,7 +516,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_user_commands_total_count_batch(
         &self,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing user command total");
 
@@ -542,7 +542,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} user commands count {pk}");
 
@@ -566,7 +566,7 @@ impl UserCommandStore for IndexerStore {
     fn increment_user_commands_pk_total_count_batch(
         &self,
         pk: &PublicKey,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing user command pk total num {pk}");
 
@@ -583,7 +583,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         count: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block user command count {state_hash} -> {count}");
         batch.put_cf(
@@ -606,7 +606,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!(
             "Incrementing user commands counts {:?}",

@@ -16,14 +16,14 @@ pub trait UserCommandStore {
     fn add_user_commands_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Set user commands for the given block
     fn set_block_user_commands_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get indexed user commands from the given block
@@ -67,7 +67,7 @@ pub trait UserCommandStore {
         &self,
         state_hash: BlockHash,
         txn_hash: &str,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get state hashes of blocks containing `txn_hash` in block sorted order
@@ -122,7 +122,7 @@ pub trait UserCommandStore {
     fn increment_user_commands_epoch_count_batch(
         &self,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per epoch count
@@ -131,7 +131,7 @@ pub trait UserCommandStore {
     /// Increment user commands total count
     fn increment_user_commands_total_count_batch(
         &self,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands total count
@@ -142,7 +142,7 @@ pub trait UserCommandStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per epoch per account count
@@ -156,7 +156,7 @@ pub trait UserCommandStore {
     fn increment_user_commands_pk_total_count_batch(
         &self,
         pk: &PublicKey,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per account total
@@ -167,7 +167,7 @@ pub trait UserCommandStore {
         &self,
         state_hash: &BlockHash,
         count: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per block
@@ -178,7 +178,7 @@ pub trait UserCommandStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 }
 

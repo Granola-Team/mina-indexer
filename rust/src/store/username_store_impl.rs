@@ -24,7 +24,7 @@ impl UsernameStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         username_updates: &UsernameUpdate,
-        batch: &mut WriteBatch<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block username updates {state_hash}");
         batch.put_cf(
