@@ -162,11 +162,10 @@ pub trait UserCommandStore {
     fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
 
     /// Increment user commands counts given `command` in `epoch`
-    fn increment_user_commands_counts_batch(
+    fn increment_user_commands_counts(
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
-        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 }
 

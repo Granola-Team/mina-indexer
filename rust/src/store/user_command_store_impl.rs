@@ -79,7 +79,7 @@ impl UserCommandStore for IndexerStore {
             );
 
             // increment counts
-            self.increment_user_commands_counts_batch(command, epoch, batch)?;
+            self.increment_user_commands_counts(command, epoch)?;
 
             // add: `txn_hash -> global_slot`
             // so we can reconstruct the key
@@ -587,11 +587,10 @@ impl UserCommandStore for IndexerStore {
             .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_counts_batch(
+    fn increment_user_commands_counts(
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
-        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!(
             "Incrementing user commands counts {:?}",
