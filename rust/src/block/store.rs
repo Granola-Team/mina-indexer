@@ -8,7 +8,7 @@ use crate::{
     },
     store::DbUpdate,
 };
-use speedb::{DBIterator, IteratorMode, WriteBatchWithTransaction};
+use speedb::{DBIterator, IteratorMode, WriteBatch};
 
 pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
 
@@ -76,7 +76,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         previous_state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get a block's parent hash
@@ -87,7 +87,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get a block's blockchain length without deserializing the PCB
@@ -98,7 +98,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         global_slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get a block's global slot without deserializing the PCB
@@ -109,7 +109,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         epoch: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the block's epoch count without deserializing the PCB
@@ -120,7 +120,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         genesis_state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the given block's genesis state hash without deserializing the PCB
@@ -140,7 +140,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         blockchain_length: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get number of blocks at the given global slot since genesis
@@ -154,7 +154,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Include in one another's collection
@@ -162,7 +162,7 @@ pub trait BlockStore {
         &self,
         blockchain_length: u32,
         global_slot: u32,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the global slots corresponding to the given block height
@@ -185,7 +185,7 @@ pub trait BlockStore {
         &self,
         pk: &PublicKey,
         state_hash: &BlockHash,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get blocks for the given public key
@@ -199,7 +199,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         version: PcbVersion,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the block's version
@@ -212,7 +212,7 @@ pub trait BlockStore {
     fn set_block_creator_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the indexed coinbase receiver for the given block
@@ -222,7 +222,7 @@ pub trait BlockStore {
     fn set_coinbase_receiver_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
@@ -230,7 +230,7 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the info needed for block comparison without deserializing the PCB
@@ -306,7 +306,7 @@ pub trait BlockStore {
     fn increment_block_production_count_batch(
         &self,
         block: &PrecomputedBlock,
-        batch: &mut WriteBatchWithTransaction<false>,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the block production count for `pk` in `epoch`
