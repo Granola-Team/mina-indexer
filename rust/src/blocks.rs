@@ -190,7 +190,15 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
 
     let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
 
-    for job in staged_ledger_diff["completed_works"].as_array().unwrap() {
+    snark_jobs(db, block_hash, staged_ledger_diff).await?;
+    user_commands(db, block_hash, staged_ledger_diff).await?;
+    internal_commands(db, block_hash, staged_ledger_diff).await?;
+
+    Ok(())
+}
+
+async fn snark_jobs(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
+    for job in diff["completed_works"].as_array().unwrap() {
         db.execute(
             format!(
                 "insert SNARKJob {{
@@ -205,8 +213,11 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
         )
         .await?;
     }
+    Ok(())
+}
 
-    for command in staged_ledger_diff["commands"].as_array().unwrap() {
+async fn user_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
+    for command in diff["commands"].as_array().unwrap() {
         let data1 = &command["data"][1];
         let payload = &data1["payload"];
         let common = &payload["common"];
@@ -219,22 +230,22 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
         // receiver_balance will be null when status == Failed
         let command = format!(
             "block := {},
-            status := '{}',
-            source_balance := {}n,
-            target_balance := {}n,
-            fee := {}n,
-            fee_payer := {},
-            fee_payer_balance := {}n,
-            fee_token := '{}',
-            fee_payer_account_creation_fee_paid := {}n,
-            target_account_creation_fee_paid := {}n,
-            nonce := {},
-            valid_until := {},
-            memo := '{}',
-            signer := {},
-            signature := '{}',
-            created_token := '{}'
-            ",
+        status := '{}',
+        source_balance := {}n,
+        target_balance := {}n,
+        fee := {}n,
+        fee_payer := {},
+        fee_payer_balance := {}n,
+        fee_token := '{}',
+        fee_payer_account_creation_fee_paid := {}n,
+        target_account_creation_fee_paid := {}n,
+        nonce := {},
+        valid_until := {},
+        memo := '{}',
+        signer := {},
+        signature := '{}',
+        created_token := '{}'
+        ",
             block_link(block_hash),
             status[0].as_str().unwrap(),
             to_decimal(&status_2["source_balance"]).unwrap().to_string(),
@@ -269,11 +280,11 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
                 db.execute(
                     format!(
                         "
-                        insert StakingDelegation {{
-                            {},
-                            source := {},
-                            target := {},
-                        }};",
+                    insert StakingDelegation {{
+                        {},
+                        source := {},
+                        target := {},
+                    }};",
                         command,
                         account_link(&delegation["delegator"]),
                         account_link(&delegation["new_delegate"])
@@ -286,13 +297,13 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
                 db.execute(
                     format!(
                         "
-                    insert Payment {{
-                        {},
-                        source := {},
-                        target := {},
-                        amount := <decimal>$0,
-                        token_id := <int64>$1,
-                    }};",
+                insert Payment {{
+                    {},
+                    source := {},
+                    target := {},
+                    amount := <decimal>$0,
+                    token_id := <int64>$1,
+                }};",
                         command,
                         account_link(&body1["source_pk"]),
                         account_link(&body1["receiver_pk"]),
@@ -306,12 +317,11 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
             }
         }
     }
+    Ok(())
+}
 
-    // Process coinbase and fee_transfer
-    for internal_command in staged_ledger_diff["internal_command_balances"]
-        .as_array()
-        .unwrap()
-    {
+async fn internal_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
+    for internal_command in diff["internal_command_balances"].as_array().unwrap() {
         let internal_command_1 = &internal_command[1];
         match internal_command[0].as_str().unwrap() {
             "Coinbase" => {
@@ -347,7 +357,6 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
             _ => {}
         }
     }
-
     Ok(())
 }
 
