@@ -140,9 +140,6 @@ impl BlockStore for IndexerStore {
         // add block internal commands
         self.add_internal_commands_batch(block, &mut batch)?;
 
-        // add block internal commands
-        self.add_internal_commands_batch(block, &mut batch)?;
-
         info!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
