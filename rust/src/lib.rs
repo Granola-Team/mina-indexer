@@ -1,5 +1,6 @@
 use bigdecimal::BigDecimal;
 use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
+use rayon::prelude::*;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
 use std::{cmp::Ordering, collections::HashSet, fs, io, path::PathBuf, str::FromStr, sync::Arc};
 
@@ -8,21 +9,34 @@ pub mod staking;
 
 /// Get (and sort) file paths for a given directory
 fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
-    let mut paths = fs::read_dir(dir)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file() && path.extension().map_or(false, |ext| ext == "json"))
-        .collect::<Vec<_>>();
+    // Read directory entries
+    let entries = fs::read_dir(dir)?;
 
-    // Sort by filename using natural sort order
-    paths.sort_by(|a, b| {
+    // Collect and filter entries in parallel
+    let paths: Vec<PathBuf> = entries
+        .par_bridge()
+        .filter_map(|entry| {
+            entry.ok().and_then(|e| {
+                let path = e.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    // Parallel sorting
+    let mut sorted_paths = paths;
+    sorted_paths.par_sort_unstable_by(|a, b| {
         natural_sort(
             a.file_name().unwrap().to_str().unwrap(),
             b.file_name().unwrap().to_str().unwrap(),
         )
     });
 
-    Ok(paths)
+    Ok(sorted_paths)
 }
 
 fn natural_sort(a: &str, b: &str) -> Ordering {
@@ -62,9 +76,9 @@ async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Err
     let retry_opts = RetryOptions::default().with_rule(
         RetryCondition::TransactionConflict,
         // No. of retries
-        5,
+        10,
         // Retry immediately instead of default with increasing backoff
-        |_| std::time::Duration::from_secs(1),
+        |_| std::time::Duration::from_secs(3),
     );
 
     Ok(Arc::new(db_builder.with_retry_options(retry_opts)))

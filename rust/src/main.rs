@@ -1,4 +1,4 @@
-use mina_db::{blocks, staking};
+use mina_db::blocks;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -9,7 +9,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // .await;
 
     let _ = tokio::spawn(async move {
-        let _ = blocks::run("/Users/jonathan/.mina-indexer/mina-indexer-dev/blocks-9999").await;
+        let _ = blocks::run("/Users/jonathan/.mina-indexer/mina-indexer-dev/blocks").await;
     })
     .await;
 

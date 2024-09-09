@@ -12,7 +12,7 @@ use crate::{
     to_json, to_titlecase,
 };
 
-const CONCURRENT_TASKS: usize = 5;
+const CONCURRENT_TASKS: usize = 2;
 
 /// Ingest pre-computed block files (JSON) into the database
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
@@ -66,11 +66,6 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
 
 /// Insert the `json` for a given `block_hash` into the `db`
 async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Result<()> {
-    println!("Processing {}", block_hash);
-
-    let accounts = extract_accounts(&json);
-    insert_accounts(db, accounts).await?;
-
     let protocol_state = &json["protocol_state"];
     let body = &protocol_state["body"];
     let consensus_state = &body["consensus_state"];
@@ -79,6 +74,11 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
     let blockchain_length = to_i64(&consensus_state["blockchain_length"]).unwrap();
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
+
+    println!("Processing {} - {}", block_hash, blockchain_length);
+
+    let accounts = extract_accounts(&json);
+    insert_accounts(db, accounts).await?;
 
     db.execute(
         format!(

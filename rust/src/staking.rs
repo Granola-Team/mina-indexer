@@ -76,7 +76,7 @@ async fn insert(
         "insert StakingEpoch {
             hash := <str>$0,
             epoch := <int64>$1
-        };",
+        } unless conflict;",
         &(ledger_hash, epoch),
     )
     .await?;
@@ -108,7 +108,7 @@ async fn insert(
                         nonce := <optional int64>$4,
                         receipt_chain_hash := <str>$5,
                         voting_for := <str>$6
-                    }}
+                    }} unless conflict
                 )
                     insert StakingTiming {{
                         ledger := ledger,
@@ -117,7 +117,7 @@ async fn insert(
                         cliff_amount := <decimal>$9,
                         vesting_period := <int64>$10,
                         vesting_increment := <decimal>$11
-                    }};", epoch, ledger_hash),
+                    }} unless conflict;", epoch, ledger_hash),
                 &(
                     source,
                     balance,
@@ -145,7 +145,7 @@ async fn insert(
                     nonce := <optional int64>$6,
                     receipt_chain_hash := <str>$7,
                     voting_for := <str>$8
-                }",
+                } unless conflict;",
                 &(
                     epoch,
                     ledger_hash,

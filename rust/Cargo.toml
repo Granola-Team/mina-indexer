@@ -13,3 +13,4 @@ bigdecimal = "0.4"
 edgedb-tokio = "*"
 edgedb-protocol = { version = "*", features = ["with-bigdecimal"] }
 rust_decimal="*"
+rayon = "1.5"
