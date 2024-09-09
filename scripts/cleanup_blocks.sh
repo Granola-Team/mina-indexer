@@ -16,7 +16,7 @@ OUTPUT_DIR="$2"
 mkdir -p "$OUTPUT_DIR"
 
 # Process each JSON file in the input directory
-for file in "$INPUT_DIR"/*.json; do
+find "$INPUT_DIR" -type f -name '*.json' -size +30k -print0 | while IFS= read -r -d '' file; do
     # Extract the base filename
     filename=$(basename "$file")
 
