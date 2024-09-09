@@ -4,6 +4,7 @@ use crate::{
     ledger::{public_key::PublicKey, username::Username},
 };
 use serde::{Deserialize, Serialize};
+use speedb::WriteBatch;
 use std::collections::HashMap;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -22,10 +23,11 @@ pub trait UsernameStore {
     fn get_pk_username(&self, pk: &PublicKey, index: u32) -> anyhow::Result<Option<Username>>;
 
     /// Set the user name updates in the block
-    fn set_block_username_updates(
+    fn set_block_username_updates_batch(
         &self,
         state_hash: &BlockHash,
         username_updates: &UsernameUpdate,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     fn get_block_username_updates(

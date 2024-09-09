@@ -18,11 +18,15 @@ use crate::{
 };
 use anyhow::bail;
 use log::{trace, warn};
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
 impl UserCommandStore for IndexerStore {
-    fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
         let epoch = block.epoch_count();
@@ -30,9 +34,9 @@ impl UserCommandStore for IndexerStore {
         let user_commands = block.commands();
 
         // per block
-        self.set_block_user_commands(block)?;
-        self.set_block_user_commands_count(&state_hash, user_commands.len() as u32)?;
-        self.set_block_username_updates(&state_hash, &block.username_updates())?;
+        self.set_block_user_commands_batch(block, batch)?;
+        self.set_block_user_commands_count_batch(&state_hash, user_commands.len() as u32, batch)?;
+        self.set_block_username_updates_batch(&state_hash, &block.username_updates(), batch)?;
 
         // per command
         for command in &user_commands {
@@ -41,7 +45,7 @@ impl UserCommandStore for IndexerStore {
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_cf(),
                 txn_block_key(&txn_hash, state_hash.clone()),
                 serde_json::to_vec(&SignedCommandWithData::from(
@@ -51,13 +55,13 @@ impl UserCommandStore for IndexerStore {
                     block.timestamp(),
                     block.global_slot_since_genesis(),
                 ))?,
-            )?;
+            );
 
             // add state hash index
-            self.set_user_command_state_hash(state_hash.clone(), &txn_hash)?;
+            self.set_user_command_state_hash_batch(state_hash.clone(), &txn_hash, batch)?;
 
             // add index for global slot sorting
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_slot_sort_cf(),
                 txn_sort_key(
                     block.global_slot_since_genesis(),
@@ -65,28 +69,28 @@ impl UserCommandStore for IndexerStore {
                     state_hash.clone(),
                 ),
                 b"",
-            )?;
+            );
 
             // add index for block height sorting
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_height_sort_cf(),
                 txn_sort_key(block.blockchain_length(), &txn_hash, state_hash.clone()),
                 b"",
-            )?;
+            );
 
             // increment counts
             self.increment_user_commands_counts(command, epoch)?;
 
             // add: `txn_hash -> global_slot`
             // so we can reconstruct the key
-            self.database.put_cf(
+            batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
                 txn_hash.as_bytes(),
                 to_be_bytes(block.global_slot_since_genesis()),
-            )?;
+            );
 
             // add sender index
-            self.database.put_cf(
+            batch.put_cf(
                 self.txn_from_height_sort_cf(),
                 pk_txn_sort_key(
                     command.sender(),
@@ -96,8 +100,8 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
-            self.database.put_cf(
+            );
+            batch.put_cf(
                 self.txn_from_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.sender(),
@@ -107,10 +111,10 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
+            );
 
             // add receiver index
-            self.database.put_cf(
+            batch.put_cf(
                 self.txn_to_height_sort_cf(),
                 pk_txn_sort_key(
                     command.receiver(),
@@ -120,8 +124,8 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
-            self.database.put_cf(
+            );
+            batch.put_cf(
                 self.txn_to_slot_sort_cf(),
                 pk_txn_sort_key(
                     command.receiver(),
@@ -131,7 +135,7 @@ impl UserCommandStore for IndexerStore {
                     block.state_hash(),
                 ),
                 command.amount().to_be_bytes(),
-            )?;
+            );
         }
 
         // per account
@@ -156,18 +160,18 @@ impl UserCommandStore for IndexerStore {
 
             if !block_pk_commands.is_empty() {
                 // write these commands to the next key for pk
-                self.database.put_cf(
+                batch.put_cf(
                     self.user_commands_pk_cf(),
                     user_command_db_key_pk(&pk.0, n),
                     serde_json::to_vec(&block_pk_commands)?,
-                )?;
+                );
 
                 // update pk's num commands
-                self.database.put_cf(
+                batch.put_cf(
                     self.user_commands_pk_num_cf(),
                     pk.0.as_bytes(),
                     to_be_bytes(n + 1),
-                )?;
+                );
             }
         }
         Ok(())
@@ -216,10 +220,11 @@ impl UserCommandStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn set_user_command_state_hash(
+    fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
         txn_hash: &str,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting user command {txn_hash} block {state_hash}");
         let mut blocks = self
@@ -236,29 +241,34 @@ impl UserCommandStore for IndexerStore {
 
         let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         // set num containing blocks
-        self.database.put_cf(
+        batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
             txn_hash.as_bytes(),
             to_be_bytes(blocks.len() as u32),
-        )?;
+        );
 
         // set containing blocks
-        self.database.put_cf(
+        batch.put_cf(
             self.user_command_state_hashes_cf(),
             txn_hash.as_bytes(),
             serde_json::to_vec(&blocks)?,
-        )?;
+        );
         Ok(())
     }
 
-    fn set_block_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn set_block_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         trace!("Setting block user commands {state_hash}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.user_commands_per_block_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&block.commands())?,
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_user_commands(
@@ -554,17 +564,19 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    fn set_block_user_commands_count(
+    fn set_block_user_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block user command count {state_hash} -> {count}");
-        Ok(self.database.put_cf(
+        batch.put_cf(
             self.block_user_command_counts_cf(),
             state_hash.0.as_bytes(),
             to_be_bytes(count),
-        )?)
+        );
+        Ok(())
     }
 
     fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {

@@ -6,17 +6,25 @@ use crate::{
     store::from_be_bytes,
 };
 use anyhow::anyhow;
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::{mem::size_of, path::PathBuf};
 
 /// Store for user commands
 pub trait UserCommandStore {
     /// Index user commands (transactions) from the given block on:
     /// public keys, transaction hash, and state hashes
-    fn add_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn add_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()>;
 
     /// Set user commands for the given block
-    fn set_block_user_commands(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
+    fn set_block_user_commands_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()>;
 
     /// Get indexed user commands from the given block
     fn get_block_user_commands(
@@ -55,10 +63,11 @@ pub trait UserCommandStore {
     ) -> anyhow::Result<Vec<SignedCommandWithData>>;
 
     /// Set block containing `txn_hash`
-    fn set_user_command_state_hash(
+    fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
         txn_hash: &str,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get state hashes of blocks containing `txn_hash` in block sorted order
@@ -142,10 +151,11 @@ pub trait UserCommandStore {
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Increment user commands per block
-    fn set_block_user_commands_count(
+    fn set_block_user_commands_count_batch(
         &self,
         state_hash: &BlockHash,
         count: u32,
+        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per block

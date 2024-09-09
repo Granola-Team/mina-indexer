@@ -857,7 +857,7 @@ test_transactions() {
 
 test_transactions_csv() {
     stage_mainnet_blocks 5 ./blocks
-    
+
     idxr_server_start_standard
     wait_for_socket
 
