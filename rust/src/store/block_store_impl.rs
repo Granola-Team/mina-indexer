@@ -134,15 +134,22 @@ impl BlockStore for IndexerStore {
         // add pcb's version
         self.set_block_version_batch(&state_hash, block.version(), &mut batch)?;
 
-        // add block user commands
-        self.add_user_commands_batch(block, &mut batch)?;
-
         // if batching is a success, then we should continue
         info!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
         );
         self.database.write(batch)?;
+
+        // add block user commands
+        let mut user_commands_batch = WriteBatch::default();
+        self.add_user_commands_batch(block, &mut user_commands_batch)?;
+
+        info!(
+            "Writing {} bytes to database from batch",
+            user_commands_batch.size_in_bytes()
+        );
+        self.database.write(user_commands_batch)?;
 
         // add block internal commands
         self.add_internal_commands(block)?;
