@@ -230,7 +230,6 @@ pub trait BlockStore {
         &self,
         state_hash: &BlockHash,
         comparison: &BlockComparison,
-        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get the info needed for block comparison without deserializing the PCB

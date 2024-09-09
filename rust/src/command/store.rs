@@ -138,11 +138,10 @@ pub trait UserCommandStore {
     fn get_user_commands_total_count(&self) -> anyhow::Result<u32>;
 
     /// Increment user commands per epoch per account count
-    fn increment_user_commands_pk_epoch_count_batch(
+    fn increment_user_commands_pk_epoch_count(
         &self,
         pk: &PublicKey,
         epoch: u32,
-        batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per epoch per account count
@@ -153,11 +152,7 @@ pub trait UserCommandStore {
     ) -> anyhow::Result<u32>;
 
     /// Increment user commands per account total
-    fn increment_user_commands_pk_total_count_batch(
-        &self,
-        pk: &PublicKey,
-        batch: &mut WriteBatch,
-    ) -> anyhow::Result<()>;
+    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()>;
 
     /// Get user commands per account total
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
