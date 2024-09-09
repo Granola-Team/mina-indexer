@@ -68,9 +68,8 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
 async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Result<()> {
     let protocol_state = &json["protocol_state"];
     let body = &protocol_state["body"];
-    let consensus_state = &body["consensus_state"];
     let blockchain_state = &body["blockchain_state"];
-    let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
+    let consensus_state = &body["consensus_state"];
     let blockchain_length = to_i64(&consensus_state["blockchain_length"]).unwrap();
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
@@ -189,7 +188,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
         .await?;
     }
 
-    for command in staged_ledger_diff["completed_works"].as_array().unwrap() {
+    let staged_ledger_diff = &json["staged_ledger_diff"]["diff"][0];
+
+    for job in staged_ledger_diff["completed_works"].as_array().unwrap() {
         db.execute(
             format!(
                 "insert SNARKJob {{
@@ -198,9 +199,9 @@ async fn insert(db: &Arc<Client>, json: Value, block_hash: &str) -> anyhow::Resu
             fee := <decimal>$0
         }};",
                 block_link(block_hash),
-                account_link(&command["prover"])
+                account_link(&job["prover"])
             ),
-            &(to_decimal(&command["fee"]),),
+            &(to_decimal(&job["fee"]),),
         )
         .await?;
     }
