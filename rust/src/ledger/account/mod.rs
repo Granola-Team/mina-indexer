@@ -45,6 +45,22 @@ impl Amount {
     }
 }
 
+impl TryFrom<Amount> for i64 {
+    type Error = &'static str;
+
+    fn try_from(amount: Amount) -> Result<Self, Self::Error> {
+        if amount.0 > i64::MAX as u64 {
+            return Err("Overflow error: u64 value exceeds i64 range");
+        }
+
+        if amount.is_negative() {
+            Ok(-(amount.0 as i64))
+        } else {
+            Ok(amount.0 as i64)
+        }
+    }
+}
+
 impl ToString for Amount {
     fn to_string(&self) -> String {
         let sign = if self.is_negative() { "-" } else { "" };
@@ -839,5 +855,51 @@ mod amount_tests {
         let result = a1 + a2;
         assert_eq!(result.0, 50 - 30);
         assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_try_from_amount_positive() {
+        let amount = Amount(50, false);
+        let result = i64::try_from(amount).unwrap();
+        assert_eq!(result, 50);
+    }
+
+    #[test]
+    fn test_try_from_amount_negative() {
+        let amount = Amount(50, true);
+        let result = i64::try_from(amount).unwrap();
+        assert_eq!(result, -50);
+    }
+
+    #[test]
+    fn test_try_from_amount_zero() {
+        let amount = Amount(0, false);
+        let result = i64::try_from(amount).unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_try_from_amount_overflow() {
+        let amount = Amount(i64::MAX as u64 + 1, false);
+        let result = i64::try_from(amount);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Overflow error: u64 value exceeds i64 range"
+        );
+    }
+
+    #[test]
+    fn test_try_from_amount_max_i64() {
+        let amount = Amount(i64::MAX as u64, false);
+        let result = i64::try_from(amount).unwrap();
+        assert_eq!(result, i64::MAX);
+    }
+
+    #[test]
+    fn test_try_from_amount_max_i64_negative() {
+        let amount = Amount(i64::MAX as u64, true);
+        let result = i64::try_from(amount).unwrap();
+        assert_eq!(result, -i64::MAX);
     }
 }
