@@ -109,7 +109,7 @@ pub struct FeetransferQueryInput {
     /// Value canonical
     canonical: Option<bool>,
 
-    ///Value recipient
+    /// Value recipient
     recipient: Option<String>,
 
     /// Value block height greater than
@@ -160,7 +160,7 @@ impl FeetransferQueryRoot {
         let epoch_num_internal_commands = db.get_internal_commands_epoch_count(None)?;
         let total_num_internal_commands = db.get_internal_commands_total_count()?;
 
-        //state_hash
+        // state_hash query
         if let Some(state_hash) = query
             .as_ref()
             .and_then(|f| f.block_state_hash.as_ref())
@@ -177,6 +177,7 @@ impl FeetransferQueryRoot {
             ));
         }
 
+        // TODO
         // block height bounded query
         if query.as_ref().map_or(false, |q| {
             q.block_height_gt.is_some()
@@ -249,7 +250,8 @@ impl FeetransferQueryRoot {
             return Ok(feetransfers);
         }
 
-        // recipient
+        // TODO
+        // recipient query
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
             let mut fee_transfers: Vec<FeetransferWithMeta> = db
                 .get_internal_commands_public_key(&recipient.into())?
@@ -304,7 +306,7 @@ fn get_fee_transfers(
         speedb::IteratorMode::End
     };
 
-    for (_, value) in db.internal_commands_global_slot_interator(mode).flatten() {
+    for (_, value) in db.internal_commands_block_height_iterator(mode).flatten() {
         let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from((
             internal_command,
@@ -355,7 +357,7 @@ fn get_fee_transfers_for_state_hash(
         Ok(Some(canonicity)) => matches!(canonicity, Canonicity::Canonical),
         _ => false,
     };
-    match db.get_internal_commands(state_hash) {
+    match db.get_internal_commands(state_hash.clone()) {
         Ok(internal_commands) => {
             let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
                 .into_iter()
@@ -442,23 +444,32 @@ impl FeetransferQueryInput {
             block_height_gte,
             block_height_lt,
             block_height_lte,
-            ..
+            block_height,
+            block_state_hash,
+            canonical,
+            recipient,
+            and,
+            or,
         } = self;
 
-        if let Some(canonical) = &self.canonical {
-            if &ft.canonical != canonical {
+        if let Some(canonical) = canonical.as_ref() {
+            if ft.canonical != *canonical {
                 return false;
             }
         }
-
-        if let Some(recipient) = &self.recipient {
-            if &ft.feetransfer.recipient != recipient {
+        if let Some(recipient) = recipient.as_ref() {
+            if ft.feetransfer.recipient != *recipient {
                 return false;
             }
         }
 
         let pcb = ft.block.as_ref().expect("block will exist");
         let blockchain_length = pcb.blockchain_length();
+        if let Some(height) = block_height.as_ref() {
+            if blockchain_length != *height {
+                return false;
+            }
+        }
 
         // block_height_gt(e) & block_height_lt(e)
         if let Some(height) = block_height_gt {
@@ -481,22 +492,19 @@ impl FeetransferQueryInput {
                 return false;
             }
         }
-
-        if let Some(block_query_input) = &self.block_state_hash {
-            if let Some(state_hash) = &block_query_input.state_hash {
-                if &ft.feetransfer.state_hash != state_hash {
+        if let Some(block_query_input) = block_state_hash.as_ref() {
+            if let Some(state_hash) = block_query_input.state_hash.as_ref() {
+                if ft.feetransfer.state_hash != *state_hash {
                     return false;
                 }
             }
         }
-
-        if let Some(query) = &self.and {
+        if let Some(query) = and.as_ref() {
             if !(query.iter().all(|and| and.matches(ft))) {
                 return false;
             }
         }
-
-        if let Some(query) = &self.or {
+        if let Some(query) = or.as_ref() {
             if !query.is_empty() && !(query.iter().any(|or| or.matches(ft))) {
                 return false;
             }
