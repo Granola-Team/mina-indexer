@@ -21,7 +21,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context};
-use log::{error, info, trace};
+use log::{error, trace};
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::mem::size_of;
 
@@ -137,7 +137,7 @@ impl BlockStore for IndexerStore {
         // add block user commands
         self.add_user_commands_batch(block, &mut batch)?;
 
-        info!(
+        trace!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
         );
