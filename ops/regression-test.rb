@@ -59,6 +59,7 @@ test_names = %w[
   do_not_ingest_orphan_blocks
   staking_delegations
   internal_commands
+  internal_commands_csv
   start_from_config
   version_file
   hurl
