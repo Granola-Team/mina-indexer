@@ -25,7 +25,7 @@ pub struct IndexerStoreVersion {
 impl IndexerStoreVersion {
     pub const MAJOR: u32 = 0;
     pub const MINOR: u32 = 10;
-    pub const PATCH: u32 = 47;
+    pub const PATCH: u32 = 48;
 
     /// Output as `MAJOR`.`MINOR`.`PATCH`
     pub fn major_minor_patch(&self) -> String {
