@@ -23,7 +23,7 @@ impl LockedBalances {
         let mut rdr = Reader::from_reader(LOCKED_BALANCES_CONTENTS.as_bytes());
         for result in rdr.deserialize() {
             let record: Record = result?;
-            locked.insert(record.slot, Amount(record.locked * 1_000_000_000_u64));
+            locked.insert(record.slot, Amount::new(record.locked * 1_000_000_000_u64));
         }
 
         Ok(LockedBalances { locked })

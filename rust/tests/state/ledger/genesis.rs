@@ -3,11 +3,13 @@ use mina_indexer::{
     chain::Network,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
+        account::Amount,
         genesis::{self, GenesisLedger},
         public_key::PublicKey,
         Ledger,
     },
 };
+
 #[test]
 fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     let genesis_root = genesis::parse_file("./data/genesis_ledgers/mainnet.json")?;
@@ -16,7 +18,8 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
 
     // Ledger account balances are in nanomina
     let total_supply = ledger.accounts.values().fold(0, |acc, account| {
-        acc + account.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0
+        let new_balance = account.balance - Amount::new(MAINNET_ACCOUNT_CREATION_FEE);
+        acc + new_balance.value()
     });
 
     assert_eq!(

@@ -1,7 +1,10 @@
 use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
 use crate::{
     canonicity::store::CanonicityStore,
-    ledger::{account::Account, store::staged::StagedLedgerStore},
+    ledger::{
+        account::{Account, Amount},
+        store::staged::StagedLedgerStore,
+    },
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -148,12 +151,12 @@ pub struct StagedLedgerAccount {
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
         // deduct 1 MINA fee for display
-        let balance_nanomina = acct.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0;
-        let mut decimal = Decimal::from(balance_nanomina);
+        let balance_nanomina = acct.balance - Amount::new(MAINNET_ACCOUNT_CREATION_FEE);
+        let mut decimal = Decimal::from(balance_nanomina.value());
         decimal.set_scale(9).ok();
 
         Self {
-            balance_nanomina,
+            balance_nanomina: balance_nanomina.value(),
             nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,

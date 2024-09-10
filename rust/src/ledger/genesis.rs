@@ -155,7 +155,7 @@ impl GenesisLedger {
         accounts.insert(pk, block_creator);
 
         for genesis_account in genesis.accounts {
-            let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
+            let balance = Amount::new(match str::parse::<Decimal>(&genesis_account.balance) {
                 Ok(amt) => (amt * dec!(1_000_000_000))
                     .to_u64()
                     .expect("Parsed Genesis Balance has wrong format"),

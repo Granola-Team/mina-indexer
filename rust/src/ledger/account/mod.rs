@@ -21,11 +21,19 @@ use std::{
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
 )]
-pub struct Amount(pub u64);
+pub struct Amount(pub u64, bool);
 
 impl Amount {
     pub fn new(amount: u64) -> Self {
-        Self(amount * MINA_SCALE)
+        Self(amount * MINA_SCALE, false)
+    }
+
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+
+    pub fn is_negative(&self) -> bool {
+        self.1
     }
 }
 
@@ -39,7 +47,7 @@ impl Add<Amount> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: Amount) -> Self::Output {
-        Self(self.0 + rhs.0)
+        Amount::new(self.0 + rhs.0)
     }
 }
 
@@ -47,7 +55,7 @@ impl Add<u64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Self(self.0 + rhs)
+        Amount::new(self.0 + rhs)
     }
 }
 
@@ -55,7 +63,7 @@ impl Add<i64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: i64) -> Self::Output {
-        Self(self.0 + rhs as u64)
+        Amount::new(self.0 + rhs as u64)
     }
 }
 
@@ -63,7 +71,7 @@ impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0 - rhs.0)
+        Amount::new(self.0 - rhs.0)
     }
 }
 
@@ -71,13 +79,13 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0 - rhs)
+        Amount::new(self.0 - rhs)
     }
 }
 
 impl From<u64> for Amount {
     fn from(value: u64) -> Self {
-        Amount(value)
+        Amount::new(value)
     }
 }
 
@@ -484,7 +492,7 @@ impl From<GenesisBlock> for Account {
         let block_creator = value.0.block_creator();
         Account {
             public_key: block_creator.clone(),
-            balance: Amount(1000_u64),
+            balance: Amount::new(1000_u64),
             delegate: block_creator,
             genesis_account: true,
             ..Default::default()

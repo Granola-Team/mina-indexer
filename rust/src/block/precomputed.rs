@@ -8,7 +8,9 @@ use crate::{
     chain::Network,
     command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
     constants::{berkeley::*, *},
-    ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
+    ledger::{
+        account::Amount, coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash,
+    },
     mina_blocks::{common::from_str, v2},
     profiling::{aggregate_processing_duration, aggregate_read_duration},
     protocol::serialization_types::{
@@ -298,9 +300,9 @@ impl PrecomputedBlock {
         // maybe coinbase receiver
         if let Some(bal) = self.coinbase_receiver_balance() {
             if [
-                MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+                MAINNET_COINBASE_REWARD - Amount::new(MAINNET_ACCOUNT_CREATION_FEE).value(),
                 // supercharged
-                2 * MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+                2 * MAINNET_COINBASE_REWARD - Amount::new(MAINNET_ACCOUNT_CREATION_FEE).value(),
             ]
             .contains(&bal)
             {
