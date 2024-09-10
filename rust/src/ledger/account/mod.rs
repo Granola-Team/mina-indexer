@@ -141,6 +141,7 @@ impl Add<i64> for Amount {
 impl Sub<Amount> for Amount {
     type Output = Amount;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Amount) -> Self::Output {
         self + rhs.negate() // Reuse addition by negating the rhs
     }
@@ -620,9 +621,8 @@ impl std::fmt::Debug for Account {
 
 #[cfg(test)]
 mod amount_tests {
-    use crate::{constants::MINA_SCALE, utility::functions::nanomina_to_mina};
-
     use super::{Account, Amount};
+    use crate::{constants::MINA_SCALE, utility::functions::nanomina_to_mina};
 
     #[test]
     fn test_account_display() -> anyhow::Result<()> {

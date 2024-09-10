@@ -411,8 +411,8 @@ mod tests {
 
     #[test]
     fn test_amount() {
-        let credit_amount = Amount::new(1000);
-        let debit_amount = Amount::new(500);
+        let credit_amount = Amount(1000, false);
+        let debit_amount = Amount(500, false);
 
         // Test Credit for PaymentDiff
         let payment_diff_credit = AccountDiff::Payment(PaymentDiff {
@@ -491,7 +491,7 @@ mod tests {
         let expected_account_diff = vec![
             vec![AccountDiff::Coinbase(CoinbaseDiff {
                 public_key: receiver.clone(),
-                amount: Amount::new(1440 * (1e9 as u64)),
+                amount: Amount(1440 * (1e9 as u64), false),
             })],
             vec![
                 AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
@@ -521,19 +521,19 @@ mod tests {
         let payment_command = Command::Payment(Payment {
             source: source_public_key.clone(),
             receiver: receiver_public_key.clone(),
-            amount: Amount::new(536900000000),
+            amount: Amount(536900000000, false),
             is_new_receiver_account: true,
             nonce,
         });
         let expected_result = vec![vec![
             AccountDiff::Payment(PaymentDiff {
                 public_key: receiver_public_key.clone(),
-                amount: Amount::new(536900000000),
+                amount: Amount(536900000000, false),
                 update_type: UpdateType::Credit,
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key,
-                amount: Amount::new(536900000000),
+                amount: Amount(536900000000, false),
                 update_type: UpdateType::Debit(Some(nonce + 1)),
             }),
         ]];
@@ -575,7 +575,7 @@ mod tests {
         });
         let expected_account_diff = vec![vec![AccountDiff::Coinbase(CoinbaseDiff {
             public_key: receiver.clone(),
-            amount: Amount::new(1440 * (1e9 as u64)),
+            amount: Amount(1440 * (1e9 as u64), false),
         })]];
         assert_eq!(account_diff, expected_account_diff);
     }
@@ -585,7 +585,7 @@ mod tests {
         let nonce = Nonce(42);
         let payment_diff = PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
-            amount: Amount::new(536900000000),
+            amount: Amount(536900000000, false),
             update_type: UpdateType::Debit(Some(nonce)),
         };
         let account_diff = AccountDiff::Payment(payment_diff);

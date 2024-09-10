@@ -155,12 +155,15 @@ impl GenesisLedger {
         accounts.insert(pk, block_creator);
 
         for genesis_account in genesis.accounts {
-            let balance = Amount::new(match str::parse::<Decimal>(&genesis_account.balance) {
-                Ok(amt) => (amt * dec!(1_000_000_000))
-                    .to_u64()
-                    .expect("Parsed Genesis Balance has wrong format"),
-                Err(_) => panic!("Unable to parse Genesis Balance"),
-            });
+            let balance = Amount(
+                match str::parse::<Decimal>(&genesis_account.balance) {
+                    Ok(amt) => (amt * dec!(1_000_000_000))
+                        .to_u64()
+                        .expect("Parsed Genesis Balance has wrong format"),
+                    Err(_) => panic!("Unable to parse Genesis Balance"),
+                },
+                false,
+            );
             let public_key = PublicKey::from(genesis_account.pk);
             accounts.insert(
                 public_key.clone(),

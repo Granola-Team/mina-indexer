@@ -160,7 +160,7 @@ impl Ledger {
     }
 
     pub fn time_locked_amount(&self, curr_global_slot: u32) -> Amount {
-        Amount::new(
+        Amount(
             self.accounts
                 .values()
                 .filter_map(|acct| {
@@ -169,6 +169,7 @@ impl Ledger {
                         .map(|_| acct.current_minimum_balance(curr_global_slot))
                 })
                 .sum(),
+            false,
         )
     }
 
@@ -303,7 +304,7 @@ mod tests {
 
     #[test]
     fn apply_diff_payment() {
-        let amount = Amount::new(42 * MINA_SCALE);
+        let amount = Amount(42 * MINA_SCALE, false);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
         let account_before = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
