@@ -196,10 +196,13 @@ impl IndexerStore {
 
         // SST File Size Configuration
         cf_opts.set_target_file_size_base(memtable_size as u64); // ---- 256Mb SST target file size.
-        cf_opts.set_target_file_size_multiplier(2); // ----------------- SST file size doubles at each level. This favours write-heavy workflow. This means that SST files double at each level
+        cf_opts.set_target_file_size_multiplier(2); // ----------------- SST file size doubles at each level. This favours
+                                                    // ----------------- write-heavy workflow. This means that SST files double at
+                                                    // ----------------- each level.
 
         // Compaction
-        cf_opts.set_disable_auto_compactions(true); // ----------------- Disable auto compaction, and we will trigger this after ingestion
+        cf_opts.set_disable_auto_compactions(true); // ----------------- Disable auto compaction, and we will trigger this after
+                                                    // ----------------- ingestion.
 
         cf_opts.set_compression_type(DBCompressionType::Zstd);
 
