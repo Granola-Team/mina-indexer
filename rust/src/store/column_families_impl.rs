@@ -354,11 +354,10 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{state_hash}{index}
+    /// - key: {receiver}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
     /// - receiver:     [PublicKey::LEN] bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
     /// - index:        4 BE bytes
     fn internal_commands_pk_cf(&self) -> &ColumnFamily {
         self.database

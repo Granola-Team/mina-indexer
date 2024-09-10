@@ -368,7 +368,7 @@ impl BlockStore for IndexerStore {
             .get_cf(self.block_date_time_cf(), state_hash.0.as_bytes())?
             .map(|bytes| {
                 let mut be_bytes = [0; size_of::<i64>()];
-                be_bytes.copy_from_slice(&mut bytes.clone());
+                be_bytes.copy_from_slice(&bytes.clone());
                 i64::from_be_bytes(be_bytes)
             }))
     }

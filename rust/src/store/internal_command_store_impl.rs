@@ -57,26 +57,16 @@ impl InternalCommandStore for IndexerStore {
         // increment internal command counts &
         // sort by pk, block height & global slot
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
+            let pk = int_cmd.recipient();
             self.increment_internal_commands_counts(int_cmd, epoch)?;
-            self.database.put_cf(
-                self.internal_commands_cf(),
-                internal_commmand_key(&state_hash, i as u32),
-                serde_json::to_vec(int_cmd)?,
-            )?;
-            self.database.put_cf(
-                self.internal_commands_block_height_sort_cf(),
-                internal_commmand_sort_key(block_height, &state_hash, i as u32),
-                serde_json::to_vec(int_cmd)?,
-            )?;
-            self.database.put_cf(
-                self.internal_commands_global_slot_sort_cf(),
-                internal_commmand_sort_key(global_slot, &state_hash, i as u32),
-                serde_json::to_vec(int_cmd)?,
-            )?;
+            self.set_block_internal_command(block, i as u32, int_cmd)?;
+            self.set_pk_internal_command(&pk, int_cmd)?;
+
+            // sort data
             self.database.put_cf(
                 self.internal_commands_pk_block_height_sort_cf(),
                 internal_commmand_pk_sort_key(
-                    int_cmd.recipient(),
+                    pk.clone(),
                     block_height,
                     state_hash.clone(),
                     i as u32,
@@ -87,7 +77,7 @@ impl InternalCommandStore for IndexerStore {
             self.database.put_cf(
                 self.internal_commands_pk_global_slot_sort_cf(),
                 internal_commmand_pk_sort_key(
-                    int_cmd.recipient(),
+                    pk,
                     global_slot,
                     state_hash.clone(),
                     i as u32,
@@ -96,37 +86,39 @@ impl InternalCommandStore for IndexerStore {
                 serde_json::to_vec(int_cmd)?,
             )?;
         }
-
-        for pk in block.all_public_keys() {
-            trace!("Writing internal commands for {pk}");
-            let n = self.get_pk_num_internal_commands(&pk)?.unwrap_or(0);
-            let pk_internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds_with_data
-                .iter()
-                .filter_map(|cmd| {
-                    if cmd.contains_pk(&pk) {
-                        Some(cmd.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            self.database.put_cf(
-                self.internal_commands_pk_cf(),
-                internal_command_pk_key(pk.clone(), n),
-                serde_json::to_vec(&pk_internal_cmds_with_data)?,
-            );
-
-            // update pk's number of internal cmds
-            self.database.put_cf(
-                self.internal_commands_pk_num_cf(),
-                pk.0.as_bytes(),
-                (n + 1).to_be_bytes(),
-            )?;
-        }
         Ok(())
     }
 
-    fn get_internal_command(
+    fn set_block_internal_command(
+        &self,
+        block: &PrecomputedBlock,
+        index: u32,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()> {
+        let state_hash = block.state_hash();
+        let global_slot = block.global_slot_since_genesis();
+        let block_height = block.blockchain_length();
+        trace!("Setting block internal command {state_hash} index {index}");
+
+        self.database.put_cf(
+            self.internal_commands_cf(),
+            internal_commmand_block_key(&state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_block_height_sort_cf(),
+            internal_commmand_sort_key(block_height, &state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_global_slot_sort_cf(),
+            internal_commmand_sort_key(global_slot, &state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        Ok(())
+    }
+
+    fn get_block_internal_command(
         &self,
         state_hash: &BlockHash,
         index: u32,
@@ -136,7 +128,41 @@ impl InternalCommandStore for IndexerStore {
             .database
             .get_cf(
                 self.internal_commands_cf(),
-                internal_commmand_key(state_hash, index),
+                internal_commmand_block_key(state_hash, index),
+            )?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+    }
+
+    fn set_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()> {
+        let n = self.get_pk_num_internal_commands(pk)?.unwrap_or(0);
+        self.database.put_cf(
+            self.internal_commands_pk_cf(),
+            internal_command_pk_key(pk.clone(), n),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_pk_num_cf(),
+            pk.0.as_bytes(),
+            (n + 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn get_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>> {
+        info!("Getting internal command pk {pk} index {index}");
+        Ok(self
+            .database
+            .get_cf(
+                self.internal_commands_pk_cf(),
+                internal_commmand_pk_key(pk, index),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
@@ -150,7 +176,7 @@ impl InternalCommandStore for IndexerStore {
         if let Some(num) = self.get_block_internal_commands_count(&state_hash)? {
             for n in 0..num {
                 res.push(
-                    self.get_internal_command(&state_hash, n)?
+                    self.get_block_internal_command(&state_hash, n)?
                         .expect("internal command exists"),
                 );
             }
@@ -166,18 +192,8 @@ impl InternalCommandStore for IndexerStore {
         let mut internal_cmds = vec![];
         if let Some(n) = self.get_pk_num_internal_commands(pk)? {
             for m in 0..n {
-                if let Some(mut block_m_internal_cmds) = self
-                    .database
-                    .get_pinned_cf(
-                        self.internal_commands_pk_cf(),
-                        internal_command_pk_key(pk.clone(), m),
-                    )?
-                    .map(|bytes| {
-                        serde_json::from_slice::<Vec<InternalCommandWithData>>(&bytes)
-                            .expect("internal commands with data")
-                    })
-                {
-                    internal_cmds.append(&mut block_m_internal_cmds);
+                if let Some(internal_command) = self.get_pk_internal_command(pk, m)? {
+                    internal_cmds.push(internal_command);
                 } else {
                     internal_cmds.clear();
                     break;
@@ -192,7 +208,7 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting pk num internal commands {pk}");
         Ok(self
             .database
-            .get_cf(self.internal_commands_cf(), pk.0.as_bytes())?
+            .get_cf(self.internal_commands_pk_num_cf(), pk.0.as_bytes())?
             .map(from_be_bytes))
     }
 
@@ -235,7 +251,10 @@ impl InternalCommandStore for IndexerStore {
             .has_headers(true)
             .from_path(path.clone())?;
         for (_, _, index, state_hash) in cmds {
-            if let Some(cmd) = self.get_internal_command(&state_hash, index)?.as_ref() {
+            if let Some(cmd) = self
+                .get_block_internal_command(&state_hash, index)?
+                .as_ref()
+            {
                 csv_writer.serialize(CsvRecordInternalCommand::from_internal_command(cmd))?;
             } else {
                 bail!("Internal command missing for block {state_hash}")
@@ -275,7 +294,7 @@ impl InternalCommandStore for IndexerStore {
                     .copy_from_slice(&u32::MAX.to_be_bytes());
 
                 // need to start after the target account
-                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice(&"D".as_bytes());
+                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
                 IteratorMode::From(&start, direction)
             }
         };
@@ -298,7 +317,7 @@ impl InternalCommandStore for IndexerStore {
                     .copy_from_slice(&u32::MAX.to_be_bytes());
 
                 // need to start after the target account
-                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice(&"D".as_bytes());
+                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
                 IteratorMode::From(&start, direction)
             }
         };
@@ -518,13 +537,20 @@ impl<'a> CsvRecordInternalCommand<'a> {
     }
 }
 
-fn internal_commmand_key(
+fn internal_commmand_block_key(
     state_hash: &BlockHash,
     index: u32,
-) -> [u8; size_of::<u32>() + BlockHash::LEN] {
-    let mut bytes = [0; size_of::<u32>() + BlockHash::LEN];
+) -> [u8; BlockHash::LEN + size_of::<u32>()] {
+    let mut bytes = [0; BlockHash::LEN + size_of::<u32>()];
     bytes[..BlockHash::LEN].copy_from_slice(&state_hash.clone().to_bytes());
     bytes[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes
+}
+
+fn internal_commmand_pk_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + size_of::<u32>()] {
+    let mut bytes = [0; PublicKey::LEN + size_of::<u32>()];
+    bytes[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+    bytes[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
 

@@ -16,16 +16,38 @@ pub trait InternalCommandStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
+    /// Set the block's `index`-th internal command
+    fn set_block_internal_command(
+        &self,
+        block: &PrecomputedBlock,
+        index: u32,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()>;
+
+    /// Set pk's internal command
+    fn set_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()>;
+
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
         &self,
         state_hash: BlockHash,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
-    /// Get indexed internal command for the given public key
-    fn get_internal_command(
+    /// Get indexed internal command from block
+    fn get_block_internal_command(
         &self,
         state_hash: &BlockHash,
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>>;
+
+    /// Get indexed internal command for the given public key
+    fn get_pk_internal_command(
+        &self,
+        pk: &PublicKey,
         index: u32,
     ) -> anyhow::Result<Option<InternalCommandWithData>>;
 
