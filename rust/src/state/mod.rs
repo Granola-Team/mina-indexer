@@ -462,9 +462,11 @@ impl IndexerState {
 
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing deep canonical chain");
-        ingestion_profiling_summary()
-            .iter()
-            .for_each(|summary| info!("{}", summary));
+        ingestion_profiling_summary().iter().for_each(|summary| {
+            if !summary.is_empty() {
+                info!("{summary}")
+            }
+        });
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks

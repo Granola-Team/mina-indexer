@@ -18,14 +18,14 @@ pub struct Coinbase {
     pub receiver_balance: Option<u64>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum CoinbaseKind {
     None,
     Coinbase(Option<CoinbaseFeeTransfer>),
     CoinbaseAndFeeTransferViaCoinbase(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct CoinbaseFeeTransfer {
     pub receiver_pk: PublicKey,
     pub fee: u64,
@@ -101,11 +101,7 @@ impl Coinbase {
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
         let kind = CoinbaseKind::from_precomputed(block);
-        let kind = if kind.len() < 2 {
-            kind[0].clone()
-        } else {
-            kind[1].clone()
-        };
+        let kind = kind.iter().max().expect("max coinbase").clone();
         Self {
             kind,
             receiver: block.coinbase_receiver(),
