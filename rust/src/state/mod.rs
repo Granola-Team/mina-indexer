@@ -422,7 +422,6 @@ impl IndexerState {
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
                         for diff in ledger_diffs.iter() {
-                            info!("{:#?} {:#?}", diff.state_hash, diff.blockchain_length);
                             self.ledger._apply_diff(diff)?;
                         }
 
