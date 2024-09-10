@@ -80,6 +80,9 @@ impl BlockStore for IndexerStore {
         // add to parent hash index
         self.set_block_parent_hash_batch(&state_hash, &block.previous_state_hash(), &mut batch)?;
 
+        // add to date time index
+        self.set_block_date_time_batch(&state_hash, block.timestamp() as i64, &mut batch)?;
+
         // add to staged ledger hash index
         self.set_block_staged_ledger_hash_batch(
             &state_hash,
@@ -354,6 +357,33 @@ impl BlockStore for IndexerStore {
             self.block_parent_hash_cf(),
             state_hash.0.as_bytes(),
             previous_state_hash.0.as_bytes(),
+        );
+        Ok(())
+    }
+
+    fn get_block_date_time(&self, state_hash: &BlockHash) -> anyhow::Result<Option<i64>> {
+        trace!("Getting block date time {state_hash}");
+        Ok(self
+            .database
+            .get_cf(self.block_date_time_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| {
+                let mut be_bytes = [0; size_of::<i64>()];
+                be_bytes.copy_from_slice(&mut bytes.clone());
+                i64::from_be_bytes(be_bytes)
+            }))
+    }
+
+    fn set_block_date_time_batch(
+        &self,
+        state_hash: &BlockHash,
+        date_time: i64,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()> {
+        trace!("Setting block date time {state_hash}");
+        batch.put_cf(
+            self.block_date_time_cf(),
+            state_hash.0.as_bytes(),
+            date_time.to_be_bytes(),
         );
         Ok(())
     }
