@@ -148,12 +148,12 @@ pub struct StagedLedgerAccount {
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
         // deduct 1 MINA fee for display
-        let balance_nanomina = acct.balance - MAINNET_ACCOUNT_CREATION_FEE;
-        let mut decimal = Decimal::from(balance_nanomina.value());
+        let balance_nanomina = acct.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0;
+        let mut decimal = Decimal::from(balance_nanomina);
         decimal.set_scale(9).ok();
 
         Self {
-            balance_nanomina: balance_nanomina.value(),
+            balance_nanomina,
             nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,
