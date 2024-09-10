@@ -64,6 +64,12 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-slot-to-heights column family exists")
     }
 
+    fn block_date_time_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-date-time")
+            .expect("blocks-date-time column family exists")
+    }
+
     fn block_parent_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-parent-hash")
@@ -323,16 +329,111 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Internal command store CFs //
     ////////////////////////////////
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - state_hash: [BlockHash::LEN] bytes
+    /// - index:      4 BE bytes
     fn internal_commands_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands")
             .expect("internal-commands column family exists")
     }
 
-    fn internal_commands_slot_cf(&self) -> &ColumnFamily {
+    /// Key-value pairs
+    /// ```
+    /// - key: [BlockHash::LEN] bytes
+    /// - val: 4 BE bytes
+    fn internal_commands_block_num_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("internal-commands-global-slot")
-            .expect("internal-commands-global-slot column family exists")
+            .cf_handle("internal-commands-block-num")
+            .expect("internal-commands-block-num column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {receiver}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - receiver:     [PublicKey::LEN] bytes
+    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - index:        4 BE bytes
+    fn internal_commands_pk_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk")
+            .expect("internal-commands-pk column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: [PublicKey::LEN] bytes
+    /// - val: 4 BE bytes
+    fn internal_commands_pk_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk-num")
+            .expect("internal-commands-pk-num column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {block_height}{state_hash}{index}{kind}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - block_height: 4 BE bytes
+    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - index:        4 BE bytes
+    /// - kind:         0, 1, or 2
+    fn internal_commands_block_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-block-height-sort")
+            .expect("internal-commands-block-height-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {global_slot}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - global_slot: 4 BE bytes
+    /// - state_hash:  [BlockHash::LEN] bytes
+    /// - index:       4 BE bytes
+    /// - kind:        0, 1, or 2
+    fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-global-slot-sort")
+            .expect("internal-commands-global-slot-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {receiver}{block_height}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - receiver:     [PublicKey::LEN] bytes
+    /// - block_height: 4 BE bytes
+    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - index:        4 BE bytes
+    fn internal_commands_pk_block_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk-block-height-sort")
+            .expect("internal-commands-pk-block-height-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {receiver}{global_slot}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - receiver:     [PublicKey::LEN] bytes
+    /// - global_slot: 4 BE bytes
+    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - index:        4 BE bytes
+    fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("internal-commands-pk-global-slot-sort")
+            .expect("internal-commands-pk-global-slot-sort column family exists")
     }
 
     //////////////////////////
