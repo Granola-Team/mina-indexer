@@ -19,12 +19,14 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
     let mut handles = vec![];
 
-    let db = get_db(CONCURRENT_TASKS * CONCURRENT_TASKS).await?;
+    let db = get_db(CONCURRENT_TASKS).await?;
+    let db_locking = get_db_locking(CONCURRENT_TASKS).await?;
 
     for path in get_file_paths(blocks_dir)? {
         // clone the Arc to the semaphore for each task
         let sem = Arc::clone(&semaphore);
         let db = Arc::clone(&db);
+        let db_locking = Arc::clone(&db_locking);
 
         let handle = tokio::spawn(async move {
             let _permit = sem.acquire().await.unwrap();
@@ -33,7 +35,7 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
                 Ok(json) => {
                     let block_hash = extract_hash_from_file_name(&path);
 
-                    let a = insert(&db, block_hash, json).await;
+                    let a = insert(&db, db_locking, json, block_hash).await;
                     match a {
                         Ok(_) => (),
                         Err(e) => panic!("block_hash: {} {:?}", block_hash, e),
@@ -65,7 +67,12 @@ pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
 }
 
 /// Insert the `json` for a given `block_hash` into the `db`
-async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Result<()> {
+async fn insert(
+    db: &Arc<Client>,
+    _db_locking: Arc<Mutex<Client>>,
+    json: Value,
+    block_hash: &str,
+) -> anyhow::Result<()> {
     let protocol_state = &json["protocol_state"];
     let body = &protocol_state["body"];
     let blockchain_state = &body["blockchain_state"];
@@ -77,7 +84,7 @@ async fn insert(db: &Arc<Client>, block_hash: &str, json: Value) -> anyhow::Resu
     println!("Processing {} - {}", block_hash, blockchain_length);
 
     let accounts = extract_accounts(&json);
-    insert_accounts(db, accounts).await?;
+    insert_accounts(&db, accounts).await?;
 
     db.execute(
         format!(

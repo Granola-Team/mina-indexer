@@ -3,6 +3,7 @@ use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
 use rayon::prelude::*;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
 use std::{cmp::Ordering, collections::HashSet, fs, io, path::PathBuf, str::FromStr, sync::Arc};
+use tokio::sync::Mutex;
 
 pub mod blocks;
 pub mod staking;
@@ -65,7 +66,7 @@ fn natural_sort(a: &str, b: &str) -> Ordering {
 }
 
 /// Get a [database][Client] connection pool
-async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Error> {
+async fn get_db_raw(num_connections: usize) -> Result<Client, edgedb_tokio::Error> {
     let db_builder = Client::new(
         &Builder::new()
             .max_concurrency(num_connections)
@@ -76,12 +77,21 @@ async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Err
     let retry_opts = RetryOptions::default().with_rule(
         RetryCondition::TransactionConflict,
         // No. of retries
-        10,
-        // Retry immediately instead of default with increasing backoff
-        |_| std::time::Duration::from_secs(3),
+        30,
+        |_| std::time::Duration::from_millis(500),
     );
 
-    Ok(Arc::new(db_builder.with_retry_options(retry_opts)))
+    Ok(db_builder.with_retry_options(retry_opts))
+}
+
+/// Get a [database][Client] connection pool
+async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Error> {
+    Ok(Arc::new(get_db_raw(num_connections).await?))
+}
+
+/// Get a [database][Client] connection pool
+async fn get_db_locking(num_connections: usize) -> Result<Arc<Mutex<Client>>, edgedb_tokio::Error> {
+    Ok(Arc::new(Mutex::new(get_db_raw(num_connections).await?)))
 }
 
 fn to_titlecase(s: &str) -> String {
