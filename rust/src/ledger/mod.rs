@@ -299,16 +299,16 @@ impl Add<i64> for Amount {
 impl Sub<Amount> for Amount {
     type Output = Amount;
 
-    fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0 - rhs.0)
+    fn sub(self, other: Amount) -> Self::Output {
+        Self(self.0.saturating_sub(other.0))
     }
 }
 
 impl Sub<u64> for Amount {
     type Output = Amount;
 
-    fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0 - rhs)
+    fn sub(self, other: u64) -> Self::Output {
+        Self(self.0.saturating_sub(other))
     }
 }
 
