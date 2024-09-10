@@ -137,14 +137,14 @@ impl BlockStore for IndexerStore {
         // add block user commands
         self.add_user_commands_batch(block, &mut batch)?;
 
+        // add block internal commands
+        self.add_internal_commands_batch(block, &mut batch)?;
+
         trace!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
         );
         self.database.write(batch)?;
-
-        // add block internal commands
-        self.add_internal_commands(block)?;
 
         // add block SNARK work
         self.add_snark_work(block)?;
