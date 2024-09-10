@@ -21,11 +21,15 @@ use std::{
 #[derive(
     Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash, Serialize, Deserialize,
 )]
-pub struct Amount(pub u64, bool);
+pub struct Amount(pub u64, pub bool); // The second field represents if it's negative.
 
 impl Amount {
     pub fn new(amount: u64) -> Self {
         Self(amount * MINA_SCALE, false)
+    }
+
+    pub fn new_negative(amount: u64) -> Self {
+        Self(amount * MINA_SCALE, true)
     }
 
     pub fn value(&self) -> u64 {
@@ -35,11 +39,16 @@ impl Amount {
     pub fn is_negative(&self) -> bool {
         self.1
     }
+
+    pub fn negate(&self) -> Amount {
+        Self(self.0, !self.1)
+    }
 }
 
 impl ToString for Amount {
     fn to_string(&self) -> String {
-        nanomina_to_mina(self.0)
+        let sign = if self.is_negative() { "-" } else { "" };
+        format!("{}{}", sign, nanomina_to_mina(self.0))
     }
 }
 
@@ -47,7 +56,28 @@ impl Add<Amount> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: Amount) -> Self::Output {
-        Amount::new(self.0 + rhs.0)
+        match (self.is_negative(), rhs.is_negative()) {
+            // Both positive, straightforward addition
+            (false, false) => Amount(self.0 + rhs.0, false),
+            // Both negative, straightforward addition with negative result
+            (true, true) => Amount(self.0 + rhs.0, true),
+            // Positive + Negative, subtraction
+            (false, true) => {
+                if self.0 >= rhs.0 {
+                    Amount(self.0 - rhs.0, false)
+                } else {
+                    Amount(rhs.0 - self.0, true)
+                }
+            }
+            // Negative + Positive, subtraction
+            (true, false) => {
+                if self.0 > rhs.0 {
+                    Amount(self.0 - rhs.0, true)
+                } else {
+                    Amount(rhs.0 - self.0, false)
+                }
+            }
+        }
     }
 }
 
@@ -55,7 +85,15 @@ impl Add<u64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Amount::new(self.0 + rhs)
+        if self.is_negative() {
+            if self.0 > rhs {
+                Amount(self.0 - rhs, true)
+            } else {
+                Amount(rhs - self.0, false)
+            }
+        } else {
+            Amount(self.0 + rhs, false)
+        }
     }
 }
 
@@ -63,7 +101,24 @@ impl Add<i64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: i64) -> Self::Output {
-        Amount::new(self.0 + rhs as u64)
+        if rhs >= 0 {
+            // Add the positive value of rhs directly to the current amount.
+            self + rhs as u64
+        } else {
+            // Handle the case where rhs is negative.
+            let rhs_abs = (-rhs) as u64;
+            if self.is_negative() {
+                // If the current amount is also negative, sum the two negative values.
+                Amount(self.0 + rhs_abs, true)
+            } else {
+                // If the current amount is positive, handle subtraction as before.
+                if self.0 >= rhs_abs {
+                    Amount(self.0 - rhs_abs, false)
+                } else {
+                    Amount(rhs_abs - self.0, true)
+                }
+            }
+        }
     }
 }
 
@@ -71,7 +126,7 @@ impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Amount::new(self.0 - rhs.0)
+        self + rhs.negate() // Reuse addition by negating the rhs
     }
 }
 
@@ -79,13 +134,19 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        Amount::new(self.0 - rhs)
+        self + -(rhs as i64) // Convert to negative and reuse addition logic
     }
 }
 
 impl From<u64> for Amount {
     fn from(value: u64) -> Self {
-        Amount::new(value)
+        Amount(value, false)
+    }
+}
+
+impl From<Amount> for u64 {
+    fn from(amount: Amount) -> Self {
+        amount.value()
     }
 }
 
@@ -520,11 +581,14 @@ impl Ord for Account {
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let deducted = Account {
-            balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
+        let deducted_balance = self.balance - MAINNET_ACCOUNT_CREATION_FEE;
+
+        let account_with_deducted_balance = Account {
+            balance: deducted_balance,
             ..self.clone()
         };
-        match serde_json::to_string_pretty(&deducted) {
+
+        match serde_json::to_string_pretty(&account_with_deducted_balance) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),
         }
@@ -534,12 +598,14 @@ impl std::fmt::Display for Account {
 /// Same as display
 impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self, f)
+        std::fmt::Display::fmt(self, f)
     }
 }
 
 #[cfg(test)]
-mod test {
+mod amount_tests {
+    use crate::{constants::MINA_SCALE, utility::functions::nanomina_to_mina};
+
     use super::{Account, Amount};
 
     #[test]
@@ -563,5 +629,215 @@ mod test {
         // same account display & debug
         assert_eq!(format!("{ledger_account}"), format!("{ledger_account:?}"));
         Ok(())
+    }
+
+    #[test]
+    fn test_new_positive() {
+        let amount = Amount::new(100);
+        assert_eq!(amount.value(), 100 * MINA_SCALE);
+        assert!(!amount.is_negative());
+    }
+
+    #[test]
+    fn test_new_negative() {
+        let amount = Amount::new_negative(100);
+        assert_eq!(amount.value(), 100 * MINA_SCALE);
+        assert!(amount.is_negative());
+    }
+
+    #[test]
+    fn test_to_string_positive() {
+        let amount = Amount(10, false);
+        assert_eq!(amount.to_string(), nanomina_to_mina(10));
+    }
+
+    #[test]
+    fn test_to_string_negative() {
+        let amount = Amount(1, true);
+        assert_eq!(amount.to_string(), format!("-{}", nanomina_to_mina(1)));
+    }
+
+    #[test]
+    fn test_add_two_positive_amounts() {
+        let a1 = Amount(50, false);
+        let a2 = Amount(30, false);
+        let result = a1 + a2;
+        assert_eq!(result.0, 50 + 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_add_two_negative_amounts() {
+        let a1 = Amount(50, true);
+        let a2 = Amount(30, true);
+        let result = a1 + a2;
+        assert_eq!(result.0, 50 + 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_add_positive_and_negative_same_magnitude() {
+        let a1 = Amount(50, false);
+        let a2 = Amount(50, true);
+        let result = a1 + a2;
+        assert_eq!(result.0, 0);
+        assert!(!result.is_negative()); // Zero should not be negative
+    }
+
+    #[test]
+    fn test_add_positive_and_negative_different_magnitude() {
+        let a1 = Amount(100, false);
+        let a2 = Amount(30, true);
+        let result = a1 + a2;
+        assert_eq!(result.0, 70);
+        assert!(!result.is_negative());
+
+        let a3 = Amount(30, false);
+        let a4 = Amount(100, true);
+        let result2 = a3 + a4;
+        assert_eq!(result2.0, 70);
+        assert!(result2.is_negative());
+    }
+
+    #[test]
+    fn test_add_u64_to_positive() {
+        let amount = Amount(50, false);
+        let result = amount + 30_u64;
+        assert_eq!(result.0, 50 + 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_add_u64_to_negative() {
+        let amount = Amount(50, true);
+        let result = amount + 30_u64;
+        assert_eq!(result.0, 50 - 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_add_i64_positive_to_positive() {
+        let amount = Amount(50, false);
+        let result = amount + 30_i64;
+        assert_eq!(result.0, 50 + 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_add_i64_negative_to_positive() {
+        let amount = Amount(50, false);
+        let result = amount + (-30_i64);
+        assert_eq!(result.0, 50 - 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_add_i64_negative_to_negative() {
+        let amount = Amount(50, true);
+        let result = amount + (-30_i64);
+        assert_eq!(result.0, 50 + 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_two_positive_amounts() {
+        let a1 = Amount(100, false);
+        let a2 = Amount(30, false);
+        let result = a1 - a2;
+        assert_eq!(result.0, 100 - 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_two_negative_amounts() {
+        let a1 = Amount(100, true);
+        let a2 = Amount(30, true);
+        let result = a1 - a2;
+        assert_eq!(result.0, 100 - 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_positive_and_negative() {
+        let a1 = Amount(100, false);
+        let a2 = Amount(30, true);
+        let result = a1 - a2;
+        assert_eq!(result.0, 100 + 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_negative_and_positive() {
+        let a1 = Amount(100, true);
+        let a2 = Amount(30, false);
+        let result = a1 - a2;
+        assert_eq!(result.0, 100 + 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_u64_from_positive() {
+        let amount = Amount(100, false);
+        let result = amount - 30_u64;
+        assert_eq!(result.0, 100 - 30);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_sub_u64_from_negative() {
+        let amount = Amount(100, true);
+        let result = amount - 30_u64;
+        assert_eq!(result.0, 100 + 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_edge_case_subtract_larger_from_smaller() {
+        let a1 = Amount(30, false);
+        let a2 = Amount(100, false);
+        let result = a1 - a2;
+        assert_eq!(result.0, 100 - 30);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_edge_case_add_zero() {
+        let a1 = Amount(50, false);
+        let result = a1 + Amount(0, false);
+        assert_eq!(result.0, 50);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_edge_case_subtract_zero() {
+        let a1 = Amount(50, false);
+        let result = a1 - Amount(0, false);
+        assert_eq!(result.0, 50);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_negate_positive() {
+        let amount = Amount(50, false);
+        let result = amount.negate();
+        assert_eq!(result.0, 50);
+        assert!(result.is_negative());
+    }
+
+    #[test]
+    fn test_negate_negative() {
+        let amount = Amount(50, true);
+        let result = amount.negate();
+        assert_eq!(result.0, 50);
+        assert!(!result.is_negative());
+    }
+
+    #[test]
+    fn test_add_with_negation() {
+        let a1 = Amount(50, false);
+        let a2 = Amount(30, true);
+        let result = a1 + a2;
+        assert_eq!(result.0, 50 - 30);
+        assert!(!result.is_negative());
     }
 }
