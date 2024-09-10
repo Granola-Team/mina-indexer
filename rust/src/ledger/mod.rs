@@ -374,20 +374,14 @@ mod tests {
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     amount,
-                    public_key: PublicKey::default(),
+                    public_key: public_key.clone(),
                     update_type: UpdateType::Debit(None),
                 }),
             ]],
         };
         let ledger = Ledger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
-        assert_eq!(
-            *account_after,
-            Account {
-                balance: account_before.balance + amount,
-                ..account_before
-            }
-        );
+        assert_eq!(*account_after, account_before);
     }
 
     #[test]
