@@ -29,17 +29,76 @@ fetch_ledgers
 # Create the database, if needed.
 #
 unless File.exist?(db_dir(BLOCKS_COUNT))
-  puts 'Initiating database creation...'
-  system(
-    EXE,
-    'database', 'create',
-    '--log-level', 'DEBUG',
-    '--ledger-cadence', '5000',
-    '--database-dir', db_dir(BLOCKS_COUNT),
-    '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-    '--staking-ledgers-dir', LEDGERS_DIR,
-    '--do-not-ingest-orphan-blocks'
-  ) || abort('database creation failed')
+  puts 'Creating database...'
+
+  if BUILD_TYPE == 'debug'
+    puts 'Ingest staking ledgers? (y/n)'
+    ingest_staking_ledgers = STDIN.gets
+    unless ['n', 'y'].include? ingest_staking_ledgers[0].downcase
+      abort('Invalid response')
+    end
+
+    puts 'Ingest orphan blocks? (y/n)'
+    ingest_orphan_blocks = STDIN.gets
+    unless ['n', 'y'].include? ingest_orphan_blocks[0].downcase
+      abort('Invalid response')
+    end
+
+    ingest_staking_ledgers = ingest_staking_ledgers[0].downcase == 'y'
+    ingest_orphan_blocks = ingest_orphan_blocks[0].downcase == 'y'
+    if !ingest_staking_ledgers && !ingest_orphan_blocks
+      system(
+        EXE,
+        'database', 'create',
+        '--log-level', 'DEBUG',
+        '--ledger-cadence', '5000',
+        '--database-dir', db_dir(BLOCKS_COUNT),
+        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+        '--do-not-ingest-orphan-blocks',
+      )
+    elsif !ingest_staking_ledgers && ingest_orphan_blocks
+      system(
+        EXE,
+        'database', 'create',
+        '--log-level', 'DEBUG',
+        '--ledger-cadence', '5000',
+        '--database-dir', db_dir(BLOCKS_COUNT),
+        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+      )
+    elsif ingest_staking_ledgers && !ingest_orphan_blocks
+      system(
+        EXE,
+        'database', 'create',
+        '--log-level', 'DEBUG',
+        '--ledger-cadence', '5000',
+        '--database-dir', db_dir(BLOCKS_COUNT),
+        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+        '--staking-ledgers-dir', LEDGERS_DIR,
+        '--do-not-ingest-orphan-blocks',
+      )
+    else
+      system(
+        EXE,
+        'database', 'create',
+        '--log-level', 'DEBUG',
+        '--ledger-cadence', '5000',
+        '--database-dir', db_dir(BLOCKS_COUNT),
+        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+        '--staking-ledgers-dir', LEDGERS_DIR,
+      )
+    end
+  else
+    system(
+      EXE,
+      'database', 'create',
+      '--log-level', 'DEBUG',
+      '--ledger-cadence', '5000',
+      '--database-dir', db_dir(BLOCKS_COUNT),
+      '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+      '--staking-ledgers-dir', LEDGERS_DIR,
+      '--do-not-ingest-orphan-blocks',
+    )
+  end || abort('database creation failed')
   puts 'Database creation succeeded.'
 end
 
