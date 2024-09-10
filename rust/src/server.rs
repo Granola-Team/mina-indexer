@@ -315,6 +315,7 @@ async fn initialize(
     }
 
     // flush/compress database
+    store.database.compact_range::<&[u8], &[u8]>(None, None);
     let store = state.indexer_store.as_ref().unwrap();
     let temp_checkpoint_dir = store.db_path.join("tmp-checkpoint");
     Checkpoint::new(&store.database)?.create_checkpoint(&temp_checkpoint_dir)?;
