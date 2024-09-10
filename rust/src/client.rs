@@ -421,6 +421,10 @@ pub enum InternalCommands {
         /// Retrieve public key's internal command info
         #[arg(long)]
         public_key: String,
+
+        /// Format output as CSV
+        #[arg(long, default_value_t = false)]
+        csv: bool,
     },
 }
 

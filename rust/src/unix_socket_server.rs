@@ -1052,9 +1052,19 @@ pub async fn handle_connection(
                 InternalCommands::PublicKey {
                     path,
                     public_key: pk,
+                    csv,
                 } => {
                     if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
+                    } else if csv {
+                        match db.write_internal_commands_csv(pk.clone().into(), path) {
+                            Ok(path) => Some(format!(
+                                "Successfully wrote internal commands CSV for {pk} to {path:?}"
+                            )),
+                            Err(e) => {
+                                Some(format!("Error writing internal commands CSV for {pk}: {e}"))
+                            }
+                        }
                     } else {
                         let internal_cmds =
                             db.get_internal_commands_public_key(&pk.clone().into())?;
@@ -1081,7 +1091,7 @@ pub async fn handle_connection(
                         invalid_state_hash(&state_hash)
                     } else {
                         let internal_cmds_str = serde_json::to_string_pretty(
-                            &db.get_internal_commands(&state_hash.clone().into())?,
+                            &db.get_internal_commands(state_hash.clone().into())?,
                         )?;
 
                         if path.is_none() {
