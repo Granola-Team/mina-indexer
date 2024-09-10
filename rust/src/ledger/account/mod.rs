@@ -245,7 +245,12 @@ impl Account {
             UpdateType::Debit(nonce) => self
                 .clone()
                 .debit(payment_diff.amount, nonce)
-                .unwrap_or(self),
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{:#?}. Current balance is {:#?} for account {:#?}",
+                        payment_diff, self.balance.0, self.public_key.0
+                    )
+                }),
         }
     }
 
