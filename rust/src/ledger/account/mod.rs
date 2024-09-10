@@ -35,6 +35,52 @@ impl ToString for Amount {
     }
 }
 
+impl Add<Amount> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Amount) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Add<u64> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl Add<i64> for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: i64) -> Self::Output {
+        Self(self.0 + rhs as u64)
+    }
+}
+
+impl Sub<Amount> for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: Amount) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl Sub<u64> for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: u64) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl From<u64> for Amount {
+    fn from(value: u64) -> Self {
+        Amount(value)
+    }
+}
+
 #[derive(
     PartialEq, Eq, Debug, Copy, Clone, Default, Serialize, Deserialize, PartialOrd, Ord, Hash,
 )]

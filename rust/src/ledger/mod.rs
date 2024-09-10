@@ -24,11 +24,7 @@ use anyhow::bail;
 use diff::account::AccountDiff;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    ops::{Add, Sub},
-    str::FromStr,
-};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Ledger {
@@ -269,52 +265,6 @@ impl std::fmt::Debug for Ledger {
         }
         writeln!(f)?;
         Ok(())
-    }
-}
-
-impl Add<Amount> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: Amount) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Add<u64> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: u64) -> Self::Output {
-        Self(self.0 + rhs)
-    }
-}
-
-impl Add<i64> for Amount {
-    type Output = Amount;
-
-    fn add(self, rhs: i64) -> Self::Output {
-        Self(self.0 + rhs as u64)
-    }
-}
-
-impl Sub<Amount> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
-impl Sub<u64> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0 - rhs)
-    }
-}
-
-impl From<u64> for Amount {
-    fn from(value: u64) -> Self {
-        Amount(value)
     }
 }
 
