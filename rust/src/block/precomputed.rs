@@ -10,7 +10,6 @@ use crate::{
     constants::{berkeley::*, *},
     ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
     mina_blocks::{common::from_str, v2},
-    profiling::{aggregate_processing_duration, aggregate_read_duration},
     protocol::serialization_types::{
         blockchain_state::BlockchainState,
         consensus_state as mina_consensus,
@@ -187,14 +186,10 @@ impl PrecomputedBlock {
 
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
-        let processing_time = std::time::Instant::now();
         let network = extract_network(path);
         let blockchain_length = extract_block_height(path);
         let state_hash = extract_state_hash(path);
-        let read_time = std::time::Instant::now();
         let contents = std::fs::read(path)?;
-        let elapsed_read_time = read_time.elapsed();
-        aggregate_read_duration(elapsed_read_time);
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
@@ -204,7 +199,6 @@ impl PrecomputedBlock {
             },
             version,
         )?;
-        aggregate_processing_duration(processing_time.elapsed() - elapsed_read_time);
         Ok(precomputed_block)
     }
 

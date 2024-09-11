@@ -22,9 +22,6 @@ use crate::{
         username::Username,
         Ledger, LedgerHash,
     },
-    profiling::{
-        aggregate_db_operation_duration, aggregate_processing_duration, ingestion_profiling_summary,
-    },
     server::IndexerVersion,
     state::{
         branch::Branch,
@@ -398,16 +395,12 @@ impl IndexerState {
                 if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
                     block_parser.next_block().await?
                 {
-                    let processing_time = std::time::Instant::now();
                     let state_hash = block.state_hash();
                     self.bytes_processed += block_bytes;
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
                     ledger_diffs.push(diff.clone());
-
-                    aggregate_processing_duration(processing_time.elapsed());
-                    let db_time = std::time::Instant::now();
 
                     indexer_store.add_block(&block, block_bytes)?;
                     indexer_store.set_best_block(&block.state_hash())?;
@@ -430,24 +423,15 @@ impl IndexerState {
                             .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
                     }
 
-                    aggregate_db_operation_duration(db_time.elapsed());
-
                     // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
-                        let processing_time_2 = std::time::Instant::now();
                         self.root_branch = Branch::new(&block)?;
-                        let db_time_2 = std::time::Instant::now();
                         self.ledger._apply_diff(&diff)?;
-                        let elapsed_db_time = db_time_2.elapsed();
-                        aggregate_db_operation_duration(elapsed_db_time);
                         self.best_tip = Tip {
                             state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
                         };
                         self.canonical_root = self.best_tip.clone();
-                        aggregate_processing_duration(
-                            processing_time_2.elapsed() - elapsed_db_time,
-                        );
                     }
                 } else {
                     bail!("Block unexpectedly missing");
@@ -462,11 +446,6 @@ impl IndexerState {
 
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing deep canonical chain");
-        info!(
-            "Ingestion Profiling Summary: {}",
-            ingestion_profiling_summary().join("\n")
-        );
-
         info!("Adding recent blocks to the witness tree and orphaned blocks to the block store");
 
         // deep canonical & recent blocks added, now add orphaned blocks

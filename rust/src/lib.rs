@@ -9,7 +9,6 @@ pub mod constants;
 pub mod event;
 pub mod ledger;
 pub mod mina_blocks;
-pub mod profiling;
 pub mod proof_systems;
 pub mod protocol;
 pub mod server;
