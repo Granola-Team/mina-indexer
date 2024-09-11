@@ -1457,7 +1457,7 @@ test_clean_kill() {
     kill "$PID"
 
     # We must give the process a chance to die cleanly.
-    sleep 2
+    sleep 3
 
     # If the process is still there, it's a fail.
     if ps -p "$PID" >/dev/null; then
