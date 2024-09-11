@@ -192,6 +192,8 @@ impl IndexerStore {
         cf_opts.set_compression_type(DBCompressionType::Zstd);
 
         let mut database_opts = speedb::Options::default();
+        database_opts.enable_statistics();
+        database_opts.set_stats_dump_period_sec(180); // every 3 minutes
         database_opts.set_compression_type(DBCompressionType::Zstd);
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
