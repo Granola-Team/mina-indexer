@@ -195,7 +195,10 @@ impl IndexerStore {
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
-        cf_opts.set_max_write_buffer_number(16);
+        cf_opts.set_write_buffer_size(4 * 1024 * 1024 * 1024); // 4 GB MemTable size
+        cf_opts.set_max_write_buffer_number(4); // 4 * 4GB = 16GB at maximum, half of available memory
+        cf_opts.set_max_background_jobs(8); // half of available cores
+        cf_opts.set_level_zero_file_num_compaction_trigger(8); // double the default and see what happens
         cf_opts.set_compression_type(DBCompressionType::Zstd);
 
         let mut database_opts = speedb::Options::default();
