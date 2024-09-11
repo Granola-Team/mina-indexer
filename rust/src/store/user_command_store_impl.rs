@@ -419,13 +419,13 @@ impl UserCommandStore for IndexerStore {
             } else {
                 "/mnt".into()
             };
-            format!("{dir}/mina-indexer-user-commands/{pk}.json")
+            format!("{dir}/mina-indexer-user-commands/{pk}.csv")
         };
         let mut csv_writer = csv::WriterBuilder::new()
             .has_headers(true)
             .from_path(path.clone())?;
         for (_, _, txn_hash) in txns {
-            if let Ok(Some(cmd)) = self.get_user_command(&txn_hash, 0).as_ref() {
+            if let Some(cmd) = self.get_user_command(&txn_hash, 0)?.as_ref() {
                 csv_writer.serialize(TxnCsvRecord::from_user_command(cmd))?;
             } else {
                 bail!("User command missing: {txn_hash}")

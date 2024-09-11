@@ -56,7 +56,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 88] = [
+    const COLUMN_FAMILIES: [&'static str; 95] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -67,6 +67,7 @@ impl IndexerStore {
         "blocks-height",
         "blocks-global-slot",
         "blocks-parent-hash",
+        "blocks-date-time",
         "blocks-epoch",
         "blocks-genesis-hash",
         "blocks-height-to-slots",
@@ -108,7 +109,13 @@ impl IndexerStore {
         // Internal command store CFs //
         ////////////////////////////////
         "internal-commands",
-        "internal-commands-global-slot",
+        "internal-commands-block-num",
+        "internal-commands-global-slot-sort",
+        "internal-commands-block-height-sort",
+        "internal-commands-pk",
+        "internal-commands-pk-num",
+        "internal-commands-pk-global-slot-sort",
+        "internal-commands-pk-block-height-sort",
         /////////////////////
         // SNARK store CFs //
         /////////////////////

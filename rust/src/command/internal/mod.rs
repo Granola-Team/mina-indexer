@@ -5,25 +5,16 @@ use crate::{
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommandKind {
     Coinbase,
+
     #[serde(rename = "Fee_transfer")]
     FeeTransfer,
+
     #[serde(rename = "Fee_transfer_via_coinbase")]
     FeeTransferViaCoinbase,
-}
-
-impl fmt::Display for InternalCommandKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            InternalCommandKind::Coinbase => write!(f, "Coinbase"),
-            InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
-            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -159,41 +150,46 @@ impl InternalCommand {
 }
 
 impl InternalCommandWithData {
-    pub fn from_internal_cmd(cmd: InternalCommand, block: &PrecomputedBlock) -> Self {
+    pub fn from_internal_cmd(
+        cmd: InternalCommand,
+        state_hash: BlockHash,
+        block_height: u32,
+        date_time: i64,
+    ) -> Self {
         match cmd {
             InternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
-                receiver,
                 amount,
-                state_hash: block.state_hash(),
+                receiver,
+                date_time,
+                state_hash,
+                block_height,
                 kind: InternalCommandKind::Coinbase,
-                block_height: block.blockchain_length(),
-                date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransfer {
                 sender,
                 receiver,
                 amount,
             } => Self::FeeTransfer {
+                amount,
                 sender,
                 receiver,
-                amount,
-                state_hash: block.state_hash(),
+                date_time,
+                state_hash,
+                block_height,
                 kind: InternalCommandKind::FeeTransfer,
-                block_height: block.blockchain_length(),
-                date_time: block.timestamp() as i64,
             },
             InternalCommand::FeeTransferViaCoinbase {
                 sender,
                 receiver,
                 amount,
             } => Self::FeeTransfer {
+                amount,
                 sender,
                 receiver,
-                amount,
-                state_hash: block.state_hash(),
+                date_time,
+                state_hash,
+                block_height,
                 kind: InternalCommandKind::FeeTransferViaCoinbase,
-                block_height: block.blockchain_length(),
-                date_time: block.timestamp() as i64,
             },
         }
     }
@@ -201,7 +197,14 @@ impl InternalCommandWithData {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         InternalCommand::from_precomputed(block)
             .iter()
-            .map(|cmd| Self::from_internal_cmd(cmd.clone(), block))
+            .map(|cmd| {
+                Self::from_internal_cmd(
+                    cmd.clone(),
+                    block.state_hash(),
+                    block.blockchain_length(),
+                    block.timestamp() as i64,
+                )
+            })
             .collect()
     }
 
@@ -220,6 +223,31 @@ impl InternalCommandWithData {
             Self::FeeTransfer {
                 sender, receiver, ..
             } => pk == sender || pk == receiver,
+        }
+    }
+
+    pub fn recipient(&self) -> PublicKey {
+        use InternalCommandWithData::*;
+        match self {
+            Coinbase { receiver, .. } | FeeTransfer { receiver, .. } => receiver.clone(),
+        }
+    }
+
+    pub fn kind(&self) -> u8 {
+        use InternalCommandWithData::*;
+        match self {
+            Coinbase { .. } => 1,
+            FeeTransfer { .. } => 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InternalCommandKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            InternalCommandKind::Coinbase => write!(f, "Coinbase"),
+            InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
+            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
         }
     }
 }
@@ -252,7 +280,14 @@ mod tests {
 
         let cmds: Vec<InternalCommandWithData> = internal_cmds
             .into_iter()
-            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
+            .map(|cmd| {
+                InternalCommandWithData::from_internal_cmd(
+                    cmd,
+                    block.state_hash(),
+                    block.blockchain_length(),
+                    block.timestamp() as i64,
+                )
+            })
             .collect();
         assert_eq!(
             cmds,

@@ -3,7 +3,8 @@ use crate::{
     command::internal::InternalCommandWithData,
     ledger::public_key::PublicKey,
 };
-use speedb::{DBIterator, WriteBatch};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
+use std::path::PathBuf;
 
 /// Store for internal commands
 pub trait InternalCommandStore {
@@ -15,24 +16,84 @@ pub trait InternalCommandStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
+    /// Set the block's `index`-th internal command
+    fn set_block_internal_command(
+        &self,
+        block: &PrecomputedBlock,
+        index: u32,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()>;
+
+    /// Set pk's internal command
+    fn set_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()>;
+
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: BlockHash,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
-    /// Get indexed internal commands for the given public key
+    /// Get indexed internal command from block
+    fn get_block_internal_command(
+        &self,
+        state_hash: &BlockHash,
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>>;
+
+    /// Get indexed internal command for the given public key
+    fn get_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>>;
+
+    /// Get internal commands for the given public key
     fn get_internal_commands_public_key(
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
     /// Get number of blocks that the public key has internal commands for
-    fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+    fn get_pk_num_internal_commands(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
-    /// Get internal commands interator (by global slot) with given mode
-    fn internal_commands_global_slot_interator(&self, mode: speedb::IteratorMode)
-        -> DBIterator<'_>;
+    /// Write the account's internal commands to a CSV file
+    fn write_internal_commands_csv(
+        &self,
+        pk: PublicKey,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<PathBuf>;
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    /// Internal commands iterator via block height
+    fn internal_commands_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Internal commands iterator via global slot
+    fn internal_commands_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Account internal commands iterator via block height
+    fn internal_commands_pk_block_height_iterator(
+        &self,
+        pk: PublicKey,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
+    /// Account internal commands iterator via global slot
+    fn internal_commands_pk_global_slot_iterator(
+        &self,
+        pk: PublicKey,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
+    /////////////////////////////
+    // Internal command counts //
+    /////////////////////////////
 
     /// Increment internal commands per epoch count
     fn increment_internal_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;

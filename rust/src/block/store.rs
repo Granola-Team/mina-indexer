@@ -82,6 +82,17 @@ pub trait BlockStore {
     /// Get a block's parent hash
     fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>>;
 
+    /// Index the block's creation date time
+    fn set_block_date_time_batch(
+        &self,
+        state_hash: &BlockHash,
+        date_time: i64,
+        batch: &mut WriteBatch,
+    ) -> anyhow::Result<()>;
+
+    /// Get a block's creation date time
+    fn get_block_date_time(&self, state_hash: &BlockHash) -> anyhow::Result<Option<i64>>;
+
     /// Index the block's blockchain length
     fn set_block_height_batch(
         &self,

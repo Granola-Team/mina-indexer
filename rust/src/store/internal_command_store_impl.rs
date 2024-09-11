@@ -1,13 +1,18 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{
+    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, pk_key_prefix,
+    pk_txn_sort_key_sort,
+};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
+    constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
     store::{from_be_bytes, to_be_bytes, u32_prefix_key, IndexerStore},
 };
-use log::trace;
-use speedb::{DBIterator, WriteBatch};
-use std::mem::size_of;
+use anyhow::bail;
+use log::{info, trace};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
+use std::{mem::size_of, path::PathBuf};
 
 impl InternalCommandStore for IndexerStore {
     /// Index internal commands on public keys & state hash
@@ -17,136 +22,178 @@ impl InternalCommandStore for IndexerStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         let epoch = block.epoch_count();
+        let state_hash = block.state_hash();
+        let global_slot = block.global_slot_since_genesis();
+        let block_height = block.blockchain_length();
+        let date_time = block.timestamp() as i64;
         trace!("Adding internal commands for block {}", block.summary());
 
-        // add internal cmds to state hash
-        let key = format!("internal-{}", block.state_hash().0);
-        let internal_cmds = InternalCommand::from_precomputed(block);
-        batch.put_cf(
-            self.internal_commands_cf(),
-            key.as_bytes(),
-            serde_json::to_vec(&internal_cmds)?,
-        );
+        // add cmds with data to public keys
+        let internal_cmds_with_data: Vec<InternalCommandWithData> =
+            InternalCommand::from_precomputed(block)
+                .into_iter()
+                .map(|c| {
+                    InternalCommandWithData::from_internal_cmd(
+                        c,
+                        state_hash.clone(),
+                        block_height,
+                        date_time,
+                    )
+                })
+                .collect();
 
         // per block internal command count
         self.set_block_internal_commands_count_batch(
-            &block.state_hash(),
-            internal_cmds.len() as u32,
+            &state_hash,
+            internal_cmds_with_data.len() as u32,
             batch,
         )?;
+        self.database.put_cf(
+            self.internal_commands_block_num_cf(),
+            state_hash.0.as_bytes(),
+            (internal_cmds_with_data.len() as u32).to_be_bytes(),
+        )?;
 
-        // add cmds with data to public keys
-        let internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds
-            .clone()
-            .into_iter()
-            .map(|c| InternalCommandWithData::from_internal_cmd(c, block))
-            .collect();
-
-        // increment internal command counts
-        for internal_cmd in &internal_cmds_with_data {
-            self.increment_internal_commands_counts(internal_cmd, epoch)?;
-        }
-
-        fn internal_commmand_key(
-            global_slot: u32,
-            state_hash: &BlockHash,
-            index: usize,
-        ) -> [u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()] {
-            let mut bytes = [0u8; size_of::<u32>() + BlockHash::LEN + size_of::<usize>()];
-            bytes[..size_of::<u32>()].copy_from_slice(&to_be_bytes(global_slot));
-            bytes[size_of::<u32>()..size_of::<u32>() + BlockHash::LEN]
-                .copy_from_slice(&state_hash.clone().to_bytes());
-            bytes[size_of::<u32>() + BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
-            bytes
-        }
-
+        // increment internal command counts &
+        // sort by pk, block height & global slot
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
-            let key =
-                internal_commmand_key(block.global_slot_since_genesis(), &block.state_hash(), i);
-            batch.put_cf(
-                self.internal_commands_slot_cf(),
-                key,
-                serde_json::to_vec(&int_cmd)?,
-            );
-        }
+            let pk = int_cmd.recipient();
+            self.increment_internal_commands_counts(int_cmd, epoch)?;
+            self.set_block_internal_command(block, i as u32, int_cmd)?;
+            self.set_pk_internal_command(&pk, int_cmd)?;
 
-        for pk in block.all_public_keys() {
-            trace!("Writing internal commands for {}", pk.0);
-
-            let n = self.get_pk_num_internal_commands(&pk.0)?.unwrap_or(0);
-            let key = format!("internal-{}-{}", pk.0, n);
-            let pk_internal_cmds_with_data: Vec<InternalCommandWithData> = internal_cmds_with_data
-                .iter()
-                .filter_map(|cmd| {
-                    if cmd.contains_pk(&pk) {
-                        Some(cmd.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            batch.put_cf(
-                self.internal_commands_cf(),
-                key.as_bytes(),
-                serde_json::to_vec(&pk_internal_cmds_with_data)?,
-            );
-
-            // update pk's number of internal cmds
-            let key = format!("internal-{}", pk.0);
-            let next_n = (n + 1).to_string();
-            batch.put_cf(
-                self.internal_commands_cf(),
-                key.as_bytes(),
-                next_n.as_bytes(),
-            );
+            // sort data
+            self.database.put_cf(
+                self.internal_commands_pk_block_height_sort_cf(),
+                internal_commmand_pk_sort_key(
+                    pk.clone(),
+                    block_height,
+                    state_hash.clone(),
+                    i as u32,
+                    int_cmd.kind(),
+                ),
+                serde_json::to_vec(int_cmd)?,
+            )?;
+            self.database.put_cf(
+                self.internal_commands_pk_global_slot_sort_cf(),
+                internal_commmand_pk_sort_key(
+                    pk,
+                    global_slot,
+                    state_hash.clone(),
+                    i as u32,
+                    int_cmd.kind(),
+                ),
+                serde_json::to_vec(int_cmd)?,
+            )?;
         }
         Ok(())
     }
 
-    fn get_internal_commands(
+    fn set_block_internal_command(
+        &self,
+        block: &PrecomputedBlock,
+        index: u32,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()> {
+        let state_hash = block.state_hash();
+        let global_slot = block.global_slot_since_genesis();
+        let block_height = block.blockchain_length();
+        trace!("Setting block internal command {state_hash} index {index}");
+
+        self.database.put_cf(
+            self.internal_commands_cf(),
+            internal_commmand_block_key(&state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_block_height_sort_cf(),
+            internal_commmand_sort_key(block_height, &state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_global_slot_sort_cf(),
+            internal_commmand_sort_key(global_slot, &state_hash, index),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        Ok(())
+    }
+
+    fn get_block_internal_command(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
-        trace!("Getting internal commands in block {}", state_hash.0);
-        let block = self.get_block(state_hash)?.expect("block to exist").0;
-
-        let key = format!("internal-{}", state_hash.0);
-        if let Some(commands_bytes) = self
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>> {
+        info!("Getting internal command block {state_hash} index {index}");
+        Ok(self
             .database
-            .get_pinned_cf(self.internal_commands_cf(), key.as_bytes())?
-        {
-            let res: Vec<InternalCommand> = serde_json::from_slice(&commands_bytes)?;
-            return Ok(res
-                .into_iter()
-                .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, &block))
-                .collect());
+            .get_cf(
+                self.internal_commands_cf(),
+                internal_commmand_block_key(state_hash, index),
+            )?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+    }
+
+    fn set_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        internal_command: &InternalCommandWithData,
+    ) -> anyhow::Result<()> {
+        let n = self.get_pk_num_internal_commands(pk)?.unwrap_or(0);
+        self.database.put_cf(
+            self.internal_commands_pk_cf(),
+            internal_command_pk_key(pk.clone(), n),
+            serde_json::to_vec(internal_command)?,
+        )?;
+        self.database.put_cf(
+            self.internal_commands_pk_num_cf(),
+            pk.0.as_bytes(),
+            (n + 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn get_pk_internal_command(
+        &self,
+        pk: &PublicKey,
+        index: u32,
+    ) -> anyhow::Result<Option<InternalCommandWithData>> {
+        info!("Getting internal command pk {pk} index {index}");
+        Ok(self
+            .database
+            .get_cf(
+                self.internal_commands_pk_cf(),
+                internal_commmand_pk_key(pk, index),
+            )?
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+    }
+
+    fn get_internal_commands(
+        &self,
+        state_hash: BlockHash,
+    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
+        trace!("Getting internal commands in block {state_hash}");
+        let mut res = vec![];
+        if let Some(num) = self.get_block_internal_commands_count(&state_hash)? {
+            for n in 0..num {
+                res.push(
+                    self.get_block_internal_command(&state_hash, n)?
+                        .expect("internal command exists"),
+                );
+            }
         }
-        Ok(vec![])
+        Ok(res)
     }
 
     fn get_internal_commands_public_key(
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<InternalCommandWithData>> {
-        trace!("Getting internal commands for public key {}", pk.0);
-
-        let commands_cf = self.internal_commands_cf();
+        trace!("Getting internal commands for public key {pk}");
         let mut internal_cmds = vec![];
-        fn key_n(pk: String, n: u32) -> Vec<u8> {
-            format!("internal-{}-{}", pk, n).as_bytes().to_vec()
-        }
-
-        if let Some(n) = self.get_pk_num_internal_commands(&pk.0)? {
+        if let Some(n) = self.get_pk_num_internal_commands(pk)? {
             for m in 0..n {
-                if let Some(mut block_m_internal_cmds) = self
-                    .database
-                    .get_pinned_cf(commands_cf, key_n(pk.0.clone(), m))?
-                    .map(|bytes| {
-                        serde_json::from_slice::<Vec<InternalCommandWithData>>(&bytes)
-                            .expect("internal commands with data")
-                    })
-                {
-                    internal_cmds.append(&mut block_m_internal_cmds);
+                if let Some(internal_command) = self.get_pk_internal_command(pk, m)? {
+                    internal_cmds.push(internal_command);
                 } else {
                     internal_cmds.clear();
                     break;
@@ -157,29 +204,130 @@ impl InternalCommandStore for IndexerStore {
     }
 
     /// Number of blocks containing `pk` internal commands
-    fn get_pk_num_internal_commands(&self, pk: &str) -> anyhow::Result<Option<u32>> {
+    fn get_pk_num_internal_commands(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
         trace!("Getting pk num internal commands {pk}");
-        let key = format!("internal-{}", pk);
-        if let Some(bytes) = self
+        Ok(self
             .database
-            .get_pinned_cf(self.internal_commands_cf(), key.as_bytes())?
-        {
-            if let Ok(s) = std::str::from_utf8(&bytes) {
-                if let Ok(num) = s.parse::<u32>() {
-                    return Ok(Some(num));
-                }
-            }
-        }
-        Ok(None)
+            .get_cf(self.internal_commands_pk_num_cf(), pk.0.as_bytes())?
+            .map(from_be_bytes))
     }
 
-    fn internal_commands_global_slot_interator(
+    fn write_internal_commands_csv(
         &self,
-        mode: speedb::IteratorMode,
-    ) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.internal_commands_slot_cf(), mode)
+        pk: PublicKey,
+        path: Option<PathBuf>,
+    ) -> anyhow::Result<PathBuf> {
+        let mut cmds = vec![];
+        for (key, _) in self
+            .internal_commands_pk_block_height_iterator(pk.clone(), Direction::Reverse)
+            .flatten()
+        {
+            let cmd_pk = pk_key_prefix(&key);
+            if cmd_pk != pk {
+                break;
+            }
+            let height = pk_txn_sort_key_sort(&key);
+            let state_hash = internal_command_pk_sort_key_state_hash(&key);
+            let index = internal_command_pk_sort_key_index(&key);
+            let kind = internal_command_pk_sort_key_kind(&key);
+            cmds.push((height, kind, index, state_hash));
+        }
+
+        cmds.sort();
+        cmds.reverse();
+
+        // write internal command records to csv
+        let path = if let Some(path) = path {
+            path.display().to_string()
+        } else {
+            let dir = if let Ok(dir) = std::env::var("VOLUMES_DIR") {
+                dir
+            } else {
+                "/mnt".into()
+            };
+            format!("{dir}/mina-indexer-internal-commands/{pk}.csv")
+        };
+        let mut csv_writer = csv::WriterBuilder::new()
+            .has_headers(true)
+            .from_path(path.clone())?;
+        for (_, _, index, state_hash) in cmds {
+            if let Some(cmd) = self
+                .get_block_internal_command(&state_hash, index)?
+                .as_ref()
+            {
+                csv_writer.serialize(CsvRecordInternalCommand::from_internal_command(cmd))?;
+            } else {
+                bail!("Internal command missing for block {state_hash}")
+            }
+        }
+
+        csv_writer.flush()?;
+        Ok(path.into())
     }
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    fn internal_commands_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.internal_commands_block_height_sort_cf(), mode)
+    }
+
+    fn internal_commands_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.internal_commands_global_slot_sort_cf(), mode)
+    }
+
+    fn internal_commands_pk_block_height_iterator(
+        &self,
+        pk: PublicKey,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        let pk_bytes = pk.to_bytes();
+        let mut start = [0; PublicKey::LEN + size_of::<u32>() + 1];
+        let mode = match direction {
+            Direction::Forward => IteratorMode::From(&pk_bytes, direction),
+            Direction::Reverse => {
+                start[..PublicKey::LEN].copy_from_slice(&pk_bytes);
+                start[PublicKey::LEN..][..size_of::<u32>()]
+                    .copy_from_slice(&u32::MAX.to_be_bytes());
+
+                // need to start after the target account
+                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
+                IteratorMode::From(&start, direction)
+            }
+        };
+        self.database
+            .iterator_cf(self.internal_commands_pk_block_height_sort_cf(), mode)
+    }
+
+    fn internal_commands_pk_global_slot_iterator(
+        &self,
+        pk: PublicKey,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        let pk_bytes = pk.to_bytes();
+        let mut start = [0; PublicKey::LEN + size_of::<u32>() + 1];
+        let mode = match direction {
+            Direction::Forward => IteratorMode::From(&pk_bytes, direction),
+            Direction::Reverse => {
+                start[..PublicKey::LEN].copy_from_slice(&pk_bytes);
+                start[PublicKey::LEN..][..size_of::<u32>()]
+                    .copy_from_slice(&u32::MAX.to_be_bytes());
+
+                // need to start after the target account
+                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
+                IteratorMode::From(&start, direction)
+            }
+        };
+        self.database
+            .iterator_cf(self.internal_commands_pk_global_slot_sort_cf(), mode)
+    }
+
+    /////////////////////////////
+    // Internal command counts //
+    /////////////////////////////
 
     fn get_internal_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
@@ -215,7 +363,6 @@ impl InternalCommandStore for IndexerStore {
 
     fn increment_internal_commands_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing internal command total");
-
         let old = self.get_internal_commands_total_count()?;
         Ok(self
             .database
@@ -273,7 +420,6 @@ impl InternalCommandStore for IndexerStore {
 
     fn increment_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
         trace!("Incrementing internal command pk total num {pk}");
-
         let old = self.get_internal_commands_pk_total_count(pk)?;
         Ok(self.database.put_cf(
             self.internal_commands_pk_total_cf(),
@@ -346,4 +492,119 @@ impl InternalCommandStore for IndexerStore {
         self.increment_internal_commands_epoch_count(epoch)?;
         self.increment_internal_commands_total_count()
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct CsvRecordInternalCommand<'a> {
+    date: String,
+    block_height: u32,
+    block_state_hash: &'a str,
+    recipient: &'a str,
+    amount: u64,
+    kind: String,
+}
+
+impl<'a> CsvRecordInternalCommand<'a> {
+    fn from_internal_command(cmd: &'a InternalCommandWithData) -> Self {
+        use InternalCommandWithData::*;
+        match cmd {
+            Coinbase {
+                receiver,
+                amount,
+                state_hash,
+                kind,
+                date_time,
+                block_height,
+            }
+            | FeeTransfer {
+                sender: _,
+                receiver,
+                amount,
+                state_hash,
+                kind,
+                date_time,
+                block_height,
+            } => Self {
+                amount: *amount,
+                recipient: &receiver.0,
+                block_height: *block_height,
+                block_state_hash: &state_hash.0,
+                date: millis_to_iso_date_string(*date_time),
+                kind: kind.to_string(),
+            },
+        }
+    }
+}
+
+fn internal_commmand_block_key(
+    state_hash: &BlockHash,
+    index: u32,
+) -> [u8; BlockHash::LEN + size_of::<u32>()] {
+    let mut bytes = [0; BlockHash::LEN + size_of::<u32>()];
+    bytes[..BlockHash::LEN].copy_from_slice(&state_hash.clone().to_bytes());
+    bytes[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes
+}
+
+fn internal_commmand_pk_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + size_of::<u32>()] {
+    let mut bytes = [0; PublicKey::LEN + size_of::<u32>()];
+    bytes[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+    bytes[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes
+}
+
+fn internal_commmand_sort_key(
+    prefix: u32,
+    state_hash: &BlockHash,
+    index: u32,
+) -> [u8; size_of::<u32>() + BlockHash::LEN + size_of::<u32>()] {
+    let mut bytes = [0; size_of::<u32>() + BlockHash::LEN + size_of::<u32>()];
+    bytes[..size_of::<u32>()].copy_from_slice(&prefix.to_be_bytes());
+    bytes[size_of::<u32>()..][..BlockHash::LEN].copy_from_slice(&state_hash.clone().to_bytes());
+    bytes[size_of::<u32>() + BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes
+}
+
+fn internal_commmand_pk_sort_key(
+    pk: PublicKey,
+    sort: u32,
+    state_hash: BlockHash,
+    index: u32,
+    kind: u8,
+) -> [u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>() + 1] {
+    let mut bytes = [0; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>() + 1];
+    bytes[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+    bytes[PublicKey::LEN..][..size_of::<u32>()].copy_from_slice(&sort.to_be_bytes());
+    bytes[PublicKey::LEN + size_of::<u32>()..][..BlockHash::LEN]
+        .copy_from_slice(&state_hash.to_bytes());
+    bytes[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN..][..size_of::<u32>()]
+        .copy_from_slice(&index.to_be_bytes());
+    bytes[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>()] = kind;
+    bytes
+}
+
+fn internal_command_pk_key(pk: PublicKey, index: u32) -> [u8; PublicKey::LEN + size_of::<u32>()] {
+    let mut bytes = [0; PublicKey::LEN + size_of::<u32>()];
+    bytes[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+    bytes[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes
+}
+
+fn internal_command_pk_sort_key_state_hash(key: &[u8]) -> BlockHash {
+    let mut bytes = [0; BlockHash::LEN];
+    bytes.copy_from_slice(&key[PublicKey::LEN + size_of::<u32>()..][..BlockHash::LEN]);
+    BlockHash::from_bytes(&bytes).expect("block state hash bytes")
+}
+
+fn internal_command_pk_sort_key_index(key: &[u8]) -> u32 {
+    let mut bytes = [0; size_of::<u32>()];
+    bytes.copy_from_slice(
+        &key[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN..][..size_of::<u32>()],
+    );
+    u32::from_be_bytes(bytes)
+}
+
+fn internal_command_pk_sort_key_kind(key: &[u8]) -> u8 {
+    key[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>()]
 }

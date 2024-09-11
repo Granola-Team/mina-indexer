@@ -21,6 +21,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing previous state hashes
     fn block_parent_hash_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block date times
+    fn block_date_time_cf(&self) -> &ColumnFamily;
+
     /// CF for storing block genesis state hashes
     fn block_genesis_state_hash_cf(&self) -> &ColumnFamily;
 
@@ -134,11 +137,29 @@ pub trait ColumnFamilyHelpers {
     // Internal command store CFs //
     ////////////////////////////////
 
-    /// CF for storing internal commands
+    /// CF for storing block internal commands
     fn internal_commands_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block internal command counts
+    fn internal_commands_block_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing internal commands by public key
+    fn internal_commands_pk_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing internal commands counts by public key
+    fn internal_commands_pk_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting internal commands by block height
+    fn internal_commands_block_height_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for sorting internal commands by global slot
-    fn internal_commands_slot_cf(&self) -> &ColumnFamily;
+    fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting internal commands by account & block height
+    fn internal_commands_pk_block_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting internal commands by account & global slot
+    fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     ///////////////////////////
     // Best ledger store CFs //

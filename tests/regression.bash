@@ -855,6 +855,7 @@ test_transactions() {
     rm -rf ./transactions
 }
 
+# Indexer correctly exports user commands CSV
 test_transactions_csv() {
     stage_mainnet_blocks 5 ./blocks
 
@@ -1404,6 +1405,29 @@ test_internal_commands() {
     assert $pk_state_hash $hash_state_hash
 }
 
+# Indexer correctly exports internal commands CSV
+test_internal_commands_csv() {
+    stage_mainnet_blocks 10 ./blocks
+
+    idxr_server_start_standard
+    wait_for_socket
+
+    # write transactions to CSV
+    csv_file=./B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP.json
+    idxr internal-commands public-key --public-key B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP --csv --path $csv_file
+
+    # check transactions CSV
+    expect="Date,BlockHeight,BlockStateHash,Recipient,Amount,Kind
+2021-03-17T00:27:00.000Z,10,3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5,B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP,1440000000000,Coinbase
+2021-03-17T00:18:00.000Z,7,3NL7dd6X6316xu6JtJj6cHwAhHrXwZC4SdBU9TUDUUhfAkB8cSoK,B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP,1440000000000,Coinbase
+2021-03-17T00:18:00.000Z,7,3NL7dd6X6316xu6JtJj6cHwAhHrXwZC4SdBU9TUDUUhfAkB8cSoK,B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP,10000000,Fee_transfer
+2021-03-17T00:15:00.000Z,6,3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v,B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP,1440000000000,Coinbase
+2021-03-17T00:15:00.000Z,6,3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v,B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP,10000000,Fee_transfer"
+    assert "$expect" "$(cat $csv_file)"
+
+    rm -f $csv_file
+}
+
 # Indexer correctly starts from config file
 test_start_from_config() {
     stage_mainnet_blocks 15 ./blocks
@@ -1775,6 +1799,7 @@ for test_name in "$@"; do
         "test_watch_staking_ledgers") test_watch_staking_ledgers ;;
         "test_staking_delegations") test_staking_delegations ;;
         "test_internal_commands") test_internal_commands ;;
+        "test_internal_commands_csv") test_internal_commands_csv ;;
         "test_start_from_config") test_start_from_config ;;
         "test_hurl") test_hurl ;;
         "test_clean_shutdown") test_clean_shutdown ;;

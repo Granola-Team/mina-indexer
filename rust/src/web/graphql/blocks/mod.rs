@@ -932,7 +932,14 @@ impl BlockWithoutCanonicity {
 
         let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(block)
             .into_iter()
-            .map(|cmd| InternalCommandWithData::from_internal_cmd(cmd, block))
+            .map(|cmd| {
+                InternalCommandWithData::from_internal_cmd(
+                    cmd,
+                    block.state_hash(),
+                    block.blockchain_length(),
+                    block.timestamp() as i64,
+                )
+            })
             .filter(|x| matches!(x, InternalCommandWithData::FeeTransfer { .. }))
             .map(|ft| ft.into())
             .collect();

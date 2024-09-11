@@ -217,7 +217,7 @@ pub struct DatabaseArgs {
     #[arg(long, default_value = Network::Mainnet)]
     network: Network,
 
-    /// Path to dump the best ledger to after ingesting all canonical blocks
+    /// Switch to not ingest orphan blocks
     #[arg(long, default_value_t = false)]
     do_not_ingest_orphan_blocks: bool,
 }
