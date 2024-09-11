@@ -47,6 +47,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const COMPACTION_INTERVAL_IN_BLOCKS: u32 = 50000;
+
 /// Rooted forest of precomputed block summaries aka the witness tree
 /// `root_branch` - represents the tree of blocks connecting back to a known
 /// ledger state, e.g. genesis `dangling_branches` - trees of blocks stemming
@@ -411,6 +413,17 @@ impl IndexerState {
                         &block.genesis_state_hash(),
                         None,
                     )?;
+
+                    if self.blocks_processed % COMPACTION_INTERVAL_IN_BLOCKS == 0 {
+                        let compaction_time = std::time::Instant::now();
+                        indexer_store
+                            .database
+                            .compact_range::<&[u8], &[u8]>(None, None);
+                        info!(
+                            "Compaction time: {}",
+                            pretty_print_duration(compaction_time.elapsed())
+                        );
+                    }
 
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
