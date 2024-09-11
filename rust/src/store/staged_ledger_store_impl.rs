@@ -442,6 +442,22 @@ impl StagedLedgerStore for IndexerStore {
         Ok(Some(Ledger { accounts }))
     }
 
+    fn persist_best_ledger(&self) -> anyhow::Result<()> {
+        let state_hash = self.get_best_block_hash()?.expect("best block exists");
+        let block_height = self.get_best_block_height()?.expect("best block exists");
+        trace!("Persisting best ledger (length {block_height}): {state_hash}");
+
+        for (_, value) in self
+            .best_ledger_account_balance_iterator(IteratorMode::Start)
+            .flatten()
+        {
+            let account: Account = serde_json::from_slice(&value)?;
+            let pk = account.public_key.clone();
+            self.set_staged_account(pk, state_hash.clone(), &account)?;
+        }
+        Ok(())
+    }
+
     ///////////////
     // Iterators //
     ///////////////
