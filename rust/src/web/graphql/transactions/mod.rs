@@ -37,7 +37,6 @@ impl TransactionsQueryRoot {
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
-
         if let Some(hash) = query.hash {
             if signed::is_valid_tx_hash(&hash) {
                 return Ok(db.get_user_command(&hash, 0)?.map(|cmd| {
@@ -45,7 +44,6 @@ impl TransactionsQueryRoot {
                 }));
             }
         }
-
         Ok(None)
     }
 
@@ -59,7 +57,6 @@ impl TransactionsQueryRoot {
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
-
         let sort_by = sort_by.unwrap_or(TransactionSortByInput::BlockHeightDesc);
 
         // transaction filtered by state hash
@@ -602,28 +599,29 @@ impl TransactionQueryInput {
         }
 
         // date time
+        let txn_date_time_millis = transaction_with_block.block.date_time.timestamp_millis();
         if let Some(date_time) = date_time {
-            if transaction_with_block.block.date_time != *date_time {
+            if txn_date_time_millis != (*date_time).timestamp_millis() {
                 return false;
             }
         }
         if let Some(date_time_gt) = date_time_gt {
-            if transaction_with_block.block.date_time < *date_time_gt {
+            if txn_date_time_millis <= (*date_time_gt).timestamp_millis() {
                 return false;
             }
         }
         if let Some(date_time_gte) = date_time_gte {
-            if transaction_with_block.block.date_time < *date_time_gte {
+            if txn_date_time_millis < (*date_time_gte).timestamp_millis() {
                 return false;
             }
         }
         if let Some(date_time_lt) = date_time_lt {
-            if transaction_with_block.block.date_time >= *date_time_lt {
+            if txn_date_time_millis >= (*date_time_lt).timestamp_millis() {
                 return false;
             }
         }
         if let Some(date_time_lte) = date_time_lte {
-            if transaction_with_block.block.date_time > *date_time_lte {
+            if txn_date_time_millis > (*date_time_lte).timestamp_millis() {
                 return false;
             }
         }
