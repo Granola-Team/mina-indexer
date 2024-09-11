@@ -15,6 +15,7 @@ use crate::{
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
+    utility::functions::pretty_print_duration,
 };
 use log::{debug, error, info, trace, warn};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -315,6 +316,12 @@ async fn initialize(
     }
 
     // flush/compress database
+    let compaction_time = std::time::Instant::now();
+    store.database.compact_range::<&[u8], &[u8]>(None, None);
+    info!(
+        "Compaction time: {}",
+        pretty_print_duration(compaction_time.elapsed())
+    );
     let store = state.indexer_store.as_ref().unwrap();
     let temp_checkpoint_dir = store.db_path.join("tmp-checkpoint");
     Checkpoint::new(&store.database)?.create_checkpoint(&temp_checkpoint_dir)?;
