@@ -82,8 +82,15 @@ impl ScalarType for Long {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DateTime(pub String);
+
+impl DateTime {
+    pub fn timestamp_millis(&self) -> i64 {
+        let date_time = chrono::DateTime::parse_from_rfc3339(&self.0).expect("RFC3339 date time");
+        date_time.timestamp_millis()
+    }
+}
 
 #[Scalar]
 impl ScalarType for DateTime {
@@ -104,9 +111,9 @@ pub(crate) fn date_time_to_scalar(millis: i64) -> DateTime {
     DateTime(millis_to_iso_date_string(millis))
 }
 
+/// Convenience function for obtaining a block's canonicity
 pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> bool {
     use crate::canonicity::{store::CanonicityStore, Canonicity};
-
     db.get_block_canonicity(&state_hash.to_owned().into())
         .map(|status| matches!(status, Some(Canonicity::Canonical)))
         .unwrap_or(false)
@@ -116,4 +123,25 @@ pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> 
 #[graphql(name = "PublicKey")]
 pub(crate) struct PK {
     pub public_key: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DateTime;
+
+    #[test]
+    fn date_time_millis() {
+        assert_eq!(
+            DateTime("1970-01-01T00:00:00.000Z".into()).timestamp_millis(),
+            0
+        );
+        assert_eq!(
+            DateTime("2021-03-17T00:00:00.000Z".into()).timestamp_millis(),
+            1615939200000
+        );
+        assert_eq!(
+            DateTime("2024-06-02T00:00:00.000Z".into()).timestamp_millis(),
+            1717286400000
+        );
+    }
 }
