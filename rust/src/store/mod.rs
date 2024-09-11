@@ -190,12 +190,12 @@ impl IndexerStore {
         let mut cf_opts = speedb::Options::default();
 
         // MemTable and Write Buffer Configuration
-        let memtable_size = 256 * 1024 * 1024;
-        cf_opts.set_write_buffer_size(memtable_size); // --------------- 256Mb MemTable size
-        cf_opts.set_max_write_buffer_number(16); // -------------------- 256Mb * 16 ~= 4Gb before MemTable is flushed to SST
+        let memtable_size = 1024 * 1024 * 1024;
+        cf_opts.set_write_buffer_size(memtable_size); // --------------- 1Gb MemTable size
+        cf_opts.set_max_write_buffer_number(8); // --------------------- 1Gb * 8 = 8Gb before MemTable is flushed to SST
 
         // SST File Size Configuration
-        cf_opts.set_target_file_size_base(memtable_size as u64); // ---- 256Mb SST target file size.
+        cf_opts.set_target_file_size_base(memtable_size as u64); // ---- 1Gb SST target file size.
         cf_opts.set_target_file_size_multiplier(2); // ----------------- SST file size doubles at each level. This favours
                                                     // ----------------- write-heavy workflow. This means that SST files double at
                                                     // ----------------- each level.

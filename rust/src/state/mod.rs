@@ -412,6 +412,17 @@ impl IndexerState {
                         None,
                     )?;
 
+                    if self.blocks_processed % 50000 == 0 {
+                        let compaction_time = std::time::Instant::now();
+                        indexer_store
+                            .database
+                            .compact_range::<&[u8], &[u8]>(None, None);
+                        info!(
+                            "Compaction time: {}",
+                            pretty_print_duration(compaction_time.elapsed())
+                        );
+                    }
+
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
                         for diff in ledger_diffs.iter() {
