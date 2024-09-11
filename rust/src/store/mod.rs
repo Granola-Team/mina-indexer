@@ -195,25 +195,12 @@ impl IndexerStore {
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
-
-        // MemTable and Write Buffer Configuration
-        let memtable_size = 256 * 1024 * 1024;
-        cf_opts.set_write_buffer_size(memtable_size); // --------------- 256Mb MemTable size
-        cf_opts.set_max_write_buffer_number(16); // -------------------- 256Mb * 16 ~= 4Gb before MemTable is flushed to SST
-
-        // SST File Size Configuration
-        cf_opts.set_target_file_size_base(memtable_size as u64); // ---- 256Mb SST target file size.
-        cf_opts.set_target_file_size_multiplier(2); // ----------------- SST file size doubles at each level. This favours
-                                                    // ----------------- write-heavy workflow. This means that SST files double at
-                                                    // ----------------- each level.
-
-        // Compaction
-        cf_opts.set_disable_auto_compactions(true); // ----------------- Disable auto compaction, and we will trigger this after
-                                                    // ----------------- ingestion.
-
+        cf_opts.set_max_write_buffer_number(16);
         cf_opts.set_compression_type(DBCompressionType::Zstd);
 
         let mut database_opts = speedb::Options::default();
+        database_opts.enable_statistics();
+        database_opts.set_stats_dump_period_sec(180); // every 3 minutes
         database_opts.set_compression_type(DBCompressionType::Zstd);
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);

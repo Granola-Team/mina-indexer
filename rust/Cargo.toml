@@ -59,13 +59,13 @@ notify = "6.1.1"
 tar = "0.4.41"
 libc = "0.2.155"
 tokio-graceful-shutdown = "0.15.0"
-lazy_static = "1.4.0"
 
 [dev-dependencies]
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.0"
 pretty_assertions = "1.4.0"
 wasm-bindgen-test = "0.3.42"
+lazy_static = "1.4.0"
 serde_stacker = "0.1.11"
 
 [dependencies.tokio]
