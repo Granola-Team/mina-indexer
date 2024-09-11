@@ -120,6 +120,9 @@ pub trait StagedLedgerStore {
     /// Build the `state_hash` staged ledger from the CF representation
     fn build_staged_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>>;
 
+    /// Persist the current best ledger as a staged ledger
+    fn persist_best_ledger(&self) -> anyhow::Result<()>;
+
     ///////////////
     // Iterators //
     ///////////////
@@ -162,16 +165,9 @@ pub fn staged_account_balance_sort_key(
     pk: PublicKey,
 ) -> [u8; BlockHash::LEN + size_of::<u64>() + PublicKey::LEN] {
     let mut res = [0u8; BlockHash::LEN + size_of::<u64>() + PublicKey::LEN];
-
-    // Copy state_hash bytes
     res[..BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
-
-    // Copy balance bytes (u64, which is 8 bytes)
-    res[BlockHash::LEN..BlockHash::LEN + size_of::<u64>()].copy_from_slice(&balance.to_be_bytes());
-
-    // Copy public key bytes
+    res[BlockHash::LEN..][..size_of::<u64>()].copy_from_slice(&balance.to_be_bytes());
     res[BlockHash::LEN + size_of::<u64>()..].copy_from_slice(pk.0.as_bytes());
-
     res
 }
 

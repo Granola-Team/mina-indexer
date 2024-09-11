@@ -499,7 +499,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                         let mut state = state.write().await;
 
                         // check if the block is already in the witness tree
-                        if state.diffs_map.contains_key(&block.state_hash()) {
+                        if state.blocks.contains(&block.state_hash()) {
                             return Ok(info!(
                                 "Block is already present in the witness tree {}",
                                 block.summary()
