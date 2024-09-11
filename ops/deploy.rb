@@ -175,14 +175,12 @@ if DEPLOY_TYPE == 'test'
     success = false
   end
 
-  system(
+  unless system(
     "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
     out: IDXR_LEDGER_DIFF
   )
-
-  ledger_diff = "cat #{IDXR_LEDGER_DIFF}"
-  if !ledger_diff.empty?
-    abort("Ledger diff mismatch:\n#{ledger_diff}")
+    warn("Regression introduced to ledgers. Inspect ledger diff file at: #{IDXR_LEDGER_DIFF}")
+    success = false
   end
 
   puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
