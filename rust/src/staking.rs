@@ -98,10 +98,11 @@ async fn insert(
             let vesting_increment = to_decimal(&timing["vesting_increment"]);
 
             db.execute(
-                format!("with ledger := (
-                    insert StakingLedger {{
-                        epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-                        source := (select Account filter .public_key = <str>$0),
+                format!("
+                    with ledger := (
+                        insert StakingLedger {{
+                            epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
+                            source := (select Account filter .public_key = <str>$0),
                         balance := <decimal>$1,
                         target := (select Account filter .public_key = <str>$2),
                         token := <int64>$3,
