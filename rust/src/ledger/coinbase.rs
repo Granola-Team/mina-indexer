@@ -196,27 +196,20 @@ impl Coinbase {
 mod coinbase_tests {
     use super::*;
 
-    fn sample_public_key() -> PublicKey {
-        PublicKey::default()
-    }
-
     #[test]
     fn test_coinbase_fee_transfer() {
         let transfer = CoinbaseFeeTransfer {
-            receiver_pk: sample_public_key(),
+            receiver_pk: PublicKey::default(),
             fee: 100,
         };
-
         let coinbase = Coinbase {
             kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
-            receiver: sample_public_key(),
+            receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
             receiver_balance: Some(0),
         };
-
         let payment_diffs = coinbase.fee_transfer();
-
         assert_eq!(payment_diffs[0].len(), 2);
 
         if let [credit, debit] = &payment_diffs[0][..] {
@@ -235,46 +228,40 @@ mod coinbase_tests {
     fn test_coinbase_is_coinbase_applied() {
         let coinbase = Coinbase {
             kind: CoinbaseKind::None,
-            receiver: sample_public_key(),
+            receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
             receiver_balance: Some(0),
         };
-
         assert!(!coinbase.is_coinbase_applied());
 
         let coinbase = Coinbase {
             kind: CoinbaseKind::Coinbase(None),
             ..coinbase
         };
-
         assert!(coinbase.is_coinbase_applied());
     }
 
     #[test]
     fn test_account_diffs_coinbase_mut() {
         let transfer = CoinbaseFeeTransfer {
-            receiver_pk: sample_public_key(),
+            receiver_pk: PublicKey::default(),
             fee: 100,
         };
-
         let coinbase = Coinbase {
             kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
-            receiver: sample_public_key(),
+            receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
             receiver_balance: Some(0),
         };
-
         let fee_transfer_payment_diffs = coinbase.fee_transfer();
-
         let mut account_diffs = vec![vec![
             AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][0].clone()),
             AccountDiff::FeeTransfer(fee_transfer_payment_diffs[0][1].clone()),
         ]];
 
         coinbase.account_diffs_coinbase_mut(&mut account_diffs);
-
         assert_eq!(
             account_diffs[0],
             vec![
@@ -288,22 +275,36 @@ mod coinbase_tests {
     fn test_coinbase_has_fee_transfer() {
         let coinbase = Coinbase {
             kind: CoinbaseKind::None,
-            receiver: sample_public_key(),
+            receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
             receiver_balance: Some(0),
         };
-
         assert!(!coinbase.has_fee_transfer());
 
         let coinbase = Coinbase {
             kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
-                receiver_pk: sample_public_key(),
+                receiver_pk: PublicKey::default(),
                 fee: 100,
             })),
             ..coinbase
         };
-
         assert!(coinbase.has_fee_transfer());
+    }
+
+    #[test]
+    fn coinbase_from_precomputed() -> anyhow::Result<()> {
+        use crate::block::precomputed::PcbVersion;
+        let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let expect = Coinbase {
+            kind: CoinbaseKind::Coinbase(None),
+            receiver: PublicKey::from("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd"),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: Some(16790466359034),
+        };
+        assert_eq!(Coinbase::from_precomputed(&block), expect);
+        Ok(())
     }
 }
