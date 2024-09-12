@@ -200,11 +200,14 @@ if DEPLOY_TYPE == 'test'
     success = false
   end
 
-  system(
+  # check ledgers match
+  unless system(
     "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
     out: IDXR_LEDGER_DIFF
-  )
-  system("cat #{IDXR_LEDGER_DIFF}")
+  ) && `cat #{IDXR_LEDGER_DIFF}`.empty?
+    warn("Regression introduced to ledger calculations. Inspect diff file: #{IDXR_LEDGER_DIFF}")
+    success = false
+  end
 
   # Restore database from the snapshot made earlier
   #
