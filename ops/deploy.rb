@@ -40,19 +40,24 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
 
   if BUILD_TYPE == 'debug'
     puts 'Ingest staking ledgers? (y/n)'
-    ingest_staking_ledgers = STDIN.gets
-    unless ['n', 'y'].include? ingest_staking_ledgers[0].downcase
-      abort('Invalid response')
+    ingest_staking_ledgers = STDIN.gets[0].downcase
+    while !['n', 'y'].include? ingest_staking_ledgers
+      warn('Invalid response')
+      puts 'Ingest staking ledgers? (y/n)'
+      ingest_staking_ledgers = STDIN.gets[0].downcase
     end
 
     puts 'Ingest orphan blocks? (y/n)'
-    ingest_orphan_blocks = STDIN.gets
-    unless ['n', 'y'].include? ingest_orphan_blocks[0].downcase
-      abort('Invalid response')
+    ingest_orphan_blocks = STDIN.gets[0].downcase
+    while !['n', 'y'].include? ingest_orphan_blocks
+      warn('Invalid response')
+      puts 'Ingest staking ledgers? (y/n)'
+      ingest_orphan_blocks = STDIN.gets[0].downcase
     end
 
-    ingest_staking_ledgers = ingest_staking_ledgers[0].downcase == 'y'
-    ingest_orphan_blocks = ingest_orphan_blocks[0].downcase == 'y'
+    ingest_staking_ledgers = ingest_staking_ledgers == 'y'
+    ingest_orphan_blocks = ingest_orphan_blocks == 'y'
+
     if !ingest_staking_ledgers && !ingest_orphan_blocks
       system(
         EXE,
@@ -142,6 +147,8 @@ if DEPLOY_TYPE == 'test'
   wait_for_socket(10)
   puts 'Server restarted.'
 
+  # Create an indexer db snapshot to restore from later
+  #
   puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
   config_snapshots_dir
   system(
@@ -152,6 +159,8 @@ if DEPLOY_TYPE == 'test'
   ) || abort('Snapshot creation failed. Aborting.')
   puts 'Snapshot complete.'
 
+  # Compare the indexer best ledger with the Mina pre-hardfork ledger
+  #
   puts 'Attempting ledger extraction...'
   unless system(
     EXE,
@@ -167,12 +176,12 @@ if DEPLOY_TYPE == 'test'
   puts 'Ledger extraction complete.'
 
   puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
-
   IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
   IDXR_NORM_LEDGER = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-norm-#{REV}.json"
   MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledger-359604/mina_ledger.json"
-  IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-diff.json"
+  IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.diff"
 
+  # normalize indexer best ledger
   unless system(
     IDXR_NORM_EXE,
     "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json",
@@ -188,6 +197,8 @@ if DEPLOY_TYPE == 'test'
   )
   system("cat #{IDXR_LEDGER_DIFF}")
 
+  # Restore database from the snapshot made earlier
+  #
   puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
   restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
   unless system(
@@ -201,6 +212,8 @@ if DEPLOY_TYPE == 'test'
   end
   puts 'Snapshot restore complete.'
 
+  # Shutdown indexer
+  #
   puts 'Initiating shutdown...'
   unless system(
     EXE,
@@ -217,6 +230,8 @@ if DEPLOY_TYPE == 'test'
   FileUtils.rm_rf(restore_path)
   File.unlink(snapshot_path(BLOCKS_COUNT))
 
+  # Do a database self-check
+  #
   # puts 'Initiating self-check...'
   # pid = spawn EXE +
   #             " --socket #{SOCKET}" \
