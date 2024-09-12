@@ -12,7 +12,14 @@ BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 require 'fileutils'
 require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
 
-abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exist?(BASE_DIR)
+abort "Error: BASE_DIR must exist to perform the deployment." unless File.exist?(BASE_DIR)
+
+# Check if we're just cleaning up BASE_DIR files
+#
+if ARGV.length == 3 && ARGV[-2] == 'clean'
+  idxr_cleanup(ARGV.last)
+  return
+end
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 

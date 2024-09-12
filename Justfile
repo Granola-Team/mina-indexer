@@ -76,6 +76,14 @@ clean-dev:
   @echo "Cleaning dev directory"
   {{REGRESSION_TEST}} clean-dev
 
+clean-prod rev=GIT_COMMIT_HASH:
+  @echo "Cleaning prod directory"
+  {{DEPLOY}} prod clean {{rev}}
+
+clean-test rev=GIT_COMMIT_HASH:
+  @echo "Cleaning test directory"
+  {{DEPLOY}} test clean {{rev}}
+
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
