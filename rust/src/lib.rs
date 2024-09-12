@@ -77,8 +77,8 @@ async fn get_db_raw(num_connections: usize) -> Result<Client, edgedb_tokio::Erro
     let retry_opts = RetryOptions::default().with_rule(
         RetryCondition::TransactionConflict,
         // No. of retries
-        30,
-        |_| std::time::Duration::from_millis(500),
+        8,
+        |_| std::time::Duration::from_millis(800),
     );
 
     Ok(db_builder.with_retry_options(retry_opts))

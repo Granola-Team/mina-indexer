@@ -9,14 +9,14 @@ use crate::{
     insert_accounts, to_decimal, to_i64, to_json,
 };
 
-const CONCURRENT_TASKS: usize = 5;
+const CONCURRENT_TASKS: usize = 10;
 
 /// Ingest staking ledger files (JSON) into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
     let mut handles = vec![];
 
-    let db = get_db(CONCURRENT_TASKS * CONCURRENT_TASKS).await?;
+    let db = get_db(CONCURRENT_TASKS * 2).await?;
 
     for path in get_file_paths(staking_ledgers_dir)? {
         // clone the Arc to the semaphore for each task
@@ -103,14 +103,14 @@ async fn insert(
                         insert StakingLedger {{
                             epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
                             source := (select Account filter .public_key = <str>$0),
-                        balance := <decimal>$1,
-                        target := (select Account filter .public_key = <str>$2),
-                        token := <int64>$3,
-                        nonce := <optional int64>$4,
-                        receipt_chain_hash := <str>$5,
-                        voting_for := <str>$6
-                    }} unless conflict
-                )
+                            balance := <decimal>$1,
+                            target := (select Account filter .public_key = <str>$2),
+                            token := <int64>$3,
+                            nonce := <optional int64>$4,
+                            receipt_chain_hash := <str>$5,
+                            voting_for := <str>$6
+                        }} unless conflict
+                    )
                     insert StakingTiming {{
                         ledger := ledger,
                         initial_minimum_balance := <decimal>$7,

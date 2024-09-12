@@ -12,15 +12,14 @@ use crate::{
     to_json, to_titlecase,
 };
 
-const CONCURRENT_TASKS: usize = 2;
+const CONCURRENT_TASKS: usize = 10;
 
 /// Ingest pre-computed block files (JSON) into the database
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
     let mut handles = vec![];
 
-    let db = get_db(CONCURRENT_TASKS).await?;
-    let db_locking = get_db_locking(CONCURRENT_TASKS).await?;
+    let db = get_db(CONCURRENT_TASKS * 2).await?;
 
     for path in get_file_paths(blocks_dir)? {
         // clone the Arc to the semaphore for each task
