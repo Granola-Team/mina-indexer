@@ -92,7 +92,7 @@ check:
 
 test-unit-mina-rs:
   @echo "--- Performing long-running mina-rs unit tests"
-  cd rust && time cargo nextest run --features mina_rs
+  cd rust && time cargo nextest run --release --features mina_rs
 
 # Perform a debug build
 debug-build:
@@ -186,7 +186,7 @@ tier2-dev: tier2-prereqs debug-build \
   tier2-regression-tests-dev
 
 # Run the 3rd tier of tests with Nix-built binary.
-tier3 blocks='5000': test-unit-mina-rs nix-build
+tier3 blocks='5000': nix-build test-unit-mina-rs
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY}} test nix {{blocks}}
 
