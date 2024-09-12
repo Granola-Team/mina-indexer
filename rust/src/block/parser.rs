@@ -172,7 +172,7 @@ impl BlockParser {
             if let Ok((canonical_paths, recent_paths, orphaned_paths)) =
                 discovery(canonical_threshold, reporting_freq, paths.iter().collect())
             {
-                info!("Canonical chain discovery successful...");
+                info!("Canonical chain discovery successful");
                 let deep_canonical_bytes = canonical_paths
                     .iter()
                     .fold(0, |acc, p| acc + p.metadata().unwrap().len());
