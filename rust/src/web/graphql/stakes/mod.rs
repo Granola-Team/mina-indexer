@@ -24,19 +24,18 @@ pub struct StakeQueryInput {
 
     #[graphql(name = "public_key")]
     public_key: Option<String>,
+    username: Option<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StakeSortByInput {
     #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
-
     #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
 
     #[graphql(name = "STAKE_ASC")]
     StakeAsc,
-
     #[graphql(name = "STAKE_DESC")]
     StakeDesc,
 }
@@ -390,10 +389,18 @@ impl StakeQueryInput {
                 public_key,
                 epoch: query_epoch,
                 ledger_hash: query_ledger_hash,
+                username,
             } = query;
             if let Some(public_key) = public_key {
                 if *public_key != account.pk.0 {
                     return false;
+                }
+            }
+            if let Some(username) = username {
+                if let Some(acct_username) = account.username.as_ref() {
+                    if *username != *acct_username {
+                        return false;
+                    }
                 }
             }
             if let Some(delegate) = delegate {
