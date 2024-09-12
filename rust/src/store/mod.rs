@@ -195,12 +195,11 @@ impl IndexerStore {
     /// Creates a new _primary_ indexer store
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let mut cf_opts = speedb::Options::default();
+        cf_opts.set_write_buffer_size(128 * 1024 * 1024); // 128 MB
         cf_opts.set_max_write_buffer_number(16);
         cf_opts.set_compression_type(DBCompressionType::Zstd);
 
         let mut database_opts = speedb::Options::default();
-        database_opts.enable_statistics();
-        database_opts.set_stats_dump_period_sec(180); // every 3 minutes
         database_opts.set_compression_type(DBCompressionType::Zstd);
         database_opts.create_missing_column_families(true);
         database_opts.create_if_missing(true);
