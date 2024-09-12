@@ -9,13 +9,14 @@ use log::info;
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::PathBuf,
+    sync::{mpsc, Arc, Mutex},
 };
 
 // discovers the canonical chain, orphaned blocks, and
 // recent blocks within the canonical threshold
 pub fn discovery(
     canonical_threshold: u32,
-    reporting_freq: u32,
+    _reporting_freq: u32,
     paths: Vec<&PathBuf>,
 ) -> anyhow::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
     if paths.is_empty() {
@@ -24,21 +25,25 @@ pub fn discovery(
 
     let time = std::time::Instant::now();
     let mut tree_map: BTreeMap<u32, Vec<&PathBuf>> = BTreeMap::new();
-    let mut parent_hash_map: HashMap<&str, &str> = HashMap::new();
 
-    for path in paths {
+    for path in &paths {
         let height = extract_block_height(path);
         // store multiple paths at a given height
         tree_map.entry(height).or_default().push(path);
     }
 
+    let phm = process_files(paths.into_iter().cloned().collect())?;
+    let mut parent_hash_map: HashMap<&str, &str> = HashMap::new();
+    for (k, v) in &phm {
+        parent_hash_map.insert(k.as_str(), v.as_str());
+    }
+
     // find the best tip
-    let best_tip: PathBuf =
-        find_best_tip(&tree_map, &mut parent_hash_map, reporting_freq).to_owned();
+    let best_tip: &PathBuf = find_best_tip(&tree_map, &parent_hash_map)?;
 
     // walk back from tip to root of tree
     let mut canonical_branch =
-        canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, &best_tip)?;
+        canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, best_tip)?;
 
     // split off recent paths from canonical branch and tree map
     let recent_paths =
@@ -60,11 +65,37 @@ pub fn discovery(
     ))
 }
 
+fn process_files(paths: Vec<PathBuf>) -> anyhow::Result<HashMap<String, String>> {
+    let parent_hash_map: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
+    let (tx, rx) = mpsc::channel();
+
+    for path in &paths {
+        let tx = tx.clone();
+        let parent_hash_map = Arc::clone(&parent_hash_map);
+        let path = path.clone();
+
+        std::thread::spawn(move || {
+            if let Ok(prev_hash) = PreviousStateHash::from_path(&path) {
+                let mut phm = parent_hash_map.lock().unwrap();
+                phm.insert(extract_state_hash(&path).to_string(), prev_hash.0);
+            }
+            tx.send(()).unwrap(); // Signal completion
+        });
+    }
+
+    // Wait for all threads to finish
+    for _ in 0..paths.len() {
+        rx.recv().unwrap();
+    }
+
+    let phm = parent_hash_map.lock().unwrap().to_owned();
+    Ok(phm)
+}
+
 fn find_best_tip<'a>(
     tree_map: &BTreeMap<u32, Vec<&'a PathBuf>>,
-    parent_hash_map: &mut HashMap<&'a str, &'a str>,
-    reporting_freq: u32,
-) -> &'a PathBuf {
+    parent_hash_map: &HashMap<&'a str, &'a str>,
+) -> anyhow::Result<&'a PathBuf> {
     let time = std::time::Instant::now();
 
     let mut queue: VecDeque<&PathBuf> = VecDeque::new();
@@ -78,18 +109,13 @@ fn find_best_tip<'a>(
     }
 
     while let Some(best_tip_candidate) = queue.pop_front() {
-        log_progress(
-            extract_block_height(best_tip_candidate),
-            reporting_freq,
-            &time,
-        );
         let (height, state_hash) = extract_height_and_hash(best_tip_candidate);
         let next_height = height + 1;
-        if let Some(next_tips) = tree_map.get(&next_height) {
+        if let Some(next_tips) = tree_map.get(&next_height).to_owned() {
             for possible_next_tip in next_tips {
-                if let Ok(prev_hash) = PreviousStateHash::from_path(possible_next_tip) {
-                    if prev_hash.0 == state_hash {
-                        parent_hash_map.insert(extract_state_hash(possible_next_tip), state_hash);
+                if let Some(prev_hash) = parent_hash_map.get(extract_state_hash(possible_next_tip))
+                {
+                    if prev_hash == &state_hash {
                         best_tip = Some(possible_next_tip);
                         queue.push_back(possible_next_tip);
                     }
@@ -98,13 +124,13 @@ fn find_best_tip<'a>(
         }
     }
 
-    let best_tip = best_tip.expect("No valid best tip found");
+    let best_tip = best_tip.ok_or_else(|| anyhow::anyhow!("No valid best tip found"))?;
     info!(
         "Found best tip at block height {} in {}",
         extract_block_height(best_tip),
         pretty_print_duration(time.elapsed())
     );
-    best_tip
+    Ok(best_tip)
 }
 
 fn canonical_branch_from_best_tip<'a>(
@@ -123,21 +149,25 @@ fn canonical_branch_from_best_tip<'a>(
     next_height -= 1;
 
     while let Some(parent_state_hash) = opt_parent_state_hash {
-        let paths = tree_map.get_mut(&next_height).unwrap();
+        opt_parent_state_hash = None;
+        let paths_opt = tree_map.get_mut(&next_height);
         let mut i = None;
 
-        for (j, path) in paths.iter().enumerate() {
-            if extract_state_hash(path) == *parent_state_hash {
-                next_height -= 1;
-                opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path));
-                canonical_branch.push(path);
-                i = Some(j);
-                break;
+        if paths_opt.is_some() {
+            let paths = paths_opt.unwrap();
+            for (j, path) in paths.iter().enumerate() {
+                if extract_state_hash(path) == *parent_state_hash {
+                    next_height -= 1;
+                    opt_parent_state_hash = parent_hash_map.get(extract_state_hash(path));
+                    canonical_branch.push(path);
+                    i = Some(j);
+                    break;
+                }
             }
-        }
 
-        if let Some(i) = i {
-            paths.remove(i);
+            if let Some(i) = i {
+                paths.remove(i);
+            }
         }
     }
     info!(
@@ -194,16 +224,6 @@ fn split_off_recent_paths<'a>(
         pretty_print_duration(time.elapsed())
     );
     recent_paths
-}
-
-fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &std::time::Instant) {
-    if length_of_chain % reporting_freq == 0 {
-        info!(
-            "Found best tip candidate at height {} in {}",
-            length_of_chain,
-            pretty_print_duration(time.elapsed())
-        );
-    }
 }
 
 #[cfg(test)]
