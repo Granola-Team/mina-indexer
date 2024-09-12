@@ -360,7 +360,7 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             if block_parser.num_deep_canonical_blocks > self.reporting_freq {
                 info!(
-                    "Adding blocks to the witness tree, reporting every {} ...",
+                    "Adding blocks to the witness tree, reporting every {}",
                     self.reporting_freq
                 );
             } else {
@@ -435,7 +435,6 @@ impl IndexerState {
         start: Option<Instant>,
     ) -> anyhow::Result<()> {
         let total_time = start.unwrap_or(Instant::now());
-        let offset = total_time.elapsed();
         let mut step_time = total_time;
 
         if block_parser.total_num_blocks > self.reporting_freq {
@@ -476,7 +475,7 @@ impl IndexerState {
                                 "Finished ingesting and applying {} blocks ({}) to the witness tree in {}",
                                 self.blocks_processed,
                                 bytesize::ByteSize::b(self.bytes_processed),
-                                pretty_print_duration(total_time.elapsed() + offset),
+                                pretty_print_duration(total_time.elapsed()),
                             );
                             break;
                         }

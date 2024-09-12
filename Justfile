@@ -9,11 +9,7 @@ export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
-# Useful aliases
-alias c := check
-alias f := format
-alias cd := clean-dev
-alias tu := test-unit
+alias tu := test-unit-dev
 alias t1 := tier1
 alias t2 := tier2-dev
 alias t3 := tier3-dev
@@ -80,6 +76,14 @@ clean-dev:
   @echo "Cleaning dev directory"
   {{REGRESSION_TEST}} clean-dev
 
+clean-prod rev=GIT_COMMIT_HASH:
+  @echo "Cleaning prod directory"
+  {{DEPLOY}} prod clean {{rev}}
+
+clean-test rev=GIT_COMMIT_HASH:
+  @echo "Cleaning test directory"
+  {{DEPLOY}} test clean {{rev}}
+
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
 
@@ -96,7 +100,7 @@ check:
 
 test-unit-mina-rs:
   @echo "--- Performing long-running mina-rs unit tests"
-  cd rust && time cargo nextest run --features mina_rs
+  cd rust && time cargo nextest run --release --features mina_rs
 
 # Perform a debug build
 debug-build:
@@ -138,34 +142,59 @@ tier1: tier1-prereqs check lint test-unit
     reuse_databases \
     hurl
 
-load:
+# Tier2 nix (release) tests
+
+tier2-load-test:
   @echo "--- Performing a simple load test with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}} load
 
-load-dev:
-  @echo "--- Performing a simple load test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load
-
-# Run the 2nd tier of tests with Nix-built binary.
-tier2: tier2-prereqs nix-build load && build-image
-  @echo "--- Performing tier 2 regression tests with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}}
+tier2-many-blocks-test:
   @echo "--- Performing many_blocks regression test with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}} many_blocks
+
+tier2-release-test:
   @echo "--- Performing release regression test with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}} release
 
-# Run the 2nd tier of with debug build.
-tier2-dev: tier2-prereqs debug-build load-dev
-  @echo "--- Performing tier 2 regression tests with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}}
+tier2-regression-tests:
+  @echo "--- Performing tier 2 regression tests with Nix-built binary"
+  time {{REGRESSION_TEST}} {{PROD_MODE}}
+
+# Tier2 dev (debug) tests
+
+tier2-load-test-dev:
+  @echo "--- Performing a simple load test with debug-built binary"
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load
+
+tier2-many-blocks-test-dev:
   @echo "--- Performing many_blocks regression test with debug-built binary"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} many_blocks
+
+tier2-release-test-dev:
   @echo "--- Performing release regression test with debug-built binary"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} release
 
+tier2-regression-tests-dev:
+  @echo "--- Performing tier 2 regression tests with debug-built binary"
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}}
+
+# Run the 2nd tier of tests with Nix-built binary & build OCI image.
+tier2: tier2-prereqs nix-build \
+  tier2-load-test \
+  tier2-many-blocks-test \
+  tier2-release-test \
+  tier2-regression-tests \
+  && build-image
+
+# Run the 2nd tier of with debug build.
+tier2-dev: tier2-prereqs debug-build \
+  tier2-load-test-dev \
+  tier2-many-blocks-test-dev \
+  tier2-release-test-dev \
+  tier2-regression-tests-dev
+
 # Run the 3rd tier of tests with Nix-built binary.
-tier3 blocks='5000': test-unit-mina-rs nix-build
+tier3 blocks='5000': nix-build test-unit-mina-rs
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY}} test nix {{blocks}}
 
@@ -183,3 +212,10 @@ deploy-local-prod blocks='5000' web_port='': nix-build
 deploy-local-prod-dev blocks='5000' web_port='': debug-build
   @echo "--- Deploying to production dev"
   time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
+
+# Shutdown a running local prod indexer.
+shutdown rev=GIT_COMMIT_HASH:
+  @echo "Shutting down prod indexer"
+  {{DEPLOY}} prod shutdown {{rev}}
+  @echo "Successfully shutdown. You may also want to do 'just clean-prod'"
+

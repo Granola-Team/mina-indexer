@@ -50,7 +50,7 @@ pub fn discovery(
 
     info!(
         "Found {} blocks in the canonical chain in {}",
-        canonical_branch.len() + recent_paths.len(),
+        1 + canonical_branch.len() as u32 + canonical_threshold,
         pretty_print_duration(time.elapsed())
     );
     Ok((
@@ -66,7 +66,6 @@ fn find_best_tip<'a>(
     reporting_freq: u32,
 ) -> &'a PathBuf {
     let time = std::time::Instant::now();
-
     let mut queue: VecDeque<&PathBuf> = VecDeque::new();
     let mut best_tip: Option<&PathBuf> = None;
 
@@ -189,7 +188,7 @@ fn split_off_recent_paths<'a>(
     }
     sort_by_height_and_lexicographical_order(&mut recent_paths);
     info!(
-        "Found {:?} recent blocks in {}",
+        "Found {} recent ({canonical_threshold} canonical) blocks in {}",
         recent_paths.len(),
         pretty_print_duration(time.elapsed())
     );

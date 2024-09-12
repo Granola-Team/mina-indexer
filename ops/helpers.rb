@@ -3,7 +3,7 @@
 require 'fileutils'
 require 'json'
 
-# NOTE: expects BASE_DIR to be defined.
+# NOTE: expects BASE_DIR & BUILD_TYPE to be defined.
 
 # Constants
 
@@ -62,12 +62,12 @@ end
 
 # Socket
 
-SOCKET = "#{BASE_DIR}/mina-indexer-#{REV}.socket"
+SOCKET = "#{BASE_DIR}/mina-indexer-#{REV}.sock"
 
 def wait_for_socket(wait_interval)
   wait_seconds = 0
   until File.exist?(SOCKET)
-    puts "Waited #{wait_seconds} s for #{SOCKET}..."
+    puts "Waited #{wait_seconds}s for #{SOCKET}..."
     sleep wait_interval
     wait_seconds += wait_interval
   end
@@ -105,4 +105,47 @@ DB_VERSION = "#{v['major']}.#{v['minor']}.#{v['patch']}"
 
 def db_dir(block_height)
   "#{BASE_DIR}/db/#{DB_VERSION}-#{block_height}"
+end
+
+# Deploy
+
+def db_version_of_git_rev(rev)
+  v = JSON.parse(`#{BASE_DIR}/bin/mina-indexer-#{rev} database version --json`)
+  return "#{v['major']}.#{v['minor']}.#{v['patch']}"
+end
+
+def idxr_cleanup(rev)
+  mina_indexer = "mina-indexer-#{rev}"
+  bin = "#{BASE_DIR}/bin/#{mina_indexer}"
+  return unless File.exist? bin
+
+  puts "Removing #{mina_indexer} bin, socket, db & logs"
+  FileUtils.rm_rf "#{BASE_DIR}/logs/#{rev}"
+  FileUtils.rm_rf Dir.glob("#{BASE_DIR}/db/#{db_version_of_git_rev(rev)}-*")
+  FileUtils.rm_f bin
+end
+
+def idxr_shutdown(rev)
+  mina_indexer = "mina-indexer-#{rev}"
+  puts "Shutting down #{mina_indexer}"
+  idxr_shutdown_via_socket(EXE, "#{BASE_DIR}/#{mina_indexer}.sock")
+end
+
+# Shutdown
+
+def idxr_shutdown_via_socket(exe, socket)
+  # Attempt a regular shutdown if the socket is present.
+  return unless File.exist?(socket)
+
+  unless system(
+    exe,
+    '--socket', socket,
+    'server', 'shutdown'
+  )
+    warn("Shutdown failed despite #{socket} existing.")
+    return
+  end
+
+  sleep 1 # Give it a chance to shut down.
+  FileUtils.rm_f socket
 end
