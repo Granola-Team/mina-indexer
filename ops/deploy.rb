@@ -21,6 +21,13 @@ if ARGV.length == 3 && ARGV[-2] == 'clean'
   return
 end
 
+# Check if we're shutting down a running indexer
+#
+if ARGV.length == 3 && ARGV[-2] == 'shutdown'
+  idxr_shutdown(ARGV.last)
+  return
+end
+
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
 success = true
@@ -118,16 +125,18 @@ end
 #
 if File.exist? CURRENT
   current = File.read(CURRENT)
-  puts "Shutting down #{current}..."
-  system(
-    EXE,
-    '--socket', "#{BASE_DIR}/mina-indexer-#{current}.socket",
-    'shutdown'
-  ) || puts('Shutting down (via command line and socket) failed. Moving on.')
+  if current != REV
+    socket = "#{BASE_DIR}/mina-indexer-#{current}.sock"
+    system(
+      EXE,
+      '--socket', socket,
+      'server', 'shutdown'
+    ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
 
-  # Maybe the shutdown worked, maybe it didn't. Either way, give the process
-  # a second to clean up.
-  sleep 1
+    # Maybe the shutdown worked, maybe it didn't. Either way, give the process
+    # a second to clean up.
+    sleep 1
+  end
 end
 
 # Now, we take over.

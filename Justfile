@@ -212,3 +212,10 @@ deploy-local-prod blocks='5000' web_port='': nix-build
 deploy-local-prod-dev blocks='5000' web_port='': debug-build
   @echo "--- Deploying to production dev"
   time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
+
+# Shutdown a running local prod indexer.
+shutdown rev=GIT_COMMIT_HASH:
+  @echo "Shutting down prod indexer"
+  {{DEPLOY}} prod shutdown {{rev}}
+  @echo "Successfully shutdown. You may also want to do 'just clean-prod'"
+
