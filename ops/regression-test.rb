@@ -5,21 +5,24 @@
 
 VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
 DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
-
-abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
+BUILD_TYPE = 'debug'
 
 require 'fileutils'
-
-REV = `git rev-parse --short=8 HEAD`.chomp
-BASE_DIR = "#{DEV_DIR}/rev-#{REV}"
-FileUtils.mkdir_p BASE_DIR
 
 # clean up dev directory
 if ARGV.length == 1 && ARGV[0] == 'clean-dev'
   puts "Removing #{DEV_DIR}/rev-*"
   FileUtils.rm_rf Dir.glob("#{DEV_DIR}/rev-*")
-  exit 0
+  return
 end
+
+abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
+
+rev = `git rev-parse --short=8 HEAD`.chomp
+BASE_DIR = "#{DEV_DIR}/rev-#{rev}"
+FileUtils.mkdir_p BASE_DIR
+
+require "#{__dir__}/helpers" # Expects BASE_DIR & BUILD_TYPE to exist.
 
 test_names = %w[
   indexer_cli_reports
@@ -65,11 +68,9 @@ test_names = %w[
   hurl
 ]
 
-# long_test_names = ['test_many_blocks', 'test_release']
-
 puts 'Regression testing...'
 BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
-EXE = ARGV.shift
+IDXR_EXE = ARGV.shift
 tests = if ARGV.empty?
           # Run all tests, but not the long-running ones.
           test_names
@@ -79,20 +80,6 @@ tests = if ARGV.empty?
         else
           ARGV
         end
-
-def cleanup_socket
-  # Attempt a regular shutdown if the socket is present.
-  socket = "#{BASE_DIR}/mina-indexer.sock"
-  return unless File.exist?(socket)
-
-  system(
-    EXE,
-    '--socket', socket,
-    'server', 'shutdown'
-  ) || warn("Shutdown failed despite #{socket} existing.")
-
-  sleep 1 # Give it a chance to shut down.
-end
 
 def cleanup_idxr_pid
   pid_file = "#{BASE_DIR}/idxr_pid"
@@ -134,18 +121,17 @@ def remove_dirs
 end
 
 def cleanup
-  cleanup_socket
+  idxr_shutdown_via_socket(IDXR_EXE, "#{BASE_DIR}/mina-indexer.sock")
   cleanup_idxr_pid
   cleanup_database_pid
   remove_dirs
 end
 
 tests.each do |tn|
-  puts
-  puts "Testing: #{tn}"
-  test_success = system(BASH_TEST_DRIVER, EXE, "test_#{tn}")
+  puts "\nTesting: #{tn}"
+  test_success = system(BASH_TEST_DRIVER, IDXR_EXE, "test_#{tn}")
   cleanup
-  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{EXE} test_#{tn}")
+  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{IDXR_EXE} test_#{tn}")
 end
 
 puts 'Regression testing complete.'
