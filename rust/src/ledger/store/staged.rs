@@ -60,6 +60,16 @@ pub trait StagedLedgerStore {
         account: &Account,
     ) -> anyhow::Result<()>;
 
+    // Set a staged ledger account with the raw serde bytes
+    fn set_staged_account_raw_bytes(
+        &self,
+        pk: PublicKey,
+        state_hash: BlockHash,
+        balance: u64,
+        account_serde_bytes: &[u8],
+    ) -> anyhow::Result<()>;
+
+    // Get pk's minimum staged ledger account block height
     fn get_pk_min_staged_ledger_block(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
     fn set_pk_min_staged_ledger_block(

@@ -17,12 +17,12 @@ use crate::{
         },
         Ledger, LedgerHash,
     },
-    store::{from_be_bytes, IndexerStore},
+    store::{balance_key_prefix, from_be_bytes, pk_key_prefix, IndexerStore},
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
-use std::collections::HashMap;
+use std::{collections::HashMap, mem::size_of};
 
 impl StagedLedgerStore for IndexerStore {
     fn get_staged_account(
@@ -32,12 +32,8 @@ impl StagedLedgerStore for IndexerStore {
     ) -> anyhow::Result<Option<Account>> {
         trace!("Getting {pk} staged ledger {state_hash} account");
 
-        // check if the account is in a staged ledger
+        // check if the account is in a sufficiently low staged ledger
         match self.get_pk_min_staged_ledger_block(&pk)? {
-            None => {
-                // account is not preset in a staged ledger
-                return Ok(None);
-            }
             Some(pk_min_block_height) => {
                 if let Some(block_height) = self.get_block_height(&state_hash)? {
                     if pk_min_block_height > block_height {
@@ -45,6 +41,7 @@ impl StagedLedgerStore for IndexerStore {
                     }
                 }
             }
+            None => return Ok(None),
         }
 
         // calculate account from canonical ancestor if needed
@@ -125,22 +122,55 @@ impl StagedLedgerStore for IndexerStore {
             None => bail!("Block missing from store {state_hash}"),
             Some(block_height) => block_height,
         };
-        let block_height = self
+        let pk_min_block_height = self
             .get_pk_min_staged_ledger_block(&pk)?
-            .map_or(block_height, |pk_min_block_height| {
-                block_height.min(pk_min_block_height)
-            });
+            .unwrap_or(u32::MAX);
 
-        self.set_pk_min_staged_ledger_block(&pk, block_height)?;
+        if block_height < pk_min_block_height {
+            self.set_pk_min_staged_ledger_block(&pk, block_height)?;
+        }
+
+        let account_serde_bytes = serde_json::to_vec(&account)?;
         self.database.put_cf(
             self.staged_ledger_accounts_cf(),
             staged_account_key(state_hash.clone(), pk.clone()),
-            serde_json::to_vec(&account)?,
+            &account_serde_bytes,
         )?;
         self.database.put_cf(
             self.staged_ledger_account_balance_sort_cf(),
             staged_account_balance_sort_key(state_hash, account.balance.0, pk),
-            serde_json::to_vec(&account)?,
+            &account_serde_bytes,
+        )?;
+        Ok(())
+    }
+
+    fn set_staged_account_raw_bytes(
+        &self,
+        pk: PublicKey,
+        state_hash: BlockHash,
+        balance: u64,
+        account_serde_bytes: &[u8],
+    ) -> anyhow::Result<()> {
+        let block_height = match self.get_block_height(&state_hash)? {
+            None => bail!("Block missing from store {state_hash}"),
+            Some(block_height) => block_height,
+        };
+        let pk_min_block_height = self
+            .get_pk_min_staged_ledger_block(&pk)?
+            .unwrap_or(u32::MAX);
+
+        if block_height < pk_min_block_height {
+            self.set_pk_min_staged_ledger_block(&pk, block_height)?;
+        }
+        self.database.put_cf(
+            self.staged_ledger_accounts_cf(),
+            staged_account_key(state_hash.clone(), pk.clone()),
+            account_serde_bytes,
+        )?;
+        self.database.put_cf(
+            self.staged_ledger_account_balance_sort_cf(),
+            staged_account_balance_sort_key(state_hash, balance, pk),
+            account_serde_bytes,
         )?;
         Ok(())
     }
@@ -447,13 +477,18 @@ impl StagedLedgerStore for IndexerStore {
         let block_height = self.get_best_block_height()?.expect("best block exists");
         trace!("Persisting best ledger (length {block_height}): {state_hash}");
 
-        for (_, value) in self
+        for (key, account_serde_bytes) in self
             .best_ledger_account_balance_iterator(IteratorMode::Start)
             .flatten()
         {
-            let account: Account = serde_json::from_slice(&value)?;
-            let pk = account.public_key.clone();
-            self.set_staged_account(pk, state_hash.clone(), &account)?;
+            let balance = balance_key_prefix(&key);
+            let pk = pk_key_prefix(&key[size_of::<u64>()..]);
+            self.set_staged_account_raw_bytes(
+                pk,
+                state_hash.clone(),
+                balance,
+                &account_serde_bytes,
+            )?;
         }
         Ok(())
     }
