@@ -55,6 +55,8 @@ pub trait InternalCommandStore {
     fn get_internal_commands_public_key(
         &self,
         pk: &PublicKey,
+        offset: usize,
+        limit: usize,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
     /// Get number of blocks that the public key has internal commands for

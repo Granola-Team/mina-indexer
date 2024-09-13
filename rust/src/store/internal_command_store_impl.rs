@@ -187,11 +187,13 @@ impl InternalCommandStore for IndexerStore {
     fn get_internal_commands_public_key(
         &self,
         pk: &PublicKey,
+        offset: usize,
+        limit: usize,
     ) -> anyhow::Result<Vec<InternalCommandWithData>> {
         trace!("Getting internal commands for public key {pk}");
         let mut internal_cmds = vec![];
         if let Some(n) = self.get_pk_num_internal_commands(pk)? {
-            for m in 0..n {
+            for m in offset as u32..std::cmp::min(limit as u32, n) {
                 if let Some(internal_command) = self.get_pk_internal_command(pk, m)? {
                     internal_cmds.push(internal_command);
                 } else {

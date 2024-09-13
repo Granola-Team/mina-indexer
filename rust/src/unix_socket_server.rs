@@ -1067,7 +1067,7 @@ pub async fn handle_connection(
                         }
                     } else {
                         let internal_cmds =
-                            db.get_internal_commands_public_key(&pk.clone().into())?;
+                            db.get_internal_commands_public_key(&pk.clone().into(), 0, usize::MAX)?;
                         let internal_cmds_str = serde_json::to_string_pretty(&internal_cmds)?;
 
                         if path.is_none() {

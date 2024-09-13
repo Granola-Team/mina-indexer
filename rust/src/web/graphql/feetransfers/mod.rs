@@ -250,33 +250,58 @@ impl FeetransferQueryRoot {
             return Ok(feetransfers);
         }
 
-        // TODO
         // recipient query
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
-            let mut fee_transfers: Vec<FeetransferWithMeta> = db
-                .get_internal_commands_public_key(&recipient.into())?
-                .into_iter()
-                .map(|internal_command| {
-                    let ft = Feetransfer::from((
-                        internal_command,
-                        epoch_num_internal_commands,
-                        total_num_internal_commands,
-                    ));
-                    let state_hash = ft.state_hash.clone();
-                    let pcb = db
-                        .get_block(&BlockHash::from(state_hash.clone()))
-                        .unwrap()
-                        .unwrap()
-                        .0;
-                    let canonical = get_block_canonicity(db, &state_hash);
-                    FeetransferWithMeta {
-                        canonical,
-                        feetransfer: ft,
-                        block: Some(pcb),
+            let mut fee_transfers: Vec<FeetransferWithMeta> = vec![];
+            let mut offset = 0;
+            let mut last_fee_transfer_len = fee_transfers.len();
+            if let Some(max_internal_commands) =
+                db.get_pk_num_internal_commands(&recipient.clone().into())?
+            {
+                loop {
+                    let end_index =
+                        std::cmp::min(offset + limit - 1, max_internal_commands as usize);
+                    if end_index <= offset || last_fee_transfer_len >= limit {
+                        // there is no more data to be gathered because either:
+                        // a. no more internal commands exist in this range for this PK
+                        // b. the gathered data is at or exceeds the limit
+                        break;
                     }
-                })
-                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
-                .collect();
+                    fee_transfers.append(
+                        &mut db
+                            .get_internal_commands_public_key(
+                                &recipient.clone().into(),
+                                offset,
+                                end_index,
+                            )?
+                            .into_iter()
+                            .map(|internal_command| {
+                                let ft = Feetransfer::from((
+                                    internal_command,
+                                    epoch_num_internal_commands,
+                                    total_num_internal_commands,
+                                ));
+                                let state_hash = ft.state_hash.clone();
+                                let pcb = db
+                                    .get_block(&BlockHash::from(state_hash.clone()))
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                let canonical = get_block_canonicity(db, &state_hash);
+                                FeetransferWithMeta {
+                                    canonical,
+                                    feetransfer: ft,
+                                    block: Some(pcb),
+                                }
+                            })
+                            .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
+                            .collect(),
+                    );
+
+                    offset += limit;
+                    last_fee_transfer_len = fee_transfers.len();
+                }
+            }
             fee_transfers.truncate(limit);
             return Ok(fee_transfers);
         }
