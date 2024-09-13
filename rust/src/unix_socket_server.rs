@@ -23,6 +23,7 @@ use std::{
     io::{self, ErrorKind},
     path::Path,
     sync::Arc,
+    u32,
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -1067,7 +1068,7 @@ pub async fn handle_connection(
                         }
                     } else {
                         let internal_cmds =
-                            db.get_internal_commands_public_key(&pk.clone().into())?;
+                            db.get_internal_commands_public_key(&pk.clone().into(), u32::MAX)?;
                         let internal_cmds_str = serde_json::to_string_pretty(&internal_cmds)?;
 
                         if path.is_none() {

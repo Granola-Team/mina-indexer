@@ -253,8 +253,8 @@ impl FeetransferQueryRoot {
         // TODO
         // recipient query
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.clone()) {
-            let mut fee_transfers: Vec<FeetransferWithMeta> = db
-                .get_internal_commands_public_key(&recipient.into())?
+            let fee_transfers: Vec<FeetransferWithMeta> = db
+                .get_internal_commands_public_key(&recipient.into(), limit as u32)?
                 .into_iter()
                 .map(|internal_command| {
                     let ft = Feetransfer::from((
@@ -277,7 +277,6 @@ impl FeetransferQueryRoot {
                 })
                 .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
                 .collect();
-            fee_transfers.truncate(limit);
             return Ok(fee_transfers);
         }
         get_fee_transfers(
