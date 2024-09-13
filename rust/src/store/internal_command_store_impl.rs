@@ -1,18 +1,18 @@
-use super::{
-    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, pk_key_prefix,
-    pk_txn_sort_key_sort,
-};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
     constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
-    store::{from_be_bytes, to_be_bytes, u32_prefix_key, IndexerStore},
+    utility::db::{
+        from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, to_be_bytes, u32_from_be_bytes,
+        u32_prefix_key, U32_LEN,
+    },
 };
 use anyhow::bail;
 use log::{info, trace};
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
-use std::{mem::size_of, path::PathBuf};
+use std::path::PathBuf;
 
 impl InternalCommandStore for IndexerStore {
     /// Index internal commands on public keys & state hash
@@ -66,9 +66,9 @@ impl InternalCommandStore for IndexerStore {
             self.database.put_cf(
                 self.internal_commands_pk_block_height_sort_cf(),
                 internal_commmand_pk_sort_key(
-                    pk.clone(),
+                    &pk,
                     block_height,
-                    state_hash.clone(),
+                    &state_hash,
                     i as u32,
                     int_cmd.kind(),
                 ),
@@ -77,9 +77,9 @@ impl InternalCommandStore for IndexerStore {
             self.database.put_cf(
                 self.internal_commands_pk_global_slot_sort_cf(),
                 internal_commmand_pk_sort_key(
-                    pk,
+                    &pk,
                     global_slot,
-                    state_hash.clone(),
+                    &state_hash,
                     i as u32,
                     int_cmd.kind(),
                 ),
@@ -141,7 +141,7 @@ impl InternalCommandStore for IndexerStore {
         let n = self.get_pk_num_internal_commands(pk)?.unwrap_or(0);
         self.database.put_cf(
             self.internal_commands_pk_cf(),
-            internal_command_pk_key(pk.clone(), n),
+            internal_command_pk_key(pk, n),
             serde_json::to_vec(internal_command)?,
         )?;
         self.database.put_cf(
@@ -287,16 +287,15 @@ impl InternalCommandStore for IndexerStore {
         direction: Direction,
     ) -> DBIterator<'_> {
         let pk_bytes = pk.to_bytes();
-        let mut start = [0; PublicKey::LEN + size_of::<u32>() + 1];
+        let mut start = [0; PublicKey::LEN + U32_LEN + 1];
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&pk_bytes, direction),
             Direction::Reverse => {
                 start[..PublicKey::LEN].copy_from_slice(&pk_bytes);
-                start[PublicKey::LEN..][..size_of::<u32>()]
-                    .copy_from_slice(&u32::MAX.to_be_bytes());
+                start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
 
                 // need to start after the target account
-                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
+                start[PublicKey::LEN + U32_LEN..].copy_from_slice("D".as_bytes());
                 IteratorMode::From(&start, direction)
             }
         };
@@ -310,16 +309,15 @@ impl InternalCommandStore for IndexerStore {
         direction: Direction,
     ) -> DBIterator<'_> {
         let pk_bytes = pk.to_bytes();
-        let mut start = [0; PublicKey::LEN + size_of::<u32>() + 1];
+        let mut start = [0; PublicKey::LEN + U32_LEN + 1];
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&pk_bytes, direction),
             Direction::Reverse => {
                 start[..PublicKey::LEN].copy_from_slice(&pk_bytes);
-                start[PublicKey::LEN..][..size_of::<u32>()]
-                    .copy_from_slice(&u32::MAX.to_be_bytes());
+                start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
 
                 // need to start after the target account
-                start[PublicKey::LEN + size_of::<u32>()..].copy_from_slice("D".as_bytes());
+                start[PublicKey::LEN + U32_LEN..].copy_from_slice("D".as_bytes());
                 IteratorMode::From(&start, direction)
             }
         };
@@ -542,16 +540,16 @@ impl<'a> CsvRecordInternalCommand<'a> {
 fn internal_commmand_block_key(
     state_hash: &BlockHash,
     index: u32,
-) -> [u8; BlockHash::LEN + size_of::<u32>()] {
-    let mut bytes = [0; BlockHash::LEN + size_of::<u32>()];
-    bytes[..BlockHash::LEN].copy_from_slice(&state_hash.clone().to_bytes());
+) -> [u8; BlockHash::LEN + U32_LEN] {
+    let mut bytes = [0; BlockHash::LEN + U32_LEN];
+    bytes[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
     bytes[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
 
-fn internal_commmand_pk_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + size_of::<u32>()] {
-    let mut bytes = [0; PublicKey::LEN + size_of::<u32>()];
-    bytes[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
+fn internal_commmand_pk_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + U32_LEN] {
+    let mut bytes = [0; PublicKey::LEN + U32_LEN];
+    bytes[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     bytes[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
@@ -560,53 +558,49 @@ fn internal_commmand_sort_key(
     prefix: u32,
     state_hash: &BlockHash,
     index: u32,
-) -> [u8; size_of::<u32>() + BlockHash::LEN + size_of::<u32>()] {
-    let mut bytes = [0; size_of::<u32>() + BlockHash::LEN + size_of::<u32>()];
-    bytes[..size_of::<u32>()].copy_from_slice(&prefix.to_be_bytes());
-    bytes[size_of::<u32>()..][..BlockHash::LEN].copy_from_slice(&state_hash.clone().to_bytes());
-    bytes[size_of::<u32>() + BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+) -> [u8; U32_LEN + BlockHash::LEN + U32_LEN] {
+    let mut bytes = [0; U32_LEN + BlockHash::LEN + U32_LEN];
+    bytes[..U32_LEN].copy_from_slice(&prefix.to_be_bytes());
+    bytes[U32_LEN..][..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    bytes[U32_LEN + BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
 
 fn internal_commmand_pk_sort_key(
-    pk: PublicKey,
+    pk: &PublicKey,
     sort: u32,
-    state_hash: BlockHash,
+    state_hash: &BlockHash,
     index: u32,
     kind: u8,
-) -> [u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>() + 1] {
-    let mut bytes = [0; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>() + 1];
-    bytes[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
-    bytes[PublicKey::LEN..][..size_of::<u32>()].copy_from_slice(&sort.to_be_bytes());
-    bytes[PublicKey::LEN + size_of::<u32>()..][..BlockHash::LEN]
-        .copy_from_slice(&state_hash.to_bytes());
-    bytes[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN..][..size_of::<u32>()]
+) -> [u8; PublicKey::LEN + U32_LEN + BlockHash::LEN + U32_LEN + 1] {
+    let mut bytes = [0; PublicKey::LEN + U32_LEN + BlockHash::LEN + U32_LEN + 1];
+    bytes[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+    bytes[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort.to_be_bytes());
+    bytes[PublicKey::LEN..][U32_LEN..][..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    bytes[PublicKey::LEN..][U32_LEN..][BlockHash::LEN..][..U32_LEN]
         .copy_from_slice(&index.to_be_bytes());
-    bytes[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>()] = kind;
+    bytes[PublicKey::LEN..][U32_LEN..][BlockHash::LEN..][U32_LEN] = kind;
     bytes
 }
 
-fn internal_command_pk_key(pk: PublicKey, index: u32) -> [u8; PublicKey::LEN + size_of::<u32>()] {
-    let mut bytes = [0; PublicKey::LEN + size_of::<u32>()];
-    bytes[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
+fn internal_command_pk_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + U32_LEN] {
+    let mut bytes = [0; PublicKey::LEN + U32_LEN];
+    bytes[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     bytes[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
 
 fn internal_command_pk_sort_key_state_hash(key: &[u8]) -> BlockHash {
-    let mut bytes = [0; BlockHash::LEN];
-    bytes.copy_from_slice(&key[PublicKey::LEN + size_of::<u32>()..][..BlockHash::LEN]);
-    BlockHash::from_bytes(&bytes).expect("block state hash bytes")
+    BlockHash::from_bytes(&key[PublicKey::LEN + U32_LEN..][..BlockHash::LEN])
+        .expect("block state hash bytes")
 }
 
 fn internal_command_pk_sort_key_index(key: &[u8]) -> u32 {
-    let mut bytes = [0; size_of::<u32>()];
-    bytes.copy_from_slice(
-        &key[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN..][..size_of::<u32>()],
-    );
-    u32::from_be_bytes(bytes)
+    u32_from_be_bytes(&key[PublicKey::LEN..][U32_LEN..][BlockHash::LEN..][..U32_LEN])
+        .expect("internal command pk sort key index u32 bytes")
 }
 
+/// `PublicKey::LEN + U32_LEN + BlockHash::LEN + U32_LEN`-th byte
 fn internal_command_pk_sort_key_kind(key: &[u8]) -> u8 {
-    key[PublicKey::LEN + size_of::<u32>() + BlockHash::LEN + size_of::<u32>()]
+    key[PublicKey::LEN + U32_LEN + BlockHash::LEN + U32_LEN]
 }

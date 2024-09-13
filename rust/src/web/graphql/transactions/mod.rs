@@ -13,9 +13,10 @@ use crate::{
     protocol::serialization_types::staged_ledger_diff::{
         SignedCommandPayloadBody, StakeDelegation,
     },
-    store::{
-        pk_key_prefix, pk_txn_sort_key_prefix, state_hash_pk_txn_sort_key, to_be_bytes,
-        txn_hash_of_key, IndexerStore,
+    store::IndexerStore,
+    utility::db::{
+        pk_key_prefix, pk_txn_sort_key_prefix, pk_txn_sort_key_state_hash, to_be_bytes,
+        txn_hash_of_key,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
@@ -147,7 +148,7 @@ impl TransactionsQueryRoot {
                 .as_ref()
                 .or(query.to.as_ref())
                 .expect("pk to exist");
-            let start = pk_txn_sort_key_prefix((pk as &str).into(), start_slot);
+            let start = pk_txn_sort_key_prefix(&(pk as &str).into(), start_slot);
             let mode = IteratorMode::From(&start, direction);
             let txn_iter = if query.from.is_some() {
                 db.txn_from_height_iterator(mode).flatten()
@@ -160,7 +161,7 @@ impl TransactionsQueryRoot {
                 if txn_pk.0 != *pk {
                     break;
                 }
-                let txn_state_hash = state_hash_pk_txn_sort_key(&key);
+                let txn_state_hash = pk_txn_sort_key_state_hash(&key);
                 let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &txn_state_hash)?

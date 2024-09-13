@@ -3,7 +3,8 @@ use crate::{
     constants::*,
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
-    store::{block_state_hash_from_key, from_be_bytes, to_be_bytes, IndexerStore},
+    store::IndexerStore,
+    utility::db::{block_sort_key_state_hash_suffix, from_be_bytes, to_be_bytes},
     web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
 use anyhow::Context as aContext;
@@ -351,7 +352,7 @@ impl SnarkQueryRoot {
         };
 
         'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = block_sort_key_state_hash_suffix(&key)?;
             let block = db.get_block(&state_hash)?.expect("block to be returned").0;
             let canonical = get_block_canonicity(db, &state_hash.0);
             let snark_work = db.get_snark_work_in_block(&state_hash)?;

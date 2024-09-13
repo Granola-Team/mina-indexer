@@ -1,11 +1,11 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     ledger::public_key::PublicKey,
     snark_work::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
-    store::{from_be_bytes, to_be_bytes, u32_prefix_key, u64_prefix_key, IndexerStore},
+    utility::db::{from_be_bytes, to_be_bytes, u32_prefix_key, u64_prefix_key},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};

@@ -3,11 +3,11 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
-    store::from_be_bytes,
+    utility::db::{u32_from_be_bytes, U32_LEN},
 };
 use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};
-use std::{mem::size_of, path::PathBuf};
+use std::path::PathBuf;
 
 /// Store for user commands
 pub trait UserCommandStore {
@@ -170,11 +170,11 @@ pub trait UserCommandStore {
 }
 
 /// u32 prefix from `key`
-/// - keep the first size_of::<u32>() bytes
+/// - keep the first U32_LEN bytes
 /// - used for global slot & block height
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
-    from_be_bytes(key[..size_of::<u32>()].to_vec())
+    u32_from_be_bytes(&key[..U32_LEN]).expect("u32 bytes")
 }
 
 /// Transaction hash from `key`

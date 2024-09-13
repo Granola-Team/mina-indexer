@@ -1,8 +1,5 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
-use crate::{
-    chain::{store::ChainStore, ChainId, Network},
-    store::IndexerStore,
-};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
+use crate::chain::{store::ChainStore, ChainId, Network};
 use log::trace;
 
 impl ChainStore for IndexerStore {

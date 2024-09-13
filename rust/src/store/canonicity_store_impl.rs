@@ -1,10 +1,10 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
-    store::{to_be_bytes, IndexerStore},
+    utility::db::to_be_bytes,
 };
 use anyhow::Context;
 use log::trace;

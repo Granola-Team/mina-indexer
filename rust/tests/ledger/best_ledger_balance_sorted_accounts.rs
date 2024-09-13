@@ -10,7 +10,8 @@ use mina_indexer::{
     },
     server::IndexerVersion,
     state::IndexerState,
-    store::{balance_key_prefix, pk_key_prefix, IndexerStore},
+    store::IndexerStore,
+    utility::db::{balance_key_prefix, pk_key_prefix},
 };
 use std::{mem::size_of, path::PathBuf, sync::Arc};
 

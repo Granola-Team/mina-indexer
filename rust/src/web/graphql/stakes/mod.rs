@@ -8,13 +8,14 @@ use crate::{
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
     },
     snark_work::store::SnarkStore,
-    store::{from_be_bytes, username::UsernameStore, IndexerStore},
+    store::{username::UsernameStore, IndexerStore},
+    utility::db::{from_be_bytes, U32_LEN},
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use speedb::Direction;
-use std::{mem::size_of, sync::Arc};
+use std::sync::Arc;
 
 #[derive(InputObject)]
 pub struct StakeQueryInput {
@@ -121,7 +122,7 @@ impl StakeQueryRoot {
         };
 
         for (key, value) in iter.flatten() {
-            let key_epoch = from_be_bytes(key[..size_of::<u32>()].to_vec());
+            let key_epoch = from_be_bytes(key[..U32_LEN].to_vec());
             if key_epoch != epoch || accounts.len() >= limit {
                 // no longer the desired staking ledger
                 break;
@@ -529,7 +530,7 @@ impl StakesLedgerAccountWithMeta {
                 .get_internal_commands_total_count()
                 .expect("total internal command count"),
             epoch_num_accounts: db
-                .get_staking_ledger_accounts_count_epoch(epoch, MAINNET_GENESIS_HASH.into())
+                .get_staking_ledger_accounts_count_epoch(epoch, &MAINNET_GENESIS_HASH.into())
                 .expect("total internal command count"),
         }
     }

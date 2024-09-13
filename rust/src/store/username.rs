@@ -30,6 +30,7 @@ pub trait UsernameStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
+    /// Get the block's username updates
     fn get_block_username_updates(
         &self,
         state_hash: &BlockHash,

@@ -1,6 +1,6 @@
 use super::{
-    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, pk_key_prefix,
-    pk_txn_sort_key_nonce, pk_txn_sort_key_prefix, pk_txn_sort_key_sort, txn_hash_of_key,
+    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, user_command_db_key_pk,
+    username::UsernameStore, IndexerStore,
 };
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockComparison, BlockHash},
@@ -11,9 +11,10 @@ use crate::{
     },
     constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
-    store::{
-        from_be_bytes, pk_txn_sort_key, to_be_bytes, txn_block_key, txn_sort_key, u32_prefix_key,
-        user_command_db_key_pk, username::UsernameStore, IndexerStore,
+    utility::db::{
+        from_be_bytes, pk_key_prefix, pk_txn_sort_key, pk_txn_sort_key_nonce,
+        pk_txn_sort_key_prefix, pk_txn_sort_key_sort, to_be_bytes, txn_block_key, txn_hash_of_key,
+        txn_sort_key, u32_prefix_key,
     },
 };
 use anyhow::bail;
@@ -50,7 +51,7 @@ impl UserCommandStore for IndexerStore {
                 txn_block_key(&txn_hash, state_hash.clone()),
                 serde_json::to_vec(&SignedCommandWithData::from(
                     command,
-                    &block.state_hash().0,
+                    &state_hash.0,
                     block.blockchain_length(),
                     block.timestamp(),
                     block.global_slot_since_genesis(),
@@ -63,18 +64,14 @@ impl UserCommandStore for IndexerStore {
             // add index for global slot sorting
             batch.put_cf(
                 self.user_commands_slot_sort_cf(),
-                txn_sort_key(
-                    block.global_slot_since_genesis(),
-                    &txn_hash,
-                    state_hash.clone(),
-                ),
+                txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
                 b"",
             );
 
             // add index for block height sorting
             batch.put_cf(
                 self.user_commands_height_sort_cf(),
-                txn_sort_key(block.blockchain_length(), &txn_hash, state_hash.clone()),
+                txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
                 b"",
             );
 
@@ -90,49 +87,51 @@ impl UserCommandStore for IndexerStore {
             );
 
             // add sender index
+            let sender = command.sender();
             batch.put_cf(
                 self.txn_from_height_sort_cf(),
                 pk_txn_sort_key(
-                    command.sender(),
+                    &sender,
                     block.blockchain_length(),
-                    command.nonce(),
+                    command.nonce().0,
                     &txn_hash,
-                    block.state_hash(),
+                    &state_hash,
                 ),
                 command.amount().to_be_bytes(),
             );
             batch.put_cf(
                 self.txn_from_slot_sort_cf(),
                 pk_txn_sort_key(
-                    command.sender(),
+                    &sender,
                     block.global_slot_since_genesis(),
-                    command.nonce(),
+                    command.nonce().0,
                     &txn_hash,
-                    block.state_hash(),
+                    &state_hash,
                 ),
                 command.amount().to_be_bytes(),
             );
 
             // add receiver index
+            let receiver = command.receiver();
             batch.put_cf(
                 self.txn_to_height_sort_cf(),
                 pk_txn_sort_key(
-                    command.receiver(),
+                    &receiver,
                     block.blockchain_length(),
-                    command.nonce(),
+                    command.nonce().0,
                     &txn_hash,
-                    block.state_hash(),
+                    &state_hash,
                 ),
                 command.amount().to_be_bytes(),
             );
             batch.put_cf(
                 self.txn_to_slot_sort_cf(),
                 pk_txn_sort_key(
-                    command.receiver(),
+                    &receiver,
                     block.global_slot_since_genesis(),
-                    command.nonce(),
+                    command.nonce().0,
                     &txn_hash,
-                    block.state_hash(),
+                    &state_hash,
                 ),
                 command.amount().to_be_bytes(),
             );
@@ -150,7 +149,7 @@ impl UserCommandStore for IndexerStore {
                 .map(|c| {
                     SignedCommandWithData::from(
                         c,
-                        &block.state_hash().0,
+                        &state_hash.0,
                         block.blockchain_length(),
                         block.timestamp(),
                         block.global_slot_since_genesis(),
@@ -380,7 +379,7 @@ impl UserCommandStore for IndexerStore {
         path: Option<PathBuf>,
     ) -> anyhow::Result<PathBuf> {
         let mut txns = vec![];
-        let start = pk_txn_sort_key_prefix(pk.clone(), u32::MAX);
+        let start = pk_txn_sort_key_prefix(pk, u32::MAX);
         let mode = IteratorMode::From(&start, speedb::Direction::Reverse);
 
         // from txns

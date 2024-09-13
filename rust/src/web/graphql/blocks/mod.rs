@@ -16,9 +16,10 @@ use crate::{
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, pk_key_prefix,
-        to_be_bytes, IndexerStore,
+    store::IndexerStore,
+    utility::db::{
+        block_sort_key_state_hash_suffix, block_u32_prefix_from_key, from_be_bytes, pk_key_prefix,
+        to_be_bytes,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -133,7 +134,7 @@ impl BlocksQueryRoot {
             .blocks_height_iterator(speedb::IteratorMode::End)
             .flatten()
         {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = block_sort_key_state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
             let canonical = get_block_canonicity(db, &state_hash.0);
             let block_num_snarks = db
@@ -205,7 +206,7 @@ impl BlocksQueryRoot {
                         break;
                     }
 
-                    let state_hash = block_state_hash_from_key(&key)?;
+                    let state_hash = block_sort_key_state_hash_suffix(&key)?;
                     if let Some(creator) = db.get_block_creator(&state_hash)? {
                         producers.insert(creator);
                         continue;
@@ -311,7 +312,7 @@ impl BlocksQueryRoot {
                 if pk_key_prefix(&key).0 != coinbase_receiver {
                     break;
                 }
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = block_sort_key_state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -353,7 +354,7 @@ impl BlocksQueryRoot {
                 if pk_key_prefix(&key).0 != creator_account {
                     break;
                 }
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = block_sort_key_state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -408,7 +409,7 @@ impl BlocksQueryRoot {
                     break;
                 }
 
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = block_sort_key_state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -472,7 +473,7 @@ impl BlocksQueryRoot {
                     break;
                 }
 
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = block_sort_key_state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -497,7 +498,7 @@ impl BlocksQueryRoot {
             GlobalSlotDesc => db.blocks_global_slot_iterator(From(&end, Reverse)),
         };
         for (key, _) in iter.flatten() {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = block_sort_key_state_hash_suffix(&key)?;
             let pcb = db
                 .get_block(&state_hash)?
                 .with_context(|| format!("block missing from store hash {state_hash}"))

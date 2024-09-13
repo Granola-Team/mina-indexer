@@ -6,7 +6,8 @@ use crate::{
         witness_tree::WitnessTreeEvent,
         IndexerEvent,
     },
-    store::{from_be_bytes, to_be_bytes, IndexerStore},
+    store::IndexerStore,
+    utility::db::{from_be_bytes, to_be_bytes},
 };
 use log::trace;
 

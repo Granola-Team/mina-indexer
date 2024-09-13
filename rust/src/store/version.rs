@@ -2,7 +2,7 @@ use crate::constants::GIT_COMMIT_HASH;
 use serde::{Deserialize, Serialize};
 
 pub trait VersionStore {
-    /// Set db version
+    /// Set db version with env var `GIT_COMMIT_HASH`
     fn set_db_version_with_git_commit(
         &self,
         major: u32,

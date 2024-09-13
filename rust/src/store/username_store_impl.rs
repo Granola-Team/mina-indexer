@@ -1,15 +1,16 @@
 use super::{
+    column_families::ColumnFamilyHelpers,
     username::{UsernameAccountUpdate, UsernameStore, UsernameUpdate},
     DbUpdate, IndexerStore,
 };
 use crate::{
     block::{store::DbBlockUpdate, BlockHash},
     ledger::{public_key::PublicKey, username::Username},
-    store::{column_families::ColumnFamilyHelpers, from_be_bytes, to_be_bytes},
+    utility::db::{from_be_bytes, pk_index_key, to_be_bytes},
 };
 use log::{error, trace};
 use speedb::WriteBatch;
-use std::{collections::HashMap, mem::size_of};
+use std::collections::HashMap;
 
 impl UsernameStore for IndexerStore {
     fn get_username(&self, pk: &PublicKey) -> anyhow::Result<Option<Username>> {
@@ -75,27 +76,21 @@ impl UsernameStore for IndexerStore {
                 if let Some(num) = self.get_pk_num_username_updates(pk)? {
                     // decr pk num username updates
                     if num == 0 {
-                        // remove pk number
+                        // remove pk
                         self.database
                             .delete_cf(self.username_pk_num_cf(), pk.0.as_bytes())?;
-
-                        // remove pk index
-                        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-                        key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-                        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(0u32));
-                        self.database.delete_cf(self.username_pk_index_cf(), key)?;
+                    } else {
+                        // decrement username update num
+                        self.database.put_cf(
+                            self.username_pk_num_cf(),
+                            pk.0.as_bytes(),
+                            to_be_bytes(num - 1),
+                        )?;
                     }
-                    self.database.put_cf(
-                        self.username_pk_num_cf(),
-                        pk.0.as_bytes(),
-                        to_be_bytes(num - 1),
-                    )?;
 
-                    // drop last update
-                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(num));
-                    self.database.delete_cf(self.username_pk_index_cf(), key)?;
+                    // drop last username update
+                    self.database
+                        .delete_cf(self.username_pk_index_cf(), pk_index_key(pk.clone(), num))?;
                 } else {
                     error!("Invalid username pk num {pk}");
                 }
@@ -105,41 +100,26 @@ impl UsernameStore for IndexerStore {
         // apply
         for updates in update.apply {
             for (pk, username) in updates.0 {
-                if let Some(mut num) = self.get_pk_num_username_updates(&pk)? {
+                let index = if let Some(num) = self.get_pk_num_username_updates(&pk)? {
                     // incr pk num username updates
-                    num += 1;
-                    self.database.put_cf(
-                        self.username_pk_num_cf(),
-                        pk.0.as_bytes(),
-                        to_be_bytes(num),
-                    )?;
-
-                    // add update
-                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(num));
-                    self.database.put_cf(
-                        self.username_pk_index_cf(),
-                        key,
-                        username.0.as_bytes(),
-                    )?;
+                    num + 1
                 } else {
-                    self.database.put_cf(
-                        self.username_pk_num_cf(),
-                        pk.0.as_bytes(),
-                        to_be_bytes(0),
-                    )?;
+                    0
+                };
 
-                    // add update
-                    let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-                    key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-                    key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(0u32));
-                    self.database.put_cf(
-                        self.username_pk_index_cf(),
-                        key,
-                        username.0.as_bytes(),
-                    )?;
-                }
+                // update num
+                self.database.put_cf(
+                    self.username_pk_num_cf(),
+                    pk.0.as_bytes(),
+                    index.to_be_bytes(),
+                )?;
+
+                // set current username
+                self.database.put_cf(
+                    self.username_pk_index_cf(),
+                    pk_index_key(pk, index),
+                    username.0.as_bytes(),
+                )?;
             }
         }
         Ok(())
@@ -147,12 +127,9 @@ impl UsernameStore for IndexerStore {
 
     fn get_pk_username(&self, pk: &PublicKey, index: u32) -> anyhow::Result<Option<Username>> {
         trace!("Getting pk's {index}th username {pk}");
-        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-        key[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
-        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(index));
         Ok(self
             .database
-            .get_cf(self.username_pk_index_cf(), key)?
+            .get_cf(self.username_pk_index_cf(), pk_index_key(pk.clone(), index))?
             .and_then(|bytes| Username::from_bytes(bytes).ok()))
     }
 
