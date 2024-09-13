@@ -195,3 +195,40 @@ HTTP 200
 [Asserts]
 
 jsonpath "$.data.feetransfers" count == 0
+
+#
+# Fee transfers for a given recipient and block height
+#
+
+POST {{url}}
+```graphql
+query Feetransfers($limit: Int = 10, $sort_by: FeetransferSortByInput!, $query: FeetransferQueryInput!) {
+  feetransfers(limit: $limit, sortBy: $sort_by, query: $query ) {
+    recipient
+    blockHeight
+  }
+}
+
+variables {
+  "sort_by": "BLOCKHEIGHT_DESC",
+  "limit": 25,
+  "query": {
+    "recipient": "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA",
+    "canonical": true,
+    "blockHeight_lte": 100
+  }
+}
+
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.feetransfers" count == 2
+
+jsonpath "$.data.feetransfers[0].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+jsonpath "$.data.feetransfers[0].blockHeight" == 70
+jsonpath "$.data.feetransfers[1].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+jsonpath "$.data.feetransfers[1].blockHeight" == 70
+
+duration < 1000
