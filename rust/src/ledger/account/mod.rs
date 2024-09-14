@@ -63,7 +63,7 @@ impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0 - rhs.0)
+        Self(self.0.checked_sub(rhs.0).unwrap())
     }
 }
 
@@ -71,7 +71,7 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0 - rhs)
+        Self(self.0.checked_sub(rhs).unwrap())
     }
 }
 
@@ -288,10 +288,7 @@ impl Account {
     pub fn payment(self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => self.credit(payment_diff.amount),
-            UpdateType::Debit(nonce) => self
-                .clone()
-                .debit(payment_diff.amount, nonce)
-                .unwrap_or(self),
+            UpdateType::Debit(nonce) => self.clone().debit(payment_diff.amount, nonce),
         }
     }
 
@@ -334,15 +331,11 @@ impl Account {
     /// An `Option` containing the new `Account` state if the debit was
     /// successful, or `None` if the debit amount exceeds the current
     /// balance.
-    fn debit(self, amount: Amount, nonce: Option<Nonce>) -> Option<Self> {
-        if amount > self.balance {
-            None
-        } else {
-            Some(Account {
-                balance: self.balance - amount,
-                nonce: nonce.or(self.nonce),
-                ..self
-            })
+    fn debit(self, amount: Amount, nonce: Option<Nonce>) -> Self {
+        Account {
+            balance: self.balance - amount,
+            nonce: nonce.or(self.nonce),
+            ..self
         }
     }
 
