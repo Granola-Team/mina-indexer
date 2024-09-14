@@ -676,7 +676,7 @@ pub async fn handle_connection(
                     if ledger::is_valid_ledger_hash(&hash) {
                         trace!("{hash} is a ledger hash");
                         if let Some(staking_ledger) =
-                            db.get_staking_ledger(&hash.clone().into(), None, &None)?
+                            db.get_staking_ledger(&hash.clone().into(), None, None)?
                         {
                             let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                             if path.is_none() {
@@ -713,7 +713,7 @@ pub async fn handle_connection(
                     if !block::is_valid_state_hash(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if let Some(staking_ledger) =
-                        db.build_staking_ledger(epoch, &Some(genesis_state_hash.into()))?
+                        db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
                     {
                         let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                         if path.is_none() {
@@ -749,7 +749,7 @@ pub async fn handle_connection(
                     } else if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
                     } else if let Some(aggregated_delegations) =
-                        db.build_aggregated_delegations(epoch, &Some(genesis_state_hash.into()))?
+                        db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?
                     {
                         let pk: PublicKey = pk.into();
                         let epoch = aggregated_delegations.epoch;
@@ -794,7 +794,7 @@ pub async fn handle_connection(
                 } => {
                     info!("Received staking-delegations command for epoch {epoch}");
                     let aggregated_delegations =
-                        db.build_aggregated_delegations(epoch, &Some(genesis_state_hash.into()))?;
+                        db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?;
                     if let Some(agg_del_str) = aggregated_delegations
                         .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
                     {

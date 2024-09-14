@@ -6,7 +6,6 @@ use super::{
 use log::trace;
 
 impl VersionStore for IndexerStore {
-    /// Set db version with env var `GIT_COMMIT_HASH`
     fn set_db_version_with_git_commit(
         &self,
         major: u32,
@@ -33,7 +32,6 @@ impl VersionStore for IndexerStore {
         Ok(())
     }
 
-    /// Get db version
     fn get_db_version(&self) -> anyhow::Result<IndexerStoreVersion> {
         trace!("Getting database version");
         Ok(self

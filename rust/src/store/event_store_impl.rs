@@ -6,7 +6,8 @@ use crate::{
         witness_tree::WitnessTreeEvent,
         IndexerEvent,
     },
-    store::{from_be_bytes, to_be_bytes, IndexerStore},
+    store::IndexerStore,
+    utility::store::from_be_bytes,
 };
 use log::trace;
 
@@ -31,8 +32,8 @@ impl EventStore for IndexerStore {
                 | DbBlockEvent::NewBlock {
                     blockchain_length, ..
                 },
-            )) => to_be_bytes(*blockchain_length).to_vec(),
-            _ => to_be_bytes(0).to_vec(),
+            )) => (*blockchain_length).to_be_bytes().to_vec(),
+            _ => 0u32.to_be_bytes().to_vec(),
         };
         value.push(event.kind());
         value.append(&mut serde_json::to_vec(&event)?);

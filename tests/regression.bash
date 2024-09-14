@@ -863,7 +863,7 @@ test_transactions_csv() {
     wait_for_socket
 
     # write transactions to CSV
-    csv_file=./B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy.json
+    csv_file=./B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy.csv
     idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --csv --path $csv_file
 
     # check transactions CSV
@@ -1413,7 +1413,7 @@ test_internal_commands_csv() {
     wait_for_socket
 
     # write transactions to CSV
-    csv_file=./B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP.json
+    csv_file=./B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP.csv
     idxr internal-commands public-key --public-key B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP --csv --path $csv_file
 
     # check transactions CSV

@@ -2,7 +2,7 @@ use crate::constants::GIT_COMMIT_HASH;
 use serde::{Deserialize, Serialize};
 
 pub trait VersionStore {
-    /// Set db version
+    /// Set db version with env var `GIT_COMMIT_HASH`
     fn set_db_version_with_git_commit(
         &self,
         major: u32,
@@ -25,7 +25,7 @@ pub struct IndexerStoreVersion {
 impl IndexerStoreVersion {
     pub const MAJOR: u32 = 0;
     pub const MINOR: u32 = 11;
-    pub const PATCH: u32 = 7;
+    pub const PATCH: u32 = 8;
 
     /// Output as `MAJOR`.`MINOR`.`PATCH`
     pub fn major_minor_patch(&self) -> String {

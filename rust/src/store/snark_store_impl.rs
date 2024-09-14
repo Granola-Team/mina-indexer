@@ -1,70 +1,15 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     ledger::public_key::PublicKey,
     snark_work::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
-    store::{from_be_bytes, to_be_bytes, u32_prefix_key, u64_prefix_key, IndexerStore},
+    utility::store::{from_be_bytes, snarks::*, u32_prefix_key, u64_prefix_key},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashMap;
-
-/// **Key format:** `{fee}{slot}{pk}{hash}{num}`
-/// ```
-/// fee:  8 BE bytes
-/// slot: 4 BE bytes
-/// pk:   [PublicKey::LEN] bytes
-/// hash: [BlockHash::LEN] bytes
-/// num:  4 BE bytes
-pub fn snark_fee_prefix_key(
-    fee: u64,
-    global_slot: u32,
-    pk: PublicKey,
-    state_hash: BlockHash,
-    num: u32,
-) -> [u8; 4 * 2 + 8 + PublicKey::LEN + BlockHash::LEN] {
-    const SIZE_OF_U32: usize = 4; // u32 is always 4 bytes
-    const SIZE_OF_U64: usize = 8; // u64 is always 8 bytes
-
-    let mut bytes = [0u8; SIZE_OF_U32 * 2 + SIZE_OF_U64 + PublicKey::LEN + BlockHash::LEN];
-
-    let mut start_index = 0;
-
-    // Copy fee (u64) - 8 bytes
-    bytes[start_index..start_index + SIZE_OF_U64].copy_from_slice(&fee.to_be_bytes());
-    start_index += SIZE_OF_U64;
-
-    // Copy global_slot (u32) - 4 bytes
-    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&global_slot.to_be_bytes());
-    start_index += SIZE_OF_U32;
-
-    // Copy pk (PublicKey) - PublicKey::LEN bytes
-    bytes[start_index..start_index + PublicKey::LEN].copy_from_slice(&pk.to_bytes());
-    start_index += PublicKey::LEN;
-
-    // Copy state_hash (BlockHash) - BlockHash::LEN bytes
-    bytes[start_index..start_index + BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
-    start_index += BlockHash::LEN;
-
-    // Copy num (u32) - 4 bytes
-    bytes[start_index..start_index + SIZE_OF_U32].copy_from_slice(&num.to_be_bytes());
-
-    bytes
-}
-
-/// **Key format:** `{prover}{slot}{index}`
-/// ```
-/// - prover: [PublicKey::LEN] bytes
-/// - slot:   4 BE bytes
-/// - index:  4 BE bytes
-fn snark_prover_prefix_key(prover: &PublicKey, global_slot: u32, index: u32) -> Vec<u8> {
-    let mut bytes = prover.0.as_bytes().to_vec();
-    bytes.append(&mut to_be_bytes(global_slot).to_vec());
-    bytes.append(&mut to_be_bytes(index).to_vec());
-    bytes
-}
 
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
@@ -77,10 +22,12 @@ impl SnarkStore for IndexerStore {
         let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
         // add: state hash -> snark works
-        let state_hash = block.state_hash().0;
-        let key = state_hash.as_bytes();
-        let value = serde_json::to_vec(&completed_works)?;
-        self.database.put_cf(self.snarks_cf(), key, value)?;
+        let state_hash = block.state_hash();
+        self.database.put_cf(
+            self.snarks_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(&completed_works)?,
+        )?;
 
         // per block SNARK count
         self.set_block_snarks_count(&block.state_hash(), completed_works.len() as u32)?;
@@ -94,8 +41,8 @@ impl SnarkStore for IndexerStore {
                 snark_fee_prefix_key(
                     snark.fee,
                     block.global_slot_since_genesis(),
-                    snark.prover.clone(),
-                    block.state_hash(),
+                    &snark.prover,
+                    &state_hash,
                     num,
                 ),
                 b"",
@@ -126,14 +73,17 @@ impl SnarkStore for IndexerStore {
             if !block_pk_snarks.is_empty() {
                 // write these SNARKs to the next key for pk
                 let key = format!("{pk_str}{n}").as_bytes().to_vec();
-                let value = serde_json::to_vec(&block_pk_snarks)?;
-                self.database.put_cf(self.snarks_cf(), key, value)?;
+                self.database.put_cf(
+                    self.snarks_cf(),
+                    key,
+                    serde_json::to_vec(&block_pk_snarks)?,
+                )?;
 
                 // update pk's next index
                 let key = pk_str.as_bytes();
                 let next_n = (n + 1).to_string();
-                let value = next_n.as_bytes();
-                self.database.put_cf(self.snarks_cf(), key, value)?;
+                self.database
+                    .put_cf(self.snarks_cf(), key, next_n.as_bytes())?;
 
                 // increment SNARK counts
                 for (index, snark) in block_pk_snarks.iter().enumerate() {
@@ -297,11 +247,6 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    /// `{prover}{slot}{index} -> snark`
-    /// - prover: 55 pk bytes
-    /// - slot:   4 BE bytes
-    /// - index:  4 BE bytes
-    /// - snark:  serde_json encoded
     fn snark_prover_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database.iterator_cf(self.snark_work_prover_cf(), mode)
     }
@@ -323,11 +268,6 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    /// `{prover}{height}{index} -> snark`
-    /// - prover:         55 pk bytes
-    /// - block height:   4 BE bytes
-    /// - index:          4 BE bytes
-    /// - snark:          serde_json encoded
     fn snark_prover_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_work_prover_height_cf(), mode)
@@ -338,8 +278,8 @@ impl SnarkStore for IndexerStore {
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
-            .get_pinned_cf(self.snarks_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .get_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -347,8 +287,8 @@ impl SnarkStore for IndexerStore {
         let old = self.get_snarks_epoch_count(Some(epoch))?;
         Ok(self.database.put_cf(
             self.snarks_epoch_cf(),
-            to_be_bytes(epoch),
-            to_be_bytes(old + 1),
+            epoch.to_be_bytes(),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -362,11 +302,10 @@ impl SnarkStore for IndexerStore {
 
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing total SNARKs count");
-
         let old = self.get_snarks_total_count()?;
         Ok(self
             .database
-            .put(Self::TOTAL_NUM_SNARKS_KEY, to_be_bytes(old + 1))?)
+            .put(Self::TOTAL_NUM_SNARKS_KEY, (old + 1).to_be_bytes())?)
     }
 
     fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> anyhow::Result<u32> {
@@ -380,12 +319,11 @@ impl SnarkStore for IndexerStore {
 
     fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} SNARKs count {pk}");
-
         let old = self.get_snarks_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.snarks_pk_epoch_cf(),
             u32_prefix_key(epoch, pk),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -399,12 +337,11 @@ impl SnarkStore for IndexerStore {
 
     fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
         trace!("Incrementing pk total SNARKs count {pk}");
-
         let old = self.get_snarks_pk_total_count(pk)?;
         Ok(self.database.put_cf(
             self.snarks_pk_total_cf(),
             pk.0.as_bytes(),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -421,7 +358,7 @@ impl SnarkStore for IndexerStore {
         Ok(self.database.put_cf(
             self.block_snark_counts_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(count),
+            count.to_be_bytes(),
         )?)
     }
 
@@ -436,56 +373,5 @@ impl SnarkStore for IndexerStore {
         // epoch & total counts
         self.increment_snarks_epoch_count(epoch)?;
         self.increment_snarks_total_count()
-    }
-}
-
-#[cfg(test)]
-mod snark_store_impl_tests {
-    use super::*;
-
-    #[test]
-    fn test_snark_fee_prefix_key_length() {
-        // Mock values for PublicKey and BlockHash
-        let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
-
-        // Invoke the function
-        let result = snark_fee_prefix_key(100u64, 50u32, pk, state_hash, 25u32);
-
-        // Expected size of the result array
-        assert_eq!(result.len(), 4 * 2 + 8 + PublicKey::LEN + BlockHash::LEN);
-    }
-
-    #[test]
-    fn test_snark_fee_prefix_key_content() {
-        // Mock values for PublicKey and BlockHash
-        let pk = PublicKey::default(); // All 1s
-        let state_hash = BlockHash::default(); // All 2s
-
-        // Values for fee, global_slot, and num
-        let fee = 100u64;
-        let global_slot = 50u32;
-        let num = 25u32;
-
-        // Invoke the function
-        let result = snark_fee_prefix_key(fee, global_slot, pk.clone(), state_hash.clone(), num);
-
-        // Assert the fee is correctly copied (big-endian u64)
-        assert_eq!(&result[0..8], &fee.to_be_bytes());
-
-        // Assert the global_slot is correctly copied (big-endian u32)
-        assert_eq!(&result[8..12], &global_slot.to_be_bytes());
-
-        // Assert the PublicKey is correctly copied
-        assert_eq!(&result[12..12 + PublicKey::LEN], &pk.to_bytes());
-
-        // Assert the BlockHash is correctly copied
-        assert_eq!(
-            &result[12 + PublicKey::LEN..12 + PublicKey::LEN + BlockHash::LEN],
-            &state_hash.to_bytes()
-        );
-
-        // Assert the num is correctly copied (big-endian u32)
-        assert_eq!(&result[result.len() - 4..], &num.to_be_bytes());
     }
 }

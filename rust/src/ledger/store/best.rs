@@ -13,6 +13,9 @@ pub trait BestLedgerStore {
     fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
 
     /// Get the display view of pk's account
+    /// ****************************************************************
+    /// This is `pk`'s balance accounting for any potential creation fee
+    /// ****************************************************************
     fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
 
     /// Get the best ledger

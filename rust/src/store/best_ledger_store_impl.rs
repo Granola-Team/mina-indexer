@@ -1,4 +1,4 @@
-use super::{column_families::ColumnFamilyHelpers, DbUpdate};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
     block::{
         store::{BlockStore, DbBlockUpdate},
@@ -14,11 +14,11 @@ use crate::{
         },
         Ledger,
     },
-    store::{fixed_keys::FixedKeys, pk_key_prefix, to_be_bytes, u64_prefix_key, IndexerStore},
+    utility::store::{from_be_bytes, pk_index_key, u64_prefix_key},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::{collections::HashMap, mem::size_of};
+use std::collections::HashMap;
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
@@ -275,16 +275,13 @@ impl BestLedgerStore for IndexerStore {
         self.database.put_cf(
             self.best_ledger_accounts_num_delegations_cf(),
             pk.0.as_bytes(),
-            to_be_bytes(num + 1),
+            (num + 1).to_be_bytes(),
         )?;
 
         // append new delegation
-        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-        key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(num));
         self.database.put_cf(
             self.best_ledger_accounts_delegations_cf(),
-            key,
+            pk_index_key(pk, num),
             delegate.0.as_bytes(),
         )?;
         Ok(())
@@ -297,22 +294,17 @@ impl BestLedgerStore for IndexerStore {
                 self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
             )?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for height of pk delegations"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
-        let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-        key[..PublicKey::LEN].copy_from_slice(&pk.clone().to_bytes());
-        key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(idx));
+        trace!("Getting pk {pk} delegation index {idx}");
         Ok(self
             .database
-            .get_cf(self.best_ledger_accounts_delegations_cf(), key)?
+            .get_cf(
+                self.best_ledger_accounts_delegations_cf(),
+                pk_index_key(pk, idx),
+            )?
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
@@ -324,15 +316,14 @@ impl BestLedgerStore for IndexerStore {
             self.database.put_cf(
                 self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
-                to_be_bytes(idx - 1),
+                (idx - 1).to_be_bytes(),
             )?;
 
             // drop delegation
-            let mut key = [0u8; PublicKey::LEN + size_of::<u32>()];
-            key[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
-            key[PublicKey::LEN..].copy_from_slice(&to_be_bytes(idx - 1));
-            self.database
-                .delete_cf(self.best_ledger_accounts_delegations_cf(), key)?;
+            self.database.delete_cf(
+                self.best_ledger_accounts_delegations_cf(),
+                pk_index_key(&pk, idx - 1),
+            )?;
         }
         Ok(())
     }
@@ -363,13 +354,7 @@ impl BestLedgerStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for total number of accounts"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
@@ -379,12 +364,12 @@ impl BestLedgerStore for IndexerStore {
         {
             trace!("Best ledger (length {best_block_height}): {best_block_hash}");
             let mut accounts = HashMap::new();
-            for (key, value) in self
+            for (_, value) in self
                 .best_ledger_account_balance_iterator(IteratorMode::End)
                 .flatten()
             {
-                let pk = pk_key_prefix(&key[size_of::<u64>()..]);
-                accounts.insert(pk, serde_json::from_slice(&value)?);
+                let account: Account = serde_json::from_slice(&value)?;
+                accounts.insert(account.public_key.clone(), account);
             }
             return Ok(Some(Ledger { accounts }));
         }

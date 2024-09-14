@@ -265,7 +265,7 @@ pub trait BlockStore {
     /// key: {block_height}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn blocks_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for blocks via global slot
@@ -273,7 +273,7 @@ pub trait BlockStore {
     /// key: {global_slot}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn blocks_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for block creators via block height
@@ -281,7 +281,7 @@ pub trait BlockStore {
     /// key: {creator}{height}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn block_creator_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for block creators via global slot
@@ -289,7 +289,7 @@ pub trait BlockStore {
     /// key: {creator}{slot}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn block_creator_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for coinbase receivers via block height
@@ -297,7 +297,7 @@ pub trait BlockStore {
     /// key: {pk}{height}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn coinbase_receiver_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for coinbase receivers via global slot
@@ -305,7 +305,7 @@ pub trait BlockStore {
     /// key: {pk}{slot}{state_hash}
     /// val: b""
     /// ```
-    /// Use [block_state_hash_from_key] to extract state hash
+    /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     //////////////////

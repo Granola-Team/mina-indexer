@@ -1,4 +1,7 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys};
+use super::{
+    column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, username::UsernameStore, DbUpdate,
+    IndexerStore,
+};
 use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
@@ -15,15 +18,14 @@ use crate::{
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
     },
     snark_work::store::SnarkStore,
-    store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, from_u64_be_bytes, to_be_bytes,
-        u32_prefix_key, username::UsernameStore, DbUpdate, IndexerStore,
+    utility::store::{
+        block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, state_hash_suffix,
+        u32_prefix_key, u64_from_be_bytes, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
-use std::mem::size_of;
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
@@ -37,7 +39,7 @@ impl BlockStore for IndexerStore {
         // add block to db - prefix with num bytes (u64) BE bytes
         let state_hash = block.state_hash();
         let mut value = num_block_bytes.to_be_bytes().to_vec();
-        value.append(&mut serde_json::to_vec(&block)?);
+        value.append(&mut serde_json::to_vec(block)?);
 
         if matches!(
             self.database
@@ -54,7 +56,7 @@ impl BlockStore for IndexerStore {
         // add to ledger diff index
         self.set_block_ledger_diff_batch(
             &state_hash,
-            LedgerDiff::from_precomputed(block),
+            &LedgerDiff::from_precomputed(block),
             &mut batch,
         )?;
 
@@ -156,7 +158,9 @@ impl BlockStore for IndexerStore {
         let bytes_processed = self
             .database
             .get(Self::NUM_BLOCK_BYTES_PROCESSED)?
-            .map_or(0, from_u64_be_bytes);
+            .map_or(0, |bytes| {
+                u64_from_be_bytes(&bytes).expect("bytes processed u64 BE bytes")
+            });
         self.database.put(
             Self::NUM_BLOCK_BYTES_PROCESSED,
             (bytes_processed + num_block_bytes).to_be_bytes(),
@@ -177,10 +181,15 @@ impl BlockStore for IndexerStore {
             .database
             .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| {
-                serde_json::from_slice::<PrecomputedBlock>(&bytes[size_of::<u64>()..])
+                serde_json::from_slice::<PrecomputedBlock>(&bytes[U64_LEN..])
                     .with_context(|| format!("{:?}", bytes.to_vec()))
                     .ok()
-                    .map(|block| (block, from_u64_be_bytes(bytes[..size_of::<u64>()].to_vec())))
+                    .map(|block| {
+                        (
+                            block,
+                            u64_from_be_bytes(&bytes[..U64_LEN]).expect("block bytes u64 BE bytes"),
+                        )
+                    })
             }))
     }
 
@@ -366,11 +375,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_date_time_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                let mut be_bytes = [0; size_of::<i64>()];
-                be_bytes.copy_from_slice(&bytes.clone());
-                i64::from_be_bytes(be_bytes)
-            }))
+            .and_then(|bytes| i64_from_be_bytes(&bytes).ok()))
     }
 
     fn set_block_date_time_batch(
@@ -396,13 +401,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_height_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block height"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_height_batch(
@@ -415,7 +414,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_height_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(blockchain_length),
+            blockchain_length.to_be_bytes(),
         );
         Ok(())
     }
@@ -425,13 +424,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_global_slot_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for global slot height"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_global_slot_batch(
@@ -444,7 +437,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_global_slot_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(global_slot),
+            global_slot.to_be_bytes(),
         );
         Ok(())
     }
@@ -476,18 +469,18 @@ impl BlockStore for IndexerStore {
         // block height sort
         batch.put_cf(
             self.block_creator_height_sort_cf(),
-            pk_block_sort_key(
-                block_creator.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
+            pk_block_sort_key(&block_creator, block.blockchain_length(), &state_hash),
             b"",
         );
 
         // global slot sort
         batch.put_cf(
             self.block_creator_slot_sort_cf(),
-            pk_block_sort_key(block_creator, block.global_slot_since_genesis(), state_hash),
+            pk_block_sort_key(
+                &block_creator,
+                block.global_slot_since_genesis(),
+                &state_hash,
+            ),
             b"",
         );
         Ok(())
@@ -520,11 +513,7 @@ impl BlockStore for IndexerStore {
         // block height sort
         batch.put_cf(
             self.block_coinbase_height_sort_cf(),
-            pk_block_sort_key(
-                coinbase_receiver.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
+            pk_block_sort_key(&coinbase_receiver, block.blockchain_length(), &state_hash),
             b"",
         );
 
@@ -532,9 +521,9 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_coinbase_slot_sort_cf(),
             pk_block_sort_key(
-                coinbase_receiver.clone(),
+                &coinbase_receiver,
                 block.global_slot_since_genesis(),
-                state_hash.clone(),
+                &state_hash,
             ),
             b"",
         );
@@ -545,14 +534,8 @@ impl BlockStore for IndexerStore {
         trace!("Getting number of blocks at height {blockchain_length}");
         Ok(self
             .database
-            .get_cf(self.blocks_at_height_cf(), to_be_bytes(blockchain_length))?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for number of block at block height"),
-                )
-            }))
+            .get_cf(self.blocks_at_height_cf(), blockchain_length.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn add_block_at_height_batch(
@@ -567,8 +550,8 @@ impl BlockStore for IndexerStore {
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
         batch.put_cf(
             self.blocks_at_height_cf(),
-            to_be_bytes(blockchain_length),
-            to_be_bytes(num_blocks_at_height + 1),
+            blockchain_length.to_be_bytes(),
+            (num_blocks_at_height + 1).to_be_bytes(),
         );
 
         // add the new key-value pair
@@ -601,14 +584,8 @@ impl BlockStore for IndexerStore {
         trace!("Getting number of blocks at slot {slot}");
         Ok(self
             .database
-            .get_cf(self.blocks_at_global_slot_cf(), to_be_bytes(slot))?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for number of block at slot"),
-                )
-            }))
+            .get_cf(self.blocks_at_global_slot_cf(), slot.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn add_block_at_slot_batch(
@@ -623,8 +600,8 @@ impl BlockStore for IndexerStore {
         let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
         batch.put_cf(
             self.blocks_at_global_slot_cf(),
-            to_be_bytes(slot),
-            to_be_bytes(num_blocks_at_slot + 1),
+            slot.to_be_bytes(),
+            (num_blocks_at_slot + 1).to_be_bytes(),
         );
 
         // add the new key-value pair
@@ -775,7 +752,7 @@ impl BlockStore for IndexerStore {
             heights.sort();
             batch.put_cf(
                 self.block_global_slot_to_heights_cf(),
-                to_be_bytes(global_slot),
+                global_slot.to_be_bytes(),
                 serde_json::to_vec(&heights)?,
             );
         }
@@ -789,7 +766,7 @@ impl BlockStore for IndexerStore {
             slots.sort();
             batch.put_cf(
                 self.block_height_to_global_slots_cf(),
-                to_be_bytes(blockchain_length),
+                blockchain_length.to_be_bytes(),
                 serde_json::to_vec(&slots)?,
             );
         }
@@ -805,7 +782,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_pinned_cf(
                 self.block_height_to_global_slots_cf(),
-                to_be_bytes(blockchain_length),
+                blockchain_length.to_be_bytes(),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
@@ -819,7 +796,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_pinned_cf(
                 self.block_global_slot_to_heights_cf(),
-                to_be_bytes(global_slot),
+                global_slot.to_be_bytes(),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
@@ -834,7 +811,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_epoch_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(epoch),
+            epoch.to_be_bytes(),
         );
         Ok(())
     }
@@ -844,13 +821,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_epoch_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block epoch"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_genesis_state_hash_batch(
@@ -932,7 +903,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_production_pk_epoch_cf(),
             u32_prefix_key(epoch, &creator),
-            to_be_bytes(acc + 1),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment pk total count
@@ -940,20 +911,20 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_production_pk_total_cf(),
             creator.to_bytes(),
-            to_be_bytes(acc + 1),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment epoch count
         let acc = self.get_block_production_epoch_count(Some(epoch))?;
         batch.put_cf(
             self.block_production_epoch_cf(),
-            to_be_bytes(epoch),
-            to_be_bytes(acc + 1),
+            epoch.to_be_bytes(),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment total count
         let acc = self.get_block_production_total_count()?;
-        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1));
+        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, (acc + 1).to_be_bytes());
 
         Ok(())
     }
@@ -971,13 +942,7 @@ impl BlockStore for IndexerStore {
                 self.block_production_pk_epoch_cf(),
                 u32_prefix_key(epoch, pk),
             )?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block production count"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
@@ -985,13 +950,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for total block production count for PK"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
@@ -999,14 +958,8 @@ impl BlockStore for IndexerStore {
         trace!("Getting epoch block production count {epoch}");
         Ok(self
             .database
-            .get_cf(self.block_production_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block production epoch count"),
-                )
-            }))
+            .get_cf(self.block_production_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
@@ -1014,13 +967,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_BLOCKS_KEY)?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for total block production"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn set_block_comparison_batch(
@@ -1078,7 +1025,7 @@ impl BlockStore for IndexerStore {
             .blocks_height_iterator(speedb::IteratorMode::Start)
             .flatten()
         {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let block_height = block_u32_prefix_from_key(&key)?;
             let global_slot = self
                 .get_block_global_slot(&state_hash)?
@@ -1096,7 +1043,7 @@ impl BlockStore for IndexerStore {
         let mut blocks = vec![];
         trace!("Getting blocks via height (mode: {})", display_mode(mode));
         for (key, _) in self.blocks_height_iterator(mode).flatten() {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
@@ -1111,7 +1058,7 @@ impl BlockStore for IndexerStore {
             .blocks_global_slot_iterator(speedb::IteratorMode::Start)
             .flatten()
         {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let block_height = block_u32_prefix_from_key(&key)?;
             let global_slot = self
                 .get_block_global_slot(&state_hash)?
@@ -1132,52 +1079,11 @@ impl BlockStore for IndexerStore {
             display_mode(mode)
         );
         for (key, _) in self.blocks_global_slot_iterator(mode).flatten() {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
     }
-}
-
-/// `{block height BE}{state hash}`
-fn block_height_key(block: &PrecomputedBlock) -> [u8; size_of::<u32>() + BlockHash::LEN] {
-    const SIZE_OF_U32: usize = size_of::<u32>();
-    let mut key = [0u8; SIZE_OF_U32 + BlockHash::LEN];
-    key[..SIZE_OF_U32].copy_from_slice(&to_be_bytes(block.blockchain_length()));
-    key[SIZE_OF_U32..].copy_from_slice(&block.state_hash().to_bytes());
-    key
-}
-
-/// `{global slot BE}{state hash}`
-fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; size_of::<u32>() + BlockHash::LEN] {
-    let mut key = [0u8; size_of::<u32>() + BlockHash::LEN];
-    key[..size_of::<u32>()].copy_from_slice(&to_be_bytes(block.global_slot_since_genesis()));
-    key[size_of::<u32>()..].copy_from_slice(&block.state_hash().to_bytes());
-    key
-}
-
-/// `{pk}{height/slot BE}{state hash}`
-fn pk_block_sort_key(
-    pk: PublicKey,
-    sort_value: u32,
-    state_hash: BlockHash,
-) -> [u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN] {
-    let mut key = [0u8; PublicKey::LEN + size_of::<u32>() + BlockHash::LEN];
-
-    let mut start_index = 0;
-
-    // Copy PublicKey bytes to the key array
-    key[start_index..start_index + PublicKey::LEN].copy_from_slice(&pk.to_bytes());
-    start_index += PublicKey::LEN;
-
-    // Copy sort_value (u32) bytes to the key array
-    key[start_index..start_index + size_of::<u32>()].copy_from_slice(&sort_value.to_be_bytes());
-    start_index += size_of::<u32>();
-
-    // Copy state_hash bytes to the key array
-    key[start_index..start_index + BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
-
-    key
 }
 
 fn block_cmp(db: &IndexerStore, a: &BlockHash, b: &BlockHash) -> std::cmp::Ordering {
@@ -1207,134 +1113,5 @@ fn display_direction(direction: Direction) -> String {
     match direction {
         Direction::Forward => "Forward".to_string(),
         Direction::Reverse => "Reverse".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod block_store_impl_tests {
-    use super::*;
-    use std::{mem::size_of, path::PathBuf};
-
-    #[test]
-    fn test_block_height_key_length() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_height_key(&block);
-
-        // Check that the key has the correct length
-        assert_eq!(result.len(), size_of::<u32>() + BlockHash::LEN);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_block_height_key_content() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_height_key(&block);
-
-        // Expected u32 bytes for the blockchain length (big-endian)
-        let expected_blockchain_length_bytes = 105489u32.to_be_bytes();
-
-        // Check that the first part of the key contains the correct blockchain length
-        // bytes
-        assert_eq!(
-            &result[..size_of::<u32>()],
-            &expected_blockchain_length_bytes
-        );
-
-        // Check that the second part of the key contains the correct state hash bytes
-        assert_eq!(
-            &result[size_of::<u32>()..],
-            "3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh".as_bytes()
-        );
-
-        Ok(())
-    }
-    #[test]
-    fn test_pk_block_sort_key_length() {
-        let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
-        let sort_value = 100u32;
-
-        // Generate the key
-        let result = pk_block_sort_key(pk, sort_value, state_hash.clone());
-
-        // Expected length: PublicKey::LEN + u32 (4 bytes) + BlockHash::LEN
-        let expected_len = PublicKey::LEN + size_of::<u32>() + BlockHash::LEN;
-
-        // Assert that the result has the correct length
-        assert_eq!(result.len(), expected_len);
-    }
-
-    #[test]
-    fn test_pk_block_sort_key_content() {
-        // Mock inputs
-        let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
-        let sort_value = 500u32;
-
-        // Generate the key
-        let result = pk_block_sort_key(pk.clone(), sort_value, state_hash.clone());
-
-        // Check that the PublicKey bytes are correctly placed
-        assert_eq!(&result[..PublicKey::LEN], &pk.to_bytes());
-
-        // Check that the sort_value bytes (u32, big-endian) are correctly placed
-        assert_eq!(
-            &result[PublicKey::LEN..PublicKey::LEN + size_of::<u32>()],
-            &sort_value.to_be_bytes()
-        );
-
-        // Check that the BlockHash bytes are correctly placed
-        assert_eq!(
-            &result[PublicKey::LEN + size_of::<u32>()..],
-            &state_hash.to_bytes()
-        );
-    }
-
-    #[test]
-    fn test_block_global_slot_key_length() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_global_slot_key(&block);
-
-        // Expected length: u32 (4 bytes) + BlockHash::LEN
-        let expected_len = size_of::<u32>() + BlockHash::LEN;
-
-        // Check that the result has the correct length
-        assert_eq!(result.len(), expected_len);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_block_global_slot_key_content() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_global_slot_key(&block);
-
-        // Expected global slot bytes (u32, big-endian)
-        let expected_global_slot_bytes = block.global_slot_since_genesis().to_be_bytes();
-
-        // Check that the first part of the key contains the correct global slot bytes
-        assert_eq!(&result[..size_of::<u32>()], &expected_global_slot_bytes);
-
-        // Check that the second part of the key contains the correct state hash bytes
-        assert_eq!(&result[size_of::<u32>()..], &block.state_hash().to_bytes());
-
-        Ok(())
     }
 }

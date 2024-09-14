@@ -45,20 +45,20 @@ impl StagedLedgerQueryRoot {
         if let Some(pk) = query.as_ref().and_then(|q| q.public_key.clone()) {
             if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
                 return Ok(db
-                    .get_staged_account(pk.into(), state_hash.into())?
+                    .get_staged_account(&pk.into(), &state_hash.into())?
                     .map(|acct| vec![acct.into()]));
             } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
                 if let Some(state_hash) =
                     db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
                 {
                     return Ok(db
-                        .get_staged_account(pk.into(), state_hash)?
+                        .get_staged_account(&pk.into(), &state_hash)?
                         .map(|acct| vec![acct.into()]));
                 }
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
                 if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
                     return Ok(db
-                        .get_staged_account(pk.into(), state_hash)?
+                        .get_staged_account(&pk.into(), &state_hash)?
                         .map(|acct| vec![acct.into()]));
                 }
             }

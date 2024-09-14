@@ -16,18 +16,18 @@ pub trait StakingLedgerStore {
     /// Get `pk`'s `epoch` staking ledger account
     fn get_staking_account(
         &self,
-        pk: PublicKey,
+        pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: &Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<StakingAccount>>;
 
     /// Set `pk`'s staking ledger account
     fn set_staking_account(
         &self,
-        pk: PublicKey,
+        pk: &PublicKey,
         epoch: u32,
-        ledger_hash: LedgerHash,
-        genesis_state_hash: BlockHash,
+        ledger_hash: &LedgerHash,
+        genesis_state_hash: &BlockHash,
         staking_account_with_delegation: StakingAccountWithEpochDelegation,
     ) -> anyhow::Result<()>;
 
@@ -43,7 +43,7 @@ pub trait StakingLedgerStore {
         &self,
         ledger_hash: &LedgerHash,
         epoch: Option<u32>,
-        genesis_state_hash: &Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<StakingLedger>>;
 
     /// Get the aggregated staking delegations for the given epoch
@@ -51,9 +51,9 @@ pub trait StakingLedgerStore {
     /// If no genesis state hash is provided, default to current network
     fn get_epoch_delegations(
         &self,
-        pk: PublicKey,
+        pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<EpochStakeDelegation>>;
 
     /// Set the epoch number corresponding to the given staking ledger hash
@@ -61,7 +61,7 @@ pub trait StakingLedgerStore {
         &self,
         ledger_hash: &LedgerHash,
         epoch: u32,
-        genesis_state_hash: Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<()>;
 
     /// Set the genesis state hash corresponding to the given staking ledger
@@ -79,7 +79,7 @@ pub trait StakingLedgerStore {
     fn get_staking_ledger_hash_by_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<LedgerHash>>;
 
     /// Get the genesis state hash corresponding to the given staking ledger
@@ -100,14 +100,14 @@ pub trait StakingLedgerStore {
     fn get_staking_ledger_accounts_count_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: BlockHash,
+        genesis_state_hash: &BlockHash,
     ) -> anyhow::Result<u32>;
 
     /// Set the total number of accounts per staking ledger
     fn set_staking_ledger_accounts_count_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: BlockHash,
+        genesis_state_hash: &BlockHash,
         count: u32,
     ) -> anyhow::Result<()>;
 
@@ -115,14 +115,14 @@ pub trait StakingLedgerStore {
     fn build_staking_ledger(
         &self,
         epoch: u32,
-        genesis_state_hash: &Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<StakingLedger>>;
 
     // Build the aggregated staking delegations from the CF representation
     fn build_aggregated_delegations(
         &self,
         epoch: u32,
-        genesis_state_hash: &Option<BlockHash>,
+        genesis_state_hash: Option<&BlockHash>,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>>;
 
     ///////////////

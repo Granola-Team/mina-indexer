@@ -9,16 +9,16 @@ use crate::{
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
-    ledger::LedgerHash,
+    ledger::{public_key::PublicKey, LedgerHash},
     proof_systems::signer::pubkey::CompressedPubKey,
     protocol::serialization_types::{
         common::Base58EncodableVersionedType, staged_ledger_diff::TransactionStatusFailedType,
         version_bytes,
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
-    store::{
-        block_state_hash_from_key, block_u32_prefix_from_key, from_be_bytes, pk_key_prefix,
-        to_be_bytes, IndexerStore,
+    store::IndexerStore,
+    utility::store::{
+        block_u32_prefix_from_key, from_be_bytes, pk_key_prefix, state_hash_suffix, U32_LEN,
     },
     web::graphql::gen::BlockQueryInput,
 };
@@ -133,7 +133,7 @@ impl BlocksQueryRoot {
             .blocks_height_iterator(speedb::IteratorMode::End)
             .flatten()
         {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
             let canonical = get_block_canonicity(db, &state_hash.0);
             let block_num_snarks = db
@@ -195,17 +195,17 @@ impl BlocksQueryRoot {
                 let mut producers = HashSet::new();
                 for (key, _) in db
                     .blocks_height_iterator(IteratorMode::From(
-                        &to_be_bytes(best_height + 1),
+                        &(best_height + 1).to_be_bytes(),
                         Direction::Reverse,
                     ))
                     .flatten()
                 {
-                    let height = from_be_bytes(key[..8].to_vec());
+                    let height = from_be_bytes(key[..U32_LEN].to_vec());
                     if height <= start_height {
                         break;
                     }
 
-                    let state_hash = block_state_hash_from_key(&key)?;
+                    let state_hash = state_hash_suffix(&key)?;
                     if let Some(creator) = db.get_block_creator(&state_hash)? {
                         producers.insert(creator);
                         continue;
@@ -297,21 +297,22 @@ impl BlocksQueryRoot {
                 .as_ref()
                 .and_then(|cb| cb.public_key.clone())
         }) {
-            let start = coinbase_receiver.as_bytes().to_vec();
-            let mut end = start.clone();
-            end.append(&mut to_be_bytes(u32::MAX).to_vec());
+            let start = coinbase_receiver.as_bytes();
+            let mut end = [0; PublicKey::LEN + U32_LEN];
+            end[..PublicKey::LEN].copy_from_slice(start);
+            end[PublicKey::LEN..].copy_from_slice(&u32::MAX.to_be_bytes());
 
             let iter = match sort_by {
-                BlockHeightAsc => db.coinbase_receiver_block_height_iterator(From(&start, Forward)),
+                BlockHeightAsc => db.coinbase_receiver_block_height_iterator(From(start, Forward)),
                 BlockHeightDesc => db.coinbase_receiver_block_height_iterator(From(&end, Reverse)),
-                GlobalSlotAsc => db.coinbase_receiver_global_slot_iterator(From(&start, Forward)),
+                GlobalSlotAsc => db.coinbase_receiver_global_slot_iterator(From(start, Forward)),
                 GlobalSlotDesc => db.coinbase_receiver_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
                 if pk_key_prefix(&key).0 != coinbase_receiver {
                     break;
                 }
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -339,21 +340,22 @@ impl BlocksQueryRoot {
                 (None, Some(lte)) => lte,
                 (None, None) => u32::MAX,
             };
-            let start = creator_account.as_bytes().to_vec();
-            let mut end = start.clone();
-            end.append(&mut to_be_bytes(upper_bound).to_vec());
+            let start = creator_account.as_bytes();
+            let mut end = [0; PublicKey::LEN + U32_LEN];
+            end[..PublicKey::LEN].copy_from_slice(start);
+            end[PublicKey::LEN..].copy_from_slice(&upper_bound.to_be_bytes());
 
             let iter = match sort_by {
-                BlockHeightAsc => db.block_creator_block_height_iterator(From(&start, Forward)),
+                BlockHeightAsc => db.block_creator_block_height_iterator(From(start, Forward)),
                 BlockHeightDesc => db.block_creator_block_height_iterator(From(&end, Reverse)),
-                GlobalSlotAsc => db.block_creator_global_slot_iterator(From(&start, Forward)),
+                GlobalSlotAsc => db.block_creator_global_slot_iterator(From(start, Forward)),
                 GlobalSlotDesc => db.block_creator_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
                 if pk_key_prefix(&key).0 != creator_account {
                     break;
                 }
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -396,8 +398,8 @@ impl BlocksQueryRoot {
                 (min_bound, max_bound)
             };
 
-            let start = to_be_bytes(min);
-            let end = to_be_bytes(max + 1);
+            let start = min.to_be_bytes();
+            let end = (max + 1).to_be_bytes();
             let mode = match sort_by {
                 BlockHeightAsc => From(&start, Forward),
                 _ => From(&end, Reverse),
@@ -408,7 +410,7 @@ impl BlocksQueryRoot {
                     break;
                 }
 
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -460,8 +462,8 @@ impl BlocksQueryRoot {
                 (min_bound, max_bound)
             };
 
-            let start = to_be_bytes(min);
-            let end = to_be_bytes(max + 1);
+            let start = min.to_be_bytes();
+            let end = (max + 1).to_be_bytes();
             let mode = match sort_by {
                 GlobalSlotAsc => From(&start, Forward),
                 _ => From(&end, Reverse),
@@ -472,7 +474,7 @@ impl BlocksQueryRoot {
                     break;
                 }
 
-                let state_hash = block_state_hash_from_key(&key)?;
+                let state_hash = state_hash_suffix(&key)?;
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -488,8 +490,8 @@ impl BlocksQueryRoot {
         }
 
         // default query handler
-        let start = to_be_bytes(0);
-        let end = to_be_bytes(u32::MAX);
+        let start = 0u32.to_be_bytes();
+        let end = u32::MAX.to_be_bytes();
         let iter = match sort_by {
             BlockHeightAsc => db.blocks_height_iterator(From(&start, Forward)),
             BlockHeightDesc => db.blocks_height_iterator(From(&end, Reverse)),
@@ -497,7 +499,7 @@ impl BlocksQueryRoot {
             GlobalSlotDesc => db.blocks_global_slot_iterator(From(&end, Reverse)),
         };
         for (key, _) in iter.flatten() {
-            let state_hash = block_state_hash_from_key(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let pcb = db
                 .get_block(&state_hash)?
                 .with_context(|| format!("block missing from store hash {state_hash}"))
