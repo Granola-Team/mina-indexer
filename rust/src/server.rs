@@ -378,11 +378,11 @@ async fn run_indexer<P: AsRef<Path>>(
     // Wrap the runtime handle in Arc
     let rt = Arc::new(Handle::current());
 
-    let rt_watcher = rt.clone(); // Clone the Arc for the watcher closure
+    let rt_watcher = rt.clone();
     let mut watcher = RecommendedWatcher::new(
         move |result| {
             let tx = tx.clone();
-            let rt = rt_watcher.clone(); // Clone Arc inside the closure
+            let rt = rt_watcher.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
                     error!("Failed to send watcher event, closing: {e}");
@@ -393,11 +393,11 @@ async fn run_indexer<P: AsRef<Path>>(
         Config::default(),
     )?;
 
-    let rt_poll_watcher = rt.clone(); // Clone the Arc for the poll watcher closure
+    let rt_poll_watcher = rt.clone();
     let mut poll_watcher = PollWatcher::new(
         move |result| {
             let tx = tx_clone.clone();
-            let rt = rt_poll_watcher.clone(); // Clone Arc inside the closure
+            let rt = rt_poll_watcher.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
                     error!("Failed to send watcher event, closing: {e}");
