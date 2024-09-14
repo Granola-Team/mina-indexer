@@ -183,7 +183,7 @@ mod utility_function_tests {
             &is_valid_state_hash
         ));
 
-        assert!(is_valid_file_name(
+        assert!(!is_valid_file_name(
             Path::new("mainnet-3Nabcdef12345678901234567890123456789012345678901234.json"),
             &is_valid_state_hash
         ));
