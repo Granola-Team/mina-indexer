@@ -323,16 +323,6 @@ impl std::fmt::Display for BlockHash {
     }
 }
 
-/// Extracts a state hash from an OS file name
-pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
-    let last_part = file_name.to_str()?.split('-').last()?.to_string();
-    let state_hash = last_part.split('.').next()?;
-    if state_hash.starts_with(BlockHash::PREFIX) {
-        return Some(state_hash.to_string());
-    }
-    None
-}
-
 /// Extracts a blockchain length from an OS file name
 pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
     file_name
