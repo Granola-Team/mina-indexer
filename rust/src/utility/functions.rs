@@ -76,9 +76,6 @@ pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) ->
         let parts: Vec<&str> = file_stem.split('-').collect();
 
         match parts.as_slice() {
-            // mainnet-<hash>.json
-            [_, hash] => hash_validator(hash),
-
             // mainnet-<number>-<hash>.json
             [_, epoch_str, hash] => epoch_str.parse::<u32>().is_ok() && hash_validator(hash),
 
