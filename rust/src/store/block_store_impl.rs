@@ -19,8 +19,8 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     utility::store::{
-        block::*, block_u32_prefix_from_key, i64_from_be_bytes, state_hash_suffix, u32_prefix_key,
-        u64_from_be_bytes, U64_LEN,
+        block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, state_hash_suffix,
+        u32_prefix_key, u64_from_be_bytes, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
@@ -401,13 +401,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_height_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block height"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_height_batch(
@@ -430,13 +424,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_global_slot_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for global slot height"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_global_slot_batch(
@@ -547,13 +535,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.blocks_at_height_cf(), blockchain_length.to_be_bytes())?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for number of block at block height"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn add_block_at_height_batch(
@@ -603,13 +585,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.blocks_at_global_slot_cf(), slot.to_be_bytes())?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for number of block at slot"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn add_block_at_slot_batch(
@@ -845,13 +821,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_epoch_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block epoch"),
-                )
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_genesis_state_hash_batch(
@@ -972,13 +942,7 @@ impl BlockStore for IndexerStore {
                 self.block_production_pk_epoch_cf(),
                 u32_prefix_key(epoch, pk),
             )?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block production count"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
@@ -986,13 +950,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for total block production count for PK"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
@@ -1001,13 +959,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_production_epoch_cf(), epoch.to_be_bytes())?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for block production epoch count"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
@@ -1015,13 +967,7 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_BLOCKS_KEY)?
-            .map_or(0, |bytes| {
-                u32::from_be_bytes(
-                    bytes[..4]
-                        .try_into()
-                        .expect("Error getting bytes for total block production"),
-                )
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn set_block_comparison_batch(

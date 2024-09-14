@@ -35,6 +35,16 @@ impl PublicKey {
         }
         bail!("Invalid public key from bytes")
     }
+
+    /// [PublicKey] upper bound
+    pub fn upper_bound() -> Self {
+        Self("B62qZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ".into())
+    }
+
+    /// [PublicKey] lower bound
+    pub fn lower_bound() -> Self {
+        Self("B62q000000000000000000000000000000000000000000000000000".into())
+    }
 }
 
 impl std::default::Default for PublicKey {
@@ -112,6 +122,14 @@ pub fn is_valid_public_key(pk: &str) -> bool {
 #[cfg(test)]
 mod test {
     use super::PublicKey;
+    use crate::ledger::public_key::is_valid_public_key;
+
+    #[test]
+    fn fixed_pks_are_valid() {
+        assert!(is_valid_public_key(&PublicKey::default().0));
+        assert!(is_valid_public_key(&PublicKey::lower_bound().0));
+        assert!(is_valid_public_key(&PublicKey::upper_bound().0));
+    }
 
     #[test]
     fn parse_public_keys() -> anyhow::Result<()> {

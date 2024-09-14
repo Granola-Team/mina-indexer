@@ -52,28 +52,27 @@ impl StakingLedgerStore for IndexerStore {
         staking_account_with_delegation: StakingAccountWithEpochDelegation,
     ) -> anyhow::Result<()> {
         trace!("Setting staking account {pk}");
-        let staking_account_with_delegation_serde_bytes =
-            serde_json::to_vec(&staking_account_with_delegation)?;
-        let staking_account_serde_bytes =
-            serde_json::to_vec(&staking_account_with_delegation.account)?;
 
-        // add account
+        // add staking account
         self.database.put_cf(
             self.staking_ledger_accounts_cf(),
             staking_ledger_account_key(genesis_state_hash, epoch, ledger_hash, pk),
-            &staking_account_serde_bytes,
+            serde_json::to_vec(&staking_account_with_delegation.account)?,
         )?;
+
+        // add staking delegations
         self.database.put_cf(
             self.staking_delegations_cf(),
             staking_ledger_account_key(genesis_state_hash, epoch, ledger_hash, pk),
-            &staking_account_serde_bytes,
+            serde_json::to_vec(&staking_account_with_delegation.delegation)?,
         )?;
 
         // balance/stake sort
+        let account_serde_bytes = serde_json::to_vec(&staking_account_with_delegation)?;
         self.database.put_cf(
             self.staking_ledger_balance_sort_cf(),
             staking_ledger_sort_key(epoch, staking_account_with_delegation.account.balance, pk),
-            &staking_account_with_delegation_serde_bytes,
+            &account_serde_bytes,
         )?;
         self.database.put_cf(
             self.staking_ledger_stake_sort_cf(),
@@ -85,7 +84,7 @@ impl StakingLedgerStore for IndexerStore {
                     .unwrap_or_default(),
                 pk,
             ),
-            &staking_account_with_delegation_serde_bytes,
+            &account_serde_bytes,
         )?;
         Ok(())
     }
@@ -459,8 +458,8 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let fstart = staking_ledger_sort_key_mock(epoch, 0, "A");
-        let rstart = staking_ledger_sort_key_mock(epoch, u64::MAX, "C");
+        let fstart = staking_ledger_sort_key(epoch, 0, &PublicKey::lower_bound());
+        let rstart = staking_ledger_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&fstart, Direction::Forward),
             Direction::Reverse => IteratorMode::From(&rstart, Direction::Reverse),
@@ -474,8 +473,8 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let fstart = staking_ledger_sort_key_mock(epoch, 0, "A");
-        let rstart = staking_ledger_sort_key_mock(epoch, u64::MAX, "C");
+        let fstart = staking_ledger_sort_key(epoch, 0, &PublicKey::lower_bound());
+        let rstart = staking_ledger_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&fstart, Direction::Forward),
             Direction::Reverse => IteratorMode::From(&rstart, Direction::Reverse),

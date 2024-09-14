@@ -54,7 +54,7 @@ pub struct NonGenesisLedger {
 pub struct LedgerHash(pub String);
 
 impl LedgerHash {
-    /// Prefx is one of {"jx", "jw", "jy", "jz"}
+    pub const PREFIX: &'static [&'static str] = &["jx", "jw", "jy", "jz"];
     pub const LEN: usize = 51;
 
     pub fn from_hashv1(hashv1: HashV1) -> Self {
@@ -66,10 +66,13 @@ impl LedgerHash {
     pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
         let hash = String::from_utf8(bytes)?;
         if is_valid_ledger_hash(&hash) {
-            Ok(Self(hash))
-        } else {
-            bail!("Invalid ledger hash: {hash}")
+            return Ok(Self(hash));
         }
+        bail!("Invalid ledger hash: {hash}")
+    }
+
+    pub fn from_bytes_or_panic(bytes: Vec<u8>) -> Self {
+        Self::from_bytes(bytes).expect("ledger hash bytes")
     }
 }
 

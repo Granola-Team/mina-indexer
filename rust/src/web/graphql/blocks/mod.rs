@@ -200,7 +200,7 @@ impl BlocksQueryRoot {
                     ))
                     .flatten()
                 {
-                    let height = from_be_bytes(key[..8].to_vec());
+                    let height = from_be_bytes(key[..U32_LEN].to_vec());
                     if height <= start_height {
                         break;
                     }

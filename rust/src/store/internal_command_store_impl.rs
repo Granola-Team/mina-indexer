@@ -334,13 +334,8 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting internal command epoch {epoch}");
         Ok(self
             .database
-            .get_pinned_cf(self.internal_commands_epoch_cf(), epoch.to_be_bytes())?
-            .map_or(0, |bytes| {
-                let byte_slice: [u8; 4] = bytes[..4]
-                    .try_into()
-                    .expect("Slice should have exactly 4 bytes");
-                u32::from_be_bytes(byte_slice)
-            }))
+            .get_cf(self.internal_commands_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn increment_internal_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -378,16 +373,11 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting internal command epoch {epoch} num {pk}");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.internal_commands_pk_epoch_cf(),
                 u32_prefix_key(epoch, pk),
             )?
-            .map_or(0, |bytes| {
-                let byte_slice: [u8; 4] = bytes[..4]
-                    .try_into()
-                    .expect("Slice should have exactly 4 bytes");
-                u32::from_be_bytes(byte_slice)
-            }))
+            .map_or(0, from_be_bytes))
     }
 
     fn increment_internal_commands_pk_epoch_count(
@@ -408,13 +398,8 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting pk total internal commands count {pk}");
         Ok(self
             .database
-            .get_pinned_cf(self.internal_commands_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, |bytes| {
-                let byte_slice: [u8; 4] = bytes[..4]
-                    .try_into()
-                    .expect("Slice should have exactly 4 bytes");
-                u32::from_be_bytes(byte_slice)
-            }))
+            .get_cf(self.internal_commands_pk_total_cf(), pk.0.as_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn increment_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
@@ -434,16 +419,11 @@ impl InternalCommandStore for IndexerStore {
         trace!("Getting block internal command count");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.block_internal_command_counts_cf(),
                 state_hash.0.as_bytes(),
             )?
-            .map(|bytes| {
-                let byte_slice: [u8; 4] = bytes[..4]
-                    .try_into()
-                    .expect("Slice should have exactly 4 bytes");
-                u32::from_be_bytes(byte_slice)
-            }))
+            .map(from_be_bytes))
     }
 
     fn set_block_internal_commands_count_batch(

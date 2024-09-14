@@ -58,6 +58,10 @@ impl BlockHash {
         bail!("Invalid state hash from bytes")
     }
 
+    pub fn from_bytes_or_panic(bytes: Vec<u8>) -> Self {
+        Self::from_bytes(&bytes).expect("block state hash bytes")
+    }
+
     pub fn from_hashv1(hashv1: HashV1) -> anyhow::Result<Self> {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
