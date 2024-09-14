@@ -9,7 +9,7 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
-    utility::db::{from_be_bytes, U32_LEN},
+    utility::store::{from_be_bytes, U32_LEN},
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};

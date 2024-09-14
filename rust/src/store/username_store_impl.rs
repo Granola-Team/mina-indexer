@@ -6,7 +6,7 @@ use super::{
 use crate::{
     block::{store::DbBlockUpdate, BlockHash},
     ledger::{public_key::PublicKey, username::Username},
-    utility::db::{from_be_bytes, pk_index_key, to_be_bytes},
+    utility::store::{from_be_bytes, pk_index_key},
 };
 use log::{error, trace};
 use speedb::WriteBatch;
@@ -84,13 +84,13 @@ impl UsernameStore for IndexerStore {
                         self.database.put_cf(
                             self.username_pk_num_cf(),
                             pk.0.as_bytes(),
-                            to_be_bytes(num - 1),
+                            (num - 1).to_be_bytes(),
                         )?;
                     }
 
                     // drop last username update
                     self.database
-                        .delete_cf(self.username_pk_index_cf(), pk_index_key(pk.clone(), num))?;
+                        .delete_cf(self.username_pk_index_cf(), pk_index_key(pk, num))?;
                 } else {
                     error!("Invalid username pk num {pk}");
                 }
@@ -117,7 +117,7 @@ impl UsernameStore for IndexerStore {
                 // set current username
                 self.database.put_cf(
                     self.username_pk_index_cf(),
-                    pk_index_key(pk, index),
+                    pk_index_key(&pk, index),
                     username.0.as_bytes(),
                 )?;
             }
@@ -129,7 +129,7 @@ impl UsernameStore for IndexerStore {
         trace!("Getting pk's {index}th username {pk}");
         Ok(self
             .database
-            .get_cf(self.username_pk_index_cf(), pk_index_key(pk.clone(), index))?
+            .get_cf(self.username_pk_index_cf(), pk_index_key(pk, index))?
             .and_then(|bytes| Username::from_bytes(bytes).ok()))
     }
 

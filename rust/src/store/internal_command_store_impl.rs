@@ -4,9 +4,9 @@ use crate::{
     command::internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
     constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
-    utility::db::{
-        from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, to_be_bytes, u32_from_be_bytes,
-        u32_prefix_key, U32_LEN,
+    utility::store::{
+        from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_from_be_bytes, u32_prefix_key,
+        U32_LEN,
     },
 };
 use anyhow::bail;
@@ -348,8 +348,8 @@ impl InternalCommandStore for IndexerStore {
         let old = self.get_internal_commands_epoch_count(Some(epoch))?;
         Ok(self.database.put_cf(
             self.internal_commands_epoch_cf(),
-            to_be_bytes(epoch),
-            to_be_bytes(old + 1),
+            epoch.to_be_bytes(),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -366,7 +366,7 @@ impl InternalCommandStore for IndexerStore {
         let old = self.get_internal_commands_total_count()?;
         Ok(self
             .database
-            .put(Self::TOTAL_NUM_FEE_TRANSFERS_KEY, to_be_bytes(old + 1))?)
+            .put(Self::TOTAL_NUM_FEE_TRANSFERS_KEY, (old + 1).to_be_bytes())?)
     }
 
     fn get_internal_commands_pk_epoch_count(
@@ -396,12 +396,11 @@ impl InternalCommandStore for IndexerStore {
         epoch: u32,
     ) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} internal commands count {pk}");
-
         let old = self.get_internal_commands_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.internal_commands_pk_epoch_cf(),
             u32_prefix_key(epoch, pk),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -424,7 +423,7 @@ impl InternalCommandStore for IndexerStore {
         Ok(self.database.put_cf(
             self.internal_commands_pk_total_cf(),
             pk.0.as_bytes(),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -457,7 +456,7 @@ impl InternalCommandStore for IndexerStore {
         batch.put_cf(
             self.block_internal_command_counts_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(count),
+            count.to_be_bytes(),
         );
         Ok(())
     }
@@ -473,10 +472,7 @@ impl InternalCommandStore for IndexerStore {
                 sender, receiver, ..
             } => (sender, receiver),
         };
-        trace!(
-            "Incrementing internal command counts {:?}",
-            internal_command
-        );
+        trace!("Incrementing internal command counts {internal_command:?}");
 
         // sender epoch & total
         self.increment_internal_commands_pk_epoch_count(sender, epoch)?;

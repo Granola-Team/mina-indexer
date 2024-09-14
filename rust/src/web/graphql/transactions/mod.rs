@@ -14,10 +14,7 @@ use crate::{
         SignedCommandPayloadBody, StakeDelegation,
     },
     store::IndexerStore,
-    utility::db::{
-        pk_key_prefix, pk_txn_sort_key_prefix, pk_txn_sort_key_state_hash, to_be_bytes,
-        txn_hash_of_key,
-    },
+    utility::store::{pk_key_prefix, pk_txn_sort_key_prefix, state_hash_suffix, txn_hash_of_key},
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use anyhow::Context as aContext;
@@ -161,7 +158,7 @@ impl TransactionsQueryRoot {
                 if txn_pk.0 != *pk {
                     break;
                 }
-                let txn_state_hash = pk_txn_sort_key_state_hash(&key);
+                let txn_state_hash = state_hash_suffix(&key)?;
                 let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &txn_state_hash)?
@@ -252,13 +249,13 @@ impl TransactionsQueryRoot {
                 db.user_commands_height_iterator(IteratorMode::From(&[0], Direction::Forward))
             }
             TransactionSortByInput::BlockHeightDesc => db.user_commands_height_iterator(
-                IteratorMode::From(&to_be_bytes(u32::MAX), Direction::Reverse),
+                IteratorMode::From(&u32::MAX.to_be_bytes(), Direction::Reverse),
             ),
             TransactionSortByInput::DateTimeAsc => {
                 db.user_commands_slot_iterator(IteratorMode::From(&[0], Direction::Forward))
             }
             TransactionSortByInput::DateTimeDesc => db.user_commands_slot_iterator(
-                IteratorMode::From(&to_be_bytes(u32::MAX), Direction::Reverse),
+                IteratorMode::From(&u32::MAX.to_be_bytes(), Direction::Reverse),
             ),
         };
         for (key, _) in iter.flatten() {

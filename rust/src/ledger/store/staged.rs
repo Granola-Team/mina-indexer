@@ -3,7 +3,7 @@
 use crate::{
     block::BlockHash,
     ledger::{account::Account, diff::LedgerDiff, public_key::PublicKey, Ledger, LedgerHash},
-    utility::db::{balance_key_prefix, pk_key_prefix, U64_LEN},
+    utility::store::{balance_key_prefix, pk_key_prefix, U64_LEN},
 };
 use speedb::{DBIterator, Direction, WriteBatch};
 
@@ -107,7 +107,7 @@ pub trait StagedLedgerStore {
     fn set_block_ledger_diff_batch(
         &self,
         state_hash: &BlockHash,
-        ledger_diff: LedgerDiff,
+        ledger_diff: &LedgerDiff,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 

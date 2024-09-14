@@ -18,9 +18,9 @@ use crate::{
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
     },
     snark_work::store::SnarkStore,
-    utility::db::{
-        block_sort_key_state_hash_suffix, block_u32_prefix_from_key, i64_from_be_bytes,
-        to_be_bytes, u32_prefix_key, u64_from_be_bytes, U32_LEN, U64_LEN,
+    utility::store::{
+        block::*, block_u32_prefix_from_key, i64_from_be_bytes, state_hash_suffix, u32_prefix_key,
+        u64_from_be_bytes, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
@@ -56,7 +56,7 @@ impl BlockStore for IndexerStore {
         // add to ledger diff index
         self.set_block_ledger_diff_batch(
             &state_hash,
-            LedgerDiff::from_precomputed(block),
+            &LedgerDiff::from_precomputed(block),
             &mut batch,
         )?;
 
@@ -420,7 +420,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_height_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(blockchain_length),
+            blockchain_length.to_be_bytes(),
         );
         Ok(())
     }
@@ -449,7 +449,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_global_slot_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(global_slot),
+            global_slot.to_be_bytes(),
         );
         Ok(())
     }
@@ -481,18 +481,18 @@ impl BlockStore for IndexerStore {
         // block height sort
         batch.put_cf(
             self.block_creator_height_sort_cf(),
-            pk_block_sort_key(
-                block_creator.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
+            pk_block_sort_key(&block_creator, block.blockchain_length(), &state_hash),
             b"",
         );
 
         // global slot sort
         batch.put_cf(
             self.block_creator_slot_sort_cf(),
-            pk_block_sort_key(block_creator, block.global_slot_since_genesis(), state_hash),
+            pk_block_sort_key(
+                &block_creator,
+                block.global_slot_since_genesis(),
+                &state_hash,
+            ),
             b"",
         );
         Ok(())
@@ -525,11 +525,7 @@ impl BlockStore for IndexerStore {
         // block height sort
         batch.put_cf(
             self.block_coinbase_height_sort_cf(),
-            pk_block_sort_key(
-                coinbase_receiver.clone(),
-                block.blockchain_length(),
-                state_hash.clone(),
-            ),
+            pk_block_sort_key(&coinbase_receiver, block.blockchain_length(), &state_hash),
             b"",
         );
 
@@ -537,9 +533,9 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_coinbase_slot_sort_cf(),
             pk_block_sort_key(
-                coinbase_receiver.clone(),
+                &coinbase_receiver,
                 block.global_slot_since_genesis(),
-                state_hash.clone(),
+                &state_hash,
             ),
             b"",
         );
@@ -550,7 +546,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting number of blocks at height {blockchain_length}");
         Ok(self
             .database
-            .get_cf(self.blocks_at_height_cf(), to_be_bytes(blockchain_length))?
+            .get_cf(self.blocks_at_height_cf(), blockchain_length.to_be_bytes())?
             .map_or(0, |bytes| {
                 u32::from_be_bytes(
                     bytes[..4]
@@ -572,8 +568,8 @@ impl BlockStore for IndexerStore {
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
         batch.put_cf(
             self.blocks_at_height_cf(),
-            to_be_bytes(blockchain_length),
-            to_be_bytes(num_blocks_at_height + 1),
+            blockchain_length.to_be_bytes(),
+            (num_blocks_at_height + 1).to_be_bytes(),
         );
 
         // add the new key-value pair
@@ -606,7 +602,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting number of blocks at slot {slot}");
         Ok(self
             .database
-            .get_cf(self.blocks_at_global_slot_cf(), to_be_bytes(slot))?
+            .get_cf(self.blocks_at_global_slot_cf(), slot.to_be_bytes())?
             .map_or(0, |bytes| {
                 u32::from_be_bytes(
                     bytes[..4]
@@ -628,8 +624,8 @@ impl BlockStore for IndexerStore {
         let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
         batch.put_cf(
             self.blocks_at_global_slot_cf(),
-            to_be_bytes(slot),
-            to_be_bytes(num_blocks_at_slot + 1),
+            slot.to_be_bytes(),
+            (num_blocks_at_slot + 1).to_be_bytes(),
         );
 
         // add the new key-value pair
@@ -780,7 +776,7 @@ impl BlockStore for IndexerStore {
             heights.sort();
             batch.put_cf(
                 self.block_global_slot_to_heights_cf(),
-                to_be_bytes(global_slot),
+                global_slot.to_be_bytes(),
                 serde_json::to_vec(&heights)?,
             );
         }
@@ -794,7 +790,7 @@ impl BlockStore for IndexerStore {
             slots.sort();
             batch.put_cf(
                 self.block_height_to_global_slots_cf(),
-                to_be_bytes(blockchain_length),
+                blockchain_length.to_be_bytes(),
                 serde_json::to_vec(&slots)?,
             );
         }
@@ -810,7 +806,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_pinned_cf(
                 self.block_height_to_global_slots_cf(),
-                to_be_bytes(blockchain_length),
+                blockchain_length.to_be_bytes(),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
@@ -824,7 +820,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_pinned_cf(
                 self.block_global_slot_to_heights_cf(),
-                to_be_bytes(global_slot),
+                global_slot.to_be_bytes(),
             )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
@@ -839,7 +835,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_epoch_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(epoch),
+            epoch.to_be_bytes(),
         );
         Ok(())
     }
@@ -937,7 +933,7 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_production_pk_epoch_cf(),
             u32_prefix_key(epoch, &creator),
-            to_be_bytes(acc + 1),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment pk total count
@@ -945,20 +941,20 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_production_pk_total_cf(),
             creator.to_bytes(),
-            to_be_bytes(acc + 1),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment epoch count
         let acc = self.get_block_production_epoch_count(Some(epoch))?;
         batch.put_cf(
             self.block_production_epoch_cf(),
-            to_be_bytes(epoch),
-            to_be_bytes(acc + 1),
+            epoch.to_be_bytes(),
+            (acc + 1).to_be_bytes(),
         );
 
         // increment total count
         let acc = self.get_block_production_total_count()?;
-        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, to_be_bytes(acc + 1));
+        batch.put(Self::TOTAL_NUM_BLOCKS_KEY, (acc + 1).to_be_bytes());
 
         Ok(())
     }
@@ -1004,7 +1000,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting epoch block production count {epoch}");
         Ok(self
             .database
-            .get_cf(self.block_production_epoch_cf(), to_be_bytes(epoch))?
+            .get_cf(self.block_production_epoch_cf(), epoch.to_be_bytes())?
             .map_or(0, |bytes| {
                 u32::from_be_bytes(
                     bytes[..4]
@@ -1083,7 +1079,7 @@ impl BlockStore for IndexerStore {
             .blocks_height_iterator(speedb::IteratorMode::Start)
             .flatten()
         {
-            let state_hash = block_sort_key_state_hash_suffix(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let block_height = block_u32_prefix_from_key(&key)?;
             let global_slot = self
                 .get_block_global_slot(&state_hash)?
@@ -1101,7 +1097,7 @@ impl BlockStore for IndexerStore {
         let mut blocks = vec![];
         trace!("Getting blocks via height (mode: {})", display_mode(mode));
         for (key, _) in self.blocks_height_iterator(mode).flatten() {
-            let state_hash = block_sort_key_state_hash_suffix(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
@@ -1116,7 +1112,7 @@ impl BlockStore for IndexerStore {
             .blocks_global_slot_iterator(speedb::IteratorMode::Start)
             .flatten()
         {
-            let state_hash = block_sort_key_state_hash_suffix(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let block_height = block_u32_prefix_from_key(&key)?;
             let global_slot = self
                 .get_block_global_slot(&state_hash)?
@@ -1137,47 +1133,11 @@ impl BlockStore for IndexerStore {
             display_mode(mode)
         );
         for (key, _) in self.blocks_global_slot_iterator(mode).flatten() {
-            let state_hash = block_sort_key_state_hash_suffix(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             blocks.push(self.get_block(&state_hash)?.expect("PCB").0);
         }
         Ok(blocks)
     }
-}
-
-/// `{block height BE}{state hash}`
-fn block_height_key(block: &PrecomputedBlock) -> [u8; U32_LEN + BlockHash::LEN] {
-    const SIZE_OF_U32: usize = U32_LEN;
-    let mut key = [0u8; SIZE_OF_U32 + BlockHash::LEN];
-    key[..SIZE_OF_U32].copy_from_slice(&to_be_bytes(block.blockchain_length()));
-    key[SIZE_OF_U32..].copy_from_slice(&block.state_hash().to_bytes());
-    key
-}
-
-/// `{global slot BE}{state hash}`
-fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; U32_LEN + BlockHash::LEN] {
-    let mut key = [0u8; U32_LEN + BlockHash::LEN];
-    key[..U32_LEN].copy_from_slice(&to_be_bytes(block.global_slot_since_genesis()));
-    key[U32_LEN..].copy_from_slice(&block.state_hash().to_bytes());
-    key
-}
-
-/// Key format
-/// ```
-/// {pk}{sort_value}{state_hash}
-/// where
-/// - pk:         [PublicKey] bytes
-/// - sort_value: u32 BE bytes
-/// - state_hash: [BlockHash] bytes
-fn pk_block_sort_key(
-    pk: PublicKey,
-    sort_value: u32,
-    state_hash: BlockHash,
-) -> [u8; PublicKey::LEN + U32_LEN + BlockHash::LEN] {
-    let mut key = [0; PublicKey::LEN + U32_LEN + BlockHash::LEN];
-    key[..PublicKey::LEN].copy_from_slice(&pk.to_bytes());
-    key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort_value.to_be_bytes());
-    key[PublicKey::LEN + U32_LEN..][..BlockHash::LEN].copy_from_slice(&state_hash.to_bytes());
-    key
 }
 
 fn block_cmp(db: &IndexerStore, a: &BlockHash, b: &BlockHash) -> std::cmp::Ordering {
@@ -1207,128 +1167,5 @@ fn display_direction(direction: Direction) -> String {
     match direction {
         Direction::Forward => "Forward".to_string(),
         Direction::Reverse => "Reverse".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod block_store_impl_tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_block_height_key_length() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_height_key(&block);
-
-        // Check that the key has the correct length
-        assert_eq!(result.len(), U32_LEN + BlockHash::LEN);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_block_height_key_content() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_height_key(&block);
-
-        // Expected u32 bytes for the blockchain length (big-endian)
-        let expected_blockchain_length_bytes = 105489u32.to_be_bytes();
-
-        // Check that the first part of the key contains the correct blockchain length
-        // bytes
-        assert_eq!(&result[..U32_LEN], &expected_blockchain_length_bytes);
-
-        // Check that the second part of the key contains the correct state hash bytes
-        assert_eq!(
-            &result[U32_LEN..],
-            "3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh".as_bytes()
-        );
-
-        Ok(())
-    }
-    #[test]
-    fn test_pk_block_sort_key_length() {
-        let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
-        let sort_value = 100u32;
-
-        // Generate the key
-        let result = pk_block_sort_key(pk, sort_value, state_hash.clone());
-
-        // Expected length: PublicKey::LEN + u32 (4 bytes) + BlockHash::LEN
-        let expected_len = PublicKey::LEN + U32_LEN + BlockHash::LEN;
-
-        // Assert that the result has the correct length
-        assert_eq!(result.len(), expected_len);
-    }
-
-    #[test]
-    fn test_pk_block_sort_key_content() {
-        // Mock inputs
-        let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
-        let sort_value = 500u32;
-
-        // Generate the key
-        let result = pk_block_sort_key(pk.clone(), sort_value, state_hash.clone());
-
-        // Check that the PublicKey bytes are correctly placed
-        assert_eq!(&result[..PublicKey::LEN], &pk.to_bytes());
-
-        // Check that the sort_value bytes (u32, big-endian) are correctly placed
-        assert_eq!(
-            &result[PublicKey::LEN..PublicKey::LEN + U32_LEN],
-            &sort_value.to_be_bytes()
-        );
-
-        // Check that the BlockHash bytes are correctly placed
-        assert_eq!(&result[PublicKey::LEN + U32_LEN..], &state_hash.to_bytes());
-    }
-
-    #[test]
-    fn test_block_global_slot_key_length() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_global_slot_key(&block);
-
-        // Expected length: u32 (4 bytes) + BlockHash::LEN
-        let expected_len = U32_LEN + BlockHash::LEN;
-
-        // Check that the result has the correct length
-        assert_eq!(result.len(), expected_len);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_block_global_slot_key_content() -> anyhow::Result<()> {
-        // Mock block
-        let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
-        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-
-        // Generate key
-        let result = block_global_slot_key(&block);
-
-        // Expected global slot bytes (u32, big-endian)
-        let expected_global_slot_bytes = block.global_slot_since_genesis().to_be_bytes();
-
-        // Check that the first part of the key contains the correct global slot bytes
-        assert_eq!(&result[..U32_LEN], &expected_global_slot_bytes);
-
-        // Check that the second part of the key contains the correct state hash bytes
-        assert_eq!(&result[U32_LEN..], &block.state_hash().to_bytes());
-
-        Ok(())
     }
 }

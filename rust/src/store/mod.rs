@@ -406,34 +406,18 @@ mod store_tests {
         block::BlockHash,
         command::signed::TXN_HASH_LEN,
         ledger::public_key::PublicKey,
-        utility::db::{
+        utility::store::{
             pk_txn_sort_key, pk_txn_sort_key_prefix, txn_sort_key, u32_prefix_key, u64_prefix_key,
             U32_LEN, U64_LEN,
         },
     };
 
     #[test]
-    fn test_txn_sort_key_length() {
-        // Mock values
-        let binding = "a".repeat(TXN_HASH_LEN);
-        let txn_hash = binding.as_str();
-        let state_hash = BlockHash::default(); // Mock state_hash
-        let prefix = 42u32; // Example prefix;
-
-        // Assert the length of the result is correct
-        assert_eq!(
-            txn_sort_key(prefix, txn_hash, &state_hash).len(),
-            U32_LEN + TXN_HASH_LEN + BlockHash::LEN
-        );
-    }
-
-    #[test]
-    fn test_txn_sort_key_content() {
-        let binding = "a".repeat(TXN_HASH_LEN);
-        let txn_hash = binding.as_str();
-        let state_hash = BlockHash::default(); // Mock state_hash
-        let prefix = 99u32; // Example prefix
-        let key = txn_sort_key(prefix, txn_hash, &state_hash);
+    fn test_txn_sort_key() {
+        let prefix = 99;
+        let state_hash = BlockHash::default();
+        let txn_hash = "a".repeat(TXN_HASH_LEN);
+        let key = txn_sort_key(prefix, &txn_hash, &state_hash);
 
         assert_eq!(&key[..U32_LEN], &prefix.to_be_bytes());
         assert_eq!(&key[U32_LEN..][..TXN_HASH_LEN], txn_hash.as_bytes());
@@ -441,50 +425,24 @@ mod store_tests {
     }
 
     #[test]
-    fn test_pk_txn_sort_key_length() {
-        // Mock inputs
-        let pk = PublicKey::default();
-        let nonce = 123456789;
-        let txn_hash = "a".repeat(TXN_HASH_LEN);
-        let state_hash = BlockHash::default();
-        let sort = 100u32;
-
-        // Check that the key has the correct length
-        assert_eq!(
-            pk_txn_sort_key(&pk, sort, nonce, &txn_hash, &state_hash).len(),
-            PublicKey::LEN + U32_LEN * 2 + TXN_HASH_LEN + BlockHash::LEN
-        );
-    }
-
-    #[test]
     fn test_pk_txn_sort_key_content() {
-        // Mock inputs
-        let pk = PublicKey::default();
+        let sort = 500;
         let nonce = 987654321;
+        let pk = PublicKey::default();
         let txn_hash = "b".repeat(TXN_HASH_LEN);
         let state_hash = BlockHash::default();
-        let sort = 500;
         let key = pk_txn_sort_key(&pk, sort, nonce, &txn_hash, &state_hash);
 
-        // Check the PublicKey bytes
         assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());
-
-        // Check the sort value bytes (u32, big-endian)
         assert_eq!(&key[PublicKey::LEN..][..U32_LEN], &sort.to_be_bytes());
-
-        // Check the nonce value bytes (u64, big-endian)
         assert_eq!(
             &key[PublicKey::LEN..][U32_LEN..][..U32_LEN],
             &nonce.to_be_bytes()
         );
-
-        // Check the transaction hash bytes
         assert_eq!(
             &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TXN_HASH_LEN],
             txn_hash.as_bytes()
         );
-
-        // Check the BlockHash bytes
         assert_eq!(
             &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][TXN_HASH_LEN..],
             state_hash.0.as_bytes()
@@ -492,43 +450,22 @@ mod store_tests {
     }
 
     #[test]
-    fn test_pk_txn_sort_key_prefix_length() {
-        // Mock inputs
-        let pk = PublicKey::default();
-        let sort = 42;
-
-        // Check that the result has the correct length
-        assert_eq!(
-            pk_txn_sort_key_prefix(&pk, sort).len(),
-            PublicKey::LEN + U32_LEN
-        );
-    }
-
-    #[test]
-    fn test_pk_txn_sort_key_prefix_content() {
-        // Mock inputs
-        let pk = PublicKey::default();
+    fn test_pk_txn_sort_key_prefix() {
         let sort = 12345;
+        let pk = PublicKey::default();
         let key = pk_txn_sort_key_prefix(&pk, sort);
 
-        // Check the PublicKey bytes
         assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());
-
-        // Check the sort value bytes (u32, big-endian)
         assert_eq!(&key[PublicKey::LEN..], &sort.to_be_bytes());
     }
 
     #[test]
     fn test_u32_prefix_key_with_valid_inputs() {
-        // Prepare a public key with known bytes
-        let public_key = PublicKey::default();
         let prefix = 42;
+        let public_key = PublicKey::default();
         let key = u32_prefix_key(prefix, &public_key);
 
-        // Check the prefix
         assert_eq!(&key[..U32_LEN], &prefix.to_be_bytes());
-
-        // Check the public key
         assert_eq!(&key[U32_LEN..], public_key.0.as_bytes());
     }
 

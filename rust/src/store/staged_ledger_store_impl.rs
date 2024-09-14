@@ -17,7 +17,7 @@ use crate::{
         },
         Ledger, LedgerHash,
     },
-    utility::db::{balance_key_prefix, from_be_bytes, pk_key_prefix, U64_LEN},
+    utility::store::{balance_key_prefix, from_be_bytes, pk_key_prefix, U64_LEN},
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
@@ -398,14 +398,14 @@ impl StagedLedgerStore for IndexerStore {
     fn set_block_ledger_diff_batch(
         &self,
         state_hash: &BlockHash,
-        ledger_diff: LedgerDiff,
+        ledger_diff: &LedgerDiff,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block ledger diff {state_hash}: {ledger_diff:?}");
         batch.put_cf(
             self.block_ledger_diff_cf(),
             state_hash.0.as_bytes(),
-            serde_json::to_vec(&ledger_diff)?,
+            serde_json::to_vec(ledger_diff)?,
         );
         Ok(())
     }
@@ -452,7 +452,7 @@ impl StagedLedgerStore for IndexerStore {
                 self.staged_ledger_hash_to_block_cf(),
                 ledger_hash.0.as_bytes(),
             )?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .map(BlockHash::from_bytes_or_panic))
     }
 
     fn build_staged_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {

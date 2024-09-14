@@ -14,7 +14,7 @@ use crate::{
         },
         Ledger,
     },
-    utility::db::{pk_index_key, to_be_bytes, u32_from_be_bytes, u64_prefix_key, U32_LEN},
+    utility::store::{from_be_bytes, pk_index_key, u64_prefix_key},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
@@ -275,13 +275,13 @@ impl BestLedgerStore for IndexerStore {
         self.database.put_cf(
             self.best_ledger_accounts_num_delegations_cf(),
             pk.0.as_bytes(),
-            to_be_bytes(num + 1),
+            (num + 1).to_be_bytes(),
         )?;
 
         // append new delegation
         self.database.put_cf(
             self.best_ledger_accounts_delegations_cf(),
-            pk_index_key(pk.clone(), num),
+            pk_index_key(pk, num),
             delegate.0.as_bytes(),
         )?;
         Ok(())
@@ -294,7 +294,7 @@ impl BestLedgerStore for IndexerStore {
                 self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
             )?
-            .map_or(0, |bytes| u32_from_be_bytes(&bytes).expect("u32 bytes")))
+            .map_or(0, from_be_bytes))
     }
 
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
@@ -303,7 +303,7 @@ impl BestLedgerStore for IndexerStore {
             .database
             .get_cf(
                 self.best_ledger_accounts_delegations_cf(),
-                pk_index_key(pk.clone(), idx),
+                pk_index_key(pk, idx),
             )?
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
@@ -316,13 +316,13 @@ impl BestLedgerStore for IndexerStore {
             self.database.put_cf(
                 self.best_ledger_accounts_num_delegations_cf(),
                 pk.0.as_bytes(),
-                to_be_bytes(idx - 1),
+                (idx - 1).to_be_bytes(),
             )?;
 
             // drop delegation
             self.database.delete_cf(
                 self.best_ledger_accounts_delegations_cf(),
-                pk_index_key(pk, idx - 1),
+                pk_index_key(&pk, idx - 1),
             )?;
         }
         Ok(())
@@ -354,7 +354,7 @@ impl BestLedgerStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
-            .and_then(|bytes| u32_from_be_bytes(&bytes[..U32_LEN]).ok()))
+            .map(from_be_bytes))
     }
 
     fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {

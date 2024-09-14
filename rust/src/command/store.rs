@@ -3,7 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
-    utility::db::{u32_from_be_bytes, U32_LEN},
+    utility::store::{u32_from_be_bytes, U32_LEN},
 };
 use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};

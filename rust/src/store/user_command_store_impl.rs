@@ -11,10 +11,10 @@ use crate::{
     },
     constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
-    utility::db::{
+    utility::store::{
         from_be_bytes, pk_key_prefix, pk_txn_sort_key, pk_txn_sort_key_nonce,
-        pk_txn_sort_key_prefix, pk_txn_sort_key_sort, to_be_bytes, txn_block_key, txn_hash_of_key,
-        txn_sort_key, u32_prefix_key,
+        pk_txn_sort_key_prefix, pk_txn_sort_key_sort, txn_block_key, txn_hash_of_key, txn_sort_key,
+        u32_prefix_key,
     },
 };
 use anyhow::bail;
@@ -83,7 +83,7 @@ impl UserCommandStore for IndexerStore {
             batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
                 txn_hash.as_bytes(),
-                to_be_bytes(block.global_slot_since_genesis()),
+                block.global_slot_since_genesis().to_be_bytes(),
             );
 
             // add sender index
@@ -169,7 +169,7 @@ impl UserCommandStore for IndexerStore {
                 batch.put_cf(
                     self.user_commands_pk_num_cf(),
                     pk.0.as_bytes(),
-                    to_be_bytes(n + 1),
+                    (n + 1).to_be_bytes(),
                 );
             }
         }
@@ -243,7 +243,7 @@ impl UserCommandStore for IndexerStore {
         batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
             txn_hash.as_bytes(),
-            to_be_bytes(blocks.len() as u32),
+            (blocks.len() as u32).to_be_bytes(),
         );
 
         // set containing blocks
@@ -485,8 +485,8 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command epoch {epoch}");
         Ok(self
             .database
-            .get_pinned_cf(self.user_commands_epoch_cf(), to_be_bytes(epoch))?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .get_cf(self.user_commands_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -494,8 +494,8 @@ impl UserCommandStore for IndexerStore {
         let old = self.get_user_commands_epoch_count(Some(epoch))?;
         Ok(self.database.put_cf(
             self.user_commands_epoch_cf(),
-            to_be_bytes(epoch),
-            to_be_bytes(old + 1),
+            epoch.to_be_bytes(),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -509,11 +509,10 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_user_commands_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing user command total");
-
         let old = self.get_user_commands_total_count()?;
         Ok(self
             .database
-            .put(Self::TOTAL_NUM_USER_COMMANDS_KEY, to_be_bytes(old + 1))?)
+            .put(Self::TOTAL_NUM_USER_COMMANDS_KEY, (old + 1).to_be_bytes())?)
     }
 
     fn get_user_commands_pk_epoch_count(
@@ -535,12 +534,11 @@ impl UserCommandStore for IndexerStore {
         epoch: u32,
     ) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} user commands count {pk}");
-
         let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.user_commands_pk_epoch_cf(),
             u32_prefix_key(epoch, pk),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -554,12 +552,11 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
         trace!("Incrementing user command pk total num {pk}");
-
         let old = self.get_user_commands_pk_total_count(pk)?;
         Ok(self.database.put_cf(
             self.user_commands_pk_total_cf(),
             pk.0.as_bytes(),
-            to_be_bytes(old + 1),
+            (old + 1).to_be_bytes(),
         )?)
     }
 
@@ -573,7 +570,7 @@ impl UserCommandStore for IndexerStore {
         batch.put_cf(
             self.block_user_command_counts_cf(),
             state_hash.0.as_bytes(),
-            to_be_bytes(count),
+            count.to_be_bytes(),
         );
         Ok(())
     }

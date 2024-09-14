@@ -27,16 +27,13 @@ use crate::{
             WitnessTreeSummaryVerbose,
         },
     },
-    store::{
-        fixed_keys::FixedKeys, staking_ledger_store_impl::split_staking_ledger_epoch_key,
-        IndexerStore,
-    },
+    store::{fixed_keys::FixedKeys, IndexerStore},
     utility::{
-        db::{
-            block_sort_key_state_hash_suffix, block_u32_prefix_from_key, to_be_bytes,
-            u64_from_be_bytes,
-        },
         functions::pretty_print_duration,
+        store::{
+            block_u32_prefix_from_key, staking_ledger::split_staking_ledger_epoch_key,
+            state_hash_suffix, u64_from_be_bytes,
+        },
     },
 };
 use anyhow::bail;
@@ -1011,12 +1008,12 @@ impl IndexerState {
                     // collect witness tree blocks
                     indexer_store
                         .blocks_height_iterator(speedb::IteratorMode::From(
-                            &to_be_bytes(root_block.blockchain_length()),
+                            &root_block.blockchain_length().to_be_bytes(),
                             speedb::Direction::Forward,
                         ))
                         .flatten()
                         .for_each(|(key, _)| {
-                            if let (Ok(height), Ok(state_hash)) = (block_u32_prefix_from_key(&key), block_sort_key_state_hash_suffix(&key)) {
+                            if let (Ok(height), Ok(state_hash)) = (block_u32_prefix_from_key(&key), state_hash_suffix(&key)) {
                                 if let Ok(Some((block, _))) = indexer_store.get_block(&state_hash) {
                                     if height > 1 {
                                         witness_tree_blocks.push(block);
@@ -1051,10 +1048,10 @@ impl IndexerState {
             } else {
                 // add all blocks to the witness tree
                 indexer_store
-                    .blocks_height_iterator(speedb::IteratorMode::From(&to_be_bytes(1), speedb::Direction::Reverse))
+                    .blocks_height_iterator(speedb::IteratorMode::From(&1u32.to_be_bytes(), speedb::Direction::Reverse))
                     .flatten()
                     .for_each(|(key, _)| {
-                        if let (Ok(height), Ok(state_hash)) = (block_u32_prefix_from_key(&key), block_sort_key_state_hash_suffix(&key)) {
+                        if let (Ok(height), Ok(state_hash)) = (block_u32_prefix_from_key(&key), state_hash_suffix(&key)) {
                             if let Ok(Some((block, _))) = indexer_store.get_block(&state_hash) {
                                 witness_tree_blocks.push(block);
                             } else {

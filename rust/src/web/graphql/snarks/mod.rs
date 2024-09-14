@@ -4,7 +4,7 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::IndexerStore,
-    utility::db::{block_sort_key_state_hash_suffix, from_be_bytes, to_be_bytes},
+    utility::store::{from_be_bytes, state_hash_suffix, U32_LEN},
     web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
 use anyhow::Context as aContext;
@@ -169,8 +169,8 @@ impl SnarkQueryRoot {
                     speedb::IteratorMode::From(&start, speedb::Direction::Forward)
                 }
                 SnarkSortByInput::BlockHeightDesc => {
-                    start.append(&mut to_be_bytes(block_height_lte).to_vec());
-                    start.append(&mut to_be_bytes(u32::MAX).to_vec());
+                    start.append(&mut block_height_lte.to_be_bytes().to_vec());
+                    start.append(&mut u32::MAX.to_be_bytes().to_vec());
                     speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
                 }
             };
@@ -182,7 +182,7 @@ impl SnarkQueryRoot {
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
                     break;
                 }
-                let block_height = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
+                let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_height = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_height {
                     let canonical = get_block_canonicity(db, &state_hash.0);
@@ -224,7 +224,7 @@ impl SnarkQueryRoot {
                 SnarkSortByInput::BlockHeightDesc => {
                     let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
                     *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
-                    start.append(&mut to_be_bytes(u32::MAX).to_vec());
+                    start.append(&mut u32::MAX.to_be_bytes().to_vec());
                     start.append(&mut pk_prefix);
                     speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
                 }
@@ -236,7 +236,7 @@ impl SnarkQueryRoot {
                     break;
                 }
 
-                let global_slot = from_be_bytes(key[PublicKey::LEN..PublicKey::LEN + 4].to_vec());
+                let global_slot = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_slot = db.get_blocks_at_slot(global_slot)?;
                 for state_hash in blocks_at_slot {
                     let canonical = get_block_canonicity(db, &state_hash.0);
@@ -352,7 +352,7 @@ impl SnarkQueryRoot {
         };
 
         'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
-            let state_hash = block_sort_key_state_hash_suffix(&key)?;
+            let state_hash = state_hash_suffix(&key)?;
             let block = db.get_block(&state_hash)?.expect("block to be returned").0;
             let canonical = get_block_canonicity(db, &state_hash.0);
             let snark_work = db.get_snark_work_in_block(&state_hash)?;
