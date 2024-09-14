@@ -311,6 +311,15 @@ mod tests {
         let account_before = Account::empty(public_key.clone());
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account_before.clone());
+        accounts.insert(
+            PublicKey::default(),
+            Account {
+                public_key: PublicKey::default(),
+                delegate: PublicKey::default(),
+                balance: Amount(1_000_000_000_000_000_000u64), // dude was rich,
+                ..Default::default()
+            },
+        );
 
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
