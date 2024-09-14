@@ -916,24 +916,13 @@ impl IndexerState {
     ) -> anyhow::Result<()> {
         let (epoch, hash) = extract_epoch_hash(path).unwrap();
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
-            loop {
-                tokio::select! {
-                    // If a shutdown signal is received, terminate processing early
-                    _ = tokio::signal::ctrl_c() => {
-                        info!("SIGINT received");
-                        break;
-                    },
-                    staking_ledger = StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()) => {
-                        let sl = staking_ledger?;
-                        let summary = sl.summary();
-                        let mut staking_ledgers = staking_ledgers.lock().unwrap();
-                        staking_ledgers.insert(sl.epoch, sl.ledger_hash.clone());
-                        store
-                            .add_staking_ledger(sl, genesis_state_hash)?;
-                        info!("Added staking ledger {summary}");
-                    }
-                }
-            }
+            let staking_ledger =
+                StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()).await?;
+            let summary = staking_ledger.summary();
+            let mut staking_ledgers = staking_ledgers.lock().unwrap();
+            staking_ledgers.insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
+            store.add_staking_ledger(staking_ledger, genesis_state_hash)?;
+            info!("Added staking ledger {summary}");
         }
 
         Ok(())
