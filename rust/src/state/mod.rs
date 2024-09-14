@@ -15,7 +15,10 @@ use crate::{
     event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
         genesis::GenesisLedger,
-        staking::parser::StakingLedgerParser,
+        staking::{
+            parser::{extract_epoch_hash, StakingLedgerParser},
+            StakingLedger,
+        },
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         Ledger, LedgerHash,
     },
@@ -41,6 +44,7 @@ use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
     collections::{HashMap, HashSet},
+    path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -875,39 +879,63 @@ impl IndexerState {
         }
 
         // parse staking ledgers in ledgers_dir if not it db already
-        let mut ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
+        let ledger_parser = StakingLedgerParser::new(ledgers_dir)?;
+
         if let Some(indexer_store) = self.indexer_store.as_ref() {
+            // Create tasks for each file to be opened and processed concurrently
+            let tasks: Vec<_> = ledger_parser
+                .ledger_paths
+                .map(|path| {
+                    let staking_ledgers = self.staking_ledgers.clone();
+                    let genesis_state_hash = self.version.genesis_state_hash.clone();
+                    let indexer_store = indexer_store.clone();
+                    tokio::task::spawn(async move {
+                        Self::process_staking_ledger(
+                            &path,
+                            &indexer_store,
+                            &staking_ledgers,
+                            &genesis_state_hash,
+                        )
+                        .await
+                    })
+                })
+                .collect();
+
+            for task in tasks {
+                let _ = task.await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn process_staking_ledger(
+        path: &Path,
+        store: &Arc<IndexerStore>,
+        staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
+        genesis_state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        let (epoch, hash) = extract_epoch_hash(path).unwrap();
+        if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
             loop {
                 tokio::select! {
-                    // wait for SIGINT
+                    // If a shutdown signal is received, terminate processing early
                     _ = tokio::signal::ctrl_c() => {
                         info!("SIGINT received");
                         break;
-                    }
-
-                    // parse the next staking ledger
-                    res = ledger_parser.next_ledger(self.indexer_store.as_ref()) => {
-                        match res {
-                            Ok(Some(staking_ledger)) => {
-                                let summary = staking_ledger.summary();
-                                let mut staking_ledgers = self.staking_ledgers.lock().unwrap();
-                                staking_ledgers
-                                    .insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
-                                indexer_store
-                                    .add_staking_ledger(staking_ledger, &self.version.genesis_state_hash)?;
-                                info!("Added staking ledger {summary}");
-                            }
-                            Ok(None) => {
-                                break;
-                            }
-                            Err(e) => {
-                                panic!("Staking ledger ingestion error: {e}");
-                            }
-                        }
+                    },
+                    staking_ledger = StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()) => {
+                        let sl = staking_ledger?;
+                        let summary = sl.summary();
+                        let mut staking_ledgers = staking_ledgers.lock().unwrap();
+                        staking_ledgers.insert(sl.epoch, sl.ledger_hash.clone());
+                        store
+                            .add_staking_ledger(sl, genesis_state_hash)?;
+                        info!("Added staking ledger {summary}");
                     }
                 }
             }
         }
+
         Ok(())
     }
 

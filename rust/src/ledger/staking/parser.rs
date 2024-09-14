@@ -13,7 +13,7 @@ use std::{
 
 pub struct StakingLedgerParser {
     pub ledgers_dir: PathBuf,
-    ledger_paths: IntoIter<PathBuf>,
+    pub ledger_paths: IntoIter<PathBuf>,
 }
 
 /// Staking ledgers have this format:
