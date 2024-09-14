@@ -1,5 +1,6 @@
 use super::{is_valid_ledger_file, StakingLedger};
 use crate::{
+    block::extract_height_and_hash,
     constants::MAINNET_GENESIS_HASH,
     ledger::{store::staking::StakingLedgerStore, LedgerHash},
     store::IndexerStore,
@@ -7,7 +8,6 @@ use crate::{
 use glob::glob;
 use std::{
     path::{Path, PathBuf},
-    str::FromStr,
     vec::IntoIter,
 };
 
@@ -39,15 +39,14 @@ impl StakingLedgerParser {
         for next_path in self.ledger_paths.by_ref() {
             if let Some(store) = store {
                 // extract epoch and ledger hash to check if it's in the db
-                if let Some((epoch, hash)) = extract_epoch_hash(&next_path) {
-                    if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
-                        // add the missing staking ledger
-                        return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
-                            .await
-                            .map(Some);
-                    } else {
-                        continue;
-                    }
+                let (epoch, hash) = extract_epoch_hash(&next_path);
+                if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
+                    // add the missing staking ledger
+                    return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
+                        .await
+                        .map(Some);
+                } else {
+                    continue;
                 }
             }
 
@@ -60,22 +59,9 @@ impl StakingLedgerParser {
     }
 }
 
-pub fn extract_epoch_hash(path: &Path) -> Option<(u32, LedgerHash)> {
-    let filename = path.file_stem().and_then(|x| x.to_str()).unwrap();
-    let first_dash = filename.find('-');
-    let second_dash =
-        first_dash.and_then(|index| filename[index + 1..].find('-').map(|i| i + index + 1));
-    if let (Some(first_dash_pos), Some(second_dash_pos)) = (first_dash, second_dash) {
-        let potential_epoch = &filename[first_dash_pos + 1..second_dash_pos];
-        let potential_hash = &filename[second_dash_pos + 1..];
-        return potential_epoch.parse().ok().and_then(|e| {
-            match LedgerHash::from_str(potential_hash) {
-                Ok(ledger_hash) => Some((e, ledger_hash)),
-                Err(_) => None,
-            }
-        });
-    }
-    None
+pub fn extract_epoch_hash(path: &Path) -> (u32, LedgerHash) {
+    let (epoch, hash) = extract_height_and_hash(path);
+    (epoch, LedgerHash(hash.to_string()))
 }
 
 #[cfg(test)]
