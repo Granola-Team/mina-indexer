@@ -147,12 +147,13 @@ impl StakeQueryRoot {
                     ledger_hash.clone(),
                     total_currency,
                 ));
+                accounts = accounts
+                    .into_iter()
+                    .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
+                    .collect::<Vec<_>>()
             }
         }
-        Ok(accounts
-            .into_iter()
-            .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
-            .collect::<Vec<_>>())
+        Ok(accounts)
     }
 }
 
