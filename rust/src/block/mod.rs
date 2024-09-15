@@ -21,7 +21,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
-use std::{ffi::OsStr, path::Path};
+use std::path::Path;
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -323,41 +323,12 @@ impl std::fmt::Display for BlockHash {
     }
 }
 
-/// Extracts a state hash from an OS file name
-pub fn get_state_hash(file_name: &OsStr) -> Option<String> {
-    let last_part = file_name.to_str()?.split('-').last()?.to_string();
-    let state_hash = last_part.split('.').next()?;
-    if state_hash.starts_with(BlockHash::PREFIX) {
-        return Some(state_hash.to_string());
-    }
-    None
-}
-
-/// Extracts a blockchain length from an OS file name
-pub fn get_blockchain_length(file_name: &OsStr) -> Option<u32> {
-    file_name
-        .to_str()?
-        .split('-')
-        .fold(None, |acc, x| match x.parse::<u32>() {
-            Err(_) => acc,
-            Ok(x) => Some(x),
-        })
-}
-
 pub fn is_valid_state_hash(input: &str) -> bool {
     input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
 }
 
 pub fn is_valid_block_file(path: &Path) -> bool {
     is_valid_file_name(path, &is_valid_state_hash)
-}
-
-pub fn length_from_path(path: &Path) -> Option<u32> {
-    if is_valid_block_file(path) {
-        get_blockchain_length(path.file_name()?)
-    } else {
-        None
-    }
 }
 
 pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf]) {

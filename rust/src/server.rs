@@ -17,7 +17,7 @@ use crate::{
     unix_socket_server::{create_socket_listener, handle_connection},
 };
 use log::{debug, error, info, trace, warn};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Config, Event, EventKind, PollWatcher, RecommendedWatcher, RecursiveMode, Watcher};
 use speedb::checkpoint::Checkpoint;
 use std::{
     collections::HashSet,
@@ -373,10 +373,31 @@ async fn run_indexer<P: AsRef<Path>>(
 ) -> anyhow::Result<()> {
     // setup fs-based precomputed block & staking ledger watchers
     let (tx, mut rx) = mpsc::channel(4096);
-    let rt = Handle::current();
+    let tx_clone = tx.clone();
+
+    // Wrap the runtime handle in Arc
+    let rt = Arc::new(Handle::current());
+
+    let rt_watcher = rt.clone();
     let mut watcher = RecommendedWatcher::new(
         move |result| {
             let tx = tx.clone();
+            let rt = rt_watcher.clone();
+            rt.spawn(async move {
+                if let Err(e) = tx.send(result).await {
+                    error!("Failed to send watcher event, closing: {e}");
+                    drop(tx);
+                }
+            });
+        },
+        Config::default(),
+    )?;
+
+    let rt_poll_watcher = rt.clone();
+    let mut poll_watcher = PollWatcher::new(
+        move |result| {
+            let tx = tx_clone.clone();
+            let rt = rt_poll_watcher.clone();
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
                     error!("Failed to send watcher event, closing: {e}");
@@ -396,7 +417,7 @@ async fn run_indexer<P: AsRef<Path>>(
     }
 
     if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
-        watcher.watch(staking_ledgers_dir.as_ref(), RecursiveMode::NonRecursive)?;
+        poll_watcher.watch(staking_ledgers_dir.as_ref(), RecursiveMode::NonRecursive)?;
         info!(
             "Watching for staking ledgers in directory: {:#?}",
             staking_ledgers_dir.as_ref()
@@ -530,7 +551,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
             } else if staking::is_valid_ledger_file(&path) {
                 // acquire state write lock
                 let version = state.read().await.version.clone();
-                let mut state = state.write().await;
+                let state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
                     match retry_parse_staking_ledger(&path, version.genesis_state_hash.clone())
                         .await
@@ -549,7 +570,8 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                                 .unwrap_or_else(|e| {
                                     error!("Error adding staking ledger {ledger_summary} {e}")
                                 });
-                            state.staking_ledgers.insert(epoch, ledger_hash);
+                            let mut staking_ledgers = state.staking_ledgers.lock().unwrap();
+                            staking_ledgers.insert(epoch, ledger_hash);
                         }
                         Err(e) => {
                             error!("Error parsing staking ledger: {e}")
