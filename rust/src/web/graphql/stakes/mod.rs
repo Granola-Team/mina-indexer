@@ -17,11 +17,12 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 use speedb::Direction;
 use std::sync::Arc;
 
-#[derive(InputObject)]
+#[derive(InputObject, Default)]
 pub struct StakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
+    stake_lte: Option<f64>,
 
     #[graphql(name = "public_key")]
     public_key: Option<String>,
@@ -148,7 +149,10 @@ impl StakeQueryRoot {
                 ));
             }
         }
-        Ok(accounts)
+        Ok(accounts
+            .into_iter()
+            .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
+            .collect::<Vec<_>>())
     }
 }
 
@@ -378,6 +382,20 @@ impl
 }
 
 impl StakeQueryInput {
+    pub fn matches(
+        query: Option<&Self>,
+        stakes_ledger_account: &StakesLedgerAccountWithMeta,
+    ) -> bool {
+        if let Some(query) = query {
+            if let Some(stakes_lte) = query.stake_lte {
+                if stakes_ledger_account.delegation_totals.total_delegated > stakes_lte {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     pub fn matches_staking_account(
         query: Option<&Self>,
         account: &StakingAccount,
@@ -391,6 +409,7 @@ impl StakeQueryInput {
                 epoch: query_epoch,
                 ledger_hash: query_ledger_hash,
                 username,
+                ..
             } = query;
             if let Some(public_key) = public_key {
                 if *public_key != account.pk.0 {
@@ -533,5 +552,74 @@ impl StakesLedgerAccountWithMeta {
                 .get_staking_ledger_accounts_count_epoch(epoch, &MAINNET_GENESIS_HASH.into())
                 .expect("total internal command count"),
         }
+    }
+}
+
+#[cfg(test)]
+mod web_graphql_stakes_tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_stake_lte_filter() {
+        let stakes_ledger_account = StakesLedgerAccountWithMeta {
+            delegation_totals: StakesDelegationTotals {
+                total_delegated: 500_000.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let query_input_none = StakeQueryInput {
+            stake_lte: None,
+            ..Default::default()
+        };
+        assert!(StakeQueryInput::matches(
+            Some(&query_input_none),
+            &stakes_ledger_account
+        ));
+
+        let query_input_greater = StakeQueryInput {
+            stake_lte: Some(600_000.0),
+            ..Default::default()
+        };
+        assert!(StakeQueryInput::matches(
+            Some(&query_input_greater),
+            &stakes_ledger_account
+        ));
+
+        let query_input_equal = StakeQueryInput {
+            stake_lte: Some(500_000.0),
+            ..Default::default()
+        };
+        assert!(StakeQueryInput::matches(
+            Some(&query_input_equal),
+            &stakes_ledger_account
+        ));
+
+        let query_input_less = StakeQueryInput {
+            stake_lte: Some(400_000.0),
+            ..Default::default()
+        };
+        assert!(!StakeQueryInput::matches(
+            Some(&query_input_less),
+            &stakes_ledger_account
+        ));
+    }
+
+    #[test]
+    fn test_matches_no_filter() {
+        let stakes_ledger_account = StakesLedgerAccountWithMeta {
+            delegation_totals: StakesDelegationTotals {
+                total_delegated: 800_000.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let query_input_none = StakeQueryInput::default();
+        assert!(StakeQueryInput::matches(
+            Some(&query_input_none),
+            &stakes_ledger_account
+        ));
     }
 }
