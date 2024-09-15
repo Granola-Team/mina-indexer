@@ -914,7 +914,7 @@ impl IndexerState {
         staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
         genesis_state_hash: &BlockHash,
     ) -> anyhow::Result<()> {
-        let (epoch, hash) = extract_epoch_hash(path).unwrap();
+        let (epoch, hash) = extract_epoch_hash(path);
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
             let staking_ledger =
                 StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()).await?;
