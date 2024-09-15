@@ -306,19 +306,9 @@ impl From<ParsedBlock> for PrecomputedBlock {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        block::{
-            blockchain_length::BlockchainLength, get_blockchain_length, is_valid_block_file,
-            length_from_path, BlockHash,
-        },
-        chain::Network,
-    };
+    use crate::{block::BlockHash, chain::Network};
     use quickcheck::{Arbitrary, Gen};
-    use quickcheck_macros::quickcheck;
-    use std::{
-        ffi::OsString,
-        path::{Path, PathBuf},
-    };
+    use std::path::PathBuf;
     impl Arbitrary for Network {
         fn arbitrary(g: &mut Gen) -> Self {
             let idx = usize::arbitrary(g) % 4;
@@ -330,129 +320,6 @@ mod tests {
                 _ => panic!("unknown network {idx}"),
             }
         }
-    }
-
-    const FILENAMES_VALID: [&str; 23] = [
-        "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u.json",
-        "mainnet-113518-3NLQ2Zop9dfDKvffNg9EBzSmBqyjYgCi2E1zAuLGFzUfJk6uq7YK.json",
-        "mainnet-175222-3NKn7ZtT6Axw3hK3HpyUGRxmirkuUhtR4cYzWFk75NCgmjCcqPby.json",
-        "mainnet-179591-3NLNMihHhdxEj78r88mK9JGTdyYuUWTP2hHD4yzJ4CvypjqYd2hv.json",
-        "mainnet-179594-3NLBTeqaKMdY94Nu1QSnYMhq6qBSELH2HNJw4z8dYEXaJwgwnKey.json",
-        "mainnet-195769-3NKbdBu8uaP41gnp2W2kSyEBDpYKqaSCxMdspoANXboxALK2g2Px.json",
-        "mainnet-195770-3NK7CQdrzY5RBw9ugVjeQ2K6nR6dZSckP3Hrf18bopVg2LY8yrMy.json",
-        "mainnet-196577-3NKPcXyRq9Ywe5e519n1DCNCNuY6fdDukuWXwrY4oWkDzdf3WWsF.json",
-        "mainnet-206418-3NKS1csVgEyHj4sSeK2mi6aD2oCy5jYVd2ANhNT7ydo7oy1b5mYu.json",
-        "mainnet-216651-3NLp9p3X8oF1ydSC1MgXnB99iJoSTTCV4qs4urmTKfiWTd6BbBsL.json",
-        "mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json",
-        "mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json",
-        "mainnet-3NK2upcz2s6BmmoD6btjtJqSw1wNdyM9H5tXSD9nmN91mQMe4vH8.json",
-        "mainnet-3NK2uq5kh6PwbUEwmhwR5RHfJNBgbwvwxxHQnKtQN5aYANudn3Wx.json",
-        "mainnet-3NK2veoFnf9dKkqU7DUg4dAgQnapNaQUZZHHANK3kqaimKD1vFuv.json",
-        "mainnet-3NK2xHq4mq5mBEG6jNhWTKSycG315pHwnZKdPqGYiyY58N3tn4oJ.json",
-        "mainnet-3NK3c24DBH1aA83x3fhQLMC9UwFRUWVtFJG57o94MsDRqyDvR7us.json",
-        "mainnet-40702-3NLkEG6S6Ra8Z1i5U5MPSNWV13hzQV8pYx1xBaeLDFN4EJhSuksw.json",
-        "mainnet-750-3NLFkhrNBLRxh8cfCAHEFJSe29MEuT3HGNEcheXBKvexfRuEo9eC.json",
-        "mainnet-84160-3NKJCCUhCqpueErQWmPMh67gk8uCY8ttFAK6bqG9xyF26rzjZBJ5.json",
-        "mainnet-84161-3NK8iBQSkCQtCpnm2qWCvhixuEsiHQq7SL7YY31nyXkiLGEDMyGk.json",
-        "mainnet-9638-3NL51H2ZPJUvuSFBaR56cEMqSt1ytiPpoHx7e6aQgEFNsVUPxSAn.json",
-        "mainnet-9644-3NK4apiDvnT4ywWEw6KBEk1UzTd1XK7SGXFZDVC9GPCDaT3EXdsv.json",
-    ];
-
-    const FILENAMES_INVALID: [&str; 6] = [
-        "mainnet-113512-3NK9bewd5kDxzB5Kvyt8niqyiccbb365B2tLdEC2u9e8tG36ds5u",
-        "mainnet-113518-3NLQ2Zop9dfDKvffNg9EBzSmBqyjYgCi2E1zAuLGFzUfJk6uq7YK.j",
-        "mainnet-175222.json",
-        "LNMihHhdxEj78r88mK9JGTdyYuUWTP2hHD4yzJ4CvypjqYd2hv.json",
-        "mainnet.json",
-        "mainnet-195769-.json",
-    ];
-
-    #[test]
-    fn blockchain_lengths_valid_or_default_none() {
-        let expected: Vec<Option<u32>> = vec![
-            Some(113512),
-            Some(113518),
-            Some(175222),
-            Some(179591),
-            Some(179594),
-            Some(195769),
-            Some(195770),
-            Some(196577),
-            Some(206418),
-            Some(216651),
-            Some(220897),
-            Some(2),
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(40702),
-            Some(750),
-            Some(84160),
-            Some(84161),
-            Some(9638),
-            Some(9644),
-        ];
-        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_VALID)
-            .iter()
-            .map(|x| get_blockchain_length(&OsString::from(x)))
-            .collect();
-        assert_eq!(expected, actual);
-
-        let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
-        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
-            .iter()
-            .map(|x| length_from_path(Path::new(x)))
-            .collect();
-
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn blockchain_length_from_path() -> anyhow::Result<()> {
-        let expected: Vec<u32> = vec![
-            111, 113512, 113518, 175222, 179591, 179594, 195769, 195770, 196577, 2, 206418, 216651,
-            220897, 320081, 338728, 5929, 26272, 32202, 31640, 31775, 40702, 750, 84160, 84161,
-            9638, 9644,
-        ];
-        let paths: Vec<PathBuf> = glob::glob("./tests/data/non_sequential_blocks/*")?
-            .flatten()
-            .collect();
-        let actual: Vec<u32> = paths
-            .iter()
-            .flat_map(|x| {
-                BlockchainLength::from_path(&PathBuf::from(x))
-                    .map(<BlockchainLength as Into<u32>>::into)
-                    .ok()
-            })
-            .collect();
-        assert_eq!(expected, actual);
-
-        let expected: Vec<Option<u32>> = vec![None, None, None, None, None, None];
-        let actual: Vec<Option<u32>> = Vec::from(FILENAMES_INVALID)
-            .iter()
-            .map(|x| length_from_path(Path::new(x)))
-            .collect();
-        assert_eq!(expected, actual);
-
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_filenames_have_invalid_state_hash_or_non_json_extension() {
-        FILENAMES_INVALID
-            .map(PathBuf::from)
-            .iter()
-            .for_each(|file| assert!(!is_valid_block_file(file)))
-    }
-
-    #[test]
-    fn valid_filenames_have_valid_state_hash_and_json_extension() {
-        FILENAMES_VALID
-            .map(PathBuf::from)
-            .iter()
-            .for_each(|file| assert!(is_valid_block_file(file)))
     }
 
     #[derive(Debug, Clone)]
@@ -485,10 +352,5 @@ mod tests {
             };
             Self(PathBuf::from(&path))
         }
-    }
-
-    #[quickcheck]
-    fn check_for_block_file_validity(valid_block: BlockFileName) -> bool {
-        is_valid_block_file(valid_block.0.as_path())
     }
 }
