@@ -2,7 +2,7 @@ pub mod parser;
 
 use super::account::Nonce;
 use crate::{
-    block::BlockHash,
+    block::{extract_height_and_hash, extract_network, BlockHash},
     chain::Network,
     constants::*,
     ledger::{
@@ -152,18 +152,9 @@ pub fn is_valid_ledger_file(path: &Path) -> bool {
 }
 
 pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
-    let parts: Vec<&str> = path
-        .file_stem()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split('-')
-        .collect();
-    (
-        parts[0].into(),
-        parts[1].parse().unwrap(),
-        LedgerHash(parts[2].into()),
-    )
+    let (height, hash) = extract_height_and_hash(path);
+    let network = extract_network(path);
+    (network, height, LedgerHash(hash.to_string()))
 }
 
 impl StakingAccount {
