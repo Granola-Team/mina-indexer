@@ -563,12 +563,12 @@ mod web_graphql_stakes_tests {
     fn test_matches_stake_lte_filter() {
         let stakes_ledger_account = StakesLedgerAccountWithMeta {
             delegation_totals: StakesDelegationTotals {
-                total_delegated: 500_000.0, // 500 thousand in total delegated MINA
+                total_delegated: 500_000.0,
                 ..Default::default()
             },
             ..Default::default()
         };
-        // Test case: `stake_lte` is None (should match)
+
         let query_input_none = StakeQueryInput {
             stake_lte: None,
             ..Default::default()
@@ -579,7 +579,7 @@ mod web_graphql_stakes_tests {
         ));
 
         let query_input_greater = StakeQueryInput {
-            stake_lte: Some(600_000.0), // 600 thousand MINA is greater than the account's stake
+            stake_lte: Some(600_000.0),
             ..Default::default()
         };
         assert!(StakeQueryInput::matches(
@@ -597,7 +597,7 @@ mod web_graphql_stakes_tests {
         ));
 
         let query_input_less = StakeQueryInput {
-            stake_lte: Some(400_000.0), // 400 thousand is less than the account's stake
+            stake_lte: Some(400_000.0),
             ..Default::default()
         };
         assert!(!StakeQueryInput::matches(
