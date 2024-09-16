@@ -7,6 +7,7 @@ use anyhow::bail;
 use std::mem::size_of;
 
 pub mod block;
+pub mod command;
 pub mod snarks;
 pub mod staking_ledger;
 

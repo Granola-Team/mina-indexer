@@ -382,7 +382,7 @@ fn get_fee_transfers_for_state_hash(
         Ok(Some(canonicity)) => matches!(canonicity, Canonicity::Canonical),
         _ => false,
     };
-    match db.get_internal_commands(state_hash.clone()) {
+    match db.get_internal_commands(state_hash) {
         Ok(internal_commands) => {
             let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
                 .into_iter()

@@ -1093,9 +1093,9 @@ pub async fn handle_connection(
                     if !block::is_valid_state_hash(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
-                        let internal_cmds_str = serde_json::to_string_pretty(
-                            &db.get_internal_commands(state_hash.clone().into())?,
-                        )?;
+                        let state_hash = BlockHash(state_hash);
+                        let internal_cmds_str =
+                            serde_json::to_string_pretty(&db.get_internal_commands(&state_hash)?)?;
 
                         if path.is_none() {
                             debug!("Writing block internal commands for {state_hash} to stdout");

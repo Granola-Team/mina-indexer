@@ -34,7 +34,7 @@ pub trait InternalCommandStore {
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
         &self,
-        state_hash: BlockHash,
+        state_hash: &BlockHash,
     ) -> anyhow::Result<Vec<InternalCommandWithData>>;
 
     /// Get indexed internal command from block
