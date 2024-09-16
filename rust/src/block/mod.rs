@@ -290,8 +290,8 @@ impl std::fmt::Debug for Block {
             self.height,
             self.blockchain_length,
             self.global_slot_since_genesis,
-            &self.state_hash.0[0..12],
-            &self.parent_hash.0[0..12]
+            &self.state_hash,
+            &self.parent_hash
         )
     }
 }

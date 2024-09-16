@@ -20,7 +20,7 @@ impl std::fmt::Debug for BlockWatcherEvent {
             } => write!(
                 f,
                 "fs watcher saw {} block (length {}): {}",
-                network, blockchain_length, state_hash.0
+                network, blockchain_length, state_hash
             ),
         }
     }

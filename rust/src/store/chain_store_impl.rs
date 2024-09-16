@@ -29,7 +29,7 @@ impl ChainStore for IndexerStore {
     }
 
     fn get_network(&self, chain_id: &ChainId) -> anyhow::Result<Network> {
-        trace!("Getting network for chain id: {}", chain_id.0);
+        trace!("Getting network for chain id: {}", chain_id);
         Ok(Network::from(
             self.database
                 .get_pinned_cf(self.chain_id_to_network_cf(), chain_id.0.as_bytes())?

@@ -118,7 +118,7 @@ impl std::fmt::Debug for DbLedgerEvent {
             } => write!(
                 f,
                 "db new ledger {} for (length {}): {}",
-                ledger_hash.0, blockchain_length, state_hash.0
+                ledger_hash, blockchain_length, state_hash
             ),
         }
     }
@@ -134,7 +134,7 @@ impl std::fmt::Debug for DbStakingLedgerEvent {
             } => write!(
                 f,
                 "db new staking ledger (epoch {}): {}",
-                epoch, ledger_hash.0
+                epoch, ledger_hash
             ),
             Self::AggregateDelegations {
                 epoch,
