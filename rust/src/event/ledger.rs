@@ -12,7 +12,7 @@ impl std::fmt::Debug for StakingLedgerWatcherEvent {
             Self::NewStakingLedger { epoch, ledger_hash } => write!(
                 f,
                 "fs watcher saw staking ledger (epoch {}): {}",
-                epoch, ledger_hash.0
+                epoch, ledger_hash
             ),
         }
     }

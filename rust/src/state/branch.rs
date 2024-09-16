@@ -104,9 +104,9 @@ impl Branch {
             .enumerate()
         {
             let state_hash = &self.branches.get(ancestor_id).unwrap().data().state_hash;
-            trace!("{}th state_hash: {}", n, state_hash.0);
+            trace!("{}th state_hash: {}", n, state_hash);
             if n + 1 == MAINNET_CANONICAL_THRESHOLD as usize {
-                trace!("returning id for {}", state_hash.0);
+                trace!("returning id for {}", state_hash);
                 return Some(ancestor_id.clone());
             }
         }

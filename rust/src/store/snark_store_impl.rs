@@ -157,7 +157,7 @@ impl SnarkStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
-        trace!("Getting SNARK work in block {}", state_hash.0);
+        trace!("Getting SNARK work in block {}", state_hash);
 
         let key = state_hash.0.as_bytes();
         if let Some(snarks_bytes) = self.database.get_pinned_cf(self.snarks_cf(), key)? {

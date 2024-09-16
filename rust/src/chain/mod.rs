@@ -16,6 +16,12 @@ impl ChainId {
     }
 }
 
+impl std::fmt::Display for ChainId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Chain id used by mina node p2p network
 pub fn chain_id(
     genesis_state_hash: &str,
