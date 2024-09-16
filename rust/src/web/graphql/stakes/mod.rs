@@ -22,7 +22,8 @@ pub struct StakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
-    stake_lte: Option<f64>,
+    #[graphql(validator(regex = "^\\d+(\\.\\d{1,9})?$"), name = "stake_lte")]
+    stake_lte: Option<String>,
 
     #[graphql(name = "public_key")]
     public_key: Option<String>,
@@ -147,12 +148,13 @@ impl StakeQueryRoot {
                     ledger_hash.clone(),
                     total_currency,
                 ));
+                accounts = accounts
+                    .into_iter()
+                    .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
+                    .collect::<Vec<_>>()
             }
         }
-        Ok(accounts
-            .into_iter()
-            .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
-            .collect::<Vec<_>>())
+        Ok(accounts)
     }
 }
 
@@ -387,8 +389,8 @@ impl StakeQueryInput {
         stakes_ledger_account: &StakesLedgerAccountWithMeta,
     ) -> bool {
         if let Some(query) = query {
-            if let Some(stakes_lte) = query.stake_lte {
-                if stakes_ledger_account.delegation_totals.total_delegated > stakes_lte {
+            if let Some(stake_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
+                if stakes_ledger_account.delegation_totals.total_delegated > stake_lte {
                     return false;
                 }
             }
@@ -579,7 +581,7 @@ mod web_graphql_stakes_tests {
         ));
 
         let query_input_greater = StakeQueryInput {
-            stake_lte: Some(600_000.0),
+            stake_lte: Some("600000.0".to_string()),
             ..Default::default()
         };
         assert!(StakeQueryInput::matches(
@@ -588,7 +590,7 @@ mod web_graphql_stakes_tests {
         ));
 
         let query_input_equal = StakeQueryInput {
-            stake_lte: Some(500_000.0),
+            stake_lte: Some("500000.0".to_string()),
             ..Default::default()
         };
         assert!(StakeQueryInput::matches(
@@ -597,7 +599,7 @@ mod web_graphql_stakes_tests {
         ));
 
         let query_input_less = StakeQueryInput {
-            stake_lte: Some(400_000.0),
+            stake_lte: Some("400000.0".to_string()),
             ..Default::default()
         };
         assert!(!StakeQueryInput::matches(

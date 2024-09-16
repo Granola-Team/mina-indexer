@@ -337,3 +337,38 @@ jsonpath "$.data.stakes[0].epoch" == 1
 jsonpath "$.data.stakes[0].epoch_num_accounts" == 1676
 
 duration < 1000
+
+#
+# Stakes LTE delegation query
+#
+
+POST {{url}}
+```graphql
+query StakesQuery($limit: Int, $query: StakeQueryInput!) {
+  stakes(limit: $limit, query: $query) {
+    delegationTotals {
+      totalDelegated
+    }
+  }
+}
+
+variables {
+  "limit": 3,
+  "query": {
+    "epoch": 1,
+    "stake_lte": "24333327.26190242"
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.stakes" count == 3
+
+# first datum
+#jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" <= 24333327.26190242
+#jsonpath "$.data.stakes[1].delegationTotals.totalDelegated" <= 16666687.22223009
+#jsonpath "$.data.stakes[2].delegationTotals.totalDelegated" <= 16666687.22223009
+
+duration < 200
