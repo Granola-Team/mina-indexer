@@ -390,7 +390,7 @@ impl StakeQueryInput {
     ) -> bool {
         if let Some(query) = query {
             if let Some(stake_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
-                if stake_ledger_account.delegation_totals.total_delegated > stake_lte {
+                if stakes_ledger_account.delegation_totals.total_delegated > stake_lte {
                     return false;
                 }
             }

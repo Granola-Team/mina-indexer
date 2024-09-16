@@ -371,4 +371,4 @@ jsonpath "$.data.stakes" count == 3
 #jsonpath "$.data.stakes[1].delegationTotals.totalDelegated" <= 16666687.22223009
 #jsonpath "$.data.stakes[2].delegationTotals.totalDelegated" <= 16666687.22223009
 
-duration < 500
+duration < 200
