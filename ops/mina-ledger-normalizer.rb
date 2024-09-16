@@ -1,27 +1,26 @@
 #! /usr/bin/env -S ruby -w
-# frozen_string_literal: true
 
 # -*- mode: ruby -*-
 
-require 'json'
+require "json"
 
 filename = ARGV[0]
 file = File.read(filename)
 data = JSON.parse(file)
 
-accounts = data['ledger']['accounts']
+accounts = data["ledger"]["accounts"]
 
 result = {}
 
 accounts.each do |account|
-  public_key = account['pk']
-  nonce = account['nonce'] || '0'
-  balance = account['balance']
-  delegate = account['delegate'] || public_key
+  public_key = account["pk"]
+  nonce = account["nonce"] || "0"
+  balance = account["balance"]
+  delegate = account["delegate"] || public_key
   result[public_key] = {
-    'nonce' => nonce,
-    'balance' => balance,
-    'delegate' => delegate
+    "nonce" => nonce,
+    "balance" => balance,
+    "delegate" => delegate
   }
 end
 

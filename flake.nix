@@ -2,7 +2,7 @@
   inputs = {
     rust-overlay.url = "github:oxalica/rust-overlay";
     nixpkgs.url =
-      "github:NixOS/nixpkgs?ref=2e45bfd5361ccdbebe45b68ae2021aea0078eb00";
+      "github:NixOS/nixpkgs?ref=931494da4b60fb26719e231d6de4b2c96167a1ce";
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
@@ -62,7 +62,7 @@
             nixfmt-classic
             rclone
             ruby
-            rubyPackages.rubocop
+            rubyPackages.standard
             rust
             shellcheck
           ] ++ buildDependencies;

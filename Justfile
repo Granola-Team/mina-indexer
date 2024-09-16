@@ -53,7 +53,7 @@ audit:
 lint:
   @echo "--- Linting ops scripts"
   ruby -cw ops/*.rb
-  #rubocop ops/*.rb
+  standardrb --no-fix ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
@@ -86,6 +86,7 @@ clean-test rev=GIT_COMMIT_HASH:
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
+  standardrb --fix ops/*.rb
 
 test-unit test='':
   @echo "--- Invoking 'cargo nextest'"
@@ -218,4 +219,3 @@ shutdown rev=GIT_COMMIT_HASH:
   @echo "Shutting down prod indexer"
   {{DEPLOY}} prod shutdown {{rev}}
   @echo "Successfully shutdown. You may also want to do 'just clean-prod'"
-
