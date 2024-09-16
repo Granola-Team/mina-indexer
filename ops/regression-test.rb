@@ -8,13 +8,6 @@ BUILD_TYPE = "debug"
 
 require "fileutils"
 
-# clean up dev directory
-if ARGV.length == 1 && ARGV[0] == "clean-dev"
-  puts "Removing #{DEV_DIR}/rev-*"
-  FileUtils.rm_rf(Dir.glob("#{DEV_DIR}/rev-*"))
-  return
-end
-
 abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
 
 rev = `git rev-parse --short=8 HEAD`.chomp
