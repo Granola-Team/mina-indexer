@@ -1,9 +1,11 @@
-use super::signed::TXN_HASH_LEN;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::{signed::SignedCommandWithData, UserCommandWithStatus},
     ledger::public_key::PublicKey,
-    utility::store::{u32_from_be_bytes, U32_LEN},
+    utility::{
+        store::{u32_from_be_bytes, U32_LEN},
+        txn::TxnHash,
+    },
 };
 use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};
@@ -178,17 +180,17 @@ pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
 }
 
 /// Transaction hash from `key`
-/// - discard 4 bytes, keep [TXN_HASH_LEN] bytes
+/// - discard 4 bytes, keep [TxnHash::LEN] bytes
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
-    String::from_utf8(key[4..(4 + TXN_HASH_LEN)].to_vec())
+    String::from_utf8(key[4..(4 + TxnHash::LEN)].to_vec())
         .map_err(|e| anyhow!("Error reading txn hash: {e}"))
 }
 
 /// State hash from `key`
-/// - discard the first 4 + [TXN_HASH_LEN] bytes
+/// - discard the first 4 + [TxnHash::LEN] bytes
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[(4 + TXN_HASH_LEN)..])
+    BlockHash::from_bytes(&key[(4 + TxnHash::LEN)..])
         .map_err(|e| anyhow!("Error reading state hash: {e}"))
 }

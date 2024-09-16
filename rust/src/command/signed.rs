@@ -4,6 +4,7 @@ use crate::{
         bin_prot,
         serialization_types::{staged_ledger_diff as mina_rs, version_bytes::V1_TXN_HASH},
     },
+    utility::txn::TxnHash,
 };
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
@@ -527,12 +528,10 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     payload_obj.insert("body".into(), body);
     Value::Object(payload_obj)
 }
-
-pub const TXN_HASH_LEN: usize = 53;
 pub const TXN_HASH_PREFIX: &str = "Ckp";
 
 pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with(TXN_HASH_PREFIX) && input.len() == TXN_HASH_LEN
+    input.starts_with(TXN_HASH_PREFIX) && input.len() == TxnHash::LEN
 }
 
 #[cfg(test)]
