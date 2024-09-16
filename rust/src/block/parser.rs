@@ -346,9 +346,9 @@ mod tests {
             let hash = BlockHash::arbitrary(g);
             let is_first_pattern = bool::arbitrary(g);
             let path = if is_first_pattern {
-                format!("{}-{}-{}.json", network, height, hash.0)
+                format!("{}-{}-{}.json", network, height, hash)
             } else {
-                format!("{}-{}.json", network, hash.0)
+                format!("{}-{}.json", network, hash)
             };
             Self(PathBuf::from(&path))
         }
