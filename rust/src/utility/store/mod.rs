@@ -1,6 +1,6 @@
+use super::txn::TxnHash;
 use crate::{
     block::BlockHash,
-    command::signed::TXN_HASH_LEN,
     ledger::{account::Nonce, public_key::PublicKey},
 };
 use anyhow::bail;
@@ -99,17 +99,17 @@ pub fn u64_prefix_key(prefix: u64, pk: &PublicKey) -> [u8; U64_LEN + PublicKey::
 /// Key format for sorting txns by block height/global slot & txn hash
 /// `{prefix}{txn_hash}{state_hash}`
 /// - `prefix`:     [u32] BE bytes
-/// - `txn_hash`:   [TXN_HASH_LEN] bytes
+/// - `txn_hash`:   [TxnHash::LEN] bytes
 /// - `state_hash`: [BlockHash::LEN] bytes
 pub fn txn_sort_key(
     prefix: u32,
     txn_hash: &str,
     state_hash: &BlockHash,
-) -> [u8; U32_LEN + TXN_HASH_LEN + BlockHash::LEN] {
-    let mut bytes = [0; U32_LEN + TXN_HASH_LEN + BlockHash::LEN];
+) -> [u8; U32_LEN + TxnHash::LEN + BlockHash::LEN] {
+    let mut bytes = [0; U32_LEN + TxnHash::LEN + BlockHash::LEN];
     bytes[..U32_LEN].copy_from_slice(&prefix.to_be_bytes());
-    bytes[U32_LEN..][..TXN_HASH_LEN].copy_from_slice(txn_hash.as_bytes());
-    bytes[U32_LEN..][TXN_HASH_LEN..].copy_from_slice(state_hash.0.as_bytes());
+    bytes[U32_LEN..][..TxnHash::LEN].copy_from_slice(txn_hash.as_bytes());
+    bytes[U32_LEN..][TxnHash::LEN..].copy_from_slice(state_hash.0.as_bytes());
     bytes
 }
 
@@ -119,7 +119,7 @@ pub fn txn_sort_key(
 /// - pk:         [PublicKey::LEN] bytes
 /// - u32_sort:   4 BE bytes
 /// - nonce:      4 BE bytes
-/// - txn_hash:   [TXN_HASH_LEN] bytes
+/// - txn_hash:   [TxnHash::LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
 pub fn pk_txn_sort_key(
     pk: &PublicKey,
@@ -127,14 +127,14 @@ pub fn pk_txn_sort_key(
     nonce: u32,
     txn_hash: &str,
     state_hash: &BlockHash,
-) -> [u8; PublicKey::LEN + U32_LEN + U32_LEN + TXN_HASH_LEN + BlockHash::LEN] {
-    let mut bytes = [0; PublicKey::LEN + U32_LEN + U32_LEN + TXN_HASH_LEN + BlockHash::LEN];
+) -> [u8; PublicKey::LEN + U32_LEN + U32_LEN + TxnHash::LEN + BlockHash::LEN] {
+    let mut bytes = [0; PublicKey::LEN + U32_LEN + U32_LEN + TxnHash::LEN + BlockHash::LEN];
     bytes[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     bytes[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort.to_be_bytes());
     bytes[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&nonce.to_be_bytes());
-    bytes[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TXN_HASH_LEN]
+    bytes[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::LEN]
         .copy_from_slice(txn_hash.as_bytes());
-    bytes[PublicKey::LEN..][U32_LEN..][U32_LEN..][TXN_HASH_LEN..]
+    bytes[PublicKey::LEN..][U32_LEN..][U32_LEN..][TxnHash::LEN..]
         .copy_from_slice(state_hash.0.as_bytes());
     bytes
 }
@@ -172,13 +172,13 @@ pub fn pk_txn_sort_key_nonce(key: &[u8]) -> Nonce {
 }
 
 /// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] bytes & parse the next
-/// [TXN_HASH_LEN] bytes
+/// [TxnHash::LEN] bytes
 pub fn txn_hash_of_key(key: &[u8]) -> String {
-    String::from_utf8(key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TXN_HASH_LEN].to_vec())
+    String::from_utf8(key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::LEN].to_vec())
         .expect("txn hash bytes")
 }
 
-/// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] + [TXN_HASH_LEN] bytes & parse
+/// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] + [TxnHash::LEN] bytes & parse
 /// the remaining [BlockHash::LEN] bytes
 pub fn pk_txn_sort_key_state_hash(key: &[u8]) -> BlockHash {
     state_hash_suffix(key).expect("state hash bytes")
@@ -191,9 +191,9 @@ pub fn block_txn_index_key(state_hash: &BlockHash, index: u32) -> [u8; BlockHash
     key
 }
 
-pub fn txn_block_key(txn_hash: &str, state_hash: BlockHash) -> [u8; TXN_HASH_LEN + BlockHash::LEN] {
-    let mut key = [0; TXN_HASH_LEN + BlockHash::LEN];
-    key[..TXN_HASH_LEN].copy_from_slice(txn_hash.as_bytes());
-    key[TXN_HASH_LEN..].copy_from_slice(state_hash.0.as_bytes());
+pub fn txn_block_key(txn_hash: &str, state_hash: BlockHash) -> [u8; TxnHash::LEN + BlockHash::LEN] {
+    let mut key = [0; TxnHash::LEN + BlockHash::LEN];
+    key[..TxnHash::LEN].copy_from_slice(txn_hash.as_bytes());
+    key[TxnHash::LEN..].copy_from_slice(state_hash.0.as_bytes());
     key
 }

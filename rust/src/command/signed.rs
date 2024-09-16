@@ -4,6 +4,7 @@ use crate::{
         bin_prot,
         serialization_types::{staged_ledger_diff as mina_rs, version_bytes::V1_TXN_HASH},
     },
+    utility::txn::TxnHash,
 };
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
@@ -142,7 +143,7 @@ impl SignedCommand {
     }
 
     /// This returns a user command (transaction) hash that starts with
-    /// [TXN_HASH_PREFIX]
+    /// [TxnHash::PREFIX]
     pub fn hash_signed_command(&self) -> anyhow::Result<String> {
         let mut binprot_bytes = Vec::new();
         bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
@@ -528,11 +529,8 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     Value::Object(payload_obj)
 }
 
-pub const TXN_HASH_LEN: usize = 53;
-pub const TXN_HASH_PREFIX: &str = "Ckp";
-
 pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with(TXN_HASH_PREFIX) && input.len() == TXN_HASH_LEN
+    input.starts_with(TxnHash::PREFIX) && input.len() == TxnHash::LEN
 }
 
 #[cfg(test)]

@@ -214,7 +214,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: b""
     /// where
     /// - height:     4 BE bytes
-    /// - txn_hash:   [TXN_HASH_LEN] bytes
+    /// - txn_hash:   [TxnHash::LEN] bytes
     /// - state_hash: [BlockHash::LEN] bytes
     fn user_commands_height_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -228,7 +228,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: b""
     /// where
     /// - slot:       4 BE bytes
-    /// - txn_hash:   [TXN_HASH_LEN] bytes
+    /// - txn_hash:   [TxnHash::LEN] bytes
     /// - state_hash: [BlockHash::LEN] bytes
     fn user_commands_slot_sort_cf(&self) -> &ColumnFamily {
         self.database

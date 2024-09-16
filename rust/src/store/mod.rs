@@ -404,11 +404,13 @@ impl IndexerStore {
 mod store_tests {
     use crate::{
         block::BlockHash,
-        command::signed::TXN_HASH_LEN,
         ledger::public_key::PublicKey,
-        utility::store::{
-            pk_txn_sort_key, pk_txn_sort_key_prefix, txn_sort_key, u32_prefix_key, u64_prefix_key,
-            U32_LEN, U64_LEN,
+        utility::{
+            store::{
+                pk_txn_sort_key, pk_txn_sort_key_prefix, txn_sort_key, u32_prefix_key,
+                u64_prefix_key, U32_LEN, U64_LEN,
+            },
+            txn::TxnHash,
         },
     };
 
@@ -416,12 +418,12 @@ mod store_tests {
     fn test_txn_sort_key() {
         let prefix = 99;
         let state_hash = BlockHash::default();
-        let txn_hash = "a".repeat(TXN_HASH_LEN);
+        let txn_hash = "a".repeat(TxnHash::LEN);
         let key = txn_sort_key(prefix, &txn_hash, &state_hash);
 
         assert_eq!(&key[..U32_LEN], &prefix.to_be_bytes());
-        assert_eq!(&key[U32_LEN..][..TXN_HASH_LEN], txn_hash.as_bytes());
-        assert_eq!(&key[U32_LEN..][TXN_HASH_LEN..], state_hash.0.as_bytes());
+        assert_eq!(&key[U32_LEN..][..TxnHash::LEN], txn_hash.as_bytes());
+        assert_eq!(&key[U32_LEN..][TxnHash::LEN..], state_hash.0.as_bytes());
     }
 
     #[test]
@@ -429,7 +431,7 @@ mod store_tests {
         let sort = 500;
         let nonce = 987654321;
         let pk = PublicKey::default();
-        let txn_hash = "b".repeat(TXN_HASH_LEN);
+        let txn_hash = "b".repeat(TxnHash::LEN);
         let state_hash = BlockHash::default();
         let key = pk_txn_sort_key(&pk, sort, nonce, &txn_hash, &state_hash);
 
@@ -440,11 +442,11 @@ mod store_tests {
             &nonce.to_be_bytes()
         );
         assert_eq!(
-            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TXN_HASH_LEN],
+            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::LEN],
             txn_hash.as_bytes()
         );
         assert_eq!(
-            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][TXN_HASH_LEN..],
+            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][TxnHash::LEN..],
             state_hash.0.as_bytes()
         );
     }
