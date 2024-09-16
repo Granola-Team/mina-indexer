@@ -39,6 +39,19 @@ pub fn pk_block_sort_key(
     key
 }
 
+/// Key format
+/// ```
+/// {prefix}{num}
+/// where
+/// - prefix: u32 BE bytes (blockchain length, global slot, etc)
+/// - num:    u32 BE bytes
+pub fn block_num_key(prefix: u32, num: u32) -> [u8; U32_LEN + U32_LEN] {
+    let mut key = [0; U32_LEN + U32_LEN];
+    key[..U32_LEN].copy_from_slice(&prefix.to_be_bytes());
+    key[U32_LEN..].copy_from_slice(&num.to_be_bytes());
+    key
+}
+
 #[cfg(test)]
 mod block_store_impl_tests {
     use super::*;
