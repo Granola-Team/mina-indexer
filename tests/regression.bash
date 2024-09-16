@@ -50,7 +50,7 @@ shutdown_idxr() {
     # The shutdown command succeeded. Give a the process a generous amount of
     # time to exit cleanly. If this gets too big, then we don't really shut
     # down correctly.
-    sleep 5
+    sleep 3
 
     # Either it timed out, or that PID did not exist.
     if ps -p "$(cat ./idxr_pid)" >/dev/null; then
@@ -66,6 +66,7 @@ shutdown_idxr() {
 
     echo "Deleting PID file."
     rm -f ./idxr_pid
+    sleep 1
 }
 
 ephemeral_port() {
@@ -1481,7 +1482,7 @@ test_clean_kill() {
     kill "$PID"
 
     # We must give the process a chance to die cleanly.
-    sleep 3
+    sleep 5
 
     # If the process is still there, it's a fail.
     if ps -p "$PID" >/dev/null; then
