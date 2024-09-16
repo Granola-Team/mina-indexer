@@ -65,6 +65,7 @@
             rubyPackages.standard
             rust
             shellcheck
+            shfmt
           ] ++ buildDependencies;
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
