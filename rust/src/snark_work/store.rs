@@ -22,7 +22,7 @@ pub trait SnarkStore {
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>>;
 
     /// Get number of blocks which pk is a SNARK work prover
-    fn get_pk_num_prover_blocks(&self, pk: &str) -> anyhow::Result<Option<u32>>;
+    fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
     /// Update top snark work producers
     fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()>;

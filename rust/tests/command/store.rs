@@ -5,18 +5,16 @@ use mina_indexer::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
     },
-    command::{
-        signed::SignedCommand,
-        store::{
-            user_commands_iterator_state_hash, user_commands_iterator_txn_hash,
-            user_commands_iterator_u32_prefix, UserCommandStore,
-        },
-    },
+    command::{signed::SignedCommand, store::UserCommandStore},
     constants::*,
     ledger::genesis::parse_file,
     server::IndexerVersion,
     state::IndexerState,
     store::*,
+    utility::store::command::user::{
+        user_commands_iterator_state_hash, user_commands_iterator_txn_hash,
+        user_commands_iterator_u32_prefix,
+    },
 };
 use speedb::IteratorMode;
 use std::{path::PathBuf, sync::Arc};

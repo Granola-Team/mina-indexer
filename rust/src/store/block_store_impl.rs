@@ -19,8 +19,8 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     utility::store::{
-        block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, state_hash_suffix,
-        u32_prefix_key, u64_from_be_bytes, U64_LEN,
+        block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, pk_index_key,
+        state_hash_suffix, u32_prefix_key, u64_from_be_bytes, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
@@ -557,7 +557,7 @@ impl BlockStore for IndexerStore {
         // add the new key-value pair
         batch.put_cf(
             self.blocks_at_height_cf(),
-            format!("{blockchain_length}-{num_blocks_at_height}"),
+            block_num_key(blockchain_length, num_blocks_at_height),
             state_hash.0.as_bytes(),
         );
         Ok(())
@@ -570,7 +570,7 @@ impl BlockStore for IndexerStore {
         for n in 0..num_blocks_at_height {
             match self.database.get_cf(
                 self.blocks_at_height_cf(),
-                format!("{blockchain_length}-{n}"),
+                block_num_key(blockchain_length, n),
             )? {
                 None => break,
                 Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
@@ -607,7 +607,7 @@ impl BlockStore for IndexerStore {
         // add the new key-value pair
         batch.put_cf(
             self.blocks_at_global_slot_cf(),
-            format!("{slot}-{num_blocks_at_slot}"),
+            block_num_key(slot, num_blocks_at_slot),
             state_hash.0.as_bytes(),
         );
         Ok(())
@@ -615,34 +615,28 @@ impl BlockStore for IndexerStore {
 
     fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting blocks at slot {slot}");
-
-        let num_blocks_at_slot = self.get_num_blocks_at_slot(slot)?;
         let mut blocks = vec![];
 
-        for n in 0..num_blocks_at_slot {
+        for n in 0..self.get_num_blocks_at_slot(slot)? {
             match self
                 .database
-                .get_cf(self.blocks_at_global_slot_cf(), format!("{slot}-{n}"))?
+                .get_cf(self.blocks_at_global_slot_cf(), block_num_key(slot, n))?
             {
                 None => break,
                 Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
             }
         }
+
         blocks.sort_by(|a, b| block_cmp(self, a, b));
         Ok(blocks)
     }
 
     fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32> {
         trace!("Getting number of blocks at public key {pk}");
-        Ok(
-            match self
-                .database
-                .get_pinned_cf(self.blocks_cf(), pk.to_string().as_bytes())?
-            {
-                None => 0,
-                Some(bytes) => String::from_utf8(bytes.to_vec())?.parse()?,
-            },
-        )
+        Ok(self
+            .database
+            .get_cf(self.blocks_cf(), pk.0.as_bytes())?
+            .map_or(0, from_be_bytes))
     }
 
     fn add_block_at_public_key_batch(
@@ -657,43 +651,39 @@ impl BlockStore for IndexerStore {
         let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
         batch.put_cf(
             self.blocks_cf(),
-            pk.to_string().as_bytes(),
-            (num_blocks_at_pk + 1).to_string().as_bytes(),
+            pk.0.as_bytes(),
+            (num_blocks_at_pk + 1).to_be_bytes(),
         );
 
         // add the new key-value pair
-        let key = format!("{pk}-{num_blocks_at_pk}");
         batch.put_cf(
             self.blocks_cf(),
-            key.as_bytes(),
-            state_hash.to_string().as_bytes(),
+            pk_index_key(pk, num_blocks_at_pk),
+            state_hash.0.as_bytes(),
         );
         Ok(())
     }
 
     fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting blocks at public key {pk}");
-
-        let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
         let mut blocks = vec![];
 
-        for n in 0..num_blocks_at_pk {
-            let key = format!("{pk}-{n}");
+        for n in 0..self.get_num_blocks_at_public_key(pk)? {
             match self
                 .database
-                .get_pinned_cf(self.blocks_cf(), key.as_bytes())?
+                .get_cf(self.blocks_cf(), pk_index_key(pk, n))?
             {
                 None => break,
                 Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
             }
         }
+
         blocks.sort_by(|a, b| block_cmp(self, a, b));
         Ok(blocks)
     }
 
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting children of block {state_hash}");
-
         if let Some(height) = self
             .get_block(state_hash)?
             .map(|(b, _)| b.blockchain_length())

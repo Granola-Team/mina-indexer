@@ -6,7 +6,10 @@ use crate::{
     },
     canonicity::Canonicity,
     chain::Network,
-    command::{signed::SignedCommand, UserCommandWithStatus, UserCommandWithStatusT},
+    command::{
+        signed::{SignedCommand, TxnHash},
+        UserCommandWithStatus, UserCommandWithStatusT,
+    },
     constants::{berkeley::*, *},
     ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
     mina_blocks::{common::from_str, v2},
@@ -605,7 +608,7 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn command_hashes(&self) -> Vec<String> {
+    pub fn command_hashes(&self) -> Vec<TxnHash> {
         SignedCommand::from_precomputed(self)
             .iter()
             .filter_map(|cmd| cmd.signed_command.hash_signed_command().ok())

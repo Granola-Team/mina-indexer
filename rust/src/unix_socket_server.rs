@@ -5,7 +5,9 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     client::*,
-    command::{internal::store::InternalCommandStore, signed, store::UserCommandStore, Command},
+    command::{
+        internal::store::InternalCommandStore, signed::TxnHash, store::UserCommandStore, Command,
+    },
     ledger::{
         self,
         public_key::{self, PublicKey},
@@ -997,8 +999,9 @@ pub async fn handle_connection(
                 }
                 Transactions::Hash { hash, verbose } => {
                     info!("Received tx-hash command for {hash}");
-                    if !signed::is_valid_tx_hash(&hash) {
-                        invalid_tx_hash(&hash)
+                    let hash = TxnHash(hash);
+                    if !TxnHash::is_valid(&hash) {
+                        invalid_tx_hash(&hash.0)
                     } else {
                         db.get_user_command(&hash, 0)?.map(|cmd| {
                             if verbose {
@@ -1090,9 +1093,9 @@ pub async fn handle_connection(
                     if !block::is_valid_state_hash(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
-                        let internal_cmds_str = serde_json::to_string_pretty(
-                            &db.get_internal_commands(state_hash.clone().into())?,
-                        )?;
+                        let state_hash = BlockHash(state_hash);
+                        let internal_cmds_str =
+                            serde_json::to_string_pretty(&db.get_internal_commands(&state_hash)?)?;
 
                         if path.is_none() {
                             debug!("Writing block internal commands for {state_hash} to stdout");

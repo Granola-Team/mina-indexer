@@ -1,13 +1,11 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{signed::SignedCommandWithData, UserCommandWithStatus},
-    ledger::public_key::PublicKey,
-    utility::{
-        store::{u32_from_be_bytes, U32_LEN},
-        txn::TxnHash,
+    command::{
+        signed::{SignedCommandWithData, TxnHash},
+        UserCommandWithStatus,
     },
+    ledger::public_key::PublicKey,
 };
-use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
@@ -37,14 +35,14 @@ pub trait UserCommandStore {
     /// Get user command by its hash & index
     fn get_user_command(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         index: u32,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
     /// Get user command by its hash & containing block
     fn get_user_command_state_hash(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
@@ -68,20 +66,20 @@ pub trait UserCommandStore {
     fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get state hashes of blocks containing `txn_hash` in block sorted order
     fn get_user_command_state_hashes(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<Vec<BlockHash>>>;
 
     /// Get number of blocks containing `txn_hash`
     fn get_user_commands_num_containing_blocks(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<u32>>;
 
     /// Write the account's user commands to a CSV file
@@ -169,28 +167,4 @@ pub trait UserCommandStore {
         command: &UserCommandWithStatus,
         epoch: u32,
     ) -> anyhow::Result<()>;
-}
-
-/// u32 prefix from `key`
-/// - keep the first U32_LEN bytes
-/// - used for global slot & block height
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
-    u32_from_be_bytes(&key[..U32_LEN]).expect("u32 bytes")
-}
-
-/// Transaction hash from `key`
-/// - discard 4 bytes, keep [TxnHash::LEN] bytes
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
-    String::from_utf8(key[4..(4 + TxnHash::LEN)].to_vec())
-        .map_err(|e| anyhow!("Error reading txn hash: {e}"))
-}
-
-/// State hash from `key`
-/// - discard the first 4 + [TxnHash::LEN] bytes
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[(4 + TxnHash::LEN)..])
-        .map_err(|e| anyhow!("Error reading state hash: {e}"))
 }
