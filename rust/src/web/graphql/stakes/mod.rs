@@ -389,8 +389,8 @@ impl StakeQueryInput {
         stakes_ledger_account: &StakesLedgerAccountWithMeta,
     ) -> bool {
         if let Some(query) = query {
-            if let Some(stakes_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
-                if stakes_ledger_account.delegation_totals.total_delegated > stakes_lte {
+            if let Some(stake_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
+                if stake_ledger_account.delegation_totals.total_delegated > stake_lte {
                     return false;
                 }
             }
