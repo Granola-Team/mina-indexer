@@ -12,7 +12,13 @@ use crate::{
         SignedCommandPayloadBody, StakeDelegation,
     },
     store::IndexerStore,
-    utility::store::{pk_key_prefix, pk_txn_sort_key_prefix, state_hash_suffix, txn_hash_of_key},
+    utility::store::{
+        command::user::{
+            pk_txn_sort_key_prefix, txn_hash_of_key, user_commands_iterator_state_hash,
+            user_commands_iterator_txn_hash,
+        },
+        pk_key_prefix, state_hash_suffix,
+    },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use anyhow::Context as aContext;

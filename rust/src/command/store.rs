@@ -5,9 +5,7 @@ use crate::{
         UserCommandWithStatus,
     },
     ledger::public_key::PublicKey,
-    utility::store::{u32_from_be_bytes, U32_LEN},
 };
-use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
@@ -169,28 +167,4 @@ pub trait UserCommandStore {
         command: &UserCommandWithStatus,
         epoch: u32,
     ) -> anyhow::Result<()>;
-}
-
-/// u32 prefix from `key`
-/// - keep the first U32_LEN bytes
-/// - used for global slot & block height
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
-    u32_from_be_bytes(&key[..U32_LEN]).expect("u32 bytes")
-}
-
-/// Transaction hash from `key`
-/// - discard 4 bytes, keep [TxnHash::LEN] bytes
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<String> {
-    String::from_utf8(key[4..(4 + TxnHash::LEN)].to_vec())
-        .map_err(|e| anyhow!("Error reading txn hash: {e}"))
-}
-
-/// State hash from `key`
-/// - discard the first 4 + [TxnHash::LEN] bytes
-/// - [user_commands_slot_iterator] & [user_commands_height_iterator]
-pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[(4 + TxnHash::LEN)..])
-        .map_err(|e| anyhow!("Error reading state hash: {e}"))
 }
