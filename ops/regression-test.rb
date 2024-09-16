@@ -1,18 +1,17 @@
 #! /usr/bin/env -S ruby -w
-# frozen_string_literal: true
 
 # -*- mode: ruby -*-
 
-VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
+VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
-BUILD_TYPE = 'debug'
+BUILD_TYPE = "debug"
 
-require 'fileutils'
+require "fileutils"
 
 # clean up dev directory
-if ARGV.length == 1 && ARGV[0] == 'clean-dev'
+if ARGV.length == 1 && ARGV[0] == "clean-dev"
   puts "Removing #{DEV_DIR}/rev-*"
-  FileUtils.rm_rf Dir.glob("#{DEV_DIR}/rev-*")
+  FileUtils.rm_rf(Dir.glob("#{DEV_DIR}/rev-*"))
   return
 end
 
@@ -68,18 +67,18 @@ test_names = %w[
   hurl
 ]
 
-puts 'Regression testing...'
+puts "Regression testing..."
 BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
 IDXR_EXE = ARGV.shift
 tests = if ARGV.empty?
-          # Run all tests, but not the long-running ones.
-          test_names
-        elsif ARGV.length == 2 && ARGV.first == 'continue'
-          # Run the supplied test and remaining
-          test_names.drop_while { |test| test != ARGV.last }
-        else
-          ARGV
-        end
+  # Run all tests, but not the long-running ones.
+  test_names
+elsif ARGV.length == 2 && ARGV.first == "continue"
+  # Run the supplied test and remaining
+  test_names.drop_while { |test| test != ARGV.last }
+else
+  ARGV
+end
 
 def cleanup_idxr_pid
   pid_file = "#{BASE_DIR}/idxr_pid"
@@ -87,8 +86,8 @@ def cleanup_idxr_pid
 
   pid = File.read pid_file
   begin
-    Process.kill('HUP', pid.to_i)
-  rescue StandardError
+    Process.kill("HUP", pid.to_i)
+  rescue
     nil
   end
   File.unlink pid_file
@@ -101,8 +100,8 @@ def cleanup_database_pid
 
   pid = File.read pid_file
   begin
-    Process.kill('HUP', pid.to_i)
-  rescue StandardError
+    Process.kill("HUP", pid.to_i)
+  rescue
     nil
   end
   sleep 1 # Give it a chance to shut down.
@@ -110,13 +109,13 @@ end
 
 def remove_dirs
   %w[epoch_42_ledger.json epoch_0_staking_delegations.json epoch_0_ledger.json
-     mina-indexer.sock].each do |f|
+    mina-indexer.sock].each do |f|
     target = "#{BASE_DIR}/#{f}"
-    FileUtils.rm_f target
+    FileUtils.rm_f(target)
   end
   %w[blocks staking-ledgers database].each do |f|
     target = "#{BASE_DIR}/#{f}"
-    FileUtils.rm_rf target
+    FileUtils.rm_rf(target)
   end
 end
 
@@ -134,4 +133,4 @@ tests.each do |tn|
   test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{IDXR_EXE} test_#{tn}")
 end
 
-puts 'Regression testing complete.'
+puts "Regression testing complete."

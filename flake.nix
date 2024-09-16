@@ -62,7 +62,7 @@
             nixfmt-classic
             rclone
             ruby
-            rubyPackages.rubocop
+            rubyPackages.standard
             rust
             shellcheck
           ] ++ buildDependencies;

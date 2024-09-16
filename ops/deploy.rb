@@ -1,29 +1,28 @@
 #! /usr/bin/env -S ruby -w
-# frozen_string_literal: true
 
 DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
 BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
 BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
 WEB_PORT = ARGV[3] || 8080  # optional web port for server
 
-VOLUMES_DIR = ENV['VOLUMES_DIR'] || '/mnt'
+VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 
-require 'fileutils'
+require "fileutils"
 require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
 
 abort "Error: BASE_DIR must exist to perform the deployment." unless File.exist?(BASE_DIR)
 
 # Check if we're just cleaning up BASE_DIR files
 #
-if ARGV.length == 3 && ARGV[-2] == 'clean'
+if ARGV.length == 3 && ARGV[-2] == "clean"
   idxr_cleanup(ARGV.last)
   return
 end
 
 # Check if we're shutting down a running indexer
 #
-if ARGV.length == 3 && ARGV[-2] == 'shutdown'
+if ARGV.length == 3 && ARGV[-2] == "shutdown"
   idxr_shutdown(ARGV.last)
   return
 end
@@ -43,82 +42,82 @@ fetch_ledgers
 # Create the database, if needed.
 #
 unless File.exist?(db_dir(BLOCKS_COUNT))
-  puts 'Creating database...'
+  puts "Creating database..."
 
-  if BUILD_TYPE == 'debug'
-    puts 'Ingest staking ledgers? (y/n)'
-    ingest_staking_ledgers = STDIN.gets[0].downcase
-    while !['n', 'y'].include? ingest_staking_ledgers
-      warn('Invalid response')
-      puts 'Ingest staking ledgers? (y/n)'
-      ingest_staking_ledgers = STDIN.gets[0].downcase
+  if BUILD_TYPE == "debug"
+    puts "Ingest staking ledgers? (y/n)"
+    ingest_staking_ledgers = $stdin.gets[0].downcase
+    until ["n", "y"].include? ingest_staking_ledgers
+      warn("Invalid response")
+      puts "Ingest staking ledgers? (y/n)"
+      ingest_staking_ledgers = $stdin.gets[0].downcase
     end
 
-    puts 'Ingest orphan blocks? (y/n)'
-    ingest_orphan_blocks = STDIN.gets[0].downcase
-    while !['n', 'y'].include? ingest_orphan_blocks
-      warn('Invalid response')
-      puts 'Ingest staking ledgers? (y/n)'
-      ingest_orphan_blocks = STDIN.gets[0].downcase
+    puts "Ingest orphan blocks? (y/n)"
+    ingest_orphan_blocks = $stdin.gets[0].downcase
+    until ["n", "y"].include? ingest_orphan_blocks
+      warn("Invalid response")
+      puts "Ingest staking ledgers? (y/n)"
+      ingest_orphan_blocks = $stdin.gets[0].downcase
     end
 
-    ingest_staking_ledgers = ingest_staking_ledgers == 'y'
-    ingest_orphan_blocks = ingest_orphan_blocks == 'y'
+    ingest_staking_ledgers = ingest_staking_ledgers == "y"
+    ingest_orphan_blocks = ingest_orphan_blocks == "y"
 
     if !ingest_staking_ledgers && !ingest_orphan_blocks
       system(
         EXE,
-        'database', 'create',
-        '--log-level', 'DEBUG',
-        '--ledger-cadence', '5000',
-        '--database-dir', db_dir(BLOCKS_COUNT),
-        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-        '--do-not-ingest-orphan-blocks',
+        "database", "create",
+        "--log-level", "DEBUG",
+        "--ledger-cadence", "5000",
+        "--database-dir", db_dir(BLOCKS_COUNT),
+        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+        "--do-not-ingest-orphan-blocks"
       )
     elsif !ingest_staking_ledgers && ingest_orphan_blocks
       system(
         EXE,
-        'database', 'create',
-        '--log-level', 'DEBUG',
-        '--ledger-cadence', '5000',
-        '--database-dir', db_dir(BLOCKS_COUNT),
-        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
+        "database", "create",
+        "--log-level", "DEBUG",
+        "--ledger-cadence", "5000",
+        "--database-dir", db_dir(BLOCKS_COUNT),
+        "--blocks-dir", blocks_dir(BLOCKS_COUNT)
       )
     elsif ingest_staking_ledgers && !ingest_orphan_blocks
       system(
         EXE,
-        'database', 'create',
-        '--log-level', 'DEBUG',
-        '--ledger-cadence', '5000',
-        '--database-dir', db_dir(BLOCKS_COUNT),
-        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-        '--staking-ledgers-dir', LEDGERS_DIR,
-        '--do-not-ingest-orphan-blocks',
+        "database", "create",
+        "--log-level", "DEBUG",
+        "--ledger-cadence", "5000",
+        "--database-dir", db_dir(BLOCKS_COUNT),
+        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+        "--staking-ledgers-dir", LEDGERS_DIR,
+        "--do-not-ingest-orphan-blocks"
       )
     else
       system(
         EXE,
-        'database', 'create',
-        '--log-level', 'DEBUG',
-        '--ledger-cadence', '5000',
-        '--database-dir', db_dir(BLOCKS_COUNT),
-        '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-        '--staking-ledgers-dir', LEDGERS_DIR,
+        "database", "create",
+        "--log-level", "DEBUG",
+        "--ledger-cadence", "5000",
+        "--database-dir", db_dir(BLOCKS_COUNT),
+        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+        "--staking-ledgers-dir", LEDGERS_DIR
       )
     end
   else
     system(
       EXE,
-      'database', 'create',
-      '--log-level', 'DEBUG',
-      '--ledger-cadence', '5000',
-      '--database-dir', db_dir(BLOCKS_COUNT),
-      '--blocks-dir', blocks_dir(BLOCKS_COUNT),
-      '--staking-ledgers-dir', LEDGERS_DIR,
-      '--do-not-ingest-orphan-blocks',
+      "database", "create",
+      "--log-level", "DEBUG",
+      "--ledger-cadence", "5000",
+      "--database-dir", db_dir(BLOCKS_COUNT),
+      "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+      "--staking-ledgers-dir", LEDGERS_DIR,
+      "--do-not-ingest-orphan-blocks"
     )
-  end || abort('database creation failed')
-  puts 'Database creation succeeded.'
+  end || abort("database creation failed")
+  puts "Database creation succeeded."
 end
 
 # Terminate the current version, if any.
@@ -129,8 +128,8 @@ if File.exist? CURRENT
     socket = "#{BASE_DIR}/mina-indexer-#{current}.sock"
     system(
       EXE,
-      '--socket', socket,
-      'server', 'shutdown'
+      "--socket", socket,
+      "server", "shutdown"
     ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
 
     # Maybe the shutdown worked, maybe it didn't. Either way, give the process
@@ -143,18 +142,18 @@ end
 #
 File.write CURRENT, REV
 
-if DEPLOY_TYPE == 'test'
-  puts 'Restarting server...'
+if DEPLOY_TYPE == "test"
+  puts "Restarting server..."
   PORT = random_port
   pid = spawn EXE +
-              " --socket #{SOCKET} " \
-              ' server start' \
-              ' --log-level DEBUG' \
-              " --web-port #{PORT}" \
-              " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-              " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+    " --socket #{SOCKET} " \
+    " server start" \
+    " --log-level DEBUG" \
+    " --web-port #{PORT}" \
+    " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+    " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   wait_for_socket(10)
-  puts 'Server restarted.'
+  puts "Server restarted."
 
   # Create an indexer db snapshot to restore from later
   #
@@ -162,27 +161,27 @@ if DEPLOY_TYPE == 'test'
   config_snapshots_dir
   system(
     EXE,
-    '--socket', SOCKET,
-    'database', 'snapshot',
-    '--output-path', snapshot_path(BLOCKS_COUNT)
-  ) || abort('Snapshot creation failed. Aborting.')
-  puts 'Snapshot complete.'
+    "--socket", SOCKET,
+    "database", "snapshot",
+    "--output-path", snapshot_path(BLOCKS_COUNT)
+  ) || abort("Snapshot creation failed. Aborting.")
+  puts "Snapshot complete."
 
   # Compare the indexer best ledger with the Mina pre-hardfork ledger
   #
-  puts 'Attempting ledger extraction...'
+  puts "Attempting ledger extraction..."
   unless system(
     EXE,
-    '--socket', SOCKET,
-    'ledgers',
-    'height',
-    '--height', BLOCKS_COUNT.to_s,
-    '--path', "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
+    "--socket", SOCKET,
+    "ledgers",
+    "height",
+    "--height", BLOCKS_COUNT.to_s,
+    "--path", "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
   )
-    warn('Ledger extraction failed.')
+    warn("Ledger extraction failed.")
     success = false
   end
-  puts 'Ledger extraction complete.'
+  puts "Ledger extraction complete."
 
   puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
   IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
@@ -215,24 +214,24 @@ if DEPLOY_TYPE == 'test'
   restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
   unless system(
     EXE,
-    'database', 'restore',
-    '--snapshot-file', snapshot_path(BLOCKS_COUNT),
-    '--restore-dir', restore_path
+    "database", "restore",
+    "--snapshot-file", snapshot_path(BLOCKS_COUNT),
+    "--restore-dir", restore_path
   )
-    warn('Snapshot restore failed.')
+    warn("Snapshot restore failed.")
     success = false
   end
-  puts 'Snapshot restore complete.'
+  puts "Snapshot restore complete."
 
   # Shutdown indexer
   #
-  puts 'Initiating shutdown...'
+  puts "Initiating shutdown..."
   unless system(
     EXE,
-    '--socket', SOCKET,
-    'shutdown'
+    "--socket", SOCKET,
+    "shutdown"
   )
-    warn('Shutdown failed after snapshot.')
+    warn("Shutdown failed after snapshot.")
     success = false
   end
   Process.wait(pid)
@@ -278,13 +277,13 @@ else
     # I am the child. (The child gets a nil return value.)
     Process.setsid
     pid = spawn EXE +
-                " --socket #{SOCKET} " \
-                ' server start' \
-                ' --log-level DEBUG' \
-                ' --web-hostname 0.0.0.0' \
-                " --web-port #{WEB_PORT}" \
-                " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-                " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+      " --socket #{SOCKET} " \
+      " server start" \
+      " --log-level DEBUG" \
+      " --web-hostname 0.0.0.0" \
+      " --web-port #{WEB_PORT}" \
+      " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+      " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     Process.detach pid
     puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
   end

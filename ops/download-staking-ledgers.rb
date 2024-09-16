@@ -1,5 +1,4 @@
 #! /usr/bin/env -S ruby -w
-# frozen_string_literal: true
 
 # -*- mode: ruby -*-
 
@@ -8,7 +7,7 @@
 
 DEST = ARGV[0]
 
-require 'fileutils'
+require "fileutils"
 
 clone_exe = "#{__dir__}/granola-rclone.rb"
 
@@ -23,8 +22,8 @@ unless File.exist?(ledgers_list)
   warn "download-staking-ledgers issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
-    a_split = a.split('-')
-    b_split = b.split('-')
+    a_split = a.split("-")
+    b_split = b.split("-")
     a_num = a_split[1].to_i
     b_num = b_split[1].to_i
     if a_num < b_num
@@ -48,15 +47,15 @@ end
 if fetch.empty?
   warn "All files already present in #{DEST}."
 else
-  File.write('ledgers-to-fetch.list', fetch.join("\n"))
+  File.write("ledgers-to-fetch.list", fetch.join("\n"))
   system(
     clone_exe,
-    'sync',
-    'linode:granola-mina-staking-ledgers',
-    '--files-from-raw', 'ledgers-to-fetch.list',
+    "sync",
+    "linode:granola-mina-staking-ledgers",
+    "--files-from-raw", "ledgers-to-fetch.list",
     DEST
-  ) || abort('Files sync failed in download-mina-staking-ledgers.rb')
-  File.delete('ledgers-to-fetch.list')
+  ) || abort("Files sync failed in download-mina-staking-ledgers.rb")
+  File.delete("ledgers-to-fetch.list")
 
   # Files should be read-only.
   #

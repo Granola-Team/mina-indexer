@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
-require 'fileutils'
-require 'json'
+require "fileutils"
+require "json"
 
 # NOTE: expects BASE_DIR & BUILD_TYPE to be defined.
 
@@ -20,7 +18,7 @@ end
 # Base directory
 
 def config_base_dir
-  FileUtils.mkdir_p BASE_DIR
+  FileUtils.mkdir_p(BASE_DIR)
 end
 
 # Logs
@@ -28,7 +26,7 @@ end
 LOGS_DIR = "#{BASE_DIR}/logs/#{REV}"
 
 def config_log_dir
-  FileUtils.mkdir_p LOGS_DIR
+  FileUtils.mkdir_p(LOGS_DIR)
 end
 
 # Snapshots
@@ -46,7 +44,7 @@ end
 # Executable
 
 EXE_DIR = "#{BASE_DIR}/bin"
-EXE_SRC = if BUILD_TYPE == 'nix'
+EXE_SRC = if BUILD_TYPE == "nix"
   "#{SRC_TOP}/result/bin/mina-indexer"
 else
   "#{SRC_TOP}/rust/target/debug/mina-indexer"
@@ -54,7 +52,7 @@ end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
 def config_exe_dir
-  FileUtils.mkdir_p EXE_DIR
+  FileUtils.mkdir_p(EXE_DIR)
   return if File.exist?(EXE)
 
   FileUtils.cp EXE_SRC, EXE
@@ -79,7 +77,7 @@ LEDGERS_DIR = "#{BASE_DIR}/staking-ledgers"
 
 def fetch_ledgers
   system("#{SRC_TOP}/ops/download-staking-ledgers.rb", LEDGERS_DIR) ||
-    abort('Something went wrong with staking ledger downloads.')
+    abort("Something went wrong with staking ledger downloads.")
 end
 
 # Blocks
@@ -91,17 +89,17 @@ end
 def get_blocks(block_height)
   system(
     "#{SRC_TOP}/ops/download-mina-blocks.rb",
-    '1', # start block
+    "1", # start block
     block_height.to_s, # end block
     blocks_dir(block_height)
-  ) || abort('Downloading Mina blocks failed.')
+  ) || abort("Downloading Mina blocks failed.")
 end
 
 # Database directory
 
 v = JSON.parse(`#{EXE_SRC} database version --json`)
 DB_VERSION_JSON = v
-DB_VERSION = "#{v['major']}.#{v['minor']}.#{v['patch']}"
+DB_VERSION = "#{v["major"]}.#{v["minor"]}.#{v["patch"]}"
 
 def db_dir(block_height)
   "#{BASE_DIR}/db/#{DB_VERSION}-#{block_height}"
@@ -111,7 +109,7 @@ end
 
 def db_version_of_git_rev(rev)
   v = JSON.parse(`#{BASE_DIR}/bin/mina-indexer-#{rev} database version --json`)
-  return "#{v['major']}.#{v['minor']}.#{v['patch']}"
+  "#{v["major"]}.#{v["minor"]}.#{v["patch"]}"
 end
 
 def idxr_cleanup(rev)
@@ -139,8 +137,8 @@ def idxr_shutdown_via_socket(exe, socket)
 
   unless system(
     exe,
-    '--socket', socket,
-    'server', 'shutdown'
+    "--socket", socket,
+    "server", "shutdown"
   )
     warn("Shutdown failed despite #{socket} existing.")
     return
