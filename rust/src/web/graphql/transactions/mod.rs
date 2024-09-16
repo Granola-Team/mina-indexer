@@ -3,10 +3,8 @@ use crate::{
     block::store::BlockStore,
     command::{
         decode_memo,
-        signed::{self, SignedCommand, SignedCommandWithData},
-        store::{
-            user_commands_iterator_state_hash, user_commands_iterator_txn_hash, UserCommandStore,
-        },
+        signed::{self, SignedCommand, SignedCommandWithData, TxnHash},
+        store::UserCommandStore,
         CommandStatusData,
     },
     ledger::public_key::PublicKey,
@@ -36,7 +34,8 @@ impl TransactionsQueryRoot {
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
         if let Some(hash) = query.hash {
-            if signed::is_valid_tx_hash(&hash) {
+            let hash = TxnHash(hash);
+            if signed::TxnHash::is_valid(&hash) {
                 return Ok(db.get_user_command(&hash, 0)?.map(|cmd| {
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 }));
@@ -82,7 +81,7 @@ impl TransactionsQueryRoot {
         if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.clone()) {
             let query = query.expect("query input to exists");
             let mut transactions: Vec<Transaction> = vec![];
-            if let Ok(Some(state_hashes)) = db.get_user_command_state_hashes(&txn_hash) {
+            if let Ok(Some(state_hashes)) = db.get_user_command_state_hashes(&txn_hash.into()) {
                 transactions = state_hashes
                     .iter()
                     .flat_map(|state_hash| db.get_block(state_hash).expect("block"))
@@ -261,7 +260,9 @@ impl TransactionsQueryRoot {
         for (key, _) in iter.flatten() {
             if let Some(ref q) = query {
                 // early exit if txn hashes don't match if we're filtering by it
-                if q.hash.is_some() && q.hash != user_commands_iterator_txn_hash(&key).ok() {
+                if q.hash.is_some()
+                    && q.hash != user_commands_iterator_txn_hash(&key).ok().map(|t| t.0)
+                {
                     continue;
                 }
             }
@@ -368,7 +369,7 @@ impl TransactionWithoutBlock {
                     failure_reason,
                     fee,
                     from: PublicKey::from(sender).0,
-                    hash: cmd.tx_hash,
+                    hash: cmd.tx_hash.0,
                     kind: kind.to_string(),
                     memo: decode_memo(&common.memo.t.0),
                     nonce,

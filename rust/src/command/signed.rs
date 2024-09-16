@@ -4,12 +4,32 @@ use crate::{
         bin_prot,
         serialization_types::{staged_ledger_diff as mina_rs, version_bytes::V1_TXN_HASH},
     },
-    utility::txn::TxnHash,
 };
+use anyhow::bail;
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+pub struct TxnHash(pub String);
+
+impl TxnHash {
+    pub const LEN: usize = 53;
+    pub const PREFIX: &'static str = "Ckp";
+
+    pub fn new(txn_hash: &str) -> anyhow::Result<Self> {
+        let res = TxnHash(txn_hash.to_string());
+        if Self::is_valid(&res) {
+            return Ok(res);
+        }
+        bail!("Invalid txn hash {txn_hash}")
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.0.starts_with(TxnHash::PREFIX) && self.0.len() == TxnHash::LEN
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommand(pub mina_rs::SignedCommandV1);
@@ -32,7 +52,7 @@ pub struct SignedCommandWithData {
     pub command: SignedCommand,
     pub state_hash: BlockHash,
     pub status: CommandStatusData,
-    pub tx_hash: String,
+    pub tx_hash: TxnHash,
     pub blockchain_length: u32,
     pub date_time: u64,
     pub nonce: Nonce,
@@ -144,7 +164,7 @@ impl SignedCommand {
 
     /// This returns a user command (transaction) hash that starts with
     /// [TxnHash::PREFIX]
-    pub fn hash_signed_command(&self) -> anyhow::Result<String> {
+    pub fn hash_signed_command(&self) -> anyhow::Result<TxnHash> {
         let mut binprot_bytes = Vec::new();
         bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
 
@@ -152,16 +172,16 @@ impl SignedCommand {
             .with_check_version(0x13)
             .into_string();
         let mut hasher = blake2::Blake2bVar::new(32).unwrap();
-
         hasher.write_all(binprot_bytes_bs58.as_bytes()).unwrap();
 
         let mut hash = hasher.finalize_boxed().to_vec();
         hash.insert(0, hash.len() as u8);
         hash.insert(0, 1);
-
-        Ok(bs58::encode(hash)
-            .with_check_version(V1_TXN_HASH)
-            .into_string())
+        Ok(TxnHash(
+            bs58::encode(hash)
+                .with_check_version(V1_TXN_HASH)
+                .into_string(),
+        ))
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<SignedCommandWithCreationData> {
@@ -360,7 +380,7 @@ impl From<SignedCommandWithData> for serde_json::Value {
         use serde_json::*;
 
         let mut obj = Map::new();
-        let tx_hash = Value::String(value.tx_hash);
+        let tx_hash = Value::String(value.tx_hash.0);
         let state_hash = Value::String(value.state_hash.0);
         let command = value.command.into();
         let status = value.status.into();
@@ -529,13 +549,24 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
     Value::Object(payload_obj)
 }
 
-pub fn is_valid_tx_hash(input: &str) -> bool {
-    input.starts_with(TxnHash::PREFIX) && input.len() == TxnHash::LEN
+impl From<String> for TxnHash {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl std::fmt::Display for TxnHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
+    use crate::{
+        block::precomputed::{PcbVersion, PrecomputedBlock},
+        command::signed::TxnHash,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -548,8 +579,8 @@ mod tests {
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
         let hashes = precomputed_block.command_hashes();
         let expect = vec![
-            "CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string(),
-            "CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj".to_string(),
+            TxnHash::new("CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX").unwrap(),
+            TxnHash::new("CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj").unwrap(),
         ];
 
         assert_eq!(hashes, expect);

@@ -5,7 +5,7 @@ use super::{
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockComparison, BlockHash},
     command::{
-        signed::{SignedCommand, SignedCommandWithData},
+        signed::{SignedCommand, SignedCommandWithData, TxnHash},
         store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
@@ -48,7 +48,7 @@ impl UserCommandStore for IndexerStore {
             // add signed command
             batch.put_cf(
                 self.user_commands_cf(),
-                txn_block_key(&txn_hash, state_hash.clone()),
+                txn_block_key(&txn_hash, &state_hash),
                 serde_json::to_vec(&SignedCommandWithData::from(
                     command,
                     &state_hash.0,
@@ -82,7 +82,7 @@ impl UserCommandStore for IndexerStore {
             // so we can reconstruct the key
             batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
-                txn_hash.as_bytes(),
+                txn_hash.0.as_bytes(),
                 block.global_slot_since_genesis().to_be_bytes(),
             );
 
@@ -178,7 +178,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_user_command(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         index: u32,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting user command {txn_hash} index {index}");
@@ -195,34 +195,31 @@ impl UserCommandStore for IndexerStore {
 
     fn get_user_command_state_hash(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting user command {txn_hash} in block {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(
-                self.user_commands_cf(),
-                txn_block_key(txn_hash, state_hash.clone()),
-            )?
+            .get_pinned_cf(self.user_commands_cf(), txn_block_key(txn_hash, state_hash))?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     fn get_user_command_state_hashes(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<Vec<BlockHash>>> {
         trace!("Getting user command blocks {txn_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.user_command_state_hashes_cf(), txn_hash.as_bytes())?
+            .get_pinned_cf(self.user_command_state_hashes_cf(), txn_hash.0.as_bytes())?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
     fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting user command {txn_hash} block {state_hash}");
@@ -238,18 +235,18 @@ impl UserCommandStore for IndexerStore {
             .collect();
         block_cmps.sort();
 
-        let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         // set num containing blocks
+        let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
-            txn_hash.as_bytes(),
+            txn_hash.0.as_bytes(),
             (blocks.len() as u32).to_be_bytes(),
         );
 
         // set containing blocks
         batch.put_cf(
             self.user_command_state_hashes_cf(),
-            txn_hash.as_bytes(),
+            txn_hash.0.as_bytes(),
             serde_json::to_vec(&blocks)?,
         );
         Ok(())
@@ -361,14 +358,14 @@ impl UserCommandStore for IndexerStore {
 
     fn get_user_commands_num_containing_blocks(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<u32>> {
         trace!("Getting user commands num containing blocks {txn_hash}");
         Ok(self
             .database
             .get_cf(
                 self.user_commands_num_containing_blocks_cf(),
-                txn_hash.as_bytes(),
+                txn_hash.0.as_bytes(),
             )?
             .map(from_be_bytes))
     }
@@ -636,7 +633,7 @@ impl<'a> TxnCsvRecord<'a> {
             from: cmd.command.source_pk().0,
             to: cmd.command.receiver_pk().0,
             nonce: cmd.nonce.0,
-            hash: &cmd.tx_hash,
+            hash: &cmd.tx_hash.0,
             fee: cmd.command.fee(),
             amount: cmd.command.amount(),
             memo: cmd.command.memo(),

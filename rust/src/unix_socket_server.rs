@@ -5,7 +5,9 @@ use crate::{
     },
     canonicity::store::CanonicityStore,
     client::*,
-    command::{internal::store::InternalCommandStore, signed, store::UserCommandStore, Command},
+    command::{
+        internal::store::InternalCommandStore, signed::TxnHash, store::UserCommandStore, Command,
+    },
     ledger::{
         self,
         public_key::{self, PublicKey},
@@ -997,8 +999,9 @@ pub async fn handle_connection(
                 }
                 Transactions::Hash { hash, verbose } => {
                     info!("Received tx-hash command for {hash}");
-                    if !signed::is_valid_tx_hash(&hash) {
-                        invalid_tx_hash(&hash)
+                    let hash = TxnHash(hash);
+                    if !TxnHash::is_valid(&hash) {
+                        invalid_tx_hash(&hash.0)
                     } else {
                         db.get_user_command(&hash, 0)?.map(|cmd| {
                             if verbose {

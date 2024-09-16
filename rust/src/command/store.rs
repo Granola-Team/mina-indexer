@@ -1,11 +1,11 @@
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::{signed::SignedCommandWithData, UserCommandWithStatus},
-    ledger::public_key::PublicKey,
-    utility::{
-        store::{u32_from_be_bytes, U32_LEN},
-        txn::TxnHash,
+    command::{
+        signed::{SignedCommandWithData, TxnHash},
+        UserCommandWithStatus,
     },
+    ledger::public_key::PublicKey,
+    utility::store::{u32_from_be_bytes, U32_LEN},
 };
 use anyhow::anyhow;
 use speedb::{DBIterator, IteratorMode, WriteBatch};
@@ -37,14 +37,14 @@ pub trait UserCommandStore {
     /// Get user command by its hash & index
     fn get_user_command(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         index: u32,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
     /// Get user command by its hash & containing block
     fn get_user_command_state_hash(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
@@ -68,20 +68,20 @@ pub trait UserCommandStore {
     fn set_user_command_state_hash_batch(
         &self,
         state_hash: BlockHash,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get state hashes of blocks containing `txn_hash` in block sorted order
     fn get_user_command_state_hashes(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<Vec<BlockHash>>>;
 
     /// Get number of blocks containing `txn_hash`
     fn get_user_commands_num_containing_blocks(
         &self,
-        txn_hash: &str,
+        txn_hash: &TxnHash,
     ) -> anyhow::Result<Option<u32>>;
 
     /// Write the account's user commands to a CSV file
