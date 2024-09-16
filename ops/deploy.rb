@@ -13,20 +13,6 @@ require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
 
 abort "Error: BASE_DIR must exist to perform the deployment." unless File.exist?(BASE_DIR)
 
-# Check if we're just cleaning up BASE_DIR files
-#
-if ARGV.length == 3 && ARGV[-2] == "clean"
-  idxr_cleanup(ARGV.last)
-  return
-end
-
-# Check if we're shutting down a running indexer
-#
-if ARGV.length == 3 && ARGV[-2] == "shutdown"
-  idxr_shutdown(ARGV.last)
-  return
-end
-
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
 success = true
