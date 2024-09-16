@@ -51,6 +51,12 @@ async fn test() -> anyhow::Result<()> {
 
     assert_eq!(best_tip, best_tip_sync);
     assert_eq!(canonical_root, canonical_root_sync);
-    assert_eq!(state.blocks, state_sync.blocks);
+
+    for state_hash in state_sync.diffs_map.keys() {
+        assert_eq!(
+            state.diffs_map.get(state_hash),
+            state_sync.diffs_map.get(state_hash)
+        );
+    }
     Ok(())
 }

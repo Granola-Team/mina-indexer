@@ -17,7 +17,7 @@ use crate::{
         },
         Ledger, LedgerHash,
     },
-    utility::store::{balance_key_prefix, from_be_bytes, pk_key_prefix, U64_LEN},
+    utility::store::from_be_bytes,
 };
 use anyhow::{bail, Context};
 use log::{error, trace};
@@ -473,24 +473,6 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
         Ok(Some(Ledger { accounts }))
-    }
-
-    fn persist_best_ledger(&self) -> anyhow::Result<()> {
-        let state_hash = self.get_best_block_hash()?.expect("best block hash exists");
-        let block_height = self
-            .get_best_block_height()?
-            .expect("best block height exists");
-        trace!("Persisting best ledger (length {block_height}): {state_hash}");
-
-        for (key, account_serde_bytes) in self
-            .best_ledger_account_balance_iterator(IteratorMode::Start)
-            .flatten()
-        {
-            let balance = balance_key_prefix(&key);
-            let pk = pk_key_prefix(&key[U64_LEN..]);
-            self.set_staged_account_raw_bytes(&pk, &state_hash, balance, &account_serde_bytes)?;
-        }
-        Ok(())
     }
 
     ///////////////

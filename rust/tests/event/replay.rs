@@ -49,6 +49,6 @@ async fn test() -> anyhow::Result<()> {
         state.canonical_root_block(),
         new_state.canonical_root_block()
     );
-    assert_eq!(state.blocks, new_state.blocks);
+    assert_eq!(state.diffs_map, new_state.diffs_map);
     Ok(())
 }
