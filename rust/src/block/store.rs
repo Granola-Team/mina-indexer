@@ -327,15 +327,39 @@ pub trait BlockStore {
         epoch: Option<u32>,
     ) -> anyhow::Result<u32>;
 
+    /// Get the supercharged block production count for `pk` in `epoch`
+    /// (default: current epoch)
+    fn get_block_production_pk_supercharged_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
+
     /// Get the total block production count for `pk`
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
-    /// Get the total block production count for `epoch` (default: current
-    /// epoch)
+    /// Get the total supercharged block production count for `pk`
+    fn get_block_production_pk_supercharged_total_count(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<u32>;
+
+    /// Get the total block production count for `epoch`
+    /// (default: current epoch)
     fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
+
+    /// Get the total supercharged block production count for `epoch`
+    /// (default: current epoch)
+    fn get_block_production_supercharged_epoch_count(
+        &self,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
 
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
+
+    /// Get the total supercharged block production count
+    fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32>;
 
     ///////////////////////////////
     // Dump block store contents //
