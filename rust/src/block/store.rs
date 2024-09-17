@@ -319,9 +319,37 @@ pub trait BlockStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
+    /// Increment the epoch & pk block production counts
+    fn increment_block_production_count(
+        &self,
+        state_hash: &BlockHash,
+        creator: &PublicKey,
+        supercharged: bool,
+    ) -> anyhow::Result<()>;
+
+    /// Increment the epoch & pk canonical block production counts
+    fn increment_block_canonical_production_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<()>;
+
+    /// Decrement the epoch & pk canonical block production counts
+    fn decrement_block_canonical_production_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<()>;
+
     /// Get the block production count for `pk` in `epoch`
     /// (default: current epoch)
     fn get_block_production_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
+
+    /// Get the canonical block production count for `pk` in `epoch`
+    /// (default: current epoch)
+    fn get_block_production_pk_canonical_epoch_count(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
@@ -338,6 +366,9 @@ pub trait BlockStore {
     /// Get the total block production count for `pk`
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
+    /// Get the total canonical block production count for `pk`
+    fn get_block_production_pk_canonical_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
+
     /// Get the total supercharged block production count for `pk`
     fn get_block_production_pk_supercharged_total_count(
         &self,
@@ -348,6 +379,11 @@ pub trait BlockStore {
     /// (default: current epoch)
     fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
 
+    /// Get the total canonical block production count for `epoch`
+    /// (default: current epoch)
+    fn get_block_production_canonical_epoch_count(&self, epoch: Option<u32>)
+        -> anyhow::Result<u32>;
+
     /// Get the total supercharged block production count for `epoch`
     /// (default: current epoch)
     fn get_block_production_supercharged_epoch_count(
@@ -357,6 +393,10 @@ pub trait BlockStore {
 
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> anyhow::Result<u32>;
+
+    /// Get the total canoncial block production count,
+    /// i.e. length of the canonical chain
+    fn get_block_production_canonical_total_count(&self) -> anyhow::Result<u32>;
 
     /// Get the total supercharged block production count
     fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32>;

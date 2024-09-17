@@ -2,6 +2,8 @@ use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdat
 use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
+    command::internal::{store::InternalCommandStore, InternalCommandWithData},
+    constants::MAINNET_COINBASE_REWARD,
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
 };
@@ -19,6 +21,21 @@ impl CanonicityStore for IndexerStore {
     ) -> anyhow::Result<()> {
         if state_hash == genesis_state_hash && genesis_prev_state_hash.is_some() {
             trace!("Adding new genesis block (length {height}): {state_hash}");
+
+            // increment regular, canonical, & supercharged counts
+            self.increment_block_canonical_production_count(state_hash)?;
+            if let Ok(internal_commands) = self.get_internal_commands(state_hash) {
+                if let Some(InternalCommandWithData::Coinbase {
+                    receiver, amount, ..
+                }) = internal_commands.first()
+                {
+                    self.increment_block_production_count(
+                        state_hash,
+                        receiver,
+                        *amount > MAINNET_COINBASE_REWARD,
+                    )?;
+                }
+            }
         } else {
             trace!("Adding canonical block (length {height}): {state_hash}");
         }
@@ -173,6 +190,7 @@ impl CanonicityStore for IndexerStore {
             )?;
             self.database
                 .delete_cf(self.canonicity_slot_cf(), unapply.global_slot.to_be_bytes())?;
+            self.decrement_block_canonical_production_count(&unapply.state_hash)?;
         }
 
         // apply canonicities
@@ -188,6 +206,7 @@ impl CanonicityStore for IndexerStore {
                 apply.global_slot.to_be_bytes(),
                 apply.state_hash.0.as_bytes(),
             )?;
+            self.increment_block_canonical_production_count(&apply.state_hash)?;
         }
         Ok(())
     }
