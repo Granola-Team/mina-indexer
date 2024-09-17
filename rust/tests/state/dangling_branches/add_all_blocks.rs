@@ -1,24 +1,53 @@
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock},
+    constants::MINA_SCALE,
+    ledger::{
+        account::{Account, Amount},
+        genesis::{GenesisLedger, GenesisRoot},
+        public_key::PublicKey,
+        Ledger,
+    },
     state::IndexerState,
 };
 use std::path::PathBuf;
 
-/// Parses all blocks in ./tests/data/sequential_blocks
-/// Adds them to a fresh state
-/// Verifies the faithfullness of the correspondence between dangling branch
-/// `leaves` and the underlying tree's leaf blocks Verifies the length of the
-/// longest chain
+/// Parses all blocks in `./tests/data/sequential_blocks`
+/// - adds them to a fresh state
+/// - verifies the faithfullness of the correspondence between dangling branch
+/// `leaves` and the underlying tree's leaf blocks
+/// - verifies the length of the longest chain
 #[tokio::test]
 async fn extension() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
 
+    // root ledger
+    let genesis_ledger =
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+    let genesis_ledger: GenesisLedger = genesis_ledger.into();
+    let mut ledger: Ledger = genesis_ledger.into();
+
+    // add required accounts with sufficient balance
+    ledger.accounts.insert(
+        PublicKey::from("B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"),
+        Account {
+            balance: Amount(1000 * MINA_SCALE),
+            ..Default::default()
+        },
+    );
+    ledger.accounts.insert(
+        PublicKey::from("B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV"),
+        Account {
+            balance: Amount(1000 * MINA_SCALE),
+            ..Default::default()
+        },
+    );
+
     let mut n = 0;
     if let Some((block, block_bytes)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let mut state =
-            IndexerState::new_testing(&block, block_bytes, None, None, None, None, None)?;
+            IndexerState::new_testing(&block, block_bytes, Some(ledger), None, None, None, None)?;
         n += 1;
 
         while let Some((block, _)) = block_parser.next_block().await? {
