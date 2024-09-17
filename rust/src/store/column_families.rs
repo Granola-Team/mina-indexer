@@ -282,11 +282,20 @@ pub trait ColumnFamilyHelpers {
     /// CF for per epoch per account block prodution info
     fn block_production_pk_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for per epoch per account supercharged block prodution info
+    fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily;
+
     /// CF for per account total block prodution info
     fn block_production_pk_total_cf(&self) -> &ColumnFamily;
 
+    /// CF for per account total supercharged block prodution info
+    fn block_production_pk_supercharged_total_cf(&self) -> &ColumnFamily;
+
     /// CF for per epoch block production totals
     fn block_production_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch block production totals
+    fn block_production_supercharged_epoch_cf(&self) -> &ColumnFamily;
 
     /// CF for per block SNARK counts
     fn block_snark_counts_cf(&self) -> &ColumnFamily;

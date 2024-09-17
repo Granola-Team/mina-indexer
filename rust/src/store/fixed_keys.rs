@@ -14,6 +14,8 @@ pub trait FixedKeys {
     // indexed totals
     const TOTAL_NUM_ACCOUNTS_KEY: &'static [u8] = "total_num_accounts".as_bytes();
     const TOTAL_NUM_BLOCKS_KEY: &'static [u8] = "total_num_blocks".as_bytes();
+    const TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY: &'static [u8] =
+        "total_num_blocks_supercharged".as_bytes();
     const TOTAL_NUM_SNARKS_KEY: &'static [u8] = "total_num_snarks".as_bytes();
     const TOTAL_NUM_FEE_TRANSFERS_KEY: &'static [u8] = "total_num_fee_transfers".as_bytes();
     const TOTAL_NUM_USER_COMMANDS_KEY: &'static [u8] = "total_num_user_commands".as_bytes();

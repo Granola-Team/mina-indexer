@@ -816,6 +816,16 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-epoch column family exists")
     }
 
+    /// CF for storing per epoch per account supercharged block prodution info
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of superchargedblocks produced by pk in epoch
+    fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-supercharged-epoch")
+            .expect("block-production-pk-supercharged-epoch column family exists")
+    }
+
     /// CF for storing per account total block prodution info
     /// ```
     /// - key: pk
@@ -826,6 +836,16 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-total column family exists")
     }
 
+    /// CF for storing per account total supercharged block prodution info
+    /// ```
+    /// - key: pk
+    /// - value: total number of supercharged blocks produced by pk
+    fn block_production_pk_supercharged_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-supercharged-total")
+            .expect("block-production-pk-supercharged-total column family exists")
+    }
+
     /// CF for storing per epoch block production totals
     /// ```
     /// - key: epoch
@@ -834,6 +854,16 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-production-epoch")
             .expect("block-production-epoch column family exists")
+    }
+
+    /// CF for storing per epoch block production totals
+    /// ```
+    /// - key: epoch
+    /// - value: number of supercharged blocks produced in epoch
+    fn block_production_supercharged_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-supercharged-epoch")
+            .expect("block-production-supercharged-epoch column family exists")
     }
 
     /// CF for storing per block SNARK counts
