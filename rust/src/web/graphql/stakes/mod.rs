@@ -445,6 +445,8 @@ impl StakeQueryInput {
                     if *username != *acct_username {
                         return false;
                     }
+                } else {
+                    return false;
                 }
             }
             if let Some(delegate) = delegate {
@@ -527,7 +529,6 @@ impl StakesLedgerAccountWithMeta {
         let pk_total_num_internal_commands = db
             .get_internal_commands_pk_total_count(&pk)
             .expect("pk total num internal commands");
-
         let username = match db.get_username(&pk) {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
