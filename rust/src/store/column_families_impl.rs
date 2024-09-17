@@ -816,10 +816,20 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-epoch column family exists")
     }
 
+    /// CF for storing per epoch per account canonical block prodution info
+    /// ```
+    /// - key: {epoch BE bytes}{pk}
+    /// - value: number of canonical blocks produced by pk in epoch
+    fn block_production_pk_canonical_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-canonical-epoch")
+            .expect("block-production-pk-canonical-epoch column family exists")
+    }
+
     /// CF for storing per epoch per account supercharged block prodution info
     /// ```
     /// - key: {epoch BE bytes}{pk}
-    /// - value: number of superchargedblocks produced by pk in epoch
+    /// - value: number of supercharged blocks produced by pk in epoch
     fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-supercharged-epoch")
@@ -834,6 +844,16 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-production-pk-total")
             .expect("block-production-pk-total column family exists")
+    }
+
+    /// CF for storing per account total canonical block prodution info
+    /// ```
+    /// - key: pk
+    /// - value: total number of canonical blocks produced by pk
+    fn block_production_pk_canonical_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-canonical-total")
+            .expect("block-production-pk-canonical-total column family exists")
     }
 
     /// CF for storing per account total supercharged block prodution info
@@ -856,7 +876,17 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-epoch column family exists")
     }
 
-    /// CF for storing per epoch block production totals
+    /// CF for storing per epoch canonical block production totals
+    /// ```
+    /// - key: epoch
+    /// - value: number of canonical blocks produced in epoch
+    fn block_production_canonical_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-canonical-epoch")
+            .expect("block-production-canonical-epoch column family exists")
+    }
+
+    /// CF for storing per epoch supercharged block production totals
     /// ```
     /// - key: epoch
     /// - value: number of supercharged blocks produced in epoch
