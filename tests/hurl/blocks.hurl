@@ -510,7 +510,6 @@ query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryIn
 }
 
 variables {
-  "limit": 100,
   "sort_by": "BLOCKHEIGHT_DESC",
   "query": {
     "canonical": true,
@@ -522,7 +521,7 @@ HTTP 200
 [Asserts]
 
 # total data count
-jsonpath "$.data.blocks" count == 100
+jsonpath "$.data.blocks" count == 10
 
 #
 # Test for early exit condition when filtering use blockHeight_lte
@@ -561,10 +560,44 @@ jsonpath "$.data.blocks" count == 50
 
 POST {{url}}
 ```graphql
-{
+query Blocks {
   blocks(limit: 1) {
     epoch_num_blocks
+    epoch_num_canonical_blocks
+    epoch_num_supercharged_blocks
     total_num_blocks
+    total_num_canonical_blocks
+    total_num_supercharged_blocks
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 1
+
+# data counts
+jsonpath "$.data.blocks[0].epoch_num_blocks" == 204
+jsonpath "$.data.blocks[0].epoch_num_canonical_blocks" == 120
+jsonpath "$.data.blocks[0].epoch_num_supercharged_blocks" == 23
+
+jsonpath "$.data.blocks[0].total_num_blocks" == 204
+jsonpath "$.data.blocks[0].total_num_canonical_blocks" == 120
+jsonpath "$.data.blocks[0].total_num_supercharged_blocks" == 23
+
+duration < 2000
+
+#
+# Per block data counts
+#
+
+POST {{url}}
+```graphql
+query Blocks {
+  blocks(limit: 10, query: {
+    stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+  }) {
     block_num_snarks
     block_num_user_commands
     block_num_internal_commands
@@ -578,13 +611,9 @@ HTTP 200
 jsonpath "$.data.blocks" count == 1
 
 # data counts
-jsonpath "$.data.blocks[0].epoch_num_blocks" == 204
-jsonpath "$.data.blocks[0].total_num_blocks" == 204
-jsonpath "$.data.blocks[0].block_num_snarks" == 0
-jsonpath "$.data.blocks[0].block_num_user_commands" == 1
+jsonpath "$.data.blocks[0].block_num_snarks" == 64
+jsonpath "$.data.blocks[0].block_num_user_commands" == 3
 jsonpath "$.data.blocks[0].block_num_internal_commands" == 2
-
-duration < 2000
 
 #
 # Non-canonical blocks query
