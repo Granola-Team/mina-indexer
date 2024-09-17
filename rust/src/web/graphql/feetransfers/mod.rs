@@ -63,7 +63,12 @@ impl FeetransferWithMeta {
     async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
         let db = db(ctx);
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
+        let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
+        let epoch_num_supercharged_blocks =
+            db.get_block_production_supercharged_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
+        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
+        let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
@@ -86,7 +91,11 @@ impl FeetransferWithMeta {
                 ),
                 canonical: self.canonical,
                 epoch_num_blocks,
+                epoch_num_canonical_blocks,
+                epoch_num_supercharged_blocks,
                 total_num_blocks,
+                total_num_canonical_blocks,
+                total_num_supercharged_blocks,
                 block_num_snarks,
                 block_num_user_commands,
                 block_num_internal_commands,

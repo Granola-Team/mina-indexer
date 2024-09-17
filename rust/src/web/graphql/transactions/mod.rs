@@ -118,7 +118,7 @@ impl TransactionsQueryRoot {
                         Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
                     if query.matches(&txn) {
                         transactions.push(txn);
-                        if transactions.len() == limit {
+                        if transactions.len() >= limit {
                             break 'outer;
                         }
                     }
@@ -144,7 +144,7 @@ impl TransactionsQueryRoot {
             .as_ref()
             .map_or(false, |q| q.from.as_ref().or(q.to.as_ref()).is_some())
         {
-            let query = query.expect("query input to exisist");
+            let query = query.expect("query input exists");
             let pk = query
                 .from
                 .as_ref()
@@ -175,7 +175,7 @@ impl TransactionsQueryRoot {
                 if query.matches(&txn) {
                     transactions.push(txn);
 
-                    if transactions.len() == limit {
+                    if transactions.len() >= limit {
                         break;
                     }
                 };
@@ -239,7 +239,7 @@ impl TransactionsQueryRoot {
 
                         if query.matches(&txn) {
                             transactions.push(txn);
-                            if transactions.len() == limit {
+                            if transactions.len() >= limit {
                                 break 'outer;
                             }
                         }
@@ -285,7 +285,7 @@ impl TransactionsQueryRoot {
             if query.as_ref().map_or(true, |q| q.matches(&txn)) {
                 transactions.push(txn);
 
-                if transactions.len() == limit {
+                if transactions.len() >= limit {
                     break;
                 }
             };
@@ -322,7 +322,7 @@ impl Transaction {
             ),
             block: TransactionBlock {
                 date_time: block_date_time,
-                state_hash: block_state_hash.0.to_owned(),
+                state_hash: block_state_hash.0,
             },
         }
     }
