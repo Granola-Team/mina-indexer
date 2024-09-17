@@ -684,3 +684,26 @@ jsonpath "$.data.blocks" count == 1
 jsonpath "$.data.blocks[0].num_unique_block_producers_last_n_blocks" == 17
 
 duration < 1000
+
+#
+# Per epoch number of slots produced
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(limit: 1) {
+    epoch_num_slots_produced
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 1
+
+# only datum
+jsonpath "$.data.blocks[0].epoch_num_slots_produced" == 120
+
+duration < 1000
