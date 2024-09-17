@@ -180,9 +180,17 @@ pub struct StakesLedgerAccountWithMeta {
     #[graphql(name = "epoch_num_blocks")]
     epoch_num_blocks: u32,
 
+    /// Value epoch num supercharged blocks
+    #[graphql(name = "epoch_num_supercharged_blocks")]
+    epoch_num_supercharged_blocks: u32,
+
     /// Value total num blocks
     #[graphql(name = "total_num_blocks")]
     total_num_blocks: u32,
+
+    /// Value total num supercharged blocks
+    #[graphql(name = "total_num_supercharged_blocks")]
+    total_num_supercharged_blocks: u32,
 
     /// Value epoch num snarks
     #[graphql(name = "epoch_num_snarks")]
@@ -531,9 +539,15 @@ impl StakesLedgerAccountWithMeta {
             epoch_num_blocks: db
                 .get_block_production_epoch_count(Some(epoch))
                 .expect("epoch block count"),
+            epoch_num_supercharged_blocks: db
+                .get_block_production_supercharged_epoch_count(Some(epoch))
+                .expect("epoch supercharged block count"),
             total_num_blocks: db
                 .get_block_production_total_count()
                 .expect("total block count"),
+            total_num_supercharged_blocks: db
+                .get_block_production_supercharged_total_count()
+                .expect("total supercharged block count"),
             epoch_num_snarks: db
                 .get_snarks_epoch_count(Some(epoch))
                 .expect("epoch snark count"),
