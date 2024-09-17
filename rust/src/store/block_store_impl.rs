@@ -10,7 +10,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_PREV_STATE_HASH},
+    constants::{MAINNET_EPOCH_SLOT_COUNT, MAINNET_GENESIS_HASH, MAINNET_GENESIS_PREV_STATE_HASH},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
         coinbase::Coinbase,
@@ -146,11 +146,18 @@ impl BlockStore for IndexerStore {
         // add block internal commands
         self.add_internal_commands_batch(block, &mut batch)?;
 
+        // write the batch
         trace!(
             "Writing {} bytes to database from batch",
             batch.size_in_bytes()
         );
         self.database.write(batch)?;
+
+        // add epoch produced slot
+        self.add_epoch_slots_produced(
+            block.epoch_count(),
+            block.global_slot_since_genesis() % MAINNET_EPOCH_SLOT_COUNT,
+        )?;
 
         // add block SNARK work
         self.add_snark_work(block)?;
@@ -841,6 +848,29 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
+    fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32) -> anyhow::Result<()> {
+        trace!("Adding epoch {epoch} slot {epoch_slot} produced");
+        let key = block_num_key(epoch, epoch_slot);
+        if self
+            .database
+            .get_cf(self.block_epoch_slots_produced_cf(), key)?
+            .is_none()
+        {
+            // add the epoch slot
+            self.database
+                .put_cf(self.block_epoch_slots_produced_cf(), key, b"")?;
+
+            // increment epoch slots produced count
+            let acc = self.get_epoch_slots_produced_count(Some(epoch))?;
+            self.database.put_cf(
+                self.block_epoch_slots_produced_count_cf(),
+                epoch.to_be_bytes(),
+                (acc + 1).to_be_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
     ///////////////
     // Iterators //
     ///////////////
@@ -1236,6 +1266,18 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_epoch_slots_produced_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting epoch {epoch} slots produced count");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_epoch_slots_produced_count_cf(),
+                epoch.to_be_bytes(),
+            )?
             .map_or(0, from_be_bytes))
     }
 
