@@ -74,6 +74,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing state hashes of blocks at fixed global slots
     fn blocks_at_global_slot_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing per epoch slots produced
+    fn block_epoch_slots_produced_cf(&self) -> &ColumnFamily;
+
     //////////////////////////
     // Canonicity store CFs //
     //////////////////////////
@@ -314,6 +317,9 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per block internal command counts
     fn block_internal_command_counts_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch slots produced counts
+    fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch user command totals
     fn user_commands_epoch_cf(&self) -> &ColumnFamily;
