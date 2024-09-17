@@ -134,9 +134,6 @@ pub trait StagedLedgerStore {
     /// Build the `state_hash` staged ledger from the CF representation
     fn build_staged_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>>;
 
-    /// Persist the current best ledger as a staged ledger
-    fn persist_best_ledger(&self) -> anyhow::Result<()>;
-
     ///////////////
     // Iterators //
     ///////////////
