@@ -180,9 +180,17 @@ pub struct StakesLedgerAccountWithMeta {
     #[graphql(name = "epoch_num_blocks")]
     epoch_num_blocks: u32,
 
+    /// Value epoch num supercharged blocks
+    #[graphql(name = "epoch_num_supercharged_blocks")]
+    epoch_num_supercharged_blocks: u32,
+
     /// Value total num blocks
     #[graphql(name = "total_num_blocks")]
     total_num_blocks: u32,
+
+    /// Value total num supercharged blocks
+    #[graphql(name = "total_num_supercharged_blocks")]
+    total_num_supercharged_blocks: u32,
 
     /// Value epoch num snarks
     #[graphql(name = "epoch_num_snarks")]
@@ -259,6 +267,14 @@ pub struct StakesLedgerAccount {
     #[graphql(name = "pk_total_num_blocks")]
     pub pk_total_num_blocks: u32,
 
+    /// Value pk epoch num supercharged blocks
+    #[graphql(name = "pk_epoch_num_supercharged_blocks")]
+    pub pk_epoch_num_supercharged_blocks: u32,
+
+    /// Value pk total num supercharged blocks
+    #[graphql(name = "pk_total_num_supercharged_blocks")]
+    pub pk_total_num_supercharged_blocks: u32,
+
     /// Value pk epoch num snarks
     #[graphql(name = "pk_epoch_num_snarks")]
     pk_epoch_num_snarks: u32,
@@ -330,12 +346,16 @@ impl
         u32,
         u32,
         u32,
+        u32,
+        u32,
         Option<String>,
     )> for StakesLedgerAccount
 {
     fn from(
         acc: (
             StakingAccount,
+            u32,
+            u32,
             u32,
             u32,
             u32,
@@ -372,13 +392,15 @@ impl
             balance_nanomina,
             pk_epoch_num_blocks: acc.1,
             pk_total_num_blocks: acc.2,
-            pk_epoch_num_snarks: acc.3,
-            pk_total_num_snarks: acc.4,
-            pk_epoch_num_user_commands: acc.5,
-            pk_total_num_user_commands: acc.6,
-            pk_epoch_num_internal_commands: acc.7,
-            pk_total_num_internal_commands: acc.8,
-            username: acc.9,
+            pk_epoch_num_supercharged_blocks: acc.3,
+            pk_total_num_supercharged_blocks: acc.4,
+            pk_epoch_num_snarks: acc.5,
+            pk_total_num_snarks: acc.6,
+            pk_epoch_num_user_commands: acc.7,
+            pk_total_num_user_commands: acc.8,
+            pk_epoch_num_internal_commands: acc.9,
+            pk_total_num_internal_commands: acc.10,
+            username: acc.11,
         }
     }
 }
@@ -481,6 +503,12 @@ impl StakesLedgerAccountWithMeta {
         let pk_total_num_blocks = db
             .get_block_production_pk_total_count(&pk)
             .expect("pk total num blocks");
+        let pk_epoch_num_supercharged_blocks = db
+            .get_block_production_pk_supercharged_epoch_count(&pk, Some(epoch))
+            .expect("pk epoch num supercharged blocks");
+        let pk_total_num_supercharged_blocks = db
+            .get_block_production_pk_supercharged_total_count(&pk)
+            .expect("pk total num supercharged blocks");
         let pk_epoch_num_snarks = db
             .get_snarks_pk_epoch_count(&pk, Some(epoch))
             .expect("pk epoch num snarks");
@@ -512,6 +540,8 @@ impl StakesLedgerAccountWithMeta {
                 account,
                 pk_epoch_num_blocks,
                 pk_total_num_blocks,
+                pk_epoch_num_supercharged_blocks,
+                pk_total_num_supercharged_blocks,
                 pk_epoch_num_snarks,
                 pk_total_num_snarks,
                 pk_epoch_num_user_commands,
@@ -531,9 +561,15 @@ impl StakesLedgerAccountWithMeta {
             epoch_num_blocks: db
                 .get_block_production_epoch_count(Some(epoch))
                 .expect("epoch block count"),
+            epoch_num_supercharged_blocks: db
+                .get_block_production_supercharged_epoch_count(Some(epoch))
+                .expect("epoch supercharged block count"),
             total_num_blocks: db
                 .get_block_production_total_count()
                 .expect("total block count"),
+            total_num_supercharged_blocks: db
+                .get_block_production_supercharged_total_count()
+                .expect("total supercharged block count"),
             epoch_num_snarks: db
                 .get_snarks_epoch_count(Some(epoch))
                 .expect("epoch snark count"),

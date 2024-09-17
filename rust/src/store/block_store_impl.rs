@@ -13,6 +13,7 @@ use crate::{
     constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_PREV_STATE_HASH},
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
+        coinbase::Coinbase,
         diff::{account::AccountDiff, LedgerDiff},
         public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
@@ -900,7 +901,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_total_count(&creator)?;
         batch.put_cf(
             self.block_production_pk_total_cf(),
-            creator.to_bytes(),
+            creator.0.as_bytes(),
             (acc + 1).to_be_bytes(),
         );
 
@@ -916,6 +917,40 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_total_count()?;
         batch.put(Self::TOTAL_NUM_BLOCKS_KEY, (acc + 1).to_be_bytes());
 
+        // supercharged counts
+        if Coinbase::from_precomputed(block).supercharge {
+            // pk epoch supercharged
+            let acc =
+                self.get_block_production_pk_supercharged_epoch_count(&creator, Some(epoch))?;
+            batch.put_cf(
+                self.block_production_pk_supercharged_epoch_cf(),
+                u32_prefix_key(epoch, &creator),
+                (acc + 1).to_be_bytes(),
+            );
+
+            // pk total supercharged
+            let acc = self.get_block_production_pk_supercharged_total_count(&creator)?;
+            batch.put_cf(
+                self.block_production_pk_supercharged_total_cf(),
+                creator.0.as_bytes(),
+                (acc + 1).to_be_bytes(),
+            );
+
+            // epoch supercharged
+            let acc = self.get_block_production_supercharged_epoch_count(Some(epoch))?;
+            batch.put_cf(
+                self.block_production_supercharged_epoch_cf(),
+                epoch.to_be_bytes(),
+                (acc + 1).to_be_bytes(),
+            );
+
+            // total supercharged
+            let acc = self.get_block_production_supercharged_total_count()?;
+            batch.put(
+                Self::TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY,
+                (acc + 1).to_be_bytes(),
+            );
+        }
         Ok(())
     }
 
@@ -935,11 +970,41 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
+    fn get_block_production_pk_supercharged_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting pk epoch {epoch} supercharged block production count {pk}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_pk_supercharged_epoch_cf(),
+                u32_prefix_key(epoch, pk),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
     fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
         trace!("Getting pk total block production count {pk}");
         Ok(self
             .database
-            .get_cf(self.block_production_pk_total_cf(), pk.clone().to_bytes())?
+            .get_cf(self.block_production_pk_total_cf(), pk.0.as_bytes())?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_pk_supercharged_total_count(
+        &self,
+        pk: &PublicKey,
+    ) -> anyhow::Result<u32> {
+        trace!("Getting pk total supercharged block production count {pk}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_pk_supercharged_total_cf(),
+                pk.0.as_bytes(),
+            )?
             .map_or(0, from_be_bytes))
     }
 
@@ -952,11 +1017,34 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
+    fn get_block_production_supercharged_epoch_count(
+        &self,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting epoch supercharged block production count {epoch}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_supercharged_epoch_cf(),
+                epoch.to_be_bytes(),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
     fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
         trace!("Getting total block production count");
         Ok(self
             .database
             .get(Self::TOTAL_NUM_BLOCKS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total supercharged block production count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY)?
             .map_or(0, from_be_bytes))
     }
 

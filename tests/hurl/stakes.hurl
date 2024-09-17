@@ -140,6 +140,8 @@ POST {{url}}
   stakes(query: {epoch: 0, public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}, limit: 1) {
     pk_epoch_num_blocks
     pk_total_num_blocks
+    pk_epoch_num_supercharged_blocks
+    pk_total_num_supercharged_blocks
     pk_epoch_num_snarks
     pk_total_num_snarks
     pk_epoch_num_user_commands
@@ -148,6 +150,8 @@ POST {{url}}
     pk_total_num_internal_commands
     epoch_num_blocks
     total_num_blocks
+    epoch_num_supercharged_blocks
+    total_num_supercharged_blocks
     epoch_num_snarks
     total_num_snarks
     epoch_num_user_commands
@@ -165,6 +169,8 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].pk_epoch_num_blocks" == 0
 jsonpath "$.data.stakes[0].pk_total_num_blocks" == 0
+jsonpath "$.data.stakes[0].pk_epoch_num_supercharged_blocks" == 0
+jsonpath "$.data.stakes[0].pk_total_num_supercharged_blocks" == 0
 jsonpath "$.data.stakes[0].pk_epoch_num_snarks" == 0
 jsonpath "$.data.stakes[0].pk_total_num_snarks" == 0
 jsonpath "$.data.stakes[0].pk_epoch_num_user_commands" == 294
@@ -173,6 +179,8 @@ jsonpath "$.data.stakes[0].pk_epoch_num_internal_commands" == 196
 jsonpath "$.data.stakes[0].pk_total_num_internal_commands" == 196
 jsonpath "$.data.stakes[0].epoch_num_blocks" == 204
 jsonpath "$.data.stakes[0].total_num_blocks" == 204
+jsonpath "$.data.stakes[0].epoch_num_supercharged_blocks" == 23
+jsonpath "$.data.stakes[0].total_num_supercharged_blocks" == 23
 jsonpath "$.data.stakes[0].epoch_num_snarks" == 64
 jsonpath "$.data.stakes[0].total_num_snarks" == 64
 jsonpath "$.data.stakes[0].epoch_num_user_commands" == 303
