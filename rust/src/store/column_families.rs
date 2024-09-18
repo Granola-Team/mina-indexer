@@ -9,6 +9,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing all blocks
     fn blocks_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block state hashes
+    fn blocks_state_hash_cf(&self) -> &ColumnFamily;
+
     /// CF for storing block heights
     fn block_height_cf(&self) -> &ColumnFamily;
 

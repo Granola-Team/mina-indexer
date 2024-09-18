@@ -44,7 +44,7 @@ impl BlockStore for IndexerStore {
 
         if matches!(
             self.database
-                .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes()),
+                .get_cf(self.blocks_state_hash_cf(), state_hash.0.as_bytes()),
             Ok(Some(_))
         ) {
             trace!("Block already present {}", block.summary());
@@ -52,6 +52,7 @@ impl BlockStore for IndexerStore {
         }
 
         let mut batch = WriteBatch::default();
+        batch.put_cf(self.blocks_state_hash_cf(), state_hash.0.as_bytes(), b"");
         batch.put_cf(self.blocks_cf(), state_hash.0.as_bytes(), value);
 
         // add to ledger diff index

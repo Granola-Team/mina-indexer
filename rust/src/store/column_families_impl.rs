@@ -12,6 +12,16 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: {num block bytes BE u64 bytes}{serde_json block bytes}
     fn blocks_cf(&self) -> &ColumnFamily {
         self.database
+            .cf_handle("blocks")
+            .expect("blocks column family exists")
+    }
+
+    /// CF for storing block state hashes
+    /// ```
+    /// key: state_hash
+    /// val: {num block bytes BE u64 bytes}{serde_json block bytes}
+    fn blocks_state_hash_cf(&self) -> &ColumnFamily {
+        self.database
             .cf_handle("blocks-state-hash")
             .expect("blocks-state-hash column family exists")
     }
