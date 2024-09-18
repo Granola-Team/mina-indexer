@@ -63,11 +63,7 @@ impl Sub<Amount> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Self(
-            self.0
-                .checked_sub(rhs.0)
-                .unwrap_or_else(|| panic!("{} > {}", self.0, rhs.0)),
-        )
+        Self(self.0.saturating_sub(rhs.0))
     }
 }
 
@@ -75,11 +71,7 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        Self(
-            self.0
-                .checked_sub(rhs)
-                .unwrap_or_else(|| panic!("{} > {rhs}", self.0)),
-        )
+        self - Self(rhs)
     }
 }
 
