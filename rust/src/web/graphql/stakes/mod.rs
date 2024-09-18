@@ -22,6 +22,7 @@ pub struct StakeQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
+
     #[graphql(validator(regex = "^\\d+(\\.\\d{1,9})?$"), name = "stake_lte")]
     stake_lte: Option<String>,
 
@@ -140,18 +141,17 @@ impl StakeQueryRoot {
                 &ledger_hash,
                 epoch,
             ) {
-                accounts.push(StakesLedgerAccountWithMeta::new(
+                let account = StakesLedgerAccountWithMeta::new(
                     db,
                     account,
                     &delegation,
                     epoch,
                     ledger_hash.clone(),
                     total_currency,
-                ));
-                accounts = accounts
-                    .into_iter()
-                    .filter(|x| StakeQueryInput::matches(query.as_ref(), x))
-                    .collect::<Vec<_>>()
+                );
+                if StakeQueryInput::matches(query.as_ref(), &account) {
+                    accounts.push(account);
+                }
             }
         }
         Ok(accounts)
@@ -433,7 +433,7 @@ impl StakeQueryInput {
                 epoch: query_epoch,
                 ledger_hash: query_ledger_hash,
                 username,
-                ..
+                stake_lte: _,
             } = query;
             if let Some(public_key) = public_key {
                 if *public_key != account.pk.0 {
@@ -445,6 +445,8 @@ impl StakeQueryInput {
                     if *username != *acct_username {
                         return false;
                     }
+                } else {
+                    return false;
                 }
             }
             if let Some(delegate) = delegate {
@@ -527,7 +529,6 @@ impl StakesLedgerAccountWithMeta {
         let pk_total_num_internal_commands = db
             .get_internal_commands_pk_total_count(&pk)
             .expect("pk total num internal commands");
-
         let username = match db.get_username(&pk) {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
