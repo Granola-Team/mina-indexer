@@ -30,7 +30,37 @@ jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKr
 jsonpath "$.data.accounts[0].timeLocked" == false
 jsonpath "$.data.accounts[0].is_genesis_account" == true
 
-duration < 750
+duration < 100
+
+#
+# Accounts delegate query
+#
+
+POST {{url}}
+```graphql
+query Accounts {
+  accounts(query: {delegate: "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe" }) {
+    publicKey
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 7
+
+# only datum
+jsonpath "$.data.accounts[0].publicKey" == "B62qkHHBnLpwcg1u4jgajoUUoSXHxMFEfZ9ji3JRbzftY6gTmuYZAxH"
+jsonpath "$.data.accounts[1].publicKey" == "B62qp1MrxFnKMUEgAcWq2AJscVJTVzpSZHVJjgf6GGS2fcJTDU5LhVS"
+jsonpath "$.data.accounts[2].publicKey" == "B62qnQCf7ccbb8f39jDzKT8kRNq2939EpPaFGpaQ4agUuy5ozytU79a"
+jsonpath "$.data.accounts[3].publicKey" == "B62qoTaYnDYrtmver4jnkgJbFU6iohjtALTU4ebf4yCKrxFFHd9Dimh"
+jsonpath "$.data.accounts[4].publicKey" == "B62qoj4NpnbGSLV62tu2UbTRFV7Ec8kYcQW6H16BfNYhHstBMiahmbi"
+jsonpath "$.data.accounts[5].publicKey" == "B62qneDu6K65UhAuf7YCXADJWtgJh1y9xk4nEtGKggLaTr2M3Fbj3iR"
+jsonpath "$.data.accounts[6].publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
+
+duration < 100
+
 
 #
 # Account public key timing query
