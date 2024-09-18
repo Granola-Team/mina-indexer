@@ -987,36 +987,6 @@ test_snapshot() {
     rm -rf ./snapshot ./restore-path
 }
 
-# Indexer server starts with many blocks
-test_many_blocks() {
-    stage_mainnet_blocks 1000 ./blocks
-
-    idxr_server_start_standard --ledger-cadence 100
-    wait_forever_for_socket
-
-    # results
-    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
-
-    assert 1000 $best_length
-    assert 990 $canonical_length
-    assert 3NK9aySQJBEgAUKcWGrpbZhA4M8wL2N3cjipq3mEb4HPTuUkowEF $canonical_hash
-    assert 3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66 $best_hash
-
-    pk=B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN
-
-    # check ledgers are present
-    # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
-    assert 502777775000000 $balance
-
-    # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
-    assert '502777775000000' $balance
-}
-
 test_rest_accounts_summary() {
     stage_mainnet_blocks 100 ./blocks
 
@@ -1139,7 +1109,7 @@ test_rest_blocks() {
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
 }
 
-test_release() {
+test_many_blocks() {
     stage_mainnet_blocks 9999 ./blocks
 
     idxr_server_start_standard
@@ -1810,7 +1780,6 @@ for test_name in "$@"; do
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
         "test_load") test_load ;;
-        "test_release") test_release ;;
         *) echo "Unknown test: $test_name"
            exit 1
            ;;

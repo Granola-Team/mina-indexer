@@ -222,11 +222,6 @@ tier2-many-blocks-test:
   @echo "--- Performing many_blocks regression test with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}} many_blocks
 
-# Run tier 2 nix (release) release test
-tier2-release-test:
-  @echo "--- Performing release regression test with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}} release
-
 # Run tier 2 nix (release) regression tests
 tier2-regression-tests:
   @echo "--- Performing tier 2 regression tests with Nix-built binary"
@@ -242,11 +237,6 @@ tier2-many-blocks-test-dev:
   @echo "--- Performing many_blocks regression test with debug-built binary"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} many_blocks
 
-# Run tier 2 dev (debug) release test
-tier2-release-test-dev:
-  @echo "--- Performing release regression test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} release
-
 # Run tier 2 dev (debug) regression tests
 tier2-regression-tests-dev:
   @echo "--- Performing tier 2 regression tests with debug-built binary"
@@ -256,7 +246,6 @@ tier2-regression-tests-dev:
 tier2: tier2-prereqs nix-build \
   tier2-load-test \
   tier2-many-blocks-test \
-  tier2-release-test \
   tier2-regression-tests \
   && build-image
 
@@ -264,7 +253,6 @@ tier2: tier2-prereqs nix-build \
 tier2-dev: tier2-prereqs debug-build \
   tier2-load-test-dev \
   tier2-many-blocks-test-dev \
-  tier2-release-test-dev \
   tier2-regression-tests-dev
 
 # Tier 3 tests
@@ -290,7 +278,7 @@ deploy-local-prod blocks='5000' web_port='': nix-build
 
 # Run a server as if in production with the debug-built binary.
 deploy-local-prod-dev blocks='5000' web_port='': debug-build
-  @echo "--- Deploying to production dev"
+  @echo "--- Deploying dev prod indexer"
   time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
 
 # Shutdown a running local prod indexer.
