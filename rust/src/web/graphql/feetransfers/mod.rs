@@ -71,6 +71,7 @@ impl FeetransferWithMeta {
         let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
+        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
         if let Some(block) = self.block.clone() {
             let block_num_snarks = db
@@ -99,6 +100,7 @@ impl FeetransferWithMeta {
                 block_num_snarks,
                 block_num_user_commands,
                 block_num_internal_commands,
+                epoch_num_slots_produced,
                 num_unique_block_producers_last_n_blocks: None,
             }))
         } else {

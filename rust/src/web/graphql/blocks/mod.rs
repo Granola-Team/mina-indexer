@@ -52,6 +52,7 @@ impl BlocksQueryRoot {
         let total_num_user_commands = db
             .get_user_commands_total_count()
             .expect("total user command count");
+        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
         // no query filters => get the best block
         if query.is_none() {
@@ -88,6 +89,7 @@ impl BlocksQueryRoot {
                             epoch_num_user_commands,
                             total_num_user_commands,
                         ),
+                        epoch_num_slots_produced,
                         num_unique_block_producers_last_n_blocks: None,
                     }
                 })
@@ -135,6 +137,7 @@ impl BlocksQueryRoot {
                     epoch_num_user_commands,
                     total_num_user_commands,
                 ),
+                epoch_num_slots_produced,
                 num_unique_block_producers_last_n_blocks: None,
             };
             if query.unwrap().matches(&block) {
@@ -180,6 +183,7 @@ impl BlocksQueryRoot {
                     epoch_num_user_commands,
                     total_num_user_commands,
                 ),
+                epoch_num_slots_produced,
                 num_unique_block_producers_last_n_blocks: None,
             };
 
@@ -259,6 +263,7 @@ impl BlocksQueryRoot {
         let total_num_internal_commands = db
             .get_internal_commands_total_count()
             .expect("total internal command count");
+        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
         let counts = [
             epoch_num_blocks,
             epoch_num_canonical_blocks,
@@ -272,6 +277,7 @@ impl BlocksQueryRoot {
             total_num_user_commands,
             epoch_num_internal_commands,
             total_num_internal_commands,
+            epoch_num_slots_produced,
         ];
         let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
@@ -550,7 +556,7 @@ fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
     block: &PrecomputedBlock,
-    counts: [u32; 12],
+    counts: [u32; 13],
 ) -> Option<Block> {
     let block_with_canonicity = Block::from_precomputed(db, block, counts);
     if query
@@ -617,7 +623,11 @@ pub struct Block {
     #[graphql(name = "block_num_internal_commands")]
     pub block_num_internal_commands: u32,
 
-    /// Value
+    /// Value epoch num slots produced
+    #[graphql(name = "epoch_num_slots_produced")]
+    pub epoch_num_slots_produced: u32,
+
+    /// Value num unique block producers last n blocks
     #[graphql(name = "num_unique_block_producers_last_n_blocks")]
     pub num_unique_block_producers_last_n_blocks: Option<u32>,
 
@@ -1316,7 +1326,7 @@ impl Block {
     pub fn from_precomputed(
         db: &Arc<IndexerStore>,
         block: &PrecomputedBlock,
-        counts: [u32; 12],
+        counts: [u32; 13],
     ) -> Self {
         let state_hash = block.state_hash();
         let epoch_num_blocks = counts[0];
@@ -1340,6 +1350,7 @@ impl Block {
             .get_block_internal_commands_count(&state_hash)
             .expect("internal command counts")
             .unwrap_or_default();
+        let epoch_num_slots_produced = counts[12];
         Self {
             canonical,
             epoch_num_blocks,
@@ -1357,6 +1368,7 @@ impl Block {
                 epoch_num_user_commands,
                 total_num_user_commands,
             ),
+            epoch_num_slots_produced,
             num_unique_block_producers_last_n_blocks: None,
         }
     }

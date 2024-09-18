@@ -66,7 +66,7 @@ shutdown_idxr() {
 
     echo "Deleting PID file."
     rm -f ./idxr_pid
-    sleep 1
+    sleep 2
 }
 
 ephemeral_port() {

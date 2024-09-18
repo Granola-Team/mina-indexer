@@ -162,6 +162,19 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-comparison column family exists")
     }
 
+    /// CF for storing per epoch slots produced
+    /// ```
+    /// key: {epoch}{slot}
+    /// val: b""
+    /// where
+    /// - epoch: u32 BE bytes
+    /// - slot:  u32 BE bytes
+    fn block_epoch_slots_produced_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-epoch-slots-produced")
+            .expect("block-epoch-slots-produced column family exists")
+    }
+
     ////////////////////////////
     // User command store CFs //
     ////////////////////////////
@@ -923,6 +936,16 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-internal-command-counts")
             .expect("block-internal-command-counts column family exists")
+    }
+
+    /// CF for storing per epoch slots produced counts
+    /// ```
+    /// key: epoch (u32 BE bytes)
+    /// val: number of slots produced in epoch (u32 BE bytes)
+    fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-epoch-slots-produced-count")
+            .expect("block-epoch-slots-produced-count column family exists")
     }
 
     /// CF for storing per epoch per account user commands
