@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require 'fileutils'
+require "fileutils"
 
 # Usage: ./move_and_update_blocks.rb <source_folder> <dest_folder> <blocks_list_file> <min_number> <max_number>
 
@@ -25,7 +25,7 @@ moved_files = []
 
 # Find and move files based on the specified number range
 Dir.foreach(source_folder) do |filename|
-  next unless filename =~ /^mainnet-(\d+)-.*\.json$/
+  next unless /^mainnet-(\d+)-.*\.json$/.match?(filename)
   number = filename.match(/^mainnet-(\d+)-.*\.json$/)[1].to_i
 
   # Check if the number is within the range
@@ -43,7 +43,7 @@ Dir.foreach(source_folder) do |filename|
 end
 
 # Overwrite the blocks.list with the moved files
-File.open(blocks_list_file, 'w') do |file|
+File.open(blocks_list_file, "w") do |file|
   moved_files.each { |moved_file| file.puts(moved_file) }
 end
 

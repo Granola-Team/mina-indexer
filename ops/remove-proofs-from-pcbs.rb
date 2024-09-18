@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
-require 'json'
-require 'find'
+require "json"
+require "find"
 
 # Recursive method to remove all "proofs" properties from a JSON structure
 def remove_proofs(obj)
@@ -16,7 +16,7 @@ end
 # Process all JSON files in a directory
 def process_directory(directory)
   Find.find(directory) do |path|
-    if path =~ /\.json$/
+    if /\.json$/.match?(path)
       begin
         file_contents = File.read(path)
         json_data = JSON.parse(file_contents)
@@ -25,12 +25,9 @@ def process_directory(directory)
         remove_proofs(json_data)
 
         # Overwrite the original file with compact JSON (single line)
-        File.open(path, 'w') do |file|
-          file.write(JSON.generate(json_data)) # Compact JSON output
-        end
+        File.write(path, JSON.generate(json_data))
 
         puts "Successfully removed 'proofs' from #{path}"
-
       rescue Errno::ENOENT
         puts "File not found: #{path}"
       rescue JSON::ParserError
