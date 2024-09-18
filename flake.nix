@@ -63,6 +63,7 @@
             rclone
             ruby
             rubyPackages.standard
+            rubyPackages.rspec
             rust
             shellcheck
             shfmt
