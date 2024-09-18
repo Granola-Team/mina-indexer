@@ -136,7 +136,7 @@ impl Ledger {
             .or(Some(Account::empty(pk.clone())))
         {
             self.accounts
-                .insert(pk, account.clone().apply_account_diff(acct_diff));
+                .insert(pk, account.apply_account_diff(acct_diff));
         }
         Ok(())
     }
