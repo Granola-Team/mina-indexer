@@ -885,7 +885,6 @@ impl BlockStore for IndexerStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Incrementing block production count {}", block.summary());
-
         let creator = block.block_creator();
         let epoch = block.epoch_count();
 
@@ -954,6 +953,150 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
+    fn increment_block_production_count(
+        &self,
+        state_hash: &BlockHash,
+        creator: &PublicKey,
+        supercharged: bool,
+    ) -> anyhow::Result<()> {
+        trace!("Incrementing block production count {state_hash}");
+
+        // increment pk epoch count
+        let acc = self.get_block_production_pk_epoch_count(creator, Some(0))?;
+        self.database.put_cf(
+            self.block_production_pk_epoch_cf(),
+            u32_prefix_key(0, creator),
+            (acc + 1).to_be_bytes(),
+        )?;
+
+        // increment pk total count
+        let acc = self.get_block_production_pk_total_count(creator)?;
+        self.database.put_cf(
+            self.block_production_pk_total_cf(),
+            creator.0.as_bytes(),
+            (acc + 1).to_be_bytes(),
+        )?;
+
+        // increment epoch count
+        let acc = self.get_block_production_epoch_count(Some(0))?;
+        self.database.put_cf(
+            self.block_production_epoch_cf(),
+            0u32.to_be_bytes(),
+            (acc + 1).to_be_bytes(),
+        )?;
+
+        // increment total count
+        let acc = self.get_block_production_total_count()?;
+        self.database
+            .put(Self::TOTAL_NUM_BLOCKS_KEY, (acc + 1).to_be_bytes())?;
+
+        // supercharged counts
+        if supercharged {
+            // pk epoch supercharged
+            let acc = self.get_block_production_pk_supercharged_epoch_count(creator, Some(0))?;
+            self.database.put_cf(
+                self.block_production_pk_supercharged_epoch_cf(),
+                u32_prefix_key(0, creator),
+                (acc + 1).to_be_bytes(),
+            )?;
+
+            // pk total supercharged
+            let acc = self.get_block_production_pk_supercharged_total_count(creator)?;
+            self.database.put_cf(
+                self.block_production_pk_supercharged_total_cf(),
+                creator.0.as_bytes(),
+                (acc + 1).to_be_bytes(),
+            )?;
+
+            // epoch supercharged
+            let acc = self.get_block_production_supercharged_epoch_count(Some(0))?;
+            self.database.put_cf(
+                self.block_production_supercharged_epoch_cf(),
+                0u32.to_be_bytes(),
+                (acc + 1).to_be_bytes(),
+            )?;
+
+            // total supercharged
+            let acc = self.get_block_production_supercharged_total_count()?;
+            self.database.put(
+                Self::TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY,
+                (acc + 1).to_be_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn increment_block_canonical_production_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        trace!("Incrementing canonical block production count {state_hash}");
+        let creator = self.get_block_creator(state_hash)?.expect("block creator");
+        let epoch = self.get_block_epoch(state_hash)?.expect("block epoch");
+
+        // increment pk epoch count
+        let acc = self.get_block_production_pk_canonical_epoch_count(&creator, Some(epoch))?;
+        self.database.put_cf(
+            self.block_production_pk_canonical_epoch_cf(),
+            u32_prefix_key(epoch, &creator),
+            (acc + 1).to_be_bytes(),
+        )?;
+
+        // increment pk total count
+        let acc = self.get_block_production_pk_canonical_total_count(&creator)?;
+        self.database.put_cf(
+            self.block_production_pk_canonical_total_cf(),
+            creator.0.as_bytes(),
+            (acc + 1).to_be_bytes(),
+        )?;
+
+        // increment epoch count
+        let acc = self.get_block_production_canonical_epoch_count(Some(epoch))?;
+        self.database.put_cf(
+            self.block_production_canonical_epoch_cf(),
+            epoch.to_be_bytes(),
+            (acc + 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn decrement_block_canonical_production_count(
+        &self,
+        state_hash: &BlockHash,
+    ) -> anyhow::Result<()> {
+        trace!("Decrementing canonical block production count {state_hash}");
+        let creator = self.get_block_creator(state_hash)?.expect("block creator");
+        let epoch = self.get_block_epoch(state_hash)?.expect("block epoch");
+
+        // decrement pk epoch count
+        let acc = self.get_block_production_pk_canonical_epoch_count(&creator, Some(epoch))?;
+        assert!(acc > 0);
+        self.database.put_cf(
+            self.block_production_pk_canonical_epoch_cf(),
+            u32_prefix_key(epoch, &creator),
+            (acc - 1).to_be_bytes(),
+        )?;
+
+        // decrement pk total count
+        let acc = self.get_block_production_pk_canonical_total_count(&creator)?;
+        assert!(acc > 0);
+        self.database.put_cf(
+            self.block_production_pk_canonical_total_cf(),
+            creator.0.as_bytes(),
+            (acc - 1).to_be_bytes(),
+        )?;
+
+        // decrement epoch count
+        let acc = self.get_block_production_canonical_epoch_count(Some(epoch))?;
+        assert!(acc > 0);
+        self.database.put_cf(
+            self.block_production_canonical_epoch_cf(),
+            epoch.to_be_bytes(),
+            (acc - 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
     fn get_block_production_pk_epoch_count(
         &self,
         pk: &PublicKey,
@@ -965,6 +1108,22 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_pk_epoch_cf(),
+                u32_prefix_key(epoch, pk),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_pk_canonical_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting pk epoch {epoch} canonical block production count {pk}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_pk_canonical_epoch_cf(),
                 u32_prefix_key(epoch, pk),
             )?
             .map_or(0, from_be_bytes))
@@ -994,6 +1153,17 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
+    fn get_block_production_pk_canonical_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+        trace!("Getting pk total canonical block production count {pk}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_pk_canonical_total_cf(),
+                pk.0.as_bytes(),
+            )?
+            .map_or(0, from_be_bytes))
+    }
+
     fn get_block_production_pk_supercharged_total_count(
         &self,
         pk: &PublicKey,
@@ -1014,6 +1184,21 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_production_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_canonical_epoch_count(
+        &self,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting epoch canonical block production count {epoch}");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_production_canonical_epoch_cf(),
+                epoch.to_be_bytes(),
+            )?
             .map_or(0, from_be_bytes))
     }
 
@@ -1038,6 +1223,12 @@ impl BlockStore for IndexerStore {
             .database
             .get(Self::TOTAL_NUM_BLOCKS_KEY)?
             .map_or(0, from_be_bytes))
+    }
+
+    fn get_block_production_canonical_total_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total canonical block production count");
+        self.get_best_block_height()
+            .map(|res| res.unwrap_or_default())
     }
 
     fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32> {
