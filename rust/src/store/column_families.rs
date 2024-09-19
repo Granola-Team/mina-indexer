@@ -80,6 +80,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing per epoch slots produced
     fn block_epoch_slots_produced_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing per epoch per account slots produced
+    fn block_pk_epoch_slots_produced_cf(&self) -> &ColumnFamily;
+
     //////////////////////////
     // Canonicity store CFs //
     //////////////////////////
@@ -291,6 +294,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for per epoch per account canonical block prodution info
     fn block_production_pk_canonical_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting per epoch per account canonical block prodution info
+    fn block_production_pk_canonical_epoch_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for per epoch per account supercharged block prodution info
     fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily;
 
@@ -323,6 +329,12 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for per epoch slots produced counts
     fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily;
+
+    /// CF for per epoch per account slots produced counts
+    fn block_pk_epoch_slots_produced_count_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting by per epoch per account slots produced counts
+    fn block_pk_epoch_slots_produced_count_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch user command totals
     fn user_commands_epoch_cf(&self) -> &ColumnFamily;
