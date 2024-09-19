@@ -52,6 +52,39 @@ pub fn block_num_key(prefix: u32, num: u32) -> [u8; U32_LEN + U32_LEN] {
     key
 }
 
+/// Key format
+/// ```
+/// {epoch}{pk}
+/// where
+/// - epoch: u32 BE bytes
+/// - pk:    [PublicKey] bytes
+pub fn epoch_pk_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::LEN] {
+    let mut key = [0; U32_LEN + PublicKey::LEN];
+    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[U32_LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+    key
+}
+
+/// Key format
+/// ```
+/// {epoch}{pk}{num}
+/// where
+/// - epoch: u32 BE bytes
+/// - pk:    [PublicKey] bytes
+/// - slot:   u32 BE bytes
+pub fn epoch_pk_num_key(
+    epoch: u32,
+    pk: &PublicKey,
+    num: u32,
+) -> [u8; U32_LEN + PublicKey::LEN + U32_LEN] {
+    let mut key = [0; U32_LEN + PublicKey::LEN + U32_LEN];
+    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[U32_LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+    key[U32_LEN..][PublicKey::LEN..].copy_from_slice(&num.to_be_bytes());
+    key
+}
+
+
 #[cfg(test)]
 mod block_store_impl_tests {
     use super::*;

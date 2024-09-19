@@ -50,7 +50,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 104] = [
+    const COLUMN_FAMILIES: [&'static str; 107] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -77,6 +77,7 @@ impl IndexerStore {
         "coinbase-receiver-height-sort",
         "coinbase-receiver-slot-sort",
         "block-epoch-slots-produced",
+        "block-pk-epoch-slots-produced",
         //////////////////////////
         // Canonicity store CFs //
         //////////////////////////
@@ -180,7 +181,10 @@ impl IndexerStore {
         "block-snark-counts",
         "block-user-command-counts",
         "block-internal-command-counts",
+        // slot counts
         "block-epoch-slots-produced-count",
+        "block-pk-epoch-slots-produced-count",
+        "block-pk-epoch-slots-produced-count-sort",
         // user command counts
         "user-commands-epoch",
         "user-commands-pk-epoch",

@@ -158,6 +158,7 @@ impl BlockStore for IndexerStore {
         self.add_epoch_slots_produced(
             block.epoch_count(),
             block.global_slot_since_genesis() % MAINNET_EPOCH_SLOT_COUNT,
+            &block.block_creator(),
         )?;
 
         // add block SNARK work
@@ -849,8 +850,15 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
     }
 
-    fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32) -> anyhow::Result<()> {
+    fn add_epoch_slots_produced(
+        &self,
+        epoch: u32,
+        epoch_slot: u32,
+        pk: &PublicKey,
+    ) -> anyhow::Result<()> {
         trace!("Adding epoch {epoch} slot {epoch_slot} produced");
+
+        // add to total
         let key = block_num_key(epoch, epoch_slot);
         if self
             .database
@@ -866,6 +874,26 @@ impl BlockStore for IndexerStore {
             self.database.put_cf(
                 self.block_epoch_slots_produced_count_cf(),
                 epoch.to_be_bytes(),
+                (acc + 1).to_be_bytes(),
+            )?;
+        }
+
+        // add to account
+        let key = epoch_pk_num_key(epoch, pk, epoch_slot);
+        if self
+            .database
+            .get_cf(self.block_pk_epoch_slots_produced_cf(), key)?
+            .is_none()
+        {
+            // add the epoch slot
+            self.database
+                .put_cf(self.block_pk_epoch_slots_produced_cf(), key, b"")?;
+
+            // increment epoch slots produced count
+            let acc = self.get_pk_epoch_slots_produced_count(pk, Some(epoch))?;
+            self.database.put_cf(
+                self.block_pk_epoch_slots_produced_count_cf(),
+                epoch_pk_key(epoch, pk),
                 (acc + 1).to_be_bytes(),
             )?;
         }
@@ -1267,6 +1295,22 @@ impl BlockStore for IndexerStore {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    fn get_pk_epoch_slots_produced_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        trace!("Getting epoch {epoch} pk {pk} slots produced count");
+        Ok(self
+            .database
+            .get_cf(
+                self.block_pk_epoch_slots_produced_count_cf(),
+                epoch_pk_key(epoch, pk),
+            )?
             .map_or(0, from_be_bytes))
     }
 

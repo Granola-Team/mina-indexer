@@ -237,7 +237,12 @@ pub trait BlockStore {
     ) -> anyhow::Result<()>;
 
     /// Index the epoch slot for a block
-    fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32) -> anyhow::Result<()>;
+    fn add_epoch_slots_produced(
+        &self,
+        epoch: u32,
+        epoch_slot: u32,
+        pk: &PublicKey,
+    ) -> anyhow::Result<()>;
 
     /// Index the block's minimimal info needed for comparison
     fn set_block_comparison_batch(
@@ -403,6 +408,13 @@ pub trait BlockStore {
 
     /// Get the total supercharged block production count
     fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32>;
+
+    /// Get the number of pk block production slots in the given epoch
+    fn get_pk_epoch_slots_produced_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<u32>;
 
     /// Get the number of block production slots in the given epoch
     fn get_epoch_slots_produced_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;

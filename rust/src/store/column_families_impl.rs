@@ -185,6 +185,22 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-epoch-slots-produced column family exists")
     }
 
+    /// CF for storing per epoch per account slots produced
+    /// ```
+    /// key: {epoch}{pk}{slot}
+    /// val: b""
+    /// where
+    /// - epoch: u32 BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// - slot:  u32 BE bytes
+    /// ```
+    /// Use [epoch_pk_num_key]
+    fn block_pk_epoch_slots_produced_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-pk-epoch-slots-produced")
+            .expect("block-pk-epoch-slots-produced column family exists")
+    }
+
     ////////////////////////////
     // User command store CFs //
     ////////////////////////////
@@ -956,6 +972,37 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("block-epoch-slots-produced-count")
             .expect("block-epoch-slots-produced-count column family exists")
+    }
+
+    /// CF for storing per epoch per account slots produced counts
+    /// ```
+    /// key: {epoch}{pk}
+    /// val: count
+    /// where
+    /// - epoch: u32 BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// - count: u32 BE bytes
+    /// ```
+    /// Use [epoch_pk_key]
+    fn block_pk_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-pk-epoch-slots-produced-count")
+            .expect("block-pk-epoch-slots-produced-count column family exists")
+    }
+
+    /// CF for storing per epoch per account slots produced counts
+    /// ```
+    /// key: {epoch}{count}{pk}
+    /// val: b""
+    /// - epoch: u32 BE bytes
+    /// - count: u32 BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// ```
+    /// Use [epoch_block_num_key]
+    fn block_pk_epoch_slots_produced_count_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-pk-epoch-slots-produced-count-sort")
+            .expect("block-pk-epoch-slots-produced-count-sort column family exists")
     }
 
     /// CF for storing per epoch per account user commands
