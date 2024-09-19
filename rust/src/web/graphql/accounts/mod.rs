@@ -13,6 +13,7 @@ use speedb::IteratorMode;
 #[derive(InputObject)]
 pub struct AccountQueryInput {
     public_key: Option<String>,
+    delegate: Option<String>,
     username: Option<String>,
     balance: Option<u64>,
 
@@ -182,6 +183,7 @@ impl AccountQueryInput {
     fn matches(&self, account: &account::Account, username: Option<&String>) -> bool {
         let AccountQueryInput {
             public_key,
+            delegate,
             username: query_username_prefix,
             balance,
             balance_gt,
@@ -192,6 +194,11 @@ impl AccountQueryInput {
         } = self;
         if let Some(public_key) = public_key {
             if *public_key != account.public_key.0 {
+                return false;
+            }
+        }
+        if let Some(delegate) = delegate {
+            if *delegate != account.delegate.0 {
                 return false;
             }
         }
