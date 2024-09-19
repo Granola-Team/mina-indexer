@@ -180,6 +180,8 @@ dev-continue subtest='': debug-build
 
 # Run unit debug tests
 test-unit:
+  @echo "--- Invoking 'rspec ops/spec'"
+  rspec ops/spec/*_spec.rb
   @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run
 
