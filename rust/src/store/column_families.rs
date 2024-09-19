@@ -294,6 +294,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for per epoch per account canonical block prodution info
     fn block_production_pk_canonical_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting per epoch per account canonical block prodution info
+    fn block_production_pk_canonical_epoch_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for per epoch per account supercharged block prodution info
     fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily;
 

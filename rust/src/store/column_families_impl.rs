@@ -865,6 +865,18 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-canonical-epoch column family exists")
     }
 
+    /// CF for sorting per epoch per account canonical block prodution info
+    /// ```
+    /// - key: {epoch BE bytes}{num BE bytes}{pk}
+    /// - value: b""
+    /// ```
+    /// Use [epoch_block_num_key]
+    fn block_production_pk_canonical_epoch_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-production-pk-canonical-epoch-sort")
+            .expect("block-production-pk-canonical-epoch-sort column family exists")
+    }
+
     /// CF for storing per epoch per account supercharged block prodution info
     /// ```
     /// - key: {epoch BE bytes}{pk}

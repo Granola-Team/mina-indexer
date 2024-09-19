@@ -84,6 +84,24 @@ pub fn epoch_pk_num_key(
     key
 }
 
+/// Key format
+/// ```
+/// {epoch}{num}{pk}
+/// where
+/// - epoch: u32 BE bytes
+/// - num:   u32 BE bytes
+/// - pk:    [PublicKey] bytes
+pub fn epoch_block_num_key(
+    epoch: u32,
+    num: u32,
+    pk: &PublicKey,
+) -> [u8; U32_LEN + U32_LEN + PublicKey::LEN] {
+    let mut key = [0; U32_LEN + U32_LEN + PublicKey::LEN];
+    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[U32_LEN..][..U32_LEN].copy_from_slice(&num.to_be_bytes());
+    key[U32_LEN..][U32_LEN..].copy_from_slice(pk.0.as_bytes());
+    key
+}
 
 #[cfg(test)]
 mod block_store_impl_tests {

@@ -21,7 +21,7 @@ use crate::{
     snark_work::store::SnarkStore,
     utility::store::{
         block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, pk_index_key,
-        state_hash_suffix, u32_prefix_key, u64_from_be_bytes, U64_LEN,
+        state_hash_suffix, u32_prefix_key, u64_from_be_bytes, U32_LEN, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
@@ -934,6 +934,34 @@ impl BlockStore for IndexerStore {
             .iterator_cf(self.block_coinbase_slot_sort_cf(), mode)
     }
 
+    fn canonical_epoch_blocks_produced_iterator(
+        &self,
+        epoch: Option<u32>,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch().expect("current epoch"));
+        let epoch_be_bytes = epoch.to_be_bytes();
+        let mut start = [0; U32_LEN + U32_LEN + PublicKey::LEN];
+        match direction {
+            Direction::Forward => {
+                // start at the beginning of the epoch
+                start[..U32_LEN].copy_from_slice(&epoch_be_bytes);
+                start[U32_LEN..][..U32_LEN].copy_from_slice(&0u32.to_be_bytes());
+                start[U32_LEN..][U32_LEN..].copy_from_slice(PublicKey::lower_bound().0.as_bytes());
+            }
+            Direction::Reverse => {
+                // start at the end of the epoch
+                start[..U32_LEN].copy_from_slice(&epoch_be_bytes);
+                start[U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+                start[U32_LEN..][U32_LEN..].copy_from_slice(PublicKey::upper_bound().0.as_bytes());
+            }
+        }
+        self.database.iterator_cf(
+            self.block_production_pk_canonical_epoch_sort_cf(),
+            IteratorMode::From(start.as_slice(), direction),
+        )
+    }
+
     //////////////////
     // Block counts //
     //////////////////
@@ -1100,6 +1128,7 @@ impl BlockStore for IndexerStore {
             u32_prefix_key(epoch, &creator),
             (acc + 1).to_be_bytes(),
         )?;
+        self.increment_block_canonical_production_count_sort(epoch, acc, &creator)?;
 
         // increment pk total count
         let acc = self.get_block_production_pk_canonical_total_count(&creator)?;
@@ -1115,6 +1144,28 @@ impl BlockStore for IndexerStore {
             self.block_production_canonical_epoch_cf(),
             epoch.to_be_bytes(),
             (acc + 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn increment_block_canonical_production_count_sort(
+        &self,
+        epoch: u32,
+        num: u32,
+        pk: &PublicKey,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Incrementing epoch {epoch} pk {pk} canonical block sort: {num} -> {}",
+            num + 1
+        );
+        self.database.delete_cf(
+            self.block_production_pk_canonical_epoch_sort_cf(),
+            epoch_block_num_key(epoch, num, pk),
+        )?;
+        self.database.put_cf(
+            self.block_production_pk_canonical_epoch_sort_cf(),
+            epoch_block_num_key(epoch, num + 1, pk),
+            b"",
         )?;
         Ok(())
     }
@@ -1135,6 +1186,7 @@ impl BlockStore for IndexerStore {
             u32_prefix_key(epoch, &creator),
             (acc - 1).to_be_bytes(),
         )?;
+        self.decrement_block_canonical_production_count_sort(epoch, acc, &creator)?;
 
         // decrement pk total count
         let acc = self.get_block_production_pk_canonical_total_count(&creator)?;
@@ -1152,6 +1204,29 @@ impl BlockStore for IndexerStore {
             self.block_production_canonical_epoch_cf(),
             epoch.to_be_bytes(),
             (acc - 1).to_be_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn decrement_block_canonical_production_count_sort(
+        &self,
+        epoch: u32,
+        num: u32,
+        pk: &PublicKey,
+    ) -> anyhow::Result<()> {
+        assert!(num > 0);
+        trace!(
+            "Decrementing epoch {epoch} pk {pk} canonical block sort: {num} -> {}",
+            num - 1
+        );
+        self.database.delete_cf(
+            self.block_production_pk_canonical_epoch_sort_cf(),
+            epoch_block_num_key(epoch, num, pk),
+        )?;
+        self.database.put_cf(
+            self.block_production_pk_canonical_epoch_sort_cf(),
+            epoch_block_num_key(epoch, num - 1, pk),
+            b"",
         )?;
         Ok(())
     }

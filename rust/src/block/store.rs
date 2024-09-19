@@ -8,7 +8,7 @@ use crate::{
     },
     store::DbUpdate,
 };
-use speedb::{DBIterator, IteratorMode, WriteBatch};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 
 pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
 
@@ -316,6 +316,16 @@ pub trait BlockStore {
     /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
+    /// Iterator for per epoch number of canonical blocks produced
+    /// ```
+    /// key: {epoch}{num}{pk}
+    /// val: b""
+    fn canonical_epoch_blocks_produced_iterator(
+        &self,
+        epoch: Option<u32>,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
     //////////////////
     // Block counts //
     //////////////////
@@ -341,10 +351,26 @@ pub trait BlockStore {
         state_hash: &BlockHash,
     ) -> anyhow::Result<()>;
 
+    /// Increment the canonical block production sort data
+    fn increment_block_canonical_production_count_sort(
+        &self,
+        epoch: u32,
+        num: u32,
+        pk: &PublicKey,
+    ) -> anyhow::Result<()>;
+
     /// Decrement the epoch & pk canonical block production counts
     fn decrement_block_canonical_production_count(
         &self,
         state_hash: &BlockHash,
+    ) -> anyhow::Result<()>;
+
+    /// Decrement the canonical block production sort data
+    fn decrement_block_canonical_production_count_sort(
+        &self,
+        epoch: u32,
+        num: u32,
+        pk: &PublicKey,
     ) -> anyhow::Result<()>;
 
     /// Get the block production count for `pk` in `epoch`
