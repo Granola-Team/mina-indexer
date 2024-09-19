@@ -257,13 +257,19 @@ impl SnarkStore for IndexerStore {
             .iterator_cf(self.snark_work_prover_height_cf(), mode)
     }
 
+    //////////////////
+    // SNARK counts //
+    //////////////////
+
     fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
-            .get_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("epoch SNARK count")
+            }))
     }
 
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -280,8 +286,10 @@ impl SnarkStore for IndexerStore {
         trace!("Getting total SNARKs count");
         Ok(self
             .database
-            .get(Self::TOTAL_NUM_SNARKS_KEY)?
-            .map_or(0, from_be_bytes))
+            .get_pinned(Self::TOTAL_NUM_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total SNARK count")
+            }))
     }
 
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
@@ -298,7 +306,9 @@ impl SnarkStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("pk epoch SNARK count")
+            }))
     }
 
     fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()> {
@@ -316,7 +326,9 @@ impl SnarkStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("pk total SNARK count")
+            }))
     }
 
     fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
@@ -334,7 +346,7 @@ impl SnarkStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.block_snark_counts_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
+            .map(|bytes| u32_from_be_bytes(&bytes).expect("block SNARK count")))
     }
 
     fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()> {
@@ -350,7 +362,7 @@ impl SnarkStore for IndexerStore {
         trace!("Incrementing SNARKs count {snark:?}");
 
         // prover epoch & total
-        let prover = snark.prover.clone();
+        let prover = snark.prover;
         self.increment_snarks_pk_epoch_count(&prover, epoch)?;
         self.increment_snarks_pk_total_count(&prover)?;
 
