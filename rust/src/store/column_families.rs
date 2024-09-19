@@ -256,20 +256,29 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing SNARKs
     fn snarks_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing all snark work fee totals
-    fn snark_top_producers_cf(&self) -> &ColumnFamily;
+    /// CF for storing all snark prover fee totals
+    fn snark_prover_fees_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting all snark work fee totals
-    fn snark_top_producers_sort_cf(&self) -> &ColumnFamily;
+    /// CF for sorting all snark prover fee totals
+    fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing/sorting SNARK work fees
-    fn snark_work_fees_cf(&self) -> &ColumnFamily;
+    /// CF for storing snark prover max fees
+    fn snark_prover_max_fee_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting SNARKs by prover
-    fn snark_work_prover_cf(&self) -> &ColumnFamily;
+    /// CF for sorting all snark provers by max fees
+    fn snark_prover_max_fee_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting SNARKS by prover and block height
-    fn snark_work_prover_height_cf(&self) -> &ColumnFamily;
+    /// CF for sorting SNARKS by prover & block height
+    fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARKS by prover & global slot
+    fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARK work fees & block height
+    fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARK work fees & global slot
+    fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     ////////////////////
     // Username store //

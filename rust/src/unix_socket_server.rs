@@ -889,7 +889,7 @@ pub async fn handle_connection(
                 Snarks::Top { num } => {
                     info!("Received top {num} SNARKers command");
                     Some(serde_json::to_string_pretty(
-                        &db.get_top_snark_workers_by_fees(num)?,
+                        &db.get_top_snark_provers_by_total_fees(num)?,
                     )?)
                 }
             },

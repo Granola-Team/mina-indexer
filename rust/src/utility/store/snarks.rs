@@ -6,23 +6,23 @@ use crate::{
 
 /// Key format
 /// ```
-/// {fee}{slot}{pk}{hash}{num}
+/// {fee}{sort}{pk}{hash}{index}
 /// where
 /// fee:   u64 BE bytes
-/// slot:  u32 BE bytes
+/// sort:  u32 BE bytes
 /// pk:    [PublicKey] bytes
 /// hash:  [BlockHash] bytes
 /// index: u32 BE bytes
-pub fn snark_fee_prefix_key(
+pub fn snark_fee_sort_key(
     fee: u64,
-    global_slot: u32,
+    u32_sort: u32,
     pk: &PublicKey,
     state_hash: &BlockHash,
     index: u32,
 ) -> [u8; U64_LEN + U32_LEN + PublicKey::LEN + BlockHash::LEN + U32_LEN] {
     let mut key = [0; U64_LEN + U32_LEN + PublicKey::LEN + BlockHash::LEN + U32_LEN];
     key[..U64_LEN].copy_from_slice(&fee.to_be_bytes());
-    key[U64_LEN..][..U32_LEN].copy_from_slice(&global_slot.to_be_bytes());
+    key[U64_LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[U64_LEN..][U32_LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..BlockHash::LEN]
         .copy_from_slice(state_hash.0.as_bytes());
@@ -33,19 +33,19 @@ pub fn snark_fee_prefix_key(
 
 /// Key format
 /// ```
-/// {prover}{slot}{index}
+/// {prover}{sort}{index}
 /// where
 /// - prover: [PublicKey] bytes
-/// - slot:   u32 BE bytes
+/// - sort:   u32 BE bytes
 /// - index:  u32 BE bytes
-pub fn snark_prover_prefix_key(
+pub fn snark_prover_sort_key(
     prover: &PublicKey,
-    global_slot: u32,
+    u32_sort: u32,
     index: u32,
 ) -> [u8; PublicKey::LEN + U32_LEN + U32_LEN] {
     let mut key = [0; PublicKey::LEN + U32_LEN + U32_LEN];
     key[..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
-    key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&global_slot.to_be_bytes());
+    key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[PublicKey::LEN..][U32_LEN..].copy_from_slice(&index.to_be_bytes());
     key
 }
@@ -55,16 +55,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_snark_fee_prefix_key() {
+    fn test_snark_fee_sort_key() {
         let fee = 100;
         let index = 25;
-        let global_slot = 50;
+        let block_height = 50;
         let pk = PublicKey::default();
         let state_hash = BlockHash::default();
-        let key = snark_fee_prefix_key(fee, global_slot, &pk, &state_hash, index);
+        let key = snark_fee_sort_key(fee, block_height, &pk, &state_hash, index);
 
         assert_eq!(&key[..U64_LEN], &fee.to_be_bytes());
-        assert_eq!(&key[U64_LEN..][..U32_LEN], &global_slot.to_be_bytes());
+        assert_eq!(&key[U64_LEN..][..U32_LEN], &block_height.to_be_bytes());
         assert_eq!(
             &key[U64_LEN..][U32_LEN..][..PublicKey::LEN],
             pk.0.as_bytes()
@@ -80,16 +80,16 @@ mod tests {
     }
 
     #[test]
-    fn test_snark_prover_prefix_key() {
+    fn test_snark_prover_sort_key() {
         let index = 25;
-        let global_slot = 50;
+        let block_height = 50;
         let pk = PublicKey::default();
-        let key = snark_prover_prefix_key(&pk, global_slot, index);
+        let key = snark_prover_sort_key(&pk, block_height, index);
 
         assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());
         assert_eq!(
             &key[PublicKey::LEN..][..U32_LEN],
-            &global_slot.to_be_bytes()
+            &block_height.to_be_bytes()
         );
         assert_eq!(&key[PublicKey::LEN..][U32_LEN..], &index.to_be_bytes());
     }

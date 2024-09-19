@@ -56,7 +56,7 @@ impl CanonicityStore for IndexerStore {
 
         // update top snarkers based on the incoming canonical block
         if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
-            self.update_top_snarkers(completed_works)?;
+            self.update_snark_prover_fees(completed_works)?;
         }
 
         // record new genesis/prev state hashes

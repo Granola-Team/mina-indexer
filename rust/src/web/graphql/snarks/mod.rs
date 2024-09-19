@@ -177,7 +177,7 @@ impl SnarkQueryRoot {
 
             let mut snarks = Vec::new();
             // key should be typed
-            'outer: for (key, snark) in db.snark_prover_height_iterator(mode).flatten() {
+            'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
                 // exit if prover isn't the same
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
                     break;
@@ -205,7 +205,7 @@ impl SnarkQueryRoot {
                     };
                     if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                         snarks.push(sw);
-                        if snarks.len() == limit {
+                        if snarks.len() >= limit {
                             break 'outer;
                         }
                     }
@@ -231,13 +231,13 @@ impl SnarkQueryRoot {
             };
 
             let mut snarks = Vec::new();
-            'outer: for (key, snark) in db.snark_prover_iterator(mode).flatten() {
+            'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
                     break;
                 }
 
-                let global_slot = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
-                let blocks_at_slot = db.get_blocks_at_slot(global_slot)?;
+                let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
+                let blocks_at_slot = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_slot {
                     let canonical = get_block_canonicity(db, &state_hash.0);
                     let pcb = db
@@ -259,7 +259,7 @@ impl SnarkQueryRoot {
                     };
                     if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                         snarks.push(sw);
-                        if snarks.len() == limit {
+                        if snarks.len() >= limit {
                             break 'outer;
                         }
                     }
