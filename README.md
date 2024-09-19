@@ -49,7 +49,7 @@ optimized for the Mina ecosystem.
 
 ### Execution Environment
 
-Invoking 'mina-indexer database create' on very large blocks directories will
+Invoking `mina-indexer database create` on very large blocks directories will
 ingest the blocks at very high speed. This requires setting `ulimit -n` to a
 larger-than-default value (for many Linux distros). 1024 is not sufficient. See
 your distro's documentation on how to set `ulimit -n` (max open files) to 4096
@@ -90,13 +90,7 @@ To quickly perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-just bt
-```
-
-To perform the unit tests in addition to that, use:
-
-```bash
-just tt
+just dev
 ```
 
 To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
@@ -127,7 +121,9 @@ just tier3
 To deploy a mina-indexer locally, the directory `/mnt/mina-indexer-prod`
 must exist.
 
-Run `just deploy-local-prod` to start an instance.
+There are two options to start an instance:
+1. `just deploy-local-prod` uses the release binary
+2. `just deploy-local-prod-dev` uses the debug binary
 
 ## Generating OCI Images With Nix
 
