@@ -58,12 +58,17 @@ impl SnarkStore for IndexerStore {
         }
 
         // add: "pk -> linked list of SNARK work summaries with state hash"
+        let completed_works_state_hash: Vec<_> = completed_works
+            .into_iter()
+            .map(|snark| SnarkWorkSummaryWithStateHash::from((snark, state_hash.clone())))
+            .collect();
         for pk in block.prover_keys() {
             trace!("Adding SNARK work for pk {pk}");
 
             // get pk's next index
             let n = self.get_pk_num_prover_blocks(&pk)?.unwrap_or(0);
             let block_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = completed_works_state_hash
+                .clone()
                 .into_iter()
                 .filter(|snark| snark.contains_pk(&pk))
                 .collect();
