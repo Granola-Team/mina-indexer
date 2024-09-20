@@ -19,10 +19,7 @@ pub trait SnarkStore {
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>>;
-
-    /// Get number of blocks which pk is a SNARK work prover
-    fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
+    ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>>;
 
     /// Update snark work prover fees
     fn update_snark_prover_fees(

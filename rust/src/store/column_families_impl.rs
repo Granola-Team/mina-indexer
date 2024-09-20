@@ -763,6 +763,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: snark
     /// where
     /// - prover: [PublicKey] bytes
+    /// - index:  u32 BE bytes
     /// - snark:  [SnarkWorkSummaryWithStateHash] serde bytes
     fn snarks_prover_cf(&self) -> &ColumnFamily {
         self.database

@@ -834,9 +834,7 @@ pub async fn handle_connection(
                     if !public_key::is_valid_public_key(&pk) {
                         invalid_public_key(&pk)
                     } else {
-                        let snarks = db
-                            .get_snark_work_by_public_key(&pk.clone().into())?
-                            .unwrap_or(vec![]);
+                        let snarks = db.get_snark_work_by_public_key(&pk.clone().into())?;
                         let snarks_str = format_vec_jq_compatible(&snarks);
 
                         if path.is_none() {

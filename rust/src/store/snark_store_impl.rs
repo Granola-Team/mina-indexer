@@ -6,7 +6,7 @@ use crate::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
     utility::store::{
-        block_index_key, from_be_bytes, pk_index_key, snarks::*, u32_from_be_bytes, u32_prefix_key,
+        block_index_key, pk_index_key, snarks::*, u32_from_be_bytes, u32_prefix_key,
         u64_from_be_bytes, u64_prefix_key, U32_LEN, U64_LEN,
     },
 };
@@ -78,83 +78,57 @@ impl SnarkStore for IndexerStore {
             trace!("Adding SNARK work for pk {pk}");
 
             // get pk's next index
-            let n = self.get_pk_num_prover_blocks(&pk)?.unwrap_or(0);
+            let n = self.get_snarks_pk_total_count(&pk)?;
             let block_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = completed_works_state_hash
                 .clone()
                 .into_iter()
                 .filter(|snark| snark.contains_pk(&pk))
                 .collect();
 
-            if !block_pk_snarks.is_empty() {
-                // write these SNARKs to the next key for pk
-                self.database.put_cf(
-                    self.snarks_prover_cf(),
-                    pk_index_key(&pk, n),
-                    serde_json::to_vec(&block_pk_snarks)?,
-                )?;
+            // increment SNARK counts
+            for (index, snark) in block_pk_snarks.iter().enumerate() {
+                if self
+                    .database
+                    .get_pinned_cf(
+                        self.snark_prover_block_height_sort_cf(),
+                        snark_prover_sort_key(&pk, block_height, index as u32),
+                    )?
+                    .is_none()
+                {
+                    self.database.put_cf(
+                        self.snarks_prover_cf(),
+                        pk_index_key(&pk, n + index as u32),
+                        serde_json::to_vec(snark)?,
+                    )?;
 
-                // update pk's next index
-                self.database.put_cf(
-                    self.snarks_pk_total_cf(),
-                    pk.0.as_bytes(),
-                    (n + 1).to_be_bytes(),
-                )?;
-
-                // increment SNARK counts
-                for (index, snark) in block_pk_snarks.iter().enumerate() {
-                    if self
-                        .database
-                        .get_pinned_cf(
-                            self.snark_prover_block_height_sort_cf(),
-                            snark_prover_sort_key(&pk, block_height, index as u32),
-                        )?
-                        .is_none()
-                    {
-                        let snark: SnarkWorkSummary = snark.clone().into();
-                        self.set_snark_by_prover_block_height(&snark, block_height, index as u32)?;
-                        self.set_snark_by_prover_global_slot(&snark, global_slot, index as u32)?;
-                        self.increment_snarks_counts(&snark, epoch)?;
-                    }
+                    let snark: SnarkWorkSummary = snark.clone().into();
+                    self.set_snark_by_prover_block_height(&snark, block_height, index as u32)?;
+                    self.set_snark_by_prover_global_slot(&snark, global_slot, index as u32)?;
+                    self.increment_snarks_counts(&snark, epoch)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
-        Ok(self
-            .database
-            .get_cf(self.snarks_cf(), pk.0.as_bytes())?
-            .map(from_be_bytes))
-    }
-
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>> {
+    ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>> {
         trace!("Getting SNARK work for public key {pk}");
-        let mut all_snarks = None;
-
-        if let Some(n) = self.get_pk_num_prover_blocks(pk)? {
-            for m in 0..n {
-                if let Some(mut block_m_snarks) = self
-                    .database
-                    .get_pinned_cf(self.snarks_cf(), pk_index_key(pk, m))?
+        let mut snarks = vec![];
+        for index in 0..self.get_snarks_pk_total_count(pk)? {
+            snarks.push(
+                self.database
+                    .get_pinned_cf(self.snarks_prover_cf(), pk_index_key(pk, index))?
                     .map(|bytes| {
-                        serde_json::from_slice::<Vec<SnarkWorkSummaryWithStateHash>>(&bytes)
-                            .expect("snark work with state hash")
+                        serde_json::from_slice::<SnarkWorkSummaryWithStateHash>(&bytes)
+                            .expect("SNARK work with state hash")
                     })
-                {
-                    let mut snarks = all_snarks.unwrap_or(vec![]);
-                    snarks.append(&mut block_m_snarks);
-                    all_snarks = Some(snarks);
-                } else {
-                    all_snarks = None;
-                    break;
-                }
-            }
+                    .expect("prover SNARK work"),
+            );
         }
-        Ok(all_snarks)
+        Ok(snarks)
     }
 
     fn get_snark_work_in_block(
