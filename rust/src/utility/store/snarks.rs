@@ -6,6 +6,19 @@ use crate::{
 
 /// Key format
 /// ```
+/// {epoch}{prover}
+/// where
+/// epoch:  u32 BE bytes
+/// prover: [PublicKey] bytes
+pub fn snark_epoch_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::LEN] {
+    let mut key = [0; U32_LEN + PublicKey::LEN];
+    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[U32_LEN..].copy_from_slice(pk.0.as_bytes());
+    key
+}
+
+/// Key format
+/// ```
 /// {fee}{sort}{pk}{hash}{index}
 /// where
 /// fee:   u64 BE bytes
@@ -47,6 +60,25 @@ pub fn snark_prover_sort_key(
     key[..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
     key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[PublicKey::LEN..][U32_LEN..].copy_from_slice(&index.to_be_bytes());
+    key
+}
+
+/// Key format
+/// ```
+/// {epoch}{fee}{prover}
+/// where
+/// - epoch:  u32 BE bytes
+/// - fee:    u64 BE bytes
+/// - prover: [PublicKey] bytes
+pub fn snark_fee_epoch_sort_key(
+    epoch: u32,
+    fee: u64,
+    prover: &PublicKey,
+) -> [u8; U32_LEN + U64_LEN + PublicKey::LEN] {
+    let mut key = [0; U32_LEN + U64_LEN + PublicKey::LEN];
+    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[U32_LEN..][..U64_LEN].copy_from_slice(&fee.to_be_bytes());
+    key[U32_LEN..][U64_LEN..].copy_from_slice(prover.0.as_bytes());
     key
 }
 

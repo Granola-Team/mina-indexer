@@ -79,13 +79,6 @@ pub fn pk_txn_sort_key_state_hash(key: &[u8]) -> BlockHash {
     state_hash_suffix(key).expect("state hash bytes")
 }
 
-pub fn block_txn_index_key(state_hash: &BlockHash, index: u32) -> [u8; BlockHash::LEN + U32_LEN] {
-    let mut key = [0; BlockHash::LEN + U32_LEN];
-    key[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-    key[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
-    key
-}
-
 pub fn txn_block_key(
     txn_hash: &TxnHash,
     state_hash: &BlockHash,
