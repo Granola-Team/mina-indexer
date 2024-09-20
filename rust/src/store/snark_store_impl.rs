@@ -53,7 +53,7 @@ impl SnarkStore for IndexerStore {
             if num_prover_works.contains_key(&snark.prover) {
                 *num_prover_works.get_mut(&snark.prover).unwrap() += 1;
             } else {
-                num_prover_works.insert(snark.prover, 1);
+                num_prover_works.insert(snark.prover.clone(), 1);
             }
         }
 
@@ -197,35 +197,100 @@ impl SnarkStore for IndexerStore {
                     self.snark_prover_total_fees_sort_cf(),
                     u64_prefix_key(old_total, &snark.prover),
                 )?;
+
+                // delete the stale per epoch data
+                self.database.delete_cf(
+                    self.snark_prover_min_fee_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_min, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_max_fee_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_max, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_total_fees_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_total, &snark.prover),
+                )?;
+
+                // update the SNARK fee table
                 prover_fees.insert(
-                    snark.prover,
-                    (old_total + snark.fee, snark.fee.max(old_max)),
+                    snark.prover.clone(),
+                    (
+                        old_total + snark.fee,
+                        snark.fee.max(old_max),
+                        old_min.min(snark.fee),
+                    ),
                 );
             }
         }
 
         // replace stale data with updated
-        for (prover, (total_fees, max_fee)) in prover_fees.iter() {
+        for (prover, (total_fees, max_fee, min_fee)) in prover_fees.iter() {
+            // store the all-time data
             self.database.put_cf(
                 self.snark_prover_fees_cf(),
                 prover.0.as_bytes(),
-                max_fee.to_be_bytes(),
+                total_fees.to_be_bytes(),
             )?;
             self.database.put_cf(
                 self.snark_prover_max_fee_cf(),
                 prover.0.as_bytes(),
-                total_fees.to_be_bytes(),
+                max_fee.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_cf(),
+                prover.0.as_bytes(),
+                min_fee.to_be_bytes(),
             )?;
 
-            // sort data
+            // store the epoch data
+            self.database.put_cf(
+                self.snark_prover_fees_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                total_fees.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                max_fee.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                min_fee.to_be_bytes(),
+            )?;
+
+            // sort the all-time data
+            self.database.put_cf(
+                self.snark_prover_total_fees_sort_cf(),
+                u64_prefix_key(*total_fees, prover),
+                b"",
+            )?;
             self.database.put_cf(
                 self.snark_prover_max_fee_sort_cf(),
                 u64_prefix_key(*max_fee, prover),
                 b"",
             )?;
             self.database.put_cf(
-                self.snark_prover_total_fees_sort_cf(),
-                u64_prefix_key(*total_fees, prover),
+                self.snark_prover_min_fee_sort_cf(),
+                u64_prefix_key(*min_fee, prover),
+                b"",
+            )?;
+
+            // sort the epoch data
+            self.database.put_cf(
+                self.snark_prover_total_fees_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *total_fees, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *max_fee, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *min_fee, prover),
                 b"",
             )?;
         }
@@ -281,6 +346,55 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
+    fn get_snark_prover_epoch_fees(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_fees_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch fees")))
+    }
+
+
+    fn get_snark_prover_epoch_max_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_max_fee_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch max fee")))
+    }
+
+    fn get_snark_prover_epoch_min_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_min_fee_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch min fee")))
+    }
+
     ///////////////
     // Iterators //
     ///////////////
@@ -320,7 +434,7 @@ impl SnarkStore for IndexerStore {
     //////////////////
 
     fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
-        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
@@ -359,7 +473,7 @@ impl SnarkStore for IndexerStore {
     }
 
     fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> anyhow::Result<u32> {
-        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
         Ok(self
             .database
@@ -420,9 +534,8 @@ impl SnarkStore for IndexerStore {
         trace!("Incrementing SNARKs count {snark:?}");
 
         // prover epoch & total
-        let prover = snark.prover;
-        self.increment_snarks_pk_epoch_count(&prover, epoch)?;
-        self.increment_snarks_pk_total_count(&prover)?;
+        self.increment_snarks_pk_epoch_count(&snark.prover, epoch)?;
+        self.increment_snarks_pk_total_count(&snark.prover)?;
 
         // epoch & total counts
         self.increment_snarks_epoch_count(epoch)?;

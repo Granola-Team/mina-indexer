@@ -50,6 +50,39 @@ pub trait SnarkStore {
         index: u32,
     ) -> anyhow::Result<()>;
 
+    /// Get the SNARK prover's total fees for all SNARKs sold
+    fn get_snark_prover_total_fees(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's total fees for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_fees(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's max fee for all SNARKs sold
+    fn get_snark_prover_max_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's max fee for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_max_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's min fee for all SNARKs sold
+    fn get_snark_prover_min_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's min fee for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_min_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
     ///////////////
     // Iterators //
     ///////////////
