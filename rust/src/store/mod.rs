@@ -50,7 +50,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 111] = [
+    const COLUMN_FAMILIES: [&'static str; 120] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -117,10 +117,19 @@ impl IndexerStore {
         // SNARK store CFs //
         /////////////////////
         "snarks",
+        "snarks-prover",
         "snark-prover-fees",
-        "snark-prover-max-fee",
-        "snark-prover-max-fee-sort",
+        "snark-prover-fees-epoch",
         "snark-prover-total-fees-sort",
+        "snark-prover-total-fees-epoch-sort",
+        "snark-prover-max-fee",
+        "snark-prover-max-fee-epoch",
+        "snark-prover-max-fee-sort",
+        "snark-prover-max-fee-epoch-sort",
+        "snark-prover-min-fee",
+        "snark-prover-min-fee-epoch",
+        "snark-prover-min-fee-sort",
+        "snark-prover-min-fee-epoch-sort",
         "snark-prover-block-height-sort",
         "snark-prover-global-slot-sort",
         "snark-work-fees-block-height-sort",
