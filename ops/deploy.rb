@@ -271,7 +271,7 @@ else
       " --database-dir #{db_dir(BLOCKS_COUNT)}" \
       " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     Process.detach pid
-    puts "Mina Indexer daemon dispatched with PID #{pid}. Child exiting."
+    puts "Mina Indexer daemon dispatched with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
   end
 end
 
