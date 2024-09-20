@@ -9,6 +9,7 @@ args = [
   "-vv", # '--log-level', 'INFO',
   "--config", CONFIG_FILE,
   "--buffer-size=128Mi",
+  "--log-level=INFO"
   *ARGV
 ]
 warn "granola-rclone issuing: #{args}"
