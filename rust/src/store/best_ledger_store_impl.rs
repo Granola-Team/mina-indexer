@@ -38,7 +38,7 @@ impl BestLedgerStore for IndexerStore {
     }
 
     fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>> {
-        Ok(self.build_best_ledger()?.map(|best_ledger| {
+        Ok(self.build_best_ledger()?.inspect(|best_ledger| {
             if let Ok(Some(state_hash)) = self.get_best_block_hash() {
                 if memoize {
                     trace!("Memoizing best ledger (state hash {state_hash})");
@@ -46,7 +46,6 @@ impl BestLedgerStore for IndexerStore {
                         .ok();
                 }
             }
-            best_ledger
         }))
     }
 

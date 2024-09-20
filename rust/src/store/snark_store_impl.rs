@@ -49,7 +49,7 @@ impl SnarkStore for IndexerStore {
             )?;
 
             // build the block's fee table
-            if num_prover_works.get(&snark.prover).is_some() {
+            if num_prover_works.contains_key(&snark.prover) {
                 *num_prover_works.get_mut(&snark.prover).unwrap() += 1;
             } else {
                 num_prover_works.insert(snark.prover.clone(), 1);
@@ -156,7 +156,7 @@ impl SnarkStore for IndexerStore {
         let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();
         for snark in snarks {
             let key = snark.prover.0.as_bytes();
-            if prover_fees.get(&snark.prover).is_some() {
+            if prover_fees.contains_key(&snark.prover) {
                 prover_fees.get_mut(&snark.prover).unwrap().1 += snark.fee;
             } else {
                 let old_total = self

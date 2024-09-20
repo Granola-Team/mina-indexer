@@ -288,11 +288,7 @@ pub const MEMO_LEN: usize = 32;
 
 pub fn decode_memo(encoded: &[u8]) -> String {
     let value = &encoded[2..encoded[1] as usize + 2];
-    if let Ok(memo) = String::from_utf8(value.to_vec()) {
-        memo
-    } else {
-        String::default()
-    }
+    String::from_utf8(value.to_vec()).unwrap_or_default()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]

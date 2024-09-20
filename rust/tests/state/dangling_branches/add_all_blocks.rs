@@ -70,21 +70,13 @@ async fn extension() -> anyhow::Result<()> {
         // dangling branches
         assert_eq!(state.dangling_branches.clone().len(), 2);
 
-        state
-            .dangling_branches
-            .iter()
-            .enumerate()
-            .for_each(|(_, tree)| {
-                assert_eq!(tree.height(), 1);
-            });
+        state.dangling_branches.iter().for_each(|tree| {
+            assert_eq!(tree.height(), 1);
+        });
 
-        state
-            .dangling_branches
-            .iter()
-            .enumerate()
-            .for_each(|(_, tree)| {
-                assert_eq!(tree.leaves().len(), 1);
-            });
+        state.dangling_branches.iter().for_each(|tree| {
+            assert_eq!(tree.leaves().len(), 1);
+        });
 
         // root branch
         println!("=== Root Branch ===");
