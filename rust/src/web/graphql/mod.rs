@@ -5,6 +5,7 @@ pub mod gen;
 pub mod snarks;
 pub mod staged_ledgers;
 pub mod stakes;
+pub mod top_snarkers;
 pub mod top_stakers;
 pub mod transactions;
 pub mod version;
@@ -28,6 +29,7 @@ pub struct Root(
     snarks::SnarkQueryRoot,
     staged_ledgers::StagedLedgerQueryRoot,
     top_stakers::TopStakersQueryRoot,
+    top_snarkers::TopSnarkersQueryRoot,
     version::VersionQueryRoot,
 );
 
