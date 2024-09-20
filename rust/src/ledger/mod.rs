@@ -203,13 +203,13 @@ impl Ledger {
     }
 }
 
-impl ToString for Ledger {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Ledger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut accounts = HashMap::new();
         for (pk, acct) in self.accounts.iter() {
             accounts.insert(pk.to_address(), acct.clone().display());
         }
-        serde_json::to_string(&accounts).unwrap()
+        write!(f, "{}", serde_json::to_string(&accounts).unwrap())
     }
 }
 

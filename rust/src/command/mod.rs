@@ -418,16 +418,17 @@ impl From<UserCommandWithStatus> for CommandStatusData {
 
 impl std::fmt::Debug for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{self}")
     }
 }
 
-impl ToString for CommandType {
-    fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result: String = match self {
             Self::Payment => "PAYMENT".into(),
             Self::Delegation => "STAKE_DELEGATION".into(),
-        }
+        };
+        write!(f, "{result}")
     }
 }
 
