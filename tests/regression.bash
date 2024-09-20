@@ -1511,7 +1511,7 @@ test_load() {
 }
 
 test_hurl() {
-    stage_mainnet_blocks 125 ./blocks
+    stage_mainnet_blocks 120 ./blocks
 
     port=$(ephemeral_port)
     idxr database create \
