@@ -1511,7 +1511,7 @@ test_load() {
 }
 
 test_hurl() {
-    stage_mainnet_blocks 120 ./blocks
+    stage_mainnet_blocks 125 ./blocks
 
     port=$(ephemeral_port)
     idxr database create \
@@ -1531,11 +1531,12 @@ test_hurl() {
     fi
 
     # selectively run hurl tests by file with HURL_TEST env var
-    test_file="$SRC"/tests/hurl/"${HURL_TEST:-}".hurl
-    if [[ -f "$test_file" ]]; then
-        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+    # run in very verbose mode by setting HURL_VERBOSE to anything
+    test_file="$SRC"/tests/hurl/"${HURL_TEST:-*}".hurl
+    if [ "${HURL_VERBOSE:-}" ]; then
+        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
     else
-        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$SRC"/tests/hurl/*.hurl
+        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
     fi
 }
 
