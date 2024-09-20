@@ -74,7 +74,7 @@ mod tests {
         let ledgers_dir: PathBuf = "./tests/data/staking_ledgers".into();
         let mut n = 0;
         let mut ledger_parser = StakingLedgerParser::new(&ledgers_dir)?;
-        let expect = vec![
+        let expect = [
             (
                 0,
                 "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string(),

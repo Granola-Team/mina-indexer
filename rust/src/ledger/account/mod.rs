@@ -29,9 +29,9 @@ impl Amount {
     }
 }
 
-impl ToString for Amount {
-    fn to_string(&self) -> String {
-        nanomina_to_mina(self.0)
+impl std::fmt::Display for Amount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", nanomina_to_mina(self.0))
     }
 }
 

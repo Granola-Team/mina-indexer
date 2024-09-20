@@ -78,12 +78,13 @@ lint:
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
   @echo "--- Linting Nix configs"
-  [ "$(nixfmt < flake.nix)" == "$(cat flake.nix)" ]
+  alejandra --check flake.nix
   @echo "--- Linting Cargo dependencies"
   cd rust && cargo machete Cargo.toml
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
+  alejandra flake.nix
 
 # Perform a fast verification of whether the source compiles.
 check:

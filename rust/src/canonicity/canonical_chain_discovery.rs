@@ -274,7 +274,7 @@ mod discovery_algorithm_tests {
         tree_map.insert(1, vec![&binding_2]);
 
         // Expected orphaned paths
-        let expected_orphaned_paths = vec![
+        let expected_orphaned_paths = [
             PathBuf::from("mainnet-2-d.json"),
             PathBuf::from("mainnet-3-e.json"),
         ];
@@ -322,16 +322,16 @@ mod discovery_algorithm_tests {
         tree_map.insert(6, vec![&binding_3]);
 
         // Expected recent paths
-        let expected_recent_paths = vec![
+        let expected_recent_paths = [
             PathBuf::from("mainnet-4-d.json"), // in canonical chain
             PathBuf::from("mainnet-4-x.json"), // recent, but not canonical
             PathBuf::from("mainnet-5-e.json"), // best tip
             PathBuf::from("mainnet-5-y.json"), // recent, but not canonical
-            PathBuf::from("mainnet-6-z.json"), // recent, but not canonical
+            PathBuf::from("mainnet-6-z.json"),
         ];
 
         // Expected canonical branch after split
-        let expected_canonical_branch = vec![
+        let expected_canonical_branch = [
             PathBuf::from("mainnet-1-a.json"),
             PathBuf::from("mainnet-2-b.json"),
             PathBuf::from("mainnet-3-c.json"),

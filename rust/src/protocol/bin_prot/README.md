@@ -18,7 +18,7 @@ Example:
 ```rust
 use mina_indexer::protocol::bin_prot::{from_reader, to_writer};
 
-fn main() {
+fn a() {
   let val: Vec<i64> = vec![20, -22, 38];
 
   // Example write into a vec of bytes
@@ -30,7 +30,6 @@ fn main() {
 
   assert!(val == de_val)
 }
-
 ```
 
 ### Loosely Typed

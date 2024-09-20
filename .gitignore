@@ -19,6 +19,9 @@ database/
 .*.swp
 /.vscode
 
+# Don't ignore the config.toml file
+!/.cargo/config.toml
+
 # Local Cargo cache
 /.cargo/
 

@@ -288,11 +288,7 @@ pub const MEMO_LEN: usize = 32;
 
 pub fn decode_memo(encoded: &[u8]) -> String {
     let value = &encoded[2..encoded[1] as usize + 2];
-    if let Ok(memo) = String::from_utf8(value.to_vec()) {
-        memo
-    } else {
-        String::default()
-    }
+    String::from_utf8(value.to_vec()).unwrap_or_default()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -422,16 +418,17 @@ impl From<UserCommandWithStatus> for CommandStatusData {
 
 impl std::fmt::Debug for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{self}")
     }
 }
 
-impl ToString for CommandType {
-    fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result: String = match self {
             Self::Payment => "PAYMENT".into(),
             Self::Delegation => "STAKE_DELEGATION".into(),
-        }
+        };
+        write!(f, "{result}")
     }
 }
 

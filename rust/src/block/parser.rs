@@ -323,6 +323,7 @@ mod tests {
     }
 
     #[derive(Debug, Clone)]
+    #[allow(dead_code)]
     struct BlockFileName(PathBuf);
 
     impl Arbitrary for BlockHash {
