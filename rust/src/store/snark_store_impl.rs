@@ -156,7 +156,11 @@ impl SnarkStore for IndexerStore {
         Ok(None)
     }
 
-    fn update_snark_prover_fees(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()> {
+    fn update_snark_prover_fees(
+        &self,
+        epoch: u32,
+        snarks: &[SnarkWorkSummary],
+    ) -> anyhow::Result<()> {
         trace!("Updating SNARK prover fees");
 
         let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();

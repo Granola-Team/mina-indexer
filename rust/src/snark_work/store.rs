@@ -25,7 +25,11 @@ pub trait SnarkStore {
     fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
 
     /// Update snark work prover fees
-    fn update_snark_prover_fees(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()>;
+    fn update_snark_prover_fees(
+        &self,
+        epoch: u32,
+        snarks: &[SnarkWorkSummary],
+    ) -> anyhow::Result<()>;
 
     /// Get top `n` SNARK provers by accumulated fees
     fn get_top_snark_provers_by_total_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
