@@ -3,7 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
 };
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode};
 
 pub trait SnarkStore {
     /// Add snark work in a precomputed block
@@ -96,8 +96,32 @@ pub trait SnarkStore {
     /// Iterator over SNARK provers by max fee
     fn snark_prover_max_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
+    /// Iterator over SNARK provers per epoch by max fee
+    fn snark_prover_max_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers by min fee
+    fn snark_prover_min_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers per epoch by min fee
+    fn snark_prover_min_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
     /// Iterator over SNARK provers by accumulated fees
     fn snark_prover_total_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers per epoch by accumulated fees
+    fn snark_prover_total_fees_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
 
     /// Iterator over SNARKs by prover, sorted by block height & index
     fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
