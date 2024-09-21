@@ -43,6 +43,19 @@ pub fn i64_from_be_bytes(i64_be_bytes: &[u8]) -> anyhow::Result<i64> {
 
 /// Key format
 /// ```
+/// {hash}{index}
+/// where
+/// - hash:  [BlockHash] bytes
+/// - index: u32 BE bytes
+pub fn block_index_key(state_hash: &BlockHash, index: u32) -> [u8; BlockHash::LEN + U32_LEN] {
+    let mut key = [0; BlockHash::LEN + U32_LEN];
+    key[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    key[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+    key
+}
+
+/// Key format
+/// ```
 /// {pk}{index}
 /// where
 /// - pk:    [PublicKey] bytes

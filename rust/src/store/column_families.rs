@@ -253,23 +253,61 @@ pub trait ColumnFamilyHelpers {
     // SNARK store CFs //
     /////////////////////
 
-    /// CF for storing SNARKs
+    /// CF for storing SNARKs by block state hash & index
+    /// [block_snark_counts_cf] stores the number of SNARKs per block
     fn snarks_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing all snark work fee totals
-    fn snark_top_producers_cf(&self) -> &ColumnFamily;
+    /// CF for storing SNARKs per prover & index
+    /// [snarks_pk_total_cf] stores per prover SNARK counts
+    fn snarks_prover_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting all snark work fee totals
-    fn snark_top_producers_sort_cf(&self) -> &ColumnFamily;
+    /// CF for storing all SNARK prover fee totals
+    fn snark_prover_fees_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing/sorting SNARK work fees
-    fn snark_work_fees_cf(&self) -> &ColumnFamily;
+    /// CF for storing per epoch SNARK prover fee totals
+    fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting SNARKs by prover
-    fn snark_work_prover_cf(&self) -> &ColumnFamily;
+    /// CF for sorting all SNARK prover fee totals
+    fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting SNARKS by prover and block height
-    fn snark_work_prover_height_cf(&self) -> &ColumnFamily;
+    /// CF for sorting per epoch SNARK prover fee totals
+    fn snark_prover_total_fees_epoch_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing SNARK prover max fees
+    fn snark_prover_max_fee_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing per epoch SNARK prover max fees
+    fn snark_prover_max_fee_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting all SNARK provers by max fees
+    fn snark_prover_max_fee_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting per epoch SNARK provers by max fees
+    fn snark_prover_max_fee_epoch_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing SNARK prover min fees
+    fn snark_prover_min_fee_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing per epoch SNARK prover min fees
+    fn snark_prover_min_fee_epoch_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting all SNARK provers by min fees
+    fn snark_prover_min_fee_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting per epoch SNARK provers by min fees
+    fn snark_prover_min_fee_epoch_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARKS by prover & block height
+    fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARKS by prover & global slot
+    fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARK work fees & block height
+    fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting SNARK work fees & global slot
+    fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     ////////////////////
     // Username store //
@@ -354,13 +392,13 @@ pub trait ColumnFamilyHelpers {
     /// CF for per acccount internal command totals
     fn internal_commands_pk_total_cf(&self) -> &ColumnFamily;
 
-    /// CF for per epoch snark totals
+    /// CF for per epoch SNARK totals
     fn snarks_epoch_cf(&self) -> &ColumnFamily;
 
-    /// CF for per epoch per acccount snark totals
+    /// CF for per epoch per acccount SNARK totals
     fn snarks_pk_epoch_cf(&self) -> &ColumnFamily;
 
-    /// CF for per acccount snark totals
+    /// CF for per acccount SNARK totals
     fn snarks_pk_total_cf(&self) -> &ColumnFamily;
 
     /////////////////////

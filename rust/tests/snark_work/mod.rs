@@ -56,10 +56,8 @@ async fn store() -> anyhow::Result<()> {
             .filter(|x| x.contains_pk(&pk))
             .cloned()
             .collect();
-        let result_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = indexer_store
-            .as_ref()
-            .get_snark_work_by_public_key(&pk)?
-            .unwrap_or(vec![]);
+        let result_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> =
+            indexer_store.as_ref().get_snark_work_by_public_key(&pk)?;
         assert_eq!(result_pk_snarks, pk_snarks);
     }
     Ok(())

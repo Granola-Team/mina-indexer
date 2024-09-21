@@ -743,59 +743,266 @@ impl ColumnFamilyHelpers for IndexerStore {
     // SNARK store CFs //
     /////////////////////
 
+    /// CF for storing SNARKs by block state hash
+    /// ```
+    /// key: {hash}{index}
+    /// val: snark
+    /// where
+    /// - hash:  [BlockHash] bytes
+    /// - index: u32 BE bytes
+    /// - snark: [SnarkWorkSummary] serde bytes
     fn snarks_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks")
             .expect("snarks column family exists")
     }
 
-    fn snark_top_producers_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("snark-work-top-producers")
-            .expect("snark-work-top-producers column family exists")
-    }
-
-    fn snark_top_producers_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("snark-work-top-producers-sort")
-            .expect("snark-work-top-producers-sort column family exists")
-    }
-
-    /// key: [snark_fee_prefix_key]
-    fn snark_work_fees_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("snark-work-fees")
-            .expect("snark-work-fees column family exists")
-    }
-
-    /// CF for storing/sorting SNARKs by prover
+    /// CF for storing SNARKs by prover
     /// ```
-    /// key: {prover}{slot}{index}
+    /// key: {prover}{index}
     /// val: snark
     /// where
-    /// - prover: 55 pk bytes
-    /// - slot:   4 BE bytes
-    /// - index:  4 BE bytes
-    /// - snark:  SNARK serde bytes
-    fn snark_work_prover_cf(&self) -> &ColumnFamily {
+    /// - prover: [PublicKey] bytes
+    /// - index:  u32 BE bytes
+    /// - snark:  [SnarkWorkSummaryWithStateHash] serde bytes
+    fn snarks_prover_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("snark-work-prover")
-            .expect("snark-work-prover column family exists")
+            .cf_handle("snarks-prover")
+            .expect("snarks-prover column family exists")
     }
 
-    /// CF for storing/sorting SNARKs by prover and block height
+    /// CF for storing SNARK total fees by prover
+    /// ```
+    /// key: prover
+    /// val: fees
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - fees:   u64 BE bytes
+    fn snark_prover_fees_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-fees")
+            .expect("snark-prover-fees column family exists")
+    }
+
+    /// CF for storing per epoch SNARK total fees by prover
+    /// ```
+    /// key: {epoch}{prover}
+    /// val: fees
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// - fees:   u64 BE bytes
+    fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-fees-epoch")
+            .expect("snark-prover-fees-epoch column family exists")
+    }
+
+    /// CF for sorting SNARK provers by total fees
+    /// ```
+    /// key: {fees}{prover}
+    /// val: b""
+    /// where
+    /// - fees:   u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-total-fees-sort")
+            .expect("snark-prover-total-fees-sort column family exists")
+    }
+
+    /// CF for sorting per epoch SNARK provers by total fees
+    /// ```
+    /// key: {epoch}{fees}{prover}
+    /// val: b""
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - fees:   u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    fn snark_prover_total_fees_epoch_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-total-fees-epoch-sort")
+            .expect("snark-prover-total-fees-epoch-sort column family exists")
+    }
+
+    /// CF for storing SNARK prover max fees
+    /// ```
+    /// key: prover
+    /// val: fee
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - fee:    u64 BE bytes
+    fn snark_prover_max_fee_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-max-fee")
+            .expect("snark-prover-max-fee column family exists")
+    }
+
+    /// CF for storing per epoch SNARK prover max fees
+    /// ```
+    /// key: {epoch}{prover}
+    /// val: fee
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// - fee:    u64 BE bytes
+    fn snark_prover_max_fee_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-max-fee-epoch")
+            .expect("snark-prover-max-fee-epoch column family exists")
+    }
+
+    /// CF for sorting SNARK provers by max fee
+    /// ```
+    /// key: {fee}{prover}
+    /// val: b""
+    /// where
+    /// - fee:    u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// ```
+    /// Use [snark_fee_sort_key]
+    fn snark_prover_max_fee_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-max-fee-sort")
+            .expect("snark-prover-max-fee-sort column family exists")
+    }
+
+    /// CF for sorting per epoch SNARK provers by max fee
+    /// ```
+    /// key:{epoch}{fee}{prover}
+    /// val: b""
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - fee:    u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// ```
+    /// Use [snark_fee_epoch_sort_key]
+    fn snark_prover_max_fee_epoch_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-max-fee-epoch-sort")
+            .expect("snark-prover-max-fee-epoch-sort column family exists")
+    }
+
+    /// CF for storing SNARK prover min fees
+    /// ```
+    /// key: prover
+    /// val: fee
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - fee:    u64 BE bytes
+    fn snark_prover_min_fee_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-min-fee")
+            .expect("snark-prover-min-fee column family exists")
+    }
+
+    /// CF for storing per epoch SNARK prover min fees
+    /// ```
+    /// key: {epoch}{prover}
+    /// val: fee
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// - fee:    u64 BE bytes
+    fn snark_prover_min_fee_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-min-fee-epoch")
+            .expect("snark-prover-min-fee-epoch column family exists")
+    }
+
+    /// CF for sorting SNARK provers by min fee
+    /// ```
+    /// key: {fee}{prover}
+    /// val: b""
+    /// where
+    /// - fee:    u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// ```
+    /// Use [snark_fee_sort_key]
+    fn snark_prover_min_fee_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-min-fee-sort")
+            .expect("snark-prover-min-fee-sort column family exists")
+    }
+
+    /// CF for sorting per epoch SNARK provers by min fee
+    /// ```
+    /// key: {epoch}{fee}{prover}
+    /// val: b""
+    /// where
+    /// - epoch:  u32 BE bytes
+    /// - fee:    u64 BE bytes
+    /// - prover: [PublicKey] bytes
+    /// ```
+    /// Use [snark_fee_epoch_sort_key]
+    fn snark_prover_min_fee_epoch_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-min-fee-epoch-sort")
+            .expect("snark-prover-min-fee-epoch-sort column family exists")
+    }
+
+    /// CF for storing/sorting SNARKs by prover & block height
     /// ```
     /// key: {prover}{block_height}{index}
     /// val: snark
     /// where
-    /// - prover:         55 pk bytes
-    /// - block height:   4 BE bytes
-    /// - index:          4 BE bytes
-    /// - snark:          SNARK serde bytes
-    fn snark_work_prover_height_cf(&self) -> &ColumnFamily {
+    /// - prover:       [PublicKey] bytes
+    /// - block height: u32 BE bytes
+    /// - index:        u32 BE bytes
+    /// - snark:        [SnarkWorkSummary] serde bytes
+    fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("snark-work-prover-height")
-            .expect("snark-work-prover column family exists")
+            .cf_handle("snark-prover-block-height-sort")
+            .expect("snark-prover-block-height-sort column family exists")
+    }
+
+    /// CF for storing/sorting SNARKs by prover & global slot
+    /// ```
+    /// key: {prover}{global_slot}{index}
+    /// val: snark
+    /// where
+    /// - prover:      [PublicKey] bytes
+    /// - global_slot: u32 BE bytes
+    /// - index:       u32 BE bytes
+    /// - snark:       [SnarkWorkSummary] serde bytes
+    fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-global-slot-sort")
+            .expect("snark-prover-global-slot-sort column family exists")
+    }
+
+    /// CF for sorting snark fees by block height
+    /// ```
+    /// {fee}{sort}{pk}{hash}{index}
+    /// where
+    /// fee:   u64 BE bytes
+    /// sort:  u32 BE bytes
+    /// pk:    [PublicKey] bytes
+    /// hash:  [BlockHash] bytes
+    /// index: u32 BE bytes
+    /// ```
+    /// Use [snark_fee_sort_key]
+    fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-fees-block-height-sort")
+            .expect("snark-work-fees-block-height-sort column family exists")
+    }
+
+    /// CF for sorting snark fees by global slot
+    /// ```
+    /// {fee}{sort}{pk}{hash}{index}
+    /// where
+    /// fee:   u64 BE bytes
+    /// sort:  u32 BE bytes
+    /// pk:    [PublicKey] bytes
+    /// hash:  [BlockHash] bytes
+    /// index: u32 BE bytes
+    /// ```
+    /// Use [snark_fee_sort_key]
+    fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-work-fees-global-slot-sort")
+            .expect("snark-work-fees-global-slot-sort column family exists")
     }
 
     ////////////////////////

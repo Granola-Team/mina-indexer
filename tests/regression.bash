@@ -1532,12 +1532,34 @@ test_hurl() {
 
     # selectively run hurl tests by file with HURL_TEST env var
     # run in very verbose mode by setting HURL_VERBOSE to anything
-    test_file="$SRC"/tests/hurl/"${HURL_TEST:-*}".hurl
-    if [ "${HURL_VERBOSE:-}" ]; then
-        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
-    else
-        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
-    fi
+    for test_file in "$SRC"/tests/hurl/*.hurl; do
+        if [ "$test_file" != "$SRC"/tests/hurl/top_snarkers.hurl ]; then
+            if [ "${HURL_VERBOSE:-}" ]; then
+                hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+            else
+                hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+            fi
+        fi
+    done
+}
+
+test_top_snarkers() {
+    stage_mainnet_blocks 125 ./blocks
+
+    port=$(ephemeral_port)
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --staking-ledgers-dir $STAKING_LEDGERS
+    idxr_server start \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0" \
+        --database-dir ./database
+    wait_for_socket
+    sleep 3
+
+    test_file="$SRC"/tests/hurl/top_snarkers.hurl
+    hurl --very-verbose --variable url=http://localhost:"$port"/graphql $test_file
 }
 
 test_version_file() {
@@ -1774,6 +1796,7 @@ for test_name in "$@"; do
         "test_internal_commands_csv") test_internal_commands_csv ;;
         "test_start_from_config") test_start_from_config ;;
         "test_hurl") test_hurl ;;
+        "test_top_snarkers") test_top_snarkers ;;
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;

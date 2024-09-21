@@ -5,45 +5,58 @@ use crate::{
     snark_work::{
         store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
-    utility::store::{from_be_bytes, pk_index_key, snarks::*, u32_prefix_key, u64_prefix_key},
+    utility::store::{
+        block_index_key, pk_index_key, snarks::*, u32_from_be_bytes, u32_prefix_key,
+        u64_from_be_bytes, u64_prefix_key, U32_LEN, U64_LEN,
+    },
 };
 use log::trace;
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
 
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding SNARK work from block {}", block.summary());
-
+        let state_hash = block.state_hash();
         let epoch = block.epoch_count();
         let global_slot = block.global_slot_since_genesis();
         let block_height = block.blockchain_length();
         let completed_works = SnarkWorkSummary::from_precomputed(block);
-        let completed_works_state_hash = SnarkWorkSummaryWithStateHash::from_precomputed(block);
 
-        // add: state hash -> snark works
-        let state_hash = block.state_hash();
-        self.database.put_cf(
-            self.snarks_cf(),
-            state_hash.0.as_bytes(),
-            serde_json::to_vec(&completed_works)?,
-        )?;
-
-        // per block SNARK count
-        self.set_block_snarks_count(&block.state_hash(), completed_works.len() as u32)?;
-
-        // store fee info
+        // add snark works & fee data
         let mut num_prover_works: HashMap<PublicKey, u32> = HashMap::new();
-        for snark in completed_works {
-            let num = num_prover_works.get(&snark.prover).copied().unwrap_or(0);
+        let num_snarks = completed_works.len() as u32;
+
+        self.set_block_snarks_count(&state_hash, num_snarks)?;
+        for (index, snark) in completed_works.iter().enumerate() {
+            // add snark
             self.database.put_cf(
-                self.snark_work_fees_cf(),
-                snark_fee_prefix_key(
+                self.snarks_cf(),
+                block_index_key(&state_hash, index as u32),
+                serde_json::to_vec(snark)?,
+            )?;
+
+            // add fee data
+            let prover_index = num_prover_works.get(&snark.prover).copied().unwrap_or(0);
+            self.database.put_cf(
+                self.snark_work_fees_block_height_sort_cf(),
+                snark_fee_sort_key(
                     snark.fee,
-                    block.global_slot_since_genesis(),
+                    block_height,
                     &snark.prover,
                     &state_hash,
-                    num,
+                    prover_index,
+                ),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_work_fees_global_slot_sort_cf(),
+                snark_fee_sort_key(
+                    snark.fee,
+                    global_slot,
+                    &snark.prover,
+                    &state_hash,
+                    prover_index,
                 ),
                 b"",
             )?;
@@ -57,146 +70,243 @@ impl SnarkStore for IndexerStore {
         }
 
         // add: "pk -> linked list of SNARK work summaries with state hash"
+        let completed_works_state_hash: Vec<_> = completed_works
+            .into_iter()
+            .map(|snark| SnarkWorkSummaryWithStateHash::from((snark, state_hash.clone())))
+            .collect();
         for pk in block.prover_keys() {
             trace!("Adding SNARK work for pk {pk}");
 
             // get pk's next index
-            let n = self.get_pk_num_prover_blocks(&pk)?.unwrap_or(0);
+            let n = self.get_snarks_pk_total_count(&pk)?;
             let block_pk_snarks: Vec<SnarkWorkSummaryWithStateHash> = completed_works_state_hash
                 .clone()
                 .into_iter()
                 .filter(|snark| snark.contains_pk(&pk))
                 .collect();
 
-            if !block_pk_snarks.is_empty() {
-                // write these SNARKs to the next key for pk
-                self.database.put_cf(
-                    self.snarks_cf(),
-                    pk_index_key(&pk, n),
-                    serde_json::to_vec(&block_pk_snarks)?,
-                )?;
+            // increment SNARK counts
+            for (index, snark) in block_pk_snarks.iter().enumerate() {
+                if self
+                    .database
+                    .get_pinned_cf(
+                        self.snark_prover_block_height_sort_cf(),
+                        snark_prover_sort_key(&pk, block_height, index as u32),
+                    )?
+                    .is_none()
+                {
+                    self.database.put_cf(
+                        self.snarks_prover_cf(),
+                        pk_index_key(&pk, n + index as u32),
+                        serde_json::to_vec(snark)?,
+                    )?;
 
-                // update pk's next index
-                self.database
-                    .put_cf(self.snarks_cf(), pk.0.as_bytes(), (n + 1).to_be_bytes())?;
-
-                // increment SNARK counts
-                for (index, snark) in block_pk_snarks.iter().enumerate() {
-                    if self
-                        .database
-                        .get_pinned_cf(
-                            self.snark_work_prover_cf(),
-                            snark_prover_prefix_key(&pk, global_slot, index as u32),
-                        )?
-                        .is_none()
-                    {
-                        let snark: SnarkWorkSummary = snark.clone().into();
-                        self.set_snark_by_prover(&snark, global_slot, index as u32)?;
-                        self.set_snark_by_prover_height(&snark, block_height, index as u32)?;
-                        self.increment_snarks_counts(&snark, epoch)?;
-                    }
+                    let snark: SnarkWorkSummary = snark.clone().into();
+                    self.set_snark_by_prover_block_height(&snark, block_height, index as u32)?;
+                    self.set_snark_by_prover_global_slot(&snark, global_slot, index as u32)?;
+                    self.increment_snarks_counts(&snark, epoch)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
-        Ok(self
-            .database
-            .get_cf(self.snarks_cf(), pk.0.as_bytes())?
-            .map(from_be_bytes))
-    }
-
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>> {
+    ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>> {
         trace!("Getting SNARK work for public key {pk}");
-        let mut all_snarks = None;
-
-        if let Some(n) = self.get_pk_num_prover_blocks(pk)? {
-            for m in 0..n {
-                if let Some(mut block_m_snarks) = self
-                    .database
-                    .get_pinned_cf(self.snarks_cf(), pk_index_key(pk, m))?
+        let mut snarks = vec![];
+        for index in 0..self.get_snarks_pk_total_count(pk)? {
+            snarks.push(
+                self.database
+                    .get_pinned_cf(self.snarks_prover_cf(), pk_index_key(pk, index))?
                     .map(|bytes| {
-                        serde_json::from_slice::<Vec<SnarkWorkSummaryWithStateHash>>(&bytes)
-                            .expect("snark work with state hash")
+                        serde_json::from_slice::<SnarkWorkSummaryWithStateHash>(&bytes)
+                            .expect("SNARK work with state hash")
                     })
-                {
-                    let mut snarks = all_snarks.unwrap_or(vec![]);
-                    snarks.append(&mut block_m_snarks);
-                    all_snarks = Some(snarks);
-                } else {
-                    all_snarks = None;
-                    break;
-                }
-            }
+                    .expect("prover SNARK work"),
+            );
         }
-        Ok(all_snarks)
+        Ok(snarks)
     }
 
     fn get_snark_work_in_block(
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
-        trace!("Getting SNARK work in block {}", state_hash);
-
-        let key = state_hash.0.as_bytes();
-        if let Some(snarks_bytes) = self.database.get_pinned_cf(self.snarks_cf(), key)? {
-            return Ok(Some(serde_json::from_slice(&snarks_bytes)?));
+        trace!("Getting SNARK work in block {state_hash}");
+        let mut snarks: Vec<SnarkWorkSummary> = vec![];
+        if let Some(num) = self.get_block_snarks_count(state_hash)? {
+            for index in 0..num {
+                let snark = self
+                    .database
+                    .get_pinned_cf(self.snarks_cf(), block_index_key(state_hash, index))?
+                    .map(|bytes| {
+                        serde_json::from_slice(&bytes).expect("SnarkWorkSummary serde bytes")
+                    })
+                    .expect("SNARK");
+                snarks.push(snark);
+            }
+            return Ok(Some(snarks));
         }
         Ok(None)
     }
 
-    fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()> {
-        trace!("Updating top SNARK workers");
-
-        let mut prover_fees: HashMap<PublicKey, (u64, u64)> = HashMap::new();
-        for snark in snarks {
-            let key = snark.prover.0.as_bytes();
+    fn update_snark_prover_fees(
+        &self,
+        epoch: u32,
+        snarks: &[SnarkWorkSummary],
+    ) -> anyhow::Result<()> {
+        trace!("Updating SNARK prover fees");
+        let mut prover_fees: HashMap<PublicKey, (u64, u64, u64)> = HashMap::new();
+        for snark in snarks.iter() {
             if prover_fees.contains_key(&snark.prover) {
-                prover_fees.get_mut(&snark.prover).unwrap().1 += snark.fee;
-            } else {
-                let old_total = self
-                    .database
-                    .get_pinned_cf(self.snark_top_producers_cf(), key)?
-                    .map_or(0, |fee_bytes| {
-                        serde_json::from_slice::<u64>(&fee_bytes).expect("fee is u64")
-                    });
-                prover_fees.insert(snark.prover.clone(), (old_total, snark.fee));
+                // update total
+                prover_fees.get_mut(&snark.prover).unwrap().0 += snark.fee;
 
-                // delete the stale data
+                // update min/max
+                let max_fee = prover_fees.get(&snark.prover).unwrap().1;
+                let min_fee = prover_fees.get(&snark.prover).unwrap().2;
+                if snark.fee > max_fee {
+                    prover_fees.get_mut(&snark.prover).unwrap().1 = snark.fee;
+                }
+                if snark.fee < min_fee {
+                    prover_fees.get_mut(&snark.prover).unwrap().2 = snark.fee;
+                }
+            } else {
+                let old_min = self
+                    .get_snark_prover_min_fee(&snark.prover)?
+                    .unwrap_or(u64::MAX);
+                let old_max = self.get_snark_prover_max_fee(&snark.prover)?.unwrap_or(0);
+                let old_total = self
+                    .get_snark_prover_total_fees(&snark.prover)?
+                    .unwrap_or(0);
+
+                // delete the stale all-time data
                 self.database.delete_cf(
-                    self.snark_top_producers_sort_cf(),
+                    self.snark_prover_min_fee_sort_cf(),
+                    u64_prefix_key(old_min, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_max_fee_sort_cf(),
+                    u64_prefix_key(old_max, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_total_fees_sort_cf(),
                     u64_prefix_key(old_total, &snark.prover),
-                )?
+                )?;
+
+                // delete the stale per epoch data
+                self.database.delete_cf(
+                    self.snark_prover_min_fee_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_min, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_max_fee_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_max, &snark.prover),
+                )?;
+                self.database.delete_cf(
+                    self.snark_prover_total_fees_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_total, &snark.prover),
+                )?;
+
+                // update the SNARK fee table
+                prover_fees.insert(
+                    snark.prover.clone(),
+                    (
+                        old_total + snark.fee,
+                        snark.fee.max(old_max),
+                        old_min.min(snark.fee),
+                    ),
+                );
             }
         }
 
         // replace stale data with updated
-        for (prover, (old_total, new_fees)) in prover_fees.iter() {
-            let total_fees = old_total + new_fees;
-            let key = u64_prefix_key(total_fees, prover);
-            self.database
-                .put_cf(self.snark_top_producers_sort_cf(), key, b"")?
-        }
+        for (prover, (total_fees, max_fee, min_fee)) in prover_fees.iter() {
+            // store the all-time data
+            self.database.put_cf(
+                self.snark_prover_fees_cf(),
+                prover.0.as_bytes(),
+                total_fees.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_cf(),
+                prover.0.as_bytes(),
+                max_fee.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_cf(),
+                prover.0.as_bytes(),
+                min_fee.to_be_bytes(),
+            )?;
 
+            // store the epoch data
+            self.database.put_cf(
+                self.snark_prover_fees_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                total_fees.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                max_fee.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                min_fee.to_be_bytes(),
+            )?;
+
+            // sort the all-time data
+            self.database.put_cf(
+                self.snark_prover_total_fees_sort_cf(),
+                u64_prefix_key(*total_fees, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_sort_cf(),
+                u64_prefix_key(*max_fee, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_sort_cf(),
+                u64_prefix_key(*min_fee, prover),
+                b"",
+            )?;
+
+            // sort the epoch data
+            self.database.put_cf(
+                self.snark_prover_total_fees_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *total_fees, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *max_fee, prover),
+                b"",
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_epoch_sort_cf(),
+                snark_fee_epoch_sort_key(epoch, *min_fee, prover),
+                b"",
+            )?;
+        }
         Ok(())
     }
 
-    fn get_top_snark_workers_by_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+    fn get_top_snark_provers_by_total_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
         trace!("Getting top {n} SNARK workers by fees");
         Ok(self
-            .top_snark_workers_iterator(IteratorMode::End)
+            .snark_prover_total_fees_iterator(IteratorMode::End)
             .take(n)
             .map(|res| {
                 res.map(|(bytes, _)| {
-                    let mut total_fees_bytes = [0; 8];
-                    total_fees_bytes.copy_from_slice(&bytes[..8]);
+                    let mut total_fees_bytes = [0; U64_LEN];
+                    total_fees_bytes.copy_from_slice(&bytes[..U64_LEN]);
                     SnarkWorkTotal {
-                        prover: PublicKey::from_bytes(&bytes[8..]).expect("public key"),
+                        prover: PublicKey::from_bytes(&bytes[U64_LEN..]).expect("public key"),
                         total_fees: u64::from_be_bytes(total_fees_bytes),
                     }
                 })
@@ -205,65 +315,197 @@ impl SnarkStore for IndexerStore {
             .collect())
     }
 
-    fn top_snark_workers_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.snark_top_producers_sort_cf(), mode)
-    }
-
-    fn snark_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database.iterator_cf(self.snark_work_fees_cf(), mode)
-    }
-
-    fn set_snark_by_prover(
-        &self,
-        snark: &SnarkWorkSummary,
-        global_slot: u32,
-        index: u32,
-    ) -> anyhow::Result<()> {
-        trace!(
-            "Setting snark slot {global_slot} at index {index} for prover {}",
-            snark.prover
-        );
-        Ok(self.database.put_cf(
-            self.snark_work_prover_cf(),
-            snark_prover_prefix_key(&snark.prover, global_slot, index),
-            serde_json::to_vec(snark)?,
-        )?)
-    }
-
-    fn snark_prover_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database.iterator_cf(self.snark_work_prover_cf(), mode)
-    }
-
-    fn set_snark_by_prover_height(
+    fn set_snark_by_prover_block_height(
         &self,
         snark: &SnarkWorkSummary,
         block_height: u32,
         index: u32,
     ) -> anyhow::Result<()> {
         trace!(
-            "Setting snark slot {block_height} at index {index} for prover {}",
+            "Setting SNARK block height {block_height} at index {index} for prover {}",
             snark.prover
         );
         Ok(self.database.put_cf(
-            self.snark_work_prover_height_cf(),
-            snark_prover_prefix_key(&snark.prover, block_height, index),
+            self.snark_prover_block_height_sort_cf(),
+            snark_prover_sort_key(&snark.prover, block_height, index),
             serde_json::to_vec(snark)?,
         )?)
     }
 
-    fn snark_prover_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.snark_work_prover_height_cf(), mode)
+    fn set_snark_by_prover_global_slot(
+        &self,
+        snark: &SnarkWorkSummary,
+        global_slot: u32,
+        index: u32,
+    ) -> anyhow::Result<()> {
+        trace!(
+            "Setting SNARK global slot {global_slot} at index {index} for prover {}",
+            snark.prover
+        );
+        Ok(self.database.put_cf(
+            self.snark_prover_global_slot_sort_cf(),
+            snark_prover_sort_key(&snark.prover, global_slot, index),
+            serde_json::to_vec(snark)?,
+        )?)
     }
 
+    fn get_snark_prover_total_fees(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+        trace!("Getting SNARK total fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.snark_prover_fees_cf(), pk.0.as_bytes())?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("snark prover total fees")))
+    }
+
+    fn get_snark_prover_epoch_fees(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_fees_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch fees")))
+    }
+
+    fn get_snark_prover_max_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+        trace!("Getting SNARK max fee for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.snark_prover_max_fee_cf(), pk.0.as_bytes())?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover max fee")))
+    }
+
+    fn get_snark_prover_epoch_max_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_max_fee_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch max fee")))
+    }
+
+    fn get_snark_prover_min_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+        trace!("Getting SNARK min fee for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(self.snark_prover_min_fee_cf(), pk.0.as_bytes())?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover min fee")))
+    }
+
+    fn get_snark_prover_epoch_min_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.snark_prover_min_fee_epoch_cf(),
+                snark_epoch_key(epoch, pk),
+            )?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch min fee")))
+    }
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    fn snark_fees_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_work_fees_block_height_sort_cf(), mode)
+    }
+
+    fn snark_fees_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_work_fees_global_slot_sort_cf(), mode)
+    }
+
+    fn snark_prover_max_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_prover_max_fee_sort_cf(), mode)
+    }
+
+    fn snark_prover_max_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        self.database.iterator_cf(
+            self.snark_prover_max_fee_epoch_sort_cf(),
+            IteratorMode::From(&start_key(epoch, direction), direction),
+        )
+    }
+
+    fn snark_prover_min_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_prover_min_fee_sort_cf(), mode)
+    }
+
+    fn snark_prover_min_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        self.database.iterator_cf(
+            self.snark_prover_min_fee_epoch_sort_cf(),
+            IteratorMode::From(&start_key(epoch, direction), direction),
+        )
+    }
+
+    fn snark_prover_total_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_prover_total_fees_sort_cf(), mode)
+    }
+
+    fn snark_prover_total_fees_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        self.database.iterator_cf(
+            self.snark_prover_total_fees_epoch_sort_cf(),
+            IteratorMode::From(&start_key(epoch, direction), direction),
+        )
+    }
+
+    fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_prover_block_height_sort_cf(), mode)
+    }
+
+    fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.snark_prover_global_slot_sort_cf(), mode)
+    }
+
+    //////////////////
+    // SNARK counts //
+    //////////////////
+
     fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
-        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
-            .get_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
-            .map_or(0, from_be_bytes))
+            .get_pinned_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("epoch SNARK count")
+            }))
     }
 
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
@@ -280,8 +522,10 @@ impl SnarkStore for IndexerStore {
         trace!("Getting total SNARKs count");
         Ok(self
             .database
-            .get(Self::TOTAL_NUM_SNARKS_KEY)?
-            .map_or(0, from_be_bytes))
+            .get_pinned(Self::TOTAL_NUM_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total SNARK count")
+            }))
     }
 
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
@@ -293,12 +537,14 @@ impl SnarkStore for IndexerStore {
     }
 
     fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> anyhow::Result<u32> {
-        let epoch = epoch.unwrap_or(self.get_current_epoch()?);
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
         Ok(self
             .database
             .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("pk epoch SNARK count")
+            }))
     }
 
     fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()> {
@@ -316,7 +562,9 @@ impl SnarkStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
-            .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("pk total SNARK count")
+            }))
     }
 
     fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
@@ -334,7 +582,7 @@ impl SnarkStore for IndexerStore {
         Ok(self
             .database
             .get_pinned_cf(self.block_snark_counts_cf(), state_hash.0.as_bytes())?
-            .map(|bytes| from_be_bytes(bytes.to_vec())))
+            .map(|bytes| u32_from_be_bytes(&bytes).expect("block SNARK count")))
     }
 
     fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()> {
@@ -350,12 +598,22 @@ impl SnarkStore for IndexerStore {
         trace!("Incrementing SNARKs count {snark:?}");
 
         // prover epoch & total
-        let prover = snark.prover.clone();
-        self.increment_snarks_pk_epoch_count(&prover, epoch)?;
-        self.increment_snarks_pk_total_count(&prover)?;
+        self.increment_snarks_pk_epoch_count(&snark.prover, epoch)?;
+        self.increment_snarks_pk_total_count(&snark.prover)?;
 
         // epoch & total counts
         self.increment_snarks_epoch_count(epoch)?;
         self.increment_snarks_total_count()
     }
+}
+
+fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + PublicKey::LEN] {
+    let mut start = [0; U32_LEN + U64_LEN + PublicKey::LEN];
+    let fstart = snark_fee_epoch_sort_key(epoch, 0, &PublicKey::lower_bound());
+    let rstart = snark_fee_epoch_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
+    match direction {
+        Direction::Forward => start.copy_from_slice(fstart.as_slice()),
+        Direction::Reverse => start.copy_from_slice(rstart.as_slice()),
+    }
+    start
 }
