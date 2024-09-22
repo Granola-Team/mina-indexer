@@ -1,9 +1,10 @@
 #! /usr/bin/env -S ruby -w
 
-DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
-BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
-BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
-WEB_PORT = ARGV[3] || 8080  # optional web port for server
+DEPLOY_TYPE = ARGV[0]                   # 'test' or 'prod'
+BUILD_TYPE = ARGV[1]                    # 'nix' or 'debug'
+BLOCKS_COUNT = ARGV[2]                  # number of blocks to deploy
+WEB_PORT = ARGV[3] || 8080              # optional web port for server
+EXCLUDE_NON_CANONICAL = ARGV[4] == "y"  # optional non-canonical block exclusion (default is false)
 
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
@@ -92,6 +93,10 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
       )
     end
   else
+    exclude_non_canonical_blocks_flag = ""
+    if EXCLUDE_NON_CANONICAL == true
+      exclude_non_canonical_blocks_flag = "--do-not-ingest-orphan-blocks"
+    end
     system(
       EXE,
       "database", "create",
@@ -100,7 +105,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
       "--database-dir", db_dir(BLOCKS_COUNT),
       "--blocks-dir", blocks_dir(BLOCKS_COUNT),
       "--staking-ledgers-dir", LEDGERS_DIR,
-      "--do-not-ingest-orphan-blocks"
+      exclude_non_canonical_blocks_flag
     )
   end || abort("database creation failed")
   puts "Database creation succeeded."
