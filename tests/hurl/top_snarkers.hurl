@@ -23,7 +23,7 @@ jsonpath "$.data.topSnarkers" count == 1
 
 # check data
 jsonpath "$.data.topSnarkers[0].public_key" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
-jsonpath "$.data.topSnarkers[0].username" == null
+jsonpath "$.data.topSnarkers[0].username" == "Unknown"
 jsonpath "$.data.topSnarkers[0].total_fees" == 0
 jsonpath "$.data.topSnarkers[0].min_fee" == 0
 jsonpath "$.data.topSnarkers[0].max_fee" == 0

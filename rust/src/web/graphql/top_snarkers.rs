@@ -28,7 +28,7 @@ pub struct TopSnarkersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopSnarker {
-    username: Option<String>,
+    username: String,
 
     #[graphql(name = "public_key")]
     public_key: String,
@@ -80,7 +80,11 @@ impl TopSnarkersQueryRoot {
             }
 
             let pk = PublicKey::from_bytes(&key[U32_LEN..][U64_LEN..])?;
-            let username = db.get_username(&pk).ok().flatten().map(|u| u.0);
+            let username = db
+                .get_username(&pk)
+                .ok()
+                .flatten()
+                .map_or("Unknown".to_string(), |u| u.0);
             let total_fees = db
                 .get_snark_prover_epoch_fees(&pk, Some(epoch))?
                 .expect("total fees");
