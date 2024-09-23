@@ -1,7 +1,6 @@
 use crate::{
-    block::BlockHash,
+    block::{store::DbBlockUpdate, BlockHash},
     canonicity::{Canonicity, CanonicityUpdate},
-    store::DbUpdate,
 };
 
 pub trait CanonicityStore {
@@ -16,7 +15,7 @@ pub trait CanonicityStore {
     ) -> anyhow::Result<()>;
 
     /// Update block canonicities
-    fn update_block_canonicities(&self, blocks: &DbUpdate<(BlockHash, u32)>) -> anyhow::Result<()>;
+    fn update_block_canonicities(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()>;
 
     fn update_canonicity(&self, updates: CanonicityUpdate) -> anyhow::Result<()>;
 

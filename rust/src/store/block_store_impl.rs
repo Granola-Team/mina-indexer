@@ -5,7 +5,7 @@ use super::{
 use crate::{
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
-        store::BlockStore,
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
         BlockComparison, BlockHash,
     },
     canonicity::{store::CanonicityStore, Canonicity},
@@ -280,7 +280,7 @@ impl BlockStore for IndexerStore {
         &self,
         old_best_tip: &BlockHash,
         new_best_tip: &BlockHash,
-    ) -> anyhow::Result<DbUpdate<(BlockHash, u32)>> {
+    ) -> anyhow::Result<DbBlockUpdate> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
             old_best_tip,
@@ -295,8 +295,11 @@ impl BlockStore for IndexerStore {
         let mut b = new_best_tip.clone();
         let mut apply = vec![];
 
-        let a_length = self.get_block_height(&a)?.expect("a has a length");
-        let b_length = self.get_block_height(&b)?.expect("b has a length");
+        let a_length = self.get_block_height(&a)?.expect("a has length");
+        let a_global_slot = self.get_block_global_slot(&a)?.expect("a has global slot");
+
+        let b_length = self.get_block_height(&b)?.expect("b has length");
+        let b_global_slot = self.get_block_global_slot(&b)?.expect("b has global slot");
 
         // bring b back to the same height as a
         for _ in 0..b_length.saturating_sub(a_length) {
@@ -304,7 +307,11 @@ impl BlockStore for IndexerStore {
             if b.0 == MAINNET_GENESIS_HASH {
                 break;
             }
-            apply.push((b.clone(), b_length));
+            apply.push(BlockUpdate {
+                state_hash: b.clone(),
+                blockchain_length: b_length,
+                global_slot_since_genesis: b_global_slot,
+            });
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -314,8 +321,16 @@ impl BlockStore for IndexerStore {
 
         while a != b && a.0 != MAINNET_GENESIS_HASH {
             // add blocks to appropriate collection
-            apply.push((b.clone(), b_length));
-            unapply.push((a.clone(), a_length));
+            apply.push(BlockUpdate {
+                state_hash: b.clone(),
+                blockchain_length: b_length,
+                global_slot_since_genesis: b_global_slot,
+            });
+            unapply.push(BlockUpdate {
+                state_hash: a.clone(),
+                blockchain_length: a_length,
+                global_slot_since_genesis: a_global_slot,
+            });
 
             // descend
             a = a_prev;

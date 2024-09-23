@@ -150,33 +150,45 @@ impl CanonicityStore for IndexerStore {
         Ok(None)
     }
 
-    fn update_block_canonicities(&self, blocks: &DbUpdate<(BlockHash, u32)>) -> anyhow::Result<()> {
+    fn update_block_canonicities(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
         let canonicity_updates = DbUpdate {
             apply: blocks
                 .apply
                 .iter()
-                .map(|(a, h)| CanonicityDiff {
-                    state_hash: a.clone(),
-                    blockchain_length: *h,
-                    global_slot: self
-                        .get_block_global_slot(a)
-                        .unwrap()
-                        .with_context(|| format!("(length {h}): {a}"))
-                        .expect("block global slot exists"),
-                })
+                .map(
+                    |BlockUpdate {
+                         state_hash: a,
+                         blockchain_length: h,
+                         ..
+                     }| CanonicityDiff {
+                        state_hash: a.clone(),
+                        blockchain_length: *h,
+                        global_slot: self
+                            .get_block_global_slot(a)
+                            .unwrap()
+                            .with_context(|| format!("(length {h}): {a}"))
+                            .expect("block global slot exists"),
+                    },
+                )
                 .collect(),
             unapply: blocks
                 .unapply
                 .iter()
-                .map(|(u, h)| CanonicityDiff {
-                    state_hash: u.clone(),
-                    blockchain_length: *h,
-                    global_slot: self
-                        .get_block_global_slot(u)
-                        .unwrap()
-                        .with_context(|| format!("(length {h}): {u}"))
-                        .expect("block global slot exists"),
-                })
+                .map(
+                    |BlockUpdate {
+                         state_hash: u,
+                         blockchain_length: h,
+                         ..
+                     }| CanonicityDiff {
+                        state_hash: u.clone(),
+                        blockchain_length: *h,
+                        global_slot: self
+                            .get_block_global_slot(u)
+                            .unwrap()
+                            .with_context(|| format!("(length {h}): {u}"))
+                            .expect("block global slot exists"),
+                    },
+                )
                 .collect(),
         };
         self.update_canonicity(canonicity_updates)

@@ -10,7 +10,13 @@ use crate::{
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 
-pub type DbBlockUpdate = DbUpdate<(BlockHash, u32)>;
+pub struct BlockUpdate {
+    pub state_hash: BlockHash,
+    pub blockchain_length: u32,
+    pub global_slot_since_genesis: u32,
+}
+
+pub type DbBlockUpdate = DbUpdate<BlockUpdate>;
 
 pub trait BlockStore {
     /// Add block to the store

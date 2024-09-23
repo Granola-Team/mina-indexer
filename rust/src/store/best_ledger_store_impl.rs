@@ -1,7 +1,7 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
     block::{
-        store::{BlockStore, DbBlockUpdate},
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
         BlockHash,
     },
     ledger::{
@@ -96,7 +96,7 @@ impl BestLedgerStore for IndexerStore {
             apply: blocks
                 .apply
                 .iter()
-                .flat_map(|(a, _)| {
+                .flat_map(|BlockUpdate { state_hash: a, .. }| {
                     let diff = self.get_block_ledger_diff(a).unwrap();
                     diff.map(|d| {
                         (
@@ -109,7 +109,7 @@ impl BestLedgerStore for IndexerStore {
             unapply: blocks
                 .unapply
                 .iter()
-                .flat_map(|(u, _)| {
+                .flat_map(|BlockUpdate { state_hash: u, .. }| {
                     let diff = self.get_block_ledger_diff(u).unwrap();
                     diff.map(|d| {
                         (
