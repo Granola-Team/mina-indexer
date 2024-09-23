@@ -56,12 +56,12 @@ impl SnarkWorkSummary {
 }
 
 impl SnarkWorkSummaryWithStateHash {
-    pub fn from(snark: mina_rs::TransactionSnarkWork, state_hash: &BlockHash) -> Self {
+    fn from_mina_rs(snark: mina_rs::TransactionSnarkWork, state_hash: BlockHash) -> Self {
         let snark: SnarkWorkSummary = snark.into();
         Self {
             fee: snark.fee,
             prover: snark.prover,
-            state_hash: state_hash.to_string(),
+            state_hash: state_hash.0,
         }
     }
 
@@ -69,7 +69,7 @@ impl SnarkWorkSummaryWithStateHash {
         block
             .completed_works()
             .into_iter()
-            .map(|snark| Self::from(snark, &block.state_hash()))
+            .map(|snark| Self::from_mina_rs(snark, block.state_hash()))
             .collect()
     }
 
@@ -94,6 +94,16 @@ impl From<SnarkWorkSummaryWithStateHash> for SnarkWorkSummary {
         Self {
             fee: value.fee,
             prover: value.prover,
+        }
+    }
+}
+
+impl From<(SnarkWorkSummary, BlockHash)> for SnarkWorkSummaryWithStateHash {
+    fn from(value: (SnarkWorkSummary, BlockHash)) -> Self {
+        Self {
+            fee: value.0.fee,
+            prover: value.0.prover,
+            state_hash: value.1 .0,
         }
     }
 }

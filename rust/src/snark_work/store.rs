@@ -3,7 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
 };
-use speedb::{DBIterator, IteratorMode};
+use speedb::{DBIterator, Direction, IteratorMode};
 
 pub trait SnarkStore {
     /// Add snark work in a precomputed block
@@ -19,44 +19,116 @@ pub trait SnarkStore {
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SnarkWorkSummaryWithStateHash>>>;
+    ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>>;
 
-    /// Get number of blocks which pk is a SNARK work prover
-    fn get_pk_num_prover_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
-
-    /// Update top snark work producers
-    fn update_top_snarkers(&self, snarks: Vec<SnarkWorkSummary>) -> anyhow::Result<()>;
-
-    /// Get top `n` SNARK producers by accumulated fees
-    fn get_top_snark_workers_by_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
-
-    /// [DBIterator] over top SNARK producers by accumulated fees
-    fn top_snark_workers_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
-    /// [DBIterator] over SNARKs by fee
-    fn snark_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
-    /// Set the SNARK for the prover in `global_slot` at `index`
-    fn set_snark_by_prover(
+    /// Update snark work prover fees
+    fn update_snark_prover_fees(
         &self,
-        snark: &SnarkWorkSummary,
-        global_slot: u32,
-        index: u32,
+        epoch: u32,
+        snarks: &[SnarkWorkSummary],
     ) -> anyhow::Result<()>;
 
-    /// Iterator over SNARKs by prover, sorted by global slot & index
-    fn snark_prover_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    /// Get top `n` SNARK provers by accumulated fees
+    fn get_top_snark_provers_by_total_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>>;
 
-    /// Set the SNARK for the prover in `global_slot` at `index`
-    fn set_snark_by_prover_height(
+    /// Set the SNARK for the prover in `block_height` at `index`
+    fn set_snark_by_prover_block_height(
         &self,
         snark: &SnarkWorkSummary,
         block_height: u32,
         index: u32,
     ) -> anyhow::Result<()>;
 
+    /// Set the SNARK for the prover in `global_slot` at `index`
+    fn set_snark_by_prover_global_slot(
+        &self,
+        snark: &SnarkWorkSummary,
+        global_slot: u32,
+        index: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Get the SNARK prover's total fees for all SNARKs sold
+    fn get_snark_prover_total_fees(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's total fees for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_fees(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's max fee for all SNARKs sold
+    fn get_snark_prover_max_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's max fee for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_max_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's min fee for all SNARKs sold
+    fn get_snark_prover_min_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+
+    /// Get the SNARK prover's min fee for all SNARKs sold in the given epoch
+    /// (default: current epoch)
+    fn get_snark_prover_epoch_min_fee(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    /// Iterator over SNARKs sorted by fee & block height
+    fn snark_fees_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARKs sorted by fee & block height
+    fn snark_fees_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers by max fee
+    fn snark_prover_max_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers per epoch by max fee
+    fn snark_prover_max_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers by min fee
+    fn snark_prover_min_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers per epoch by min fee
+    fn snark_prover_min_fee_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers by accumulated fees
+    fn snark_prover_total_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARK provers per epoch by accumulated fees
+    fn snark_prover_total_fees_epoch_iterator(
+        &self,
+        epoch: u32,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
     /// Iterator over SNARKs by prover, sorted by block height & index
-    fn snark_prover_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator over SNARKs by prover, sorted by global slot & index
+    fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    //////////////////
+    // SNARK counts //
+    //////////////////
 
     /// Increment snarks per epoch count
     fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()>;

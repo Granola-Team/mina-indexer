@@ -3,7 +3,7 @@ use crate::{
     block::{store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     command::internal::{store::InternalCommandStore, InternalCommandWithData},
-    constants::MAINNET_COINBASE_REWARD,
+    constants::{MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT},
     event::{db::*, store::EventStore, IndexerEvent},
     snark_work::store::SnarkStore,
 };
@@ -56,7 +56,10 @@ impl CanonicityStore for IndexerStore {
 
         // update top snarkers based on the incoming canonical block
         if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
-            self.update_top_snarkers(completed_works)?;
+            self.update_snark_prover_fees(
+                global_slot / MAINNET_EPOCH_SLOT_COUNT,
+                &completed_works,
+            )?;
         }
 
         // record new genesis/prev state hashes
