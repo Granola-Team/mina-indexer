@@ -1,8 +1,8 @@
-require 'json'
-require_relative '../remove-proofs-from-pcbs'
+require "json"
+require_relative "../remove-proofs-from-pcbs"
 
-RSpec.describe 'Remove Proofs Script' do
-  let(:test_directory) { 'spec/test_json' }
+RSpec.describe "Remove Proofs Script" do
+  let(:test_directory) { "spec/test_json" }
   let(:test_file) { "#{test_directory}/test.json" }
 
   # JSON content with "proofs" property
@@ -37,20 +37,20 @@ RSpec.describe 'Remove Proofs Script' do
 
   before do
     # Create the spec directory if it doesn't exist
-    Dir.mkdir('spec') unless Dir.exist?('spec')
+    Dir.mkdir("spec") unless Dir.exist?("spec")
 
     # Create test directory and file
     Dir.mkdir(test_directory) unless Dir.exist?(test_directory)
 
     # Write the JSON content with "proofs" property to test file
-    File.open(test_file, 'w') { |f| f.write(JSON.generate(json_content)) }
+    File.write(test_file, JSON.generate(json_content))
   end
 
   after do
     # Clean up - remove the test directory and files
     File.delete(test_file) if File.exist?(test_file)
     Dir.rmdir(test_directory) if Dir.exist?(test_directory)
-    Dir.rmdir('spec') if Dir.exist?('spec') && Dir.empty?('spec')
+    Dir.rmdir("spec") if Dir.exist?("spec") && Dir.empty?("spec")
   end
 
   it 'removes all occurrences of "proofs" and keeps JSON compact' do

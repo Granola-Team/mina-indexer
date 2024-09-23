@@ -3,4 +3,4 @@
 
 ulimit -Sn
 ulimit -Hn
-nix develop --command just deploy-local-prod 359604
+nix develop --command just deploy-local-prod 359604 8080 y
