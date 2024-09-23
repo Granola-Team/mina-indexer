@@ -1,27 +1,36 @@
 use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal};
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
     ledger::public_key::PublicKey,
+    store::DbUpdate,
 };
 use speedb::{DBIterator, Direction, IteratorMode};
 
+pub struct SnarkUpdate {
+    pub state_hash: BlockHash,
+    pub global_slot_since_genesis: u32,
+    pub works: Vec<SnarkWorkSummary>,
+}
+
+pub type DbSnarkUpdate = DbUpdate<SnarkUpdate>;
+
 pub trait SnarkStore {
-    /// Add snark work in a precomputed block
+    /// Add SNARK work in a precomputed block
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()>;
 
-    /// Get snark work in a given block
-    fn get_snark_work_in_block(
+    /// Get SNARK work in a given block
+    fn get_block_snark_work(
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>>;
 
-    /// Get snark work associated with a prover key
+    /// Get SNARK work associated with a prover key
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>>;
 
-    /// Update snark work prover fees
+    /// Update SNARK work prover fees
     fn update_snark_prover_fees(
         &self,
         epoch: u32,
@@ -79,6 +88,12 @@ pub trait SnarkStore {
         pk: &PublicKey,
         epoch: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
+
+    /// Update SNARK work from the applied & unapplied blocks
+    fn update_block_snarks(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()>;
+
+    /// Update SNARK work for each update
+    fn update_snarks(&self, update: DbSnarkUpdate) -> anyhow::Result<()>;
 
     ///////////////
     // Iterators //

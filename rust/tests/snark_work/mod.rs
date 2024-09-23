@@ -45,7 +45,7 @@ async fn store() -> anyhow::Result<()> {
     // check state hash key
     let result_snarks = indexer_store
         .as_ref()
-        .get_snark_work_in_block(&state_hash.into())?
+        .get_block_snark_work(&state_hash.into())?
         .unwrap();
     assert_eq!(result_snarks, block_snarks);
 

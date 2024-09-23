@@ -313,7 +313,7 @@ impl SnarkQueryRoot {
                         .with_context(|| format!("block missing from store {state_hash}"))
                         .unwrap()
                         .0;
-                    let snark_work = db.get_snark_work_in_block(&state_hash)?;
+                    let snark_work = db.get_block_snark_work(&state_hash)?;
                     let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                         summaries
                             .into_iter()
@@ -355,7 +355,7 @@ impl SnarkQueryRoot {
             let state_hash = state_hash_suffix(&key)?;
             let block = db.get_block(&state_hash)?.expect("block to be returned").0;
             let canonical = get_block_canonicity(db, &state_hash.0);
-            let snark_work = db.get_snark_work_in_block(&state_hash)?;
+            let snark_work = db.get_block_snark_work(&state_hash)?;
             let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                 summaries
                     .into_iter()

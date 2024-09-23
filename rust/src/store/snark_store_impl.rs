@@ -1,9 +1,15 @@
-use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
+use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{
+        precomputed::PrecomputedBlock,
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
+        BlockHash,
+    },
+    constants::MAINNET_EPOCH_SLOT_COUNT,
     ledger::public_key::PublicKey,
     snark_work::{
-        store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
+        store::{DbSnarkUpdate, SnarkStore, SnarkUpdate},
+        SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
     utility::store::{
         block_index_key, pk_index_key, snarks::*, u32_from_be_bytes, u32_prefix_key,
@@ -131,7 +137,7 @@ impl SnarkStore for IndexerStore {
         Ok(snarks)
     }
 
-    fn get_snark_work_in_block(
+    fn get_block_snark_work(
         &self,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
@@ -419,6 +425,64 @@ impl SnarkStore for IndexerStore {
                 snark_epoch_key(epoch, pk),
             )?
             .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch min fee")))
+    }
+
+    fn update_block_snarks(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
+        let snark_updates = DbUpdate {
+            apply: blocks
+                .apply
+                .iter()
+                .map(
+                    |BlockUpdate {
+                         state_hash: a,
+                         global_slot_since_genesis,
+                         ..
+                     }| {
+                        let block_snarks = self.get_block_snark_work(a).ok().flatten().unwrap();
+                        SnarkUpdate {
+                            state_hash: a.clone(),
+                            global_slot_since_genesis: *global_slot_since_genesis,
+                            works: block_snarks,
+                        }
+                    },
+                )
+                .collect(),
+            unapply: blocks
+                .unapply
+                .iter()
+                .map(
+                    |BlockUpdate {
+                         state_hash: u,
+                         global_slot_since_genesis,
+                         ..
+                     }| {
+                        let block_snarks = self.get_block_snark_work(u).ok().flatten().unwrap();
+                        SnarkUpdate {
+                            state_hash: u.clone(),
+                            global_slot_since_genesis: *global_slot_since_genesis,
+                            works: block_snarks,
+                        }
+                    },
+                )
+                .collect(),
+        };
+        self.update_snarks(snark_updates)
+    }
+
+    fn update_snarks(&self, update: DbSnarkUpdate) -> anyhow::Result<()> {
+        trace!("Updating SNARKs");
+
+        // unapply
+        for _updates in update.unapply {}
+
+        // apply
+        for updates in update.apply {
+            self.update_snark_prover_fees(
+                updates.global_slot_since_genesis / MAINNET_EPOCH_SLOT_COUNT,
+                &updates.works,
+            )?;
+        }
+        Ok(())
     }
 
     ///////////////
