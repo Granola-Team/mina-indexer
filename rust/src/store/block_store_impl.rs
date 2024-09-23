@@ -254,6 +254,7 @@ impl BlockStore for IndexerStore {
             let reorg_blocks = self.reorg_blocks(&old, state_hash)?;
             self.update_block_canonicities(&reorg_blocks)?;
             self.update_block_best_accounts(state_hash, &reorg_blocks)?;
+            self.update_block_snarks(&reorg_blocks)?;
             self.update_block_usernames(&reorg_blocks)?;
         }
 

@@ -1,11 +1,13 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    block::{store::BlockStore, BlockHash},
+    block::{
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
+        BlockHash,
+    },
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     command::internal::{store::InternalCommandStore, InternalCommandWithData},
-    constants::{MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT},
+    constants::MAINNET_COINBASE_REWARD,
     event::{db::*, store::EventStore, IndexerEvent},
-    snark_work::store::SnarkStore,
 };
 use anyhow::Context;
 use log::trace;
@@ -53,14 +55,6 @@ impl CanonicityStore for IndexerStore {
             global_slot.to_be_bytes(),
             state_hash.0.as_bytes(),
         )?;
-
-        // update top snarkers based on the incoming canonical block
-        if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
-            self.update_snark_prover_fees(
-                global_slot / MAINNET_EPOCH_SLOT_COUNT,
-                &completed_works,
-            )?;
-        }
 
         // record new genesis/prev state hashes
         if let Some(genesis_prev_state_hash) = genesis_prev_state_hash {
