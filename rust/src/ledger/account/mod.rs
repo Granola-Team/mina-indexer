@@ -401,9 +401,9 @@ impl Account {
         Account { nonce, ..self }
     }
 
-    pub fn delegation_unapply(self, delegate: PublicKey, nonce: Option<Nonce>) -> Self {
+    pub fn delegation_unapply(self, nonce: Option<Nonce>) -> Self {
         Account {
-            delegate,
+            delegate: self.public_key.clone(),
             nonce,
             ..self
         }
@@ -437,11 +437,7 @@ impl Account {
         Some(match diff {
             AccountDiff::Payment(payment_diff) => self.payment_unapply(payment_diff),
             AccountDiff::Delegation(delegation_diff) => {
-                // TODO get previous delegate?
-                self.delegation_unapply(
-                    delegation_diff.delegate.clone(),
-                    Some(delegation_diff.nonce),
-                )
+                self.delegation_unapply(Some(delegation_diff.nonce))
             }
             AccountDiff::Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
             AccountDiff::FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),

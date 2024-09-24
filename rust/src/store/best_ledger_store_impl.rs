@@ -180,7 +180,7 @@ impl BestLedgerStore for IndexerStore {
                             } else {
                                 Some(diff.nonce - 1)
                             },
-                            delegate: diff.delegate.clone(),
+                            delegate: acct.public_key.clone(),
                             ..acct
                         })
                     }
