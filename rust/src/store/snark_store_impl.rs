@@ -20,6 +20,20 @@ use log::trace;
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
+pub struct SnarkAllTimeFees {
+    pub total: u64,
+    pub max: u64,
+    pub min: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SnarkEpochFees {
+    pub total: u64,
+    pub max: u64,
+    pub min: u64,
+}
+
 impl SnarkStore for IndexerStore {
     fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
         trace!("Adding SNARK work from block {}", block.summary());
@@ -165,137 +179,159 @@ impl SnarkStore for IndexerStore {
         snarks: &[SnarkWorkSummary],
     ) -> anyhow::Result<()> {
         trace!("Updating SNARK prover fees");
-        let mut prover_fees: HashMap<PublicKey, (u64, u64, u64)> = HashMap::new();
+        let mut prover_fees: HashMap<PublicKey, (SnarkAllTimeFees, SnarkEpochFees)> =
+            HashMap::new();
         for snark in snarks.iter() {
             if prover_fees.contains_key(&snark.prover) {
-                // update total
-                prover_fees.get_mut(&snark.prover).unwrap().0 += snark.fee;
+                if let Some(fees) = prover_fees.get_mut(&snark.prover) {
+                    // all-time fees
+                    fees.0.total += snark.fee;
+                    if snark.fee > fees.0.max {
+                        fees.0.max = snark.fee;
+                    }
+                    if snark.fee < fees.0.min {
+                        fees.0.min = snark.fee;
+                    }
 
-                // update min/max
-                let max_fee = prover_fees.get(&snark.prover).unwrap().1;
-                let min_fee = prover_fees.get(&snark.prover).unwrap().2;
-                if snark.fee > max_fee {
-                    prover_fees.get_mut(&snark.prover).unwrap().1 = snark.fee;
-                }
-                if snark.fee < min_fee {
-                    prover_fees.get_mut(&snark.prover).unwrap().2 = snark.fee;
+                    // epoch fees
+                    fees.1.total += snark.fee;
+                    if snark.fee > fees.1.max {
+                        fees.1.max = snark.fee;
+                    }
+                    if snark.fee < fees.1.min {
+                        fees.1.min = snark.fee;
+                    }
                 }
             } else {
+                // all-time fees
+                let old_total = self
+                    .get_snark_prover_total_fees(&snark.prover)?
+                    .unwrap_or_default();
+                let old_max = self
+                    .get_snark_prover_max_fee(&snark.prover)?
+                    .unwrap_or_default();
                 let old_min = self
                     .get_snark_prover_min_fee(&snark.prover)?
                     .unwrap_or(u64::MAX);
-                let old_max = self.get_snark_prover_max_fee(&snark.prover)?.unwrap_or(0);
-                let old_total = self
-                    .get_snark_prover_total_fees(&snark.prover)?
-                    .unwrap_or(0);
 
-                // delete the stale all-time data
                 self.database.delete_cf(
-                    self.snark_prover_min_fee_sort_cf(),
-                    u64_prefix_key(old_min, &snark.prover),
+                    self.snark_prover_total_fees_sort_cf(),
+                    u64_prefix_key(old_total, &snark.prover),
                 )?;
                 self.database.delete_cf(
                     self.snark_prover_max_fee_sort_cf(),
                     u64_prefix_key(old_max, &snark.prover),
                 )?;
                 self.database.delete_cf(
-                    self.snark_prover_total_fees_sort_cf(),
-                    u64_prefix_key(old_total, &snark.prover),
+                    self.snark_prover_min_fee_sort_cf(),
+                    u64_prefix_key(old_min, &snark.prover),
                 )?;
 
-                // delete the stale per epoch data
+                // epoch fees
+                let old_epoch_total = self
+                    .get_snark_prover_epoch_fees(&snark.prover, Some(epoch))?
+                    .unwrap_or_default();
+                let old_epoch_max = self
+                    .get_snark_prover_epoch_max_fee(&snark.prover, Some(epoch))?
+                    .unwrap_or_default();
+                let old_epoch_min = self
+                    .get_snark_prover_epoch_min_fee(&snark.prover, Some(epoch))?
+                    .unwrap_or(u64::MAX);
+
                 self.database.delete_cf(
-                    self.snark_prover_min_fee_epoch_sort_cf(),
-                    snark_fee_epoch_sort_key(epoch, old_min, &snark.prover),
+                    self.snark_prover_total_fees_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_epoch_total, &snark.prover),
                 )?;
                 self.database.delete_cf(
                     self.snark_prover_max_fee_epoch_sort_cf(),
-                    snark_fee_epoch_sort_key(epoch, old_max, &snark.prover),
+                    snark_fee_epoch_sort_key(epoch, old_epoch_max, &snark.prover),
                 )?;
                 self.database.delete_cf(
-                    self.snark_prover_total_fees_epoch_sort_cf(),
-                    snark_fee_epoch_sort_key(epoch, old_total, &snark.prover),
+                    self.snark_prover_min_fee_epoch_sort_cf(),
+                    snark_fee_epoch_sort_key(epoch, old_epoch_min, &snark.prover),
                 )?;
 
                 // update the SNARK fee table
                 prover_fees.insert(
                     snark.prover.clone(),
                     (
-                        old_total + snark.fee,
-                        snark.fee.max(old_max),
-                        old_min.min(snark.fee),
+                        SnarkAllTimeFees {
+                            total: old_total + snark.fee,
+                            max: old_max.max(snark.fee),
+                            min: old_min.min(snark.fee),
+                        },
+                        SnarkEpochFees {
+                            total: old_epoch_total + snark.fee,
+                            max: old_epoch_max.max(snark.fee),
+                            min: old_epoch_min.min(snark.fee),
+                        },
                     ),
                 );
             }
         }
 
-        // replace stale data with updated
-        for (prover, (total_fees, max_fee, min_fee)) in prover_fees.iter() {
-            // store the all-time data
+        for (prover, (all_time_fees, epoch_fees)) in prover_fees.iter() {
+            // store & sort all-time data
             self.database.put_cf(
                 self.snark_prover_fees_cf(),
                 prover.0.as_bytes(),
-                total_fees.to_be_bytes(),
+                all_time_fees.total.to_be_bytes(),
             )?;
             self.database.put_cf(
                 self.snark_prover_max_fee_cf(),
                 prover.0.as_bytes(),
-                max_fee.to_be_bytes(),
+                all_time_fees.max.to_be_bytes(),
             )?;
             self.database.put_cf(
                 self.snark_prover_min_fee_cf(),
                 prover.0.as_bytes(),
-                min_fee.to_be_bytes(),
+                all_time_fees.min.to_be_bytes(),
             )?;
-
-            // store the epoch data
-            self.database.put_cf(
-                self.snark_prover_fees_epoch_cf(),
-                snark_epoch_key(epoch, prover),
-                total_fees.to_be_bytes(),
-            )?;
-            self.database.put_cf(
-                self.snark_prover_max_fee_epoch_cf(),
-                snark_epoch_key(epoch, prover),
-                max_fee.to_be_bytes(),
-            )?;
-            self.database.put_cf(
-                self.snark_prover_min_fee_epoch_cf(),
-                snark_epoch_key(epoch, prover),
-                min_fee.to_be_bytes(),
-            )?;
-
-            // sort the all-time data
             self.database.put_cf(
                 self.snark_prover_total_fees_sort_cf(),
-                u64_prefix_key(*total_fees, prover),
+                u64_prefix_key(all_time_fees.total, prover),
                 b"",
             )?;
             self.database.put_cf(
                 self.snark_prover_max_fee_sort_cf(),
-                u64_prefix_key(*max_fee, prover),
+                u64_prefix_key(all_time_fees.max, prover),
                 b"",
             )?;
             self.database.put_cf(
                 self.snark_prover_min_fee_sort_cf(),
-                u64_prefix_key(*min_fee, prover),
+                u64_prefix_key(all_time_fees.min, prover),
                 b"",
             )?;
 
-            // sort the epoch data
+            // store & sort epoch fees
+            self.database.put_cf(
+                self.snark_prover_fees_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                epoch_fees.total.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_max_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                epoch_fees.max.to_be_bytes(),
+            )?;
+            self.database.put_cf(
+                self.snark_prover_min_fee_epoch_cf(),
+                snark_epoch_key(epoch, prover),
+                epoch_fees.min.to_be_bytes(),
+            )?;
             self.database.put_cf(
                 self.snark_prover_total_fees_epoch_sort_cf(),
-                snark_fee_epoch_sort_key(epoch, *total_fees, prover),
+                snark_fee_epoch_sort_key(epoch, epoch_fees.total, prover),
                 b"",
             )?;
             self.database.put_cf(
                 self.snark_prover_max_fee_epoch_sort_cf(),
-                snark_fee_epoch_sort_key(epoch, *max_fee, prover),
+                snark_fee_epoch_sort_key(epoch, epoch_fees.max, prover),
                 b"",
             )?;
             self.database.put_cf(
                 self.snark_prover_min_fee_epoch_sort_cf(),
-                snark_fee_epoch_sort_key(epoch, *min_fee, prover),
+                snark_fee_epoch_sort_key(epoch, epoch_fees.min, prover),
                 b"",
             )?;
         }
