@@ -276,14 +276,14 @@ tier3-dev blocks='5000': debug-build
 #
 
 # Run a server as if in production with the Nix-built binary.
-deploy-local-prod blocks='5000' web_port='8080' exclude_non_canonical='n': nix-build
+deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying prod indexer"
-  time {{DEPLOY}} prod nix {{blocks}} {{web_port}} {{exclude_non_canonical}}
+  time {{DEPLOY}} prod nix {{blocks}} {{web_port}}
 
 # Run a server as if in production with the debug-built binary.
-deploy-local-prod-dev blocks='5000' web_port='8080' exclude_non_canonical='y': debug-build
+deploy-local-prod-dev blocks='5000' web_port='': debug-build
   @echo "--- Deploying dev prod indexer"
-  time {{DEPLOY}} prod debug {{blocks}} {{web_port}} {{exclude_non_canonical}}
+  time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
 
 # Shutdown a running local prod indexer.
 shutdown rev=GIT_COMMIT_HASH:
