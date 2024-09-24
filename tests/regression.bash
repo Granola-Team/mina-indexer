@@ -1534,9 +1534,9 @@ test_hurl() {
     # run in very verbose mode by setting HURL_VERBOSE to anything
     test_file="$SRC"/tests/hurl/"${HURL_TEST:-*}".hurl
     if [[ -z "${HURL_VERBOSE:-}" ]]; then
-        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
-    else
         hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+    else
+        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
     fi
 }
 
