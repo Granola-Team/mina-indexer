@@ -861,7 +861,7 @@ pub async fn handle_connection(
                     if !block::is_valid_state_hash(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
-                        db.get_snark_work_in_block(&state_hash.clone().into())?
+                        db.get_block_snark_work(&state_hash.clone().into())?
                             .and_then(|snarks| {
                                 let snarks_str = format_vec_jq_compatible(&snarks);
                                 if path.is_none() {

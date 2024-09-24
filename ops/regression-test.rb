@@ -58,7 +58,6 @@ test_names = %w[
   start_from_config
   version_file
   hurl
-  top_snarkers
 ]
 
 puts "Regression testing..."

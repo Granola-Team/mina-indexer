@@ -4,7 +4,10 @@ use super::{
     DbUpdate, IndexerStore,
 };
 use crate::{
-    block::{store::DbBlockUpdate, BlockHash},
+    block::{
+        store::{BlockUpdate, DbBlockUpdate},
+        BlockHash,
+    },
     ledger::{public_key::PublicKey, username::Username},
     utility::store::{from_be_bytes, pk_index_key},
 };
@@ -52,14 +55,14 @@ impl UsernameStore for IndexerStore {
             apply: blocks
                 .apply
                 .iter()
-                .map(|(a, _)| {
+                .map(|BlockUpdate { state_hash: a, .. }| {
                     UsernameUpdate(self.get_block_username_updates(a).ok().flatten().unwrap())
                 })
                 .collect(),
             unapply: blocks
                 .unapply
                 .iter()
-                .map(|(u, _)| {
+                .map(|BlockUpdate { state_hash: u, .. }| {
                     UsernameUpdate(self.get_block_username_updates(u).ok().flatten().unwrap())
                 })
                 .collect(),

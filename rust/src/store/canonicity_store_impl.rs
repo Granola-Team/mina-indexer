@@ -1,11 +1,13 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    block::{store::BlockStore, BlockHash},
+    block::{
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
+        BlockHash,
+    },
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     command::internal::{store::InternalCommandStore, InternalCommandWithData},
-    constants::{MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT},
+    constants::MAINNET_COINBASE_REWARD,
     event::{db::*, store::EventStore, IndexerEvent},
-    snark_work::store::SnarkStore,
 };
 use anyhow::Context;
 use log::trace;
@@ -53,14 +55,6 @@ impl CanonicityStore for IndexerStore {
             global_slot.to_be_bytes(),
             state_hash.0.as_bytes(),
         )?;
-
-        // update top snarkers based on the incoming canonical block
-        if let Some(completed_works) = self.get_snark_work_in_block(state_hash)? {
-            self.update_snark_prover_fees(
-                global_slot / MAINNET_EPOCH_SLOT_COUNT,
-                &completed_works,
-            )?;
-        }
 
         // record new genesis/prev state hashes
         if let Some(genesis_prev_state_hash) = genesis_prev_state_hash {
@@ -150,33 +144,45 @@ impl CanonicityStore for IndexerStore {
         Ok(None)
     }
 
-    fn update_block_canonicities(&self, blocks: &DbUpdate<(BlockHash, u32)>) -> anyhow::Result<()> {
+    fn update_block_canonicities(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
         let canonicity_updates = DbUpdate {
             apply: blocks
                 .apply
                 .iter()
-                .map(|(a, h)| CanonicityDiff {
-                    state_hash: a.clone(),
-                    blockchain_length: *h,
-                    global_slot: self
-                        .get_block_global_slot(a)
-                        .unwrap()
-                        .with_context(|| format!("(length {h}): {a}"))
-                        .expect("block global slot exists"),
-                })
+                .map(
+                    |BlockUpdate {
+                         state_hash: a,
+                         blockchain_length: h,
+                         ..
+                     }| CanonicityDiff {
+                        state_hash: a.clone(),
+                        blockchain_length: *h,
+                        global_slot: self
+                            .get_block_global_slot(a)
+                            .unwrap()
+                            .with_context(|| format!("(length {h}): {a}"))
+                            .expect("block global slot exists"),
+                    },
+                )
                 .collect(),
             unapply: blocks
                 .unapply
                 .iter()
-                .map(|(u, h)| CanonicityDiff {
-                    state_hash: u.clone(),
-                    blockchain_length: *h,
-                    global_slot: self
-                        .get_block_global_slot(u)
-                        .unwrap()
-                        .with_context(|| format!("(length {h}): {u}"))
-                        .expect("block global slot exists"),
-                })
+                .map(
+                    |BlockUpdate {
+                         state_hash: u,
+                         blockchain_length: h,
+                         ..
+                     }| CanonicityDiff {
+                        state_hash: u.clone(),
+                        blockchain_length: *h,
+                        global_slot: self
+                            .get_block_global_slot(u)
+                            .unwrap()
+                            .with_context(|| format!("(length {h}): {u}"))
+                            .expect("block global slot exists"),
+                    },
+                )
                 .collect(),
         };
         self.update_canonicity(canonicity_updates)
