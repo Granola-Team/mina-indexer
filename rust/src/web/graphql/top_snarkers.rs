@@ -86,13 +86,13 @@ impl TopSnarkersQueryRoot {
                 .flatten()
                 .map_or("Unknown".to_string(), |u| u.0);
             let total_fees = db
-                .get_snark_prover_epoch_fees(&pk, Some(epoch))?
+                .get_snark_prover_epoch_fees(&pk, Some(epoch), None)?
                 .expect("total fees");
             let min_fee = db
-                .get_snark_prover_epoch_min_fee(&pk, Some(epoch))?
+                .get_snark_prover_epoch_min_fee(&pk, Some(epoch), None)?
                 .expect("min fee");
             let max_fee = db
-                .get_snark_prover_epoch_max_fee(&pk, Some(epoch))?
+                .get_snark_prover_epoch_max_fee(&pk, Some(epoch), None)?
                 .expect("max fee");
             let snarks_sold = db.get_snarks_pk_epoch_count(&pk, Some(epoch))?;
 
