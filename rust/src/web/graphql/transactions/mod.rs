@@ -7,6 +7,7 @@ use crate::{
         store::UserCommandStore,
         CommandStatusData,
     },
+    constants::millis_to_global_slot,
     ledger::public_key::PublicKey,
     protocol::serialization_types::staged_ledger_diff::{
         SignedCommandPayloadBody, StakeDelegation,
@@ -17,14 +18,72 @@ use crate::{
             pk_txn_sort_key_prefix, txn_hash_of_key, user_commands_iterator_state_hash,
             user_commands_iterator_txn_hash,
         },
-        pk_key_prefix, state_hash_suffix,
+        state_hash_suffix, U32_LEN,
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
-use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
+
+#[derive(Clone, Copy, Debug, Enum, Eq, PartialEq)]
+pub enum TransactionSortByInput {
+    #[graphql(name = "BLOCKHEIGHT_ASC")]
+    BlockHeightAsc,
+    #[graphql(name = "BLOCKHEIGHT_DESC")]
+    BlockHeightDesc,
+
+    #[graphql(name = "DATETIME_ASC")]
+    DateTimeAsc,
+    #[graphql(name = "DATETIME_DESC")]
+    DateTimeDesc,
+
+    #[graphql(name = "GLOBALSLOT_ASC")]
+    GlobalSlotAsc,
+    #[graphql(name = "GLOBALSLOT_DESC")]
+    GlobalSlotDesc,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct TransactionWithoutBlock {
+    amount: u64,
+    block_height: u32,
+    global_slot: u32,
+    canonical: bool,
+    failure_reason: String,
+    fee: u64,
+    from: String,
+    hash: String,
+    kind: String,
+    memo: String,
+    nonce: u32,
+    receiver: PK,
+    to: String,
+    token: Option<u64>,
+
+    /// Total number of user commands in the given epoch
+    /// (default: current epoch)
+    #[graphql(name = "epoch_num_user_commands")]
+    epoch_num_user_commands: u32,
+
+    /// Total number of user commands
+    #[graphql(name = "total_num_user_commands")]
+    total_num_user_commands: u32,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct Transaction {
+    block: TransactionBlock,
+
+    #[graphql(flatten)]
+    transaction: TransactionWithoutBlock,
+}
+
+#[derive(Clone, Debug, PartialEq, SimpleObject)]
+struct TransactionBlock {
+    date_time: DateTime,
+    state_hash: String,
+}
 
 #[derive(Default)]
 pub struct TransactionsQueryRoot;
@@ -57,36 +116,86 @@ impl TransactionsQueryRoot {
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<TransactionSortByInput>,
     ) -> Result<Vec<Transaction>> {
+        use TransactionSortByInput::*;
+
         let db = db(ctx);
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
         let sort_by = sort_by.unwrap_or(TransactionSortByInput::BlockHeightDesc);
+        let mut transactions = vec![];
 
-        // transaction filtered by state hash
+        // state hash query
         if let Some(state_hash) = query
             .as_ref()
             .and_then(|input| input.block.as_ref())
             .and_then(|block| block.state_hash.clone())
         {
             let query = query.expect("query input to exists");
-            let mut transactions: Vec<Transaction> = db
-                .get_block(&state_hash.into())?
-                .into_iter()
-                .flat_map(|(b, _)| SignedCommandWithData::from_precomputed(&b))
-                .map(|cmd| {
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
-                })
-                .filter(|txn| query.matches(txn))
-                .collect();
-            reorder_asc(&mut transactions, sort_by);
-            transactions.truncate(limit);
+            let block_height = db
+                .get_block_height(&state_hash.into())?
+                .expect("block height");
+            let (min, max) = match sort_by {
+                BlockHeightAsc | BlockHeightDesc => (block_height, block_height + 1),
+                GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
+                    let min_slots = db
+                        .get_block_global_slots_from_height(block_height)?
+                        .expect("global slots at min height");
+                    let max_slots = db
+                        .get_block_global_slots_from_height(block_height + 1)?
+                        .expect("global slots at max height");
+                    (
+                        min_slots.iter().min().copied().unwrap_or_default(),
+                        max_slots.iter().max().copied().unwrap_or(u32::MAX),
+                    )
+                }
+            };
+            let iter = match sort_by {
+                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                    &max.to_be_bytes(),
+                    Direction::Reverse,
+                )),
+                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
+            };
+
+            for (key, _) in iter.flatten() {
+                if key[..U32_LEN] < *min.to_be_bytes().as_slice()
+                    || key[..U32_LEN] > *max.to_be_bytes().as_slice()
+                {
+                    // check if we've gone beyond the desired bound
+                    break;
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let state_hash = state_hash_suffix(&key)?;
+                let cmd = db
+                    .get_user_command_state_hash(&txn_hash, &state_hash)?
+                    .expect("txn at hash");
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() >= limit {
+                        break;
+                    }
+                }
+            }
             return Ok(transactions);
         }
 
         // txn hash query (no state hash)
         if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.clone()) {
             let query = query.expect("query input to exists");
-            let mut transactions: Vec<Transaction> = vec![];
             if let Ok(Some(state_hashes)) = db.get_user_command_state_hashes(&txn_hash.into()) {
                 transactions = state_hashes
                     .iter()
@@ -104,39 +213,68 @@ impl TransactionsQueryRoot {
 
         // block height query
         if let Some(block_height) = query.as_ref().and_then(|input| input.block_height) {
-            let mut transactions = vec![];
             let query = query.expect("query input to exists");
-            'outer: for state_hash in db.get_blocks_at_height(block_height)? {
-                let block = db
-                    .get_block(&state_hash)
-                    .with_context(|| format!("block missing from store {state_hash}"))
-                    .unwrap()
-                    .unwrap()
-                    .0;
-                for cmd in SignedCommandWithData::from_precomputed(&block) {
-                    let txn =
-                        Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
-                    if query.matches(&txn) {
-                        transactions.push(txn);
-                        if transactions.len() >= limit {
-                            break 'outer;
-                        }
+            let (min, max) = match sort_by {
+                BlockHeightAsc | BlockHeightDesc => (block_height, block_height + 1),
+                GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
+                    let min_slots = db
+                        .get_block_global_slots_from_height(block_height)?
+                        .expect("global slots at min height");
+                    let max_slots = db
+                        .get_block_global_slots_from_height(block_height + 1)?
+                        .expect("global slots at max height");
+                    (
+                        min_slots.iter().min().copied().unwrap_or_default(),
+                        max_slots.iter().max().copied().unwrap_or(u32::MAX),
+                    )
+                }
+            };
+            let iter = match sort_by {
+                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                    &max.to_be_bytes(),
+                    Direction::Reverse,
+                )),
+                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
+            };
+
+            for (key, _) in iter.flatten() {
+                if key[..U32_LEN] != block_height.to_be_bytes() {
+                    // we've gone beyond the desired block height
+                    break;
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let state_hash = state_hash_suffix(&key)?;
+                let cmd = db
+                    .get_user_command_state_hash(&txn_hash, &state_hash)?
+                    .expect("txn at hash");
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() >= limit {
+                        break;
                     }
                 }
             }
-            reorder_asc(&mut transactions, sort_by);
             return Ok(transactions);
         }
 
         // iterator mode & direction determined by desired sorting
-        let mut transactions = Vec::new();
-        let (start_slot, direction) = match sort_by {
-            TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => {
-                (0, Direction::Forward)
-            }
-            TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
-                (u32::MAX, Direction::Reverse)
-            }
+        let (start, direction) = match sort_by {
+            BlockHeightAsc | DateTimeAsc | GlobalSlotAsc => (0, Direction::Forward),
+            BlockHeightDesc | DateTimeDesc | GlobalSlotDesc => (u32::MAX, Direction::Reverse),
         };
 
         // from/to account (sender/receiver) query
@@ -150,7 +288,7 @@ impl TransactionsQueryRoot {
                 .as_ref()
                 .or(query.to.as_ref())
                 .expect("pk to exist");
-            let start = pk_txn_sort_key_prefix(&(pk as &str).into(), start_slot);
+            let start = pk_txn_sort_key_prefix(&(pk as &str).into(), start);
             let mode = IteratorMode::From(&start, direction);
             let txn_iter = if query.from.is_some() {
                 db.txn_from_height_iterator(mode).flatten()
@@ -158,11 +296,11 @@ impl TransactionsQueryRoot {
                 db.txn_to_height_iterator(mode).flatten()
             };
             for (key, _) in txn_iter {
-                // public key bytes
-                let txn_pk = pk_key_prefix(&key);
-                if txn_pk.0 != *pk {
+                if key[..PublicKey::LEN] != *pk.as_bytes() {
+                    // we've gone beyond the desired public key
                     break;
                 }
+
                 let txn_state_hash = state_hash_suffix(&key)?;
                 let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
@@ -200,49 +338,188 @@ impl TransactionsQueryRoot {
                     ..
                 } = query;
                 let min_bound = match (block_height_gte, block_height_gt) {
-                    (Some(gte), Some(gt)) => std::cmp::max(gte, gt + 1),
+                    (Some(gte), Some(gt)) => gte.max(gt + 1),
+                    (Some(gte), None) => gte,
+                    (None, Some(gt)) => gt + 1,
+                    (None, None) => 1,
+                };
+                let max_bound = match (block_height_lte, block_height_lt) {
+                    (Some(lte), Some(lt)) => lte.min(lt - 1),
+                    (Some(lte), None) => lte,
+                    (None, Some(lt)) => lt - 1,
+                    (None, None) => db.get_best_block_height()?.expect("best block height"),
+                };
+                match sort_by {
+                    BlockHeightAsc | BlockHeightDesc => (min_bound, max_bound),
+                    GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
+                        let min_slots = db
+                            .get_block_global_slots_from_height(min_bound)?
+                            .expect("global slots at min height");
+                        let max_slots = db
+                            .get_block_global_slots_from_height(max_bound)?
+                            .expect("global slots at max height");
+                        (
+                            min_slots.iter().min().copied().unwrap_or_default(),
+                            max_slots.iter().max().copied().unwrap_or(u32::MAX),
+                        )
+                    }
+                }
+            };
+            let iter = match sort_by {
+                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                    &max.to_be_bytes(),
+                    Direction::Reverse,
+                )),
+                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
+            };
+
+            for (key, _) in iter.flatten() {
+                if key[..U32_LEN] > *max.to_be_bytes().as_slice()
+                    || key[..U32_LEN] < *min.to_be_bytes().as_slice()
+                {
+                    // we've gone beyond the query bounds
+                    break;
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let state_hash = state_hash_suffix(&key)?;
+                let cmd = db
+                    .get_user_command_state_hash(&txn_hash, &state_hash)?
+                    .expect("txn at hash");
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() >= limit {
+                        break;
+                    }
+                }
+            }
+            return Ok(transactions);
+        }
+
+        // date time/global slot bounded query
+        if query.as_ref().map_or(false, |q| {
+            q.global_slot_gt.is_some()
+                || q.global_slot_gte.is_some()
+                || q.global_slot_lt.is_some()
+                || q.global_slot_lte.is_some()
+                || q.date_time_gt.is_some()
+                || q.date_time_gte.is_some()
+                || q.date_time_lt.is_some()
+                || q.date_time_lte.is_some()
+        }) {
+            let query = query.expect("query input to exists");
+            let (min, max) = {
+                let TransactionQueryInput {
+                    global_slot_gt,
+                    global_slot_gte,
+                    global_slot_lt,
+                    global_slot_lte,
+                    ref date_time_gt,
+                    ref date_time_gte,
+                    ref date_time_lt,
+                    ref date_time_lte,
+                    ..
+                } = query;
+                let min_bound = match (
+                    global_slot_gte.or(date_time_gte
+                        .as_ref()
+                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+                    global_slot_gt.or(date_time_gt
+                        .as_ref()
+                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+                ) {
+                    (Some(gte), Some(gt)) => gte.max(gt + 1),
                     (Some(gte), None) => gte,
                     (None, Some(gt)) => gt + 1,
                     (None, None) => 1,
                 };
 
-                let max_bound = match (block_height_lte, block_height_lt) {
-                    (Some(lte), Some(lt)) => std::cmp::min(lte, lt - 1),
+                let max_bound = match (
+                    global_slot_lte.or(date_time_lte
+                        .as_ref()
+                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+                    global_slot_lt.or(date_time_lt
+                        .as_ref()
+                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+                ) {
+                    (Some(lte), Some(lt)) => lte.min(lt - 1),
                     (Some(lte), None) => lte,
                     (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block_height()?.unwrap(),
+                    (None, None) => db
+                        .get_best_block_global_slot()?
+                        .expect("best block global slot"),
                 };
-                (min_bound, max_bound)
+                match sort_by {
+                    BlockHeightAsc | BlockHeightDesc => {
+                        let min_heights = db
+                            .get_block_heights_from_global_slot(min_bound)?
+                            .expect("heights at min slot");
+                        let max_heights = db
+                            .get_block_heights_from_global_slot(max_bound)?
+                            .expect("heights at max slot");
+                        (
+                            min_heights.iter().min().copied().unwrap_or_default(),
+                            max_heights.iter().max().copied().unwrap_or(u32::MAX),
+                        )
+                    }
+                    GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
+                        (min_bound, max_bound)
+                    }
+                }
+            };
+            let iter = match sort_by {
+                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                    &max.to_be_bytes(),
+                    Direction::Reverse,
+                )),
+                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
+                    &min.to_be_bytes(),
+                    Direction::Forward,
+                )),
+                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
             };
 
-            let mut block_heights: Vec<u32> = (min..=max).collect();
-            if sort_by == TransactionSortByInput::BlockHeightDesc {
-                block_heights.reverse();
-            }
-            let mut transactions = Vec::new();
+            for (key, _) in iter.flatten() {
+                if key[..U32_LEN] > *max.to_be_bytes().as_slice()
+                    || key[..U32_LEN] < *min.to_be_bytes().as_slice()
+                {
+                    // we've gone beyond the query bounds
+                    break;
+                }
 
-            'outer: for height in block_heights {
-                for state_hash in db.get_blocks_at_height(height)? {
-                    let block = db
-                        .get_block(&state_hash)
-                        .with_context(|| format!("block missing from store {state_hash}"))
-                        .unwrap()
-                        .unwrap()
-                        .0;
-                    for cmd in SignedCommandWithData::from_precomputed(&block) {
-                        let txn = Transaction::new(
-                            cmd,
-                            db,
-                            epoch_num_user_commands,
-                            total_num_user_commands,
-                        );
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let state_hash = state_hash_suffix(&key)?;
+                let cmd = db
+                    .get_user_command_state_hash(&txn_hash, &state_hash)?
+                    .expect("txn at hash");
+                let txn =
+                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
 
-                        if query.matches(&txn) {
-                            transactions.push(txn);
-                            if transactions.len() >= limit {
-                                break 'outer;
-                            }
-                        }
+                if query.matches(&txn) {
+                    transactions.push(txn);
+
+                    if transactions.len() >= limit {
+                        break;
                     }
                 }
             }
@@ -250,18 +527,10 @@ impl TransactionsQueryRoot {
         }
 
         let iter = match sort_by {
-            TransactionSortByInput::BlockHeightAsc => {
-                db.user_commands_height_iterator(IteratorMode::From(&[0], Direction::Forward))
-            }
-            TransactionSortByInput::BlockHeightDesc => db.user_commands_height_iterator(
-                IteratorMode::From(&u32::MAX.to_be_bytes(), Direction::Reverse),
-            ),
-            TransactionSortByInput::DateTimeAsc => {
-                db.user_commands_slot_iterator(IteratorMode::From(&[0], Direction::Forward))
-            }
-            TransactionSortByInput::DateTimeDesc => db.user_commands_slot_iterator(
-                IteratorMode::From(&u32::MAX.to_be_bytes(), Direction::Reverse),
-            ),
+            BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::Start),
+            BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::End),
+            DateTimeAsc | GlobalSlotAsc => db.user_commands_slot_iterator(IteratorMode::Start),
+            DateTimeDesc | GlobalSlotDesc => db.user_commands_slot_iterator(IteratorMode::End),
         };
         for (key, _) in iter.flatten() {
             if let Some(ref q) = query {
@@ -292,15 +561,6 @@ impl TransactionsQueryRoot {
         }
 
         Ok(transactions)
-    }
-}
-
-fn reorder_asc<T>(values: &mut [T], sort_by: TransactionSortByInput) {
-    match sort_by {
-        TransactionSortByInput::BlockHeightAsc | TransactionSortByInput::DateTimeAsc => (),
-        TransactionSortByInput::BlockHeightDesc | TransactionSortByInput::DateTimeDesc => {
-            values.reverse()
-        }
     }
 }
 
@@ -336,10 +596,10 @@ impl TransactionWithoutBlock {
         total_num_user_commands: u32,
     ) -> Self {
         let failure_reason = match cmd.status {
-            CommandStatusData::Applied { .. } => "".to_owned(),
+            CommandStatusData::Applied { .. } => "N/A".to_owned(),
             CommandStatusData::Failed(failed_types, _) => failed_types
                 .first()
-                .map_or("".to_owned(), |f| f.to_string()),
+                .map_or("Unknown".to_owned(), |f| f.to_string()),
         };
         match cmd.command {
             SignedCommand(signed_cmd) => {
@@ -484,6 +744,8 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
+        // boolean
         if let Some(query) = and {
             if query.iter().all(|and| and.matches(transaction_with_block)) {
                 return false;
@@ -659,56 +921,4 @@ impl TransactionQueryInput {
         }
         true
     }
-}
-
-#[derive(Clone, Copy, Debug, Enum, Eq, PartialEq)]
-pub enum TransactionSortByInput {
-    #[graphql(name = "BLOCKHEIGHT_ASC")]
-    BlockHeightAsc,
-    #[graphql(name = "BLOCKHEIGHT_DESC")]
-    BlockHeightDesc,
-
-    #[graphql(name = "DATETIME_ASC")]
-    DateTimeAsc,
-    #[graphql(name = "DATETIME_DESC")]
-    DateTimeDesc,
-}
-
-#[derive(Clone, Debug, SimpleObject)]
-pub struct TransactionWithoutBlock {
-    amount: u64,
-    block_height: u32,
-    global_slot: u32,
-    canonical: bool,
-    failure_reason: String,
-    fee: u64,
-    from: String,
-    hash: String,
-    kind: String,
-    memo: String,
-    nonce: u32,
-    /// The receiver's public key
-    receiver: PK,
-    to: String,
-    token: Option<u64>,
-
-    #[graphql(name = "epoch_num_user_commands")]
-    epoch_num_user_commands: u32,
-
-    #[graphql(name = "total_num_user_commands")]
-    total_num_user_commands: u32,
-}
-
-#[derive(Clone, Debug, SimpleObject)]
-pub struct Transaction {
-    block: TransactionBlock,
-
-    #[graphql(flatten)]
-    transaction: TransactionWithoutBlock,
-}
-
-#[derive(Clone, Debug, PartialEq, SimpleObject)]
-struct TransactionBlock {
-    date_time: DateTime,
-    state_hash: String,
 }
