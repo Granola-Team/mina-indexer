@@ -798,6 +798,32 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("snark-prover-fees-epoch column family exists")
     }
 
+    /// CF for storing historical SNARK all-time fee updates
+    /// ```
+    /// key: {prover}{height}
+    /// val: [SnarkAllTimeFees] serde bytes
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - height: u32 BE bytes
+    fn snark_prover_fees_historical_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-fees-historical")
+            .expect("snark-prover-fees-historical column family exists")
+    }
+
+    /// CF for storing historical SNARK epoch fee updates
+    /// ```
+    /// key: {prover}{height}
+    /// val: [SnarkEpochFees] serde bytes
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - height: u32 BE bytes
+    fn snark_prover_fees_epoch_historical_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("snark-prover-fees-epoch-historical")
+            .expect("snark-prover-fees-epoch-historical column family exists")
+    }
+
     /// CF for sorting SNARK provers by total fees
     /// ```
     /// key: {fees}{prover}

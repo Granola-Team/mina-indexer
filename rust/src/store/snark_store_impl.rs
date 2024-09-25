@@ -391,76 +391,145 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_snark_prover_total_fees(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+    fn get_snark_prover_total_fees(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
         trace!("Getting SNARK total fees for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(self.snark_prover_fees_cf(), pk.0.as_bytes())?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("snark prover total fees")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(self.snark_prover_fees_cf(), pk.0.as_bytes())?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK total fees")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, None)?
+                .map(|bytes| {
+                    let fees: SnarkAllTimeFees =
+                        serde_json::from_slice(&bytes).expect("SNARK all-time fees");
+                    fees.total
+                }),
+        })
     }
 
     fn get_snark_prover_epoch_fees(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting SNARK epoch {epoch} fees for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(
-                self.snark_prover_fees_epoch_cf(),
-                snark_epoch_key(epoch, pk),
-            )?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch fees")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(
+                    self.snark_prover_fees_epoch_cf(),
+                    snark_epoch_key(epoch, pk),
+                )?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch total fees")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, Some(epoch))?
+                .map(|bytes| {
+                    let fees: SnarkEpochFees =
+                        serde_json::from_slice(&bytes).expect("SNARK epoch fees");
+                    fees.total
+                }),
+        })
     }
 
-    fn get_snark_prover_max_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+    fn get_snark_prover_max_fee(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
         trace!("Getting SNARK max fee for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(self.snark_prover_max_fee_cf(), pk.0.as_bytes())?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover max fee")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(self.snark_prover_max_fee_cf(), pk.0.as_bytes())?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK max fee")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, None)?
+                .map(|bytes| {
+                    let fees: SnarkAllTimeFees =
+                        serde_json::from_slice(&bytes).expect("SNARK all-time fees");
+                    fees.max
+                }),
+        })
     }
 
     fn get_snark_prover_epoch_max_fee(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting SNARK epoch {epoch} fees for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(
-                self.snark_prover_max_fee_epoch_cf(),
-                snark_epoch_key(epoch, pk),
-            )?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch max fee")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(
+                    self.snark_prover_max_fee_epoch_cf(),
+                    snark_epoch_key(epoch, pk),
+                )?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch max fee")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, Some(epoch))?
+                .map(|bytes| {
+                    let fees: SnarkEpochFees =
+                        serde_json::from_slice(&bytes).expect("SNARK epoch fees");
+                    fees.max
+                }),
+        })
     }
 
-    fn get_snark_prover_min_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>> {
+    fn get_snark_prover_min_fee(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>> {
         trace!("Getting SNARK min fee for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(self.snark_prover_min_fee_cf(), pk.0.as_bytes())?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover min fee")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(self.snark_prover_min_fee_cf(), pk.0.as_bytes())?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK min fee")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, None)?
+                .map(|bytes| {
+                    let fees: SnarkAllTimeFees =
+                        serde_json::from_slice(&bytes).expect("SNARK all-time fees");
+                    fees.min
+                }),
+        })
     }
 
     fn get_snark_prover_epoch_min_fee(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting SNARK epoch {epoch} fees for {pk}");
-        Ok(self
-            .database
-            .get_pinned_cf(
-                self.snark_prover_min_fee_epoch_cf(),
-                snark_epoch_key(epoch, pk),
-            )?
-            .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK prover epoch min fee")))
+        Ok(match block_height {
+            None => self
+                .database
+                .get_pinned_cf(
+                    self.snark_prover_min_fee_epoch_cf(),
+                    snark_epoch_key(epoch, pk),
+                )?
+                .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch min fee")),
+            Some(block_height) => self
+                .get_snark_prover_prev_fees(pk, block_height, Some(epoch))?
+                .map(|bytes| {
+                    let fees: SnarkEpochFees =
+                        serde_json::from_slice(&bytes).expect("SNARK epoch fees");
+                    fees.min
+                }),
+        })
     }
 
     fn update_block_snarks(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
@@ -472,11 +541,12 @@ impl SnarkStore for IndexerStore {
                     |BlockUpdate {
                          state_hash: a,
                          global_slot_since_genesis,
-                         ..
+                         blockchain_length,
                      }| {
                         let block_snarks = self.get_block_snark_work(a).ok().flatten().unwrap();
                         SnarkUpdate {
                             state_hash: a.clone(),
+                            blockchain_length: *blockchain_length,
                             global_slot_since_genesis: *global_slot_since_genesis,
                             works: block_snarks,
                         }
@@ -490,11 +560,12 @@ impl SnarkStore for IndexerStore {
                     |BlockUpdate {
                          state_hash: u,
                          global_slot_since_genesis,
-                         ..
+                         blockchain_length,
                      }| {
                         let block_snarks = self.get_block_snark_work(u).ok().flatten().unwrap();
                         SnarkUpdate {
                             state_hash: u.clone(),
+                            blockchain_length: *blockchain_length,
                             global_slot_since_genesis: *global_slot_since_genesis,
                             works: block_snarks,
                         }
@@ -519,6 +590,59 @@ impl SnarkStore for IndexerStore {
             )?;
         }
         Ok(())
+    }
+
+    fn get_snark_prover_prev_fees(
+        &self,
+        prover: &PublicKey,
+        block_height: u32,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        // start at the previous block height
+        let mut start = [0; PublicKey::LEN + U32_LEN];
+        start[..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
+        start[PublicKey::LEN..].copy_from_slice(&(block_height - 1).to_be_bytes());
+
+        // use appropriate CF for iteration
+        let mut iter = match epoch {
+            None => self
+                .database
+                .iterator_cf(
+                    self.snark_prover_fees_historical_cf(),
+                    IteratorMode::From(&start, Direction::Reverse),
+                )
+                .flatten(),
+            Some(_) => self
+                .database
+                .iterator_cf(
+                    self.snark_prover_fees_epoch_historical_cf(),
+                    IteratorMode::From(&start, Direction::Reverse),
+                )
+                .flatten(),
+        };
+        if let Some((key, value)) = iter.next() {
+            let pk_bytes = &key[..PublicKey::LEN];
+            if pk_bytes != prover.0.as_bytes() {
+                return Ok(None);
+            }
+
+            let block_height = u32_from_be_bytes(&key[PublicKey::LEN..]).expect("u32 block height");
+            if let Some(epoch) = epoch {
+                if let Some(state_hash) = self.get_canonical_hash_at_height(block_height)? {
+                    if let Some(block_epoch) = self.get_block_epoch(&state_hash)? {
+                        if block_epoch != epoch {
+                            return Ok(None);
+                        }
+                    } else {
+                        return Ok(None);
+                    }
+                } else {
+                    return Ok(None);
+                }
+            }
+            return Ok(Some(value.to_vec()));
+        }
+        Ok(None)
     }
 
     ///////////////
