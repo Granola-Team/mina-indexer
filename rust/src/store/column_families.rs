@@ -267,6 +267,12 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing per epoch SNARK prover fee totals
     fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing per block height all-time SNARK prover fee updates
+    fn snark_prover_fees_historical_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing per block height epoch SNARK prover fee updates
+    fn snark_prover_fees_epoch_historical_cf(&self) -> &ColumnFamily;
+
     /// CF for sorting all SNARK prover fee totals
     fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily;
 

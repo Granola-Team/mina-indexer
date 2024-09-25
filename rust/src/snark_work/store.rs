@@ -4,15 +4,30 @@ use crate::{
     ledger::public_key::PublicKey,
     store::DbUpdate,
 };
+use serde::{Deserialize, Serialize};
 use speedb::{DBIterator, Direction, IteratorMode};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnarkProverFees {
+    pub total: u64,
+    pub max: u64,
+    pub min: u64,
+}
 
 pub struct SnarkUpdate {
     pub state_hash: BlockHash,
+    pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
     pub works: Vec<SnarkWorkSummary>,
 }
 
 pub type DbSnarkUpdate = DbUpdate<SnarkUpdate>;
+
+pub enum SnarkApplication {
+    Apply,
+    Unapply,
+}
 
 pub trait SnarkStore {
     /// Add SNARK work in a precomputed block
@@ -30,11 +45,18 @@ pub trait SnarkStore {
         pk: &PublicKey,
     ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>>;
 
-    /// Update SNARK work prover fees
+    /// Returns the map of prover total, max & min fees for `snarks`
+    fn snark_prover_fees(
+        snarks: &[SnarkWorkSummary],
+    ) -> anyhow::Result<HashMap<PublicKey, SnarkProverFees>>;
+
+    /// Update snark work prover fees
     fn update_snark_prover_fees(
         &self,
-        epoch: u32,
+        block_height: u32,
+        global_slot: u32,
         snarks: &[SnarkWorkSummary],
+        apply: SnarkApplication,
     ) -> anyhow::Result<()>;
 
     /// Get top `n` SNARK provers by accumulated fees
@@ -57,36 +79,57 @@ pub trait SnarkStore {
     ) -> anyhow::Result<()>;
 
     /// Get the SNARK prover's total fees for all SNARKs sold
-    fn get_snark_prover_total_fees(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+    /// below the specified block height
+    fn get_snark_prover_total_fees(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
 
-    /// Get the SNARK prover's total fees for all SNARKs sold in the given epoch
-    /// (default: current epoch)
+    /// Get the SNARK prover's total fees for SNARKs sold in the given epoch
+    /// below the specified block height
+    /// (epoch default: current epoch)
     fn get_snark_prover_epoch_fees(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
 
     /// Get the SNARK prover's max fee for all SNARKs sold
-    fn get_snark_prover_max_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+    /// below the specified block height
+    fn get_snark_prover_max_fee(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
 
-    /// Get the SNARK prover's max fee for all SNARKs sold in the given epoch
-    /// (default: current epoch)
+    /// Get the SNARK prover's max fee for SNARKs sold in the given epoch
+    /// below the specified block height
+    /// (epoch default: current epoch)
     fn get_snark_prover_epoch_max_fee(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
 
-    /// Get the SNARK prover's min fee for all SNARKs sold
-    fn get_snark_prover_min_fee(&self, pk: &PublicKey) -> anyhow::Result<Option<u64>>;
+    /// Get the SNARK prover's min fee for SNARKs sold
+    /// below the specified block height
+    fn get_snark_prover_min_fee(
+        &self,
+        pk: &PublicKey,
+        block_height: Option<u32>,
+    ) -> anyhow::Result<Option<u64>>;
 
-    /// Get the SNARK prover's min fee for all SNARKs sold in the given epoch
-    /// (default: current epoch)
+    /// Get the SNARK prover's min fee for SNARKs sold in the given epoch
+    /// below the specified block height
+    /// (epoch default: current epoch)
     fn get_snark_prover_epoch_min_fee(
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
 
     /// Update SNARK work from the applied & unapplied blocks
@@ -94,6 +137,75 @@ pub trait SnarkStore {
 
     /// Update SNARK work for each update
     fn update_snarks(&self, update: DbSnarkUpdate) -> anyhow::Result<()>;
+
+    /// Stores the all-time fee data
+    fn store_all_time_snark_fees(
+        &self,
+        prover: &PublicKey,
+        total_fees: u64,
+        max_fee: u64,
+        min_fee: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Adds the specified all-time fee sort data
+    /// Used in combination with [delete_old_all_time_snark_fees] for updates
+    fn sort_all_time_snark_fees(
+        &self,
+        prover: &PublicKey,
+        total_fees: u64,
+        max_fee: u64,
+        min_fee: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Deletes the specified all-time fee sort data
+    /// Used in combination with [sort_all_time_snark_fees] for updates
+    fn delete_old_all_time_snark_fees(
+        &self,
+        prover: &PublicKey,
+        old_total: u64,
+        old_max: u64,
+        old_min: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Stores the epoch fee data
+    fn store_epoch_snark_fees(
+        &self,
+        epoch: u32,
+        prover: &PublicKey,
+        epoch_total_fees: u64,
+        epoch_max_fee: u64,
+        epoch_min_fee: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Adds the specified epoch fee sort data
+    /// Used in combination with [delete_old_epoch_snark_fees] for updates
+    fn sort_epoch_snark_fees(
+        &self,
+        epoch: u32,
+        prover: &PublicKey,
+        epoch_total_fees: u64,
+        epoch_max_fee: u64,
+        epoch_min_fee: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Deletes the specified epoch fee sort data
+    /// Used in combination with [sort_epoch_snark_fees] for updates
+    fn delete_old_epoch_snark_fees(
+        &self,
+        epoch: u32,
+        prover: &PublicKey,
+        old_epoch_total: u64,
+        old_epoch_max: u64,
+        old_epoch_min: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Gets SNARK prover fees for the previous update
+    fn get_snark_prover_prev_fees(
+        &self,
+        prover: &PublicKey,
+        block_height: u32,
+        epoch: Option<u32>,
+    ) -> anyhow::Result<Option<Vec<u8>>>;
 
     ///////////////
     // Iterators //
