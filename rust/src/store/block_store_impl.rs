@@ -710,10 +710,7 @@ impl BlockStore for IndexerStore {
 
     fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>> {
         trace!("Getting children of block {state_hash}");
-        if let Some(height) = self
-            .get_block(state_hash)?
-            .map(|(b, _)| b.blockchain_length())
-        {
+        if let Some(height) = self.get_block_height(state_hash)? {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
             let mut children: Vec<BlockHash> = blocks_at_next_height
                 .into_iter()

@@ -29,6 +29,10 @@ impl TxnHash {
     pub fn is_valid(&self) -> bool {
         self.0.starts_with(TxnHash::PREFIX) && self.0.len() == TxnHash::LEN
     }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
+        Ok(Self(String::from_utf8(bytes)?))
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
