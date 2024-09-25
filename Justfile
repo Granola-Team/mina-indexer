@@ -150,9 +150,9 @@ clean:
   @echo "Consider also 'git clean -xdfn'"
 
 # Clean the mina-indexer-dev directory
-clean-dev rev=GIT_COMMIT_HASH:
+clean-dev which='one' rev=GIT_COMMIT_HASH:
   @echo "Cleaning dev directory"
-  {{UTILS}} dev clean {{rev}}
+  {{UTILS}} dev clean {{which}} {{rev}}
 
 # Clean mina-indexer-prod subdirectory
 clean-prod rev=GIT_COMMIT_HASH:

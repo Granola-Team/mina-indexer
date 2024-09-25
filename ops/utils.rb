@@ -23,11 +23,14 @@ DEV_DIR = "#{BASE_DIR}/rev-#{REV}" # Only makes sense for DEPLOY_TYPE == 'dev'
 
 def clean_dev(type)
   if type == "dev"
-    if Dir.exist? DEV_DIR
+    if ARGV[2] == "all"
+      puts "Removing all dev rev directories"
+      FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/rev-*"))
+    elsif Dir.exist? DEV_DIR
       puts "Removing #{DEV_DIR}"
       FileUtils.rm_rf(Dir.glob(DEV_DIR))
-      exit 0
     end
+    exit 0
   end
 end
 
