@@ -175,7 +175,7 @@ impl StakingLedger {
         genesis_state_hash: BlockHash,
     ) -> anyhow::Result<StakingLedger> {
         trace!(
-            "Parsing staking ledger {}",
+            "Parsing staking ledger {:?}",
             path.file_stem().unwrap().to_str().unwrap_or_default()
         );
         let bytes = std::fs::read(path)?;
