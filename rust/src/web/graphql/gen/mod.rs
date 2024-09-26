@@ -804,6 +804,9 @@ pub struct TransactionQueryInput {
     pub token: Option<u64>,
     pub is_delegation: Option<bool>,
 
+    /// Failure reason only applies to failed transactions
+    pub failure_reason: Option<String>,
+
     // sender attributes
     pub from: Option<String>,
     pub source: Option<TransactionSourceQueryInput>,
