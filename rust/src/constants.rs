@@ -71,8 +71,9 @@ pub fn from_timestamp_millis(millis: i64) -> DateTime<Utc> {
 }
 
 /// Convert epoch milliseconds to global slot number
-pub fn millis_to_global_slot(millis: i64) -> u64 {
-    (millis as u64 - MAINNET_GENESIS_TIMESTAMP) / MAINNET_BLOCK_SLOT_TIME_MILLIS
+pub fn millis_to_global_slot(millis: i64) -> u32 {
+    let millis_since_genesis = millis as u64 - MAINNET_GENESIS_TIMESTAMP;
+    (millis_since_genesis / MAINNET_BLOCK_SLOT_TIME_MILLIS) as u32
 }
 
 pub mod berkeley {
