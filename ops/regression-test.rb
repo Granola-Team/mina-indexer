@@ -12,7 +12,7 @@ abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
 
 rev = `git rev-parse --short=8 HEAD`.chomp
 BASE_DIR = "#{DEV_DIR}/rev-#{rev}"
-FileUtils.mkdir_p BASE_DIR
+FileUtils.mkdir_p(BASE_DIR)
 
 require "#{__dir__}/helpers" # Expects BASE_DIR & BUILD_TYPE to exist.
 
@@ -77,13 +77,13 @@ def cleanup_idxr_pid
   pid_file = "#{BASE_DIR}/idxr_pid"
   return unless File.exist?(pid_file)
 
-  pid = File.read pid_file
+  pid = File.read(pid_file)
   begin
     Process.kill("HUP", pid.to_i)
   rescue
     nil
   end
-  File.unlink pid_file
+  File.unlink(pid_file)
   sleep 1 # Give it a chance to shut down.
 end
 
@@ -91,7 +91,7 @@ def cleanup_database_pid
   pid_file = "#{BASE_DIR}/database/PID"
   return unless File.exist?(pid_file)
 
-  pid = File.read pid_file
+  pid = File.read(pid_file)
   begin
     Process.kill("HUP", pid.to_i)
   rescue

@@ -126,7 +126,7 @@ end
 
 # Now, we take over.
 #
-File.write CURRENT, REV
+File.write(CURRENT, REV)
 
 if DEPLOY_TYPE == "test"
   puts "Restarting server..."

@@ -84,7 +84,7 @@ lint:
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
-  standardrb ops/*.rb
+  standardrb --fix ops/*.rb
   alejandra flake.nix
 
 # Perform a fast verification of whether the source compiles.

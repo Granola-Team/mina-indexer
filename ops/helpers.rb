@@ -55,7 +55,7 @@ def config_exe_dir
   FileUtils.mkdir_p(EXE_DIR)
   return if File.exist?(EXE)
 
-  FileUtils.cp EXE_SRC, EXE
+  FileUtils.cp(EXE_SRC, EXE)
 end
 
 # Socket
@@ -118,9 +118,9 @@ def idxr_cleanup(rev)
   return unless File.exist? bin
 
   puts "Removing #{mina_indexer} bin, socket, db & logs"
-  FileUtils.rm_rf "#{BASE_DIR}/logs/#{rev}"
-  FileUtils.rm_rf Dir.glob("#{BASE_DIR}/db/#{db_version_of_git_rev(rev)}-*")
-  FileUtils.rm_f bin
+  FileUtils.rm_rf("#{BASE_DIR}/logs/#{rev}")
+  FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/db/#{db_version_of_git_rev(rev)}-*"))
+  FileUtils.rm_f(bin)
 end
 
 def idxr_shutdown(rev)
@@ -145,5 +145,5 @@ def idxr_shutdown_via_socket(exe, socket)
   end
 
   sleep 1 # Give it a chance to shut down.
-  FileUtils.rm_f socket
+  FileUtils.rm_f(socket)
 end
