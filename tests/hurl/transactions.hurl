@@ -483,3 +483,94 @@ jsonpath "$.data.transactions[5].blockHeight" == 116
 jsonpath "$.data.transactions[5].nonce" == 171
 
 duration < 750
+
+#
+# Transactions with & without failure reason
+#
+
+POST {{url}}
+```graphql
+query TransactionsNonce {
+  transactions(
+    limit: 20,
+    sortBy: BLOCKHEIGHT_ASC,
+    query: {
+      from: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+    }) {
+    nonce
+    blockHeight
+    failureReason
+  }  
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 20
+
+# first datum
+jsonpath "$.data.transactions[0].blockHeight" == 3
+jsonpath "$.data.transactions[0].nonce" == 0
+jsonpath "$.data.transactions[0].failureReason" == "Amount_insufficient_to_create_account"
+
+# last datum
+jsonpath "$.data.transactions[19].blockHeight" == 12
+jsonpath "$.data.transactions[19].nonce" == 14
+jsonpath "$.data.transactions[19].failureReason" == null
+
+duration < 100
+
+#
+# Transactions failure reason filter (results sorted by txn hash)
+#
+
+POST {{url}}
+```graphql
+query TransactionsNonce {
+  transactions(
+    limit: 5,
+    sortBy: BLOCKHEIGHT_ASC,
+    query: {
+      failureReason: "Amount_insufficient_to_create_account"
+    }) {
+    nonce
+    blockHeight
+    failureReason
+    hash
+  }  
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 5
+
+# all data
+jsonpath "$.data.transactions[0].blockHeight" == 3
+jsonpath "$.data.transactions[0].nonce" == 2
+jsonpath "$.data.transactions[0].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[0].hash" == "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+
+jsonpath "$.data.transactions[1].blockHeight" == 3
+jsonpath "$.data.transactions[1].nonce" == 3
+jsonpath "$.data.transactions[1].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[1].hash" == "CkpZ1u12zrTuEttp7QktfEy7wosHrPV6r3DJkq4sA9f1yKgEqmj5k"
+
+jsonpath "$.data.transactions[2].blockHeight" == 3
+jsonpath "$.data.transactions[2].nonce" == 1
+jsonpath "$.data.transactions[2].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[2].hash" == "CkpZB4WE3wDRJ4CqCXqS4dqF8hoRQDVK8banePKUgTR6kvhTfyjRp"
+
+jsonpath "$.data.transactions[3].blockHeight" == 3
+jsonpath "$.data.transactions[3].nonce" == 0
+jsonpath "$.data.transactions[3].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[3].hash" == "CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa"
+
+jsonpath "$.data.transactions[4].blockHeight" == 4
+jsonpath "$.data.transactions[4].nonce" == 5
+jsonpath "$.data.transactions[4].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[4].hash" == "CkpZK28AEmzhB8AjsfT6Dd1cKdR5WF2gQw4xqDu4f93ozDX2jekTq"
+
+duration < 100
