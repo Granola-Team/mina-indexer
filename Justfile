@@ -38,8 +38,8 @@ alias dlp := deploy-local-prod-dev
 is_rustfmt_nightly := `cd rust && rustfmt --version | grep stable || echo "true"`
 nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" }
 
-DEBUG_MODE := TOPLEVEL + "/rust/target/debug/mina-indexer"
-PROD_MODE := TOPLEVEL + "/result/bin/mina-indexer"
+DEBUG_MODE := "debug"
+PROD_MODE := "nix"
 REGRESSION_TEST := "./ops/regression-test.rb"
 DEPLOY := "./ops/deploy.rb"
 UTILS := "./ops/utils.rb"
