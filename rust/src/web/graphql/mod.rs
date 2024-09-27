@@ -132,6 +132,7 @@ pub(crate) struct PK {
 #[cfg(test)]
 mod tests {
     use super::DateTime;
+    use crate::constants::{millis_to_global_slot, MAINNET_GENESIS_TIMESTAMP};
 
     #[test]
     fn date_time_millis() {
@@ -147,5 +148,20 @@ mod tests {
             DateTime("2024-06-02T00:00:00.000Z".into()).timestamp_millis(),
             1717286400000
         );
+        assert_eq!(
+            DateTime("2024-06-03T00:00:00.000Z".into()).timestamp_millis(),
+            1717372800000
+        );
+    }
+
+    #[test]
+    fn date_time_to_global_slot() {
+        assert_eq!(millis_to_global_slot(MAINNET_GENESIS_TIMESTAMP as i64), 0);
+
+        let dt_millis = DateTime("2024-06-02T00:00:00.000Z".into()).timestamp_millis();
+        assert_eq!(millis_to_global_slot(dt_millis), 563040);
+
+        let dt_millis = DateTime("2024-06-03T00:00:00.000Z".into()).timestamp_millis();
+        assert_eq!(millis_to_global_slot(dt_millis), 563520);
     }
 }
