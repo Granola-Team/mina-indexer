@@ -21,7 +21,7 @@ use crate::{
     snark_work::store::SnarkStore,
     utility::store::{
         block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, pk_index_key,
-        state_hash_suffix, u32_prefix_key, u64_from_be_bytes, U32_LEN, U64_LEN,
+        state_hash_suffix, u32_from_be_bytes, u32_prefix_key, u64_from_be_bytes, U32_LEN, U64_LEN,
     },
 };
 use anyhow::{bail, Context};
@@ -911,6 +911,48 @@ impl BlockStore for IndexerStore {
             )?;
         }
         Ok(())
+    }
+
+    fn get_next_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<Option<u32>> {
+        trace!("Getting next slot produced at or above {global_slot}");
+        let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
+        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+
+        if let Some((key, _)) = self
+            .database
+            .iterator_cf(
+                self.block_epoch_slots_produced_cf(),
+                IteratorMode::From(&block_num_key(epoch, epoch_slot), Direction::Forward),
+            )
+            .flatten()
+            .next()
+        {
+            let epoch = u32_from_be_bytes(&key[..U32_LEN]).expect("epoch u32 bytes");
+            let epoch_slot = u32_from_be_bytes(&key[U32_LEN..]).expect("epoch slot u32 bytes");
+            return Ok(Some(epoch * MAINNET_EPOCH_SLOT_COUNT + epoch_slot));
+        }
+        Ok(None)
+    }
+
+    fn get_prev_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<u32> {
+        trace!("Getting previous slot produced at or below {global_slot}");
+        let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
+        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+
+        if let Some((key, _)) = self
+            .database
+            .iterator_cf(
+                self.block_epoch_slots_produced_cf(),
+                IteratorMode::From(&block_num_key(epoch, epoch_slot), Direction::Reverse),
+            )
+            .flatten()
+            .next()
+        {
+            let epoch = u32_from_be_bytes(&key[..U32_LEN]).expect("epoch u32 bytes");
+            let epoch_slot = u32_from_be_bytes(&key[U32_LEN..]).expect("epoch slot u32 bytes");
+            return Ok(epoch * MAINNET_EPOCH_SLOT_COUNT + epoch_slot);
+        }
+        Ok(0)
     }
 
     ///////////////

@@ -250,6 +250,14 @@ pub trait BlockStore {
         pk: &PublicKey,
     ) -> anyhow::Result<()>;
 
+    /// Returns the current slot if blocks were produced there,
+    /// otherwise it returns the next slot with blocks produced
+    fn get_next_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<Option<u32>>;
+
+    /// Returns the current slot if blocks were produced there,
+    /// otherwise it returns the previous slot with blocks produced
+    fn get_prev_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<u32>;
+
     /// Index the block's minimimal info needed for comparison
     fn set_block_comparison_batch(
         &self,
