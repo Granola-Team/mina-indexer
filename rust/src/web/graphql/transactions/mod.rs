@@ -445,8 +445,11 @@ impl TransactionsQueryRoot {
                     (Some(gte), Some(gt)) => gte.max(gt + 1),
                     (Some(gte), None) => gte,
                     (None, Some(gt)) => gt + 1,
-                    (None, None) => 1,
+                    (None, None) => 0,
                 };
+                let min_bound = db
+                    .get_next_global_slot_produced(min_bound)?
+                    .expect("min global slot produced");
 
                 let max_bound = match (
                     global_slot_lte.or(date_time_lte
@@ -463,6 +466,8 @@ impl TransactionsQueryRoot {
                         .get_best_block_global_slot()?
                         .expect("best block global slot"),
                 };
+                let max_bound = db.get_prev_global_slot_produced(max_bound)?;
+
                 match sort_by {
                     BlockHeightAsc | BlockHeightDesc => {
                         let min_heights = db
