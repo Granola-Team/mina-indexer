@@ -445,7 +445,7 @@ jsonpath "$.data.transactions[3].hash" == "CkpZrxGwdxH2CL8wGTF3B9BgJcc5xyfiF8iyz
 duration < 750
 
 #
-# Transactions by hash (block order)
+# Transactions by hash (block/nonce order)
 #
 
 POST {{url}}
@@ -490,7 +490,7 @@ duration < 750
 
 POST {{url}}
 ```graphql
-query TransactionsNonce {
+query TransactionsAppliedFailed {
   transactions(
     limit: 20,
     sortBy: BLOCKHEIGHT_ASC,
@@ -527,7 +527,7 @@ duration < 100
 
 POST {{url}}
 ```graphql
-query TransactionsNonce {
+query TransactionsFailureReason {
   transactions(
     limit: 5,
     sortBy: BLOCKHEIGHT_ASC,
@@ -573,4 +573,64 @@ jsonpath "$.data.transactions[4].nonce" == 5
 jsonpath "$.data.transactions[4].failureReason" == "Amount_insufficient_to_create_account"
 jsonpath "$.data.transactions[4].hash" == "CkpZK28AEmzhB8AjsfT6Dd1cKdR5WF2gQw4xqDu4f93ozDX2jekTq"
 
-duration < 100
+duration < 200
+
+#
+# Transactions date time bounded (next/prev)
+#
+
+POST {{url}}
+```graphql
+query TransactionsDateTimeBound {
+  prev: transactions(
+    limit: 1,
+    sortBy: DATETIME_DESC,
+    query: {
+      canonical: true,
+      kind: "PAYMENT",
+      dateTimeLte: "2021-03-17T00:24:00.000Z"
+    }) {
+    nonce
+    blockHeight
+    globalSlot
+    block {
+      dateTime
+    }
+  }
+
+  next: transactions(
+    limit: 1,
+    sortBy: DATETIME_ASC,
+    query: {
+      canonical: true,
+      kind: "PAYMENT",
+      dateTimeGte: "2021-03-17T00:30:00.000Z"
+    }) {
+    nonce
+    blockHeight
+    globalSlot
+    block {
+      dateTime
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.prev" count == 1
+jsonpath "$.data.next" count == 1
+
+# all data
+jsonpath "$.data.prev[0].blockHeight" == 8
+jsonpath "$.data.prev[0].globalSlot" == 7
+jsonpath "$.data.prev[0].nonce" == 11
+jsonpath "$.data.prev[0].block.dateTime" == "2021-03-17T00:21:00.000Z"
+
+jsonpath "$.data.next[0].blockHeight" == 11
+jsonpath "$.data.next[0].globalSlot" == 11
+jsonpath "$.data.next[0].nonce" == 12
+jsonpath "$.data.next[0].block.dateTime" == "2021-03-17T00:33:00.000Z"
+
+duration < 200

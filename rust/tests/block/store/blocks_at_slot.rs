@@ -31,5 +31,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     }
 
     assert_eq!(db.get_blocks_at_slot(155140)?.len(), 3);
+    assert_eq!(db.get_next_global_slot_produced(155157)?.unwrap(), 155158);
+    assert_eq!(db.get_prev_global_slot_produced(155157)?, 155156);
     Ok(())
 }
