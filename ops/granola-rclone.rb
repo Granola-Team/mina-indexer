@@ -6,7 +6,6 @@ CONFIG_FILE = "#{__dir__}/rclone.conf"
 
 args = [
   "rclone",
-  "-vv", # '--log-level', 'INFO',
   "--config", CONFIG_FILE,
   "--buffer-size=128Mi",
   "--log-level=INFO",
