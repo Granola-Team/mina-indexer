@@ -4,7 +4,7 @@
 
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
-BUILD_TYPE = "debug"
+BUILD_TYPE = ARGV.shift
 
 require "fileutils"
 
@@ -62,7 +62,6 @@ test_names = %w[
 
 puts "Regression testing..."
 BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
-IDXR_EXE = ARGV.shift
 tests = if ARGV.empty?
   # Run all tests, but not the long-running ones.
   test_names
@@ -113,7 +112,7 @@ def remove_dirs
 end
 
 def cleanup
-  idxr_shutdown_via_socket(IDXR_EXE, "#{BASE_DIR}/mina-indexer.sock")
+  idxr_shutdown_via_socket(EXE_SRC, "#{BASE_DIR}/mina-indexer.sock")
   cleanup_idxr_pid
   cleanup_database_pid
   remove_dirs
@@ -121,9 +120,9 @@ end
 
 tests.each do |tn|
   puts "\nTesting: #{tn}"
-  test_success = system(BASH_TEST_DRIVER, IDXR_EXE, "test_#{tn}")
+  test_success = system(BASH_TEST_DRIVER, EXE_SRC, "test_#{tn}")
   cleanup
-  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{IDXR_EXE} test_#{tn}")
+  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{EXE_SRC} test_#{tn}")
 end
 
 puts "Regression testing complete."
