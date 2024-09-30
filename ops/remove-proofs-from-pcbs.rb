@@ -14,9 +14,9 @@ def remove_proofs(obj)
 end
 
 # Process all JSON files in a directory
-def process_directory(directory)
+def process_directory(directory, processed_files)
   Find.find(directory) do |path|
-    if /\.json$/.match?(path)
+    if /\.json$/.match?(path) && !processed_files.include?(path)
       begin
         file_contents = File.read(path)
         json_data = JSON.parse(file_contents)
@@ -26,6 +26,9 @@ def process_directory(directory)
 
         # Overwrite the original file with compact JSON (single line)
         File.write(path, JSON.generate(json_data))
+
+        # Add file to processed list
+        processed_files << path
 
         puts "Successfully removed 'proofs' from #{path}"
       rescue Errno::ENOENT
@@ -37,11 +40,20 @@ def process_directory(directory)
   end
 end
 
-# Usage: ./remove_proofs_from_json_directory_compact.rb <directory>
+# Usage: ./remove_proofs_from_pcbs.rb <directory>
 if ARGV.length != 1
   puts "Usage: #{$PROGRAM_NAME} <directory>"
   exit 1
 end
 
 directory = ARGV[0]
-process_directory(directory)
+processed_files = [] # Array to store the processed files
+
+# Loop indefinitely
+loop do
+  process_directory(directory, processed_files)
+  puts "Waiting for new files to process..."
+
+  # Sleep for 10 minutes before the next iteration (600 seconds)
+  sleep 600
+end
