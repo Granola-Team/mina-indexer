@@ -51,6 +51,7 @@ pub struct TransactionWithoutBlock {
     global_slot: u32,
     canonical: bool,
     failure_reason: Option<String>,
+    is_applied: bool,
     fee: u64,
     from: String,
     hash: String,
@@ -637,6 +638,7 @@ impl TransactionWithoutBlock {
                     block_height: cmd.blockchain_length,
                     global_slot: cmd.global_slot_since_genesis,
                     canonical,
+                    is_applied: failure_reason.is_none(),
                     failure_reason,
                     fee,
                     from: PublicKey::from(sender).0,
@@ -701,6 +703,7 @@ impl TransactionQueryInput {
             or,
             block,
             failure_reason,
+            is_applied,
             fee_payer: _,
             source: _,
             from_account: _,
@@ -709,8 +712,8 @@ impl TransactionQueryInput {
             token: _,
             is_delegation: _,
         } = self;
-        if let Some(state_hash) = block.as_ref().and_then(|b| b.state_hash.clone()) {
-            if transaction.block.state_hash != state_hash {
+        if let Some(state_hash) = block.as_ref().and_then(|b| b.state_hash.as_ref()) {
+            if transaction.block.state_hash != *state_hash {
                 return false;
             }
         }
@@ -749,8 +752,15 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
+        // failed/applied
         if let Some(failure_reason) = failure_reason {
             if transaction.transaction.failure_reason.as_ref() != Some(failure_reason) {
+                return false;
+            }
+        }
+        if let Some(is_applied) = is_applied {
+            if transaction.transaction.failure_reason.is_none() != *is_applied {
                 return false;
             }
         }

@@ -806,6 +806,7 @@ pub struct TransactionQueryInput {
 
     /// Failure reason only applies to failed transactions
     pub failure_reason: Option<String>,
+    pub is_applied: Option<bool>,
 
     // sender attributes
     pub from: Option<String>,
