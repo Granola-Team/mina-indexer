@@ -582,7 +582,7 @@ impl Transaction {
         Transaction {
             transaction: TransactionWithoutBlock::new(
                 cmd,
-                get_block_canonicity(db, &block_state_hash.0),
+                get_block_canonicity(db, &block_state_hash),
                 epoch_num_user_commands,
                 total_num_user_commands,
             ),

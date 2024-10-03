@@ -229,7 +229,7 @@ impl FeetransferQueryRoot {
 
             'outer: for height in block_heights {
                 for state_hash in db.get_blocks_at_height(height)?.iter() {
-                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let canonical = get_block_canonicity(db, state_hash);
                     let block = db
                         .get_block(state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -292,12 +292,8 @@ impl FeetransferQueryRoot {
                                     epoch_num_internal_commands,
                                     total_num_internal_commands,
                                 ));
-                                let state_hash = ft.state_hash.clone();
-                                let pcb = db
-                                    .get_block(&BlockHash::from(state_hash.clone()))
-                                    .unwrap()
-                                    .unwrap()
-                                    .0;
+                                let state_hash = BlockHash::from(ft.state_hash.clone());
+                                let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
                                 let canonical = get_block_canonicity(db, &state_hash);
                                 FeetransferWithMeta {
                                     canonical,
@@ -349,13 +345,9 @@ fn get_fee_transfers(
             epoch_num_internal_commands,
             total_num_internal_commands,
         ));
-        let state_hash = ft.state_hash.clone();
+        let state_hash = BlockHash::from(ft.state_hash.clone());
         let canonical = get_block_canonicity(db, &state_hash);
-        let pcb = db
-            .get_block(&BlockHash::from(state_hash.clone()))
-            .unwrap()
-            .unwrap()
-            .0;
+        let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
             feetransfer: ft,

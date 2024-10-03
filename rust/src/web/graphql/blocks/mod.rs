@@ -59,7 +59,7 @@ impl BlocksQueryRoot {
             return Ok(db.get_best_block().map(|b| {
                 b.map(|pcb| {
                     let state_hash = pcb.state_hash();
-                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let canonical = get_block_canonicity(db, &state_hash);
                     let block_num_snarks = db
                         .get_block_snarks_count(&state_hash)
                         .expect("snark counts")
@@ -107,7 +107,7 @@ impl BlocksQueryRoot {
                 None => return Ok(None),
             };
             let state_hash = pcb.state_hash();
-            let canonical = get_block_canonicity(db, &state_hash.0);
+            let canonical = get_block_canonicity(db, &state_hash);
             let block_num_snarks = db
                 .get_block_snarks_count(&state_hash)
                 .expect("snark counts")
@@ -153,7 +153,7 @@ impl BlocksQueryRoot {
         {
             let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
-            let canonical = get_block_canonicity(db, &state_hash.0);
+            let canonical = get_block_canonicity(db, &state_hash);
             let block_num_snarks = db
                 .get_block_snarks_count(&state_hash)
                 .expect("snark counts")
@@ -1337,7 +1337,7 @@ impl Block {
         let total_num_supercharged_blocks = counts[5];
         let epoch_num_user_commands = counts[8];
         let total_num_user_commands = counts[9];
-        let canonical = get_block_canonicity(db, &state_hash.0);
+        let canonical = get_block_canonicity(db, &state_hash);
         let block_num_snarks = db
             .get_block_snarks_count(&state_hash)
             .expect("snark counts")

@@ -185,7 +185,7 @@ impl SnarkQueryRoot {
                 let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_height = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_height {
-                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let canonical = get_block_canonicity(db, &state_hash);
                     let pcb = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -239,7 +239,7 @@ impl SnarkQueryRoot {
                 let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_slot = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_slot {
-                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let canonical = get_block_canonicity(db, &state_hash);
                     let pcb = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -307,7 +307,7 @@ impl SnarkQueryRoot {
 
             'outer: for height in block_heights {
                 for state_hash in db.get_blocks_at_height(height)? {
-                    let canonical = get_block_canonicity(db, &state_hash.0);
+                    let canonical = get_block_canonicity(db, &state_hash);
                     let block = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -354,7 +354,7 @@ impl SnarkQueryRoot {
         'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
             let state_hash = state_hash_suffix(&key)?;
             let block = db.get_block(&state_hash)?.expect("block to be returned").0;
-            let canonical = get_block_canonicity(db, &state_hash.0);
+            let canonical = get_block_canonicity(db, &state_hash);
             let snark_work = db.get_block_snark_work(&state_hash)?;
             let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                 summaries
@@ -392,29 +392,28 @@ fn snark_summary_matches_query(
     query: &Option<SnarkQueryInput>,
     snark: SnarkWorkSummaryWithStateHash,
 ) -> anyhow::Result<Option<SnarkWithCanonicity>> {
-    let canonical = get_block_canonicity(db, &snark.state_hash);
-    Ok(db
-        .get_block(&snark.state_hash.clone().into())?
-        .and_then(|(block, _)| {
-            let snark_with_canonicity = SnarkWithCanonicity {
-                pcb: block,
-                canonical,
-                snark: (
-                    snark,
-                    db.get_snarks_epoch_count(None).expect("epoch snarks count"),
-                    db.get_snarks_total_count().expect("total snarks count"),
-                )
-                    .into(),
-            };
-            if query
-                .as_ref()
-                .map_or(true, |q| q.matches(&snark_with_canonicity))
-            {
-                Some(snark_with_canonicity)
-            } else {
-                None
-            }
-        }))
+    let state_hash = BlockHash::from(snark.state_hash.clone());
+    let canonical = get_block_canonicity(db, &state_hash);
+    Ok(db.get_block(&state_hash)?.and_then(|(block, _)| {
+        let snark_with_canonicity = SnarkWithCanonicity {
+            pcb: block,
+            canonical,
+            snark: (
+                snark,
+                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                db.get_snarks_total_count().expect("total snarks count"),
+            )
+                .into(),
+        };
+        if query
+            .as_ref()
+            .map_or(true, |q| q.matches(&snark_with_canonicity))
+        {
+            Some(snark_with_canonicity)
+        } else {
+            None
+        }
+    }))
 }
 
 impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
