@@ -112,15 +112,25 @@ def db_version_of_git_rev(rev)
   "#{v["major"]}.#{v["minor"]}.#{v["patch"]}"
 end
 
-def idxr_cleanup(rev)
-  mina_indexer = "mina-indexer-#{rev}"
-  bin = "#{BASE_DIR}/bin/#{mina_indexer}"
-  return unless File.exist? bin
+def idxr_cleanup(which, rev)
+  if which == "one"
+    mina_indexer = "mina-indexer-#{rev}"
+    bin = "#{BASE_DIR}/bin/#{mina_indexer}"
+    return unless File.exist? bin
 
-  puts "Removing #{mina_indexer} bin, socket, db & logs"
-  FileUtils.rm_rf("#{BASE_DIR}/logs/#{rev}")
-  FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/db/#{db_version_of_git_rev(rev)}-*"))
-  FileUtils.rm_f(bin)
+    puts "Removing #{mina_indexer} bin, socket, db & logs"
+    FileUtils.rm_rf("#{BASE_DIR}/logs/#{rev}")
+    FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/db/#{db_version_of_git_rev(rev)}-*"))
+    FileUtils.rm_f(bin)
+  elsif which == "all"
+    bin_dir = "#{BASE_DIR}/bin"
+    return if Dir.empty? bin_dir
+
+    puts "Removing all mina-indexer bins, sockets, dbs & logs"
+    FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/logs/*"))
+    FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/db/*"))
+    FileUtils.rm_rf(Dir.glob("#{bin_dir}/mina-indexer-*"))
+  end
 end
 
 def idxr_shutdown(rev)

@@ -155,9 +155,9 @@ clean-dev which='one' rev=GIT_COMMIT_HASH:
   {{UTILS}} dev clean {{which}} {{rev}}
 
 # Clean mina-indexer-prod subdirectory
-clean-prod rev=GIT_COMMIT_HASH:
+clean-prod which='one' rev=GIT_COMMIT_HASH:
   @echo "Cleaning prod directory"
-  {{UTILS}} prod clean {{rev}}
+  {{UTILS}} prod clean {{which}} {{rev}}
 
 # Clean mina-indexer-test subdirectory
 clean-test rev=GIT_COMMIT_HASH:

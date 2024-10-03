@@ -34,9 +34,16 @@ def clean_dev(type)
   end
 end
 
-def clean(type)
-  if type == "prod" || type == "test"
-    idxr_cleanup(ARGV.last)
+def clean_prod(type)
+  if type == "prod"
+    idxr_cleanup(ARGV[-2], ARGV.last)
+    exit 0
+  end
+end
+
+def clean_test(type)
+  if type == "test"
+    idxr_cleanup("one", ARGV.last)
     exit 0
   end
 end
@@ -44,7 +51,8 @@ end
 # clean up directories
 if ARGV[1] == "clean"
   clean_dev(DEPLOY_TYPE)
-  clean(DEPLOY_TYPE)
+  clean_prod(DEPLOY_TYPE)
+  clean_test(DEPLOY_TYPE)
   exit 0
 end
 
