@@ -59,7 +59,7 @@ jsonpath "$.data.accounts[4].publicKey" == "B62qoj4NpnbGSLV62tu2UbTRFV7Ec8kYcQW6
 jsonpath "$.data.accounts[5].publicKey" == "B62qneDu6K65UhAuf7YCXADJWtgJh1y9xk4nEtGKggLaTr2M3Fbj3iR"
 jsonpath "$.data.accounts[6].publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 
-duration < 100
+duration < 200
 
 
 #

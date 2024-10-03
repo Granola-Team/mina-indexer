@@ -485,7 +485,7 @@ jsonpath "$.data.transactions[5].nonce" == 171
 duration < 750
 
 #
-# Transactions with & without failure reason
+# Transactions applied & failed
 #
 
 POST {{url}}
@@ -500,7 +500,19 @@ query TransactionsAppliedFailed {
     nonce
     blockHeight
     failureReason
-  }  
+    isApplied
+  }
+
+  applied: transactions(
+    limit: 20,
+    sortBy: BLOCKHEIGHT_ASC,
+    query: {
+      isApplied: true
+    }) {
+    nonce
+    blockHeight
+    isApplied
+  }
 }
 ```
 HTTP 200
@@ -508,16 +520,27 @@ HTTP 200
 
 # total data count
 jsonpath "$.data.transactions" count == 20
+jsonpath "$.data.applied" count == 20
 
-# first datum
+# first data
 jsonpath "$.data.transactions[0].blockHeight" == 3
 jsonpath "$.data.transactions[0].nonce" == 0
 jsonpath "$.data.transactions[0].failureReason" == "Amount_insufficient_to_create_account"
+jsonpath "$.data.transactions[0].isApplied" == false
 
-# last datum
+jsonpath "$.data.applied[0].blockHeight" == 11
+jsonpath "$.data.applied[0].nonce" == 12
+jsonpath "$.data.applied[0].isApplied" == true
+
+# last data
 jsonpath "$.data.transactions[19].blockHeight" == 12
 jsonpath "$.data.transactions[19].nonce" == 14
 jsonpath "$.data.transactions[19].failureReason" == null
+jsonpath "$.data.transactions[19].isApplied" == true
+
+jsonpath "$.data.applied[19].blockHeight" == 17
+jsonpath "$.data.applied[19].nonce" == 24
+jsonpath "$.data.applied[19].isApplied" == true
 
 duration < 100
 
