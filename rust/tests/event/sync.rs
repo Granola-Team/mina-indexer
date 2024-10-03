@@ -49,14 +49,20 @@ async fn test() -> anyhow::Result<()> {
     let best_tip_sync: BlockWithoutHeight = state_sync.best_tip_block().clone().into();
     let canonical_root_sync: BlockWithoutHeight = state_sync.canonical_root_block().clone().into();
 
+    // root & tip match
     assert_eq!(best_tip, best_tip_sync);
     assert_eq!(canonical_root, canonical_root_sync);
 
+    // sync diffs contained in original diffs
     for state_hash in state_sync.diffs_map.keys() {
         assert_eq!(
             state.diffs_map.get(state_hash),
             state_sync.diffs_map.get(state_hash)
         );
     }
+
+    // no dangling branches
+    assert!(state.dangling_branches.is_empty());
+    assert!(state_sync.dangling_branches.is_empty());
     Ok(())
 }

@@ -1082,10 +1082,11 @@ impl IndexerState {
                         .flatten()
                         .for_each(|(key, _)| {
                             if let (Ok(height), Ok(state_hash)) = (block_u32_prefix_from_key(&key), state_hash_suffix(&key)) {
+                                if height <= 1 || state_hash == root_block.state_hash() {
+                                    return;
+                                }
                                 if let Ok(Some((block, _))) = indexer_store.get_block(&state_hash) {
-                                    if height > 1 {
-                                        witness_tree_blocks.push(block);
-                                    }
+                                    witness_tree_blocks.push(block);
                                 } else {
                                     panic!(
                                         "Fatal sync error: block missing from db (length {height}): {state_hash}"
