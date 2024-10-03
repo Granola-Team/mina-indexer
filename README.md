@@ -125,11 +125,6 @@ There are two options to start an instance:
 1. `just deploy-local-prod` uses the release binary
 2. `just deploy-local-prod-dev` uses the debug binary
 
-*** Deployment note ***
-Hardware limitations may limit some users from downloading all blocks.
-To circumvent this, run `ruby ops/remove-proofs-from-pcbs.rb $VOLUMES_DIR/path/to/blocks/folder` once the deployment process has begun downloading blocks.
-Blocks consist mostly of proofs which are not ingested by the indexer, and removing them significantly reduces space occupied on disk.
-
 ## Generating OCI Images With Nix
 
 Note: This requires [the Docker Engine](https://docs.docker.com/engine/install/) to be installed.
