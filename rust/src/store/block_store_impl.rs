@@ -295,15 +295,10 @@ impl BlockStore for IndexerStore {
         // follows the new best tip back to the common ancestor
         let mut b = new_best_tip.clone();
         let mut apply = vec![];
-
-        let a_length = self.get_block_height(&a)?.expect("a has length");
-        let a_global_slot = self.get_block_global_slot(&a)?.expect("a has global slot");
-
         let b_length = self.get_block_height(&b)?.expect("b has length");
-        let b_global_slot = self.get_block_global_slot(&b)?.expect("b has global slot");
 
         // bring b back to the same height as a
-        for _ in 0..b_length.saturating_sub(a_length) {
+        for _ in 0..b_length.saturating_sub(self.get_block_height(&a)?.expect("a has length")) {
             // check if there's a previous block
             if b.0 == MAINNET_GENESIS_HASH {
                 break;
@@ -311,7 +306,9 @@ impl BlockStore for IndexerStore {
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
-                global_slot_since_genesis: b_global_slot,
+                global_slot_since_genesis: self
+                    .get_block_global_slot(&b)?
+                    .expect("b has global slot"),
             });
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
@@ -324,13 +321,17 @@ impl BlockStore for IndexerStore {
             // add blocks to appropriate collection
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
-                blockchain_length: b_length,
-                global_slot_since_genesis: b_global_slot,
+                blockchain_length: self.get_block_height(&b)?.expect("b has length"),
+                global_slot_since_genesis: self
+                    .get_block_global_slot(&b)?
+                    .expect("b has global slot"),
             });
             unapply.push(BlockUpdate {
                 state_hash: a.clone(),
-                blockchain_length: a_length,
-                global_slot_since_genesis: a_global_slot,
+                blockchain_length: self.get_block_height(&a)?.expect("a has length"),
+                global_slot_since_genesis: self
+                    .get_block_global_slot(&a)?
+                    .expect("a has global slot"),
             });
 
             // descend
