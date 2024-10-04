@@ -221,11 +221,6 @@ tier2-load-test:
   @echo "--- Performing a simple load test with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}} load
 
-# Run tier 2 nix (release) many_blocks test
-tier2-many-blocks-test:
-  @echo "--- Performing many_blocks regression test with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}} many_blocks
-
 # Run tier 2 nix (release) best_chain_many_blocks test
 tier2-best-chain-many-blocks-test:
   @echo "--- Performing best_chain_many_blocks regression test with Nix-built binary"
@@ -241,11 +236,6 @@ tier2-load-test-dev:
   @echo "--- Performing a simple load test with debug-built binary"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} load
 
-# Run tier 2 dev (debug) many_blocks test
-tier2-many-blocks-test-dev:
-  @echo "--- Performing many_blocks regression test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} many_blocks
-
 # Run tier 2 dev (debug) best_chain_many_blocks test
 tier2-best-chain-many-blocks-test-dev:
   @echo "--- Performing best_chain_many_blocks regression test with debug-built binary"
@@ -259,7 +249,6 @@ tier2-regression-tests-dev:
 # Run tier 2 tests with Nix-built (release) binary & build OCI image.
 tier2: tier2-prereqs nix-build \
   tier2-load-test \
-  tier2-many-blocks-test \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests \
   && build-image
@@ -267,7 +256,6 @@ tier2: tier2-prereqs nix-build \
 # Run tier 2 tests with debug build.
 tier2-dev: tier2-prereqs debug-build \
   tier2-load-test-dev \
-  tier2-many-blocks-test-dev \
   tier2-best-chain-many-blocks-test-dev \
   tier2-regression-tests-dev
 

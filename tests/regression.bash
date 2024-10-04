@@ -1109,35 +1109,6 @@ test_rest_blocks() {
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
 }
 
-test_many_blocks() {
-    stage_mainnet_blocks 9999 ./blocks
-
-    idxr_server_start_standard
-    wait_forever_for_socket
-
-    # results
-    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-    canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    canonical_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
-
-    assert '9999' $best_length
-    assert '9989' $canonical_length
-    assert '3NKSj9ZRtZq9XCKkbf1a5s5YHWUMJkpLtp6irQKMPMKi24dU9yLi' $canonical_hash
-    assert '3NLjanAoyqjqmPsQHafJcvQiGW2xbvyXANHxEyNwPwan2eUoZBV9' $best_hash
-
-    pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
-
-    # check ledgers are present
-    # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
-    assert '502777775000000' $balance
-
-    # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
-    assert '502777775000000' $balance
-}
-
 test_best_chain_many_blocks() {
     stage_mainnet_blocks 5000 ./blocks
 
@@ -1219,6 +1190,28 @@ test_best_chain_many_blocks() {
       \"global_slot_since_genesis\": 7026
     }
 ]"
+
+    # results
+    best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    best_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+    root_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    root_length=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
+
+    assert 4990 $root_length
+    assert 5000 $best_length
+    assert '3NKiyxhxfohCGpHkQg7TC1cNxHzAHbcHCUAdSM1aNt2u6dGtVrvC' $root_hash
+    assert '3NLn1bsWFjycHNJGGLy3KSxXSW6ixmFrunn1iym5GWjTXxkt6oFi' $best_hash
+
+    pk='B62qpJ4Q5J4LoBXgQBfq6gbXTyevFPhwMNYZEBdTSixmFq4UrdNadSN'
+
+    # check ledgers are present
+    # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
+    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
+
+    # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
+    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    assert '502777775000000' $balance
 }
 
 test_genesis_block_creator() {
@@ -1862,7 +1855,6 @@ for test_name in "$@"; do
         "test_version_file") test_version_file ;;
         "test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
         # Tier 2 tests:
-        "test_many_blocks") test_many_blocks ;;
         "test_best_chain_many_blocks") test_best_chain_many_blocks ;;
         "test_load") test_load ;;
         *) echo "Unknown test: $test_name"
