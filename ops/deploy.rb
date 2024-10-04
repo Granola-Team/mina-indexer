@@ -30,6 +30,7 @@ fetch_ledgers
 unless File.exist?(db_dir(BLOCKS_COUNT))
   puts "Creating database..."
 
+  # deploy-local-prod-dev
   if BUILD_TYPE == "debug"
     puts "Ingest staking ledgers? (y/n)"
     ingest_staking_ledgers = $stdin.gets[0].downcase
@@ -92,6 +93,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
       )
     end
   else
+    # deploy-local-prod
     system(
       EXE,
       "database", "create",
@@ -99,8 +101,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
       "--ledger-cadence", "5000",
       "--database-dir", db_dir(BLOCKS_COUNT),
       "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-      "--staking-ledgers-dir", LEDGERS_DIR,
-      "--do-not-ingest-orphan-blocks"
+      "--staking-ledgers-dir", LEDGERS_DIR
     )
   end || abort("database creation failed")
   puts "Database creation succeeded."
