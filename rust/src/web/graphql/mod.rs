@@ -11,7 +11,7 @@ pub mod transactions;
 pub mod version;
 
 use super::ENDPOINT_GRAPHQL;
-use crate::{constants::*, store::IndexerStore};
+use crate::{block::BlockHash, constants::*, store::IndexerStore};
 use actix_web::HttpResponse;
 use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
@@ -116,9 +116,9 @@ pub(crate) fn date_time_to_scalar(millis: i64) -> DateTime {
 }
 
 /// Convenience function for obtaining a block's canonicity
-pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &str) -> bool {
+pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> bool {
     use crate::canonicity::{store::CanonicityStore, Canonicity};
-    db.get_block_canonicity(&state_hash.to_owned().into())
+    db.get_block_canonicity(state_hash)
         .map(|status| matches!(status, Some(Canonicity::Canonical)))
         .unwrap_or(false)
 }

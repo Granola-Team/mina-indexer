@@ -29,7 +29,7 @@ HTTP 200
 [Asserts]
 
 # total query results
-jsonpath "$.data.blocks" count == 119
+jsonpath "$.data.blocks" count == 120
 
 # first datum
 jsonpath "$.data.blocks[0].stateHash" == "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
@@ -42,16 +42,16 @@ jsonpath "$.data.blocks[0].receivedTime" == "2021-03-17T00:00:00.000Z"
 jsonpath "$.data.blocks[0].snarkFees" == "0"
 
 # last datum
-jsonpath "$.data.blocks[118].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
-jsonpath "$.data.blocks[118].txFees" == "10000000"
-jsonpath "$.data.blocks[118].blockHeight" == 120
-jsonpath "$.data.blocks[118].canonical" == true
-jsonpath "$.data.blocks[118].creator" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
-jsonpath "$.data.blocks[118].dateTime" == "2021-03-17T08:39:00.000Z"
-jsonpath "$.data.blocks[118].receivedTime" == "2021-03-17T08:39:40.591Z"
-jsonpath "$.data.blocks[118].snarkFees" == "0"
+jsonpath "$.data.blocks[119].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.blocks[119].txFees" == "10000000"
+jsonpath "$.data.blocks[119].blockHeight" == 120
+jsonpath "$.data.blocks[119].canonical" == true
+jsonpath "$.data.blocks[119].creator" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
+jsonpath "$.data.blocks[119].dateTime" == "2021-03-17T08:39:00.000Z"
+jsonpath "$.data.blocks[119].receivedTime" == "2021-03-17T08:39:40.591Z"
+jsonpath "$.data.blocks[119].snarkFees" == "0"
 
-duration < 2000
+duration < 1000
 
 # 
 # Blocks non-canonical height descending query
@@ -71,17 +71,19 @@ HTTP 200
 [Asserts]
 
 # Non-canonical block count
-jsonpath "$.data.blocks" count == 85
+jsonpath "$.data.blocks" count == 84
 
 # First non-canonical block
 jsonpath "$.data.blocks[0].blockHeight" == 120
+jsonpath "$.data.blocks[0].stateHash" == "3NKFoxsSXhZ5YVfAUWgkEh6FXdATjHgUxfjTnGtJcrTuUZavq7d1"
 jsonpath "$.data.blocks[0].canonical" == false
 
 # Last non-canonical block
-jsonpath "$.data.blocks[84].blockHeight" == 6
-jsonpath "$.data.blocks[84].canonical" == false
+jsonpath "$.data.blocks[83].blockHeight" == 6
+jsonpath "$.data.blocks[83].stateHash" == "3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45"
+jsonpath "$.data.blocks[83].canonical" == false
 
-duration < 2000
+duration < 1000
 
 # 
 # Blocks creator account  query (default sort_by: BLOCKHEIGHT_DESC)
@@ -586,7 +588,7 @@ jsonpath "$.data.blocks[0].total_num_blocks" == 204
 jsonpath "$.data.blocks[0].total_num_canonical_blocks" == 120
 jsonpath "$.data.blocks[0].total_num_supercharged_blocks" == 23
 
-duration < 2000
+duration < 200
 
 #
 # Per block data counts
@@ -646,7 +648,7 @@ jsonpath "$.data.blocks[5].blockHeight" == 115
 jsonpath "$.data.blocks[6].blockHeight" == 113
 jsonpath "$.data.blocks[7].blockHeight" == 113
 jsonpath "$.data.blocks[8].blockHeight" == 112
-jsonpath "$.data.blocks[9].blockHeight" == 112
+jsonpath "$.data.blocks[9].blockHeight" == 111
 
 # canonicity
 jsonpath "$.data.blocks[0].canonical" == false
@@ -660,7 +662,7 @@ jsonpath "$.data.blocks[7].canonical" == false
 jsonpath "$.data.blocks[8].canonical" == false
 jsonpath "$.data.blocks[9].canonical" == false
 
-duration < 2000
+duration < 1000
 
 #
 # Unique block producer last n blocks query

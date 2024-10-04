@@ -9,7 +9,6 @@ use crate::{
     constants::MAINNET_COINBASE_REWARD,
     event::{db::*, store::EventStore, IndexerEvent},
 };
-use anyhow::Context;
 use log::trace;
 
 impl CanonicityStore for IndexerStore {
@@ -153,15 +152,11 @@ impl CanonicityStore for IndexerStore {
                     |BlockUpdate {
                          state_hash: a,
                          blockchain_length: h,
-                         ..
+                         global_slot_since_genesis: g,
                      }| CanonicityDiff {
                         state_hash: a.clone(),
                         blockchain_length: *h,
-                        global_slot: self
-                            .get_block_global_slot(a)
-                            .unwrap()
-                            .with_context(|| format!("(length {h}): {a}"))
-                            .expect("block global slot exists"),
+                        global_slot: *g,
                     },
                 )
                 .collect(),
@@ -172,15 +167,11 @@ impl CanonicityStore for IndexerStore {
                     |BlockUpdate {
                          state_hash: u,
                          blockchain_length: h,
-                         ..
+                         global_slot_since_genesis: g,
                      }| CanonicityDiff {
                         state_hash: u.clone(),
                         blockchain_length: *h,
-                        global_slot: self
-                            .get_block_global_slot(u)
-                            .unwrap()
-                            .with_context(|| format!("(length {h}): {u}"))
-                            .expect("block global slot exists"),
+                        global_slot: *g,
                     },
                 )
                 .collect(),

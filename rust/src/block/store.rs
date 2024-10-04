@@ -10,6 +10,7 @@ use crate::{
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 
+#[derive(Debug)]
 pub struct BlockUpdate {
     pub state_hash: BlockHash,
     pub blockchain_length: u32,
