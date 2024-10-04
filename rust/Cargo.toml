@@ -50,8 +50,8 @@ bs58 = { version = "0.5.1", default-features = false, features = ["check", "std"
 tempfile = "3.12.0"
 actix-web = { version = "4.9.0", default-features = false , features = ["macros"] }
 actix-cors = "0.7.0"
-async-graphql = { version = "7.0.9", default-features = false, features = ["graphiql"] }
-async-graphql-actix-web = "7.0.9"
+async-graphql = { version = "7.0.11", default-features = false, features = ["graphiql"] }
+async-graphql-actix-web = "7.0.11"
 base64 = { version = "0.22.1", default-features = false }
 hex-literal = "0.4.1"
 chrono = { version = "0.4.38", default-features = false }
