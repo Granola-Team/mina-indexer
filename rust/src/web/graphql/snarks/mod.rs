@@ -102,7 +102,7 @@ impl SnarkQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<SnarkWithCanonicity>> {
         let db = db(ctx);
-        let mut snarks = Vec::new();
+        let mut snarks = <Vec<SnarkWithCanonicity>>::new();
         let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
 
         // state hash
@@ -111,7 +111,7 @@ impl SnarkQueryRoot {
             .and_then(|q| q.block.as_ref())
             .and_then(|block| block.state_hash.clone())
         {
-            let mut snarks: Vec<SnarkWithCanonicity> = db
+            snarks = db
                 .get_block(&state_hash.into())?
                 .into_iter()
                 .flat_map(|(block, _)| {
@@ -175,7 +175,6 @@ impl SnarkQueryRoot {
                 }
             };
 
-            let mut snarks = Vec::new();
             // key should be typed
             'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
                 // exit if prover isn't the same
@@ -185,7 +184,14 @@ impl SnarkQueryRoot {
                 let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_height = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_height {
+                    // avoid deserializing PCB if possible
                     let canonical = get_block_canonicity(db, &state_hash);
+                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
                     let pcb = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -230,7 +236,6 @@ impl SnarkQueryRoot {
                 }
             };
 
-            let mut snarks = Vec::new();
             'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
                 if key[..PublicKey::LEN] != *prover.as_bytes() {
                     break;
@@ -239,7 +244,14 @@ impl SnarkQueryRoot {
                 let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
                 let blocks_at_slot = db.get_blocks_at_height(block_height)?;
                 for state_hash in blocks_at_slot {
+                    // avoid deserializing PCB if possible
                     let canonical = get_block_canonicity(db, &state_hash);
+                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
                     let pcb = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -275,7 +287,6 @@ impl SnarkQueryRoot {
                 || q.block_height_lt.is_some()
                 || q.block_height_lte.is_some()
         }) {
-            let mut snarks = Vec::new();
             let (min, max) = {
                 let SnarkQueryInput {
                     block_height_gt,
@@ -307,7 +318,14 @@ impl SnarkQueryRoot {
 
             'outer: for height in block_heights {
                 for state_hash in db.get_blocks_at_height(height)? {
+                    // avoid deserializing PCB if possible
                     let canonical = get_block_canonicity(db, &state_hash);
+                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
                     let block = db
                         .get_block(&state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -335,7 +353,7 @@ impl SnarkQueryRoot {
                         if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                             snarks.push(sw);
 
-                            if snarks.len() == limit {
+                            if snarks.len() >= limit {
                                 break 'outer;
                             }
                         }
@@ -353,15 +371,27 @@ impl SnarkQueryRoot {
 
         'outer: for (key, _) in db.blocks_height_iterator(mode).flatten() {
             let state_hash = state_hash_suffix(&key)?;
-            let block = db.get_block(&state_hash)?.expect("block to be returned").0;
+
+            // avoid deserializing PCB if possible
             let canonical = get_block_canonicity(db, &state_hash);
+            if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                if canonical != query_canonicity {
+                    continue;
+                }
+            }
+
             let snark_work = db.get_block_snark_work(&state_hash)?;
             let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                 summaries
                     .into_iter()
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
-                        pcb: block.clone(),
+                        pcb: db
+                            .get_block(&state_hash)
+                            .ok()
+                            .flatten()
+                            .expect("block exists")
+                            .0,
                         snark: (
                             snark,
                             state_hash.clone(),
@@ -377,7 +407,7 @@ impl SnarkQueryRoot {
                 if query.as_ref().map_or(true, |q| q.matches(&sw)) {
                     snarks.push(sw);
 
-                    if snarks.len() == limit {
+                    if snarks.len() >= limit {
                         break 'outer;
                     }
                 }
@@ -458,10 +488,14 @@ impl SnarkQueryInput {
             and,
             or,
         } = self;
-
         let blockchain_length = snark.pcb.blockchain_length();
 
-        // block_height_gt(e) & block_height_lt(e)
+        // block height
+        if let Some(block_height) = block_height {
+            if snark.pcb.blockchain_length() != *block_height {
+                return false;
+            }
+        }
         if let Some(height) = block_height_gt {
             if blockchain_length <= *height {
                 return false;
@@ -483,6 +517,7 @@ impl SnarkQueryInput {
             }
         }
 
+        // block
         if let Some(block_query_input) = block {
             if let Some(state_hash) = &block_query_input.state_hash {
                 if snark.pcb.state_hash().0 != *state_hash {
@@ -490,11 +525,8 @@ impl SnarkQueryInput {
                 }
             }
         }
-        if let Some(block_height) = block_height {
-            if snark.pcb.blockchain_length() != *block_height {
-                return false;
-            }
-        }
+
+        // prover
         if let Some(prover) = prover {
             if !snark
                 .pcb
@@ -504,11 +536,15 @@ impl SnarkQueryInput {
                 return false;
             }
         }
+
+        // canonicity
         if let Some(canonical) = canonical {
             if snark.canonical != *canonical {
                 return false;
             }
         }
+
+        // boolean
         if let Some(query) = and {
             if !query.iter().all(|and| and.matches(snark)) {
                 return false;

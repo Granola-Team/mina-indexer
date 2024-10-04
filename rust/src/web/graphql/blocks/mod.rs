@@ -17,9 +17,7 @@ use crate::{
     },
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
-    utility::store::{
-        block_u32_prefix_from_key, from_be_bytes, pk_key_prefix, state_hash_suffix, U32_LEN,
-    },
+    utility::store::{block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN},
     web::graphql::gen::BlockQueryInput,
 };
 use anyhow::Context;
@@ -343,10 +341,18 @@ impl BlocksQueryRoot {
                 GlobalSlotDesc => db.coinbase_receiver_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
-                if pk_key_prefix(&key).0 != coinbase_receiver {
+                if key[..PublicKey::LEN] != *coinbase_receiver.as_bytes() {
                     break;
                 }
+
+                // avoid deserializing PCB if possible
                 let state_hash = state_hash_suffix(&key)?;
+                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                    if get_block_canonicity(db, &state_hash) != query_canonicity {
+                        continue;
+                    }
+                }
+
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -386,10 +392,18 @@ impl BlocksQueryRoot {
                 GlobalSlotDesc => db.block_creator_global_slot_iterator(From(&end, Reverse)),
             };
             for (key, _) in iter.flatten() {
-                if pk_key_prefix(&key).0 != creator_account {
+                if key[..PublicKey::LEN] != *creator_account.as_bytes() {
                     break;
                 }
+
+                // avoid deserializing PCB if possible
                 let state_hash = state_hash_suffix(&key)?;
+                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                    if get_block_canonicity(db, &state_hash) != query_canonicity {
+                        continue;
+                    }
+                }
+
                 let pcb = get_block(db, &state_hash);
                 if let Some(block) = precomputed_matches_query(db, &query, &pcb, counts) {
                     blocks.push(block);
@@ -444,7 +458,14 @@ impl BlocksQueryRoot {
                     break;
                 }
 
+                // avoid deserializing PCB if possible
                 let state_hash = state_hash_suffix(&key)?;
+                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                    if get_block_canonicity(db, &state_hash) != query_canonicity {
+                        continue;
+                    }
+                }
+
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -508,7 +529,14 @@ impl BlocksQueryRoot {
                     break;
                 }
 
+                // avoid deserializing PCB if possible
                 let state_hash = state_hash_suffix(&key)?;
+                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                    if get_block_canonicity(db, &state_hash) != query_canonicity {
+                        continue;
+                    }
+                }
+
                 let pcb = get_block(db, &state_hash);
                 if let Some(block_with_canonicity) =
                     precomputed_matches_query(db, &query, &pcb, counts)
@@ -533,7 +561,14 @@ impl BlocksQueryRoot {
             GlobalSlotDesc => db.blocks_global_slot_iterator(From(&end, Reverse)),
         };
         for (key, _) in iter.flatten() {
+            // avoid deserializing PCB if possible
             let state_hash = state_hash_suffix(&key)?;
+            if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                if get_block_canonicity(db, &state_hash) != query_canonicity {
+                    continue;
+                }
+            }
+
             let pcb = db
                 .get_block(&state_hash)?
                 .with_context(|| format!("block missing from store hash {state_hash}"))

@@ -5,7 +5,6 @@ use super::{
 };
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    canonicity::{store::CanonicityStore, Canonicity},
     command::{
         internal::{store::InternalCommandStore, InternalCommandWithData},
         store::UserCommandStore,
@@ -229,7 +228,14 @@ impl FeetransferQueryRoot {
 
             'outer: for height in block_heights {
                 for state_hash in db.get_blocks_at_height(height)?.iter() {
+                    // avoid deserializing PCB if possible
                     let canonical = get_block_canonicity(db, state_hash);
+                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
                     let block = db
                         .get_block(state_hash)?
                         .with_context(|| format!("block missing from store {state_hash}"))
@@ -286,20 +292,28 @@ impl FeetransferQueryRoot {
                                 end_index,
                             )?
                             .into_iter()
-                            .map(|internal_command| {
+                            .filter_map(|internal_command| {
                                 let ft = Feetransfer::from((
                                     internal_command,
                                     epoch_num_internal_commands,
                                     total_num_internal_commands,
                                 ));
                                 let state_hash = BlockHash::from(ft.state_hash.clone());
-                                let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
                                 let canonical = get_block_canonicity(db, &state_hash);
-                                FeetransferWithMeta {
+                                if let Some(query_canonicity) =
+                                    query.as_ref().and_then(|q| q.canonical)
+                                {
+                                    if canonical != query_canonicity {
+                                        return None;
+                                    }
+                                }
+
+                                let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
+                                Some(FeetransferWithMeta {
                                     canonical,
                                     feetransfer: ft,
                                     block: Some(pcb),
-                                }
+                                })
                             })
                             .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
                             .collect(),
@@ -347,6 +361,12 @@ fn get_fee_transfers(
         ));
         let state_hash = BlockHash::from(ft.state_hash.clone());
         let canonical = get_block_canonicity(db, &state_hash);
+        if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+            if canonical != query_canonicity {
+                continue;
+            }
+        }
+
         let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
@@ -377,13 +397,16 @@ fn get_fee_transfers_for_state_hash(
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
 ) -> Vec<FeetransferWithMeta> {
+    let canonical = get_block_canonicity(db, state_hash);
+    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+        if canonical != query_canonicity {
+            return vec![];
+        }
+    }
+
     let pcb = match db.get_block(state_hash) {
         Ok(Some(pcb)) => pcb.0,
         _ => return vec![],
-    };
-    let canonical = match db.get_block_canonicity(state_hash) {
-        Ok(Some(canonicity)) => matches!(canonicity, Canonicity::Canonical),
-        _ => false,
     };
     match db.get_internal_commands(state_hash) {
         Ok(internal_commands) => {
