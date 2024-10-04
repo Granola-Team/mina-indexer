@@ -1138,6 +1138,89 @@ test_many_blocks() {
     assert '502777775000000' $balance
 }
 
+test_best_chain_many_blocks() {
+    stage_mainnet_blocks 5000 ./blocks
+
+    idxr_server_start_standard
+    wait_forever_for_socket
+
+    # write best chain to file
+    file=./best_chain.json
+    idxr chain best --path $file
+    assert "$(cat $file)" "[
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKYJR1m2hFXw169JR3gUrxYv6KhG8TFRaidZJb17SXjxBChYfEG\",
+      \"state_hash\": \"3NLn1bsWFjycHNJGGLy3KSxXSW6ixmFrunn1iym5GWjTXxkt6oFi\",
+      \"blockchain_length\": 5000,
+      \"global_slot_since_genesis\": 7042
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NLU9vTSBoGYzb5jrGeUw93b9k1fVbdo62sZeAxsADWsaMcWDf9Z\",
+      \"state_hash\": \"3NKYJR1m2hFXw169JR3gUrxYv6KhG8TFRaidZJb17SXjxBChYfEG\",
+      \"blockchain_length\": 4999,
+      \"global_slot_since_genesis\": 7039
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKVX7T9nqFVvWiC8VzVyQm1JtmQwGT6ixDhGM58qhkrQCpW1Pmb\",
+      \"state_hash\": \"3NLU9vTSBoGYzb5jrGeUw93b9k1fVbdo62sZeAxsADWsaMcWDf9Z\",
+      \"blockchain_length\": 4998,
+      \"global_slot_since_genesis\": 7038
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NLJxyWYk4FWkxLA3xQJBQ4ez56su8Tk6wdGcD3epy5tDqdfywy5\",
+      \"state_hash\": \"3NKVX7T9nqFVvWiC8VzVyQm1JtmQwGT6ixDhGM58qhkrQCpW1Pmb\",
+      \"blockchain_length\": 4997,
+      \"global_slot_since_genesis\": 7036
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKExctYENxSUb5yuQ9L9LFMxJLGZU6NkAFy91nWjCidFroYzvwW\",
+      \"state_hash\": \"3NLJxyWYk4FWkxLA3xQJBQ4ez56su8Tk6wdGcD3epy5tDqdfywy5\",
+      \"blockchain_length\": 4996,
+      \"global_slot_since_genesis\": 7033
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKiaQdEvzSvhVwpYavT2oYxGHgqrhkDEuR1xs6wRb9Vri7MtoAB\",
+      \"state_hash\": \"3NKExctYENxSUb5yuQ9L9LFMxJLGZU6NkAFy91nWjCidFroYzvwW\",
+      \"blockchain_length\": 4995,
+      \"global_slot_since_genesis\": 7032
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NL9vdeBBXhA3YdrKt2vqAYPaJ125nDVvJ41fKVWQ8g9uHD3htD7\",
+      \"state_hash\": \"3NKiaQdEvzSvhVwpYavT2oYxGHgqrhkDEuR1xs6wRb9Vri7MtoAB\",
+      \"blockchain_length\": 4994,
+      \"global_slot_since_genesis\": 7031
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKcipz589LEJY3a4au67989giUCbgjEcYWfKbeqAS8NXbHSbAvv\",
+      \"state_hash\": \"3NL9vdeBBXhA3YdrKt2vqAYPaJ125nDVvJ41fKVWQ8g9uHD3htD7\",
+      \"blockchain_length\": 4993,
+      \"global_slot_since_genesis\": 7030
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NLCgStAZSqfGPZE8N8RYZR1XNjaMzMKnsNu9N8sUu9juRaf7xoZ\",
+      \"state_hash\": \"3NKcipz589LEJY3a4au67989giUCbgjEcYWfKbeqAS8NXbHSbAvv\",
+      \"blockchain_length\": 4992,
+      \"global_slot_since_genesis\": 7029
+    },
+    {
+      \"canonicity\": \"Canonical\",
+      \"parent_hash\": \"3NKiyxhxfohCGpHkQg7TC1cNxHzAHbcHCUAdSM1aNt2u6dGtVrvC\",
+      \"state_hash\": \"3NLCgStAZSqfGPZE8N8RYZR1XNjaMzMKnsNu9N8sUu9juRaf7xoZ\",
+      \"blockchain_length\": 4991,
+      \"global_slot_since_genesis\": 7026
+    }
+]"
+}
+
 test_genesis_block_creator() {
     idxr_server_start_standard
     wait_for_socket
@@ -1780,6 +1863,7 @@ for test_name in "$@"; do
         "test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
         # Tier 2 tests:
         "test_many_blocks") test_many_blocks ;;
+        "test_best_chain_many_blocks") test_best_chain_many_blocks ;;
         "test_load") test_load ;;
         *) echo "Unknown test: $test_name"
            exit 1
