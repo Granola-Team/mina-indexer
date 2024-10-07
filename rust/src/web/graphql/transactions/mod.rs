@@ -196,18 +196,26 @@ impl TransactionsQueryRoot {
 
         // txn hash query (no state hash)
         if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.clone()) {
+            let txn_hash = TxnHash::from(txn_hash);
             let query = query.expect("query input to exists");
-            if let Ok(Some(state_hashes)) = db.get_user_command_state_hashes(&txn_hash.into()) {
-                transactions = state_hashes
-                    .iter()
-                    .flat_map(|state_hash| db.get_block(state_hash).expect("block"))
-                    .flat_map(|(b, _)| SignedCommandWithData::from_precomputed(&b))
-                    .map(|cmd| {
-                        Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
-                    })
-                    .filter(|txn| query.matches(txn))
-                    .collect();
-                transactions.truncate(limit);
+            if let Some(state_hashes) = db.get_user_command_state_hashes(&txn_hash)? {
+                for state_hash in state_hashes.iter() {
+                    if let Some(cmd) = db.get_user_command_state_hash(&txn_hash, state_hash)? {
+                        let txn = Transaction::new(
+                            cmd,
+                            db,
+                            epoch_num_user_commands,
+                            total_num_user_commands,
+                        );
+                        if query.matches(&txn) {
+                            transactions.push(txn);
+                        }
+
+                        if transactions.len() >= limit {
+                            break;
+                        }
+                    }
+                }
             }
             return Ok(transactions);
         }
@@ -254,8 +262,15 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let state_hash = state_hash_suffix(&key)?;
+                let canonical = get_block_canonicity(db, &state_hash);
+                if let Some(query_canonicity) = query.canonical {
+                    if canonical != query_canonicity {
+                        continue;
+                    }
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -302,10 +317,17 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_state_hash = state_hash_suffix(&key)?;
+                let state_hash = state_hash_suffix(&key)?;
+                let canonical = get_block_canonicity(db, &state_hash);
+                if let Some(query_canonicity) = query.canonical {
+                    if canonical != query_canonicity {
+                        continue;
+                    }
+                }
+
                 let txn_hash = txn_hash_of_key(&key);
                 let cmd = db
-                    .get_user_command_state_hash(&txn_hash, &txn_state_hash)?
+                    .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("command at txn hash and state hash");
                 let txn =
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
@@ -392,8 +414,15 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let state_hash = state_hash_suffix(&key)?;
+                let canonical = get_block_canonicity(db, &state_hash);
+                if let Some(query_canonicity) = query.canonical {
+                    if canonical != query_canonicity {
+                        continue;
+                    }
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -513,8 +542,15 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let state_hash = state_hash_suffix(&key)?;
+                let canonical = get_block_canonicity(db, &state_hash);
+                if let Some(query_canonicity) = query.canonical {
+                    if canonical != query_canonicity {
+                        continue;
+                    }
+                }
+
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -547,8 +583,16 @@ impl TransactionsQueryRoot {
                     continue;
                 }
             }
-            let txn_hash = user_commands_iterator_txn_hash(&key)?;
+
             let state_hash = user_commands_iterator_state_hash(&key)?;
+            let canonical = get_block_canonicity(db, &state_hash);
+            if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                if canonical != query_canonicity {
+                    continue;
+                }
+            }
+
+            let txn_hash = user_commands_iterator_txn_hash(&key)?;
             let txn = Transaction::new(
                 db.get_user_command_state_hash(&txn_hash, &state_hash)?
                     .unwrap(),

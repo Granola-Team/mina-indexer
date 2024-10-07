@@ -1,5 +1,5 @@
 use super::{
-    db, gen::BlockProtocolStateConsensusStateQueryInput, get_block_canonicity,
+    db, gen::BlockProtocolStateConsensusStateQueryInput, get_block, get_block_canonicity,
     millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD, PK,
 };
 use crate::{
@@ -20,7 +20,6 @@ use crate::{
     utility::store::{block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN},
     web::graphql::gen::BlockQueryInput,
 };
-use anyhow::Context;
 use async_graphql::{self, Enum, Object, Result, SimpleObject};
 use log::error;
 use speedb::{Direction, IteratorMode};
@@ -100,11 +99,11 @@ impl BlocksQueryRoot {
                 return Ok(None);
             }
 
-            let pcb = match db.get_block(&state_hash.clone().into())? {
+            let state_hash = BlockHash::from(state_hash);
+            let pcb = match db.get_block(&state_hash)? {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
-            let state_hash = pcb.state_hash();
             let canonical = get_block_canonicity(db, &state_hash);
             let block_num_snarks = db
                 .get_block_snarks_count(&state_hash)
@@ -282,7 +281,7 @@ impl BlocksQueryRoot {
 
         // state hash query
         if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
-            let block = db.get_block(&state_hash.clone().into())?;
+            let block = db.get_block(&state_hash.into())?;
             return Ok(block
                 .iter()
                 .filter_map(|(b, _)| precomputed_matches_query(db, &query, b, counts))
@@ -569,15 +568,10 @@ impl BlocksQueryRoot {
                 }
             }
 
-            let pcb = db
-                .get_block(&state_hash)?
-                .with_context(|| format!("block missing from store hash {state_hash}"))
-                .expect("block")
-                .0;
-            let block = Block::from_precomputed(db, &pcb, counts);
-
-            if query.as_ref().map_or(true, |q| q.matches(&block)) {
-                blocks.push(block);
+            let pcb = get_block(db, &state_hash);
+            if let Some(block_with_canonicity) = precomputed_matches_query(db, &query, &pcb, counts)
+            {
+                blocks.push(block_with_canonicity);
                 if blocks.len() >= limit {
                     break;
                 }
@@ -1139,7 +1133,7 @@ impl BlockQueryInput {
             block_height_lt,
             block_height_lte,
             protocol_state,
-            ..
+            unique_block_producers_last_n_blocks: _,
         } = self;
         if let Some(canonical) = canonical {
             if block.canonical != *canonical {
@@ -1211,39 +1205,39 @@ impl BlockQueryInput {
         }
 
         // global_slot_gt(e) & global_slot_lt(e)
-        if let Some(global_slot) = protocol_state
+        if let Some(slot_since_genesis_gt) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_gt)
         {
-            if block.block.global_slot_since_genesis <= global_slot {
+            if block.block.global_slot_since_genesis <= slot_since_genesis_gt {
                 return false;
             }
         }
-        if let Some(global_slot) = protocol_state
+        if let Some(slot_since_genesis_gte) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_gte)
         {
-            if block.block.global_slot_since_genesis < global_slot {
+            if block.block.global_slot_since_genesis < slot_since_genesis_gte {
                 return false;
             }
         }
-        if let Some(global_slot) = protocol_state
+        if let Some(slot_since_genesis_lt) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_lt)
         {
-            if block.block.global_slot_since_genesis >= global_slot {
+            if block.block.global_slot_since_genesis >= slot_since_genesis_lt {
                 return false;
             }
         }
-        if let Some(global_slot) = protocol_state
+        if let Some(slot_since_genesis_lte) = protocol_state
             .as_ref()
             .and_then(|f| f.consensus_state.as_ref())
             .and_then(|f| f.slot_since_genesis_lte)
         {
-            if block.block.global_slot_since_genesis > global_slot {
+            if block.block.global_slot_since_genesis > slot_since_genesis_lte {
                 return false;
             }
         }
@@ -1281,14 +1275,6 @@ impl BlockQueryInput {
         }
         true
     }
-}
-
-fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock {
-    db.get_block(state_hash)
-        .with_context(|| format!("block missing from store {state_hash}"))
-        .unwrap()
-        .unwrap()
-        .0
 }
 
 fn reorder(db: &Arc<IndexerStore>, blocks: &mut [Block], sort_by: BlockSortByInput) {
