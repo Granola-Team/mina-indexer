@@ -5,7 +5,7 @@ use super::{
 use crate::{
     block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::{
-        internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
+        internal::{store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData},
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
@@ -1013,17 +1013,17 @@ impl BlockWithoutCanonicity {
             MAINNET_COINBASE_REWARD
         };
 
-        let fee_transfers: Vec<BlockFeetransfer> = InternalCommand::from_precomputed(block)
+        let fee_transfers: Vec<BlockFeetransfer> = DbInternalCommand::from_precomputed(block)
             .into_iter()
             .map(|cmd| {
-                InternalCommandWithData::from_internal_cmd(
+                DbInternalCommandWithData::from_internal_cmd(
                     cmd,
                     block.state_hash(),
                     block.blockchain_length(),
                     block.timestamp() as i64,
                 )
             })
-            .filter(|x| matches!(x, InternalCommandWithData::FeeTransfer { .. }))
+            .filter(|x| matches!(x, DbInternalCommandWithData::FeeTransfer { .. }))
             .map(|ft| ft.into())
             .collect();
 
@@ -1395,10 +1395,10 @@ impl Block {
     }
 }
 
-impl From<InternalCommandWithData> for BlockFeetransfer {
-    fn from(int_cmd: InternalCommandWithData) -> Self {
+impl From<DbInternalCommandWithData> for BlockFeetransfer {
+    fn from(int_cmd: DbInternalCommandWithData) -> Self {
         match int_cmd {
-            InternalCommandWithData::FeeTransfer {
+            DbInternalCommandWithData::FeeTransfer {
                 receiver,
                 amount,
                 kind,
@@ -1408,7 +1408,7 @@ impl From<InternalCommandWithData> for BlockFeetransfer {
                 recipient: receiver.0,
                 feetransfer_kind: kind.to_string(),
             },
-            InternalCommandWithData::Coinbase {
+            DbInternalCommandWithData::Coinbase {
                 receiver,
                 amount,
                 kind,

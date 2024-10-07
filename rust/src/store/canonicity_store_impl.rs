@@ -5,7 +5,7 @@ use crate::{
         BlockHash,
     },
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
-    command::internal::{store::InternalCommandStore, InternalCommandWithData},
+    command::internal::{store::InternalCommandStore, DbInternalCommandWithData},
     constants::MAINNET_COINBASE_REWARD,
     event::{db::*, store::EventStore, IndexerEvent},
 };
@@ -26,7 +26,7 @@ impl CanonicityStore for IndexerStore {
             // increment regular, canonical, & supercharged counts
             self.increment_block_canonical_production_count(state_hash)?;
             if let Ok(internal_commands) = self.get_internal_commands(state_hash) {
-                if let Some(InternalCommandWithData::Coinbase {
+                if let Some(DbInternalCommandWithData::Coinbase {
                     receiver, amount, ..
                 }) = internal_commands.first()
                 {

@@ -1,12 +1,12 @@
+//! Store for internal commands
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
-    command::internal::InternalCommandWithData,
+    command::internal::DbInternalCommandWithData,
     ledger::public_key::PublicKey,
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
-/// Store for internal commands
 pub trait InternalCommandStore {
     /// Index internal commands for the given block on:
     /// public keys and state hashes
@@ -21,35 +21,35 @@ pub trait InternalCommandStore {
         &self,
         block: &PrecomputedBlock,
         index: u32,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()>;
 
     /// Set pk's internal command
     fn set_pk_internal_command(
         &self,
         pk: &PublicKey,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()>;
 
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>>;
+    ) -> anyhow::Result<Vec<DbInternalCommandWithData>>;
 
     /// Get indexed internal command from block
     fn get_block_internal_command(
         &self,
         state_hash: &BlockHash,
         index: u32,
-    ) -> anyhow::Result<Option<InternalCommandWithData>>;
+    ) -> anyhow::Result<Option<DbInternalCommandWithData>>;
 
     /// Get indexed internal command for the given public key
     fn get_pk_internal_command(
         &self,
         pk: &PublicKey,
         index: u32,
-    ) -> anyhow::Result<Option<InternalCommandWithData>>;
+    ) -> anyhow::Result<Option<DbInternalCommandWithData>>;
 
     /// Get internal commands for the given public key
     fn get_internal_commands_public_key(
@@ -57,7 +57,7 @@ pub trait InternalCommandStore {
         pk: &PublicKey,
         offset: usize,
         limit: usize,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>>;
+    ) -> anyhow::Result<Vec<DbInternalCommandWithData>>;
 
     /// Get number of blocks that the public key has internal commands for
     fn get_pk_num_internal_commands(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>>;
@@ -146,7 +146,7 @@ pub trait InternalCommandStore {
     /// Increment internal commands counts given `internal_command` in `epoch`
     fn increment_internal_commands_counts(
         &self,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
         epoch: u32,
     ) -> anyhow::Result<()>;
 }

@@ -1,7 +1,9 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
-    command::internal::{store::InternalCommandStore, InternalCommand, InternalCommandWithData},
+    command::internal::{
+        store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData,
+    },
     constants::millis_to_iso_date_string,
     ledger::public_key::PublicKey,
     utility::store::{
@@ -29,11 +31,11 @@ impl InternalCommandStore for IndexerStore {
         trace!("Adding internal commands for block {}", block.summary());
 
         // add cmds with data to public keys
-        let internal_cmds_with_data: Vec<InternalCommandWithData> =
-            InternalCommand::from_precomputed(block)
+        let internal_cmds_with_data: Vec<DbInternalCommandWithData> =
+            DbInternalCommand::from_precomputed(block)
                 .into_iter()
                 .map(|c| {
-                    InternalCommandWithData::from_internal_cmd(
+                    DbInternalCommandWithData::from_internal_cmd(
                         c,
                         state_hash.clone(),
                         block_height,
@@ -93,7 +95,7 @@ impl InternalCommandStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         index: u32,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
         let global_slot = block.global_slot_since_genesis();
@@ -122,7 +124,7 @@ impl InternalCommandStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         index: u32,
-    ) -> anyhow::Result<Option<InternalCommandWithData>> {
+    ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         info!("Getting internal command block {state_hash} index {index}");
         Ok(self
             .database
@@ -136,7 +138,7 @@ impl InternalCommandStore for IndexerStore {
     fn set_pk_internal_command(
         &self,
         pk: &PublicKey,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()> {
         let n = self.get_pk_num_internal_commands(pk)?.unwrap_or(0);
         self.database.put_cf(
@@ -156,7 +158,7 @@ impl InternalCommandStore for IndexerStore {
         &self,
         pk: &PublicKey,
         index: u32,
-    ) -> anyhow::Result<Option<InternalCommandWithData>> {
+    ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         info!("Getting internal command pk {pk} index {index}");
         Ok(self
             .database
@@ -170,7 +172,7 @@ impl InternalCommandStore for IndexerStore {
     fn get_internal_commands(
         &self,
         state_hash: &BlockHash,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
+    ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands in block {state_hash}");
         let mut res = vec![];
         if let Some(num) = self.get_block_internal_commands_count(state_hash)? {
@@ -189,7 +191,7 @@ impl InternalCommandStore for IndexerStore {
         pk: &PublicKey,
         offset: usize,
         limit: usize,
-    ) -> anyhow::Result<Vec<InternalCommandWithData>> {
+    ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands for public key {pk}");
         let mut internal_cmds = vec![];
         if let Some(n) = self.get_pk_num_internal_commands(pk)? {
@@ -443,26 +445,18 @@ impl InternalCommandStore for IndexerStore {
 
     fn increment_internal_commands_counts(
         &self,
-        internal_command: &InternalCommandWithData,
+        internal_command: &DbInternalCommandWithData,
         epoch: u32,
     ) -> anyhow::Result<()> {
-        let (sender, receiver) = match internal_command {
-            InternalCommandWithData::Coinbase { .. } => return Ok(()),
-            InternalCommandWithData::FeeTransfer {
-                sender, receiver, ..
-            } => (sender, receiver),
+        let receiver = match internal_command {
+            DbInternalCommandWithData::Coinbase { .. } => return Ok(()),
+            DbInternalCommandWithData::FeeTransfer { receiver, .. } => receiver,
         };
         trace!("Incrementing internal command counts {internal_command:?}");
 
-        // sender epoch & total
-        self.increment_internal_commands_pk_epoch_count(sender, epoch)?;
-        self.increment_internal_commands_pk_total_count(sender)?;
-
         // receiver epoch & total
-        if sender != receiver {
-            self.increment_internal_commands_pk_epoch_count(receiver, epoch)?;
-            self.increment_internal_commands_pk_total_count(receiver)?;
-        }
+        self.increment_internal_commands_pk_epoch_count(receiver, epoch)?;
+        self.increment_internal_commands_pk_total_count(receiver)?;
 
         // epoch & total counts
         self.increment_internal_commands_epoch_count(epoch)?;
@@ -482,8 +476,8 @@ struct CsvRecordInternalCommand<'a> {
 }
 
 impl<'a> CsvRecordInternalCommand<'a> {
-    fn from_internal_command(cmd: &'a InternalCommandWithData) -> Self {
-        use InternalCommandWithData::*;
+    fn from_internal_command(cmd: &'a DbInternalCommandWithData) -> Self {
+        use DbInternalCommandWithData::*;
         match cmd {
             Coinbase {
                 receiver,
@@ -494,7 +488,6 @@ impl<'a> CsvRecordInternalCommand<'a> {
                 block_height,
             }
             | FeeTransfer {
-                sender: _,
                 receiver,
                 amount,
                 state_hash,
