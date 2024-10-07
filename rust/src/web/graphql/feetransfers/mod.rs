@@ -6,7 +6,7 @@ use super::{
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::{
-        internal::{store::InternalCommandStore, InternalCommandWithData},
+        internal::{store::InternalCommandStore, DbInternalCommandWithData},
         store::UserCommandStore,
     },
     constants::*,
@@ -242,7 +242,7 @@ impl FeetransferQueryRoot {
                     }
                 }
 
-                let internal_cmd: InternalCommandWithData = serde_json::from_slice(&value)?;
+                let internal_cmd: DbInternalCommandWithData = serde_json::from_slice(&value)?;
                 let ft = Feetransfer::from((
                     internal_cmd,
                     epoch_num_internal_commands,
@@ -294,7 +294,7 @@ impl FeetransferQueryRoot {
                     }
                 }
 
-                let internal_command: InternalCommandWithData = serde_json::from_slice(&value)?;
+                let internal_command: DbInternalCommandWithData = serde_json::from_slice(&value)?;
                 let pcb = get_block(db, &state_hash);
                 let ft = FeetransferWithMeta {
                     canonical,
@@ -352,7 +352,7 @@ fn get_default_fee_transfers(
         }
 
         let ft = Feetransfer::from((
-            serde_json::from_slice::<InternalCommandWithData>(&value)?,
+            serde_json::from_slice::<DbInternalCommandWithData>(&value)?,
             epoch_num_internal_commands,
             total_num_internal_commands,
         ));
@@ -435,10 +435,10 @@ fn get_fee_transfers_for_state_hash(
     }
 }
 
-impl From<(InternalCommandWithData, u32, u32)> for Feetransfer {
-    fn from(int_cmd: (InternalCommandWithData, u32, u32)) -> Self {
+impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
+    fn from(int_cmd: (DbInternalCommandWithData, u32, u32)) -> Self {
         match int_cmd.0 {
-            InternalCommandWithData::FeeTransfer {
+            DbInternalCommandWithData::FeeTransfer {
                 receiver,
                 amount,
                 state_hash,
@@ -456,7 +456,7 @@ impl From<(InternalCommandWithData, u32, u32)> for Feetransfer {
                 epoch_num_internal_commands: int_cmd.1,
                 total_num_internal_commands: int_cmd.2,
             },
-            InternalCommandWithData::Coinbase {
+            DbInternalCommandWithData::Coinbase {
                 receiver,
                 amount,
                 state_hash,

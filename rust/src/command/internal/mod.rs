@@ -38,39 +38,6 @@ pub enum InternalCommand {
     },
 }
 
-/// This type is used to get internal commands with metadata from the store.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum InternalCommandWithData {
-    // Fee_transfer or Fee_transfer_via_coinbase
-    FeeTransfer {
-        sender: PublicKey,
-        receiver: PublicKey,
-        amount: u64,
-        state_hash: BlockHash,
-        kind: InternalCommandKind,
-        date_time: i64,
-        block_height: u32,
-    },
-    Coinbase {
-        receiver: PublicKey,
-        amount: u64,
-        state_hash: BlockHash,
-        kind: InternalCommandKind,
-        date_time: i64,
-        block_height: u32,
-    },
-}
-
-/// This type is used to store internal commands in the store.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum DbInternalCommand {
-    Coinbase { amount: u64, receiver: PublicKey },
-    FeeTransfer { amount: u64, receiver: PublicKey },
-    FeeTransferViaCoinbase { amount: u64, receiver: PublicKey },
-}
-
 impl InternalCommand {
     /// Compute the internal commands for the given precomputed block
     ///
@@ -162,15 +129,47 @@ impl InternalCommand {
     }
 }
 
-impl InternalCommandWithData {
+/// This type is used to store internal commands in the store.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DbInternalCommand {
+    Coinbase { amount: u64, receiver: PublicKey },
+    FeeTransfer { amount: u64, receiver: PublicKey },
+    FeeTransferViaCoinbase { amount: u64, receiver: PublicKey },
+}
+
+/// This type is used to get internal commands with metadata from the store.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DbInternalCommandWithData {
+    // Fee_transfer or Fee_transfer_via_coinbase
+    FeeTransfer {
+        receiver: PublicKey,
+        amount: u64,
+        state_hash: BlockHash,
+        kind: InternalCommandKind,
+        date_time: i64,
+        block_height: u32,
+    },
+    Coinbase {
+        receiver: PublicKey,
+        amount: u64,
+        state_hash: BlockHash,
+        kind: InternalCommandKind,
+        date_time: i64,
+        block_height: u32,
+    },
+}
+
+impl DbInternalCommandWithData {
     pub fn from_internal_cmd(
-        cmd: InternalCommand,
+        cmd: DbInternalCommand,
         state_hash: BlockHash,
         block_height: u32,
         date_time: i64,
     ) -> Self {
         match cmd {
-            InternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
+            DbInternalCommand::Coinbase { receiver, amount } => Self::Coinbase {
                 amount,
                 receiver,
                 date_time,
@@ -178,26 +177,16 @@ impl InternalCommandWithData {
                 block_height,
                 kind: InternalCommandKind::Coinbase,
             },
-            InternalCommand::FeeTransfer {
-                sender,
-                receiver,
+            DbInternalCommand::FeeTransfer { receiver, amount } => Self::FeeTransfer {
                 amount,
-            } => Self::FeeTransfer {
-                amount,
-                sender,
                 receiver,
                 date_time,
                 state_hash,
                 block_height,
                 kind: InternalCommandKind::FeeTransfer,
             },
-            InternalCommand::FeeTransferViaCoinbase {
-                sender,
-                receiver,
+            DbInternalCommand::FeeTransferViaCoinbase { receiver, amount } => Self::FeeTransfer {
                 amount,
-            } => Self::FeeTransfer {
-                amount,
-                sender,
                 receiver,
                 date_time,
                 state_hash,
@@ -208,11 +197,11 @@ impl InternalCommandWithData {
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        InternalCommand::from_precomputed(block)
-            .iter()
+        DbInternalCommand::from_precomputed(block)
+            .into_iter()
             .map(|cmd| {
                 Self::from_internal_cmd(
-                    cmd.clone(),
+                    cmd,
                     block.state_hash(),
                     block.blockchain_length(),
                     block.timestamp() as i64,
@@ -221,33 +210,29 @@ impl InternalCommandWithData {
             .collect()
     }
 
-    pub fn public_keys(&self) -> Vec<PublicKey> {
+    pub fn public_keys(&self) -> PublicKey {
         match self {
-            Self::Coinbase { receiver, .. } => vec![receiver.clone()],
-            Self::FeeTransfer {
-                sender, receiver, ..
-            } => vec![sender.clone(), receiver.clone()],
+            Self::Coinbase { receiver, .. } => receiver.clone(),
+            Self::FeeTransfer { receiver, .. } => receiver.clone(),
         }
     }
 
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {
         match self {
             Self::Coinbase { receiver, .. } => pk == receiver,
-            Self::FeeTransfer {
-                sender, receiver, ..
-            } => pk == sender || pk == receiver,
+            Self::FeeTransfer { receiver, .. } => pk == receiver,
         }
     }
 
     pub fn recipient(&self) -> PublicKey {
-        use InternalCommandWithData::*;
+        use DbInternalCommandWithData::*;
         match self {
             Coinbase { receiver, .. } | FeeTransfer { receiver, .. } => receiver.clone(),
         }
     }
 
     pub fn kind(&self) -> u8 {
-        use InternalCommandWithData::*;
+        use DbInternalCommandWithData::*;
         match self {
             Coinbase { .. } => 1,
             FeeTransfer { .. } => 0,
@@ -352,10 +337,9 @@ mod tests {
     fn from_precomputed() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./tests/data/canonical_chain_discovery/contiguous/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-        let internal_cmds = InternalCommand::from_precomputed(&block);
 
         assert_eq!(
-            internal_cmds,
+            InternalCommand::from_precomputed(&block),
             vec![
                 InternalCommand::Coinbase {
                     receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
@@ -369,10 +353,25 @@ mod tests {
             ]
         );
 
-        let cmds: Vec<InternalCommandWithData> = internal_cmds
+        let internal_cmds = DbInternalCommand::from_precomputed(&block);
+        assert_eq!(
+            internal_cmds,
+            vec![
+                DbInternalCommand::Coinbase {
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 720000000000
+                },
+                DbInternalCommand::FeeTransfer {
+                    receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
+                    amount: 20000000
+                }
+            ]
+        );
+
+        let cmds: Vec<DbInternalCommandWithData> = internal_cmds
             .into_iter()
             .map(|cmd| {
-                InternalCommandWithData::from_internal_cmd(
+                DbInternalCommandWithData::from_internal_cmd(
                     cmd,
                     block.state_hash(),
                     block.blockchain_length(),
@@ -383,7 +382,7 @@ mod tests {
         assert_eq!(
             cmds,
             vec![
-                InternalCommandWithData::Coinbase {
+                DbInternalCommandWithData::Coinbase {
                     receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
                     amount: 720000000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),
@@ -391,8 +390,7 @@ mod tests {
                     block_height: block.blockchain_length(),
                     date_time: block.timestamp() as i64,
                 },
-                InternalCommandWithData::FeeTransfer {
-                    sender: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
+                DbInternalCommandWithData::FeeTransfer {
                     receiver: "B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm".into(),
                     amount: 20000000,
                     state_hash: "3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into(),

@@ -197,7 +197,13 @@ duration < 750
 POST {{url}}
 ```graphql
 query Accounts {
-  accounts(query: {publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}) {
+  account0: accounts(query: {publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}) {
+    publicKey
+    pk_epoch_num_internal_commands
+    pk_total_num_internal_commands
+  }
+
+  account1: accounts(query: {publicKey: "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"}) {
     publicKey
     pk_epoch_num_internal_commands
     pk_total_num_internal_commands
@@ -207,15 +213,21 @@ query Accounts {
 HTTP 200
 [Asserts]
 
-# total data count
-jsonpath "$.data.accounts" count == 1
+# data counts
+jsonpath "$.data.account0" count == 1
+jsonpath "$.data.account1" count == 1
 
-# block production info
-jsonpath "$.data.accounts[0].publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.accounts[0].pk_epoch_num_internal_commands" == 196
-jsonpath "$.data.accounts[0].pk_total_num_internal_commands" == 196
+# first account
+jsonpath "$.data.account0[0].publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.account0[0].pk_epoch_num_internal_commands" == 0
+jsonpath "$.data.account0[0].pk_total_num_internal_commands" == 0
 
-duration < 750
+# last account
+jsonpath "$.data.account1[0].publicKey" == "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"
+jsonpath "$.data.account1[0].pk_epoch_num_internal_commands" == 21
+jsonpath "$.data.account1[0].pk_total_num_internal_commands" == 21
+
+duration < 500
 
 #
 # Account default (balance descending) query

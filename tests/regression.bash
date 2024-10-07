@@ -1404,7 +1404,6 @@ test_internal_commands() {
 
     kind=$(idxr internal-commands public-key --public-key $pk | jq -r .[1].kind)
     amount=$(idxr internal-commands public-key --public-key $pk | jq -r .[1].amount)
-    sender=$(idxr internal-commands public-key --public-key $pk | jq -r .[1].sender)
     receiver=$(idxr internal-commands public-key --public-key $pk | jq -r .[1].receiver)
     state_hash=$(idxr internal-commands public-key --public-key $pk | jq -r .[1].state_hash)
 
@@ -1412,7 +1411,6 @@ test_internal_commands() {
     assert $block $state_hash
     assert '20000000' $amount
     assert 'Fee_transfer' $kind
-    assert 'B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy' $sender
 
     kind=$(idxr internal-commands public-key --public-key $pk | jq -r .[0].kind)
     amount=$(idxr internal-commands public-key --public-key $pk | jq -r .[0].amount)
