@@ -89,6 +89,7 @@ impl AccountQueryRoot {
         sort_by: Option<AccountSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<Account>> {
+        use AccountSortByInput::*;
         let db = db(ctx);
 
         // public key query handler
@@ -133,8 +134,8 @@ impl AccountQueryRoot {
         // default query handler use balance-sorted accounts
         let mut accounts = Vec::new();
         let mode = match sort_by {
-            Some(AccountSortByInput::BalanceAsc) => IteratorMode::Start,
-            Some(AccountSortByInput::BalanceDesc) | None => IteratorMode::End,
+            Some(BalanceAsc) => IteratorMode::Start,
+            Some(BalanceDesc) | None => IteratorMode::End,
         };
 
         for (_, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
@@ -149,7 +150,7 @@ impl AccountQueryRoot {
                 .map_or(true, |q| q.matches(&account, username.as_ref()))
             {
                 let account = Account::from((
-                    account.clone(),
+                    account,
                     db.get_block_production_pk_epoch_count(&pk, None)
                         .expect("pk epoch block count"),
                     db.get_block_production_pk_total_count(&pk)
@@ -170,7 +171,7 @@ impl AccountQueryRoot {
                 ));
 
                 accounts.push(account);
-                if accounts.len() == limit {
+                if accounts.len() >= limit {
                     break;
                 }
             }
