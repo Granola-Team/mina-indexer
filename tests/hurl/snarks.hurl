@@ -47,7 +47,7 @@ jsonpath "$.data.snarks[9].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZ
 jsonpath "$.data.snarks[9].fee" == 0
 jsonpath "$.data.snarks[9].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
 
-duration < 4000
+duration < 500
 
 #
 # SNARKs canonical block height query
@@ -85,7 +85,7 @@ jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 jsonpath "$.data.snarks[63].fee" == 0
 
-duration < 4000
+duration < 500
 
 #
 # SNARKs canonical state hash query
@@ -120,7 +120,7 @@ jsonpath "$.data.snarks[0].total_num_snarks" == 64
 jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].block.stateHash" == "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
 
-duration < 4000
+duration < 500
 
 #
 # SNARKs by prover query
@@ -152,7 +152,7 @@ jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15De
 jsonpath "$.data.snarks[63].canonical" == true
 jsonpath "$.data.snarks[63].blockHeight" == 111
 
-duration < 4000
+duration < 500
 
 #
 # SNARKs canonical block height lte
@@ -175,11 +175,11 @@ jsonpath "$.data.snarks" count == 64
 jsonpath "$.data.snarks[0].blockHeight" == 111
 jsonpath "$.data.snarks[63].blockHeight" == 111
 
-duration < 4000
+duration < 500
 
-
-# filter by prover and sort by blockheight
-
+#
+# SNARKs filter by prover and sort by blockheight
+#
 
 POST {{url}}
 ```graphql
@@ -217,21 +217,19 @@ jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZ
 jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 
-duration < 4000
+duration < 500
 
-# Test SNARKs filtered by prover and sorted by block height
+#
+# SNARKs filtered by prover and sorted by block height
+#
+
 POST {{url}}
 ```graphql
 query SnarksQuery($sort_by: SnarkSortByInput, $limit: Int = 10, $query: SnarkQueryInput) {
   snarks(sortBy: $sort_by, limit: $limit, query: $query) {
     blockHeight
-    dateTime
     prover
     canonical
-    block {
-      stateHash
-    }
-    fee
   }
 }
 
@@ -248,12 +246,17 @@ variables {
 HTTP 200
 [Asserts]
 
+# data count
 jsonpath "$.data.snarks" count == 64
 
+# first datum
 jsonpath "$.data.snarks[0].blockHeight" == 111
+jsonpath "$.data.snarks[0].canonical" == true
 jsonpath "$.data.snarks[0].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+
+# last datum
 jsonpath "$.data.snarks[63].blockHeight" == 111
+jsonpath "$.data.snarks[63].canonical" == true
 jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 
-# TODO global slot query
-# TODO block height/global slot/date time bounded query
+duration < 500
