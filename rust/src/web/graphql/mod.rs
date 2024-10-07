@@ -11,8 +11,13 @@ pub mod transactions;
 pub mod version;
 
 use super::ENDPOINT_GRAPHQL;
-use crate::{block::BlockHash, constants::*, store::IndexerStore};
+use crate::{
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    constants::*,
+    store::IndexerStore,
+};
 use actix_web::HttpResponse;
+use anyhow::Context as aContext;
 use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
     InputValueResult, MergedObject, Scalar, ScalarType, Schema, SimpleObject, Value,
@@ -121,6 +126,14 @@ pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &BlockHas
     db.get_block_canonicity(state_hash)
         .map(|status| matches!(status, Some(Canonicity::Canonical)))
         .unwrap_or(false)
+}
+
+pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock {
+    db.get_block(state_hash)
+        .with_context(|| format!("block missing from store {state_hash}"))
+        .unwrap()
+        .unwrap()
+        .0
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject)]

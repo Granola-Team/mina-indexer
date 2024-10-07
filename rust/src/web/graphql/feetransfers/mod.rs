@@ -1,7 +1,7 @@
 use super::{
     blocks::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,
-    get_block_canonicity,
+    get_block, get_block_canonicity,
 };
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
@@ -16,7 +16,6 @@ use crate::{
     utility::store::U32_LEN,
     web::graphql::db,
 };
-use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
@@ -252,12 +251,7 @@ impl FeetransferQueryRoot {
                 let feetransfer_with_meta = FeetransferWithMeta {
                     canonical,
                     feetransfer: ft,
-                    block: Some(
-                        db.get_block(&state_hash)?
-                            .with_context(|| format!("block missing from store {state_hash}"))
-                            .unwrap()
-                            .0,
-                    ),
+                    block: Some(get_block(db, &state_hash)),
                 };
                 if query
                     .as_ref()
@@ -301,7 +295,7 @@ impl FeetransferQueryRoot {
                 }
 
                 let internal_command: InternalCommandWithData = serde_json::from_slice(&value)?;
-                let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
+                let pcb = get_block(db, &state_hash);
                 let ft = FeetransferWithMeta {
                     canonical,
                     block: Some(pcb),
@@ -357,13 +351,12 @@ fn get_default_fee_transfers(
             }
         }
 
-        let internal_command = serde_json::from_slice::<InternalCommandWithData>(&value)?;
         let ft = Feetransfer::from((
-            internal_command,
+            serde_json::from_slice::<InternalCommandWithData>(&value)?,
             epoch_num_internal_commands,
             total_num_internal_commands,
         ));
-        let pcb = db.get_block(&state_hash).unwrap().unwrap().0;
+        let pcb = get_block(db, &state_hash);
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
             feetransfer: ft,
