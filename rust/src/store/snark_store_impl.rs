@@ -890,11 +890,29 @@ impl SnarkStore for IndexerStore {
         )
     }
 
+    /// Iterator over SNARKs by prover & block height
+    /// ```
+    /// key: {prover}{block_height}{index}{state_hash}
+    /// val: snark
+    /// where
+    /// - prover:       [PublicKey] bytes
+    /// - block_height: u32 BE bytes
+    /// - index:        u32 BE bytes
+    /// - snark:        [SnarkWorkSummary] serde bytes
     fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_prover_block_height_sort_cf(), mode)
     }
 
+    /// Iterator over SNARKs by prover & global slot
+    /// ```
+    /// key: {prover}{global_slot}{index}
+    /// val: snark
+    /// where
+    /// - prover:      [PublicKey] bytes
+    /// - global_slot: u32 BE bytes
+    /// - index:       u32 BE bytes
+    /// - snark:       [SnarkWorkSummary] serde bytes
     fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_prover_global_slot_sort_cf(), mode)
