@@ -5,6 +5,7 @@ use crate::{
     ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommandKind {
@@ -17,6 +18,8 @@ pub enum InternalCommandKind {
     FeeTransferViaCoinbase,
 }
 
+/// This type is our internal representation of internal commands.
+/// We use these internal commands for ledger calculations.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum InternalCommand {
     Coinbase {
@@ -35,6 +38,7 @@ pub enum InternalCommand {
     },
 }
 
+/// This type is used to get internal commands with metadata from the store.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum InternalCommandWithData {
@@ -58,10 +62,19 @@ pub enum InternalCommandWithData {
     },
 }
 
+/// This type is used to store internal commands in the store.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DbInternalCommand {
+    Coinbase { amount: u64, receiver: PublicKey },
+    FeeTransfer { amount: u64, receiver: PublicKey },
+    FeeTransferViaCoinbase { amount: u64, receiver: PublicKey },
+}
+
 impl InternalCommand {
     /// Compute the internal commands for the given precomputed block
     ///
-    /// See `LedgerDiff::from_precomputed`
+    /// See [crate::ledger::diff::LedgerDiff::from_precomputed]
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         let mut all_account_diff_fees: Vec<Vec<AccountDiff>> = AccountDiff::from_block_fees(block);
 
@@ -248,6 +261,84 @@ impl std::fmt::Display for InternalCommandKind {
             InternalCommandKind::Coinbase => write!(f, "Coinbase"),
             InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
             InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
+        }
+    }
+}
+
+impl DbInternalCommand {
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
+        let internal_cmd_parts = InternalCommand::from_precomputed(block);
+        let mut coinbase: Option<Self> = None;
+        let mut fee_transfers = <HashMap<PublicKey, Self>>::new();
+        let mut fee_transfers_via_coinbase = <HashMap<PublicKey, Self>>::new();
+        for cmd in internal_cmd_parts {
+            match cmd {
+                InternalCommand::Coinbase { .. } => {
+                    coinbase = Some(cmd.into());
+                }
+                InternalCommand::FeeTransfer {
+                    ref receiver,
+                    amount: amt,
+                    ..
+                } => match fee_transfers.get_mut(receiver) {
+                    Some(Self::FeeTransfer { amount, .. }) => {
+                        *amount += amt;
+                    }
+                    None => {
+                        fee_transfers.insert(receiver.clone(), cmd.into());
+                    }
+                    _ => unimplemented!(),
+                },
+                InternalCommand::FeeTransferViaCoinbase {
+                    ref sender,
+                    amount: amt,
+                    ..
+                } => match fee_transfers_via_coinbase.get_mut(sender) {
+                    Some(Self::FeeTransferViaCoinbase { amount, .. }) => {
+                        *amount += amt;
+                    }
+                    None => {
+                        fee_transfers_via_coinbase.insert(sender.clone(), cmd.into());
+                    }
+                    _ => unimplemented!(),
+                },
+            }
+        }
+
+        // coinbase
+        let mut internal_commands = vec![];
+        if let Some(cb) = coinbase {
+            internal_commands.push(cb);
+        }
+
+        // fee transfers via coinbase
+        let mut ftvc = fee_transfers_via_coinbase.into_values().collect::<Vec<_>>();
+        ftvc.sort();
+        internal_commands.append(&mut ftvc);
+
+        // fee transfers
+        let mut ft = fee_transfers.into_values().collect::<Vec<_>>();
+        ft.sort();
+        internal_commands.append(&mut ft);
+        internal_commands
+    }
+}
+
+impl From<InternalCommand> for DbInternalCommand {
+    fn from(value: InternalCommand) -> Self {
+        use InternalCommand::*;
+        match value {
+            Coinbase { receiver, amount } => Self::Coinbase { receiver, amount },
+            FeeTransfer {
+                receiver,
+                amount,
+                sender: _,
+            } => Self::FeeTransfer { receiver, amount },
+            FeeTransferViaCoinbase {
+                receiver,
+                amount,
+                sender: _,
+            } => Self::FeeTransferViaCoinbase { receiver, amount },
         }
     }
 }
