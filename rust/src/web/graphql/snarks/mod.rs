@@ -1,3 +1,4 @@
+use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity};
 use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     constants::*,
@@ -5,9 +6,7 @@ use crate::{
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::IndexerStore,
     utility::store::{from_be_bytes, state_hash_suffix, U32_LEN},
-    web::graphql::{db, gen::BlockQueryInput, get_block_canonicity},
 };
-use anyhow::Context as aContext;
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
 
@@ -109,16 +108,24 @@ impl SnarkQueryRoot {
         if let Some(state_hash) = query
             .as_ref()
             .and_then(|q| q.block.as_ref())
-            .and_then(|block| block.state_hash.clone())
+            .and_then(|block| block.state_hash.as_ref())
         {
             snarks = db
-                .get_block(&state_hash.into())?
+                .get_block_snark_work(&state_hash.clone().into())?
+                .expect("SNARK work")
                 .into_iter()
-                .flat_map(|(block, _)| {
-                    SnarkWorkSummaryWithStateHash::from_precomputed(&block)
-                        .into_iter()
-                        .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
-                        .collect::<Vec<SnarkWithCanonicity>>()
+                .flat_map(|snark| {
+                    snark_summary_matches_query(
+                        db,
+                        &query,
+                        SnarkWorkSummaryWithStateHash {
+                            fee: snark.fee,
+                            prover: snark.prover,
+                            state_hash: state_hash.clone(),
+                        },
+                    )
+                    .ok()
+                    .flatten()
                 })
                 .collect();
 
@@ -137,12 +144,7 @@ impl SnarkQueryRoot {
                 .get_blocks_at_height(block_height)?
                 .iter()
                 .flat_map(|state_hash| {
-                    let block = db
-                        .get_block(state_hash)
-                        .with_context(|| format!("block missing from store {state_hash}"))
-                        .unwrap()
-                        .unwrap()
-                        .0;
+                    let block = get_block(db, state_hash);
                     SnarkWorkSummaryWithStateHash::from_precomputed(&block)
                         .into_iter()
                         .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
@@ -192,11 +194,7 @@ impl SnarkQueryRoot {
                         }
                     }
 
-                    let pcb = db
-                        .get_block(&state_hash)?
-                        .with_context(|| format!("block missing from store {state_hash}"))
-                        .expect("blocks exists")
-                        .0;
+                    let pcb = get_block(db, &state_hash);
                     let snark = serde_json::from_slice(&snark)?;
                     let sw = SnarkWithCanonicity {
                         canonical,
@@ -252,11 +250,7 @@ impl SnarkQueryRoot {
                         }
                     }
 
-                    let pcb = db
-                        .get_block(&state_hash)?
-                        .with_context(|| format!("block missing from store {state_hash}"))
-                        .expect("block exists")
-                        .0;
+                    let pcb = get_block(db, &state_hash);
                     let snark = serde_json::from_slice(&snark)?;
                     let sw = SnarkWithCanonicity {
                         canonical,
@@ -326,11 +320,7 @@ impl SnarkQueryRoot {
                         }
                     }
 
-                    let block = db
-                        .get_block(&state_hash)?
-                        .with_context(|| format!("block missing from store {state_hash}"))
-                        .unwrap()
-                        .0;
+                    let block = get_block(db, &state_hash);
                     let snark_work = db.get_block_snark_work(&state_hash)?;
                     let snarks_with_canonicity = snark_work.map_or(vec![], |summaries| {
                         summaries
@@ -386,12 +376,7 @@ impl SnarkQueryRoot {
                     .into_iter()
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
-                        pcb: db
-                            .get_block(&state_hash)
-                            .ok()
-                            .flatten()
-                            .expect("block exists")
-                            .0,
+                        pcb: get_block(db, &state_hash),
                         snark: (
                             snark,
                             state_hash.clone(),
@@ -424,26 +409,25 @@ fn snark_summary_matches_query(
 ) -> anyhow::Result<Option<SnarkWithCanonicity>> {
     let state_hash = BlockHash::from(snark.state_hash.clone());
     let canonical = get_block_canonicity(db, &state_hash);
-    Ok(db.get_block(&state_hash)?.and_then(|(block, _)| {
-        let snark_with_canonicity = SnarkWithCanonicity {
-            pcb: block,
-            canonical,
-            snark: (
-                snark,
-                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
-                db.get_snarks_total_count().expect("total snarks count"),
-            )
-                .into(),
-        };
-        if query
-            .as_ref()
-            .map_or(true, |q| q.matches(&snark_with_canonicity))
-        {
-            Some(snark_with_canonicity)
-        } else {
-            None
-        }
-    }))
+    let snark_with_canonicity = SnarkWithCanonicity {
+        pcb: get_block(db, &state_hash),
+        canonical,
+        snark: (
+            snark,
+            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+            db.get_snarks_total_count().expect("total snarks count"),
+        )
+            .into(),
+    };
+
+    if query
+        .as_ref()
+        .map_or(true, |q| q.matches(&snark_with_canonicity))
+    {
+        Ok(Some(snark_with_canonicity))
+    } else {
+        Ok(None)
+    }
 }
 
 impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
