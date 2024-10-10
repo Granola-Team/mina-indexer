@@ -167,10 +167,20 @@ pub struct DatabaseArgs {
     genesis_hash: String,
 
     /// Path to the genesis constants (JSON)
+    #[arg(long)]
     genesis_constants: Option<PathBuf>,
 
     /// Override the constraint system digests
+    #[arg(long)]
     constraint_system_digests: Option<Vec<String>>,
+
+    /// Override the protocol transaction version digest
+    #[arg(long)]
+    protocol_txn_version_digest: Option<String>,
+
+    /// Override the protocol network version digest
+    #[arg(long)]
+    protocol_network_version_digest: Option<String>,
 
     /// Directory of precomputed blocks
     #[arg(long)]
@@ -416,6 +426,10 @@ fn process_indexer_configuration(
     let genesis_hash = args.db.genesis_hash.into();
     let blocks_dir = args.db.blocks_dir;
     let staking_ledgers_dir = args.db.staking_ledgers_dir;
+    let genesis_constants = args.db.genesis_constants;
+    let constraint_system_digests = args.db.constraint_system_digests;
+    let protocol_txn_version_digest = args.db.protocol_txn_version_digest;
+    let protocol_network_version_digest = args.db.protocol_network_version_digest;
     let prune_interval = args.db.prune_interval;
     let canonical_threshold = args.db.canonical_threshold;
     let canonical_update_threshold = args.db.canonical_update_threshold;
@@ -428,13 +442,7 @@ fn process_indexer_configuration(
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
 
-    assert!(
-        // bad things happen if this condition fails
-        canonical_update_threshold < MAINNET_TRANSITION_FRONTIER_K,
-        "canonical update threshold must be strictly less than the transition frontier length!"
-    );
-
-    // Ensure blocks and staking ledgers dirs exist
+    // ensure blocks dir exists
     if let Some(ref blocks_dir) = blocks_dir {
         debug!("Ensuring blocks directory exists: {blocks_dir:#?}");
         if let Err(e) = fs::create_dir_all(blocks_dir) {
@@ -443,6 +451,7 @@ fn process_indexer_configuration(
         }
     }
 
+    // ensure staking ledgers dir exists
     if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
         debug!("Ensuring staking ledgers directory exists: {staking_ledgers_dir:#?}");
         if let Err(e) = fs::create_dir_all(staking_ledgers_dir) {
@@ -452,20 +461,21 @@ fn process_indexer_configuration(
     }
 
     // pick up protocol constants from the given file or use defaults
-    let genesis_constants = protocol_constants(args.db.genesis_constants)?;
-    let constraint_system_digests = args.db.constraint_system_digests.unwrap_or(
+    let genesis_constants = protocol_constants(genesis_constants)?;
+    let constraint_system_digests = constraint_system_digests.unwrap_or(
         MAINNET_CONSTRAINT_SYSTEM_DIGESTS
             .iter()
             .map(|x| x.to_string())
             .collect(),
     );
-
     let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger)?;
     Ok(IndexerConfiguration {
         genesis_ledger,
         genesis_hash,
         genesis_constants,
         constraint_system_digests,
+        protocol_txn_version_digest,
+        protocol_network_version_digest,
         version: PcbVersion::default(),
         blocks_dir,
         staking_ledgers_dir,
@@ -599,6 +609,8 @@ struct ServerArgsJson {
     genesis_hash: String,
     genesis_constants: Option<String>,
     constraint_system_digests: Option<Vec<String>>,
+    protocol_txn_version_digest: Option<String>,
+    protocol_network_version_digest: Option<String>,
     blocks_dir: Option<String>,
     staking_ledgers_dir: Option<String>,
     database_dir: String,
@@ -632,6 +644,8 @@ impl From<ServerArgs> for ServerArgsJson {
             genesis_hash: value.db.genesis_hash,
             genesis_constants: value.db.genesis_constants.map(|g| g.display().to_string()),
             constraint_system_digests: value.db.constraint_system_digests,
+            protocol_txn_version_digest: value.db.protocol_txn_version_digest,
+            protocol_network_version_digest: value.db.protocol_network_version_digest,
             blocks_dir: value.db.blocks_dir.map(|d| d.display().to_string()),
             staking_ledgers_dir: value
                 .db
@@ -666,6 +680,8 @@ impl From<ServerArgsJson> for ServerArgs {
             genesis_ledger: value.genesis_ledger.and_then(|path| path.parse().ok()),
             genesis_hash: value.genesis_hash,
             genesis_constants: value.genesis_constants.map(|g| g.into()),
+            protocol_txn_version_digest: value.protocol_txn_version_digest,
+            protocol_network_version_digest: value.protocol_network_version_digest,
             constraint_system_digests: value.constraint_system_digests,
             blocks_dir: value.blocks_dir.map(|d| d.into()),
             staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
