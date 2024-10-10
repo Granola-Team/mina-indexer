@@ -1,12 +1,15 @@
-use super::precomputed::PcbVersion;
+use super::{
+    extract_block_height,
+    genesis_state_hash::GenesisStateHash,
+    precomputed::{PcbVersion, PrecomputedBlock},
+};
 use crate::{
-    block::{extract_block_height, precomputed::PrecomputedBlock},
-    canonicity::canonical_chain_discovery::discovery,
+    canonicity::canonical_chain_discovery::discovery, chain::ChainData,
     utility::functions::calculate_total_size,
 };
 use anyhow::{anyhow, bail};
 use glob::glob;
-use log::info;
+use log::{debug, info};
 use std::{
     path::{Path, PathBuf},
     vec::IntoIter,
@@ -31,6 +34,8 @@ pub struct BlockParser {
     pub total_num_bytes: u64,
     pub deep_canonical_bytes: u64,
     pub version: PcbVersion,
+    pub chain_data: ChainData,
+
     canonical_paths: IntoIter<PathBuf>,
     recent_paths: IntoIter<PathBuf>,
     orphaned_paths: IntoIter<PathBuf>,
@@ -98,7 +103,7 @@ impl BlockParser {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
             let mut paths: Vec<PathBuf> = glob(&format!("{}/*-*-*.json", blocks_dir.display()))?
-                .filter_map(|x| x.ok())
+                .flatten()
                 .collect();
             let total_num_bytes = paths
                 .iter()
@@ -126,6 +131,7 @@ impl BlockParser {
                 recent_paths: paths.into_iter(),
                 canonical_paths: vec![].into_iter(),
                 orphaned_paths: vec![].into_iter(),
+                chain_data: ChainData::default(),
             })
         } else {
             Ok(Self::empty(blocks_dir, &[]))
@@ -137,7 +143,7 @@ impl BlockParser {
         if blocks_dir.exists() {
             let blocks_dir = blocks_dir.to_owned();
             let mut paths: Vec<PathBuf> = glob(&format!("{}/*-*-*.json", blocks_dir.display()))?
-                .filter_map(|x| x.ok())
+                .flatten()
                 .collect();
             paths.sort_by_cached_key(|path| extract_block_height(path));
 
@@ -168,7 +174,7 @@ impl BlockParser {
         if blocks_dir.exists() {
             let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
-            let paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
+            let paths: Vec<PathBuf> = glob(&pattern)?.flatten().collect();
             if let Ok((canonical_paths, recent_paths, orphaned_paths)) =
                 discovery(canonical_threshold, reporting_freq, paths.iter().collect())
             {
@@ -206,6 +212,7 @@ impl BlockParser {
                     } else {
                         orphaned_paths.into_iter()
                     },
+                    chain_data: ChainData::default(),
                 })
             } else {
                 Ok(Self::empty(&blocks_dir, &paths))
@@ -221,16 +228,32 @@ impl BlockParser {
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
     ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
         let block_bytes = path.metadata().unwrap().len();
-        match PrecomputedBlock::parse_file(path, self.version.clone()).map(designation) {
+        let genesis_state_hash = GenesisStateHash::from_path(path)?;
+        let curr_pcb_version = self.version.clone();
+        let (new_pcb_version, _) = self
+            .chain_data
+            .0
+            .get(&genesis_state_hash)
+            .cloned()
+            .expect("PCB version");
+
+        // if the PCB version changed, change block parser version
+        if curr_pcb_version != new_pcb_version {
+            debug!("Changing block parser version: {curr_pcb_version} -> {new_pcb_version}");
+            self.version = new_pcb_version.clone();
+        }
+
+        match PrecomputedBlock::parse_file(path, new_pcb_version).map(designation) {
             Ok(parsed_block) => {
                 self.blocks_processed += 1;
                 self.bytes_processed += block_bytes;
                 Ok(Some((parsed_block, block_bytes)))
             }
-            Err(e) => bail!("Block parsing error: {}", e),
+            Err(e) => bail!("Block parsing error: {e}"),
         }
     }
-    /// Traverses `self`'s internal paths
+
+    /// Traverses block parser's internal paths
     /// - deep canonical
     /// - recent
     /// - orphaned
@@ -290,6 +313,7 @@ impl BlockParser {
             canonical_paths: vec![].into_iter(),
             recent_paths: Vec::from(paths).into_iter(),
             orphaned_paths: vec![].into_iter(),
+            chain_data: ChainData::default(),
         }
     }
 }
