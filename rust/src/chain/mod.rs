@@ -1,14 +1,23 @@
 pub mod store;
 
-use crate::constants::*;
+use crate::{
+    block::{precomputed::PcbVersion, BlockHash},
+    constants::*,
+};
 use bincode::{Decode, Encode};
 use clap::builder::OsStr;
 use hex::ToHex;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter, Result};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter, Result},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ChainId(pub String);
+
+#[derive(Debug)]
+pub struct ChainData(pub HashMap<BlockHash, (PcbVersion, ChainId)>);
 
 impl ChainId {
     pub fn new(chain_id: &str) -> Self {
@@ -22,11 +31,43 @@ impl std::fmt::Display for ChainId {
     }
 }
 
+impl Default for ChainData {
+    fn default() -> Self {
+        let v1_genesis_state_hash: BlockHash = MAINNET_GENESIS_HASH.into();
+        let v1_chain_id = chain_id(
+            &v1_genesis_state_hash.0,
+            MAINNET_PROTOCOL_CONSTANTS,
+            MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+            MAINNET_GENESIS_TIMESTAMP as i64,
+            None,
+            None,
+        );
+        let v2_genesis_state_hash: BlockHash = HARDFORK_GENSIS_HASH.into();
+        let v2_chain_id = chain_id(
+            &v2_genesis_state_hash.0,
+            MAINNET_PROTOCOL_CONSTANTS,
+            HARDFORK_CONSTRAINT_SYSTEM_DIGESTS,
+            HARDFORK_GENESIS_TIMESTAMP as i64,
+            Some(HARDFORK_PROTOCOL_TXN_VERSION_DIGEST),
+            Some(HARDFORK_PROTOCOL_NETWORK_VERSION_DIGEST),
+        );
+        Self(HashMap::from([
+            (v1_genesis_state_hash, (PcbVersion::V1, v1_chain_id)),
+            (v2_genesis_state_hash, (PcbVersion::V2, v2_chain_id)),
+        ]))
+    }
+}
+
 /// Chain id used by mina node p2p network
+///
+/// See https://github.com/MinaProtocol/mina/blob/compatible/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml#L20
 pub fn chain_id(
     genesis_state_hash: &str,
     genesis_constants: &[u32],
     constraint_system_digests: &[&str],
+    genesis_timestamp: i64,
+    protocol_txn_version_disgest: Option<&str>,
+    protocol_network_version_disgest: Option<&str>,
 ) -> ChainId {
     use blake2::{digest::VariableOutput, Blake2bVar};
     use std::io::Write;
@@ -37,7 +78,7 @@ pub fn chain_id(
             .map(u32::to_string)
             .collect::<Vec<String>>();
         gcs.push(
-            from_timestamp_millis(MAINNET_GENESIS_TIMESTAMP as i64)
+            from_timestamp_millis(genesis_timestamp)
                 .format("%Y-%m-%d %H:%M:%S%.6fZ")
                 .to_string(),
         );
@@ -47,10 +88,18 @@ pub fn chain_id(
         hasher.finalize_boxed().encode_hex()
     };
     let all_snark_keys = constraint_system_digests.concat();
-    let digest_str = [genesis_state_hash, &all_snark_keys, &genesis_constants_hash].concat();
+    let mut digest = vec![genesis_state_hash, &all_snark_keys, &genesis_constants_hash];
+
+    // post-hardfork
+    if let Some(protocol_txn_version_disgest) = protocol_txn_version_disgest {
+        digest.push(protocol_txn_version_disgest);
+    }
+    if let Some(protocol_network_version_disgest) = protocol_network_version_disgest {
+        digest.push(protocol_network_version_disgest);
+    }
 
     let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.write_all(digest_str.as_bytes()).unwrap();
+    hasher.write_all(digest.concat().as_bytes()).unwrap();
     ChainId(hasher.finalize_boxed().to_vec().encode_hex())
 }
 
@@ -125,13 +174,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chain_id_test() {
+    fn chain_id_v1() {
         assert_eq!(
-            "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1",
+            MAINNET_CHAIN_ID,
             chain_id(
                 MAINNET_GENESIS_HASH,
                 MAINNET_PROTOCOL_CONSTANTS,
-                MAINNET_CONSTRAINT_SYSTEM_DIGESTS
+                MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
+                MAINNET_GENESIS_TIMESTAMP as i64,
+                None,
+                None,
+            )
+            .0
+        )
+    }
+
+    #[test]
+    fn chain_id_v2() {
+        assert_eq!(
+            HARDFORK_CHAIN_ID,
+            chain_id(
+                HARDFORK_GENSIS_HASH,
+                MAINNET_PROTOCOL_CONSTANTS,
+                HARDFORK_CONSTRAINT_SYSTEM_DIGESTS,
+                HARDFORK_GENESIS_TIMESTAMP as i64,
+                Some(HARDFORK_PROTOCOL_TXN_VERSION_DIGEST),
+                Some(HARDFORK_PROTOCOL_NETWORK_VERSION_DIGEST),
             )
             .0
         )
