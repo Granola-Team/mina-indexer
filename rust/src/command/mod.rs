@@ -9,7 +9,9 @@ use crate::{
         account::{Amount, Nonce},
         public_key::PublicKey,
     },
-    protocol::serialization_types::staged_ledger_diff as mina_rs,
+    protocol::serialization_types::staged_ledger_diff::{
+        self as mina_rs, TransactionStatusFailedType,
+    },
 };
 use log::trace;
 use mina_serialization_versioned::Versioned;
@@ -600,6 +602,44 @@ fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serd
     balance_obj.insert("receiver_balance".into(), receiver_balance);
     balance_obj.insert("source_balance".into(), source_balance);
     Value::Object(balance_obj)
+}
+
+impl std::fmt::Display for TransactionStatusFailedType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransactionStatusFailedType::Predicate => write!(f, "Predicate"),
+            TransactionStatusFailedType::SourceNotPresent => write!(f, "Source_not_present"),
+            TransactionStatusFailedType::ReceiverNotPresent => write!(f, "Receiver_not_present"),
+            TransactionStatusFailedType::AmountInsufficientToCreateAccount => {
+                write!(f, "Amount_insufficient_to_create_account")
+            }
+            TransactionStatusFailedType::CannotPayCreationFeeInToken => {
+                write!(f, "Cannot_pay_creation_fee_in_token")
+            }
+            TransactionStatusFailedType::SourceInsufficientBalance => {
+                write!(f, "Source_insufficient_balance")
+            }
+            TransactionStatusFailedType::SourceMinimumBalanceViolation => {
+                write!(f, "Source_minimum_balance_violation")
+            }
+            TransactionStatusFailedType::ReceiverAlreadyExists => {
+                write!(f, "Receiver_already_exists")
+            }
+            TransactionStatusFailedType::NotTokenOwner => write!(f, "Not_token_owner"),
+            TransactionStatusFailedType::MismatchedTokenPermissions => {
+                write!(f, "Mismatched_token_permissions")
+            }
+            TransactionStatusFailedType::Overflow => write!(f, "Overflow"),
+            TransactionStatusFailedType::SignedCommandOnSnappAccount => {
+                write!(f, "Signed_command_on_snapp_account")
+            }
+            TransactionStatusFailedType::SnappAccountNotPresent => {
+                write!(f, "Snapp_account_not_present")
+            }
+            TransactionStatusFailedType::UpdateNotPermitted => write!(f, "Update_not_permitted"),
+            TransactionStatusFailedType::IncorrectNonce => write!(f, "Incorrect_nonce"),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -4,7 +4,6 @@ use super::account::Nonce;
 use crate::{
     block::{extract_height_and_hash, extract_network, BlockHash},
     chain::Network,
-    constants::*,
     ledger::{
         account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
         public_key::PublicKey,
@@ -155,18 +154,6 @@ pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
     let (height, hash) = extract_height_and_hash(path);
     let network = extract_network(path);
     (network, height, LedgerHash(hash.to_string()))
-}
-
-impl StakingAccount {
-    pub fn chain_id() -> String {
-        crate::chain::chain_id(
-            MAINNET_GENESIS_HASH,
-            MAINNET_PROTOCOL_CONSTANTS,
-            MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
-        )
-        .0[..6]
-            .to_string()
-    }
 }
 
 impl StakingLedger {

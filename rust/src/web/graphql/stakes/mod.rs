@@ -1,6 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
+    chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::MAINNET_GENESIS_HASH,
     ledger::{
@@ -337,6 +338,7 @@ impl StakesDelegationTotals {
 impl
     From<(
         StakingAccount,
+        String,
         u32,
         u32,
         u32,
@@ -353,6 +355,7 @@ impl
     fn from(
         acc: (
             StakingAccount,
+            String,
             u32,
             u32,
             u32,
@@ -379,7 +382,7 @@ impl
         let receipt_chain_hash = acc.0.receipt_chain_hash.0;
         let voting_for = acc.0.voting_for.0;
         Self {
-            chain_id: StakingAccount::chain_id(),
+            chain_id: acc.1,
             balance,
             nonce: nonce.0,
             delegate,
@@ -389,17 +392,17 @@ impl
             receipt_chain_hash,
             voting_for,
             balance_nanomina,
-            pk_epoch_num_blocks: acc.1,
-            pk_total_num_blocks: acc.2,
-            pk_epoch_num_supercharged_blocks: acc.3,
-            pk_total_num_supercharged_blocks: acc.4,
-            pk_epoch_num_snarks: acc.5,
-            pk_total_num_snarks: acc.6,
-            pk_epoch_num_user_commands: acc.7,
-            pk_total_num_user_commands: acc.8,
-            pk_epoch_num_internal_commands: acc.9,
-            pk_total_num_internal_commands: acc.10,
-            username: acc.11,
+            pk_epoch_num_blocks: acc.2,
+            pk_total_num_blocks: acc.3,
+            pk_epoch_num_supercharged_blocks: acc.4,
+            pk_total_num_supercharged_blocks: acc.5,
+            pk_epoch_num_snarks: acc.6,
+            pk_total_num_snarks: acc.7,
+            pk_epoch_num_user_commands: acc.8,
+            pk_total_num_user_commands: acc.9,
+            pk_epoch_num_internal_commands: acc.10,
+            pk_total_num_internal_commands: acc.11,
+            username: acc.12,
         }
     }
 }
@@ -496,6 +499,7 @@ impl StakesLedgerAccountWithMeta {
             vesting_increment: Some(timing.vesting_increment),
             vesting_period: Some(timing.vesting_period),
         });
+        let chain_id = db.get_chain_id().expect("chain id").0;
 
         // pk data counts
         let pk_epoch_num_blocks = db
@@ -538,6 +542,7 @@ impl StakesLedgerAccountWithMeta {
             ledger_hash,
             account: StakesLedgerAccount::from((
                 account,
+                chain_id,
                 pk_epoch_num_blocks,
                 pk_total_num_blocks,
                 pk_epoch_num_supercharged_blocks,

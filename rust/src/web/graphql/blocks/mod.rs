@@ -1,6 +1,7 @@
 use super::{
     db, gen::BlockProtocolStateConsensusStateQueryInput, get_block, get_block_canonicity,
-    millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD, PK,
+    millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD,
+    MAINNET_EPOCH_SLOT_COUNT, PK,
 };
 use crate::{
     block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
@@ -9,12 +10,7 @@ use crate::{
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
-    ledger::{public_key::PublicKey, LedgerHash},
-    proof_systems::signer::pubkey::CompressedPubKey,
-    protocol::serialization_types::{
-        common::Base58EncodableVersionedType, staged_ledger_diff::TransactionStatusFailedType,
-        version_bytes,
-    },
+    ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
     utility::store::{block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN},
@@ -855,7 +851,7 @@ struct BlockchainState {
     date: String,
 
     /// Value snarked ledger hash
-    snarked_ledger_hash: String,
+    snarked_ledger_hash: Option<String>,
 
     /// Value staged ledger hash
     staged_ledger_hash: String,
@@ -881,9 +877,8 @@ impl BlockWithoutCanonicity {
         total_num_user_commands: u32,
     ) -> Self {
         let winner_account = block.block_creator().0;
-        let date_time = millis_to_iso_date_string(block.timestamp().try_into().unwrap());
-        let pk_creator = block.consensus_state().block_creator;
-        let creator = CompressedPubKey::from(&pk_creator).into_address();
+        let date_time = millis_to_iso_date_string(block.timestamp() as i64);
+        let creator = block.block_creator().0;
         let scheduled_time = block.scheduled_time().clone();
         let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
@@ -892,121 +887,39 @@ impl BlockWithoutCanonicity {
         let utc_date = block.timestamp().to_string();
 
         // blockchain state
-        let blockchain_state = block.blockchain_state();
-        let snarked_ledger_hash =
-            LedgerHash::from_hashv1(blockchain_state.clone().snarked_ledger_hash).0;
-        let staged_ledger_hashv1 = blockchain_state
-            .staged_ledger_hash
-            .t
-            .t
-            .non_snark
-            .t
-            .ledger_hash;
-        let staged_ledger_hash = LedgerHash::from_hashv1(staged_ledger_hashv1).0;
+        let snarked_ledger_hash = block.snarked_ledger_hash().map(|hash| hash.0);
+        let staged_ledger_hash = block.staged_ledger_hash().0;
 
         // consensus state
-        let consensus_state = block.consensus_state();
-
-        let total_currency = consensus_state.total_currency.t.t;
+        let total_currency = block.total_currency();
         let blockchain_length = block.blockchain_length();
         let block_height = blockchain_length;
         let epoch_count = block.epoch_count();
         let epoch = epoch_count;
-        let has_ancestor_in_same_checkpoint_window =
-            consensus_state.has_ancestor_in_same_checkpoint_window;
+        let has_ancestor_in_same_checkpoint_window = block.has_ancestor_in_same_checkpoint_window();
         let last_vrf_output = block.last_vrf_output();
-        let min_window_density = consensus_state.min_window_density.t.t;
-        let slot_since_genesis = consensus_state.global_slot_since_genesis.t.t;
-        let slot = slot_since_genesis - (epoch_count * 7140);
+        let min_window_density = block.min_window_density();
+        let slot_since_genesis = block.global_slot_since_genesis();
+        let slot = slot_since_genesis % MAINNET_EPOCH_SLOT_COUNT;
 
-        // NextEpochData
-        let seed_hashv1 = consensus_state.next_epoch_data.t.t.seed;
-        let seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
-            seed_hashv1.into();
-        let seed = seed_bs58.to_base58_string().expect("bs58 encoded seed");
-        let epoch_length = consensus_state.next_epoch_data.t.t.epoch_length.t.t;
+        // next epoch data
+        let next_epoch_seed = block.next_epoch_seed();
+        let next_epoch_length = block.next_epoch_length();
+        let next_epoch_start_checkpoint = block.next_epoch_start_checkpoint().0;
+        let next_epoch_lock_checkpoint = block.next_epoch_lock_checkpoint().0;
+        let next_epoch_ledger_hash = block.next_epoch_ledger_hash().0;
+        let next_epoch_total_currency = block.next_epoch_total_currency();
 
-        let start_checkpoint_hashv1 = consensus_state.next_epoch_data.t.t.start_checkpoint;
-        let start_checkpoint_bs58: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
-            start_checkpoint_hashv1.into();
-        let start_checkpoint = start_checkpoint_bs58
-            .to_base58_string()
-            .expect("bs58 encoded start checkpoint");
-
-        let lock_checkpoint_hashv1 = consensus_state.next_epoch_data.t.t.lock_checkpoint;
-        let lock_checkpoint_bs58: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
-            lock_checkpoint_hashv1.into();
-        let lock_checkpoint = lock_checkpoint_bs58
-            .to_base58_string()
-            .expect("bs58 encoded lock checkpoint");
-
-        let ledger_hashv1 = consensus_state.next_epoch_data.t.t.ledger.t.t.hash;
-        let ledger_hash_bs58: Base58EncodableVersionedType<{ version_bytes::LEDGER_HASH }, _> =
-            ledger_hashv1.into();
-        let ledger_hash = ledger_hash_bs58
-            .to_base58_string()
-            .expect("bs58 encoded ledger hash");
-        let ledger_total_currency = consensus_state
-            .next_epoch_data
-            .t
-            .t
-            .ledger
-            .t
-            .t
-            .total_currency
-            .t
-            .t;
-
-        // StakingEpochData
-        let staking_seed_hashv1 = consensus_state.staking_epoch_data.t.t.seed;
-        let staking_seed_bs58: Base58EncodableVersionedType<{ version_bytes::EPOCH_SEED }, _> =
-            staking_seed_hashv1.into();
-        let staking_seed = staking_seed_bs58
-            .to_base58_string()
-            .expect("bs58 encoded seed");
-
-        let staking_epoch_length = consensus_state.staking_epoch_data.t.t.epoch_length.t.t;
-
-        let staking_start_checkpoint_hashv1 =
-            consensus_state.staking_epoch_data.t.t.start_checkpoint;
-        let staking_start_checkpoint_bs58: Base58EncodableVersionedType<
-            { version_bytes::STATE_HASH },
-            _,
-        > = staking_start_checkpoint_hashv1.into();
-        let staking_start_checkpoint = staking_start_checkpoint_bs58
-            .to_base58_string()
-            .expect("bs58 encoded start checkpoint");
-
-        let staking_lock_checkpoint_hashv1 = consensus_state.staking_epoch_data.t.t.lock_checkpoint;
-        let staking_lock_checkpoint_bs58: Base58EncodableVersionedType<
-            { version_bytes::STATE_HASH },
-            _,
-        > = staking_lock_checkpoint_hashv1.into();
-        let staking_lock_checkpoint = staking_lock_checkpoint_bs58
-            .to_base58_string()
-            .expect("bs58 encoded lock checkpoint");
-
-        let staking_ledger_hashv1 = consensus_state.staking_epoch_data.t.t.ledger.t.t.hash;
-        let staking_ledger_hash_bs58: Base58EncodableVersionedType<
-            { version_bytes::LEDGER_HASH },
-            _,
-        > = staking_ledger_hashv1.into();
-        let staking_ledger_hash = staking_ledger_hash_bs58
-            .to_base58_string()
-            .expect("bs58 encoded ledger hash");
-        let staking_ledger_total_currency = consensus_state
-            .staking_epoch_data
-            .t
-            .t
-            .ledger
-            .t
-            .t
-            .total_currency
-            .t
-            .t;
+        // staking epoch data
+        let staking_epoch_seed = block.staking_epoch_seed();
+        let staking_epoch_length = block.staking_epoch_length();
+        let staking_epoch_start_checkpoint = block.staking_epoch_start_checkpoint().0;
+        let staking_epoch_lock_checkpoint = block.staking_epoch_lock_checkpoint().0;
+        let staking_epoch_ledger_hash = block.staking_epoch_ledger_hash().0;
+        let staking_epoch_total_currency = block.staking_epoch_total_currency();
 
         let coinbase_receiver_account = block.coinbase_receiver().0;
-        let supercharged = consensus_state.supercharge_coinbase;
+        let supercharged = block.supercharge_coinbase();
         let coinbase: u64 = if supercharged {
             2 * MAINNET_COINBASE_REWARD
         } else {
@@ -1082,23 +995,23 @@ impl BlockWithoutCanonicity {
                     slot,
                     slot_since_genesis,
                     next_epoch_data: NextEpochData {
-                        seed,
-                        epoch_length,
-                        start_checkpoint,
-                        lock_checkpoint,
+                        seed: next_epoch_seed,
+                        epoch_length: next_epoch_length,
+                        start_checkpoint: next_epoch_start_checkpoint,
+                        lock_checkpoint: next_epoch_lock_checkpoint,
                         ledger: NextEpochDataLedger {
-                            hash: ledger_hash,
-                            total_currency: ledger_total_currency,
+                            hash: next_epoch_ledger_hash,
+                            total_currency: next_epoch_total_currency,
                         },
                     },
                     staking_epoch_data: StakingEpochData {
-                        seed: staking_seed,
+                        seed: staking_epoch_seed,
                         epoch_length: staking_epoch_length,
-                        start_checkpoint: staking_start_checkpoint,
-                        lock_checkpoint: staking_lock_checkpoint,
+                        start_checkpoint: staking_epoch_start_checkpoint,
+                        lock_checkpoint: staking_epoch_lock_checkpoint,
                         ledger: StakingEpochDataLedger {
-                            hash: staking_ledger_hash,
-                            total_currency: staking_ledger_total_currency,
+                            hash: staking_epoch_ledger_hash,
+                            total_currency: staking_epoch_total_currency,
                         },
                     },
                 },
@@ -1430,44 +1343,6 @@ impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
             date_time: value.3,
             fee: value.0.fee,
             prover: value.0.prover.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for TransactionStatusFailedType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TransactionStatusFailedType::Predicate => write!(f, "Predicate"),
-            TransactionStatusFailedType::SourceNotPresent => write!(f, "Source_not_present"),
-            TransactionStatusFailedType::ReceiverNotPresent => write!(f, "Receiver_not_present"),
-            TransactionStatusFailedType::AmountInsufficientToCreateAccount => {
-                write!(f, "Amount_insufficient_to_create_account")
-            }
-            TransactionStatusFailedType::CannotPayCreationFeeInToken => {
-                write!(f, "Cannot_pay_creation_fee_in_token")
-            }
-            TransactionStatusFailedType::SourceInsufficientBalance => {
-                write!(f, "Source_insufficient_balance")
-            }
-            TransactionStatusFailedType::SourceMinimumBalanceViolation => {
-                write!(f, "Source_minimum_balance_violation")
-            }
-            TransactionStatusFailedType::ReceiverAlreadyExists => {
-                write!(f, "Receiver_already_exists")
-            }
-            TransactionStatusFailedType::NotTokenOwner => write!(f, "Not_token_owner"),
-            TransactionStatusFailedType::MismatchedTokenPermissions => {
-                write!(f, "Mismatched_token_permissions")
-            }
-            TransactionStatusFailedType::Overflow => write!(f, "Overflow"),
-            TransactionStatusFailedType::SignedCommandOnSnappAccount => {
-                write!(f, "Signed_command_on_snapp_account")
-            }
-            TransactionStatusFailedType::SnappAccountNotPresent => {
-                write!(f, "Snapp_account_not_present")
-            }
-            TransactionStatusFailedType::UpdateNotPermitted => write!(f, "Update_not_permitted"),
-            TransactionStatusFailedType::IncorrectNonce => write!(f, "Incorrect_nonce"),
         }
     }
 }

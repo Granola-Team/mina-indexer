@@ -1,10 +1,5 @@
 use crate::{
-    block::{
-        self,
-        parser::BlockParser,
-        precomputed::{PcbVersion, PrecomputedBlock},
-        BlockHash,
-    },
+    block::{self, parser::BlockParser, precomputed::PcbVersion, BlockHash},
     chain::{chain_id, ChainId, Network},
     constants::*,
     ledger::{
@@ -48,6 +43,8 @@ pub struct IndexerConfiguration {
     pub genesis_hash: BlockHash,
     pub genesis_constants: GenesisConstants,
     pub constraint_system_digests: Vec<String>,
+    pub protocol_txn_version_digest: Option<String>,
+    pub protocol_network_version_digest: Option<String>,
     pub version: PcbVersion,
     pub blocks_dir: Option<PathBuf>,
     pub staking_ledgers_dir: Option<PathBuf>,
@@ -175,6 +172,8 @@ async fn initialize(
         reporting_freq,
         genesis_constants,
         constraint_system_digests,
+        protocol_txn_version_digest,
+        protocol_network_version_digest,
         version,
         do_not_ingest_orphan_blocks,
         ..
@@ -207,6 +206,9 @@ async fn initialize(
             .map(|x| x.as_str())
             .collect::<Vec<&str>>()
             .as_slice(),
+        MAINNET_GENESIS_TIMESTAMP as i64,
+        protocol_txn_version_digest.as_ref().map(|d| d as &str),
+        protocol_network_version_digest.as_ref().map(|d| d as &str),
     );
     let indexer_version = IndexerVersion::new(&Network::Mainnet, &chain_id, &genesis_hash);
     let state_config = IndexerStateConfig {
@@ -463,10 +465,10 @@ async fn retry_parse_staking_ledger(
         match StakingLedger::parse_file(path, genesis_state_hash.clone()).await {
             Ok(ledger) => return Ok(ledger),
             Err(e) if attempt < 5 => {
-                warn!("Attempt {} failed: {}. Retrying in 1 second...", attempt, e);
+                warn!("Attempt {attempt} failed: {e}. Retrying in 1 second...");
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
-            Err(e) => panic!("{}", format!("Failed after {} attempts: {}", attempt, e)),
+            Err(e) => panic!("Failed after {attempt} attempts: {e}"),
         }
     }
     panic!("All attempts to parse the staking ledger failed.")
@@ -492,8 +494,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
             }
             if block::is_valid_block_file(&path) {
                 debug!("Valid precomputed block file: {}", path.display());
-                let mut version = state.read().await.version.clone();
-                match PrecomputedBlock::parse_file(&path, version.version.clone()) {
+                match IndexerState::parse_file(state, &path).await {
                     Ok(block) => {
                         // Acquire write lock
                         let mut state = state.write().await;
@@ -514,15 +515,6 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                                 }
                             }
                             Err(e) => error!("Error adding block: {e}"),
-                        }
-
-                        // check for block parser version update
-                        if state.version.genesis_state_hash.0 != *MAINNET_GENESIS_HASH {
-                            trace!("Changing block parser from {}", version.version);
-                            version.version.update()?;
-
-                            trace!("Block parser changed to {}", version.version);
-                            version.genesis_state_hash = state.version.genesis_state_hash.clone();
                         }
                     }
                     Err(e) => error!("Error parsing precomputed block: {e}"),
@@ -669,12 +661,11 @@ impl IndexerVersion {
 
 impl Default for IndexerVersion {
     fn default() -> Self {
-        let chain_id = chain_id(
-            MAINNET_GENESIS_HASH,
-            MAINNET_PROTOCOL_CONSTANTS,
-            MAINNET_CONSTRAINT_SYSTEM_DIGESTS,
-        );
-        Self::new(&Network::Mainnet, &chain_id, &MAINNET_GENESIS_HASH.into())
+        Self::new(
+            &Network::Mainnet,
+            &ChainId(MAINNET_CHAIN_ID.to_string()),
+            &MAINNET_GENESIS_HASH.into(),
+        )
     }
 }
 

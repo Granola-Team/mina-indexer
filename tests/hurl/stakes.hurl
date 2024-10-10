@@ -43,7 +43,7 @@ jsonpath "$.data.stakes" count == 1
 # only datum
 jsonpath "$.data.stakes[0].balance" == 2498323.273015384
 jsonpath "$.data.stakes[0].balanceNanomina" == 2498323273015384
-jsonpath "$.data.stakes[0].chainId" == "5f704c"
+jsonpath "$.data.stakes[0].chainId" == "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1"
 jsonpath "$.data.stakes[0].delegate" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].epoch" == 42
 jsonpath "$.data.stakes[0].ledgerHash" == "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"

@@ -4,13 +4,14 @@ pub mod summary;
 use crate::{
     block::{
         genesis::GenesisBlock,
+        genesis_state_hash::GenesisStateHash,
         parser::{BlockParser, ParsedBlock},
         precomputed::PrecomputedBlock,
         store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
-    chain::store::ChainStore,
+    chain::{store::ChainStore, ChainData},
     constants::*,
     event::{db::*, store::*, witness_tree::*, IndexerEvent},
     ledger::{
@@ -47,6 +48,7 @@ use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
     collections::HashMap,
+    path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -115,6 +117,9 @@ pub struct IndexerState {
 
     /// Network blocks and staking ledgers to be processed
     pub version: IndexerVersion,
+
+    /// PCB versions & chain ids for various networks
+    pub chain_data: ChainData,
 }
 
 #[derive(Debug, Clone)]
@@ -206,6 +211,37 @@ impl IndexerState {
         ))
     }
 
+    /// Indexer parses valid PCB file with the correct block parser
+    /// and updates the indexer version
+    pub async fn parse_file(
+        state: &Arc<tokio::sync::RwLock<Self>>,
+        path: &Path,
+    ) -> anyhow::Result<PrecomputedBlock> {
+        let genesis_state_hash = GenesisStateHash::from_path(path)?;
+        let read_state = state.read().await;
+        let curr_pcb_version = read_state.version.version.clone();
+        let (new_pcb_version, new_chain_id) = read_state
+            .chain_data
+            .0
+            .get(&genesis_state_hash)
+            .cloned()
+            .expect("PCB version");
+
+        // if the PCB version changed, change state version quantities
+        if curr_pcb_version != new_pcb_version {
+            debug!("Changing indexer version: {curr_pcb_version} -> {new_pcb_version}");
+            state.write().await.version.version = new_pcb_version.clone();
+            state.write().await.version.genesis_state_hash = genesis_state_hash;
+
+            if let Some(store) = state.write().await.indexer_store.as_ref() {
+                store
+                    .set_chain_id_for_network(&new_chain_id, &state.read().await.version.network)?;
+            }
+            state.write().await.version.chain_id = new_chain_id;
+        }
+        PrecomputedBlock::parse_file(path, new_pcb_version)
+    }
+
     /// Creates a new indexer state from the genesis ledger
     pub fn new_from_config(config: IndexerStateConfig) -> anyhow::Result<Self> {
         // set chain id
@@ -276,6 +312,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
+            chain_data: ChainData::default(),
         })
     }
 
@@ -308,6 +345,7 @@ impl IndexerState {
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
             staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
+            chain_data: ChainData::default(),
         })
     }
 
@@ -316,7 +354,7 @@ impl IndexerState {
         root_block: &PrecomputedBlock,
         root_block_bytes: u64,
         root_ledger: Option<Ledger>,
-        speedb_path: Option<&std::path::Path>,
+        speedb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
         ledger_cadence: Option<u32>,
         reporting_freq: Option<u32>,
@@ -367,6 +405,7 @@ impl IndexerState {
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
             staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
             version: IndexerVersion::default(),
+            chain_data: ChainData::default(),
         })
     }
 
@@ -910,7 +949,7 @@ impl IndexerState {
     /// Add staking ledgers to the underlying ledger store
     pub async fn add_startup_staking_ledgers_to_store(
         &mut self,
-        ledgers_dir: &std::path::Path,
+        ledgers_dir: &Path,
     ) -> anyhow::Result<()> {
         match std::fs::read_dir(ledgers_dir) {
             Ok(dir) => {
@@ -952,7 +991,7 @@ impl IndexerState {
     }
 
     pub async fn process_staking_ledger(
-        path: &std::path::Path,
+        path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
         genesis_state_hash: &BlockHash,

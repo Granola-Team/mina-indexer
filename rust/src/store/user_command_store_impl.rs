@@ -184,10 +184,12 @@ impl UserCommandStore for IndexerStore {
             .get_user_command_state_hashes(txn_hash)
             .ok()
             .flatten()
-            .and_then(|b| b.get(index as usize).cloned())
-            .and_then(|state_hash| {
-                self.get_user_command_state_hash(txn_hash, &state_hash)
-                    .unwrap()
+            .and_then(|blocks| {
+                self.get_user_command_state_hash(
+                    txn_hash,
+                    blocks.get(index as usize).expect("user command in block"),
+                )
+                .expect("user command in block at index")
             }))
     }
 
