@@ -2,8 +2,8 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::VERSION,
-    ledger::{account::Amount, store::best::BestLedgerStore, LedgerHash},
+    constants::{MAINNET_EPOCH_SLOT_COUNT, VERSION},
+    ledger::{account::Amount, store::best::BestLedgerStore},
     snark_work::store::SnarkStore,
     store::{
         version::{IndexerStoreVersion, VersionStore},
@@ -33,7 +33,7 @@ pub struct BlockchainSummary {
     min_window_density: u32,
     next_epoch_ledger_hash: String,
     previous_state_hash: String,
-    snarked_ledger_hash: String,
+    snarked_ledger_hash: Option<String>,
     staged_ledger_hash: String,
     staking_epoch_ledger_hash: String,
     state_hash: String,
@@ -92,53 +92,19 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_accounts,
     } = input;
     let blockchain_length = best_tip.blockchain_length();
-    let date_time = millis_to_date_string(best_tip.timestamp().try_into().unwrap());
+    let date_time = millis_to_date_string(best_tip.timestamp() as i64);
     let epoch = best_tip.epoch_count();
     let global_slot = best_tip.global_slot_since_genesis();
-    let min_window_density = best_tip.consensus_state().min_window_density.t.t;
-    let next_epoch_ledger_hash = LedgerHash::from_hashv1(
-        best_tip
-            .consensus_state()
-            .next_epoch_data
-            .inner()
-            .inner()
-            .ledger
-            .inner()
-            .inner()
-            .hash,
-    )
-    .0;
-
+    let min_window_density = best_tip.min_window_density();
+    let next_epoch_ledger_hash = best_tip.next_epoch_ledger_hash().0;
     let previous_state_hash = best_tip.previous_state_hash().0;
-    let slot = global_slot - (epoch * 7140);
-    let snarked_ledger_hash =
-        LedgerHash::from_hashv1(best_tip.blockchain_state().snarked_ledger_hash).0;
-    let staged_ledger_hash = LedgerHash::from_hashv1(
-        best_tip
-            .blockchain_state()
-            .staged_ledger_hash
-            .inner()
-            .inner()
-            .non_snark
-            .inner()
-            .ledger_hash,
-    )
-    .0;
-    let staking_epoch_ledger_hash = LedgerHash::from_hashv1(
-        best_tip
-            .consensus_state()
-            .staking_epoch_data
-            .inner()
-            .inner()
-            .ledger
-            .inner()
-            .inner()
-            .hash,
-    )
-    .0;
+    let slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+    let snarked_ledger_hash = best_tip.snarked_ledger_hash().map(|hash| hash.0);
+    let staged_ledger_hash = best_tip.staged_ledger_hash().0;
+    let staking_epoch_ledger_hash = best_tip.staking_epoch_ledger_hash().0;
     let state_hash = best_tip.state_hash().0;
-    let total_currency_u64 = best_tip.consensus_state().total_currency.inner().inner();
-    let locked_currency_u64 = locked_balance.map(|a| a.0).unwrap_or(0);
+    let total_currency_u64 = best_tip.total_currency();
+    let locked_currency_u64 = locked_balance.map(|a| a.0).unwrap_or_default();
     let total_currency = nanomina_to_mina(total_currency_u64);
     let circulating_supply = nanomina_to_mina(total_currency_u64 - locked_currency_u64);
     let locked_supply = nanomina_to_mina(locked_currency_u64);
@@ -185,7 +151,7 @@ pub async fn get_blockchain_summary(
         trace!("Found best tip: {}", best_tip.summary());
         let total_num_accounts = store
             .get_num_accounts()
-            .unwrap_or_default()
+            .expect("num accounts")
             .unwrap_or_default();
 
         // aggregated on-chain & off-chain time-locked tokens

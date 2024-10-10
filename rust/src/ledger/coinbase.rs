@@ -107,7 +107,7 @@ impl Coinbase {
             receiver: block.coinbase_receiver(),
             receiver_balance: block.coinbase_receiver_balance(),
             is_new_account: block.accounts_created().1.is_some(),
-            supercharge: block.consensus_state().supercharge_coinbase,
+            supercharge: block.supercharge_coinbase(),
         }
     }
 

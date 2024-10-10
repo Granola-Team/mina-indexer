@@ -41,7 +41,7 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
 
     let genesis_block = GenesisBlock::new().unwrap().0;
     assert_eq!(
-        genesis_block.total_supply(),
+        genesis_block.total_currency(),
         total_supply,
         "Mina inital distribution"
     );
