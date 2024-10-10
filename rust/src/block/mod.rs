@@ -1,16 +1,17 @@
 //! Indexer internal block representation used in the witness tree
 
 pub mod blockchain_length;
+pub mod epoch_data;
 pub mod genesis;
+pub mod genesis_state_hash;
 pub mod parser;
 pub mod precomputed;
 pub mod previous_state_hash;
 pub mod store;
 pub mod vrf_output;
 
-use self::vrf_output::VrfOutput;
+use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
-    block::precomputed::PrecomputedBlock,
     canonicity::Canonicity,
     chain::Network,
     protocol::serialization_types::{
@@ -19,7 +20,7 @@ use crate::{
     },
     utility::functions::is_valid_file_name,
 };
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -62,13 +63,10 @@ impl BlockHash {
         Self::from_bytes(&bytes).expect("block state hash bytes")
     }
 
-    pub fn from_hashv1(hashv1: HashV1) -> anyhow::Result<Self> {
+    pub fn from_hashv1(hashv1: HashV1) -> Self {
         let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
             hashv1.into();
-        versioned
-            .to_base58_string()
-            .map(Self)
-            .map_err(|e| anyhow!("Error converting from hashv1: {e}"))
+        Self(versioned.to_base58_string().expect("block state hash"))
     }
 
     pub fn to_bytes(self) -> [u8; BlockHash::LEN] {
@@ -343,9 +341,9 @@ pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf
     });
 }
 
-pub fn extract_height_and_hash(path: &std::path::Path) -> (u32, &str) {
+pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
     let filename = path
-        .file_name()
+        .file_stem()
         .and_then(|x| x.to_str())
         .expect("Failed to extract filename from path");
 
@@ -377,14 +375,33 @@ pub fn extract_state_hash(path: &Path) -> &str {
 pub fn extract_network(path: &Path) -> Network {
     let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
     let dash_pos = name.find('-').unwrap();
-    let network = &name[..dash_pos];
-    Network::from(network)
+    Network::from(&name[..dash_pos])
+}
+
+/// Extracts all three values from file name
+///
+/// Valid block file names have the form: {network}-{block height}-{state hash}
+pub fn extract_network_height_hash(path: &Path) -> (Network, u32, BlockHash) {
+    let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
+    let network_end = name.find('-').expect("valid block file has network");
+    let height_end = name[network_end + 1..]
+        .find('-')
+        .expect("valid block file has height");
+    let block_height = name[network_end + 1..][..height_end]
+        .parse::<u32>()
+        .expect("block height is u32");
+    let state_hash = &name[network_end + 1..][height_end + 1..];
+    (
+        Network::from(&name[..network_end]),
+        block_height,
+        state_hash.into(),
+    )
 }
 
 #[cfg(test)]
 mod block_tests {
     use super::*;
-    use crate::block::precomputed::PcbVersion;
+    use precomputed::PcbVersion;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -394,32 +411,58 @@ mod block_tests {
 
     #[test]
     fn extract_state_hash_test() {
-        let filename2 =
-            &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
-        let filename3 = &Path::new(
+        let path0 =
+            Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+        let path1 = Path::new(
             "/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
         );
 
         assert_eq!(
             "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH",
-            extract_state_hash(filename2)
+            extract_state_hash(path0)
         );
         assert_eq!(
             "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R",
-            extract_state_hash(filename3)
+            extract_state_hash(path1)
         );
     }
 
     #[test]
     fn extract_block_height_test() {
-        let filename2 =
-            &Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
-        let filename3 = &Path::new(
+        let path0 =
+            Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+        let path1 = Path::new(
             "/tmp/blocks/mainnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
         );
 
-        assert_eq!(2, extract_block_height(filename2));
-        assert_eq!(3, extract_block_height(filename3));
+        assert_eq!(2, extract_block_height(path0));
+        assert_eq!(3, extract_block_height(path1));
+    }
+
+    #[test]
+    fn extract_network_height_hash_test() {
+        let path0 =
+            Path::new("mainnet-2-3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH.json");
+        let path1 = Path::new(
+            "/tmp/blocks/devnet-3-3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R.json",
+        );
+
+        assert_eq!(
+            (
+                Network::Mainnet,
+                2,
+                BlockHash::from("3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH")
+            ),
+            extract_network_height_hash(path0)
+        );
+        assert_eq!(
+            (
+                Network::Devnet,
+                3,
+                BlockHash::from("3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R")
+            ),
+            extract_network_height_hash(path1)
+        );
     }
 
     #[test]
