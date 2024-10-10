@@ -1,9 +1,7 @@
 //! Indexer internal precomputed block representation
 
+use super::{epoch_data::EpochSeed, extract_network_height_hash, Block, BlockHash, VrfOutput};
 use crate::{
-    block::{
-        extract_block_height, extract_network, extract_state_hash, Block, BlockHash, VrfOutput,
-    },
     canonicity::Canonicity,
     chain::Network,
     command::{
@@ -14,14 +12,11 @@ use crate::{
     ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
     mina_blocks::{common::from_str, v2},
     protocol::serialization_types::{
-        blockchain_state::BlockchainState,
-        consensus_state as mina_consensus,
         protocol_state::{ProtocolState, ProtocolStateJson},
         snark_work as mina_snark, staged_ledger_diff as mina_rs,
     },
     store::username::UsernameUpdate,
 };
-use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -51,6 +46,12 @@ fn mainnet_genesis_timestamp() -> u64 {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockFileV2 {
+    version: u32,
+    data: BlockFileDataV2,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BlockFileDataV2 {
     #[serde(default = "berkeley_genesis_timestamp")]
     #[serde(deserialize_with = "from_str")]
     scheduled_time: u64,
@@ -79,20 +80,24 @@ pub enum PrecomputedBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV1 {
+    // metadata
     pub network: Network,
     pub state_hash: BlockHash,
-    pub scheduled_time: u64,
     pub blockchain_length: u32,
+    // from PCB
+    pub scheduled_time: u64,
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV2 {
+    // metadata
     pub network: Network,
     pub state_hash: BlockHash,
-    pub scheduled_time: u64,
     pub blockchain_length: u32,
+    // from PCB
+    pub scheduled_time: u64,
     pub protocol_state: v2::protocol_state::ProtocolState,
     pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
 }
@@ -152,9 +157,13 @@ impl PrecomputedBlock {
             }
             PcbVersion::V2 => {
                 let BlockFileV2 {
-                    scheduled_time,
-                    protocol_state,
-                    staged_ledger_diff,
+                    version: _,
+                    data:
+                        BlockFileDataV2 {
+                            scheduled_time,
+                            protocol_state,
+                            staged_ledger_diff,
+                        },
                 } = serde_json::from_slice(&block_file_contents.contents)?;
                 Ok(Self::V2(PrecomputedBlockV2 {
                     state_hash,
@@ -189,16 +198,14 @@ impl PrecomputedBlock {
 
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
-        let network = extract_network(path);
-        let blockchain_length = extract_block_height(path);
-        let state_hash = extract_state_hash(path);
+        let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
         let contents = std::fs::read(path)?;
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
                 blockchain_length,
                 network,
-                state_hash: state_hash.into(),
+                state_hash,
             },
             version,
         )?;
@@ -206,7 +213,6 @@ impl PrecomputedBlock {
     }
 
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
-        // This order is the correct order
         let mut commands = self.commands_pre_diff();
         commands.append(&mut self.commands_post_diff());
         commands
@@ -267,24 +273,6 @@ impl PrecomputedBlock {
             .sum()
     }
 
-    pub fn total_supply(&self) -> u64 {
-        match self {
-            Self::V1(v1) => {
-                v1.protocol_state
-                    .body
-                    .t
-                    .t
-                    .consensus_state
-                    .t
-                    .t
-                    .total_currency
-                    .t
-                    .t
-            }
-            Self::V2(_) => todo!("V2 total_currency {}", self.summary()),
-        }
-    }
-
     /// Returns the pair of
     /// - new pk balances (after applying coinbase, before fee transfers)
     /// - new coinbase receiver option
@@ -326,26 +314,141 @@ impl PrecomputedBlock {
         (account_balances, new_coinbase_receiver)
     }
 
-    pub fn consensus_state(&self) -> mina_consensus::ConsensusState {
+    //////////////////////
+    // Blockchain state //
+    //////////////////////
+
+    pub fn snarked_ledger_hash(&self) -> Option<LedgerHash> {
         match self {
-            Self::V1(v1) => v1.protocol_state.body.t.t.consensus_state.t.t.to_owned(),
-            Self::V2(_) => todo!("consensus_state {}", self.summary()),
+            Self::V1(v1) => Some(LedgerHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .blockchain_state
+                    .t
+                    .t
+                    .snarked_ledger_hash
+                    .to_owned(),
+            )),
+            Self::V2(_v2) => None,
         }
     }
 
-    pub fn blockchain_state(&self) -> BlockchainState {
+    pub fn staged_ledger_hash(&self) -> LedgerHash {
         match self {
-            Self::V1(v1) => v1.protocol_state.body.t.t.blockchain_state.t.t.to_owned(),
-            Self::V2(_) => todo!("blockchain_state {}", self.summary()),
+            Self::V1(v1) => LedgerHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .blockchain_state
+                    .t
+                    .t
+                    .staged_ledger_hash
+                    .t
+                    .t
+                    .non_snark
+                    .t
+                    .ledger_hash
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .blockchain_state
+                .staged_ledger_hash
+                .non_snark
+                .ledger_hash
+                .to_owned(),
+        }
+    }
+
+    /////////////////////
+    // Consensus state //
+    /////////////////////
+
+    pub fn total_currency(&self) -> u64 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .total_currency
+                    .t
+                    .t
+            }
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.total_currency,
         }
     }
 
     pub fn block_creator(&self) -> PublicKey {
-        self.consensus_state().block_creator.into()
+        match self {
+            Self::V1(v1) => v1
+                .protocol_state
+                .body
+                .t
+                .t
+                .consensus_state
+                .t
+                .t
+                .block_creator
+                .to_owned()
+                .into(),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .block_creator
+                .to_owned(),
+        }
     }
 
     pub fn block_stake_winner(&self) -> PublicKey {
-        self.consensus_state().block_stake_winner.into()
+        match self {
+            Self::V1(v1) => v1
+                .protocol_state
+                .body
+                .t
+                .t
+                .consensus_state
+                .t
+                .t
+                .block_stake_winner
+                .to_owned()
+                .into(),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .block_stake_winner
+                .to_owned(),
+        }
+    }
+
+    pub fn has_ancestor_in_same_checkpoint_window(&self) -> bool {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .has_ancestor_in_same_checkpoint_window
+            }
+            Self::V2(v2) => {
+                v2.protocol_state
+                    .body
+                    .consensus_state
+                    .has_ancestor_in_same_checkpoint_window
+            }
+        }
     }
 
     pub fn internal_command_balances(&self) -> Vec<mina_rs::InternalCommandBalanceData> {
@@ -356,31 +459,10 @@ impl PrecomputedBlock {
             .collect()
     }
 
-    pub fn staged_ledger_hash(&self) -> LedgerHash {
-        LedgerHash::from_hashv1(match self {
-            Self::V1(v1) => v1
-                .protocol_state
-                .body
-                .t
-                .t
-                .blockchain_state
-                .t
-                .t
-                .staged_ledger_hash
-                .t
-                .t
-                .non_snark
-                .t
-                .ledger_hash
-                .to_owned(),
-            Self::V2(_) => todo!("staged_ledger_hash {}", self.summary()),
-        })
-    }
-
     pub fn staged_ledger_diff_tuple(&self) -> mina_rs::StagedLedgerDiffTuple {
         match self {
             Self::V1(v1) => v1.staged_ledger_diff.diff.t.to_owned(),
-            Self::V2(_) => todo!("staged_ledger_diff_tuple {}", self.summary()),
+            Self::V2(_v2) => todo!("V2 staged_ledger_diff_tuple {}", self.summary()),
         }
     }
 
@@ -435,7 +517,41 @@ impl PrecomputedBlock {
     }
 
     pub fn coinbase_receiver(&self) -> PublicKey {
-        self.consensus_state().coinbase_receiver.into()
+        match self {
+            Self::V1(v1) => v1
+                .protocol_state
+                .body
+                .t
+                .t
+                .consensus_state
+                .t
+                .t
+                .coinbase_receiver
+                .to_owned()
+                .into(),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .coinbase_receiver
+                .to_owned(),
+        }
+    }
+
+    pub fn supercharge_coinbase(&self) -> bool {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .supercharge_coinbase
+            }
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.supercharge_coinbase,
+        }
     }
 
     pub fn consensus_public_keys(&self) -> HashSet<PublicKey> {
@@ -524,10 +640,9 @@ impl PrecomputedBlock {
     pub fn genesis_state_hash(&self) -> BlockHash {
         match self {
             Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.clone())
-                    .expect("genesis state hash")
+                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
             }
-            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.clone(),
+            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.to_owned(),
         }
     }
 
@@ -546,12 +661,365 @@ impl PrecomputedBlock {
                     .t
             }
             Self::V2(v2) => {
-                // TODO add mainnet end slot height?
                 v2.protocol_state
                     .body
                     .consensus_state
                     .global_slot_since_genesis
             }
+        }
+    }
+
+    pub fn min_window_density(&self) -> u32 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .min_window_density
+                    .t
+                    .t
+            }
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.min_window_density,
+        }
+    }
+
+    // next epoch data
+
+    pub fn next_epoch_seed(&self) -> String {
+        match self {
+            Self::V1(v1) => EpochSeed::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .seed
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .next_epoch_data
+                .seed
+                .to_owned(),
+        }
+    }
+
+    pub fn next_epoch_ledger_hash(&self) -> LedgerHash {
+        match self {
+            Self::V1(v1) => LedgerHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .ledger
+                    .t
+                    .t
+                    .hash
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .next_epoch_data
+                .ledger
+                .hash
+                .to_owned(),
+        }
+    }
+
+    pub fn next_epoch_length(&self) -> u32 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .epoch_length
+                    .t
+                    .t
+            }
+            Self::V2(v2) => {
+                v2.protocol_state
+                    .body
+                    .consensus_state
+                    .next_epoch_data
+                    .epoch_length
+            }
+        }
+    }
+
+    pub fn next_epoch_total_currency(&self) -> u64 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .ledger
+                    .t
+                    .t
+                    .total_currency
+                    .t
+                    .t
+            }
+            Self::V2(v2) => {
+                v2.protocol_state
+                    .body
+                    .consensus_state
+                    .next_epoch_data
+                    .ledger
+                    .total_currency
+            }
+        }
+    }
+
+    pub fn next_epoch_start_checkpoint(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => BlockHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .start_checkpoint
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .next_epoch_data
+                .start_checkpoint
+                .to_owned(),
+        }
+    }
+
+    pub fn next_epoch_lock_checkpoint(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => BlockHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .lock_checkpoint
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .next_epoch_data
+                .lock_checkpoint
+                .to_owned(),
+        }
+    }
+
+    // staking epoch data
+
+    pub fn staking_epoch_length(&self) -> u32 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .next_epoch_data
+                    .t
+                    .t
+                    .epoch_length
+                    .t
+                    .t
+            }
+            Self::V2(v2) => {
+                v2.protocol_state
+                    .body
+                    .consensus_state
+                    .next_epoch_data
+                    .epoch_length
+            }
+        }
+    }
+
+    pub fn staking_epoch_ledger_hash(&self) -> LedgerHash {
+        match self {
+            Self::V1(v1) => LedgerHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .staking_epoch_data
+                    .t
+                    .t
+                    .ledger
+                    .t
+                    .t
+                    .hash
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .staking_epoch_data
+                .ledger
+                .hash
+                .to_owned(),
+        }
+    }
+
+    pub fn staking_epoch_seed(&self) -> String {
+        match self {
+            Self::V1(v1) => EpochSeed::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .staking_epoch_data
+                    .t
+                    .t
+                    .seed
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .staking_epoch_data
+                .seed
+                .to_owned(),
+        }
+    }
+
+    pub fn staking_epoch_total_currency(&self) -> u64 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .staking_epoch_data
+                    .t
+                    .t
+                    .ledger
+                    .t
+                    .t
+                    .total_currency
+                    .t
+                    .t
+            }
+            Self::V2(v2) => {
+                v2.protocol_state
+                    .body
+                    .consensus_state
+                    .staking_epoch_data
+                    .ledger
+                    .total_currency
+            }
+        }
+    }
+
+    pub fn staking_epoch_start_checkpoint(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => BlockHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .staking_epoch_data
+                    .t
+                    .t
+                    .start_checkpoint
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .staking_epoch_data
+                .start_checkpoint
+                .to_owned(),
+        }
+    }
+
+    pub fn staking_epoch_lock_checkpoint(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => BlockHash::from_hashv1(
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .consensus_state
+                    .t
+                    .t
+                    .staking_epoch_data
+                    .t
+                    .t
+                    .lock_checkpoint
+                    .to_owned(),
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .staking_epoch_data
+                .lock_checkpoint
+                .to_owned(),
         }
     }
 
@@ -602,7 +1070,6 @@ impl PrecomputedBlock {
         match self {
             Self::V1(v1) => {
                 BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
-                    .expect("previous state hash")
             }
             Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
         }
@@ -639,14 +1106,56 @@ impl PrecomputedBlock {
 
     /// Base64 encoded string
     pub fn last_vrf_output(&self) -> String {
-        let last_vrf_output = VrfOutput::new(self.consensus_state().last_vrf_output.t.0.clone());
-        last_vrf_output.base64_encode()
+        match self {
+            Self::V1(v1) => {
+                let last_vrf_output = VrfOutput::new(
+                    v1.protocol_state
+                        .body
+                        .t
+                        .t
+                        .consensus_state
+                        .t
+                        .t
+                        .last_vrf_output
+                        .t
+                        .0
+                        .to_owned(),
+                );
+                last_vrf_output.base64_encode()
+            }
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .last_vrf_output
+                .to_owned(),
+        }
     }
 
     /// Blake2b hex digest of last_vrf_output
     pub fn hash_last_vrf_output(&self) -> VrfOutput {
-        let last_vrf_output = VrfOutput::new(self.consensus_state().last_vrf_output.t.0.clone());
-        VrfOutput::new(last_vrf_output.hex_digest())
+        match self {
+            Self::V1(v1) => {
+                let last_vrf_output = VrfOutput::new(
+                    v1.protocol_state
+                        .body
+                        .t
+                        .t
+                        .consensus_state
+                        .t
+                        .t
+                        .last_vrf_output
+                        .t
+                        .0
+                        .to_owned(),
+                );
+                VrfOutput::new(last_vrf_output.hex_digest())
+            }
+            Self::V2(v2) => {
+                VrfOutput::base64_decode(&v2.protocol_state.body.consensus_state.last_vrf_output)
+                    .expect("V2 last VRF output decodes")
+            }
+        }
     }
 
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
@@ -714,18 +1223,6 @@ impl PrecomputedBlock {
     }
 }
 
-impl PcbVersion {
-    pub fn update(&mut self) -> anyhow::Result<()> {
-        match self {
-            Self::V1 => {
-                *self = Self::V2;
-                Ok(())
-            }
-            Self::V2 => bail!("No successor verion of {}", self),
-        }
-    }
-}
-
 impl std::cmp::PartialOrd for PrecomputedBlock {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -764,7 +1261,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn vrf_output() -> anyhow::Result<()> {
+    fn vrf_output_v1() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         assert_eq!(
@@ -776,6 +1273,17 @@ mod tests {
             VrfOutput::new(
                 hex!("7b0bc721df63c1eabf5b85c0e05e952c6b06c1aa101db1ed3acea4faaf8420c4").to_vec()
             )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn vrf_output_v2() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/berkeley/sequential_blocks/berkeley-2-3NLBi19dn8P4Fm5UZgd2gdmi1WbuxyM1uuk2ci1zEwP4iEijHEwJ.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        assert_eq!(
+            pcb.last_vrf_output(),
+            "rWxD4L_t-VXaoDDVJipD5OR9OU6X4T6WwEWCxvoEAAA=".to_string()
         );
         Ok(())
     }
