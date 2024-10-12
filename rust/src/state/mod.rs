@@ -249,7 +249,7 @@ impl IndexerState {
             .indexer_store
             .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
-        let genesis_block = GenesisBlock::new()?;
+        let genesis_block = GenesisBlock::new_v1()?;
         let genesis_bytes = genesis_block.1;
         let genesis_block = genesis_block.0;
 
@@ -999,14 +999,14 @@ impl IndexerState {
         let (epoch, hash) = extract_epoch_hash(path);
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
             let staking_ledger =
-                StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()).await?;
+                StakingLedger::parse_file(path, genesis_state_hash.clone()).await?;
             let summary = staking_ledger.summary();
             let mut staking_ledgers = staking_ledgers.lock().unwrap();
+
             staking_ledgers.insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
             store.add_staking_ledger(staking_ledger, genesis_state_hash)?;
             info!("Added staking ledger {summary}");
         }
-
         Ok(())
     }
 
@@ -1141,7 +1141,9 @@ impl IndexerState {
                     {
                         let (genesis_state_hash, epoch, ledger_hash) =
                             split_staking_ledger_epoch_key(&key)?;
-                        if genesis_state_hash.0 == MAINNET_GENESIS_HASH {
+                        if genesis_state_hash.0 == MAINNET_GENESIS_HASH
+                            || genesis_state_hash.0 == HARDFORK_GENSIS_HASH
+                        {
                             staking_ledgers.insert(epoch, ledger_hash);
                         } else {
                             error!("Unrecognized genesis state hash");

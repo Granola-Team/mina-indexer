@@ -39,7 +39,7 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         "Total number of genesis accounts"
     );
 
-    let genesis_block = GenesisBlock::new().unwrap().0;
+    let genesis_block = GenesisBlock::new_v1().unwrap().0;
     assert_eq!(
         genesis_block.total_currency(),
         total_supply,
