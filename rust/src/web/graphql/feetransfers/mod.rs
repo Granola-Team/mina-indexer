@@ -110,7 +110,7 @@ impl FeetransferWithMeta {
     }
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Default)]
 pub struct FeetransferQueryInput {
     /// Value block height
     block_height: Option<u32>,
@@ -253,11 +253,19 @@ impl FeetransferQueryRoot {
                     feetransfer: ft,
                     block: Some(get_block(db, &state_hash)),
                 };
+                if let Some(q) = query.as_ref() {
+                    if let Some(ref block) = feetransfer_with_meta.block {
+                        if block_out_of_bounds(block.blockchain_length(), q) {
+                            break;
+                        }
+                    }
+                }
                 if query
                     .as_ref()
                     .map_or(true, |q| q.matches(&feetransfer_with_meta))
                 {
                     fee_transfers.push(feetransfer_with_meta);
+
                     if fee_transfers.len() >= limit {
                         break;
                     }
@@ -305,6 +313,13 @@ impl FeetransferQueryRoot {
                         total_num_internal_commands,
                     )),
                 };
+                if let Some(q) = query.as_ref() {
+                    if let Some(ref block) = ft.block {
+                        if block_out_of_bounds(block.blockchain_length(), q) {
+                            break;
+                        }
+                    }
+                }
                 if query.as_ref().map_or(true, |q| q.matches(&ft)) {
                     fee_transfers.push(ft);
                 }
@@ -362,6 +377,14 @@ fn get_default_fee_transfers(
             feetransfer: ft,
             block: Some(pcb),
         };
+
+        if let Some(q) = query.as_ref() {
+            if let Some(ref block) = feetransfer_with_meta.block {
+                if block_out_of_bounds(block.blockchain_length(), q) {
+                    break;
+                }
+            }
+        }
 
         if query
             .as_ref()
@@ -550,5 +573,96 @@ impl FeetransferQueryInput {
             }
         }
         true
+    }
+}
+
+fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) -> bool {
+    query
+        .block_height_gt
+        .map_or(false, |gt| blockchain_length <= gt)
+        || query
+            .block_height_gte
+            .map_or(false, |gte| blockchain_length < gte)
+        || query
+            .block_height_lt
+            .map_or(false, |lt| blockchain_length >= lt)
+        || query
+            .block_height_lte
+            .map_or(false, |lte| blockchain_length > lte)
+}
+#[cfg(test)]
+mod block_out_of_bounds_tests {
+    use super::*;
+
+    #[test]
+    fn test_within_bounds() {
+        let query = FeetransferQueryInput {
+            block_height_gte: Some(50),
+            block_height_gt: None,
+            block_height_lte: Some(100),
+            block_height_lt: None,
+            ..Default::default()
+        };
+        assert!(!block_out_of_bounds(75, &query));
+    }
+
+    #[test]
+    fn test_block_height_gte_out_of_bounds() {
+        let query = FeetransferQueryInput {
+            block_height_gte: Some(100),
+            block_height_gt: None,
+            block_height_lte: Some(200),
+            block_height_lt: None,
+            ..Default::default()
+        };
+        assert!(block_out_of_bounds(99, &query));
+    }
+
+    #[test]
+    fn test_block_height_gt_out_of_bounds() {
+        let query = FeetransferQueryInput {
+            block_height_gte: None,
+            block_height_gt: Some(100),
+            block_height_lte: Some(200),
+            block_height_lt: None,
+            ..Default::default()
+        };
+        assert!(block_out_of_bounds(100, &query));
+    }
+
+    #[test]
+    fn test_block_height_lte_out_of_bounds() {
+        let query = FeetransferQueryInput {
+            block_height_gte: Some(50),
+            block_height_gt: None,
+            block_height_lte: Some(75),
+            block_height_lt: None,
+            ..Default::default()
+        };
+        assert!(block_out_of_bounds(76, &query));
+    }
+
+    #[test]
+    fn test_block_height_lt_out_of_bounds() {
+        let query = FeetransferQueryInput {
+            block_height_gte: Some(50),
+            block_height_gt: None,
+            block_height_lte: None,
+            block_height_lt: Some(100),
+            ..Default::default()
+        };
+        assert!(block_out_of_bounds(100, &query));
+    }
+
+    #[test]
+    fn test_no_bounds_specified() {
+        let query = FeetransferQueryInput {
+            block_height_gte: None,
+            block_height_gt: None,
+            block_height_lte: None,
+            block_height_lt: None,
+            ..Default::default()
+        };
+        assert!(!block_out_of_bounds(100, &query));
     }
 }
