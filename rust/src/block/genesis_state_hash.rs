@@ -12,10 +12,10 @@ impl GenesisStateHash {
     pub fn from_path(path: &Path) -> anyhow::Result<BlockHash> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        let mut buffer = String::with_capacity(250);
+        let mut buffer = String::with_capacity(400);
 
-        // Limit the reader to read only the first 250 bytes
-        reader.take(250).read_to_string(&mut buffer)?;
+        // Limit the reader to read only the first 400 bytes
+        reader.take(400).read_to_string(&mut buffer)?;
 
         // Locate "genesis_state_hash" within the buffer
         let gen_state_hash_key = "\"genesis_state_hash\"";
