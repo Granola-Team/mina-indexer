@@ -122,12 +122,12 @@ impl CommandStatusData {
 
         match data {
             TS::Applied(auxiliary_data, balance_data) => Self::Applied {
-                auxiliary_data: auxiliary_data.clone().inner(),
-                balance_data: balance_data.clone().inner(),
+                auxiliary_data: auxiliary_data.t.to_owned(),
+                balance_data: balance_data.t.to_owned(),
             },
             TS::Failed(fails, balance_data) => Self::Failed(
-                fails.iter().map(|reason| reason.clone().inner()).collect(),
-                balance_data.clone().inner(),
+                fails.iter().map(|reason| reason.t.to_owned()).collect(),
+                balance_data.t.to_owned(),
             ),
         }
     }
@@ -143,13 +143,15 @@ pub trait UserCommandWithStatusT {
 
     fn contains_public_key(&self, pk: &PublicKey) -> bool;
 
-    fn data(&self) -> mina_rs::UserCommand;
+    fn data(&self) -> &mina_rs::UserCommand;
 
     fn to_command(&self) -> Command;
 
     fn sender(&self) -> PublicKey;
 
     fn receiver(&self) -> PublicKey;
+
+    fn fee_payer_pk(&self) -> PublicKey;
 
     fn nonce(&self) -> Nonce;
 
@@ -172,16 +174,16 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 
     fn status_data(&self) -> CommandStatusData {
-        match self.0.t.status.t.clone() {
+        match &self.0.t.status.t {
             mina_rs::TransactionStatus::Applied(auxiliary_data, balance_data) => {
                 CommandStatusData::Applied {
-                    auxiliary_data: auxiliary_data.inner(),
-                    balance_data: balance_data.inner(),
+                    auxiliary_data: auxiliary_data.t.to_owned(),
+                    balance_data: balance_data.t.to_owned(),
                 }
             }
             mina_rs::TransactionStatus::Failed(reason, balance_data) => CommandStatusData::Failed(
-                reason.iter().map(|r| r.clone().inner()).collect(),
-                balance_data.inner(),
+                reason.iter().map(|r| r.t.to_owned()).collect(),
+                balance_data.t.to_owned(),
             ),
         }
     }
@@ -191,8 +193,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         signed.all_command_public_keys().contains(pk)
     }
 
-    fn data(&self) -> mina_rs::UserCommand {
-        self.0.clone().inner().data.inner().inner()
+    fn data(&self) -> &mina_rs::UserCommand {
+        &self.0.t.data.t.t
     }
 
     fn to_command(&self) -> Command {
@@ -204,12 +206,12 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         receiver_pk,
                         amount,
                         ..
-                    } = payment_payload_v1.clone().inner().inner();
+                    } = payment_payload_v1.t.t.to_owned();
                     Command::Payment(Payment {
                         source: source_pk.into(),
                         receiver: receiver_pk.into(),
-                        nonce: SignedCommand(v1.clone()).source_nonce(),
-                        amount: amount.inner().inner().into(),
+                        nonce: Nonce(v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
+                        amount: amount.t.t.into(),
                         is_new_receiver_account: self.receiver_account_creation_fee_paid(),
                     })
                 }
@@ -217,11 +219,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     let mina_rs::StakeDelegation::SetDelegate {
                         delegator,
                         new_delegate,
-                    } = stake_delegation_v1.clone().inner();
+                    } = stake_delegation_v1.t.to_owned();
                     Command::Delegation(Delegation {
                         delegator: delegator.into(),
                         delegate: new_delegate.into(),
-                        nonce: SignedCommand(v1.clone()).source_nonce(),
+                        nonce: Nonce(v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
                     })
                 }
             },
@@ -230,16 +232,15 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn sender(&self) -> PublicKey {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
+            mina_rs::UserCommand::SignedCommand(v1) => match &v1.t.t.payload.t.t.body.t.t {
                 mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
-                    let mina_rs::PaymentPayload { source_pk, .. } =
-                        payment_payload_v1.clone().inner().inner();
-                    source_pk.into()
+                    let mina_rs::PaymentPayload { ref source_pk, .. } = payment_payload_v1.t.t;
+                    source_pk.to_owned().into()
                 }
                 mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
-                    let mina_rs::StakeDelegation::SetDelegate { delegator, .. } =
-                        stake_delegation_v1.clone().inner();
-                    delegator.into()
+                    let mina_rs::StakeDelegation::SetDelegate { ref delegator, .. } =
+                        stake_delegation_v1.t;
+                    delegator.to_owned().into()
                 }
             },
         }
@@ -247,19 +248,28 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn receiver(&self) -> PublicKey {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
+            mina_rs::UserCommand::SignedCommand(v1) => match &v1.t.t.payload.t.t.body.t.t {
                 mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
-                    let mina_rs::PaymentPayload { receiver_pk, .. } =
-                        payment_payload_v1.clone().inner().inner();
-                    receiver_pk.into()
+                    let mina_rs::PaymentPayload {
+                        ref receiver_pk, ..
+                    } = payment_payload_v1.t.t;
+                    receiver_pk.to_owned().into()
                 }
                 mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
-                    let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } =
-                        stake_delegation_v1.clone().inner();
-                    new_delegate.into()
+                    let mina_rs::StakeDelegation::SetDelegate {
+                        ref new_delegate, ..
+                    } = stake_delegation_v1.t;
+                    new_delegate.to_owned().into()
                 }
             },
         }
+    }
+
+    fn fee_payer_pk(&self) -> PublicKey {
+        let mina_rs::UserCommand::SignedCommand(v1) = self.data();
+        let mina_rs::SignedCommandPayloadCommon { fee_payer_pk, .. } =
+            &v1.t.t.payload.t.t.common.t.t.t;
+        fee_payer_pk.to_owned().into()
     }
 
     fn nonce(&self) -> Nonce {
@@ -275,8 +285,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn memo(&self) -> String {
         let mina_rs::UserCommand::SignedCommand(cmd) = self.data();
-        let bytes = cmd.t.t.payload.t.t.common.t.t.t.memo.t.0;
-        decode_memo(&bytes)
+        decode_memo(&cmd.t.t.payload.t.t.common.t.t.t.memo.t.0)
     }
 }
 
@@ -306,33 +315,33 @@ impl Command {
             .commands()
             .iter()
             .filter(|&command| command.is_applied())
-            .map(|command| match command.clone().data() {
+            .map(|command| match command.data() {
                 mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    match SignedCommand(signed_command.clone()).payload_body() {
+                    match &signed_command.t.t.payload.t.t.body.t.t {
                         mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                             let source: PublicKey =
-                                payment_payload.clone().inner().inner().source_pk.into();
+                                payment_payload.t.t.source_pk.to_owned().into();
                             let receiver: PublicKey =
-                                payment_payload.clone().inner().inner().receiver_pk.into();
-                            let amount = payment_payload.inner().inner().amount.inner().inner();
+                                payment_payload.t.t.receiver_pk.to_owned().into();
+                            let amount = payment_payload.t.t.amount.t.t;
                             trace!("Payment {{ source: {source}, receiver: {receiver}, amount: {amount} }}");
                             Self::Payment(Payment {
                                 source,
                                 receiver,
-                                nonce: SignedCommand(signed_command).source_nonce(),
+                                nonce: Nonce(signed_command.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
                                 amount: amount.into(),
                                 is_new_receiver_account: command.receiver_account_creation_fee_paid(),
                             })
                         }
                         mina_rs::SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
-                            match delegation_payload.inner() {
+                            match delegation_payload.t.to_owned() {
                                 mina_rs::StakeDelegation::SetDelegate {
                                     delegator,
                                     new_delegate,
                                 } => {
                                     let delegator: PublicKey = delegator.into();
                                     let new_delegate: PublicKey = new_delegate.into();
-                                    let nonce = SignedCommand(signed_command).source_nonce();
+                                    let nonce = Nonce(signed_command.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32);
                                     trace!("Delegation {{ delegator: {delegator}, new_delegate: {new_delegate}, nonce: {nonce} }}");
                                     Self::Delegation(Delegation {
                                         delegate: new_delegate,
@@ -358,23 +367,25 @@ impl Command {
 
 impl PaymentPayload {
     pub fn source_pk(&self) -> PublicKey {
-        self.0.clone().inner().inner().source_pk.into()
+        self.0.t.t.source_pk.to_owned().into()
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
-        self.0.clone().inner().inner().receiver_pk.into()
+        self.0.t.t.receiver_pk.to_owned().into()
     }
 }
 
 impl StakeDelegation {
     pub fn delegator(&self) -> PublicKey {
-        let mina_rs::StakeDelegation::SetDelegate { delegator, .. } = self.0.clone().inner();
-        delegator.into()
+        let mina_rs::StakeDelegation::SetDelegate { ref delegator, .. } = self.0.t;
+        delegator.to_owned().into()
     }
 
     pub fn new_delegate(&self) -> PublicKey {
-        let mina_rs::StakeDelegation::SetDelegate { new_delegate, .. } = self.0.clone().inner();
-        new_delegate.into()
+        let mina_rs::StakeDelegation::SetDelegate {
+            ref new_delegate, ..
+        } = self.0.t;
+        new_delegate.to_owned().into()
     }
 }
 
@@ -401,7 +412,11 @@ impl From<UserCommandWithStatus> for mina_rs::UserCommandWithStatus {
 
 impl From<UserCommandWithStatus> for Command {
     fn from(value: UserCommandWithStatus) -> Self {
-        (value.data(), value.receiver_account_creation_fee_paid()).into()
+        (
+            value.data().to_owned(),
+            value.receiver_account_creation_fee_paid(),
+        )
+            .into()
     }
 }
 

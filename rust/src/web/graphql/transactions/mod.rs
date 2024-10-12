@@ -3,7 +3,7 @@ use crate::{
     block::store::BlockStore,
     command::{
         decode_memo,
-        signed::{self, SignedCommand, SignedCommandWithData, TxnHash},
+        signed::{SignedCommand, SignedCommandWithData, TxnHash},
         store::UserCommandStore,
         CommandStatusData,
     },
@@ -100,8 +100,8 @@ impl TransactionsQueryRoot {
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
         if let Some(hash) = query.hash {
-            let hash = TxnHash(hash);
-            if signed::TxnHash::is_valid(&hash) {
+            let hash = TxnHash::from(hash);
+            if hash.is_valid() {
                 return Ok(db.get_user_command(&hash, 0)?.map(|cmd| {
                     Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
                 }));

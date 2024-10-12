@@ -997,19 +997,15 @@ pub async fn handle_connection(
                 }
                 Transactions::Hash { hash, verbose } => {
                     info!("Received tx-hash command for {hash}");
-                    let hash = TxnHash(hash);
-                    if !TxnHash::is_valid(&hash) {
-                        invalid_tx_hash(&hash.0)
-                    } else {
-                        db.get_user_command(&hash, 0)?.map(|cmd| {
-                            if verbose {
-                                format!("{cmd:?}")
-                            } else {
-                                let cmd: Command = cmd.into();
-                                format!("{cmd:?}")
-                            }
-                        })
-                    }
+                    let hash = TxnHash::new(&hash)?;
+                    db.get_user_command(&hash, 0)?.map(|cmd| {
+                        if verbose {
+                            format!("{cmd:?}")
+                        } else {
+                            let cmd: Command = cmd.into();
+                            format!("{cmd:?}")
+                        }
+                    })
                 }
                 Transactions::StateHash {
                     state_hash,
@@ -1160,12 +1156,6 @@ mod helpers {
     pub fn invalid_public_key(input: &str) -> Option<String> {
         let msg = format!("Invalid public key: {input}");
         error!("Invalid public key: {input}");
-        Some(msg)
-    }
-
-    pub fn invalid_tx_hash(input: &str) -> Option<String> {
-        let msg = format!("Invalid transaction hash: {input}");
-        error!("Invalid transaction hash: {input}");
         Some(msg)
     }
 

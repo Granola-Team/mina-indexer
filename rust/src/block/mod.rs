@@ -80,12 +80,10 @@ impl BlockHash {
 
 impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
-        let parent_hash = precomputed_block.previous_state_hash();
-        let state_hash = precomputed_block.state_hash();
         Self {
             height,
-            state_hash,
-            parent_hash,
+            state_hash: precomputed_block.state_hash(),
+            parent_hash: precomputed_block.previous_state_hash(),
             blockchain_length: precomputed_block.blockchain_length(),
             hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
             global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
@@ -102,8 +100,8 @@ impl From<Block> for BlockWithoutHeight {
     fn from(value: Block) -> Self {
         Self {
             canonicity: None,
-            parent_hash: value.parent_hash.clone(),
-            state_hash: value.state_hash.clone(),
+            parent_hash: value.parent_hash,
+            state_hash: value.state_hash,
             global_slot_since_genesis: value.global_slot_since_genesis,
             blockchain_length: value.blockchain_length,
         }
@@ -203,7 +201,7 @@ impl std::str::FromStr for BlockHash {
         if is_valid_state_hash(s) {
             Ok(Self(s.to_string()))
         } else {
-            bail!("Invalid state hash: {}", s)
+            bail!("Invalid state hash: {s}")
         }
     }
 }
@@ -300,8 +298,8 @@ impl std::fmt::Debug for Block {
             self.height,
             self.blockchain_length,
             self.global_slot_since_genesis,
-            &self.state_hash,
-            &self.parent_hash
+            self.state_hash,
+            self.parent_hash
         )
     }
 }

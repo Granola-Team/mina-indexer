@@ -879,7 +879,7 @@ impl BlockWithoutCanonicity {
         let winner_account = block.block_creator().0;
         let date_time = millis_to_iso_date_string(block.timestamp() as i64);
         let creator = block.block_creator().0;
-        let scheduled_time = block.scheduled_time().clone();
+        let scheduled_time = block.scheduled_time();
         let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
         let tx_fees = block.tx_fees();

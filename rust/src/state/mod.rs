@@ -695,10 +695,11 @@ impl IndexerState {
                 }
             }
 
+            // check if the best chain is extended
             let best_tip_id = merged_tip_ids.iter().min_by(|a, b| {
-                let a_best_block = self.root_branch.branches.get(a).unwrap().data().clone();
-                let b_best_block = self.root_branch.branches.get(b).unwrap().data().clone();
-                a_best_block.cmp(&b_best_block)
+                let a_best_block = self.root_branch.branches.get(a).unwrap().data();
+                let b_best_block = self.root_branch.branches.get(b).unwrap().data();
+                a_best_block.cmp(b_best_block)
             });
             if let Some(merged_tip_id) = best_tip_id {
                 let merged_tip_block = self
