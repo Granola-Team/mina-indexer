@@ -1,5 +1,6 @@
 use crate::{
     command::*,
+    proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
         serialization_types::{
@@ -453,10 +454,9 @@ fn signer(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
     serde_json::Value::String(pk.0)
 }
 
-fn signature(_value: mina_rs::SignedCommandV1) -> serde_json::Value {
-    use serde_json::*;
-
-    Value::String("signature".into())
+fn signature(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
+    let sig: Signature = value.t.t.signature.to_owned().into();
+    serde_json::Value::String(sig.to_string())
 }
 
 fn payload_json(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
@@ -555,6 +555,7 @@ impl std::fmt::Display for TxnHash {
 
 #[cfg(test)]
 mod tests {
+    use super::SignedCommand;
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::signed::TxnHash,
@@ -562,7 +563,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn transaction_hash() {
+    fn transaction_hash() -> anyhow::Result<()> {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
@@ -576,5 +577,63 @@ mod tests {
         ];
 
         assert_eq!(hashes, expect);
+        Ok(())
+    }
+
+    #[test]
+    fn signed_command_json() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
+        let signed_commands = precomputed_block
+            .commands()
+            .into_iter()
+            .map(|c| format!("{:?}", SignedCommand::from(c)))
+            .collect::<Vec<_>>();
+
+        let expect0 = r#"{
+  "payload": {
+    "body": {
+      "amount": 60068000,
+      "kind": "Payment",
+      "receiver_pk": "B62qmbBg93wtMp1yN42nN7SuunWWNpVbBwiusvhqbxJ2yt5QonEKzVY",
+      "source_pk": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
+      "token_id": 1
+    },
+    "common": {
+      "fee": 10000000,
+      "fee_payer_pk": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
+      "fee_token": 1,
+      "memo": "FPayment",
+      "nonce": 7295,
+      "valid_until": 4294967295
+    }
+  },
+  "signature": "27688b6b9c23dda2681fe1f09e813110f1600462e13da63515519967db316a433be34e62db7b7fd71c7c6f72b32e33f02c1d985a35d9bbfeca9387993e2006df",
+  "signer": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"
+}"#;
+        let expect1 = r#"{
+  "payload": {
+    "body": {
+      "amount": 1000,
+      "kind": "Payment",
+      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+      "token_id": 1
+    },
+    "common": {
+      "fee": 1000000,
+      "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+      "fee_token": 1,
+      "memo": "",
+      "nonce": 146491,
+      "valid_until": 4294967295
+    }
+  },
+  "signature": "313aeadfa061ef68c3fdffe79e8c5dfd6e5167bd2ea9a240be8d04e29331468e23cf18712887c903844e4c1a827a77dccdbabd59e1698b3a0b33d76f8ae3861c",
+  "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+}"#;
+
+        assert_eq!(signed_commands, vec![expect0, expect1]);
+        Ok(())
     }
 }
