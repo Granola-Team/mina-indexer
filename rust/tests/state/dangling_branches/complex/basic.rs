@@ -72,7 +72,7 @@ async fn extension() -> anyhow::Result<()> {
     // add leaf
     // --------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block, true)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block, true, true)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     println!("=== Before Root Branch ===");
@@ -125,7 +125,7 @@ async fn extension() -> anyhow::Result<()> {
     println!("{tree}");
 
     // dangling branch rebases on top of root_branch
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block, true)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block, true, true)?;
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     // no more dangling branches

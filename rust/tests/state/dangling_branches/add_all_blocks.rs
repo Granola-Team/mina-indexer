@@ -52,7 +52,7 @@ async fn extension() -> anyhow::Result<()> {
 
         while let Some((block, _)) = block_parser.next_block().await? {
             let block: PrecomputedBlock = block.into();
-            state.add_block_to_witness_tree(&block, true)?;
+            state.add_block_to_witness_tree(&block, true, true)?;
             n += 1;
         }
 

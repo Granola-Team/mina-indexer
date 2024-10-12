@@ -77,7 +77,7 @@ async fn test() -> anyhow::Result<()> {
             .map(|store| store.add_block(&block, block_bytes).unwrap())
         {
             if db_event.map(|db| db.is_new_block_event()).unwrap_or(false) {
-                if let Some(wt_event) = state1.add_block_to_witness_tree(&block, false)?.1 {
+                if let Some(wt_event) = state1.add_block_to_witness_tree(&block, false, true)?.1 {
                     let (best_tip, new_canonical_blocks) = match wt_event {
                         WitnessTreeEvent::UpdateBestTip {
                             best_tip,
@@ -99,7 +99,7 @@ async fn test() -> anyhow::Result<()> {
                                 .unwrap()
                         }
                     });
-                    state1.add_block_to_witness_tree(&block, true)?;
+                    state1.add_block_to_witness_tree(&block, true, true)?;
                 }
             }
         }

@@ -90,7 +90,9 @@ async fn extensions() -> anyhow::Result<()> {
     // ---------
 
     // make a new dangling branch
-    let (extension_type, _) = state.add_block_to_witness_tree(&root1_block, true).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&root1_block, true, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // Root branch

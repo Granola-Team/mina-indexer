@@ -98,7 +98,9 @@ async fn extensions() {
     // add root 0
     // ----------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&root0_block, true).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&root0_block, true, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // ------------
@@ -106,7 +108,7 @@ async fn extensions() {
     // ------------
 
     let (extension_type, _) = state
-        .add_block_to_witness_tree(&child10_block, true)
+        .add_block_to_witness_tree(&child10_block, true, true)
         .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
@@ -137,7 +139,7 @@ async fn extensions() {
     // -----------
 
     let (extension_type, _) = state
-        .add_block_to_witness_tree(&child0_block, true)
+        .add_block_to_witness_tree(&child0_block, true, true)
         .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
@@ -145,7 +147,9 @@ async fn extensions() {
     // add root 1
     // ----------
 
-    let (extension_type, _) = state.add_block_to_witness_tree(&root1_block, true).unwrap();
+    let (extension_type, _) = state
+        .add_block_to_witness_tree(&root1_block, true, true)
+        .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleReverse);
 
     // ------------
@@ -153,7 +157,7 @@ async fn extensions() {
     // ------------
 
     let (extension_type, _) = state
-        .add_block_to_witness_tree(&child11_block, true)
+        .add_block_to_witness_tree(&child11_block, true, true)
         .unwrap();
     assert_eq!(extension_type, ExtensionType::DanglingSimpleForward);
 
