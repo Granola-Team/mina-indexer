@@ -1,3 +1,5 @@
+mod hardfork;
+
 use mina_indexer::block::{
     parser::BlockParser,
     precomputed::{PcbVersion, PrecomputedBlock},
