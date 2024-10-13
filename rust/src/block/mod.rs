@@ -14,6 +14,7 @@ use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
     canonicity::Canonicity,
     chain::Network,
+    constants::*,
     protocol::serialization_types::{
         common::{Base58EncodableVersionedType, HashV1},
         version_bytes,
@@ -21,8 +22,9 @@ use crate::{
     utility::functions::is_valid_file_name,
 };
 use anyhow::bail;
+use precomputed::PcbVersion;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{cmp::Ordering, path::Path};
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -78,12 +80,10 @@ impl BlockHash {
 
 impl Block {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
-        let parent_hash = precomputed_block.previous_state_hash();
-        let state_hash = precomputed_block.state_hash();
         Self {
             height,
-            state_hash,
-            parent_hash,
+            state_hash: precomputed_block.state_hash(),
+            parent_hash: precomputed_block.previous_state_hash(),
             blockchain_length: precomputed_block.blockchain_length(),
             hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
             global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
@@ -100,8 +100,8 @@ impl From<Block> for BlockWithoutHeight {
     fn from(value: Block) -> Self {
         Self {
             canonicity: None,
-            parent_hash: value.parent_hash.clone(),
-            state_hash: value.state_hash.clone(),
+            parent_hash: value.parent_hash,
+            state_hash: value.state_hash,
             global_slot_since_genesis: value.global_slot_since_genesis,
             blockchain_length: value.blockchain_length,
         }
@@ -140,6 +140,7 @@ pub struct BlockComparison {
     pub state_hash: BlockHash,
     pub blockchain_length: u32,
     pub hash_last_vrf_output: VrfOutput,
+    pub version: PcbVersion,
 }
 
 impl From<PrecomputedBlock> for Block {
@@ -188,6 +189,7 @@ impl From<&PrecomputedBlock> for BlockComparison {
             state_hash: value.state_hash(),
             blockchain_length: value.blockchain_length(),
             hash_last_vrf_output: value.hash_last_vrf_output(),
+            version: value.version(),
         }
     }
 }
@@ -199,7 +201,7 @@ impl std::str::FromStr for BlockHash {
         if is_valid_state_hash(s) {
             Ok(Self(s.to_string()))
         } else {
-            bail!("Invalid state hash: {}", s)
+            bail!("Invalid state hash: {s}")
         }
     }
 }
@@ -217,14 +219,17 @@ impl From<&str> for BlockHash {
 }
 
 impl std::cmp::PartialOrd for BlockComparison {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl std::cmp::Ord for BlockComparison {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering;
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.version == PcbVersion::V2 && other.version == PcbVersion::V1 {
+            // hardfork blocks are better than pre-hardfork blocks
+            return Ordering::Less;
+        }
 
         let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
         let vrf_cmp = self.hash_last_vrf_output.cmp(&other.hash_last_vrf_output);
@@ -240,7 +245,7 @@ impl std::cmp::Ord for BlockComparison {
 }
 
 impl std::cmp::PartialOrd for Block {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -249,8 +254,13 @@ impl std::cmp::Ord for Block {
     /// Follows `selectLongerChain`
     /// A < B means A is better than B
     /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering;
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.genesis_state_hash.0 == HARDFORK_GENSIS_HASH
+            && other.genesis_state_hash.0 == MAINNET_GENESIS_HASH
+        {
+            // hardfork blocks are better than pre-hardfork blocks
+            return Ordering::Less;
+        }
 
         let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
         let vrf_cmp = self.hash_last_vrf_output.cmp(&other.hash_last_vrf_output);
@@ -288,8 +298,8 @@ impl std::fmt::Debug for Block {
             self.height,
             self.blockchain_length,
             self.global_slot_since_genesis,
-            &self.state_hash,
-            &self.parent_hash
+            self.state_hash,
+            self.parent_hash
         )
     }
 }
@@ -335,7 +345,7 @@ pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf
         let (height_b, hash_b) = extract_height_and_hash(b);
 
         match height_a.cmp(&height_b) {
-            std::cmp::Ordering::Equal => hash_a.cmp(hash_b),
+            Ordering::Equal => hash_a.cmp(hash_b),
             other => other,
         }
     });

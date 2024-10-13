@@ -1,8 +1,12 @@
 use crate::{
     command::*,
+    proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
-        serialization_types::{staged_ledger_diff as mina_rs, version_bytes::V1_TXN_HASH},
+        serialization_types::{
+            staged_ledger_diff as mina_rs,
+            version_bytes::{USER_COMMAND, V1_TXN_HASH},
+        },
     },
 };
 use anyhow::bail;
@@ -77,24 +81,24 @@ impl SignedCommand {
     }
 
     pub fn fee(&self) -> u64 {
-        self.payload_common().fee.inner().inner()
+        self.payload_common().fee.t.t
     }
 
     pub fn fee_payer_pk(&self) -> PublicKey {
-        self.payload_common().fee_payer_pk.into()
+        self.payload_common().fee_payer_pk.to_owned().into()
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
         match self.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                payment_payload.t.t.receiver_pk.into()
+                payment_payload.t.t.receiver_pk.to_owned().into()
             }
             mina_rs::SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
                 match delegation_payload.t {
                     mina_rs::StakeDelegation::SetDelegate {
                         delegator: _,
-                        new_delegate,
-                    } => new_delegate.into(),
+                        ref new_delegate,
+                    } => new_delegate.to_owned().into(),
                 }
             }
         }
@@ -103,14 +107,14 @@ impl SignedCommand {
     pub fn source_pk(&self) -> PublicKey {
         match self.payload_body() {
             mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
-                payment_payload.t.t.source_pk.into()
+                payment_payload.t.t.source_pk.to_owned().into()
             }
             mina_rs::SignedCommandPayloadBody::StakeDelegation(delegation_payload) => {
                 match delegation_payload.t {
                     mina_rs::StakeDelegation::SetDelegate {
-                        delegator,
+                        ref delegator,
                         new_delegate: _,
-                    } => delegator.into(),
+                    } => delegator.to_owned().into(),
                 }
             }
         }
@@ -158,12 +162,12 @@ impl SignedCommand {
         Nonce(self.payload_common().nonce.t.t as u32)
     }
 
-    pub fn payload_body(&self) -> mina_rs::SignedCommandPayloadBody {
-        self.payload().body.clone().inner().inner()
+    pub fn payload_body(&self) -> &mina_rs::SignedCommandPayloadBody {
+        &self.payload().body.t.t
     }
 
-    pub fn payload_common(&self) -> mina_rs::SignedCommandPayloadCommon {
-        self.payload().common.clone().inner().inner().inner()
+    pub fn payload_common(&self) -> &mina_rs::SignedCommandPayloadCommon {
+        &self.payload().common.t.t.t
     }
 
     /// This returns a user command (transaction) hash that starts with
@@ -173,7 +177,7 @@ impl SignedCommand {
         bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
 
         let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
-            .with_check_version(0x13)
+            .with_check_version(USER_COMMAND)
             .into_string();
         let mut hasher = blake2::Blake2bVar::new(32).unwrap();
         hasher.write_all(binprot_bytes_bs58.as_bytes()).unwrap();
@@ -287,11 +291,11 @@ impl From<SignedCommandWithCreationData> for Command {
                     receiver_pk,
                     amount,
                     ..
-                } = payment_payload_v1.inner().inner();
+                } = &payment_payload_v1.t.t;
                 Command::Payment(Payment {
-                    source: source_pk.into(),
-                    receiver: receiver_pk.into(),
-                    amount: amount.inner().inner().into(),
+                    source: source_pk.to_owned().into(),
+                    receiver: receiver_pk.to_owned().into(),
+                    amount: amount.t.t.into(),
                     nonce: signed.source_nonce(),
                     is_new_receiver_account: value.is_new_receiver_account,
                 })
@@ -300,7 +304,7 @@ impl From<SignedCommandWithCreationData> for Command {
                 let mina_rs::StakeDelegation::SetDelegate {
                     delegator,
                     new_delegate,
-                } = stake_delegation_v1.inner();
+                } = stake_delegation_v1.t.to_owned();
                 Command::Delegation(Delegation {
                     delegate: new_delegate.into(),
                     delegator: delegator.into(),
@@ -347,13 +351,10 @@ impl From<SignedCommand> for serde_json::Value {
         use serde_json::*;
 
         let mut object = Map::new();
-        let payload = payload_json(value.0.clone());
-        let signer = signer(value.0.clone());
-        let signature = signature(value.0);
+        object.insert("payload".into(), payload_json(&value.0));
+        object.insert("signer".into(), signer(&value.0));
+        object.insert("signature".into(), signature(&value.0));
 
-        object.insert("payload".into(), payload);
-        object.insert("signer".into(), signer);
-        object.insert("signature".into(), signature);
         Value::Object(object)
     }
 }
@@ -395,6 +396,7 @@ impl From<SignedCommandWithData> for serde_json::Value {
         obj.insert("status".into(), status);
         obj.insert("state_hash".into(), state_hash);
         obj.insert("blockchain_length".into(), blockchain_length);
+
         Value::Object(obj)
     }
 }
@@ -447,23 +449,21 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
     }
 }
 
-fn signer(value: mina_rs::SignedCommandV1) -> serde_json::Value {
-    use serde_json::*;
-    let pk: PublicKey = value.inner().inner().signer.0.inner().into();
-    Value::String(pk.0)
+fn signer(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
+    let pk: PublicKey = value.t.t.signer.0.t.to_owned().into();
+    serde_json::Value::String(pk.0)
 }
 
-fn signature(_value: mina_rs::SignedCommandV1) -> serde_json::Value {
-    use serde_json::*;
-
-    Value::String("signature".into())
+fn signature(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
+    let sig: Signature = value.t.t.signature.to_owned().into();
+    serde_json::Value::String(sig.to_string())
 }
 
-fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
+fn payload_json(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
     use serde_json::*;
 
     let mut payload_obj = Map::new();
-    let mina_rs::SignedCommand { payload, .. } = value.inner().inner();
+    let mina_rs::SignedCommand { payload, .. } = &value.t.t;
 
     let mut common = Map::new();
     let mina_rs::SignedCommandPayloadCommon {
@@ -473,33 +473,24 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
         nonce,
         valid_until,
         memo,
-    } = payload.t.t.common.t.t.t.clone();
-    common.insert(
-        "fee".into(),
-        Value::Number(Number::from(fee.inner().inner())),
-    );
+    } = &payload.t.t.common.t.t.t;
+    common.insert("fee".into(), Value::Number(Number::from(fee.t.t)));
     common.insert(
         "fee_token".into(),
-        Value::Number(Number::from(fee_token.inner().inner().inner())),
+        Value::Number(Number::from(fee_token.t.t.t)),
     );
     common.insert(
         "fee_payer_pk".into(),
-        Value::String(PublicKey::from(fee_payer_pk).to_address()),
+        Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_address()),
     );
-    common.insert(
-        "nonce".into(),
-        Value::Number(Number::from(nonce.inner().inner())),
-    );
+    common.insert("nonce".into(), Value::Number(Number::from(nonce.t.t)));
     common.insert(
         "valid_until".into(),
-        Value::Number(Number::from(valid_until.inner().inner() as u32)),
+        Value::Number(Number::from(valid_until.t.t as u32)),
     );
-    common.insert(
-        "memo".into(),
-        Value::String(String::from_utf8_lossy(&memo.inner().0).to_string()),
-    );
+    common.insert("memo".into(), Value::String(decode_memo(&memo.t.0)));
 
-    let body = match payload.inner().inner().body.inner().inner() {
+    let body = match &payload.t.t.body.t.t {
         mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
             let mut body_obj = Map::new();
             let mina_rs::PaymentPayload {
@@ -507,24 +498,21 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
                 receiver_pk,
                 token_id,
                 amount,
-            } = payment_payload.inner().inner();
+            } = &payment_payload.t.t;
 
             body_obj.insert(
                 "source_pk".into(),
-                Value::String(PublicKey::from(source_pk).to_address()),
+                Value::String(PublicKey::from(source_pk.to_owned()).to_address()),
             );
             body_obj.insert(
                 "receiver_pk".into(),
-                Value::String(PublicKey::from(receiver_pk).to_address()),
+                Value::String(PublicKey::from(receiver_pk.to_owned()).to_address()),
             );
             body_obj.insert(
                 "token_id".into(),
-                Value::Number(Number::from(token_id.inner().inner().inner())),
+                Value::Number(Number::from(token_id.t.t.t)),
             );
-            body_obj.insert(
-                "amount".into(),
-                Value::Number(Number::from(amount.inner().inner())),
-            );
+            body_obj.insert("amount".into(), Value::Number(Number::from(amount.t.t)));
             body_obj.insert("kind".into(), Value::String("Payment".into()));
             Value::Object(body_obj)
         }
@@ -533,7 +521,7 @@ fn payload_json(value: mina_rs::SignedCommandV1) -> serde_json::Value {
             let mina_rs::StakeDelegation::SetDelegate {
                 delegator,
                 new_delegate,
-            } = stake_delegation.inner();
+            } = stake_delegation.t.to_owned();
 
             body_obj.insert(
                 "delegator".into(),
@@ -567,6 +555,7 @@ impl std::fmt::Display for TxnHash {
 
 #[cfg(test)]
 mod tests {
+    use super::SignedCommand;
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::signed::TxnHash,
@@ -574,7 +563,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn transaction_hash() {
+    fn transaction_hash() -> anyhow::Result<()> {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
@@ -588,5 +577,63 @@ mod tests {
         ];
 
         assert_eq!(hashes, expect);
+        Ok(())
+    }
+
+    #[test]
+    fn signed_command_json() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
+        let signed_commands = precomputed_block
+            .commands()
+            .into_iter()
+            .map(|c| format!("{:?}", SignedCommand::from(c)))
+            .collect::<Vec<_>>();
+
+        let expect0 = r#"{
+  "payload": {
+    "body": {
+      "amount": 60068000,
+      "kind": "Payment",
+      "receiver_pk": "B62qmbBg93wtMp1yN42nN7SuunWWNpVbBwiusvhqbxJ2yt5QonEKzVY",
+      "source_pk": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
+      "token_id": 1
+    },
+    "common": {
+      "fee": 10000000,
+      "fee_payer_pk": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP",
+      "fee_token": 1,
+      "memo": "FPayment",
+      "nonce": 7295,
+      "valid_until": 4294967295
+    }
+  },
+  "signature": "27688b6b9c23dda2681fe1f09e813110f1600462e13da63515519967db316a433be34e62db7b7fd71c7c6f72b32e33f02c1d985a35d9bbfeca9387993e2006df",
+  "signer": "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"
+}"#;
+        let expect1 = r#"{
+  "payload": {
+    "body": {
+      "amount": 1000,
+      "kind": "Payment",
+      "receiver_pk": "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
+      "source_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+      "token_id": 1
+    },
+    "common": {
+      "fee": 1000000,
+      "fee_payer_pk": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
+      "fee_token": 1,
+      "memo": "",
+      "nonce": 146491,
+      "valid_until": 4294967295
+    }
+  },
+  "signature": "313aeadfa061ef68c3fdffe79e8c5dfd6e5167bd2ea9a240be8d04e29331468e23cf18712887c903844e4c1a827a77dccdbabd59e1698b3a0b33d76f8ae3861c",
+  "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+}"#;
+
+        assert_eq!(signed_commands, vec![expect0, expect1]);
+        Ok(())
     }
 }

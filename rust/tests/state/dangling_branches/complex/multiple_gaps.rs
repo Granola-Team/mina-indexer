@@ -72,11 +72,11 @@ async fn extension() -> anyhow::Result<()> {
         IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
 
     // other in dangling branch 0
-    let (extension_type, _) = state.add_block_to_witness_tree(&other_block, true)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&other_block, true, true)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // leaf in dangling branch 1
-    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block, true)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&leaf_block, true, true)?;
     assert_eq!(extension_type, ExtensionType::DanglingNew);
 
     // 2 dangling branches
@@ -100,7 +100,7 @@ async fn extension() -> anyhow::Result<()> {
     // ----------------
 
     // merges branch 2 into 0
-    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block, true)?;
+    let (extension_type, _) = state.add_block_to_witness_tree(&middle_block, true, true)?;
     assert!(matches!(extension_type, ExtensionType::RootComplex(_)));
 
     for (idx, branch) in state.dangling_branches.iter().enumerate() {

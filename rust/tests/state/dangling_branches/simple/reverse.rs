@@ -64,7 +64,7 @@ async fn extension() {
 
     // old_dangling_root_block is originally the root of the 0th dangling branch
     let (extension_type, _) = state
-        .add_block_to_witness_tree(&old_dangling_root_block, true)
+        .add_block_to_witness_tree(&old_dangling_root_block, true, true)
         .unwrap();
 
     assert_eq!(extension_type, ExtensionType::DanglingNew);
@@ -96,7 +96,7 @@ async fn extension() {
 
     // extend the branch with new_dangling_root_block (the parent)
     let (extension_type, _) = state
-        .add_block_to_witness_tree(&new_dangling_root_block, true)
+        .add_block_to_witness_tree(&new_dangling_root_block, true, true)
         .unwrap();
 
     println!("=== After state ===");

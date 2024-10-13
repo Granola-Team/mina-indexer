@@ -150,7 +150,7 @@ impl GenesisLedger {
         let mut accounts = HashMap::new();
 
         // Add genesis block winner
-        let block_creator = Account::from(GenesisBlock::new().unwrap());
+        let block_creator = Account::from(GenesisBlock::new_v1().unwrap());
         let pk = block_creator.public_key.clone();
         accounts.insert(pk, block_creator);
 

@@ -151,8 +151,8 @@ impl PrecomputedBlock {
                     scheduled_time,
                     blockchain_length,
                     network: block_file_contents.network,
-                    protocol_state: protocol_state.to_owned().into(),
-                    staged_ledger_diff: staged_ledger_diff.to_owned().into(),
+                    protocol_state: protocol_state.into(),
+                    staged_ledger_diff: staged_ledger_diff.into(),
                 })))
             }
             PcbVersion::V2 => {
@@ -170,8 +170,8 @@ impl PrecomputedBlock {
                     scheduled_time,
                     blockchain_length,
                     network: block_file_contents.network,
-                    protocol_state: protocol_state.to_owned(),
-                    staged_ledger_diff: staged_ledger_diff.to_owned(),
+                    protocol_state,
+                    staged_ledger_diff,
                 }))
             }
         }
@@ -223,13 +223,13 @@ impl PrecomputedBlock {
             Self::V1(v1) => v1
                 .staged_ledger_diff
                 .diff
-                .clone()
-                .inner()
+                .t
                 .0
-                .inner()
-                .inner()
+                .t
+                .t
                 .commands
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(UserCommandWithStatus)
                 .collect(),
             Self::V2(_) => todo!("commands_pre_diff {}", self.summary()),
@@ -241,14 +241,15 @@ impl PrecomputedBlock {
             Self::V1(v1) => v1
                 .staged_ledger_diff
                 .diff
-                .clone()
-                .inner()
+                .t
                 .1
+                .as_ref()
                 .map_or(vec![], |diff| {
-                    diff.inner()
-                        .inner()
+                    diff.t
+                        .t
                         .commands
-                        .into_iter()
+                        .iter()
+                        .cloned()
                         .map(UserCommandWithStatus)
                         .collect()
                 }),
@@ -260,7 +261,7 @@ impl PrecomputedBlock {
         self.commands()
             .into_iter()
             .map(|cmd| {
-                let signed: SignedCommand = cmd.clone().into();
+                let signed: SignedCommand = cmd.into();
                 signed.fee()
             })
             .sum()
@@ -297,16 +298,14 @@ impl PrecomputedBlock {
         // from user commands
         self.commands().iter().for_each(|cmd| {
             let status = cmd.status_data();
-            let signed: SignedCommand = cmd.clone().into();
-
             if status.fee_payer_account_creation_fee_paid().is_some() {
                 account_balances.insert(
-                    signed.fee_payer_pk(),
+                    cmd.fee_payer_pk(),
                     status.fee_payer_balance().unwrap_or_default(),
                 );
             } else if status.receiver_account_creation_fee_paid().is_some() {
                 account_balances.insert(
-                    signed.receiver_pk(),
+                    cmd.receiver(),
                     status.receiver_balance().unwrap_or_default(),
                 );
             }
@@ -462,16 +461,16 @@ impl PrecomputedBlock {
     pub fn staged_ledger_diff_tuple(&self) -> mina_rs::StagedLedgerDiffTuple {
         match self {
             Self::V1(v1) => v1.staged_ledger_diff.diff.t.to_owned(),
-            Self::V2(_v2) => todo!("V2 staged_ledger_diff_tuple {}", self.summary()),
+            Self::V2(_v2) => todo!("PrecomputedBlock::V2 staged_ledger_diff_tuple()"),
         }
     }
 
     pub fn staged_ledger_pre_diff(&self) -> mina_rs::StagedLedgerPreDiff {
-        self.staged_ledger_diff_tuple().0.inner().inner()
+        self.staged_ledger_diff_tuple().0.t.t
     }
 
     pub fn staged_ledger_post_diff(&self) -> Option<mina_rs::StagedLedgerPreDiff> {
-        self.staged_ledger_diff_tuple().1.map(|x| x.inner().inner())
+        self.staged_ledger_diff_tuple().1.map(|x| x.t.t)
     }
 
     pub fn completed_works(&self) -> Vec<mina_snark::TransactionSnarkWork> {
@@ -496,7 +495,7 @@ impl PrecomputedBlock {
     pub fn coinbase_receiver_balance(&self) -> Option<u64> {
         for internal_balance in self.internal_command_balances() {
             if let mina_rs::InternalCommandBalanceData::CoinBase(x) = internal_balance {
-                return Some(x.inner().coinbase_receiver_balance.inner().inner().inner());
+                return Some(x.t.coinbase_receiver_balance.t.t.t);
             }
         }
 
@@ -569,9 +568,9 @@ impl PrecomputedBlock {
         // add keys from all commands
         let commands = self.commands();
         commands.iter().for_each(|command| {
-            let signed_command = match command.clone().data() {
+            let signed_command = match command.data() {
                 mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    SignedCommand(signed_command)
+                    SignedCommand(signed_command.to_owned())
                 }
             };
             add_keys(&mut pk_set, signed_command.all_command_public_keys());
@@ -614,9 +613,9 @@ impl PrecomputedBlock {
             .iter()
             .filter(|cmd| cmd.is_applied())
             .for_each(|command| {
-                let signed_command = match command.clone().data() {
+                let signed_command = match command.data() {
                     mina_rs::UserCommand::SignedCommand(signed_command) => {
-                        SignedCommand(signed_command)
+                        SignedCommand(signed_command.to_owned())
                     }
                 };
                 add_keys(&mut public_keys, signed_command.all_command_public_keys());
@@ -1078,7 +1077,11 @@ impl PrecomputedBlock {
     pub fn command_hashes(&self) -> Vec<TxnHash> {
         SignedCommand::from_precomputed(self)
             .iter()
-            .filter_map(|cmd| cmd.signed_command.hash_signed_command().ok())
+            .map(|cmd| {
+                cmd.signed_command
+                    .hash_signed_command()
+                    .expect("signed command hash")
+            })
             .collect()
     }
 

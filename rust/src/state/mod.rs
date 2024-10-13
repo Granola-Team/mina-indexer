@@ -249,7 +249,7 @@ impl IndexerState {
             .indexer_store
             .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
-        let genesis_block = GenesisBlock::new()?;
+        let genesis_block = GenesisBlock::new_v1()?;
         let genesis_bytes = genesis_block.1;
         let genesis_block = genesis_block.0;
 
@@ -579,7 +579,7 @@ impl IndexerState {
         if let Some(db_event) = self.add_block_to_store(block, block_bytes, false)? {
             self.bytes_processed += block_bytes;
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
-                if let Some(wt_event) = self.add_block_to_witness_tree(block, true)?.1 {
+                if let Some(wt_event) = self.add_block_to_witness_tree(block, true, true)?.1 {
                     match wt_event {
                         WitnessTreeEvent::UpdateBestTip {
                             best_tip,
@@ -614,7 +614,8 @@ impl IndexerState {
     pub fn add_block_to_witness_tree(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-        incremnet_blocks: bool,
+        increment_blocks: bool,
+        insert_diff: bool,
     ) -> anyhow::Result<(ExtensionType, Option<WitnessTreeEvent>)> {
         let incoming_length = precomputed_block.blockchain_length();
         if self.root_branch.root_block().blockchain_length > incoming_length {
@@ -626,11 +627,14 @@ impl IndexerState {
         }
 
         // put the pcb's ledger diff in the map
-        self.diffs_map.insert(
-            precomputed_block.state_hash(),
-            LedgerDiff::from_precomputed(precomputed_block),
-        );
-        if incremnet_blocks {
+        if insert_diff {
+            self.diffs_map.insert(
+                precomputed_block.state_hash(),
+                LedgerDiff::from_precomputed(precomputed_block),
+            );
+        }
+
+        if increment_blocks {
             self.blocks_processed += 1;
         }
 
@@ -681,7 +685,7 @@ impl IndexerState {
             trace!("Root extension block {}", precomputed_block.summary());
             // check if new block connects to a dangling branch
             let mut merged_tip_ids = vec![];
-            let mut branches_to_remove = Vec::new();
+            let mut branches_to_remove = vec![];
 
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 // new block is the parent of the dangling branch root
@@ -695,10 +699,11 @@ impl IndexerState {
                 }
             }
 
+            // check if the best chain is extended
             let best_tip_id = merged_tip_ids.iter().min_by(|a, b| {
-                let a_best_block = self.root_branch.branches.get(a).unwrap().data().clone();
-                let b_best_block = self.root_branch.branches.get(b).unwrap().data().clone();
-                a_best_block.cmp(&b_best_block)
+                let a_best_block = self.root_branch.branches.get(a).unwrap().data();
+                let b_best_block = self.root_branch.branches.get(b).unwrap().data();
+                a_best_block.cmp(b_best_block)
             });
             if let Some(merged_tip_id) = best_tip_id {
                 let merged_tip_block = self
@@ -717,18 +722,18 @@ impl IndexerState {
                 for (num_removed, index_to_remove) in branches_to_remove.iter().enumerate() {
                     self.dangling_branches.remove(index_to_remove - num_removed);
                 }
-                Ok(Some(ExtensionType::RootComplex(
+                return Ok(Some(ExtensionType::RootComplex(
                     self.best_tip_block().clone(),
-                )))
+                )));
             } else {
                 // there aren't any branches that are connected
-                Ok(Some(ExtensionType::RootSimple(
+                return Ok(Some(ExtensionType::RootSimple(
                     self.best_tip_block().clone(),
-                )))
+                )));
             }
-        } else {
-            Ok(None)
         }
+
+        Ok(None)
     }
 
     /// Extends an existing dangling branch either forwards or backwards
@@ -768,7 +773,6 @@ impl IndexerState {
                 }
             }
         }
-
         Ok(extension)
     }
 
@@ -999,14 +1003,14 @@ impl IndexerState {
         let (epoch, hash) = extract_epoch_hash(path);
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
             let staking_ledger =
-                StakingLedger::parse_file(path, MAINNET_GENESIS_HASH.into()).await?;
+                StakingLedger::parse_file(path, genesis_state_hash.clone()).await?;
             let summary = staking_ledger.summary();
             let mut staking_ledgers = staking_ledgers.lock().unwrap();
+
             staking_ledgers.insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
             store.add_staking_ledger(staking_ledger, genesis_state_hash)?;
             info!("Added staking ledger {summary}");
         }
-
         Ok(())
     }
 
@@ -1141,7 +1145,9 @@ impl IndexerState {
                     {
                         let (genesis_state_hash, epoch, ledger_hash) =
                             split_staking_ledger_epoch_key(&key)?;
-                        if genesis_state_hash.0 == MAINNET_GENESIS_HASH {
+                        if genesis_state_hash.0 == MAINNET_GENESIS_HASH
+                            || genesis_state_hash.0 == HARDFORK_GENSIS_HASH
+                        {
                             staking_ledgers.insert(epoch, ledger_hash);
                         } else {
                             error!("Unrecognized genesis state hash");
@@ -1185,7 +1191,7 @@ impl IndexerState {
         self.staking_ledgers = Arc::new(Mutex::new(staking_ledgers));
         for block in witness_tree_blocks {
             debug!("Sync: add block {}", block.summary());
-            self.add_block_to_witness_tree(&block, false)?;
+            self.add_block_to_witness_tree(&block, false, true)?;
         }
         Ok(min_length_filter)
     }
@@ -1256,7 +1262,7 @@ impl IndexerState {
                                 indexer_store.get_block_height(state_hash)?,
                                 Some(*blockchain_length),
                             );
-                            self.add_block_to_witness_tree(&block, true)?;
+                            self.add_block_to_witness_tree(&block, true, true)?;
                             return Ok(());
                         }
                         panic!("Fatal: block missing from store {block_summary}")

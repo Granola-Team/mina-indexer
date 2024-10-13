@@ -32,7 +32,7 @@ fn block_added() -> anyhow::Result<()> {
             .get_block(&MAINNET_GENESIS_HASH.into())
             .unwrap()
             .map(|b| b.0),
-        Some(GenesisBlock::new().unwrap().to_precomputed())
+        Some(GenesisBlock::new_v1().unwrap().to_precomputed())
     );
     Ok(())
 }

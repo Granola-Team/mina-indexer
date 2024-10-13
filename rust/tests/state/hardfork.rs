@@ -1,44 +1,64 @@
-use mina_indexer::block::{
-    parser::BlockParser,
-    precomputed::{PcbVersion, PrecomputedBlock},
+use mina_indexer::{
+    block::{
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+    },
+    state::IndexerState,
 };
 use std::path::PathBuf;
 
-/// Ingests v1 & v2 blocks
-/// checks the block parser version before & after each
+/// Witness tree ingests:
+/// - the final pre-hardfork v1 block,
+/// - hardfork genesis block,
+/// - post-hardfork v1 & v2 blocks
 #[tokio::test]
 async fn hardfork() -> anyhow::Result<()> {
-    let blocks_dir = PathBuf::from("./tests/data/post_hardfork");
-    let mut block_parser = BlockParser::new_testing(&blocks_dir).unwrap();
+    let blocks_dir = PathBuf::from("./tests/data/hardfork");
+    let mut block_parser =
+        BlockParser::new_length_sorted_filtered(&blocks_dir, PcbVersion::default(), None, None)?;
 
-    let v1_blocks = [
-        "3NKTG8sg2vKQSUfe2D7nTxe1t4TDzRVubSxp4SUyHUWyXEpUVwqo".to_string(), /* mainnet-359605-3NKTG8sg2vKQSUfe2D7nTxe1t4TDzRVubSxp4SUyHUWyXEpUVwqo */
-        "3NLw1pazmm1SWCqLLzbnwnBAKCzWR1KPVodKeXfbbp29fbJF5iio".to_string(), /* mainnet-359606-3NLw1pazmm1SWCqLLzbnwnBAKCzWR1KPVodKeXfbbp29fbJF5iio */
-    ];
-    let v2_blocks = [
-        "3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot".to_string(), /* mainnet-359606-3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot */
-        "3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg".to_string(), /* mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg */
-        "3NKXo8ugDzgiJBc3zZTejrdJSoNXRCxM9kAEXzzxeCGzJRMX3NkP".to_string(), /* mainnet-359607-3NKXo8ugDzgiJBc3zZTejrdJSoNXRCxM9kAEXzzxeCGzJRMX3NkP */
-    ];
+    // final pre-harfork v1 block
+    let (root_block, root_block_bytes) = block_parser.next_block().await?.unwrap();
+    let root_block: PrecomputedBlock = root_block.into();
+    assert_eq!(
+        root_block.state_hash().0,
+        "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15"
+    );
 
-    // start with default PCB version
-    assert_eq!(block_parser.version, PcbVersion::default());
+    // root the witness tree at the final pre-harfork v1 block
+    let mut state =
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
 
+    // ingest the remaining blocks
     while let Some((block, _)) = block_parser.next_block().await? {
-        let pcb: PrecomputedBlock = block.into();
-
-        // after consuming a v1 block
-        if v1_blocks.contains(&pcb.state_hash().0) {
-            assert_eq!(block_parser.version, PcbVersion::V1);
-        }
-
-        // after consuming a v2 block
-        if v2_blocks.contains(&pcb.state_hash().0) {
-            assert_eq!(block_parser.version, PcbVersion::V2);
-        }
+        state.add_block_to_witness_tree(&block.into(), true, false)?;
     }
 
-    // final consumed block is v2
-    assert_eq!(block_parser.version, PcbVersion::V2);
+    // root branch
+    println!("=== Root Branch ===");
+    println!("{}", state.root_branch);
+
+    assert_eq!(state.root_branch.len(), 7);
+    assert_eq!(state.root_branch.height(), 4);
+    assert_eq!(state.root_branch.leaves().len(), 3);
+
+    // dangling branches
+    assert_eq!(state.dangling_branches.len(), 0);
+
+    let best_chain = state
+        .best_chain()
+        .into_iter()
+        .map(|b| b.state_hash.0)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        best_chain,
+        vec![
+            "3NKXo8ugDzgiJBc3zZTejrdJSoNXRCxM9kAEXzzxeCGzJRMX3NkP",
+            "3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot",
+            "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP",
+            "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15"
+        ]
+    );
+
     Ok(())
 }
