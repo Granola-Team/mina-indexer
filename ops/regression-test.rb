@@ -1,4 +1,4 @@
-#! /usr/bin/env -S ruby -w
+#!/usr/bin/env -S ruby -w
 
 # -*- mode: ruby -*-
 

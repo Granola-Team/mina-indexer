@@ -1,4 +1,6 @@
-#! /usr/bin/env -S ruby -w
+#!/usr/bin/env -S ruby -w
+
+# -*- mode: ruby -*-
 
 START_BLOCK = ARGV[0]
 END_BLOCK = ARGV[1]

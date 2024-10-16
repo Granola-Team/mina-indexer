@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Use this script to generate ledgers from the AN. This is useful for
 # us to compare ledgers with the indexer.

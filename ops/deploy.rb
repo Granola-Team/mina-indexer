@@ -1,4 +1,6 @@
-#! /usr/bin/env -S ruby -w
+#!/usr/bin/env -S ruby -w
+
+# -*- mode: ruby -*-
 
 DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
 BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'

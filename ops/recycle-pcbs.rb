@@ -1,4 +1,6 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S ruby -w
+
+# -*- mode: ruby -*-
 
 require "fileutils"
 

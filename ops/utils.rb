@@ -1,4 +1,6 @@
-#! /usr/bin/env -S ruby -w
+#!/usr/bin/env -S ruby -w
+
+# -*- mode: ruby -*-
 
 # show mina-indexer PID(s)
 if ARGV == ["pids", "show"]
