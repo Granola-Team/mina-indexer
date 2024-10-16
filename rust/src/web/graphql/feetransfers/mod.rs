@@ -13,7 +13,7 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::store::SnarkStore,
     store::IndexerStore,
-    utility::store::U32_LEN,
+    utility::store::{from_be_bytes, U32_LEN},
     web::graphql::db,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -236,9 +236,15 @@ impl FeetransferQueryRoot {
 
                 // avoid deserializing internal command & PCB if possible
                 let canonical = get_block_canonicity(db, &state_hash);
-                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-                    if canonical != query_canonicity {
-                        continue;
+                if let Some(q) = query.as_ref() {
+                    if let Some(query_canonicity) = q.canonical {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
+                    if block_out_of_bounds(from_be_bytes(key[..U32_LEN].to_vec()), q) {
+                        break;
                     }
                 }
 
@@ -253,13 +259,7 @@ impl FeetransferQueryRoot {
                     feetransfer: ft,
                     block: Some(get_block(db, &state_hash)),
                 };
-                if let Some(q) = query.as_ref() {
-                    if let Some(ref block) = feetransfer_with_meta.block {
-                        if block_out_of_bounds(block.blockchain_length(), q) {
-                            break;
-                        }
-                    }
-                }
+
                 if query
                     .as_ref()
                     .map_or(true, |q| q.matches(&feetransfer_with_meta))
@@ -296,9 +296,18 @@ impl FeetransferQueryRoot {
                 let state_hash =
                     BlockHash::from_bytes(&key[PublicKey::LEN..][U32_LEN..][..BlockHash::LEN])?;
                 let canonical = get_block_canonicity(db, &state_hash);
-                if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-                    if canonical != query_canonicity {
-                        continue;
+                if let Some(q) = query.as_ref() {
+                    if let Some(query_canonicity) = q.canonical {
+                        if canonical != query_canonicity {
+                            continue;
+                        }
+                    }
+
+                    if block_out_of_bounds(
+                        from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec()),
+                        q,
+                    ) {
+                        break;
                     }
                 }
 
@@ -313,13 +322,7 @@ impl FeetransferQueryRoot {
                         total_num_internal_commands,
                     )),
                 };
-                if let Some(q) = query.as_ref() {
-                    if let Some(ref block) = ft.block {
-                        if block_out_of_bounds(block.blockchain_length(), q) {
-                            break;
-                        }
-                    }
-                }
+
                 if query.as_ref().map_or(true, |q| q.matches(&ft)) {
                     fee_transfers.push(ft);
                 }
@@ -360,9 +363,15 @@ fn get_default_fee_transfers(
     for (key, value) in db.internal_commands_block_height_iterator(mode).flatten() {
         let state_hash = BlockHash::from_bytes(&key[U32_LEN..][..BlockHash::LEN])?;
         let canonical = get_block_canonicity(db, &state_hash);
-        if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-            if canonical != query_canonicity {
-                continue;
+        if let Some(q) = query.as_ref() {
+            if let Some(query_canonicity) = q.canonical {
+                if canonical != query_canonicity {
+                    continue;
+                }
+            }
+
+            if block_out_of_bounds(from_be_bytes(key[..U32_LEN].to_vec()), q) {
+                break;
             }
         }
 
@@ -377,14 +386,6 @@ fn get_default_fee_transfers(
             feetransfer: ft,
             block: Some(pcb),
         };
-
-        if let Some(q) = query.as_ref() {
-            if let Some(ref block) = feetransfer_with_meta.block {
-                if block_out_of_bounds(block.blockchain_length(), q) {
-                    break;
-                }
-            }
-        }
 
         if query
             .as_ref()
