@@ -57,6 +57,7 @@ tier1-prereqs:
   cd rust && cargo clippy --version
   cd rust && cargo machete --help 2>&1 >/dev/null
   shellcheck --version
+  shfmt --version
 
 # Check for presence of tier 2 dependencies.
 tier2-prereqs: tier1-prereqs
@@ -85,6 +86,7 @@ lint:
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
   standardrb --fix ops/*.rb
+  shfmt --write ops/*.sh
   alejandra flake.nix
 
 # Perform a fast verification of whether the source compiles.
