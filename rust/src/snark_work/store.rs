@@ -289,4 +289,22 @@ pub trait SnarkStore {
 
     /// Increment snarks counts given `snark` in `epoch`
     fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> anyhow::Result<()>;
+
+    /// Get count of canonical snark work
+    fn get_snarks_total_canonical_count(&self) -> anyhow::Result<u32>;
+
+    /// Get count of non-canonical snark work
+    fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment the count of canonical snark work
+    fn increment_snarks_total_canonical_count(&self) -> anyhow::Result<()>;
+
+    /// Increment the count of non-canonical snark work
+    fn increment_snarks_total_non_canonical_count(&self) -> anyhow::Result<()>;
+
+    /// Increment the count of canonical snark work
+    fn decrement_snarks_total_canonical_count(&self) -> anyhow::Result<()>;
+
+    /// Increment the count of non-canonical snark work
+    fn decrement_snarks_total_non_canonical_count(&self) -> anyhow::Result<()>;
 }

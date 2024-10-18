@@ -953,6 +953,74 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
+    fn get_snarks_total_canonical_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total canonical SNARKs count");
+        Ok(self
+            .database
+            .get_pinned(Self::TOTAL_NUM_CANONICAL_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total canonical SNARK count")
+            }))
+    }
+
+    fn increment_snarks_total_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Incrementing total canonical SNARKs count");
+        let old = self
+            .get_snarks_total_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_SNARKS_KEY,
+            (old + 1).to_be_bytes(),
+        )?)
+    }
+
+    fn decrement_snarks_total_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Incrementing total canonical SNARKs count");
+        let old = self
+            .get_snarks_total_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_SNARKS_KEY,
+            (old.saturating_sub(1)).to_be_bytes(),
+        )?)
+    }
+
+    fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total non-canonical SNARKs count");
+        Ok(self
+            .database
+            .get_pinned(Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total non-canonical SNARK count")
+            }))
+    }
+
+    fn increment_snarks_total_non_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Incrementing total non-canonical SNARKs count");
+        let old = self
+            .get_snarks_total_non_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
+            (old + 1).to_be_bytes(),
+        )?)
+    }
+
+    fn decrement_snarks_total_non_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Decrementing total non-canonical SNARKs count");
+        let old = self
+            .get_snarks_total_non_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
+            (old.saturating_sub(1)).to_be_bytes(),
+        )?)
+    }
+
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing total SNARKs count");
         let old = self.get_snarks_total_count()?;
@@ -1041,4 +1109,63 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
         Direction::Reverse => start.copy_from_slice(rstart.as_slice()),
     }
     start
+}
+
+#[cfg(test)]
+mod snark_store_impl_tests {
+    use super::*;
+    use crate::store::IndexerStore;
+    use anyhow::Result;
+    use std::env;
+    use tempfile::TempDir;
+
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn test_incr_dec_snarks_total_non_canonical_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        indexer.increment_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
+
+        indexer.increment_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_snarks_total_canonical_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        indexer.increment_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+
+        indexer.increment_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+
+        Ok(())
+    }
 }
