@@ -515,9 +515,9 @@ impl PrecomputedBlock {
         res
     }
 
-    pub fn coinbase_receiver(&self) -> PublicKey {
-        match self {
-            Self::V1(v1) => v1
+    /////////////////
+    // Public keys //
+    /////////////////
                 .protocol_state
                 .body
                 .t
@@ -568,12 +568,9 @@ impl PrecomputedBlock {
         // add keys from all commands
         let commands = self.commands();
         commands.iter().for_each(|command| {
-            let signed_command = match command.data() {
-                mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    SignedCommand(signed_command.to_owned())
-                }
-            };
-            add_keys(&mut pk_set, signed_command.all_command_public_keys());
+            let mut pks = vec![command.sender(), command.fee_payer_pk(), command.signer()];
+            pks.append(&mut command.receiver());
+            add_keys(&mut pk_set, pks);
         });
 
         let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
@@ -588,7 +585,7 @@ impl PrecomputedBlock {
         // add prover keys from completed SNARK work
         let completed_works = self.completed_works();
         completed_works.iter().for_each(|work| {
-            pk_set.insert(work.prover.clone().into());
+            pk_set.insert(work.prover.to_owned());
         });
 
         let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
@@ -613,12 +610,9 @@ impl PrecomputedBlock {
             .iter()
             .filter(|cmd| cmd.is_applied())
             .for_each(|command| {
-                let signed_command = match command.data() {
-                    mina_rs::UserCommand::SignedCommand(signed_command) => {
-                        SignedCommand(signed_command.to_owned())
-                    }
-                };
-                add_keys(&mut public_keys, signed_command.all_command_public_keys());
+                let mut pks = vec![command.sender(), command.fee_payer_pk(), command.signer()];
+                pks.append(&mut command.receiver());
+                add_keys(&mut public_keys, pks);
             });
 
         let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();
