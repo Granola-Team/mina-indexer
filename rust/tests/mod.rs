@@ -7,6 +7,7 @@ mod ledger;
 mod protocol;
 mod snark_work;
 mod state;
+mod store;
 mod usernames;
 
 pub mod helpers {
