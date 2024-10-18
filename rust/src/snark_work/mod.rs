@@ -150,9 +150,8 @@ impl std::fmt::Debug for SnarkWorkSummaryWithStateHash {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::block::precomputed::PcbVersion;
+    use crate::{block::precomputed::PcbVersion, constants::MINA_SCALE_DEC};
     use rust_decimal::{prelude::ToPrimitive, Decimal};
-    use rust_decimal_macros::dec;
     use serde_json::*;
     use std::path::PathBuf;
 
@@ -162,7 +161,7 @@ mod test {
             match value {
                 Value::String(s) => {
                     if let Ok(num) = s.parse::<Decimal>() {
-                        Value::Number(Number::from((num * dec!(1_000_000_000)).to_u64().unwrap()))
+                        Value::Number(Number::from((num * MINA_SCALE_DEC).to_u64().unwrap()))
                     } else {
                         Value::String(s)
                     }

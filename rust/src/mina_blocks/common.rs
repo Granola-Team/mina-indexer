@@ -1,3 +1,4 @@
+use crate::constants::MINA_SCALE_DEC;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
@@ -39,7 +40,7 @@ where
     D: Deserializer<'de>,
 {
     match String::deserialize(de)?.parse::<Decimal>() {
-        Ok(res) => Ok(res.to_u64().unwrap()),
+        Ok(res) => Ok((res * MINA_SCALE_DEC).to_u64().unwrap()),
         Err(e) => Err(serde::de::Error::custom(e)),
     }
 }
