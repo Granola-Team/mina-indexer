@@ -31,8 +31,8 @@ pub fn split_staking_ledger_sort_key(key: &[u8]) -> anyhow::Result<(u32, u64, Pu
 /// ```
 /// {epoch}{amount}{pk}
 /// where
-/// - epoch:  u32 BE bytes
-/// - amount: u64 BE bytes
+/// - epoch:  [u32] BE bytes
+/// - amount: [u64] BE bytes
 /// - pk:     [PublicKey::LEN] bytes
 pub fn staking_ledger_sort_key(
     epoch: u32,
@@ -51,7 +51,7 @@ pub fn staking_ledger_sort_key(
 /// {genesis_hash}{epoch}{ledger_hash}{pk}
 /// where
 /// - genesis_hash: [BlockHash::LEN] bytes
-/// - epoch:        u32 BE bytes
+/// - epoch:        [u32] BE bytes
 /// - ledger_hash:  [LedgerHash::LEN] bytes
 /// - pk:           [PublicKey::LEN] bytes
 pub fn staking_ledger_account_key(
@@ -73,7 +73,7 @@ pub fn staking_ledger_account_key(
 /// {genesis_hash}{epoch}{ledger_hash}
 /// where
 /// - genesis_hash: [BlockHash::LEN] bytes
-/// - epoch:        4 BE bytes
+/// - epoch:        [u32] BE bytes
 /// - ledger_hash:  [LedgerHash::LEN] bytes
 pub fn staking_ledger_epoch_key(
     genesis_state_hash: &BlockHash,
@@ -93,7 +93,7 @@ pub fn staking_ledger_epoch_key(
 /// - val: aggregated epoch delegations serde bytes
 /// where
 /// - genesis_hash: [BlockHash::LEN] bytes
-/// - epoch:        u32 BE bytes
+/// - epoch:        [u32] BE bytes
 pub fn staking_ledger_epoch_key_prefix(
     genesis_state_hash: &BlockHash,
     epoch: u32,

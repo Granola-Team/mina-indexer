@@ -66,7 +66,7 @@ pub trait BestLedgerStore {
     /// ```
     /// {balance}{pk} -> _
     /// where
-    /// - balance: 8 BE bytes
+    /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey::LEN] bytes
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }

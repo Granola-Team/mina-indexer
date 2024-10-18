@@ -4,13 +4,13 @@ use crate::{
     ledger::{account::Nonce, public_key::PublicKey},
     utility::store::{state_hash_suffix, u32_from_be_bytes, U32_LEN},
 };
-use anyhow::anyhow;
 
 /// Key format for sorting txns by block height/global slot & txn hash
 /// `{prefix}{txn_hash}{state_hash}`
-/// - `prefix`:     [u32] BE bytes
-/// - `txn_hash`:   [TxnHash::V1_LEN] bytes
-/// - `state_hash`: [BlockHash::LEN] bytes
+/// ```
+/// - prefix:     [u32] BE bytes
+/// - txn_hash:   [TxnHash::V1_LEN] bytes
+/// - state_hash: [BlockHash::LEN] bytes
 pub fn txn_sort_key(
     prefix: u32,
     txn_hash: &TxnHash,
@@ -27,8 +27,8 @@ pub fn txn_sort_key(
 /// `{pk}{u32_sort}{nonce}{txn_hash}{state_hash}`
 /// ```
 /// - pk:         [PublicKey::LEN] bytes
-/// - u32_sort:   4 BE bytes
-/// - nonce:      4 BE bytes
+/// - u32_sort:   [u32] BE bytes
+/// - nonce:      [u32] BE bytes
 /// - txn_hash:   [TxnHash::V1_LEN] bytes
 /// - state_hash: [BlockHash::LEN] bytes
 pub fn pk_txn_sort_key(
