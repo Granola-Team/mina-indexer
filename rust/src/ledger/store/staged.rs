@@ -168,7 +168,7 @@ pub fn staged_account_key(
 /// {state_hash}{balance}{pk}
 /// where
 /// - state_hash: [BlockHash::LEN] bytes
-/// - balance:    8 BE bytes
+/// - balance:    [u64] BE bytes
 /// - pk:         [PublicKey::LEN] bytes
 pub fn staged_account_balance_sort_key(
     state_hash: &BlockHash,
