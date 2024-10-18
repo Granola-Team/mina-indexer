@@ -2,7 +2,13 @@ pub mod command;
 pub mod completed_work;
 
 use super::protocol_state::SupplyAdjustment;
-use crate::{ledger::public_key::PublicKey, mina_blocks::common::*};
+use crate::{
+    ledger::public_key::PublicKey,
+    mina_blocks::common::*,
+    protocol::serialization_types::{
+        signatures::SignatureJson, staged_ledger_diff::TransactionStatusFailedType,
+    },
+};
 use completed_work::CompletedWork;
 use serde::{Deserialize, Serialize};
 
@@ -56,11 +62,13 @@ pub struct Command {
     pub status: Status,
 }
 
+impl Eq for Command {}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Status {
     Status((StatusKind,)),
-    StatusAndFailure(StatusKind, (((FailureReason,),),)),
+    StatusAndFailure(StatusKind, (((TransactionStatusFailedType,),),)),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,7 +83,7 @@ pub enum CommandKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CommandData {
-    UserCommandData(UserCommandData),
+    UserCommandData(Box<UserCommandData>),
     ZkappCommandData(ZkappCommandData),
 }
 
@@ -87,7 +95,7 @@ pub struct UserCommandData {
     pub signer: PublicKey,
 
     pub payload: UserCommandPayload,
-    pub signature: String,
+    pub signature: SignatureJson,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -128,7 +136,7 @@ pub struct StakeDelegationPayload {
 
 /// Zkapp command
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ZkappCommandData {
     pub fee_payer: FeePayer,
     pub account_updates: Vec<AccountUpdates>,
@@ -137,13 +145,15 @@ pub struct ZkappCommandData {
     pub memo: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl Eq for ZkappCommandData {}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FeePayer {
     pub body: FeePayerBody,
     pub authorization: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FeePayerBody {
     #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
@@ -158,32 +168,32 @@ pub struct FeePayerBody {
     pub nonce: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountUpdates {
     pub elt: Elt,
     pub stack_hash: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Elt {
     pub account_update: AccountUpdate,
     pub account_update_digest: String,
     pub calls: Vec<Call>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountUpdate {
     pub body: AccountUpdateBody,
     pub authorization: Authorization,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum ProofOrSignature {
     Proof,
     Signature,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Authorization {
     #[serde(rename = "None_given")]
@@ -197,7 +207,7 @@ pub enum Authorization {
     Impossible,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountUpdateBody {
     #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
@@ -216,19 +226,19 @@ pub struct AccountUpdateBody {
     pub authorization_kind: Authorization,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum MayUseToken {
     No,
     Yes,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ZkappActions(pub Vec<String>);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ZkappEvents(pub Vec<String>);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Update {
     // one for each app state field element
     pub app_state: [(UpdateKind,); 8],
@@ -242,21 +252,21 @@ pub struct Update {
     pub voting_for: (UpdateKind,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum UpdateKind {
     Keep,
     Set(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Preconditions {
     pub network: NetworkPreconditions,
     pub account: AccountPreconditions,
     pub valid_while: (PreconditionKind,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NetworkPreconditions {
     pub snarked_ledger_hash: (PreconditionKind,),
     pub blockchain_length: (PreconditionKind,),
@@ -267,7 +277,7 @@ pub struct NetworkPreconditions {
     pub next_epoch_data: StakingEpochDataPreconditions,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct StakingEpochDataPreconditions {
     pub ledger: LedgerPreconditions,
     pub seed: (PreconditionKind,),
@@ -276,13 +286,13 @@ pub struct StakingEpochDataPreconditions {
     pub epoch_length: (PreconditionKind,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct LedgerPreconditions {
     pub hash: (PreconditionKind,),
     pub total_currency: (PreconditionKind,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountPreconditions {
     pub balance: (PreconditionKind,),
     pub nonce: (PreconditionKind,),
@@ -294,14 +304,14 @@ pub struct AccountPreconditions {
     pub is_new: (PreconditionKind,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PreconditionKind {
     Ignore,
     Check(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Call {
     pub elt: Box<Elt>,
     pub stack_hash: String,
@@ -329,139 +339,4 @@ pub struct UserCommandPayloadCommon {
 pub enum StatusKind {
     Applied,
     Failed,
-}
-
-/// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/transaction_status.ml
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FailureReason {
-    Predicate,
-
-    #[serde(rename = "Source_not_present")]
-    SourceNotPresent,
-
-    #[serde(rename = "Receiver_not_present")]
-    ReceiverNotPresent,
-
-    #[serde(rename = "Amount_insufficient_to_create_account")]
-    AmountInsufficientToCreateAccount,
-
-    #[serde(rename = "Cannot_pay_creation_fee_in_token")]
-    CannotPayCreationFeeInToken,
-
-    #[serde(rename = "Source_insufficient_balance")]
-    SourceInsufficientBalance,
-
-    #[serde(rename = "Source_minimum_balance_violation")]
-    SourceMinimumBalanceViolation,
-
-    #[serde(rename = "Receiver_already_exists")]
-    ReceiverAlreadyExists,
-
-    #[serde(rename = "Token_owner_not_caller")]
-    TokenOwnerNotCaller,
-    Overflow,
-
-    #[serde(rename = "Global_excess_overflow")]
-    GlobalExcessOverflow,
-
-    #[serde(rename = "Local_excess_overflow")]
-    LocalExcessOverflow,
-
-    #[serde(rename = "Local_supply_increase_overflow")]
-    LocalSupplyIncreaseOverflow,
-
-    #[serde(rename = "Global_supply_increase_overflow")]
-    GlobalSupplyIncreaseOverflow,
-
-    #[serde(rename = "Signed_command_on_zkapp_account")]
-    SignedCommandOnZkappAccount,
-
-    #[serde(rename = "Zkapp_account_not_present")]
-    ZkappAccountNotPresent,
-
-    #[serde(rename = "Update_not_permitted_balance")]
-    UpdateNotPermittedBalance,
-
-    #[serde(rename = "Update_not_permitted_access")]
-    UpdateNotPermittedAccess,
-
-    #[serde(rename = "Update_not_permitted_timing")]
-    UpdateNotPermittedTiming,
-
-    #[serde(rename = "Update_not_permitted_delegate")]
-    UpdateNotPermittedDelegate,
-
-    #[serde(rename = "Update_not_permitted_app_state")]
-    UpdateNotPermittedAppState,
-
-    #[serde(rename = "Update_not_permitted_verification_key")]
-    UpdateNotPermittedVerificationKey,
-
-    #[serde(rename = "Update_not_permitted_action_state")]
-    UpdateNotPermittedactionState,
-
-    #[serde(rename = "Update_not_permitted_zkapp_uri")]
-    UpdateNotPermittedZkappUri,
-
-    #[serde(rename = "Update_not_permitted_token_symbol")]
-    UpdateNotPermittedTokenSymbol,
-
-    #[serde(rename = "Update_not_permitted_permissions")]
-    UpdateNotPermittedpermissions,
-
-    #[serde(rename = "Update_not_permitted_nonce")]
-    UpdateNotPermittedNonce,
-
-    #[serde(rename = "Update_not_permitted_voting_for")]
-    UpdateNotPermittedVotingFor,
-
-    #[serde(rename = "Zkapp_command_replay_check_failed")]
-    ZkappCommandReplayCheckFailed,
-
-    #[serde(rename = "Fee_payer_nonce_must_increase")]
-    FeePayerNonceMustIncrease,
-
-    #[serde(rename = "Fee_payer_must_be_signed")]
-    FeePayerMustBeSigned,
-
-    #[serde(rename = "Account_balance_precondition_unsatisfied")]
-    AccountBalancePreconditionUnsatisfied,
-
-    #[serde(rename = "Account_nonce_precondition_unsatisfied")]
-    AccountNoncePreconditionUnsatisfied,
-
-    #[serde(rename = "Account_receipt_chain_hash_precondition_unsatisfied")]
-    AccountReceiptChainHashPreconditionUnsatisfied,
-
-    #[serde(rename = "Account_delegate_precondition_unsatisfied")]
-    AccountDelegatePreconditionUnsatisfied,
-
-    #[serde(rename = "Account_action_state_precondition_unsatisfied")]
-    AccountActionStatePreconditionUnsatisfied,
-
-    #[serde(rename = "Account_app_state_precondition_unsatisfied")]
-    AccountAppStatePreconditionUnsatisfied(i64),
-
-    #[serde(rename = "Account_proved_state_precondition_unsatisfied")]
-    AccountProvedStatePreconditionUnsatisfied,
-
-    #[serde(rename = "Account_is_new_precondition_unsatisfied")]
-    AccountIsNewPreconditionUnsatisfied,
-
-    #[serde(rename = "Protocol_state_precondition_unsatisfied")]
-    ProtocolStatePreconditionUnsatisfied,
-
-    #[serde(rename = "Unexpected_verification_key_hash")]
-    UnexpectedVerificationKeyHash,
-
-    #[serde(rename = "Valid_while_precondition_unsatisfied")]
-    ValidWhilePreconditionUnsatisfied,
-
-    #[serde(rename = "Incorrect_nonce")]
-    IncorrectNonce,
-
-    #[serde(rename = "Invalid_fee_excess")]
-    InvalidFeeExcess,
-    Cancelled,
 }

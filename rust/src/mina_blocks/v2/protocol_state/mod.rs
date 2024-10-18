@@ -77,7 +77,7 @@ pub struct FeeExcess {
     pub amount: SupplyAdjustment,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SupplyAdjustment {
     #[serde(deserialize_with = "from_str")]
     pub magnitude: u64,
@@ -85,7 +85,7 @@ pub struct SupplyAdjustment {
     pub sgn: (SupplyAdjustmentSign,),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum SupplyAdjustmentSign {
     Pos,
     Neg,
@@ -217,4 +217,17 @@ pub struct LedgerData {
 
     #[serde(deserialize_with = "from_str")]
     pub total_currency: u64,
+}
+
+/////////////////
+// Conversions //
+/////////////////
+
+impl From<&SupplyAdjustment> for i64 {
+    fn from(value: &SupplyAdjustment) -> Self {
+        match value.sgn.0 {
+            SupplyAdjustmentSign::Neg => -(value.magnitude as i64),
+            SupplyAdjustmentSign::Pos => value.magnitude as i64,
+        }
+    }
 }
