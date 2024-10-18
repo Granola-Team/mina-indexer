@@ -1604,14 +1604,43 @@ test_hurl() {
         parallel_flag="--parallel"
     fi
 
-    # selectively run hurl tests by file with HURL_TEST env var
-    # run in very verbose mode by setting HURL_VERBOSE to anything
-    test_file="$SRC"/tests/hurl/"${HURL_TEST:-*}".hurl
-    if [[ -z "${HURL_VERBOSE:-}" ]]; then
-        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
-    else
-        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
-    fi
+    extract_endpoint() {
+        file="$1"
+        basename "$file" | cut -d'.' -f1
+    }
+
+    # Function to extract the base filename without extension
+    extract_test_name() {
+        file="$1"
+        basename "$file" | cut -d'.' -f1
+    }
+
+    # Create an array of test files and their corresponding URLs
+    test_file_url_pairs=(
+        "$SRC/tests/hurl/*.hurl" "http://localhost:$port/graphql"
+        "$SRC/tests/hurl/rest/summary.hurl" "http://localhost:$port/summary"
+    )
+
+    # Loop through the array in pairs (file path and URL)
+    for ((i=0; i<${#test_file_url_pairs[@]}; i+=2)); do
+        test_files=${test_file_url_pairs[i]}
+        url=${test_file_url_pairs[i+1]}
+
+        # Run each file
+        for test_file in $test_files; do
+            test_name=$(extract_test_name "$test_file")
+
+            # If HURL_TEST is set, only run the matching test
+            if [[ -z "${HURL_TEST:-}" || "$test_name" == "$HURL_TEST" ]]; then
+                echo "Running test file: $test_file with URL: $url"
+                if [[ -z "${HURL_VERBOSE:-}" ]]; then
+                    hurl --variable url=$url --test $parallel_flag "$test_file"
+                else
+                    hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+                fi
+            fi
+        done
+    done
 }
 
 test_version_file() {

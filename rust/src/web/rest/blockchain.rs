@@ -43,6 +43,7 @@ pub struct BlockchainSummary {
     total_num_blocks: u32,
     epoch_num_snarks: u32,
     total_num_snarks: u32,
+    total_num_canonical_snarks: u32,
     epoch_num_user_commands: u32,
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
@@ -67,6 +68,7 @@ struct SummaryInput {
     total_num_blocks: u32,
     epoch_num_snarks: u32,
     total_num_snarks: u32,
+    total_num_canonical_snarks: u32,
     epoch_num_user_commands: u32,
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
@@ -85,6 +87,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_blocks,
         epoch_num_snarks,
         total_num_snarks,
+        total_num_canonical_snarks,
         epoch_num_user_commands,
         total_num_user_commands,
         epoch_num_internal_commands,
@@ -132,6 +135,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_blocks,
         epoch_num_snarks,
         total_num_snarks,
+        total_num_canonical_snarks,
         epoch_num_user_commands,
         total_num_user_commands,
         epoch_num_internal_commands,
@@ -174,6 +178,9 @@ pub async fn get_blockchain_summary(
             .get_snarks_epoch_count(None)
             .expect("epoch snarks count");
         let total_num_snarks = store.get_snarks_total_count().expect("total snarks count");
+        let total_num_canonical_snarks = store
+            .get_snarks_total_canonical_count()
+            .expect("total canonical snarks count");
         let epoch_num_user_commands = store
             .get_user_commands_epoch_count(None)
             .expect("epoch user commands count");
@@ -197,6 +204,7 @@ pub async fn get_blockchain_summary(
             total_num_blocks,
             epoch_num_snarks,
             total_num_snarks,
+            total_num_canonical_snarks,
             epoch_num_user_commands,
             total_num_user_commands,
             epoch_num_internal_commands,

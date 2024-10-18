@@ -62,6 +62,9 @@
     "totalNumSnarks": {
       "type": "integer"
     },
+    "totalNumCanonicalSnarks": {
+      "type": "integer"
+    },
     "epochNumUserCommands": {
       "type": "integer"
     },
@@ -99,6 +102,7 @@
     "totalNumBlocks",
     "epochNumSnarks",
     "totalNumSnarks",
+    "totalNumCanonicalSnarks",
     "epochNumUserCommands",
     "totalNumUserCommands",
     "epochNumInternalCommands",
