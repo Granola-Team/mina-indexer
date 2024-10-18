@@ -68,9 +68,8 @@ pub fn pk_txn_sort_key_nonce(key: &[u8]) -> Nonce {
 /// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] bytes & parse the next
 /// [TxnHash::V1_LEN] bytes
 pub fn txn_hash_of_key(key: &[u8]) -> TxnHash {
-    String::from_utf8(key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::V1_LEN].to_vec())
-        .expect("txn hash bytes")
-        .into()
+    TxnHash::from_bytes(key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::V1_LEN].to_vec())
+        .expect("txn hash")
 }
 
 /// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] + [TxnHash::V1_LEN] bytes &
@@ -102,9 +101,7 @@ pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
 /// - discard 4 bytes, keep [TxnHash::V1_LEN] bytes
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<TxnHash> {
-    String::from_utf8(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())
-        .map(|s| s.into())
-        .map_err(|e| anyhow!("Error reading txn hash: {e}"))
+    TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())
 }
 
 /// State hash from `key`
@@ -112,5 +109,4 @@ pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<TxnHash> {
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<BlockHash> {
     BlockHash::from_bytes(&key[U32_LEN..][TxnHash::V1_LEN..])
-        .map_err(|e| anyhow!("Error reading state hash: {e}"))
 }

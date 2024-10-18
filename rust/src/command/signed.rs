@@ -50,9 +50,11 @@ impl TxnHash {
         if Self::is_valid_v1(&txn_hash) {
             return Ok(Self::V1(txn_hash.to_string()));
         }
+
         if Self::is_valid_v2(&txn_hash) {
             return Ok(Self::V2(txn_hash.to_string()));
         }
+
         bail!("Invalid txn hash {txn_hash}")
     }
 
@@ -72,6 +74,14 @@ impl TxnHash {
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
+        // v2
+        if bytes.starts_with(Self::V2_PREFIX.as_bytes()) {
+            let mut bytes = bytes;
+            bytes.remove(Self::V2_LEN);
+            return Self::new(String::from_utf8(bytes)?);
+        }
+
+        // v1 or fail
         Self::new(String::from_utf8(bytes)?)
     }
 

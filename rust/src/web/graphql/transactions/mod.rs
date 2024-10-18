@@ -176,7 +176,7 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
+                let txn_hash = user_commands_iterator_txn_hash(&key)?;
                 let state_hash = state_hash_suffix(&key)?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
@@ -270,7 +270,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
+                let txn_hash = user_commands_iterator_txn_hash(&key)?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -422,7 +422,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
+                let txn_hash = user_commands_iterator_txn_hash(&key)?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -550,7 +550,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
+                let txn_hash = user_commands_iterator_txn_hash(&key)?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
