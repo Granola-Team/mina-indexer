@@ -1,5 +1,7 @@
 use crate::ledger::account::Amount;
 use chrono::{DateTime, SecondsFormat, Utc};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 // version
 
@@ -18,6 +20,8 @@ pub const PRUNE_INTERVAL_DEFAULT: u32 = 10;
 // mina constants
 
 pub const MINA_SCALE: u64 = 1_000_000_000;
+pub const MINA_SCALE_DEC: Decimal = dec!(1_000_000_000);
+
 pub const MAINNET_BLOCK_SLOT_TIME_MILLIS: u64 = 180000;
 pub const MAINNET_GENESIS_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
 pub const MAINNET_GENESIS_PREV_STATE_HASH: &str =

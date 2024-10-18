@@ -1,11 +1,13 @@
 use crate::{
     command::*,
+    mina_blocks::v2::{self, staged_ledger_diff::CommandData},
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
         serialization_types::{
+            signatures::PublicKey2V1,
             staged_ledger_diff as mina_rs,
-            version_bytes::{USER_COMMAND, V1_TXN_HASH},
+            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
         },
     },
 };
@@ -16,31 +18,85 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-pub struct TxnHash(pub String);
+pub enum TxnHash {
+    V1(String),
+    V2(String),
+}
 
 impl TxnHash {
-    pub const LEN: usize = 53;
-    pub const PREFIX: &'static str = "Ckp";
+    // v1 pre-hardfork
+    pub const V1_LEN: usize = 53;
+    pub const V1_PREFIX: &'static str = "Ckp";
 
-    pub fn new(txn_hash: &str) -> anyhow::Result<Self> {
-        let res = TxnHash(txn_hash.to_string());
-        if Self::is_valid(&res) {
-            return Ok(res);
+    // v2 post-hardfork
+    pub const V2_LEN: usize = 52;
+    pub const V2_PREFIX: &'static str = "5J";
+
+    pub fn inner(self) -> String {
+        match self {
+            Self::V1(v1) => v1,
+            Self::V2(v2) => v2,
+        }
+    }
+
+    pub fn ref_inner(&self) -> &String {
+        match self {
+            Self::V1(v1) => v1,
+            Self::V2(v2) => v2,
+        }
+    }
+
+    pub fn new(txn_hash: String) -> anyhow::Result<Self> {
+        if Self::is_valid_v1(&txn_hash) {
+            return Ok(Self::V1(txn_hash.to_string()));
+        }
+        if Self::is_valid_v2(&txn_hash) {
+            return Ok(Self::V2(txn_hash.to_string()));
         }
         bail!("Invalid txn hash {txn_hash}")
     }
 
     pub fn is_valid(&self) -> bool {
-        self.0.starts_with(TxnHash::PREFIX) && self.0.len() == TxnHash::LEN
+        match self {
+            Self::V1(hash) => Self::is_valid_v1(hash),
+            Self::V2(hash) => Self::is_valid_v2(hash),
+        }
+    }
+
+    pub fn is_valid_v1(txn_hash: &str) -> bool {
+        txn_hash.starts_with(TxnHash::V1_PREFIX) && txn_hash.len() == TxnHash::V1_LEN
+    }
+
+    pub fn is_valid_v2(txn_hash: &str) -> bool {
+        txn_hash.starts_with(TxnHash::V2_PREFIX) && txn_hash.len() == TxnHash::V2_LEN
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
-        Ok(Self(String::from_utf8(bytes)?))
+        Self::new(String::from_utf8(bytes)?)
+    }
+
+    pub fn right_pad_v2(&self) -> [u8; Self::V1_LEN] {
+        let mut bytes = [0; Self::V1_LEN];
+
+        match self {
+            Self::V1(_) => {
+                bytes.copy_from_slice(self.ref_inner().as_bytes());
+                bytes
+            }
+            Self::V2(_) => {
+                bytes[..Self::V2_LEN].copy_from_slice(self.ref_inner().as_bytes());
+                bytes[Self::V2_LEN] = 0;
+                bytes
+            }
+        }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SignedCommand(pub mina_rs::SignedCommandV1);
+pub enum SignedCommand {
+    V1(mina_rs::SignedCommandV1),
+    V2(mina_rs::SignedCommandV2),
+}
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithCreationData {
@@ -121,7 +177,10 @@ impl SignedCommand {
     }
 
     pub fn signer(&self) -> PublicKey {
-        self.0.clone().inner().inner().signer.0.inner().into()
+        match self {
+            Self::V1(v1) => v1.t.t.signer.0.t.to_owned().into(),
+            Self::V2(v2) => v2.t.t.signer.0.t.to_owned().into(),
+        }
     }
 
     pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
@@ -149,12 +208,18 @@ impl SignedCommand {
     }
 
     pub fn payload(&self) -> &mina_rs::SignedCommandPayload {
-        &self.0.t.t.payload.t.t
+        match self {
+            Self::V1(v1) => &v1.t.t.payload.t.t,
+            Self::V2(v2) => &v2.t.t.payload.t.t,
+        }
     }
 
-    pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
-        match uc.0.inner().data.inner().inner() {
-            mina_rs::UserCommand::SignedCommand(signed_command) => signed_command.into(),
+    pub fn from_user_command(uc: UserCommandWithStatus) -> Option<Self> {
+        match uc {
+            UserCommandWithStatus::V1(v1) => match &v1.t.data.t.t {
+                mina_rs::UserCommand::SignedCommand(v1) => Some(v1.to_owned().into()),
+            },
+            UserCommandWithStatus::V2(v2) => v2.data.1.into(),
         }
     }
 
@@ -170,26 +235,48 @@ impl SignedCommand {
         &self.payload().common.t.t.t
     }
 
-    /// This returns a user command (transaction) hash that starts with
-    /// [TxnHash::PREFIX]
+    /// Returns a user command (transaction) hash
     pub fn hash_signed_command(&self) -> anyhow::Result<TxnHash> {
-        let mut binprot_bytes = Vec::new();
-        bin_prot::to_writer(&mut binprot_bytes, &self.0).map_err(anyhow::Error::from)?;
+        match self {
+            Self::V1(v1) => {
+                let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
+                bin_prot::to_writer(&mut binprot_bytes, v1)?;
 
-        let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
-            .with_check_version(USER_COMMAND)
-            .into_string();
-        let mut hasher = blake2::Blake2bVar::new(32).unwrap();
-        hasher.write_all(binprot_bytes_bs58.as_bytes()).unwrap();
+                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+                    .with_check_version(USER_COMMAND)
+                    .into_string();
+                let mut hasher = blake2::Blake2bVar::new(32)?;
+                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
 
-        let mut hash = hasher.finalize_boxed().to_vec();
-        hash.insert(0, hash.len() as u8);
-        hash.insert(0, 1);
-        Ok(TxnHash(
-            bs58::encode(hash)
-                .with_check_version(V1_TXN_HASH)
-                .into_string(),
-        ))
+                let mut hash = hasher.finalize_boxed().to_vec();
+                hash.insert(0, hash.len() as u8);
+                hash.insert(0, 1); //version byte
+                Ok(TxnHash::V1(
+                    bs58::encode(hash)
+                        .with_check_version(V1_TXN_HASH)
+                        .into_string(),
+                ))
+            }
+            Self::V2(v2) => {
+                let mut binprot_bytes = Vec::with_capacity(TxnHash::V2_LEN * 8); // max number of bits
+                bin_prot::to_writer(&mut binprot_bytes, v2)?;
+
+                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+                    .with_check_version(USER_COMMAND)
+                    .into_string();
+                let mut hasher = blake2::Blake2bVar::new(32)?;
+                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+
+                let mut hash = hasher.finalize_boxed().to_vec();
+                hash.insert(0, hash.len() as u8);
+                hash.insert(0, 2); //version byte
+                Ok(TxnHash::V2(
+                    bs58::encode(hash)
+                        .with_check_version(V2_TXN_HASH)
+                        .into_string(),
+                ))
+            }
+        }
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<SignedCommandWithCreationData> {
@@ -258,26 +345,112 @@ impl SignedCommandWithData {
     }
 }
 
-impl From<(mina_rs::UserCommand, bool)> for SignedCommandWithCreationData {
-    fn from(value: (mina_rs::UserCommand, bool)) -> Self {
-        let mina_rs::UserCommand::SignedCommand(v1) = value.0;
+/////////////////
+// Conversions //
+/////////////////
+
+impl From<CommandData> for Option<SignedCommand> {
+    fn from(value: CommandData) -> Self {
+        match value {
+            CommandData::UserCommandData(ucd) => Some(SignedCommand::V2(Versioned::new(
+                Versioned::new(ucd.as_ref().to_owned().into()),
+            ))),
+            CommandData::ZkappCommandData(_) => None,
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::UserCommandData> for mina_rs::SignedCommand {
+    fn from(value: v2::staged_ledger_diff::UserCommandData) -> Self {
         Self {
-            signed_command: v1.into(),
-            is_new_receiver_account: value.1,
+            payload: Versioned::new(Versioned::new(value.payload.into())),
+            signer: PublicKey2V1(Versioned::new(value.signer.into())),
+            signature: value.signature.into(),
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::UserCommandPayload> for mina_rs::SignedCommandPayload {
+    fn from(value: v2::staged_ledger_diff::UserCommandPayload) -> Self {
+        let fee_payer = value.common.fee_payer_pk.to_owned();
+        Self {
+            common: Versioned::new(Versioned::new(Versioned::new(value.common.into()))),
+            body: Versioned::new(Versioned::new((value.body.1, fee_payer).into())),
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::UserCommandPayloadCommon>
+    for mina_rs::SignedCommandPayloadCommon
+{
+    fn from(value: v2::staged_ledger_diff::UserCommandPayloadCommon) -> Self {
+        Self {
+            fee: Versioned::new(Versioned::new(value.fee)),
+            fee_token: Versioned::new(Versioned::new(Versioned::new(1))),
+            fee_payer_pk: value.fee_payer_pk.into(),
+            nonce: Versioned::new(Versioned::new(value.nonce as i32)),
+            valid_until: Versioned::new(Versioned::new(value.valid_until as i32)),
+            memo: Versioned::new(value.memo.into()),
+        }
+    }
+}
+
+impl From<(v2::staged_ledger_diff::UserCommandPayloadBody, PublicKey)>
+    for mina_rs::SignedCommandPayloadBody
+{
+    fn from(value: (v2::staged_ledger_diff::UserCommandPayloadBody, PublicKey)) -> Self {
+        match value.0 {
+            v2::staged_ledger_diff::UserCommandPayloadBody::Payment(payload) => {
+                Self::PaymentPayload(Versioned::new(Versioned::new(mina_rs::PaymentPayload {
+                    source_pk: value.1.into(),
+                    receiver_pk: payload.receiver_pk.into(),
+                    token_id: Versioned::new(Versioned::new(Versioned::new(1))),
+                    amount: Versioned::new(Versioned::new(payload.amount)),
+                })))
+            }
+            v2::staged_ledger_diff::UserCommandPayloadBody::StakeDelegation(payload) => {
+                Self::StakeDelegation(Versioned::new(mina_rs::StakeDelegation::SetDelegate {
+                    delegator: value.1.into(),
+                    new_delegate: payload.new_delegate.into(),
+                }))
+            }
+        }
+    }
+}
+
+impl From<(UserCommand, bool)> for SignedCommandWithCreationData {
+    fn from(value: (UserCommand, bool)) -> Self {
+        match value.0 {
+            UserCommand::SignedCommand(signed_cmd) => match signed_cmd.as_ref() {
+                SignedCommand::V1(v1) => Self {
+                    signed_command: v1.to_owned().into(),
+                    is_new_receiver_account: value.1,
+                },
+                SignedCommand::V2(v2) => Self {
+                    signed_command: v2.to_owned().into(),
+                    is_new_receiver_account: value.1,
+                },
+            },
+            UserCommand::ZkappCommand(_) => unreachable!(),
         }
     }
 }
 
 impl From<mina_rs::UserCommandWithStatus> for SignedCommand {
     fn from(value: mina_rs::UserCommandWithStatus) -> Self {
-        Self::from_user_command(value.into())
+        Self::from_user_command(value.into()).expect("signed command from user command with status")
     }
 }
 
 impl From<UserCommandWithStatus> for SignedCommand {
     fn from(value: UserCommandWithStatus) -> Self {
-        let value: mina_rs::UserCommandWithStatus = value.into();
-        value.into()
+        match value {
+            UserCommandWithStatus::V1(v1) => v1.t.to_owned().into(),
+            UserCommandWithStatus::V2(v2) => {
+                let opt: Option<SignedCommand> = v2.data.1.into();
+                opt.expect("signed command")
+            }
+        }
     }
 }
 
@@ -340,22 +513,35 @@ impl From<SignedCommandWithStateHash> for CommandWithStateHash {
     }
 }
 
-impl From<Versioned2<mina_rs::SignedCommand, 1, 1>> for SignedCommand {
-    fn from(value: Versioned2<mina_rs::SignedCommand, 1, 1>) -> Self {
-        Self(value)
+impl<const MAJOR: u16, const MINOR: u16> From<Versioned2<mina_rs::SignedCommand, MAJOR, MINOR>>
+    for SignedCommand
+{
+    fn from(value: Versioned2<mina_rs::SignedCommand, MAJOR, MINOR>) -> Self {
+        if MAJOR == 1 && MINOR == 1 {
+            return Self::V1(Versioned::new(Versioned::new(value.t.t)));
+        } else if MAJOR == 2 && MINOR == 1 {
+            return Self::V2(Versioned {
+                t: Versioned::new(value.t.t),
+                version: 2,
+            });
+        }
+        unreachable!()
     }
 }
 
 impl From<SignedCommand> for serde_json::Value {
     fn from(value: SignedCommand) -> Self {
-        use serde_json::*;
+        let value = match value {
+            SignedCommand::V1(v1) => v1.t.t,
+            SignedCommand::V2(v2) => v2.t.t,
+        };
 
-        let mut object = Map::new();
-        object.insert("payload".into(), payload_json(&value.0));
-        object.insert("signer".into(), signer(&value.0));
-        object.insert("signature".into(), signature(&value.0));
+        let mut object = serde_json::Map::new();
+        object.insert("payload".into(), payload_json(&value));
+        object.insert("signer".into(), signer(&value));
+        object.insert("signature".into(), signature(&value));
 
-        Value::Object(object)
+        serde_json::Value::Object(object)
     }
 }
 
@@ -385,7 +571,7 @@ impl From<SignedCommandWithData> for serde_json::Value {
         use serde_json::*;
 
         let mut obj = Map::new();
-        let tx_hash = Value::String(value.tx_hash.0);
+        let tx_hash = Value::String(value.tx_hash.inner());
         let state_hash = Value::String(value.state_hash.0);
         let command = value.command.into();
         let status = value.status.into();
@@ -449,21 +635,21 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
     }
 }
 
-fn signer(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
-    let pk: PublicKey = value.t.t.signer.0.t.to_owned().into();
+fn signer(value: &mina_rs::SignedCommand) -> serde_json::Value {
+    let pk: PublicKey = value.signer.0.t.to_owned().into();
     serde_json::Value::String(pk.0)
 }
 
-fn signature(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
-    let sig: Signature = value.t.t.signature.to_owned().into();
+fn signature(value: &mina_rs::SignedCommand) -> serde_json::Value {
+    let sig: Signature = value.signature.to_owned().into();
     serde_json::Value::String(sig.to_string())
 }
 
-fn payload_json(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
+fn payload_json(value: &mina_rs::SignedCommand) -> serde_json::Value {
     use serde_json::*;
 
     let mut payload_obj = Map::new();
-    let mina_rs::SignedCommand { payload, .. } = &value.t.t;
+    let mina_rs::SignedCommand { ref payload, .. } = value;
 
     let mut common = Map::new();
     let mina_rs::SignedCommandPayloadCommon {
@@ -474,6 +660,7 @@ fn payload_json(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
         valid_until,
         memo,
     } = &payload.t.t.common.t.t.t;
+
     common.insert("fee".into(), Value::Number(Number::from(fee.t.t)));
     common.insert(
         "fee_token".into(),
@@ -543,13 +730,13 @@ fn payload_json(value: &mina_rs::SignedCommandV1) -> serde_json::Value {
 
 impl From<String> for TxnHash {
     fn from(value: String) -> Self {
-        Self(value)
+        Self::new(value).expect("transaction hash")
     }
 }
 
 impl std::fmt::Display for TxnHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.ref_inner())
     }
 }
 
@@ -572,8 +759,8 @@ mod tests {
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
         let hashes = precomputed_block.command_hashes();
         let expect = vec![
-            TxnHash::new("CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX").unwrap(),
-            TxnHash::new("CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj").unwrap(),
+            TxnHash::new("CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string())?,
+            TxnHash::new("CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj".to_string())?,
         ];
 
         assert_eq!(hashes, expect);
@@ -634,6 +821,26 @@ mod tests {
 }"#;
 
         assert_eq!(signed_commands, vec![expect0, expect1]);
+        Ok(())
+    }
+
+    #[test]
+    fn right_pad_txn_hashes() -> anyhow::Result<()> {
+        // v1 - no right padding
+        let v1 = TxnHash::new("CkpBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS".into())?;
+        assert!(matches!(v1, TxnHash::V1(_)));
+        assert_eq!(&v1.right_pad_v2(), v1.to_string().as_bytes());
+
+        // v2 - single 0 byte right padding
+        let v2 = TxnHash::new("5JBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS".into())?;
+        assert!(matches!(v2, TxnHash::V2(_)));
+
+        let mut v2_right_pad = [0; TxnHash::V1_LEN];
+        v2_right_pad[..TxnHash::V1_LEN - 1].copy_from_slice(v2.to_string().as_bytes());
+        *v2_right_pad.last_mut().unwrap() = 0;
+
+        assert_eq!(v2.right_pad_v2(), v2_right_pad);
+
         Ok(())
     }
 }

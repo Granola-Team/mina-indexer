@@ -21,13 +21,12 @@ use mina_serialization_versioned::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use smart_default::SmartDefault;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 /// Top level wrapper type for a StagedLedgerDiff
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct StagedLedgerDiff {
     pub diff: StagedLedgerDiffTupleV1,
 }
 
-/// Top level wrapper type for a StagedLedgerDiff (v1)
 pub type StagedLedgerDiffV1 = Versioned<StagedLedgerDiff, 1>;
 
 /// Top level wrapper type for a StagedLedgerDiff (json)
@@ -40,7 +39,11 @@ pub struct StagedLedgerDiffJson {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct StagedLedgerDiffTuple(pub StagedLedgerPreDiffV1, pub Option<StagedLedgerPreDiffV1>);
 
+// v1 pre-hardfork
 pub type StagedLedgerDiffTupleV1 = Versioned<StagedLedgerDiffTuple, 1>;
+
+// v2 post-harfork
+pub type StagedLedgerDiffTupleV2 = Versioned<StagedLedgerDiffTuple, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(StagedLedgerDiffTuple)]
@@ -57,7 +60,11 @@ pub struct StagedLedgerPreDiff {
     pub internal_command_balances: Vec<InternalCommandBalanceDataV1>,
 }
 
+// v1 pre-hardfork
 pub type StagedLedgerPreDiffV1 = Versioned2<StagedLedgerPreDiff, 1, 1>;
+
+// v2 post-hardfork
+pub type StagedLedgerPreDiffV2 = Versioned2<StagedLedgerPreDiff, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(StagedLedgerPreDiff)]
@@ -74,7 +81,11 @@ pub struct UserCommandWithStatus {
     pub status: TransactionStatusV1,
 }
 
+// v1 pre-hardfork
 pub type UserCommandWithStatusV1 = Versioned<UserCommandWithStatus, 1>;
+
+// v2 post-hardfork
+pub type UserCommandWithStatusV2 = Versioned<UserCommandWithStatus, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(UserCommandWithStatus)]
@@ -86,10 +97,13 @@ pub struct UserCommandWithStatusJson {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum UserCommand {
     SignedCommand(SignedCommandV1),
-    // FIXME: other variants are not covered by current test block
 }
 
+// v1 pre-hardfork
 pub type UserCommandV1 = Versioned2<UserCommand, 1, 1>;
+
+// v2 post-hardfork
+pub type UserCommandV2 = Versioned2<UserCommand, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum UserCommandJsonProxy {
@@ -102,6 +116,7 @@ enum UserCommandJsonProxy {
 #[auto_from(UserCommandJsonProxy)]
 pub enum UserCommandJson {
     SignedCommand(SignedCommandJson),
+    // ZkappCommand(ZkappCommandJson),
 }
 
 impl_mina_enum_json_serde!(UserCommandJson, UserCommandJsonProxy);
@@ -113,7 +128,11 @@ pub struct SignedCommand {
     pub signature: SignatureV1,
 }
 
+// v1 pre-hardfork
 pub type SignedCommandV1 = Versioned2<SignedCommand, 1, 1>;
+
+// v2 post-hardfork
+pub type SignedCommandV2 = Versioned2<SignedCommand, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(SignedCommand)]
@@ -129,7 +148,11 @@ pub struct SignedCommandPayload {
     pub body: SignedCommandPayloadBodyV1,
 }
 
+// v1 pre-hardfork
 pub type SignedCommandPayloadV1 = Versioned2<SignedCommandPayload, 1, 1>;
+
+// v2 post-hardfork
+pub type SignedCommandPayloadV2 = Versioned2<SignedCommandPayload, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(SignedCommandPayload)]
@@ -148,7 +171,11 @@ pub struct SignedCommandPayloadCommon {
     pub memo: SignedCommandMemoV1,
 }
 
+// v1 pre-hardfork
 pub type SignedCommandPayloadCommonV1 = Versioned3<SignedCommandPayloadCommon, 1, 1, 1>;
+
+// v2 post-hardfork
+pub type SignedCommandPayloadCommonV2 = Versioned3<SignedCommandPayloadCommon, 2, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(SignedCommandPayloadCommon)]
@@ -165,10 +192,13 @@ pub struct SignedCommandPayloadCommonJson {
 pub enum SignedCommandPayloadBody {
     PaymentPayload(PaymentPayloadV1),
     StakeDelegation(StakeDelegationV1),
-    // FIXME: other variants are not covered by current test block
 }
 
+// v1 pre-hardfork
 pub type SignedCommandPayloadBodyV1 = Versioned2<SignedCommandPayloadBody, 1, 1>;
+
+// v2 post-hardfork
+pub type SignedCommandPayloadBodyV2 = Versioned2<SignedCommandPayloadBody, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum SignedCommandPayloadBodyJsonProxy {
@@ -200,7 +230,11 @@ pub struct PaymentPayload {
     pub amount: AmountV1,
 }
 
+// v1 per-hardfork
 pub type PaymentPayloadV1 = Versioned2<PaymentPayload, 1, 1>;
+
+// v2 post-hardfork
+pub type PaymentPayloadV2 = Versioned2<PaymentPayload, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(PaymentPayload)]
@@ -219,7 +253,11 @@ pub enum StakeDelegation {
     },
 }
 
+// v1 pre-hardfork
 pub type StakeDelegationV1 = Versioned<StakeDelegation, 1>;
+
+// v2 post-harfork
+pub type StakeDelegationV2 = Versioned<StakeDelegation, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum StakeDelegationJsonProxy {
@@ -242,12 +280,17 @@ pub enum StakeDelegationJson {
 
 impl_mina_enum_json_serde!(StakeDelegationJson, StakeDelegationJsonProxy);
 
+// v1 pre-hardfork
 pub type SignedCommandFeeTokenV1 = Versioned3<u64, 1, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SignedCommandMemo(pub Vec<u8>);
 
+// v1 pre-hardfork
 pub type SignedCommandMemoV1 = Versioned<SignedCommandMemo, 1>;
+
+// v2 post-hardfork
+pub type SignedCommandMemoV2 = Versioned<SignedCommandMemo, 2>;
 
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
 #[auto_from(SignedCommandMemo)]
@@ -280,8 +323,8 @@ impl<'de> Deserialize<'de> for SignedCommandMemoJson {
     }
 }
 
-// FIXME: No test coverage yet
-pub type SnappCommand = Versioned2<(), 1, 1>;
+// v2 post-harfork
+pub type ZkappCommand = Versioned2<(), 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TransactionStatus {
@@ -295,7 +338,11 @@ pub enum TransactionStatus {
     ),
 }
 
+// v1 pre-hardfork
 pub type TransactionStatusV1 = Versioned<TransactionStatus, 1>;
+
+// v2 post-hardfork
+pub type TransactionStatusV2 = Versioned<TransactionStatus, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum TransactionStatusJsonProxy {
@@ -325,7 +372,7 @@ pub enum TransactionStatusJson {
 
 impl_mina_enum_json_serde!(TransactionStatusJson, TransactionStatusJsonProxy);
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TransactionStatusAuxiliaryData {
     pub fee_payer_account_creation_fee_paid: Option<AmountV1>,
     pub receiver_account_creation_fee_paid: Option<AmountV1>,
@@ -342,113 +389,412 @@ pub struct TransactionStatusAuxiliaryDataJson {
     pub created_token: Option<U64Json>,
 }
 
+/// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/transaction_status.ml
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TransactionStatusFailedType {
-    #[serde(rename = "Predicate")]
     Predicate,
+
     #[serde(rename = "Source_not_present")]
     SourceNotPresent,
+
     #[serde(rename = "Receiver_not_present")]
     ReceiverNotPresent,
+
     #[serde(rename = "Amount_insufficient_to_create_account")]
     AmountInsufficientToCreateAccount,
+
     #[serde(rename = "Cannot_pay_creation_fee_in_token")]
     CannotPayCreationFeeInToken,
+
     #[serde(rename = "Source_insufficient_balance")]
     SourceInsufficientBalance,
+
     #[serde(rename = "Source_minimum_balance_violation")]
     SourceMinimumBalanceViolation,
+
     #[serde(rename = "Receiver_already_exists")]
     ReceiverAlreadyExists,
-    #[serde(rename = "Not_token_owner")]
-    NotTokenOwner,
-    #[serde(rename = "Mismatched_token_permissions")]
-    MismatchedTokenPermissions,
-    #[serde(rename = "Overflow")]
+
+    #[serde(rename = "Token_owner_not_caller")]
+    TokenOwnerNotCaller,
     Overflow,
-    #[serde(rename = "Signed_command_on_snapp_account")]
-    SignedCommandOnSnappAccount,
-    #[serde(rename = "Snapp_account_not_present")]
-    SnappAccountNotPresent,
-    #[serde(rename = "Update_not_permitted")]
-    UpdateNotPermitted,
+
+    #[serde(rename = "Global_excess_overflow")]
+    GlobalExcessOverflow,
+
+    #[serde(rename = "Local_excess_overflow")]
+    LocalExcessOverflow,
+
+    #[serde(rename = "Local_supply_increase_overflow")]
+    LocalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Global_supply_increase_overflow")]
+    GlobalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Signed_command_on_zkapp_account")]
+    SignedCommandOnZkappAccount,
+
+    #[serde(rename = "Zkapp_account_not_present")]
+    ZkappAccountNotPresent,
+
+    #[serde(rename = "Update_not_permitted_balance")]
+    UpdateNotPermittedBalance,
+
+    #[serde(rename = "Update_not_permitted_access")]
+    UpdateNotPermittedAccess,
+
+    #[serde(rename = "Update_not_permitted_timing")]
+    UpdateNotPermittedTiming,
+
+    #[serde(rename = "Update_not_permitted_delegate")]
+    UpdateNotPermittedDelegate,
+
+    #[serde(rename = "Update_not_permitted_app_state")]
+    UpdateNotPermittedAppState,
+
+    #[serde(rename = "Update_not_permitted_verification_key")]
+    UpdateNotPermittedVerificationKey,
+
+    #[serde(rename = "Update_not_permitted_action_state")]
+    UpdateNotPermittedactionState,
+
+    #[serde(rename = "Update_not_permitted_zkapp_uri")]
+    UpdateNotPermittedZkappUri,
+
+    #[serde(rename = "Update_not_permitted_token_symbol")]
+    UpdateNotPermittedTokenSymbol,
+
+    #[serde(rename = "Update_not_permitted_permissions")]
+    UpdateNotPermittedpermissions,
+
+    #[serde(rename = "Update_not_permitted_nonce")]
+    UpdateNotPermittedNonce,
+
+    #[serde(rename = "Update_not_permitted_voting_for")]
+    UpdateNotPermittedVotingFor,
+
+    #[serde(rename = "Zkapp_command_replay_check_failed")]
+    ZkappCommandReplayCheckFailed,
+
+    #[serde(rename = "Fee_payer_nonce_must_increase")]
+    FeePayerNonceMustIncrease,
+
+    #[serde(rename = "Fee_payer_must_be_signed")]
+    FeePayerMustBeSigned,
+
+    #[serde(rename = "Account_balance_precondition_unsatisfied")]
+    AccountBalancePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_nonce_precondition_unsatisfied")]
+    AccountNoncePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_receipt_chain_hash_precondition_unsatisfied")]
+    AccountReceiptChainHashPreconditionUnsatisfied,
+
+    #[serde(rename = "Account_delegate_precondition_unsatisfied")]
+    AccountDelegatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_action_state_precondition_unsatisfied")]
+    AccountActionStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_app_state_precondition_unsatisfied")]
+    AccountAppStatePreconditionUnsatisfied(i64),
+
+    #[serde(rename = "Account_proved_state_precondition_unsatisfied")]
+    AccountProvedStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_is_new_precondition_unsatisfied")]
+    AccountIsNewPreconditionUnsatisfied,
+
+    #[serde(rename = "Protocol_state_precondition_unsatisfied")]
+    ProtocolStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Unexpected_verification_key_hash")]
+    UnexpectedVerificationKeyHash,
+
+    #[serde(rename = "Valid_while_precondition_unsatisfied")]
+    ValidWhilePreconditionUnsatisfied,
+
     #[serde(rename = "Incorrect_nonce")]
     IncorrectNonce,
+
+    #[serde(rename = "Invalid_fee_excess")]
+    InvalidFeeExcess,
+    Cancelled,
 }
 
 pub type TransactionStatusFailedTypeV1 = Versioned<TransactionStatusFailedType, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum TransactionStatusFailedTypeJsonProxy {
-    #[serde(rename = "Predicate")]
     Predicate,
+
     #[serde(rename = "Source_not_present")]
     SourceNotPresent,
+
     #[serde(rename = "Receiver_not_present")]
     ReceiverNotPresent,
+
     #[serde(rename = "Amount_insufficient_to_create_account")]
     AmountInsufficientToCreateAccount,
+
     #[serde(rename = "Cannot_pay_creation_fee_in_token")]
     CannotPayCreationFeeInToken,
+
     #[serde(rename = "Source_insufficient_balance")]
     SourceInsufficientBalance,
+
     #[serde(rename = "Source_minimum_balance_violation")]
     SourceMinimumBalanceViolation,
+
     #[serde(rename = "Receiver_already_exists")]
     ReceiverAlreadyExists,
-    #[serde(rename = "Not_token_owner")]
-    NotTokenOwner,
-    #[serde(rename = "Mismatched_token_permissions")]
-    MismatchedTokenPermissions,
-    #[serde(rename = "Overflow")]
+
+    #[serde(rename = "Token_owner_not_caller")]
+    TokenOwnerNotCaller,
     Overflow,
-    #[serde(rename = "Signed_command_on_snapp_account")]
-    SignedCommandOnSnappAccount,
-    #[serde(rename = "Snapp_account_not_present")]
-    SnappAccountNotPresent,
-    #[serde(rename = "Update_not_permitted")]
-    UpdateNotPermitted,
+
+    #[serde(rename = "Global_excess_overflow")]
+    GlobalExcessOverflow,
+
+    #[serde(rename = "Local_excess_overflow")]
+    LocalExcessOverflow,
+
+    #[serde(rename = "Local_supply_increase_overflow")]
+    LocalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Global_supply_increase_overflow")]
+    GlobalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Signed_command_on_zkapp_account")]
+    SignedCommandOnZkappAccount,
+
+    #[serde(rename = "Zkapp_account_not_present")]
+    ZkappAccountNotPresent,
+
+    #[serde(rename = "Update_not_permitted_balance")]
+    UpdateNotPermittedBalance,
+
+    #[serde(rename = "Update_not_permitted_access")]
+    UpdateNotPermittedAccess,
+
+    #[serde(rename = "Update_not_permitted_timing")]
+    UpdateNotPermittedTiming,
+
+    #[serde(rename = "Update_not_permitted_delegate")]
+    UpdateNotPermittedDelegate,
+
+    #[serde(rename = "Update_not_permitted_app_state")]
+    UpdateNotPermittedAppState,
+
+    #[serde(rename = "Update_not_permitted_verification_key")]
+    UpdateNotPermittedVerificationKey,
+
+    #[serde(rename = "Update_not_permitted_action_state")]
+    UpdateNotPermittedactionState,
+
+    #[serde(rename = "Update_not_permitted_zkapp_uri")]
+    UpdateNotPermittedZkappUri,
+
+    #[serde(rename = "Update_not_permitted_token_symbol")]
+    UpdateNotPermittedTokenSymbol,
+
+    #[serde(rename = "Update_not_permitted_permissions")]
+    UpdateNotPermittedpermissions,
+
+    #[serde(rename = "Update_not_permitted_nonce")]
+    UpdateNotPermittedNonce,
+
+    #[serde(rename = "Update_not_permitted_voting_for")]
+    UpdateNotPermittedVotingFor,
+
+    #[serde(rename = "Zkapp_command_replay_check_failed")]
+    ZkappCommandReplayCheckFailed,
+
+    #[serde(rename = "Fee_payer_nonce_must_increase")]
+    FeePayerNonceMustIncrease,
+
+    #[serde(rename = "Fee_payer_must_be_signed")]
+    FeePayerMustBeSigned,
+
+    #[serde(rename = "Account_balance_precondition_unsatisfied")]
+    AccountBalancePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_nonce_precondition_unsatisfied")]
+    AccountNoncePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_receipt_chain_hash_precondition_unsatisfied")]
+    AccountReceiptChainHashPreconditionUnsatisfied,
+
+    #[serde(rename = "Account_delegate_precondition_unsatisfied")]
+    AccountDelegatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_action_state_precondition_unsatisfied")]
+    AccountActionStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_app_state_precondition_unsatisfied")]
+    AccountAppStatePreconditionUnsatisfied(i64),
+
+    #[serde(rename = "Account_proved_state_precondition_unsatisfied")]
+    AccountProvedStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_is_new_precondition_unsatisfied")]
+    AccountIsNewPreconditionUnsatisfied,
+
+    #[serde(rename = "Protocol_state_precondition_unsatisfied")]
+    ProtocolStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Unexpected_verification_key_hash")]
+    UnexpectedVerificationKeyHash,
+
+    #[serde(rename = "Valid_while_precondition_unsatisfied")]
+    ValidWhilePreconditionUnsatisfied,
+
     #[serde(rename = "Incorrect_nonce")]
     IncorrectNonce,
+
+    #[serde(rename = "Invalid_fee_excess")]
+    InvalidFeeExcess,
+    Cancelled,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(TransactionStatusFailedType)]
 #[auto_from(TransactionStatusFailedTypeJsonProxy)]
 pub enum TransactionStatusFailedTypeJson {
-    #[serde(rename = "Predicate")]
     Predicate,
+
     #[serde(rename = "Source_not_present")]
     SourceNotPresent,
+
     #[serde(rename = "Receiver_not_present")]
     ReceiverNotPresent,
+
     #[serde(rename = "Amount_insufficient_to_create_account")]
     AmountInsufficientToCreateAccount,
+
     #[serde(rename = "Cannot_pay_creation_fee_in_token")]
     CannotPayCreationFeeInToken,
+
     #[serde(rename = "Source_insufficient_balance")]
     SourceInsufficientBalance,
+
     #[serde(rename = "Source_minimum_balance_violation")]
     SourceMinimumBalanceViolation,
+
     #[serde(rename = "Receiver_already_exists")]
     ReceiverAlreadyExists,
-    #[serde(rename = "Not_token_owner")]
-    NotTokenOwner,
-    #[serde(rename = "Mismatched_token_permissions")]
-    MismatchedTokenPermissions,
-    #[serde(rename = "Overflow")]
+
+    #[serde(rename = "Token_owner_not_caller")]
+    TokenOwnerNotCaller,
     Overflow,
-    #[serde(rename = "Signed_command_on_snapp_account")]
-    SignedCommandOnSnappAccount,
-    #[serde(rename = "Snapp_account_not_present")]
-    SnappAccountNotPresent,
-    #[serde(rename = "Update_not_permitted")]
-    UpdateNotPermitted,
+
+    #[serde(rename = "Global_excess_overflow")]
+    GlobalExcessOverflow,
+
+    #[serde(rename = "Local_excess_overflow")]
+    LocalExcessOverflow,
+
+    #[serde(rename = "Local_supply_increase_overflow")]
+    LocalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Global_supply_increase_overflow")]
+    GlobalSupplyIncreaseOverflow,
+
+    #[serde(rename = "Signed_command_on_zkapp_account")]
+    SignedCommandOnZkappAccount,
+
+    #[serde(rename = "Zkapp_account_not_present")]
+    ZkappAccountNotPresent,
+
+    #[serde(rename = "Update_not_permitted_balance")]
+    UpdateNotPermittedBalance,
+
+    #[serde(rename = "Update_not_permitted_access")]
+    UpdateNotPermittedAccess,
+
+    #[serde(rename = "Update_not_permitted_timing")]
+    UpdateNotPermittedTiming,
+
+    #[serde(rename = "Update_not_permitted_delegate")]
+    UpdateNotPermittedDelegate,
+
+    #[serde(rename = "Update_not_permitted_app_state")]
+    UpdateNotPermittedAppState,
+
+    #[serde(rename = "Update_not_permitted_verification_key")]
+    UpdateNotPermittedVerificationKey,
+
+    #[serde(rename = "Update_not_permitted_action_state")]
+    UpdateNotPermittedactionState,
+
+    #[serde(rename = "Update_not_permitted_zkapp_uri")]
+    UpdateNotPermittedZkappUri,
+
+    #[serde(rename = "Update_not_permitted_token_symbol")]
+    UpdateNotPermittedTokenSymbol,
+
+    #[serde(rename = "Update_not_permitted_permissions")]
+    UpdateNotPermittedpermissions,
+
+    #[serde(rename = "Update_not_permitted_nonce")]
+    UpdateNotPermittedNonce,
+
+    #[serde(rename = "Update_not_permitted_voting_for")]
+    UpdateNotPermittedVotingFor,
+
+    #[serde(rename = "Zkapp_command_replay_check_failed")]
+    ZkappCommandReplayCheckFailed,
+
+    #[serde(rename = "Fee_payer_nonce_must_increase")]
+    FeePayerNonceMustIncrease,
+
+    #[serde(rename = "Fee_payer_must_be_signed")]
+    FeePayerMustBeSigned,
+
+    #[serde(rename = "Account_balance_precondition_unsatisfied")]
+    AccountBalancePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_nonce_precondition_unsatisfied")]
+    AccountNoncePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_receipt_chain_hash_precondition_unsatisfied")]
+    AccountReceiptChainHashPreconditionUnsatisfied,
+
+    #[serde(rename = "Account_delegate_precondition_unsatisfied")]
+    AccountDelegatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_action_state_precondition_unsatisfied")]
+    AccountActionStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_app_state_precondition_unsatisfied")]
+    AccountAppStatePreconditionUnsatisfied(i64),
+
+    #[serde(rename = "Account_proved_state_precondition_unsatisfied")]
+    AccountProvedStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Account_is_new_precondition_unsatisfied")]
+    AccountIsNewPreconditionUnsatisfied,
+
+    #[serde(rename = "Protocol_state_precondition_unsatisfied")]
+    ProtocolStatePreconditionUnsatisfied,
+
+    #[serde(rename = "Unexpected_verification_key_hash")]
+    UnexpectedVerificationKeyHash,
+
+    #[serde(rename = "Valid_while_precondition_unsatisfied")]
+    ValidWhilePreconditionUnsatisfied,
+
     #[serde(rename = "Incorrect_nonce")]
     IncorrectNonce,
+
+    #[serde(rename = "Invalid_fee_excess")]
+    InvalidFeeExcess,
+    Cancelled,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TransactionStatusBalanceData {
     pub fee_payer_balance: Option<ExtendedU64_3>,
     pub source_balance: Option<ExtendedU64_3>,
@@ -513,7 +859,11 @@ pub struct CoinBaseFeeTransfer {
     pub fee: ExtendedU64_2,
 }
 
+// v1 pre-hardfork
 pub type CoinBaseFeeTransferV1 = Versioned2<CoinBaseFeeTransfer, 1, 1>;
+
+// v2 post-hardfork
+pub type CoinBaseFeeTransferV2 = Versioned2<CoinBaseFeeTransfer, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(CoinBaseFeeTransfer)]
@@ -581,4 +931,11 @@ pub type FeeTransferBalanceDataV1 = Versioned<FeeTransferBalanceData, 1>;
 pub struct FeeTransferBalanceDataJson {
     pub receiver1_balance: U64Json,
     pub receiver2_balance: Option<U64Json>,
+}
+
+impl std::fmt::Display for TransactionStatusFailedType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = serde_json::to_string(self).unwrap();
+        write!(f, "{}", s.trim_matches('"'))
+    }
 }

@@ -20,6 +20,8 @@ pub struct ChainId(pub String);
 pub struct ChainData(pub HashMap<BlockHash, (PcbVersion, ChainId)>);
 
 impl ChainId {
+    pub const LEN: u32 = 64;
+
     pub fn new(chain_id: &str) -> Self {
         Self(chain_id.to_string())
     }

@@ -1,6 +1,6 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
-    command::{signed::SignedCommand, Command, UserCommandWithStatus},
+    command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
     ledger::{account::Nonce, coinbase::Coinbase, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
@@ -97,6 +97,7 @@ impl AccountDiff {
                     nonce: delegation.nonce + 1,
                 })]]
             }
+            Command::Zkapp(zkapp) => todo!("account diff {zkapp:?}"),
         }
     }
 
@@ -143,14 +144,13 @@ impl AccountDiff {
     ) -> Vec<Vec<Self>> {
         let mut fee_map = HashMap::new();
         for user_cmd in user_cmds.iter() {
-            let signed_cmd = SignedCommand::from_user_command(user_cmd.clone());
-            let fee_payer = signed_cmd.fee_payer_pk();
-            let fee = signed_cmd.fee();
+            let fee = user_cmd.fee();
             fee_map
-                .entry(fee_payer)
+                .entry(user_cmd.fee_payer_pk())
                 .and_modify(|acc| *acc += fee)
                 .or_insert(fee);
         }
+
         fee_map
             .iter()
             .flat_map(|(pk, fee)| {
@@ -179,10 +179,12 @@ impl AccountDiff {
         let coinbase_receiver = &precomputed_block.coinbase_receiver();
         let mut fees =
             Self::transaction_fees(coinbase_receiver, precomputed_block.commands_pre_diff());
+
         fees.append(&mut Self::transaction_fees(
             coinbase_receiver,
             precomputed_block.commands_post_diff(),
         ));
+
         fees
     }
 

@@ -9,26 +9,35 @@ use crate::{
         account::{Amount, Nonce},
         public_key::PublicKey,
     },
-    protocol::serialization_types::staged_ledger_diff::{
-        self as mina_rs, TransactionStatusFailedType,
-    },
+    mina_blocks::v2::{self, staged_ledger_diff::ZkappCommandData},
+    protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use signed::SignedCommandWithCreationData;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UserCommand {
+    SignedCommand(Box<SignedCommand>),
+    ZkappCommand(ZkappCommandData),
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Hash)]
 pub enum CommandType {
     Payment,
     Delegation,
+    // Zkapp,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Command {
     Payment(Payment),
+
     #[serde(rename = "Stake_delegation")]
     Delegation(Delegation),
+
+    Zkapp(ZkappCommandData),
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -56,12 +65,12 @@ pub struct Delegation {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CommandStatusData {
     Applied {
-        auxiliary_data: mina_rs::TransactionStatusAuxiliaryData,
-        balance_data: mina_rs::TransactionStatusBalanceData,
+        auxiliary_data: Option<mina_rs::TransactionStatusAuxiliaryData>,
+        balance_data: Option<mina_rs::TransactionStatusBalanceData>,
     },
     Failed(
         Vec<mina_rs::TransactionStatusFailedType>,
-        mina_rs::TransactionStatusBalanceData,
+        Option<mina_rs::TransactionStatusBalanceData>,
     ),
 }
 
@@ -72,14 +81,14 @@ impl CommandStatusData {
 
     fn balance_data(&self) -> Option<&mina_rs::TransactionStatusBalanceData> {
         if let Self::Applied { balance_data, .. } = self {
-            return Some(balance_data);
+            return balance_data.as_ref();
         }
         None
     }
 
     fn auxiliary_data(&self) -> Option<&mina_rs::TransactionStatusAuxiliaryData> {
         if let Self::Applied { auxiliary_data, .. } = self {
-            return Some(auxiliary_data);
+            return auxiliary_data.as_ref();
         }
         None
     }
@@ -118,23 +127,24 @@ impl CommandStatusData {
     }
 
     pub fn from_transaction_status(data: &mina_rs::TransactionStatus) -> Self {
-        use mina_rs::TransactionStatus as TS;
-
         match data {
-            TS::Applied(auxiliary_data, balance_data) => Self::Applied {
-                auxiliary_data: auxiliary_data.t.to_owned(),
-                balance_data: balance_data.t.to_owned(),
+            mina_rs::TransactionStatus::Applied(auxiliary_data, balance_data) => Self::Applied {
+                auxiliary_data: Some(auxiliary_data.t.to_owned()),
+                balance_data: Some(balance_data.t.to_owned()),
             },
-            TS::Failed(fails, balance_data) => Self::Failed(
+            mina_rs::TransactionStatus::Failed(fails, balance_data) => Self::Failed(
                 fails.iter().map(|reason| reason.t.to_owned()).collect(),
-                balance_data.t.to_owned(),
+                Some(balance_data.t.to_owned()),
             ),
         }
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct UserCommandWithStatus(pub mina_rs::UserCommandWithStatusV1);
+pub enum UserCommandWithStatus {
+    V1(Box<mina_rs::UserCommandWithStatusV1>),
+    V2(v2::staged_ledger_diff::Command),
+}
 
 pub trait UserCommandWithStatusT {
     fn is_applied(&self) -> bool;
@@ -143,21 +153,25 @@ pub trait UserCommandWithStatusT {
 
     fn contains_public_key(&self, pk: &PublicKey) -> bool;
 
-    fn data(&self) -> &mina_rs::UserCommand;
+    fn data(&self) -> UserCommand;
 
     fn to_command(&self) -> Command;
 
     fn sender(&self) -> PublicKey;
 
-    fn receiver(&self) -> PublicKey;
+    fn receiver(&self) -> Vec<PublicKey>;
 
     fn fee_payer_pk(&self) -> PublicKey;
+
+    fn fee(&self) -> u64;
 
     fn nonce(&self) -> Nonce;
 
     fn amount(&self) -> u64;
 
     fn memo(&self) -> String;
+
+    fn signer(&self) -> PublicKey;
 
     fn receiver_account_creation_fee_paid(&self) -> bool;
 }
@@ -174,18 +188,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 
     fn status_data(&self) -> CommandStatusData {
-        match &self.0.t.status.t {
-            mina_rs::TransactionStatus::Applied(auxiliary_data, balance_data) => {
-                CommandStatusData::Applied {
-                    auxiliary_data: auxiliary_data.t.to_owned(),
-                    balance_data: balance_data.t.to_owned(),
-                }
-            }
-            mina_rs::TransactionStatus::Failed(reason, balance_data) => CommandStatusData::Failed(
-                reason.iter().map(|r| r.t.to_owned()).collect(),
-                balance_data.t.to_owned(),
-            ),
-        }
+        let status = match self {
+            Self::V1(v1) => &v1.t.status.t,
+            Self::V2(v2) => &v2.status.to_owned().into(),
+        };
+        CommandStatusData::from_transaction_status(status)
     }
 
     fn contains_public_key(&self, pk: &PublicKey) -> bool {
@@ -193,83 +200,133 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         signed.all_command_public_keys().contains(pk)
     }
 
-    fn data(&self) -> &mina_rs::UserCommand {
-        &self.0.t.data.t.t
+    fn data(&self) -> UserCommand {
+        match self {
+            Self::V1(v1) => v1.t.data.t.t.to_owned().into(),
+            Self::V2(v2) => v2.data.1.to_owned().into(),
+        }
     }
 
     fn to_command(&self) -> Command {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(ref v1) => match &v1.t.t.payload.t.t.body.t.t {
-                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
-                    let mina_rs::PaymentPayload {
-                        source_pk,
-                        receiver_pk,
-                        amount,
-                        ..
-                    } = payment_payload_v1.t.t.to_owned();
-                    Command::Payment(Payment {
-                        source: source_pk.into(),
-                        receiver: receiver_pk.into(),
-                        nonce: Nonce(v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
-                        amount: amount.t.t.into(),
-                        is_new_receiver_account: self.receiver_account_creation_fee_paid(),
-                    })
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                match &cmd.payload.t.t.body.t.t {
+                    mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
+                        let mina_rs::PaymentPayload {
+                            source_pk,
+                            receiver_pk,
+                            amount,
+                            ..
+                        } = &payment_payload_v1.t.t;
+                        Command::Payment(Payment {
+                            source: source_pk.to_owned().into(),
+                            receiver: receiver_pk.to_owned().into(),
+                            nonce: Nonce(cmd.payload.t.t.common.t.t.t.nonce.t.t as u32),
+                            amount: amount.t.t.into(),
+                            is_new_receiver_account: self.receiver_account_creation_fee_paid(),
+                        })
+                    }
+                    mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
+                        let mina_rs::StakeDelegation::SetDelegate {
+                            delegator,
+                            new_delegate,
+                        } = stake_delegation_v1.t.to_owned();
+                        Command::Delegation(Delegation {
+                            delegator: delegator.into(),
+                            delegate: new_delegate.into(),
+                            nonce: Nonce(cmd.payload.t.t.common.t.t.t.nonce.t.t as u32),
+                        })
+                    }
                 }
-                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
-                    let mina_rs::StakeDelegation::SetDelegate {
-                        delegator,
-                        new_delegate,
-                    } = stake_delegation_v1.t.to_owned();
-                    Command::Delegation(Delegation {
-                        delegator: delegator.into(),
-                        delegate: new_delegate.into(),
-                        nonce: Nonce(v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
-                    })
-                }
-            },
+            }
+            UserCommand::ZkappCommand(_) => unreachable!(),
         }
     }
 
     fn sender(&self) -> PublicKey {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(v1) => match &v1.t.t.payload.t.t.body.t.t {
-                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
-                    let mina_rs::PaymentPayload { ref source_pk, .. } = payment_payload_v1.t.t;
-                    source_pk.to_owned().into()
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                match &cmd.payload.t.t.body.t.t {
+                    mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
+                        let mina_rs::PaymentPayload { ref source_pk, .. } = payment_payload_v1.t.t;
+                        source_pk.to_owned().into()
+                    }
+                    mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
+                        let mina_rs::StakeDelegation::SetDelegate { ref delegator, .. } =
+                            stake_delegation_v1.t;
+                        delegator.to_owned().into()
+                    }
                 }
-                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
-                    let mina_rs::StakeDelegation::SetDelegate { ref delegator, .. } =
-                        stake_delegation_v1.t;
-                    delegator.to_owned().into()
-                }
-            },
+            }
+            UserCommand::ZkappCommand(zkapp) => zkapp.fee_payer.body.public_key.to_owned(),
         }
     }
 
-    fn receiver(&self) -> PublicKey {
+    fn receiver(&self) -> Vec<PublicKey> {
         match self.data() {
-            mina_rs::UserCommand::SignedCommand(v1) => match &v1.t.t.payload.t.t.body.t.t {
-                mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload_v1) => {
-                    let mina_rs::PaymentPayload {
-                        ref receiver_pk, ..
-                    } = payment_payload_v1.t.t;
-                    receiver_pk.to_owned().into()
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                match &cmd.payload.t.t.body.t.t {
+                    mina_rs::SignedCommandPayloadBody::PaymentPayload(v1) => {
+                        let mina_rs::PaymentPayload {
+                            ref receiver_pk, ..
+                        } = v1.t.t;
+                        vec![receiver_pk.to_owned().into()]
+                    }
+                    mina_rs::SignedCommandPayloadBody::StakeDelegation(v1) => {
+                        let mina_rs::StakeDelegation::SetDelegate {
+                            ref new_delegate, ..
+                        } = v1.t;
+                        vec![new_delegate.to_owned().into()]
+                    }
                 }
-                mina_rs::SignedCommandPayloadBody::StakeDelegation(stake_delegation_v1) => {
-                    let mina_rs::StakeDelegation::SetDelegate {
-                        ref new_delegate, ..
-                    } = stake_delegation_v1.t;
-                    new_delegate.to_owned().into()
-                }
-            },
+            }
+            UserCommand::ZkappCommand(zkapp) => zkapp
+                .account_updates
+                .iter()
+                .map(|x| x.elt.account_update.body.public_key.to_owned())
+                .collect(),
         }
     }
 
     fn fee_payer_pk(&self) -> PublicKey {
-        let mina_rs::UserCommand::SignedCommand(v1) = self.data();
-        let mina_rs::SignedCommandPayloadCommon { fee_payer_pk, .. } =
-            &v1.t.t.payload.t.t.common.t.t.t;
-        fee_payer_pk.to_owned().into()
+        match self.data() {
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                let mina_rs::SignedCommandPayloadCommon { fee_payer_pk, .. } =
+                    &cmd.payload.t.t.common.t.t.t;
+                fee_payer_pk.to_owned().into()
+            }
+            UserCommand::ZkappCommand(zkapp) => zkapp.fee_payer.body.public_key.to_owned(),
+        }
+    }
+
+    fn fee(&self) -> u64 {
+        match self.data() {
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                let mina_rs::SignedCommandPayloadCommon { fee, .. } = &cmd.payload.t.t.common.t.t.t;
+                fee.t.t
+            }
+            UserCommand::ZkappCommand(zkapp) => zkapp.fee_payer.body.fee,
+        }
     }
 
     fn nonce(&self) -> Nonce {
@@ -280,12 +337,38 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         match self.to_command() {
             Command::Delegation(_) => 0,
             Command::Payment(payment) => payment.amount.0,
+            Command::Zkapp(data) => data.account_updates.iter().fold(0, |acc, update| {
+                let delta: i64 = (&update.elt.account_update.body.balance_change).into();
+                if delta < 0 {
+                    acc - delta.unsigned_abs()
+                } else {
+                    acc + delta.unsigned_abs()
+                }
+            }),
         }
     }
 
     fn memo(&self) -> String {
-        let mina_rs::UserCommand::SignedCommand(cmd) = self.data();
-        decode_memo(&cmd.t.t.payload.t.t.common.t.t.t.memo.t.0)
+        match self.data() {
+            UserCommand::SignedCommand(signed_cmd) => {
+                let cmd = match signed_cmd.as_ref() {
+                    SignedCommand::V1(v1) => &v1.t.t,
+                    SignedCommand::V2(v2) => &v2.t.t,
+                };
+                decode_memo(&cmd.payload.t.t.common.t.t.t.memo.t.0)
+            }
+            UserCommand::ZkappCommand(zkapp) => decode_memo(zkapp.memo.as_bytes()),
+        }
+    }
+
+    fn signer(&self) -> PublicKey {
+        match self.data() {
+            UserCommand::SignedCommand(signed_cmd) => match signed_cmd.as_ref() {
+                SignedCommand::V1(v1) => v1.t.t.signer.to_owned().into(),
+                SignedCommand::V2(v2) => v2.t.t.signer.to_owned().into(),
+            },
+            UserCommand::ZkappCommand(zkapp) => zkapp.fee_payer.body.public_key,
+        }
     }
 }
 
@@ -302,6 +385,15 @@ pub fn decode_memo(encoded: &[u8]) -> String {
     String::from_utf8(value.to_vec()).unwrap_or_default()
 }
 
+impl From<String> for mina_rs::SignedCommandMemo {
+    fn from(value: String) -> Self {
+        let mut bytes = value.as_bytes().to_vec();
+        bytes.insert(0, bytes.len() as u8);
+        bytes.insert(0, 1); // version byte
+        Self(bytes)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct PaymentPayload(pub mina_rs::PaymentPayloadV1);
 
@@ -316,8 +408,12 @@ impl Command {
             .iter()
             .filter(|&command| command.is_applied())
             .map(|command| match command.data() {
-                mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    match &signed_command.t.t.payload.t.t.body.t.t {
+                UserCommand::SignedCommand(signed_cmd) => {
+                    let cmd = match signed_cmd.as_ref() {
+                        SignedCommand::V1(v1) => &v1.t.t,
+                        SignedCommand::V2(v2) => &v2.t.t,
+                    };
+                    match &cmd.payload.t.t.body.t.t {
                         mina_rs::SignedCommandPayloadBody::PaymentPayload(payment_payload) => {
                             let source: PublicKey =
                                 payment_payload.t.t.source_pk.to_owned().into();
@@ -328,7 +424,7 @@ impl Command {
                             Self::Payment(Payment {
                                 source,
                                 receiver,
-                                nonce: Nonce(signed_command.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32),
+                                nonce: Nonce(cmd.payload.t.t.common.t.t.t.nonce.t.t as u32),
                                 amount: amount.into(),
                                 is_new_receiver_account: command.receiver_account_creation_fee_paid(),
                             })
@@ -341,7 +437,7 @@ impl Command {
                                 } => {
                                     let delegator: PublicKey = delegator.into();
                                     let new_delegate: PublicKey = new_delegate.into();
-                                    let nonce = Nonce(signed_command.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32);
+                                    let nonce = Nonce(cmd.payload.t.t.common.t.t.t.nonce.t.t as u32);
                                     trace!("Delegation {{ delegator: {delegator}, new_delegate: {new_delegate}, nonce: {nonce} }}");
                                     Self::Delegation(Delegation {
                                         delegate: new_delegate,
@@ -353,6 +449,7 @@ impl Command {
                         }
                     }
                 }
+                UserCommand::ZkappCommand(_zkapp) => unimplemented!()
             })
             .collect()
     }
@@ -361,6 +458,7 @@ impl Command {
         match self {
             Self::Delegation(Delegation { nonce, .. }) => *nonce,
             Self::Payment(Payment { nonce, .. }) => *nonce,
+            Self::Zkapp(zkapp) => todo!("nonce {zkapp:?}"),
         }
     }
 }
@@ -389,24 +487,86 @@ impl StakeDelegation {
     }
 }
 
-impl From<mina_rs::TransactionStatus> for CommandStatusData {
-    fn from(value: mina_rs::TransactionStatus) -> Self {
-        Self::from_transaction_status(&value)
+/////////////////
+// Conversions //
+/////////////////
+
+impl From<v2::staged_ledger_diff::Command> for UserCommand {
+    fn from(value: v2::staged_ledger_diff::Command) -> Self {
+        match value.data.0 {
+            v2::staged_ledger_diff::CommandKind::SignedCommand => {
+                let opt: Option<SignedCommand> = value.data.1.into();
+                Self::SignedCommand(Box::new(opt.expect("signed command")))
+            }
+            v2::staged_ledger_diff::CommandKind::ZkappCommand => match value.data.1 {
+                v2::staged_ledger_diff::CommandData::ZkappCommandData(data) => {
+                    Self::ZkappCommand(data)
+                }
+                _ => unreachable!(),
+            },
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::Command> for UserCommandWithStatus {
+    fn from(value: v2::staged_ledger_diff::Command) -> Self {
+        Self::V2(value)
+    }
+}
+
+impl From<v2::staged_ledger_diff::CommandData> for UserCommand {
+    fn from(value: v2::staged_ledger_diff::CommandData) -> Self {
+        match value {
+            v2::staged_ledger_diff::CommandData::UserCommandData(data) => {
+                Self::SignedCommand(Box::new(SignedCommand::V2(Versioned {
+                    t: Versioned::new(data.as_ref().to_owned().into()),
+                    version: 2,
+                })))
+            }
+            v2::staged_ledger_diff::CommandData::ZkappCommandData(data) => Self::ZkappCommand(data),
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::CommandData> for mina_rs::UserCommand {
+    fn from(value: v2::staged_ledger_diff::CommandData) -> Self {
+        match value {
+            v2::staged_ledger_diff::CommandData::UserCommandData(data) => {
+                Self::SignedCommand(Versioned {
+                    t: Versioned::new(data.as_ref().to_owned().into()),
+                    version: 2,
+                })
+            }
+            v2::staged_ledger_diff::CommandData::ZkappCommandData(_) => unreachable!(),
+        }
+    }
+}
+
+impl From<mina_rs::UserCommand> for UserCommand {
+    fn from(value: mina_rs::UserCommand) -> Self {
+        let mina_rs::UserCommand::SignedCommand(versioned) = value;
+        if versioned.version == 1 {
+            return Self::SignedCommand(Box::new(SignedCommand::V1(versioned)));
+        }
+        if versioned.version == 2 {
+            unimplemented!()
+        }
+        unreachable!()
     }
 }
 
 impl From<mina_rs::UserCommandWithStatus> for UserCommandWithStatus {
     fn from(value: mina_rs::UserCommandWithStatus) -> Self {
-        Self(Versioned {
-            version: 1,
-            t: value,
-        })
+        Self::V1(Box::new(Versioned::new(value)))
     }
 }
 
-impl From<UserCommandWithStatus> for mina_rs::UserCommandWithStatus {
-    fn from(value: UserCommandWithStatus) -> Self {
-        value.0.inner()
+impl From<v2::staged_ledger_diff::Command> for mina_rs::UserCommandWithStatus {
+    fn from(value: v2::staged_ledger_diff::Command) -> Self {
+        Self {
+            data: Versioned::new(Versioned::new(value.data.1.into())),
+            status: Versioned::new(value.status.into()),
+        }
     }
 }
 
@@ -420,8 +580,8 @@ impl From<UserCommandWithStatus> for Command {
     }
 }
 
-impl From<(mina_rs::UserCommand, bool)> for Command {
-    fn from(value: (mina_rs::UserCommand, bool)) -> Self {
+impl From<(UserCommand, bool)> for Command {
+    fn from(value: (UserCommand, bool)) -> Self {
         let value: SignedCommandWithCreationData = value.into();
         value.into()
     }
@@ -430,6 +590,25 @@ impl From<(mina_rs::UserCommand, bool)> for Command {
 impl From<UserCommandWithStatus> for CommandStatusData {
     fn from(value: UserCommandWithStatus) -> Self {
         value.status_data()
+    }
+}
+
+impl From<v2::staged_ledger_diff::Status> for mina_rs::TransactionStatus {
+    fn from(value: v2::staged_ledger_diff::Status) -> Self {
+        match value {
+            v2::staged_ledger_diff::Status::Status(_) => {
+                Self::Applied(Default::default(), Default::default())
+            }
+            v2::staged_ledger_diff::Status::StatusAndFailure(_, (((failure,),),)) => {
+                Self::Failed(vec![Versioned::new(failure)], Default::default())
+            }
+        }
+    }
+}
+
+impl From<mina_rs::TransactionStatus> for CommandStatusData {
+    fn from(value: mina_rs::TransactionStatus) -> Self {
+        Self::from_transaction_status(&value)
     }
 }
 
@@ -449,6 +628,10 @@ impl std::fmt::Display for CommandType {
     }
 }
 
+//////////////////////
+// JSON conversions //
+//////////////////////
+
 impl From<CommandStatusData> for serde_json::Value {
     fn from(value: CommandStatusData) -> Self {
         use serde_json::*;
@@ -466,6 +649,7 @@ impl From<CommandStatusData> for serde_json::Value {
                 applied_obj.insert("kind".into(), status);
                 applied_obj.insert("auxiliary_data".into(), aux_json);
                 applied_obj.insert("balance_data".into(), balance_json);
+
                 Value::Object(applied_obj)
             }
             CommandStatusData::Failed(reason, balance_data) => {
@@ -484,6 +668,7 @@ impl From<CommandStatusData> for serde_json::Value {
                 failed_obj.insert("kind".into(), status);
                 failed_obj.insert("reason".into(), reason_json);
                 failed_obj.insert("balance_data".into(), balance_json);
+
                 Value::Object(failed_obj)
             }
         }
@@ -510,6 +695,7 @@ impl From<Command> for serde_json::Value {
                 payment.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Payment".into(), Value::Object(payment));
             }
+
             Command::Delegation(Delegation {
                 delegate,
                 delegator,
@@ -521,6 +707,8 @@ impl From<Command> for serde_json::Value {
                 delegation.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Stake_delegation".into(), Value::Object(delegation));
             }
+
+            Command::Zkapp(zkapp) => todo!("{zkapp:?}"),
         };
         Value::Object(json)
     }
@@ -539,13 +727,17 @@ impl From<UserCommandWithStatus> for serde_json::Value {
     fn from(value: UserCommandWithStatus) -> Self {
         use serde_json::*;
 
-        let mut object = Map::new();
-        let user_cmd: UserCommandWithStatus = value.0.inner().into();
+        let user_cmd: UserCommandWithStatus = match value {
+            UserCommandWithStatus::V1(v1) => v1.inner().into(),
+            UserCommandWithStatus::V2(v2) => v2.into(),
+        };
         let status: CommandStatusData = user_cmd.clone().into();
         let data: SignedCommandWithKind = user_cmd.into();
 
+        let mut object = Map::new();
         object.insert("data".into(), data.into());
         object.insert("status".into(), status.into());
+
         Value::Object(object)
     }
 }
@@ -560,25 +752,34 @@ impl std::fmt::Debug for UserCommandWithStatus {
 }
 
 fn to_auxiliary_json(
-    auxiliary_data: &mina_rs::TransactionStatusAuxiliaryData,
+    auxiliary_data: &Option<mina_rs::TransactionStatusAuxiliaryData>,
 ) -> serde_json::Value {
     use serde_json::*;
 
     let mut auxiliary_obj = Map::new();
     let fee_payer_account_creation_fee_paid = auxiliary_data
-        .fee_payer_account_creation_fee_paid
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .as_ref()
+        .and_then(|aux| {
+            aux.fee_payer_account_creation_fee_paid
+                .as_ref()
+                .map(|amt| Value::Number(Number::from(amt.t.t)))
+        })
         .unwrap_or(Value::Null);
     let receiver_account_creation_fee_paid = auxiliary_data
-        .receiver_account_creation_fee_paid
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner())))
+        .as_ref()
+        .and_then(|aux| {
+            aux.receiver_account_creation_fee_paid
+                .as_ref()
+                .map(|amt| Value::Number(Number::from(amt.t.t)))
+        })
         .unwrap_or(Value::Null);
     let created_token = auxiliary_data
-        .created_token
-        .clone()
-        .map(|id| Value::Number(Number::from(id.inner().inner().inner())))
+        .as_ref()
+        .and_then(|aux| {
+            aux.created_token
+                .as_ref()
+                .map(|id| Value::Number(Number::from(id.t.t.t)))
+        })
         .unwrap_or(Value::Null);
 
     auxiliary_obj.insert(
@@ -590,71 +791,46 @@ fn to_auxiliary_json(
         receiver_account_creation_fee_paid,
     );
     auxiliary_obj.insert("created_token".into(), created_token);
+
     Value::Object(auxiliary_obj)
 }
 
-fn to_balance_json(balance_data: &mina_rs::TransactionStatusBalanceData) -> serde_json::Value {
+fn to_balance_json(
+    balance_data: &Option<mina_rs::TransactionStatusBalanceData>,
+) -> serde_json::Value {
     use serde_json::*;
 
     let mut balance_obj = Map::new();
     let fee_payer_balance = balance_data
-        .fee_payer_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .as_ref()
+        .and_then(|bal| {
+            bal.fee_payer_balance
+                .as_ref()
+                .map(|amt| Value::Number(Number::from(amt.t.t.t)))
+        })
         .unwrap_or(Value::Null);
     let receiver_balance = balance_data
-        .receiver_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .as_ref()
+        .and_then(|bal| {
+            bal.receiver_balance
+                .as_ref()
+                .map(|amt| Value::Number(Number::from(amt.t.t.t)))
+        })
         .unwrap_or(Value::Null);
     let source_balance = balance_data
-        .source_balance
-        .clone()
-        .map(|amt| Value::Number(Number::from(amt.inner().inner().inner())))
+        .as_ref()
+        .and_then(|bal| {
+            bal.source_balance
+                .as_ref()
+                .map(|amt| Value::Number(Number::from(amt.t.t.t)))
+        })
         .unwrap_or(Value::Null);
 
     balance_obj.insert("fee_payer_balance".into(), fee_payer_balance);
     balance_obj.insert("receiver_balance".into(), receiver_balance);
     balance_obj.insert("source_balance".into(), source_balance);
-    Value::Object(balance_obj)
-}
 
-impl std::fmt::Display for TransactionStatusFailedType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TransactionStatusFailedType::Predicate => write!(f, "Predicate"),
-            TransactionStatusFailedType::SourceNotPresent => write!(f, "Source_not_present"),
-            TransactionStatusFailedType::ReceiverNotPresent => write!(f, "Receiver_not_present"),
-            TransactionStatusFailedType::AmountInsufficientToCreateAccount => {
-                write!(f, "Amount_insufficient_to_create_account")
-            }
-            TransactionStatusFailedType::CannotPayCreationFeeInToken => {
-                write!(f, "Cannot_pay_creation_fee_in_token")
-            }
-            TransactionStatusFailedType::SourceInsufficientBalance => {
-                write!(f, "Source_insufficient_balance")
-            }
-            TransactionStatusFailedType::SourceMinimumBalanceViolation => {
-                write!(f, "Source_minimum_balance_violation")
-            }
-            TransactionStatusFailedType::ReceiverAlreadyExists => {
-                write!(f, "Receiver_already_exists")
-            }
-            TransactionStatusFailedType::NotTokenOwner => write!(f, "Not_token_owner"),
-            TransactionStatusFailedType::MismatchedTokenPermissions => {
-                write!(f, "Mismatched_token_permissions")
-            }
-            TransactionStatusFailedType::Overflow => write!(f, "Overflow"),
-            TransactionStatusFailedType::SignedCommandOnSnappAccount => {
-                write!(f, "Signed_command_on_snapp_account")
-            }
-            TransactionStatusFailedType::SnappAccountNotPresent => {
-                write!(f, "Snapp_account_not_present")
-            }
-            TransactionStatusFailedType::UpdateNotPermitted => write!(f, "Update_not_permitted"),
-            TransactionStatusFailedType::IncorrectNonce => write!(f, "Incorrect_nonce"),
-        }
-    }
+    Value::Object(balance_obj)
 }
 
 #[cfg(test)]
@@ -715,6 +891,7 @@ mod test {
                     println!("a: {}", amount.0);
                     payments.push((source, receiver, amount));
                 }
+
                 Command::Delegation(Delegation {
                     delegate,
                     delegator,
@@ -725,6 +902,8 @@ mod test {
                     println!("n: {nonce}");
                     delegations.push((delegate, delegator));
                 }
+
+                Command::Zkapp(_) => unreachable!("no zkapp commands pre-hardfork"),
             }
         }
 
@@ -844,7 +1023,7 @@ mod test {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
-        fn convert(value: serde_json::Value) -> serde_json::Value {
+        fn convert(value: Value) -> Value {
             match value {
                 Value::Number(n) => Value::String(n.to_string()),
                 Value::Object(mut obj) => {
@@ -861,7 +1040,7 @@ mod test {
                 x => x,
             }
         }
-        fn fee_convert(value: serde_json::Value) -> serde_json::Value {
+        fn fee_convert(value: Value) -> Value {
             match value {
                 Value::Object(mut obj) => {
                     obj.iter_mut().for_each(|(key, x)| {
@@ -881,7 +1060,7 @@ mod test {
             }
         }
         /// Convert to Mina precomputed block json format
-        fn to_mina_format(json: serde_json::Value) -> serde_json::Value {
+        fn to_mina_format(json: Value) -> Value {
             match json {
                 Value::Object(mut obj) => {
                     let keys: Vec<String> = obj.keys().cloned().collect();
@@ -943,10 +1122,42 @@ mod test {
                 x => x,
             }
         }
-        fn to_mina_json(json: serde_json::Value) -> serde_json::Value {
+
+        fn convert_v1_to_v2(json: Value) -> Value {
+            match json {
+                Value::Object(mut obj) => {
+                    obj.iter_mut().for_each(|(key, value)| {
+                        if key == "body" {
+                            if let Value::Array(arr) = value {
+                                if let Value::Object(map) = arr.get_mut(1).unwrap() {
+                                    map.remove("source_pk");
+                                    map.remove("token_id");
+                                }
+                            }
+                        } else if key == "common" {
+                            if let Value::Object(map) = value {
+                                map.remove("fee_token");
+                            }
+                        } else if key == "status" {
+                            if let Value::Array(arr) = value {
+                                *value = Value::Array(vec![arr.first().cloned().unwrap()]);
+                            }
+                        } else {
+                            *value = convert_v1_to_v2(value.clone())
+                        }
+                    });
+                    Value::Object(obj)
+                }
+                Value::Array(arr) => Value::Array(arr.into_iter().map(convert_v1_to_v2).collect()),
+                x => x,
+            }
+        }
+
+        fn to_mina_json(json: Value) -> Value {
             to_mina_format(convert(fee_convert(json)))
         }
 
+        // v1
         let path: PathBuf = "./tests/data/non_sequential_blocks/mainnet-220897-3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw.json".into();
         let contents = std::fs::read(path.clone())?;
         let mina_json: Value =
@@ -955,7 +1166,102 @@ mod test {
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        assert_eq!(convert(mina_json), to_mina_json(user_cmd_with_status));
+        assert_eq!(
+            convert(mina_json),
+            to_mina_json(user_cmd_with_status.clone())
+        );
+        assert_eq!(
+            serde_json::to_string_pretty(&to_mina_json(user_cmd_with_status)).unwrap(),
+            r#"{
+  "data": [
+    "Signed_command",
+    {
+      "payload": {
+        "body": [
+          "Payment",
+          {
+            "amount": "536900000000",
+            "receiver_pk": "B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs",
+            "source_pk": "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG",
+            "token_id": "1"
+          }
+        ],
+        "common": {
+          "fee": "0.1",
+          "fee_payer_pk": "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG",
+          "fee_token": "1",
+          "memo": null,
+          "nonce": "14",
+          "valid_until": "4294967295"
+        }
+      },
+      "signature": null,
+      "signer": "B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"
+    }
+  ],
+  "status": [
+    "Applied",
+    {
+      "created_token": null,
+      "fee_payer_account_creation_fee_paid": null,
+      "receiver_account_creation_fee_paid": null
+    },
+    {
+      "fee_payer_balance": "0",
+      "receiver_balance": "4347326279755751",
+      "source_balance": "0"
+    }
+  ]
+}"#
+        );
+
+        // v2
+        let path: PathBuf = "./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json".into();
+        let contents = std::fs::read(path.clone())?;
+        let mina_json: Value = from_slice::<Value>(&contents)?["data"]["staged_ledger_diff"]
+            ["diff"][0]["commands"][0]
+            .clone();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let user_cmd_with_status = block.commands()[0].clone();
+        let user_cmd_with_status: Value = user_cmd_with_status.into();
+
+        assert_eq!(
+            convert(mina_json),
+            convert_v1_to_v2(to_mina_json(user_cmd_with_status.clone()))
+        );
+        assert_eq!(
+            serde_json::to_string_pretty(&convert_v1_to_v2(to_mina_json(user_cmd_with_status)))
+                .unwrap(),
+            r#"{
+  "data": [
+    "Signed_command",
+    {
+      "payload": {
+        "body": [
+          "Payment",
+          {
+            "amount": "1000000000",
+            "receiver_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+          }
+        ],
+        "common": {
+          "fee": "0.0011",
+          "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
+          "memo": null,
+          "nonce": "765",
+          "valid_until": "4294967295"
+        }
+      },
+      "signature": null,
+      "signer": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+    }
+  ],
+  "status": [
+    "Applied"
+  ]
+}"#
+        );
+
         Ok(())
     }
 }

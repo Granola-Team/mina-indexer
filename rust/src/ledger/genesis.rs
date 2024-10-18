@@ -6,7 +6,6 @@ use super::{
 use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
 use anyhow::anyhow;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
@@ -156,7 +155,7 @@ impl GenesisLedger {
 
         for genesis_account in genesis.accounts {
             let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
-                Ok(amt) => (amt * dec!(1_000_000_000))
+                Ok(amt) => (amt * MINA_SCALE_DEC)
                     .to_u64()
                     .expect("Parsed Genesis Balance has wrong format"),
                 Err(_) => panic!("Unable to parse Genesis Balance"),
@@ -200,21 +199,21 @@ impl From<GenesisAccountTiming> for Timing {
     fn from(value: GenesisAccountTiming) -> Self {
         Self {
             initial_minimum_balance: match value.initial_minimum_balance.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000))
+                Ok(amt) => (amt * MINA_SCALE_DEC)
                     .to_u64()
                     .expect("genesis initial minimum balance is u64"),
                 Err(_) => panic!("Unable to parse genesis initial minimum balance"),
             },
             cliff_time: value.cliff_time.parse().expect("cliff time is u64"),
             cliff_amount: match value.cliff_amount.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000))
+                Ok(amt) => (amt * MINA_SCALE_DEC)
                     .to_u64()
                     .expect("genesis cliff amount is u64"),
                 Err(_) => panic!("Unable to parse genesis cliff amount"),
             },
             vesting_period: value.vesting_period.parse().expect("vesting period is u64"),
             vesting_increment: match value.vesting_increment.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000))
+                Ok(amt) => (amt * MINA_SCALE_DEC)
                     .to_u64()
                     .expect("genesis vesting increment is u64"),
                 Err(_) => panic!("Unable to parse genesis vesting increment"),

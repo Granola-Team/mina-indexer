@@ -9,12 +9,18 @@ use crate::{
         UserCommandWithStatus, UserCommandWithStatusT,
     },
     constants::{berkeley::*, *},
-    ledger::{coinbase::Coinbase, public_key::PublicKey, username::Username, LedgerHash},
+    ledger::{
+        coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
+        public_key::PublicKey,
+        username::Username,
+        LedgerHash,
+    },
     mina_blocks::{common::from_str, v2},
     protocol::serialization_types::{
         protocol_state::{ProtocolState, ProtocolStateJson},
-        snark_work as mina_snark, staged_ledger_diff as mina_rs,
+        staged_ledger_diff as mina_rs,
     },
+    snark_work::SnarkWorkSummary,
     store::username::UsernameUpdate,
 };
 use serde::{Deserialize, Serialize};
@@ -212,6 +218,26 @@ impl PrecomputedBlock {
         Ok(precomputed_block)
     }
 
+    pub fn scheduled_time(&self) -> String {
+        match self {
+            Self::V1(v1) => v1.scheduled_time.to_string(),
+            Self::V2(v2) => v2.scheduled_time.to_string(),
+        }
+    }
+
+    pub fn previous_state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => {
+                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
+            }
+            Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
+        }
+    }
+
+    ////////////////////////
+    // Staged ledger diff //
+    ////////////////////////
+
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
         let mut commands = self.commands_pre_diff();
         commands.append(&mut self.commands_post_diff());
@@ -230,9 +256,16 @@ impl PrecomputedBlock {
                 .commands
                 .iter()
                 .cloned()
-                .map(UserCommandWithStatus)
+                .map(|c| UserCommandWithStatus::V1(Box::new(c)))
                 .collect(),
-            Self::V2(_) => todo!("commands_pre_diff {}", self.summary()),
+            Self::V2(v2) => v2
+                .staged_ledger_diff
+                .diff
+                .iter()
+                .flatten()
+                .flat_map(|d| d.commands.to_owned())
+                .map(UserCommandWithStatus::V2)
+                .collect(),
         }
     }
 
@@ -250,27 +283,45 @@ impl PrecomputedBlock {
                         .commands
                         .iter()
                         .cloned()
-                        .map(UserCommandWithStatus)
+                        .map(|c| UserCommandWithStatus::V1(Box::new(c)))
                         .collect()
                 }),
-            Self::V2(_) => todo!("commands_post_diff {}", self.summary()),
+            Self::V2(v2) => v2.staged_ledger_diff.diff[1]
+                .as_ref()
+                .map_or(vec![], |diff| {
+                    diff.commands
+                        .iter()
+                        .cloned()
+                        .map(UserCommandWithStatus::V2)
+                        .collect()
+                }),
         }
     }
 
-    pub fn tx_fees(&self) -> u64 {
-        self.commands()
-            .into_iter()
+    /// Returns the vector of user command hashes
+    pub fn command_hashes(&self) -> Vec<TxnHash> {
+        SignedCommand::from_precomputed(self)
+            .iter()
             .map(|cmd| {
-                let signed: SignedCommand = cmd.into();
-                signed.fee()
+                cmd.signed_command
+                    .hash_signed_command()
+                    .expect("signed command hash")
             })
-            .sum()
+            .collect()
     }
 
+    // fees
+
+    /// Computes total fees for all user commands in block
+    pub fn tx_fees(&self) -> u64 {
+        self.commands().into_iter().map(|cmd| cmd.fee()).sum()
+    }
+
+    /// Computes total fees for all SNARK work in block
     pub fn snark_fees(&self) -> u64 {
         self.completed_works()
             .into_iter()
-            .map(|work| work.fee.t.t)
+            .map(|work| work.fee)
             .sum()
     }
 
@@ -305,17 +356,36 @@ impl PrecomputedBlock {
                 );
             } else if status.receiver_account_creation_fee_paid().is_some() {
                 account_balances.insert(
-                    cmd.receiver(),
+                    cmd.receiver().first().expect("receiver").to_owned(),
                     status.receiver_balance().unwrap_or_default(),
                 );
             }
         });
+
         (account_balances, new_coinbase_receiver)
     }
 
     //////////////////////
     // Blockchain state //
     //////////////////////
+
+    pub fn timestamp(&self) -> u64 {
+        match self {
+            Self::V1(v1) => {
+                v1.protocol_state
+                    .body
+                    .t
+                    .t
+                    .blockchain_state
+                    .t
+                    .t
+                    .timestamp
+                    .t
+                    .t
+            }
+            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp,
+        }
+    }
 
     pub fn snarked_ledger_hash(&self) -> Option<LedgerHash> {
         match self {
@@ -360,6 +430,259 @@ impl PrecomputedBlock {
                 .non_snark
                 .ledger_hash
                 .to_owned(),
+        }
+    }
+
+    pub fn completed_works(&self) -> Vec<SnarkWorkSummary> {
+        let mut completed_works = self.completed_works_post_diff().unwrap_or_default();
+        completed_works.append(&mut self.completed_works_pre_diff());
+        completed_works
+    }
+
+    pub fn completed_works_pre_diff(&self) -> Vec<SnarkWorkSummary> {
+        match self {
+            Self::V1(v1) => v1
+                .staged_ledger_diff
+                .diff
+                .t
+                .0
+                .t
+                .t
+                .completed_works
+                .iter()
+                .map(|w| w.t.to_owned().into())
+                .collect(),
+            Self::V2(v2) => v2.staged_ledger_diff.diff[0]
+                .as_ref()
+                .expect("V2 staged ledger pre-diff")
+                .completed_works
+                .iter()
+                .cloned()
+                .map(|w| w.into())
+                .collect(),
+        }
+    }
+
+    pub fn completed_works_post_diff(&self) -> Option<Vec<SnarkWorkSummary>> {
+        match self {
+            Self::V1(v1) => v1.staged_ledger_diff.diff.t.1.as_ref().map(|d| {
+                d.t.t
+                    .completed_works
+                    .iter()
+                    .map(|w| w.t.to_owned().into())
+                    .collect()
+            }),
+            Self::V2(v2) => v2.staged_ledger_diff.diff[1].as_ref().map(|d| {
+                d.completed_works
+                    .iter()
+                    .cloned()
+                    .map(|w| w.into())
+                    .collect()
+            }),
+        }
+    }
+
+    pub fn pre_diff_coinbase(&self) -> CoinbaseKind {
+        match self {
+            Self::V1(v1) => match &v1.staged_ledger_diff.diff.t.0.t.t.coinbase.t {
+                mina_rs::CoinBase::None => CoinbaseKind::None,
+                mina_rs::CoinBase::Coinbase(cb) => CoinbaseKind::Coinbase(cb.as_ref().map(|cb| {
+                    let mina_rs::CoinBaseFeeTransfer { receiver_pk, fee } = cb.t.t.to_owned();
+                    CoinbaseFeeTransfer {
+                        receiver_pk: PublicKey::from(receiver_pk),
+                        fee: fee.inner().inner(),
+                    }
+                })),
+                mina_rs::CoinBase::CoinbaseAndFeeTransferViaCoinbase(fst, snd) => {
+                    CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
+                        fst.as_ref().map(|c| c.t.t.to_owned().into()),
+                        snd.as_ref().map(|c| c.t.t.to_owned().into()),
+                    )
+                }
+            },
+            Self::V2(v2) => v2.staged_ledger_diff.diff[0]
+                .as_ref()
+                .expect("V2 staged ledger pre diff")
+                .coinbase
+                .to_owned()
+                .into(),
+        }
+    }
+
+    pub fn post_diff_coinbase(&self) -> Option<CoinbaseKind> {
+        match self {
+            Self::V1(v1) => match v1
+                .staged_ledger_diff
+                .diff
+                .t
+                .1
+                .as_ref()
+                .map(|diff| diff.t.t.coinbase.t.to_owned())
+            {
+                None => None,
+                Some(mina_rs::CoinBase::None) => Some(CoinbaseKind::None),
+                Some(mina_rs::CoinBase::Coinbase(x)) => Some(CoinbaseKind::Coinbase(x.map(|cb| {
+                    let mina_rs::CoinBaseFeeTransfer { receiver_pk, fee } = cb.inner().inner();
+                    CoinbaseFeeTransfer {
+                        receiver_pk: PublicKey::from(receiver_pk),
+                        fee: fee.inner().inner(),
+                    }
+                }))),
+                Some(mina_rs::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y)) => {
+                    Some(CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
+                        x.map(|c| c.inner().inner().into()),
+                        y.map(|c| c.inner().inner().into()),
+                    ))
+                }
+            },
+            Self::V2(v2) => v2.staged_ledger_diff.diff[1]
+                .as_ref()
+                .map(|diff| diff.coinbase.to_owned().into()),
+        }
+    }
+
+    pub fn coinbase_receiver_balance(&self) -> Option<u64> {
+        match self {
+            Self::V1(v1) => {
+                for internal_balance in v1
+                    .staged_ledger_diff
+                    .diff
+                    .t
+                    .0
+                    .t
+                    .t
+                    .internal_command_balances
+                    .iter()
+                {
+                    if let mina_rs::InternalCommandBalanceData::CoinBase(ref v1) =
+                        internal_balance.t
+                    {
+                        return Some(v1.t.coinbase_receiver_balance.t.t.t);
+                    }
+                }
+                None
+            }
+            Self::V2(_v2) => None,
+        }
+    }
+
+    pub fn internal_command_balances(&self) -> Vec<mina_rs::InternalCommandBalanceData> {
+        match self {
+            Self::V1(v1) => v1
+                .staged_ledger_diff
+                .diff
+                .t
+                .0
+                .t
+                .t
+                .internal_command_balances
+                .iter()
+                .map(|bal| bal.t.to_owned())
+                .collect(),
+            Self::V2(_v2) => vec![], // this data does not exist in V2 PCBs
+        }
+    }
+
+    pub fn fee_transfer_balances(&self) -> Vec<(u64, Option<u64>)> {
+        let mut res = vec![];
+        for internal_balance in self.internal_command_balances() {
+            if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
+                res.push((
+                    x.t.receiver1_balance.t.t.t,
+                    x.t.receiver2_balance.map(|balance| balance.t.t.t),
+                ));
+            }
+        }
+        res
+    }
+
+    /////////////////
+    // Public keys //
+    /////////////////
+
+    pub fn consensus_public_keys(&self) -> HashSet<PublicKey> {
+        HashSet::from([
+            self.block_creator(),
+            self.coinbase_receiver(),
+            self.block_stake_winner(),
+        ])
+    }
+
+    /// All applied & failed command public keys
+    pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
+        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
+
+        // add keys from all commands
+        let commands = self.commands();
+        commands.iter().for_each(|command| {
+            let mut pks = vec![command.sender(), command.fee_payer_pk(), command.signer()];
+            pks.append(&mut command.receiver());
+            add_keys(&mut pk_set, pks);
+        });
+
+        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
+        pks.sort();
+        pks
+    }
+
+    /// Prover public keys for completed SNARK work
+    pub fn prover_keys(&self) -> Vec<PublicKey> {
+        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
+
+        // add prover keys from completed SNARK work
+        let completed_works = self.completed_works();
+        completed_works.iter().for_each(|work| {
+            pk_set.insert(work.prover.to_owned());
+        });
+
+        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
+        pks.sort();
+        pks
+    }
+
+    /// Vec of public keys which send or receive funds in applied commands and
+    /// coinbase
+    pub fn active_public_keys(&self) -> Vec<PublicKey> {
+        // block creator and block stake winner
+        let mut public_keys: HashSet<PublicKey> =
+            HashSet::from([self.block_creator(), self.block_stake_winner()]);
+
+        // coinbase receiver if coinbase is applied
+        if Coinbase::from_precomputed(self).is_coinbase_applied() {
+            public_keys.insert(self.coinbase_receiver());
+        }
+
+        // applied commands
+        self.commands()
+            .iter()
+            .filter(|cmd| cmd.is_applied())
+            .for_each(|command| {
+                let mut pks = vec![command.sender(), command.fee_payer_pk(), command.signer()];
+                pks.append(&mut command.receiver());
+                add_keys(&mut public_keys, pks);
+            });
+
+        let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();
+        pks.sort();
+        pks
+    }
+
+    pub fn all_public_keys(&self) -> Vec<PublicKey> {
+        let mut public_keys: HashSet<PublicKey> =
+            self.all_command_public_keys().into_iter().collect();
+        add_keys(&mut public_keys, self.prover_keys());
+
+        let mut public_keys: Vec<PublicKey> = public_keys.into_iter().collect();
+        public_keys.sort();
+        public_keys
+    }
+
+    pub fn genesis_state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => {
+                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
+            }
+            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.to_owned(),
         }
     }
 
@@ -450,71 +773,6 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn internal_command_balances(&self) -> Vec<mina_rs::InternalCommandBalanceData> {
-        self.staged_ledger_pre_diff()
-            .internal_command_balances
-            .iter()
-            .map(|x| x.t.to_owned())
-            .collect()
-    }
-
-    pub fn staged_ledger_diff_tuple(&self) -> mina_rs::StagedLedgerDiffTuple {
-        match self {
-            Self::V1(v1) => v1.staged_ledger_diff.diff.t.to_owned(),
-            Self::V2(_v2) => todo!("PrecomputedBlock::V2 staged_ledger_diff_tuple()"),
-        }
-    }
-
-    pub fn staged_ledger_pre_diff(&self) -> mina_rs::StagedLedgerPreDiff {
-        self.staged_ledger_diff_tuple().0.t.t
-    }
-
-    pub fn staged_ledger_post_diff(&self) -> Option<mina_rs::StagedLedgerPreDiff> {
-        self.staged_ledger_diff_tuple().1.map(|x| x.t.t)
-    }
-
-    pub fn completed_works(&self) -> Vec<mina_snark::TransactionSnarkWork> {
-        let mut completed_works = self.completed_works_post_diff().unwrap_or_default();
-        completed_works.append(&mut self.completed_works_pre_diff());
-        completed_works
-    }
-
-    pub fn completed_works_pre_diff(&self) -> Vec<mina_snark::TransactionSnarkWork> {
-        self.staged_ledger_pre_diff()
-            .completed_works
-            .iter()
-            .map(|x| x.t.clone())
-            .collect()
-    }
-
-    pub fn completed_works_post_diff(&self) -> Option<Vec<mina_snark::TransactionSnarkWork>> {
-        self.staged_ledger_post_diff()
-            .map(|diff| diff.completed_works.iter().map(|x| x.t.clone()).collect())
-    }
-
-    pub fn coinbase_receiver_balance(&self) -> Option<u64> {
-        for internal_balance in self.internal_command_balances() {
-            if let mina_rs::InternalCommandBalanceData::CoinBase(x) = internal_balance {
-                return Some(x.t.coinbase_receiver_balance.t.t.t);
-            }
-        }
-
-        None
-    }
-
-    pub fn fee_transfer_balances(&self) -> Vec<(u64, Option<u64>)> {
-        let mut res = vec![];
-        for internal_balance in self.internal_command_balances() {
-            if let mina_rs::InternalCommandBalanceData::FeeTransfer(x) = internal_balance {
-                res.push((
-                    x.t.receiver1_balance.t.t.t,
-                    x.t.receiver2_balance.map(|balance| balance.t.t.t),
-                ));
-            }
-        }
-        res
-    }
-
     pub fn coinbase_receiver(&self) -> PublicKey {
         match self {
             Self::V1(v1) => v1
@@ -550,98 +808,6 @@ impl PrecomputedBlock {
                     .supercharge_coinbase
             }
             Self::V2(v2) => v2.protocol_state.body.consensus_state.supercharge_coinbase,
-        }
-    }
-
-    pub fn consensus_public_keys(&self) -> HashSet<PublicKey> {
-        HashSet::from([
-            self.block_creator(),
-            self.coinbase_receiver(),
-            self.block_stake_winner(),
-        ])
-    }
-
-    /// All applied & failed command public keys
-    pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
-        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
-
-        // add keys from all commands
-        let commands = self.commands();
-        commands.iter().for_each(|command| {
-            let signed_command = match command.data() {
-                mina_rs::UserCommand::SignedCommand(signed_command) => {
-                    SignedCommand(signed_command.to_owned())
-                }
-            };
-            add_keys(&mut pk_set, signed_command.all_command_public_keys());
-        });
-
-        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
-        pks.sort();
-        pks
-    }
-
-    /// Prover public keys for completed SNARK work
-    pub fn prover_keys(&self) -> Vec<PublicKey> {
-        let mut pk_set: HashSet<PublicKey> = self.consensus_public_keys();
-
-        // add prover keys from completed SNARK work
-        let completed_works = self.completed_works();
-        completed_works.iter().for_each(|work| {
-            pk_set.insert(work.prover.clone().into());
-        });
-
-        let mut pks: Vec<PublicKey> = pk_set.into_iter().collect();
-        pks.sort();
-        pks
-    }
-
-    /// Vec of public keys which send or receive funds in applied commands and
-    /// coinbase
-    pub fn active_public_keys(&self) -> Vec<PublicKey> {
-        // block creator and block stake winner
-        let mut public_keys: HashSet<PublicKey> =
-            HashSet::from([self.block_creator(), self.block_stake_winner()]);
-
-        // coinbase receiver if coinbase is applied
-        if Coinbase::from_precomputed(self).is_coinbase_applied() {
-            public_keys.insert(self.coinbase_receiver());
-        }
-
-        // applied commands
-        self.commands()
-            .iter()
-            .filter(|cmd| cmd.is_applied())
-            .for_each(|command| {
-                let signed_command = match command.data() {
-                    mina_rs::UserCommand::SignedCommand(signed_command) => {
-                        SignedCommand(signed_command.to_owned())
-                    }
-                };
-                add_keys(&mut public_keys, signed_command.all_command_public_keys());
-            });
-
-        let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();
-        pks.sort();
-        pks
-    }
-
-    pub fn all_public_keys(&self) -> Vec<PublicKey> {
-        let mut public_keys: HashSet<PublicKey> =
-            self.all_command_public_keys().into_iter().collect();
-        add_keys(&mut public_keys, self.prover_keys());
-
-        let mut public_keys: Vec<PublicKey> = public_keys.into_iter().collect();
-        public_keys.sort();
-        public_keys
-    }
-
-    pub fn genesis_state_hash(&self) -> BlockHash {
-        match self {
-            Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
-            }
-            Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.to_owned(),
         }
     }
 
@@ -1040,73 +1206,6 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn timestamp(&self) -> u64 {
-        match self {
-            Self::V1(v1) => {
-                v1.protocol_state
-                    .body
-                    .t
-                    .t
-                    .blockchain_state
-                    .t
-                    .t
-                    .timestamp
-                    .t
-                    .t
-            }
-            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp,
-        }
-    }
-
-    pub fn scheduled_time(&self) -> String {
-        match self {
-            Self::V1(v1) => v1.scheduled_time.to_string(),
-            Self::V2(v2) => v2.scheduled_time.to_string(),
-        }
-    }
-
-    pub fn previous_state_hash(&self) -> BlockHash {
-        match self {
-            Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
-            }
-            Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
-        }
-    }
-
-    pub fn command_hashes(&self) -> Vec<TxnHash> {
-        SignedCommand::from_precomputed(self)
-            .iter()
-            .map(|cmd| {
-                cmd.signed_command
-                    .hash_signed_command()
-                    .expect("signed command hash")
-            })
-            .collect()
-    }
-
-    pub fn username_updates(&self) -> UsernameUpdate {
-        let mut updates = HashMap::new();
-        self.commands().iter().for_each(|cmd| {
-            // check for the special name service txns
-            if cmd.is_applied() {
-                let sender = cmd.sender();
-                let receiver = cmd.receiver();
-                let memo = cmd.memo();
-                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
-                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
-                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
-                {
-                    updates.insert(
-                        sender,
-                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
-                    );
-                }
-            }
-        });
-        UsernameUpdate(updates)
-    }
-
     /// Base64 encoded string
     pub fn last_vrf_output(&self) -> String {
         match self {
@@ -1159,6 +1258,30 @@ impl PrecomputedBlock {
                     .expect("V2 last VRF output decodes")
             }
         }
+    }
+
+    /// Returns the map username updates in the block
+    pub fn username_updates(&self) -> UsernameUpdate {
+        let mut updates = HashMap::new();
+        self.commands().iter().for_each(|cmd| {
+            // check for the special name service txns
+            if cmd.is_applied() {
+                let sender = cmd.sender();
+                let receiver = cmd.receiver();
+                let receiver = receiver.first().expect("receiver");
+                let memo = cmd.memo();
+                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+                {
+                    updates.insert(
+                        sender,
+                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                    );
+                }
+            }
+        });
+        UsernameUpdate(updates)
     }
 
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
@@ -1225,6 +1348,10 @@ impl PrecomputedBlock {
         }
     }
 }
+
+/////////////////
+// Conversions //
+/////////////////
 
 impl std::cmp::PartialOrd for PrecomputedBlock {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

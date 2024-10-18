@@ -1,6 +1,6 @@
 use crate::{
     proof_systems::signer::pubkey::{CompressedPubKey, PubKey},
-    protocol::serialization_types::signatures::PublicKeyV1,
+    protocol::serialization_types::signatures::{PublicKey2V1, PublicKeyV1},
 };
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -99,6 +99,12 @@ impl From<PublicKeyV1> for PublicKey {
     fn from(v1: PublicKeyV1) -> Self {
         let pk = CompressedPubKey::from(&v1.0.inner().inner());
         Self(pk.into_address())
+    }
+}
+
+impl From<PublicKey2V1> for PublicKey {
+    fn from(v1: PublicKey2V1) -> Self {
+        v1.0.t.into()
     }
 }
 

@@ -4,6 +4,7 @@ use super::account::Nonce;
 use crate::{
     block::{extract_height_and_hash, extract_network, BlockHash},
     chain::Network,
+    constants::MINA_SCALE_DEC,
     ledger::{
         account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
         public_key::PublicKey,
@@ -14,7 +15,6 @@ use crate::{
 use anyhow::Context;
 use log::trace;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -105,7 +105,7 @@ impl From<StakingAccountJson> for StakingAccount {
         let token = Some(value.token.parse().expect("token is u32"));
         let nonce = value.nonce.map(|nonce| nonce.into());
         let balance = match value.balance.parse::<Decimal>() {
-            Ok(amt) => (amt * dec!(1_000_000_000))
+            Ok(amt) => (amt * MINA_SCALE_DEC)
                 .to_u64()
                 .expect("staking account balance"),
             Err(e) => panic!("Unable to parse staking account balance: {e}"),
@@ -117,15 +117,15 @@ impl From<StakingAccountJson> for StakingAccount {
                 .parse()
                 .expect("vesting_period is u64"),
             initial_minimum_balance: match timing.initial_minimum_balance.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000)).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
                 Err(e) => panic!("Unable to parse initial_minimum_balance: {e}"),
             },
             cliff_amount: match timing.cliff_amount.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000)).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
                 Err(e) => panic!("Unable to parse cliff_amount: {e}"),
             },
             vesting_increment: match timing.vesting_increment.parse::<Decimal>() {
-                Ok(amt) => (amt * dec!(1_000_000_000)).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
                 Err(e) => panic!("Unable to parse vesting_increment: {e}"),
             },
         });

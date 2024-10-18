@@ -80,7 +80,7 @@ impl UserCommandStore for IndexerStore {
             // so we can reconstruct the key
             batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
-                txn_hash.0.as_bytes(),
+                txn_hash.ref_inner().as_bytes(),
                 block.global_slot_since_genesis().to_be_bytes(),
             );
 
@@ -110,29 +110,30 @@ impl UserCommandStore for IndexerStore {
             );
 
             // add receiver index
-            let receiver = command.receiver();
-            batch.put_cf(
-                self.txn_to_height_sort_cf(),
-                pk_txn_sort_key(
-                    &receiver,
-                    block.blockchain_length(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
-                command.amount().to_be_bytes(),
-            );
-            batch.put_cf(
-                self.txn_to_slot_sort_cf(),
-                pk_txn_sort_key(
-                    &receiver,
-                    block.global_slot_since_genesis(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
-                command.amount().to_be_bytes(),
-            );
+            for receiver in command.receiver() {
+                batch.put_cf(
+                    self.txn_to_height_sort_cf(),
+                    pk_txn_sort_key(
+                        &receiver,
+                        block.blockchain_length(),
+                        command.nonce().0,
+                        &txn_hash,
+                        &state_hash,
+                    ),
+                    command.amount().to_be_bytes(),
+                );
+                batch.put_cf(
+                    self.txn_to_slot_sort_cf(),
+                    pk_txn_sort_key(
+                        &receiver,
+                        block.global_slot_since_genesis(),
+                        command.nonce().0,
+                        &txn_hash,
+                        &state_hash,
+                    ),
+                    command.amount().to_be_bytes(),
+                );
+            }
         }
 
         // per account
@@ -212,7 +213,10 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command blocks {txn_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.user_command_state_hashes_cf(), txn_hash.0.as_bytes())?
+            .get_pinned_cf(
+                self.user_command_state_hashes_cf(),
+                txn_hash.ref_inner().as_bytes(),
+            )?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
@@ -239,14 +243,14 @@ impl UserCommandStore for IndexerStore {
         let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
-            txn_hash.0.as_bytes(),
+            txn_hash.ref_inner().as_bytes(),
             (blocks.len() as u32).to_be_bytes(),
         );
 
         // set containing blocks
         batch.put_cf(
             self.user_command_state_hashes_cf(),
-            txn_hash.0.as_bytes(),
+            txn_hash.ref_inner().as_bytes(),
             serde_json::to_vec(&blocks)?,
         );
         Ok(())
@@ -365,7 +369,7 @@ impl UserCommandStore for IndexerStore {
             .database
             .get_cf(
                 self.user_commands_num_containing_blocks_cf(),
-                txn_hash.0.as_bytes(),
+                txn_hash.ref_inner().as_bytes(),
             )?
             .map(from_be_bytes))
     }
@@ -596,10 +600,11 @@ impl UserCommandStore for IndexerStore {
         self.increment_user_commands_pk_total_count(&sender)?;
 
         // receiver epoch & total
-        let receiver = command.receiver();
-        if sender != receiver {
-            self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
-            self.increment_user_commands_pk_total_count(&receiver)?;
+        for receiver in command.receiver() {
+            if sender != receiver {
+                self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
+                self.increment_user_commands_pk_total_count(&receiver)?;
+            }
         }
 
         // epoch & total counts
@@ -633,7 +638,7 @@ impl<'a> TxnCsvRecord<'a> {
             from: cmd.command.source_pk().0,
             to: cmd.command.receiver_pk().0,
             nonce: cmd.nonce.0,
-            hash: &cmd.tx_hash.0,
+            hash: cmd.tx_hash.ref_inner(),
             fee: cmd.command.fee(),
             amount: cmd.command.amount(),
             memo: cmd.command.memo(),

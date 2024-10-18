@@ -176,7 +176,7 @@ impl TransactionsQueryRoot {
                     break;
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
                 let state_hash = state_hash_suffix(&key)?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
@@ -270,7 +270,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -422,7 +422,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -550,7 +550,7 @@ impl TransactionsQueryRoot {
                     }
                 }
 
-                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::LEN].to_vec())?;
+                let txn_hash = TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())?;
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
@@ -578,7 +578,10 @@ impl TransactionsQueryRoot {
             if let Some(ref q) = query {
                 // early exit if txn hashes don't match if we're filtering by it
                 if q.hash.is_some()
-                    && q.hash != user_commands_iterator_txn_hash(&key).ok().map(|t| t.0)
+                    && q.hash
+                        != user_commands_iterator_txn_hash(&key)
+                            .ok()
+                            .map(|t| t.to_string())
                 {
                     continue;
                 }
@@ -651,54 +654,55 @@ impl TransactionWithoutBlock {
                 failed_types.first().map(|f| f.to_string())
             }
         };
-        match cmd.command {
-            SignedCommand(signed_cmd) => {
-                let payload = signed_cmd.t.t.payload;
-                let common = payload.t.t.common.t.t.t;
-                let token = common.fee_token.t.t.t;
-                let nonce = common.nonce.t.t as u32;
-                let fee = common.fee.t.t;
-                let (sender, receiver, kind, token_id, amount) = {
-                    match payload.t.t.body.t.t {
-                        SignedCommandPayloadBody::PaymentPayload(payload) => (
-                            payload.t.t.source_pk,
-                            payload.t.t.receiver_pk,
-                            "PAYMENT",
-                            token,
-                            payload.t.t.amount.t.t,
-                        ),
-                        SignedCommandPayloadBody::StakeDelegation(payload) => {
-                            let StakeDelegation::SetDelegate {
-                                delegator,
-                                new_delegate,
-                            } = payload.t;
-                            (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
-                        }
-                    }
-                };
-                let receiver = PublicKey::from(receiver).0;
-                Self {
-                    amount,
-                    block_height: cmd.blockchain_length,
-                    global_slot: cmd.global_slot_since_genesis,
-                    canonical,
-                    is_applied: failure_reason.is_none(),
-                    failure_reason,
-                    fee,
-                    from: PublicKey::from(sender).0,
-                    hash: cmd.tx_hash.0,
-                    kind: kind.to_string(),
-                    memo: decode_memo(&common.memo.t.0),
-                    nonce,
-                    receiver: PK {
-                        public_key: receiver.to_owned(),
-                    },
-                    to: receiver,
-                    token: Some(token_id),
-                    epoch_num_user_commands,
-                    total_num_user_commands,
+        let signed_cmd = match cmd.command {
+            SignedCommand::V1(v1) => v1.t.t,
+            SignedCommand::V2(v2) => v2.t.t,
+        };
+
+        let payload = signed_cmd.payload;
+        let common = payload.t.t.common.t.t.t;
+        let token = common.fee_token.t.t.t;
+        let nonce = common.nonce.t.t as u32;
+        let fee = common.fee.t.t;
+        let (sender, receiver, kind, token_id, amount) = {
+            match payload.t.t.body.t.t {
+                SignedCommandPayloadBody::PaymentPayload(payload) => (
+                    payload.t.t.source_pk,
+                    payload.t.t.receiver_pk,
+                    "PAYMENT",
+                    token,
+                    payload.t.t.amount.t.t,
+                ),
+                SignedCommandPayloadBody::StakeDelegation(payload) => {
+                    let StakeDelegation::SetDelegate {
+                        delegator,
+                        new_delegate,
+                    } = payload.t;
+                    (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
                 }
             }
+        };
+        let receiver = PublicKey::from(receiver).0;
+        Self {
+            amount,
+            block_height: cmd.blockchain_length,
+            global_slot: cmd.global_slot_since_genesis,
+            canonical,
+            is_applied: failure_reason.is_none(),
+            failure_reason,
+            fee,
+            from: PublicKey::from(sender).0,
+            hash: cmd.tx_hash.to_string(),
+            kind: kind.to_string(),
+            memo: decode_memo(&common.memo.t.0),
+            nonce,
+            receiver: PK {
+                public_key: receiver.to_owned(),
+            },
+            to: receiver,
+            token: Some(token_id),
+            epoch_num_user_commands,
+            total_num_user_commands,
         }
     }
 }
