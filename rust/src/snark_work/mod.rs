@@ -3,11 +3,14 @@ pub mod store;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     ledger::public_key::PublicKey,
+    mina_blocks::v2::staged_ledger_diff::completed_work::CompletedWork,
     protocol::serialization_types::snark_work as mina_rs,
 };
+use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
+#[auto_from(CompletedWork)]
 pub struct SnarkWorkSummary {
     pub fee: u64,
     pub prover: PublicKey,
@@ -51,39 +54,36 @@ impl SnarkWorkSummary {
     }
 
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {
-        &self.prover == pk
+        self.prover == *pk
     }
 }
 
 impl SnarkWorkSummaryWithStateHash {
-    fn from_mina_rs(snark: mina_rs::TransactionSnarkWork, state_hash: BlockHash) -> Self {
-        let snark: SnarkWorkSummary = snark.into();
-        Self {
-            fee: snark.fee,
-            prover: snark.prover,
-            state_hash: state_hash.0,
-        }
-    }
-
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         block
             .completed_works()
             .into_iter()
-            .map(|snark| Self::from_mina_rs(snark, block.state_hash()))
+            .map(|snark| Self {
+                fee: snark.fee,
+                prover: snark.prover,
+                state_hash: block.state_hash().to_string(),
+            })
             .collect()
     }
 
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {
-        &self.prover == pk
+        self.prover == *pk
     }
 }
 
-// mina-rs conversions
+/////////////////
+// Conversions //
+/////////////////
 
 impl From<mina_rs::TransactionSnarkWork> for SnarkWorkSummary {
     fn from(value: mina_rs::TransactionSnarkWork) -> Self {
         Self {
-            fee: value.fee.inner().inner(),
+            fee: value.fee.t.t,
             prover: value.prover.into(),
         }
     }
@@ -103,7 +103,7 @@ impl From<(SnarkWorkSummary, BlockHash)> for SnarkWorkSummaryWithStateHash {
         Self {
             fee: value.0.fee,
             prover: value.0.prover,
-            state_hash: value.1 .0,
+            state_hash: value.1.to_string(),
         }
     }
 }
