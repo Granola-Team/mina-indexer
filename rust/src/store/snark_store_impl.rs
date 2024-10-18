@@ -1113,13 +1113,11 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
 
 #[cfg(test)]
 mod snark_store_impl_tests {
-    use std::env;
-
+    use super::*;
     use crate::store::IndexerStore;
     use anyhow::Result;
+    use std::env;
     use tempfile::TempDir;
-
-    use super::*;
 
     fn create_indexer_store() -> Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
