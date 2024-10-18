@@ -1604,14 +1604,34 @@ test_hurl() {
         parallel_flag="--parallel"
     fi
 
-    # selectively run hurl tests by file with HURL_TEST env var
-    # run in very verbose mode by setting HURL_VERBOSE to anything
-    test_file="$SRC"/tests/hurl/"${HURL_TEST:-*}".hurl
+    extract_endpoint() {
+        file="$1"
+        basename "$file" | cut -d'.' -f1
+    }
+
+    graphql_test_files="$SRC"/tests/hurl/*.hurl
+    summary_test_files="$SRC"/tests/hurl/rest/*.hurl
+
+    # Run all GraphQL tests
+    for test_file in $graphql_test_files; do
     if [[ -z "${HURL_VERBOSE:-}" ]]; then
-        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+        hurl --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$test_file"
     else
-        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag $test_file
+        hurl --very-verbose --variable url=http://localhost:"$port"/graphql --test $parallel_flag "$test_file"
     fi
+    done
+
+    # Run all REST tests
+    for test_file in $summary_test_files; do
+        # Extract endpoint from filename
+        endpoint=$(extract_endpoint "$test_file")
+        if [[ -z "${HURL_VERBOSE:-}" ]]; then
+            hurl --variable url=http://localhost:"$port"/"$endpoint" --test $parallel_flag "$test_file"
+        else
+            hurl --very-verbose --variable url=http://localhost:"$port"/"$endpoint" --test $parallel_flag "$test_file"
+        fi
+    done
+
 }
 
 test_version_file() {

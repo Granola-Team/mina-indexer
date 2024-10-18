@@ -755,6 +755,7 @@ impl SnarkStore for IndexerStore {
 
         // unapply
         for snark_update in update.unapply {
+            self.decrement_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
                 snark_update.blockchain_length,
                 snark_update.global_slot_since_genesis,
@@ -765,6 +766,7 @@ impl SnarkStore for IndexerStore {
 
         // apply
         for snark_update in update.apply {
+            self.increment_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
                 snark_update.blockchain_length,
                 snark_update.global_slot_since_genesis,
