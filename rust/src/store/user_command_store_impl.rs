@@ -110,29 +110,30 @@ impl UserCommandStore for IndexerStore {
             );
 
             // add receiver index
-            let receiver = command.receiver();
-            batch.put_cf(
-                self.txn_to_height_sort_cf(),
-                pk_txn_sort_key(
-                    &receiver,
-                    block.blockchain_length(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
-                command.amount().to_be_bytes(),
-            );
-            batch.put_cf(
-                self.txn_to_slot_sort_cf(),
-                pk_txn_sort_key(
-                    &receiver,
-                    block.global_slot_since_genesis(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
-                command.amount().to_be_bytes(),
-            );
+            for receiver in command.receiver() {
+                batch.put_cf(
+                    self.txn_to_height_sort_cf(),
+                    pk_txn_sort_key(
+                        &receiver,
+                        block.blockchain_length(),
+                        command.nonce().0,
+                        &txn_hash,
+                        &state_hash,
+                    ),
+                    command.amount().to_be_bytes(),
+                );
+                batch.put_cf(
+                    self.txn_to_slot_sort_cf(),
+                    pk_txn_sort_key(
+                        &receiver,
+                        block.global_slot_since_genesis(),
+                        command.nonce().0,
+                        &txn_hash,
+                        &state_hash,
+                    ),
+                    command.amount().to_be_bytes(),
+                );
+            }
         }
 
         // per account
@@ -599,10 +600,11 @@ impl UserCommandStore for IndexerStore {
         self.increment_user_commands_pk_total_count(&sender)?;
 
         // receiver epoch & total
-        let receiver = command.receiver();
-        if sender != receiver {
-            self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
-            self.increment_user_commands_pk_total_count(&receiver)?;
+        for receiver in command.receiver() {
+            if sender != receiver {
+                self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
+                self.increment_user_commands_pk_total_count(&receiver)?;
+            }
         }
 
         // epoch & total counts
