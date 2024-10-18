@@ -15,20 +15,29 @@ mod tests {
     }
 
     #[test]
-    fn test_incr_snarks_total_non_canonical_count() -> Result<()> {
+    fn test_incr_dec_snarks_total_non_canonical_count() -> Result<()> {
         let indexer = create_indexer_store()?;
 
         indexer.increment_snarks_total_non_canonical_count()?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
 
         indexer.increment_snarks_total_non_canonical_count()?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 2);
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
 
         Ok(())
     }
 
     #[test]
-    fn test_incr_snarks_total_canonical_count() -> Result<()> {
+    fn test_incr_dec_snarks_total_canonical_count() -> Result<()> {
         let indexer = create_indexer_store()?;
 
         indexer.increment_snarks_total_canonical_count()?;
@@ -36,6 +45,15 @@ mod tests {
 
         indexer.increment_snarks_total_canonical_count()?;
         assert_eq!(indexer.get_snarks_total_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
 
         Ok(())
     }
