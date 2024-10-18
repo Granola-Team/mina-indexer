@@ -997,7 +997,7 @@ pub async fn handle_connection(
                 }
                 Transactions::Hash { hash, verbose } => {
                     info!("Received tx-hash command for {hash}");
-                    let hash = TxnHash::new(&hash)?;
+                    let hash = TxnHash::new(hash)?;
                     db.get_user_command(&hash, 0)?.map(|cmd| {
                         if verbose {
                             format!("{cmd:?}")

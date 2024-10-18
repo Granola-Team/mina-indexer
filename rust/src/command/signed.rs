@@ -80,11 +80,11 @@ impl TxnHash {
 
         match self {
             Self::V1(_) => {
-                bytes.copy_from_slice(&mut self.ref_inner().as_bytes());
+                bytes.copy_from_slice(self.ref_inner().as_bytes());
                 bytes
             }
             Self::V2(_) => {
-                bytes[..Self::V2_LEN].copy_from_slice(&mut self.ref_inner().as_bytes());
+                bytes[..Self::V2_LEN].copy_from_slice(self.ref_inner().as_bytes());
                 bytes[Self::V2_LEN] = 0;
                 bytes
             }
@@ -836,7 +836,7 @@ mod tests {
         assert!(matches!(v2, TxnHash::V2(_)));
 
         let mut v2_right_pad = [0; TxnHash::V1_LEN];
-        v2_right_pad[..TxnHash::V1_LEN - 1].copy_from_slice(&mut v2.to_string().as_bytes());
+        v2_right_pad[..TxnHash::V1_LEN - 1].copy_from_slice(v2.to_string().as_bytes());
         *v2_right_pad.last_mut().unwrap() = 0;
 
         assert_eq!(v2.right_pad_v2(), v2_right_pad);

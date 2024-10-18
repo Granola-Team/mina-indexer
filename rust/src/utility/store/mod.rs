@@ -138,12 +138,15 @@ mod tests {
     fn test_txn_sort_key() {
         let prefix = 99;
         let state_hash = BlockHash::default();
-        let txn_hash = TxnHash("a".repeat(TxnHash::LEN));
+        let txn_hash = TxnHash::V1("a".repeat(TxnHash::V1_LEN));
         let key = txn_sort_key(prefix, &txn_hash, &state_hash);
 
         assert_eq!(&key[..U32_LEN], &prefix.to_be_bytes());
-        assert_eq!(&key[U32_LEN..][..TxnHash::LEN], txn_hash.0.as_bytes());
-        assert_eq!(&key[U32_LEN..][TxnHash::LEN..], state_hash.0.as_bytes());
+        assert_eq!(
+            &key[U32_LEN..][..TxnHash::V1_LEN],
+            txn_hash.to_string().as_bytes()
+        );
+        assert_eq!(&key[U32_LEN..][TxnHash::V1_LEN..], state_hash.0.as_bytes());
     }
 
     #[test]
@@ -151,7 +154,7 @@ mod tests {
         let sort = 500;
         let nonce = 987654321;
         let pk = PublicKey::default();
-        let txn_hash = TxnHash("b".repeat(TxnHash::LEN));
+        let txn_hash = TxnHash::V1("b".repeat(TxnHash::V1_LEN));
         let state_hash = BlockHash::default();
         let key = pk_txn_sort_key(&pk, sort, nonce, &txn_hash, &state_hash);
 
@@ -162,11 +165,11 @@ mod tests {
             &nonce.to_be_bytes()
         );
         assert_eq!(
-            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::LEN],
-            txn_hash.0.as_bytes()
+            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][..TxnHash::V1_LEN],
+            txn_hash.to_string().as_bytes()
         );
         assert_eq!(
-            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][TxnHash::LEN..],
+            &key[PublicKey::LEN..][U32_LEN..][U32_LEN..][TxnHash::V1_LEN..],
             state_hash.0.as_bytes()
         );
     }
