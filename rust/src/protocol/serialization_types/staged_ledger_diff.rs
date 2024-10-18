@@ -27,8 +27,6 @@ pub struct StagedLedgerDiff {
     pub diff: StagedLedgerDiffTupleV1,
 }
 
-pub type StagedLedgerDiffV1 = Versioned<StagedLedgerDiff, 1>;
-
 /// Top level wrapper type for a StagedLedgerDiff (json)
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(StagedLedgerDiff)]

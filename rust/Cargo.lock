@@ -1612,7 +1612,6 @@ dependencies = [
  "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
- "rand",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
