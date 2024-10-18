@@ -6,6 +6,7 @@ use crate::{
         diff::account::{AccountDiff, PaymentDiff, UpdateType},
         PublicKey,
     },
+    mina_blocks::v2,
     protocol::serialization_types::staged_ledger_diff,
 };
 
@@ -23,6 +24,32 @@ pub enum CoinbaseKind {
     None,
     Coinbase(Option<CoinbaseFeeTransfer>),
     CoinbaseAndFeeTransferViaCoinbase(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
+}
+
+impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
+    fn from(value: v2::staged_ledger_diff::Coinbase) -> Self {
+        match value {
+            v2::staged_ledger_diff::Coinbase::Zero(_) => Self::None,
+            v2::staged_ledger_diff::Coinbase::One(_, one) => {
+                Self::Coinbase(one.map(|o| CoinbaseFeeTransfer {
+                    receiver_pk: o.receiver_pk,
+                    fee: o.fee,
+                }))
+            }
+            v2::staged_ledger_diff::Coinbase::Two(_, fst, snd) => {
+                Self::CoinbaseAndFeeTransferViaCoinbase(
+                    fst.map(|f| CoinbaseFeeTransfer {
+                        receiver_pk: f.receiver_pk,
+                        fee: f.fee,
+                    }),
+                    snd.map(|s| CoinbaseFeeTransfer {
+                        receiver_pk: s.receiver_pk,
+                        fee: s.fee,
+                    }),
+                )
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
@@ -43,44 +70,8 @@ impl From<staged_ledger_diff::CoinBaseFeeTransfer> for CoinbaseFeeTransfer {
 impl CoinbaseKind {
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
         let mut res = vec![];
-        let pre_diff_coinbase = match precomputed_block.staged_ledger_pre_diff().coinbase.inner() {
-            staged_ledger_diff::CoinBase::None => Self::None,
-            staged_ledger_diff::CoinBase::Coinbase(x) => Self::Coinbase(x.map(|cb| {
-                let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
-                    cb.inner().inner();
-                CoinbaseFeeTransfer {
-                    receiver_pk: PublicKey::from(receiver_pk),
-                    fee: fee.inner().inner(),
-                }
-            })),
-            staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y) => {
-                Self::CoinbaseAndFeeTransferViaCoinbase(
-                    x.map(|c| c.inner().inner().into()),
-                    y.map(|c| c.inner().inner().into()),
-                )
-            }
-        };
-        let post_diff_coinbase = match precomputed_block
-            .staged_ledger_post_diff()
-            .map(|diff| diff.coinbase.inner())
-        {
-            None => None,
-            Some(staged_ledger_diff::CoinBase::None) => Some(Self::None),
-            Some(staged_ledger_diff::CoinBase::Coinbase(x)) => Some(Self::Coinbase(x.map(|cb| {
-                let staged_ledger_diff::CoinBaseFeeTransfer { receiver_pk, fee } =
-                    cb.inner().inner();
-                CoinbaseFeeTransfer {
-                    receiver_pk: PublicKey::from(receiver_pk),
-                    fee: fee.inner().inner(),
-                }
-            }))),
-            Some(staged_ledger_diff::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y)) => {
-                Some(Self::CoinbaseAndFeeTransferViaCoinbase(
-                    x.map(|c| c.inner().inner().into()),
-                    y.map(|c| c.inner().inner().into()),
-                ))
-            }
-        };
+        let pre_diff_coinbase = precomputed_block.pre_diff_coinbase();
+        let post_diff_coinbase = precomputed_block.post_diff_coinbase();
 
         res.push(pre_diff_coinbase);
         if let Some(post_diff_coinbase) = post_diff_coinbase {
