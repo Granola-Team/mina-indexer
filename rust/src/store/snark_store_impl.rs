@@ -1110,3 +1110,64 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
     }
     start
 }
+
+#[cfg(test)]
+mod snark_store_impl_tests {
+    use std::env;
+
+    use crate::store::IndexerStore;
+    use anyhow::Result;
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn test_incr_dec_snarks_total_non_canonical_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        indexer.increment_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
+
+        indexer.increment_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_non_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_snarks_total_canonical_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        indexer.increment_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+
+        indexer.increment_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 2);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+
+        indexer.decrement_snarks_total_canonical_count()?;
+        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+
+        Ok(())
+    }
+}
