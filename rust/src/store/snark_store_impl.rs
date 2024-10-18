@@ -953,6 +953,26 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
+    fn get_snarks_total_canonical_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total canonical SNARKs count");
+        Ok(self
+            .database
+            .get_pinned(Self::TOTAL_NUM_CANONICAL_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total canonical SNARK count")
+            }))
+    }
+
+    fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting total non-canonical SNARKs count");
+        Ok(self
+            .database
+            .get_pinned(Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY)?
+            .map_or(0, |bytes| {
+                u32_from_be_bytes(&bytes).expect("total non-canonical SNARK count")
+            }))
+    }
+
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing total SNARKs count");
         let old = self.get_snarks_total_count()?;
