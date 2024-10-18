@@ -212,6 +212,26 @@ impl PrecomputedBlock {
         Ok(precomputed_block)
     }
 
+    pub fn scheduled_time(&self) -> String {
+        match self {
+            Self::V1(v1) => v1.scheduled_time.to_string(),
+            Self::V2(v2) => v2.scheduled_time.to_string(),
+        }
+    }
+
+    pub fn previous_state_hash(&self) -> BlockHash {
+        match self {
+            Self::V1(v1) => {
+                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
+            }
+            Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
+        }
+    }
+
+    ////////////////////////
+    // Staged ledger diff //
+    ////////////////////////
+
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
         let mut commands = self.commands_pre_diff();
         commands.append(&mut self.commands_post_diff());
@@ -1052,22 +1072,6 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn scheduled_time(&self) -> String {
-        match self {
-            Self::V1(v1) => v1.scheduled_time.to_string(),
-            Self::V2(v2) => v2.scheduled_time.to_string(),
-        }
-    }
-
-    pub fn previous_state_hash(&self) -> BlockHash {
-        match self {
-            Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
-            }
-            Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
-        }
-    }
-
     pub fn command_hashes(&self) -> Vec<TxnHash> {
         SignedCommand::from_precomputed(self)
             .iter()
@@ -1077,28 +1081,6 @@ impl PrecomputedBlock {
                     .expect("signed command hash")
             })
             .collect()
-    }
-
-    pub fn username_updates(&self) -> UsernameUpdate {
-        let mut updates = HashMap::new();
-        self.commands().iter().for_each(|cmd| {
-            // check for the special name service txns
-            if cmd.is_applied() {
-                let sender = cmd.sender();
-                let receiver = cmd.receiver();
-                let memo = cmd.memo();
-                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
-                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
-                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
-                {
-                    updates.insert(
-                        sender,
-                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
-                    );
-                }
-            }
-        });
-        UsernameUpdate(updates)
     }
 
     /// Base64 encoded string
@@ -1153,6 +1135,30 @@ impl PrecomputedBlock {
                     .expect("V2 last VRF output decodes")
             }
         }
+    }
+
+    /// Returns the map username updates in the block
+    pub fn username_updates(&self) -> UsernameUpdate {
+        let mut updates = HashMap::new();
+        self.commands().iter().for_each(|cmd| {
+            // check for the special name service txns
+            if cmd.is_applied() {
+                let sender = cmd.sender();
+                let receiver = cmd.receiver();
+                let receiver = receiver.first().expect("receiver");
+                let memo = cmd.memo();
+                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+                {
+                    updates.insert(
+                        sender,
+                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                    );
+                }
+            }
+        });
+        UsernameUpdate(updates)
     }
 
     pub fn with_canonicity(&self, canonicity: Canonicity) -> PrecomputedBlockWithCanonicity {
@@ -1219,6 +1225,10 @@ impl PrecomputedBlock {
         }
     }
 }
+
+/////////////////
+// Conversions //
+/////////////////
 
 impl std::cmp::PartialOrd for PrecomputedBlock {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
