@@ -301,4 +301,10 @@ pub trait SnarkStore {
 
     /// Increment the count of non-canonical snark work
     fn increment_snarks_total_non_canonical_count(&self) -> anyhow::Result<()>;
+
+    /// Increment the count of canonical snark work
+    fn decrement_snarks_total_canonical_count(&self) -> anyhow::Result<()>;
+
+    /// Increment the count of non-canonical snark work
+    fn decrement_snarks_total_non_canonical_count(&self) -> anyhow::Result<()>;
 }

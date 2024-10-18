@@ -975,6 +975,18 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
+    fn decrement_snarks_total_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Incrementing total canonical SNARKs count");
+        let old = self
+            .get_snarks_total_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_SNARKS_KEY,
+            (old.saturating_sub(1)).to_be_bytes(),
+        )?)
+    }
+
     fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32> {
         trace!("Getting total non-canonical SNARKs count");
         Ok(self
@@ -994,6 +1006,18 @@ impl SnarkStore for IndexerStore {
         Ok(self.database.put(
             Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
             (old + 1).to_be_bytes(),
+        )?)
+    }
+
+    fn decrement_snarks_total_non_canonical_count(&self) -> anyhow::Result<()> {
+        trace!("Decrementing total non-canonical SNARKs count");
+        let old = self
+            .get_snarks_total_non_canonical_count()
+            .ok()
+            .unwrap_or_default();
+        Ok(self.database.put(
+            Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
+            (old.saturating_sub(1)).to_be_bytes(),
         )?)
     }
 
