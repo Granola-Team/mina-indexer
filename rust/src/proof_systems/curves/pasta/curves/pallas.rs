@@ -1,8 +1,5 @@
 use crate::proof_systems::curves::pasta::fields::{fp::Fp, fq::Fq};
-use ark_ec::{
-    models::short_weierstrass_jacobian::{GroupAffine, GroupProjective},
-    ModelParameters, SWModelParameters,
-};
+use ark_ec::{models::short_weierstrass_jacobian::GroupAffine, ModelParameters, SWModelParameters};
 use ark_ff::{field_new, Zero};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -14,7 +11,6 @@ impl ModelParameters for PallasParameters {
 }
 
 pub type Pallas = GroupAffine<PallasParameters>;
-pub type ProjectivePallas = GroupProjective<PallasParameters>;
 
 impl SWModelParameters for PallasParameters {
     /// COEFF_A = 0
@@ -67,5 +63,3 @@ impl SWModelParameters for LegacyPallasParameters {
     const AFFINE_GENERATOR_COEFFS: (Self::BaseField, Self::BaseField) =
         <PallasParameters as SWModelParameters>::AFFINE_GENERATOR_COEFFS;
 }
-
-pub type LegacyPallas = GroupAffine<LegacyPallasParameters>;

@@ -3,15 +3,9 @@
 
 //! Some basic versioned types used throughout
 
-use crate::protocol::{
-    bin_prot,
-    serialization_types::{
-        errors::{
-            Error,
-            Error::{Base58DecodeError, BinProtError},
-        },
-        version_bytes,
-    },
+use crate::protocol::serialization_types::{
+    errors::{Error, Error::Base58DecodeError},
+    version_bytes,
 };
 use bs58::encode::EncodeBuilder;
 use derive_more::{From, Into};
@@ -32,9 +26,6 @@ impl_from_for_newtype!(U64Json, TokenIdV1);
 
 /// u64 representing a block time (v1)
 pub type BlockTimeV1 = Versioned2<u64, 1, 1>;
-
-/// u64 representing an account nonce (v1) // This should also be an extendedu32
-pub type AccountNonceV1 = Versioned2<u32, 1, 1>;
 
 /// u32 wrapper (json)
 /// Note that integers are represented as string in mina json
@@ -334,9 +325,11 @@ where
 #[derive(Debug, Clone, Eq, PartialEq, derive_more::From)]
 pub struct Base58EncodableVersionedType<const VERSION_BYTE: u8, T>(pub T);
 
-impl<'de, const VERSION_BYTE: u8, T> Base58EncodableVersionedType<VERSION_BYTE, T>
+use serde::de::DeserializeOwned;
+
+impl<const VERSION_BYTE: u8, T> Base58EncodableVersionedType<VERSION_BYTE, T>
 where
-    T: Deserialize<'de>,
+    T: DeserializeOwned,
 {
     /// Decode input base58 encoded bytes into [Base58EncodableVersionedType]
     pub fn from_base58(input: impl AsRef<[u8]>) -> Result<Self, Error> {
@@ -344,8 +337,10 @@ where
             .with_check(Some(VERSION_BYTE))
             .into_vec()
             .map_err(Base58DecodeError)?;
-        // skip the version check byte
-        let data: T = bin_prot::from_reader_strict(&bytes[1..]).map_err(BinProtError)?;
+
+        // Deserialize from the bytes, skipping the version check byte
+        let data: T = serde_json::from_slice(&bytes[1..]).map_err(Error::SerdeError)?;
+
         Ok(Self(data))
     }
 }
@@ -361,11 +356,8 @@ where
     }
 
     /// Encode inner data with version check byte into [EncodeBuilder]
-    pub fn to_base58_builder(
-        &self,
-    ) -> Result<EncodeBuilder<'static, Vec<u8>>, bin_prot::error::Error> {
-        let mut buf = Vec::new();
-        bin_prot::to_writer(&mut buf, &self.0)?;
+    pub fn to_base58_builder(&self) -> Result<EncodeBuilder<'static, Vec<u8>>, Error> {
+        let buf = serde_json::to_vec(&self.0)?;
         Ok(bs58::encode(buf).with_check_version(VERSION_BYTE))
     }
 }
@@ -394,7 +386,7 @@ where
 impl<'de, const VERSION_BYTE: u8, T> Deserialize<'de>
     for Base58EncodableVersionedType<VERSION_BYTE, T>
 where
-    T: Deserialize<'de>,
+    T: DeserializeOwned,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

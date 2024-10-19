@@ -3,14 +3,10 @@ mod txn_hash;
 use crate::{
     command::*,
     mina_blocks::v2::{self, staged_ledger_diff::CommandData},
-    proof_systems::signer::signature::Signature,
-    protocol::{
-        bin_prot,
-        serialization_types::{
-            signatures::PublicKey2V1,
-            staged_ledger_diff as mina_rs,
-            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
-        },
+    protocol::serialization_types::{
+        signatures::PublicKey2V1,
+        staged_ledger_diff as mina_rs,
+        version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
     },
 };
 use blake2::digest::VariableOutput;
@@ -168,14 +164,14 @@ impl SignedCommand {
     pub fn hash_signed_command(&self) -> anyhow::Result<TxnHash> {
         match self {
             Self::V1(v1) => {
-                let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
-                bin_prot::to_writer(&mut binprot_bytes, v1)?;
+                let mut bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
+                serde_json::to_writer(&mut bytes, v1).map_err(anyhow::Error::from)?;
 
-                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+                let bytes_bs58 = bs58::encode(&bytes[..])
                     .with_check_version(USER_COMMAND)
                     .into_string();
                 let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+                hasher.write_all(bytes_bs58.as_bytes())?;
 
                 let mut hash = hasher.finalize_boxed().to_vec();
                 hash.insert(0, hash.len() as u8);
@@ -187,14 +183,14 @@ impl SignedCommand {
                 ))
             }
             Self::V2(v2) => {
-                let mut binprot_bytes = Vec::with_capacity(TxnHash::V2_LEN * 8); // max number of bits
-                bin_prot::to_writer(&mut binprot_bytes, v2)?;
+                let mut bytes = Vec::with_capacity(TxnHash::V2_LEN * 8); // max number of bits
+                serde_json::to_writer(&mut bytes, v2).map_err(anyhow::Error::from)?;
 
-                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+                let bytes_bs58 = bs58::encode(&bytes[..])
                     .with_check_version(USER_COMMAND)
                     .into_string();
                 let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+                hasher.write_all(bytes_bs58.as_bytes())?;
 
                 let mut hash = hasher.finalize_boxed().to_vec();
                 hash.insert(0, hash.len() as u8);
@@ -294,7 +290,6 @@ impl From<v2::staged_ledger_diff::UserCommandData> for mina_rs::SignedCommand {
         Self {
             payload: Versioned::new(Versioned::new(value.payload.into())),
             signer: PublicKey2V1(Versioned::new(value.signer.into())),
-            signature: value.signature.into(),
         }
     }
 }
@@ -468,7 +463,6 @@ impl From<SignedCommand> for serde_json::Value {
         let mut object = serde_json::Map::new();
         object.insert("payload".into(), payload_json(&value));
         object.insert("signer".into(), signer(&value));
-        object.insert("signature".into(), signature(&value));
 
         serde_json::Value::Object(object)
     }
@@ -567,11 +561,6 @@ impl std::fmt::Debug for SignedCommandWithStateHash {
 fn signer(value: &mina_rs::SignedCommand) -> serde_json::Value {
     let pk: PublicKey = value.signer.0.t.to_owned().into();
     serde_json::Value::String(pk.0)
-}
-
-fn signature(value: &mina_rs::SignedCommand) -> serde_json::Value {
-    let sig: Signature = value.signature.to_owned().into();
-    serde_json::Value::String(sig.to_string())
 }
 
 fn payload_json(value: &mina_rs::SignedCommand) -> serde_json::Value {

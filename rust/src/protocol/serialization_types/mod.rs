@@ -15,21 +15,15 @@
 #![deny(missing_docs)]
 
 pub mod blockchain_state;
-pub mod bulletproof_challenges;
 pub mod common;
 pub mod consensus_state;
-pub mod delta_transition_chain_proof;
 pub mod epoch_data;
 pub mod errors;
 pub mod field_and_curve_elements;
 pub mod global_slot;
-pub mod opening_proof;
-pub mod proof_evaluations;
-pub mod proof_messages;
 pub mod protocol_constants;
 pub mod protocol_state;
 pub mod protocol_state_body;
-pub mod protocol_state_proof;
 pub mod protocol_version;
 pub mod signatures;
 pub mod snark_work;

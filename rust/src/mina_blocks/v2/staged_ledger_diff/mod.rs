@@ -3,11 +3,8 @@ pub mod completed_work;
 
 use super::protocol_state::SupplyAdjustment;
 use crate::{
-    ledger::public_key::PublicKey,
-    mina_blocks::common::*,
-    protocol::serialization_types::{
-        signatures::SignatureJson, staged_ledger_diff::TransactionStatusFailedType,
-    },
+    ledger::public_key::PublicKey, mina_blocks::common::*,
+    protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
 };
 use completed_work::CompletedWork;
 use serde::{Deserialize, Serialize};
@@ -95,7 +92,6 @@ pub struct UserCommandData {
     pub signer: PublicKey,
 
     pub payload: UserCommandPayload,
-    pub signature: SignatureJson,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
