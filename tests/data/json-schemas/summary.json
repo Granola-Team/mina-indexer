@@ -71,6 +71,12 @@
     "totalNumUserCommands": {
       "type": "integer"
     },
+    "totalNumAppliedUserCommands": {
+      "type": "integer"
+    },
+    "totalNumFailedUserCommands": {
+      "type": "integer"
+    },
     "epochNumInternalCommands": {
       "type": "integer"
     },
@@ -105,6 +111,8 @@
     "totalNumCanonicalSnarks",
     "epochNumUserCommands",
     "totalNumUserCommands",
+    "totalNumAppliedUserCommands",
+    "totalNumFailedUserCommands",
     "epochNumInternalCommands",
     "totalNumInternalCommands",
     "totalNumAccounts"
