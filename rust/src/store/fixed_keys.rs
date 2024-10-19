@@ -22,4 +22,12 @@ pub trait FixedKeys {
         "total_num_non_canonical_snarks".as_bytes();
     const TOTAL_NUM_FEE_TRANSFERS_KEY: &'static [u8] = "total_num_fee_transfers".as_bytes();
     const TOTAL_NUM_USER_COMMANDS_KEY: &'static [u8] = "total_num_user_commands".as_bytes();
+    const TOTAL_NUM_APPLIED_USER_COMMANDS_KEY: &'static [u8] =
+        "total_num_applied_user_commands_key".as_bytes();
+    const TOTAL_NUM_FAILED_USER_COMMANDS_KEY: &'static [u8] =
+        "total_num_failed_user_commands_key".as_bytes();
+    const TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
+        "total_num_applied_canonical_user_commands_key".as_bytes();
+    const TOTAL_NUM_FAILED_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
+        "total_num_applied_canonical_user_commands_key".as_bytes();
 }
