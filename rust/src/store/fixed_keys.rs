@@ -18,8 +18,6 @@ pub trait FixedKeys {
         "total_num_blocks_supercharged".as_bytes();
     const TOTAL_NUM_SNARKS_KEY: &'static [u8] = "total_num_snarks".as_bytes();
     const TOTAL_NUM_CANONICAL_SNARKS_KEY: &'static [u8] = "total_num_canonical_snarks".as_bytes();
-    const TOTAL_NUM_NON_CANONICAL_SNARKS_KEY: &'static [u8] =
-        "total_num_non_canonical_snarks".as_bytes();
     const TOTAL_NUM_FEE_TRANSFERS_KEY: &'static [u8] = "total_num_fee_transfers".as_bytes();
     const TOTAL_NUM_USER_COMMANDS_KEY: &'static [u8] = "total_num_user_commands".as_bytes();
 }

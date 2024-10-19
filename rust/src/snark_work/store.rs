@@ -293,24 +293,9 @@ pub trait SnarkStore {
     /// Get count of canonical snark work
     fn get_snarks_total_canonical_count(&self) -> anyhow::Result<u32>;
 
-    /// Get count of non-canonical snark work
-    fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32>;
-
     /// Increment the count of canonical snark work
     fn increment_snarks_total_canonical_count(&self, incr: u32) -> anyhow::Result<()>;
 
-    /// Increment the count of non-canonical snark work
-    fn increment_snarks_total_non_canonical_count(&self, incr: u32) -> anyhow::Result<()>;
-
     /// Increment the count of canonical snark work
     fn decrement_snarks_total_canonical_count(&self, decr: u32) -> anyhow::Result<()>;
-
-    /// Increment the count of non-canonical snark work
-    fn decrement_snarks_total_non_canonical_count(&self, decr: u32) -> anyhow::Result<()>;
-
-    /// index snark work
-    fn index_snark_work(&self, block: &PrecomputedBlock, canonical: bool) -> anyhow::Result<()>;
-
-    /// index snark work
-    fn deindex_snark_work(&self, block: &PrecomputedBlock, canonical: bool) -> anyhow::Result<()>;
 }
