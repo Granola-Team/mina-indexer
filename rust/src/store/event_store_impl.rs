@@ -76,7 +76,7 @@ impl EventStore for IndexerStore {
         Ok(events)
     }
 
-    /// Key: sequence number (4 BE bytes)
+    /// Key: sequence number ([u32] BE bytes)
     /// Value: event (serialized with [serde_json::to_vec])
     fn event_log_iterator(&self, mode: speedb::IteratorMode) -> speedb::DBIterator<'_> {
         self.database.iterator_cf(self.events_cf(), mode)

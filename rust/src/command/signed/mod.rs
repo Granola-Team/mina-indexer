@@ -1,3 +1,5 @@
+mod txn_hash;
+
 use crate::{
     command::*,
     mina_blocks::v2::{self, staged_ledger_diff::CommandData},
@@ -11,86 +13,13 @@ use crate::{
         },
     },
 };
-use anyhow::bail;
 use blake2::digest::VariableOutput;
 use mina_serialization_versioned::Versioned2;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-pub enum TxnHash {
-    V1(String),
-    V2(String),
-}
-
-impl TxnHash {
-    // v1 pre-hardfork
-    pub const V1_LEN: usize = 53;
-    pub const V1_PREFIX: &'static str = "Ckp";
-
-    // v2 post-hardfork
-    pub const V2_LEN: usize = 52;
-    pub const V2_PREFIX: &'static str = "5J";
-
-    pub fn inner(self) -> String {
-        match self {
-            Self::V1(v1) => v1,
-            Self::V2(v2) => v2,
-        }
-    }
-
-    pub fn ref_inner(&self) -> &String {
-        match self {
-            Self::V1(v1) => v1,
-            Self::V2(v2) => v2,
-        }
-    }
-
-    pub fn new(txn_hash: String) -> anyhow::Result<Self> {
-        if Self::is_valid_v1(&txn_hash) {
-            return Ok(Self::V1(txn_hash.to_string()));
-        }
-        if Self::is_valid_v2(&txn_hash) {
-            return Ok(Self::V2(txn_hash.to_string()));
-        }
-        bail!("Invalid txn hash {txn_hash}")
-    }
-
-    pub fn is_valid(&self) -> bool {
-        match self {
-            Self::V1(hash) => Self::is_valid_v1(hash),
-            Self::V2(hash) => Self::is_valid_v2(hash),
-        }
-    }
-
-    pub fn is_valid_v1(txn_hash: &str) -> bool {
-        txn_hash.starts_with(TxnHash::V1_PREFIX) && txn_hash.len() == TxnHash::V1_LEN
-    }
-
-    pub fn is_valid_v2(txn_hash: &str) -> bool {
-        txn_hash.starts_with(TxnHash::V2_PREFIX) && txn_hash.len() == TxnHash::V2_LEN
-    }
-
-    pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
-        Self::new(String::from_utf8(bytes)?)
-    }
-
-    pub fn right_pad_v2(&self) -> [u8; Self::V1_LEN] {
-        let mut bytes = [0; Self::V1_LEN];
-
-        match self {
-            Self::V1(_) => {
-                bytes.copy_from_slice(self.ref_inner().as_bytes());
-                bytes
-            }
-            Self::V2(_) => {
-                bytes[..Self::V2_LEN].copy_from_slice(self.ref_inner().as_bytes());
-                bytes[Self::V2_LEN] = 0;
-                bytes
-            }
-        }
-    }
-}
+// re-export [txn_hash::TxnHash]
+pub type TxnHash = txn_hash::TxnHash;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum SignedCommand {
@@ -742,11 +671,8 @@ impl std::fmt::Display for TxnHash {
 
 #[cfg(test)]
 mod tests {
-    use super::SignedCommand;
-    use crate::{
-        block::precomputed::{PcbVersion, PrecomputedBlock},
-        command::signed::TxnHash,
-    };
+    use super::*;
+    use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
     use std::path::PathBuf;
 
     #[test]
@@ -821,26 +747,6 @@ mod tests {
 }"#;
 
         assert_eq!(signed_commands, vec![expect0, expect1]);
-        Ok(())
-    }
-
-    #[test]
-    fn right_pad_txn_hashes() -> anyhow::Result<()> {
-        // v1 - no right padding
-        let v1 = TxnHash::new("CkpBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS".into())?;
-        assert!(matches!(v1, TxnHash::V1(_)));
-        assert_eq!(&v1.right_pad_v2(), v1.to_string().as_bytes());
-
-        // v2 - single 0 byte right padding
-        let v2 = TxnHash::new("5JBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS".into())?;
-        assert!(matches!(v2, TxnHash::V2(_)));
-
-        let mut v2_right_pad = [0; TxnHash::V1_LEN];
-        v2_right_pad[..TxnHash::V1_LEN - 1].copy_from_slice(v2.to_string().as_bytes());
-        *v2_right_pad.last_mut().unwrap() = 0;
-
-        assert_eq!(v2.right_pad_v2(), v2_right_pad);
-
         Ok(())
     }
 }

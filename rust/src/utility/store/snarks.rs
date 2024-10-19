@@ -8,7 +8,7 @@ use crate::{
 /// ```
 /// {epoch}{prover}
 /// where
-/// epoch:  u32 BE bytes
+/// epoch:  [u32] BE bytes
 /// prover: [PublicKey] bytes
 pub fn snark_epoch_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::LEN] {
     let mut key = [0; U32_LEN + PublicKey::LEN];
@@ -21,11 +21,11 @@ pub fn snark_epoch_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::
 /// ```
 /// {fee}{sort}{pk}{hash}{index}
 /// where
-/// fee:   u64 BE bytes
-/// sort:  u32 BE bytes
+/// fee:   [u64] BE bytes
+/// sort:  [u32] BE bytes
 /// pk:    [PublicKey] bytes
 /// hash:  [BlockHash] bytes
-/// index: u32 BE bytes
+/// index: [u32] BE bytes
 pub fn snark_fee_sort_key(
     fee: u64,
     u32_sort: u32,
@@ -49,8 +49,8 @@ pub fn snark_fee_sort_key(
 /// {prover}{sort}{index}
 /// where
 /// - prover: [PublicKey] bytes
-/// - sort:   u32 BE bytes
-/// - index:  u32 BE bytes
+/// - sort:   [u32] BE bytes
+/// - index:  [u32] BE bytes
 pub fn snark_prover_sort_key(
     prover: &PublicKey,
     u32_sort: u32,
@@ -67,8 +67,8 @@ pub fn snark_prover_sort_key(
 /// ```
 /// {epoch}{fee}{prover}
 /// where
-/// - epoch:  u32 BE bytes
-/// - fee:    u64 BE bytes
+/// - epoch:  [u32] BE bytes
+/// - fee:    [u64] BE bytes
 /// - prover: [PublicKey] bytes
 pub fn snark_fee_epoch_sort_key(
     epoch: u32,
