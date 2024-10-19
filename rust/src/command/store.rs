@@ -167,4 +167,22 @@ pub trait UserCommandStore {
         command: &UserCommandWithStatus,
         epoch: u32,
     ) -> anyhow::Result<()>;
+
+    /// Get applied user commands count
+    fn get_applied_user_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Get failed user commands count
+    fn get_failed_user_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment applied user commands count
+    fn increment_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Increment applied user commands count
+    fn increment_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Decrement applied user commands count
+    fn decrement_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Decrement failed user commands count
+    fn decrement_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
 }

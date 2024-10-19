@@ -594,6 +594,12 @@ impl UserCommandStore for IndexerStore {
             command.to_command()
         );
 
+        if command.is_applied() {
+            self.increment_applied_user_commands_count(1)?;
+        } else {
+            self.increment_failed_user_commands_count(1)?;
+        }
+
         // sender epoch & total
         let sender = command.sender();
         self.increment_user_commands_pk_epoch_count(&sender, epoch)?;
@@ -610,6 +616,64 @@ impl UserCommandStore for IndexerStore {
         // epoch & total counts
         self.increment_user_commands_epoch_count(epoch)?;
         self.increment_user_commands_total_count()
+    }
+
+    /// Get applied user commands count
+    fn get_applied_user_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting applied user command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Get failed user commands count
+    fn get_failed_user_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting failed user command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Increment applied user commands count
+    fn increment_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Incrementing applied user command count");
+        let old = self.get_applied_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// Increment failed user commands count
+    fn increment_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Incrementing failed user command count");
+        let old = self.get_failed_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// Decrement applied user commands count
+    fn decrement_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrementing applied user command count");
+        let old = self.get_applied_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
+    }
+
+    /// Decrement failed user commands count
+    fn decrement_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrementing failed user command count");
+        let old = self.get_failed_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
     }
 }
 
@@ -644,5 +708,97 @@ impl<'a> TxnCsvRecord<'a> {
             memo: cmd.command.memo(),
             kind: cmd.command.kind().to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod user_command_store_impl_tests {
+    use super::*;
+    use crate::block::precomputed::PcbVersion;
+    use anyhow::Result;
+    use std::{env, path::Path};
+    use tempfile::TempDir;
+
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn test_increment_user_commands_counts() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        let applied_commands_path = Path::new("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
+        let applied_commands_pcb =
+            PrecomputedBlock::parse_file(applied_commands_path, PcbVersion::V1)?;
+        let epoch = 1;
+
+        let binding = applied_commands_pcb.commands();
+        let applied_command = binding.first().unwrap();
+
+        // Test with the applied user command
+        indexer.increment_user_commands_counts(applied_command, epoch)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 1);
+        assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+
+        // Clean up: reset counts by decrementing them back to zero
+        indexer.decrement_applied_user_commands_count(1)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_applied_user_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Increment applied user commands count
+        indexer.increment_applied_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_applied_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 2);
+
+        // Decrement applied user commands count
+        indexer.decrement_applied_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_applied_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 0);
+
+        // Ensure it does not go below 0
+        indexer.decrement_applied_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_user_commands_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_failed_user_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Increment failed user commands count
+        indexer.increment_failed_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_user_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_failed_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_user_commands_count()?, 2);
+
+        // Decrement failed user commands count
+        indexer.decrement_failed_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_user_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_failed_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+
+        // Ensure it does not go below 0
+        indexer.decrement_failed_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+
+        Ok(())
     }
 }
