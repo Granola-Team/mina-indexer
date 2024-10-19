@@ -1082,9 +1082,9 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
 #[cfg(test)]
 mod snark_store_impl_tests {
     use super::*;
-    use crate::{block::precomputed::PcbVersion, store::IndexerStore};
+    use crate::store::IndexerStore;
     use anyhow::Result;
-    use std::{env, path::Path};
+    use std::env;
     use tempfile::TempDir;
 
     fn create_indexer_store() -> Result<IndexerStore> {
