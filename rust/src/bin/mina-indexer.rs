@@ -313,16 +313,20 @@ impl ServerCommand {
 
         info!("Starting the web server listening on {web_hostname}:{web_port}");
         let store = db.clone();
+        let host = web_hostname.clone();
         subsys.start(SubsystemBuilder::new("Web Server", move |s| {
-            start_web_server(s, store, (web_hostname, web_port))
+            start_web_server(s, store, (host, web_port))
         }));
 
+        println!("GraphQL server started at: http://{web_hostname}:{web_port}/graphql");
         subsys.on_shutdown_requested().await;
+
         info!("Shutting down primary database instance");
         db.database.cancel_all_background_work(true);
         remove_pid(&database_dir);
         drop(db);
         remove_unix_socket(&domain_socket_path)?;
+
         Ok(())
     }
 }
