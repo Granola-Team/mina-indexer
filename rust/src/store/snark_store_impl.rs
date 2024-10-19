@@ -989,62 +989,6 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_snarks_total_non_canonical_count(&self) -> anyhow::Result<u32> {
-        trace!("Getting total non-canonical SNARKs count");
-        Ok(self
-            .database
-            .get_pinned(Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY)?
-            .map_or(0, |bytes| {
-                u32_from_be_bytes(&bytes).expect("total non-canonical SNARK count")
-            }))
-    }
-
-    fn increment_snarks_total_non_canonical_count(&self, incr: u32) -> anyhow::Result<()> {
-        trace!("Incrementing total non-canonical SNARKs count");
-        let old = self
-            .get_snarks_total_non_canonical_count()
-            .ok()
-            .unwrap_or_default();
-        Ok(self.database.put(
-            Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
-            (old + incr).to_be_bytes(),
-        )?)
-    }
-
-    fn decrement_snarks_total_non_canonical_count(&self, decr: u32) -> anyhow::Result<()> {
-        trace!("Decrementing total non-canonical SNARKs count");
-        let old = self
-            .get_snarks_total_non_canonical_count()
-            .ok()
-            .unwrap_or_default();
-        Ok(self.database.put(
-            Self::TOTAL_NUM_NON_CANONICAL_SNARKS_KEY,
-            (old.saturating_sub(decr)).to_be_bytes(),
-        )?)
-    }
-
-    fn index_snark_work(&self, block: &PrecomputedBlock, canonical: bool) -> anyhow::Result<()> {
-        let completed_works = SnarkWorkSummary::from_precomputed(block);
-        let num_snarks = completed_works.len() as u32;
-        if canonical {
-            self.increment_snarks_total_canonical_count(num_snarks)?;
-        } else {
-            self.increment_snarks_total_non_canonical_count(num_snarks)?;
-        }
-        Ok(())
-    }
-
-    fn deindex_snark_work(&self, block: &PrecomputedBlock, canonical: bool) -> anyhow::Result<()> {
-        let completed_works = SnarkWorkSummary::from_precomputed(block);
-        let num_snarks = completed_works.len() as u32;
-        if canonical {
-            self.decrement_snarks_total_canonical_count(num_snarks)?;
-        } else {
-            self.decrement_snarks_total_non_canonical_count(num_snarks)?;
-        }
-        Ok(())
-    }
-
     fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
         trace!("Incrementing total SNARKs count");
         let old = self.get_snarks_total_count()?;
@@ -1138,63 +1082,15 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
 #[cfg(test)]
 mod snark_store_impl_tests {
     use super::*;
-    use crate::{block::precomputed::PcbVersion, store::IndexerStore};
+    use crate::store::IndexerStore;
     use anyhow::Result;
-    use std::{env, path::Path};
+    use std::env;
     use tempfile::TempDir;
 
     fn create_indexer_store() -> Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
         let store = IndexerStore::new(temp_dir.path())?;
         Ok(store)
-    }
-
-    #[test]
-    fn index_deindex_snark_work() -> Result<()> {
-        let indexer = create_indexer_store()?;
-
-        let canonical_pcb_path = Path::new("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
-        let non_canonical_pcb_path = Path::new("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
-
-        let canonical_pcb = PrecomputedBlock::parse_file(canonical_pcb_path, PcbVersion::V1)?;
-        let non_canonical_pcb =
-            PrecomputedBlock::parse_file(non_canonical_pcb_path, PcbVersion::V1)?;
-
-        indexer.index_snark_work(&canonical_pcb, true)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 51);
-
-        indexer.deindex_snark_work(&canonical_pcb, true)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
-
-        indexer.index_snark_work(&non_canonical_pcb, false)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
-
-        indexer.deindex_snark_work(&non_canonical_pcb, false)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_incr_dec_snarks_total_non_canonical_count() -> Result<()> {
-        let indexer = create_indexer_store()?;
-
-        indexer.increment_snarks_total_non_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
-
-        indexer.increment_snarks_total_non_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 2);
-
-        indexer.decrement_snarks_total_non_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 1);
-
-        indexer.decrement_snarks_total_non_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
-
-        indexer.decrement_snarks_total_non_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_non_canonical_count()?, 0);
-
-        Ok(())
     }
 
     #[test]
