@@ -3,7 +3,11 @@ use super::{
     username::UsernameStore, IndexerStore,
 };
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockComparison, BlockHash},
+    block::{
+        precomputed::PrecomputedBlock,
+        store::{BlockStore, DbBlockUpdate},
+        BlockComparison, BlockHash,
+    },
     command::{
         signed::{SignedCommand, SignedCommandWithData, TxnHash},
         store::UserCommandStore,
@@ -675,6 +679,129 @@ impl UserCommandStore for IndexerStore {
             (old.saturating_sub(incr)).to_be_bytes(),
         )?)
     }
+
+    /// Get canonical user commands count
+    fn get_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting canonical user command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Increment canonical user commands count
+    fn increment_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Incrementing canonical user command count");
+        let old = self.get_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// Decrement canonical user commands count
+    fn decrement_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrementing canonical user command count");
+        let old = self.get_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
+    }
+
+    /// Get applied canonical user commands count
+    fn get_applied_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting applied canonical user command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Increment canonical user commands count
+    fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Incrementing applied canonical user command count");
+        let old = self.get_applied_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// Decrement canonical user commands count
+    fn decrement_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrementing applied canonical user command count");
+        let old = self.get_applied_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
+    }
+
+    /// Get failed canonical user commands count
+    fn get_failed_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting failed canonical user command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_FAILED_CANONICAL_USER_COMMANDS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Increment canonical user commands count
+    fn increment_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Incrementing failed canonical user command count");
+        let old = self.get_failed_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_FAILED_CANONICAL_USER_COMMANDS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// decrement canonical user commands count
+    fn decrement_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrementing failed canonical user command count");
+        let old = self.get_failed_canonical_user_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_FAILED_CANONICAL_USER_COMMANDS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
+    }
+
+    fn update_user_commands(&self, block: &DbBlockUpdate) -> anyhow::Result<()> {
+        for update in block.unapply.iter() {
+            if let Some(user_commands) = self
+                .get_block_user_commands(&update.state_hash)
+                .ok()
+                .flatten()
+            {
+                self.decrement_canonical_user_commands_count(user_commands.len() as u32)?;
+                let (applied_uc, failed_uc): (
+                    Vec<UserCommandWithStatus>,
+                    Vec<UserCommandWithStatus>,
+                ) = user_commands.into_iter().partition(|uc| uc.is_applied());
+                self.decrement_applied_canonical_user_commands_count(applied_uc.len() as u32)?;
+                self.decrement_failed_canonical_user_commands_count(failed_uc.len() as u32)?;
+            }
+        }
+
+        for update in block.apply.iter() {
+            if let Some(user_commands) = self
+                .get_block_user_commands(&update.state_hash)
+                .ok()
+                .flatten()
+            {
+                self.increment_canonical_user_commands_count(user_commands.len() as u32)?;
+                let (applied_uc, failed_uc): (
+                    Vec<UserCommandWithStatus>,
+                    Vec<UserCommandWithStatus>,
+                ) = user_commands.into_iter().partition(|uc| uc.is_applied());
+                self.increment_applied_canonical_user_commands_count(applied_uc.len() as u32)?;
+                self.increment_failed_canonical_user_commands_count(failed_uc.len() as u32)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -798,6 +925,87 @@ mod user_command_store_impl_tests {
         // Ensure it does not go below 0
         indexer.decrement_failed_user_commands_count(1)?;
         assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_canonical_user_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Increment canonical user commands count
+        indexer.increment_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_user_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_user_commands_count()?, 2);
+
+        // Decrement canonical user commands count
+        indexer.decrement_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_user_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_user_commands_count()?, 0);
+
+        // Ensure it does not go below 0
+        indexer.decrement_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_user_commands_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_applied_canonical_user_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Increment applied canonical user commands count
+        indexer.increment_applied_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_canonical_user_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_applied_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_canonical_user_commands_count()?, 2);
+
+        // Decrement applied canonical user commands count
+        indexer.decrement_applied_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_canonical_user_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_applied_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_canonical_user_commands_count()?, 0);
+
+        // Ensure it does not go below 0
+        indexer.decrement_applied_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_applied_canonical_user_commands_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_incr_dec_failed_canonical_user_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Increment failed canonical user commands count
+        indexer.increment_failed_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_canonical_user_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_failed_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_canonical_user_commands_count()?, 2);
+
+        // Decrement failed canonical user commands count
+        indexer.decrement_failed_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_canonical_user_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_failed_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_canonical_user_commands_count()?, 0);
+
+        // Ensure it does not go below 0
+        indexer.decrement_failed_canonical_user_commands_count(1)?;
+        assert_eq!(indexer.get_failed_canonical_user_commands_count()?, 0);
 
         Ok(())
     }

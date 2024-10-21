@@ -1,5 +1,5 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
     command::{
         signed::{SignedCommandWithData, TxnHash},
         UserCommandWithStatus,
@@ -180,9 +180,39 @@ pub trait UserCommandStore {
     /// Increment applied user commands count
     fn increment_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
 
+    /// Decrement failed user commands count
+    fn decrement_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
     /// Decrement applied user commands count
     fn decrement_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
 
-    /// Decrement failed user commands count
-    fn decrement_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+    /// Get canonical user commands count
+    fn get_canonical_user_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment canonical user commands count
+    fn increment_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Decrement canonical user commands count
+    fn decrement_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Get applied canonical user commands count
+    fn get_applied_canonical_user_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment canonical user commands count
+    fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Decrement canonical user commands count
+    fn decrement_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Get failed canonical user commands count
+    fn get_failed_canonical_user_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment canonical user commands count
+    fn increment_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// decrement canonical user commands count
+    fn decrement_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Update user commands from DbBlockUpdate
+    fn update_user_commands(&self, block: &DbBlockUpdate) -> anyhow::Result<()>;
 }
