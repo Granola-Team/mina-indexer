@@ -48,6 +48,7 @@ pub struct BlockchainSummary {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
+    total_num_canonical_internal_commands: u32,
     db_version: String,
     indexer_version: String,
 }
@@ -73,6 +74,7 @@ struct SummaryInput {
     total_num_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
+    total_num_canonical_internal_commands: u32,
     total_num_accounts: u32,
 }
 
@@ -92,6 +94,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
+        total_num_canonical_internal_commands,
         total_num_accounts,
     } = input;
     let blockchain_length = best_tip.blockchain_length();
@@ -140,6 +143,7 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
+        total_num_canonical_internal_commands,
         db_version,
         indexer_version,
     })
@@ -193,6 +197,9 @@ pub async fn get_blockchain_summary(
         let total_num_internal_commands = store
             .get_internal_commands_total_count()
             .expect("total internal commands count");
+        let total_num_canonical_internal_commands = store
+            .get_canonical_internal_commands_count()
+            .expect("total number of canonical internal commands");
 
         if let Some(ref summary) = calculate_summary(SummaryInput {
             chain_id,
@@ -209,6 +216,7 @@ pub async fn get_blockchain_summary(
             total_num_user_commands,
             epoch_num_internal_commands,
             total_num_internal_commands,
+            total_num_canonical_internal_commands,
             total_num_accounts,
         }) {
             trace!("Blockchain summary: {summary:?}");
