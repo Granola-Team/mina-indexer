@@ -1,6 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{
+        precomputed::PrecomputedBlock,
+        store::{BlockStore, DbBlockUpdate},
+        BlockHash,
+    },
     command::internal::{
         store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData,
     },
@@ -462,6 +466,50 @@ impl InternalCommandStore for IndexerStore {
         self.increment_internal_commands_epoch_count(epoch)?;
         self.increment_internal_commands_total_count()
     }
+
+    /// get canonical internal commands count
+    fn get_canonical_internal_commands_count(&self) -> anyhow::Result<u32> {
+        trace!("Getting canonical internal command count");
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_CANONICAL_FEE_TRANSFERS_KEY)?
+            .map_or(0, from_be_bytes))
+    }
+
+    /// Increment canonical internal commands count
+    fn increment_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Increment canonical internal commands count");
+        let old = self.get_canonical_internal_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_FEE_TRANSFERS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
+    }
+
+    /// Decrement canonical internal commands count
+    fn decrement_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+        trace!("Decrement canonical internal commands count");
+        let old = self.get_canonical_internal_commands_count()?;
+        Ok(self.database.put(
+            Self::TOTAL_NUM_CANONICAL_FEE_TRANSFERS_KEY,
+            (old.saturating_sub(incr)).to_be_bytes(),
+        )?)
+    }
+
+    /// Update Internal Commands from DbBlockUpdate
+    fn update_internal_commands(&self, block: &DbBlockUpdate) -> anyhow::Result<()> {
+        for update in block.unapply.iter() {
+            let internal_commands = self.get_internal_commands(&update.state_hash)?;
+            self.decrement_canonical_internal_commands_count(internal_commands.len() as u32)?;
+        }
+
+        for update in block.apply.iter() {
+            let internal_commands = self.get_internal_commands(&update.state_hash)?;
+            self.increment_canonical_internal_commands_count(internal_commands.len() as u32)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -503,5 +551,47 @@ impl<'a> CsvRecordInternalCommand<'a> {
                 kind: kind.to_string(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod internal_command_store_impl_tests {
+    use super::*;
+    use anyhow::Result;
+    use std::env;
+    use tempfile::TempDir;
+
+    // Utility function to create an in-memory IndexerStore for testing
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn test_incr_dec_canonical_internal_commands_count() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        // Test incrementing canonical internal commands count
+        indexer.increment_canonical_internal_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_internal_commands_count()?, 1);
+
+        // Increment again
+        indexer.increment_canonical_internal_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_internal_commands_count()?, 2);
+
+        // Test decrementing canonical internal commands count
+        indexer.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_internal_commands_count()?, 1);
+
+        // Decrement to 0
+        indexer.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_internal_commands_count()?, 0);
+
+        // Ensure count does not go below 0
+        indexer.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(indexer.get_canonical_internal_commands_count()?, 0);
+
+        Ok(())
     }
 }

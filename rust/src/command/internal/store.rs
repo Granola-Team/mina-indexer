@@ -1,6 +1,6 @@
 //! Store for internal commands
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
     command::internal::DbInternalCommandWithData,
     ledger::public_key::PublicKey,
 };
@@ -149,4 +149,16 @@ pub trait InternalCommandStore {
         internal_command: &DbInternalCommandWithData,
         epoch: u32,
     ) -> anyhow::Result<()>;
+
+    /// get canonical internal commands count
+    fn get_canonical_internal_commands_count(&self) -> anyhow::Result<u32>;
+
+    /// Increment canonical internal commands count
+    fn increment_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Decrement canonical internal commands count
+    fn decrement_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()>;
+
+    /// Internal commands from DbBlockUpdate
+    fn update_internal_commands(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()>;
 }
