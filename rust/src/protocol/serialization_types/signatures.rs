@@ -71,7 +71,7 @@ pub struct PublicKey2V1(pub Versioned<PublicKeyV1, 1>); // with an extra version
 
 mod conversions {
     use super::*;
-    use crate::proof_systems::{signer::signature::BaseField, FieldHelpers};
+    use crate::proof_systems::{signer::pubkey::BaseField, FieldHelpers};
 
     impl From<&CompressedCurvePoint> for CompressedPubKey {
         fn from(t: &CompressedCurvePoint) -> Self {
