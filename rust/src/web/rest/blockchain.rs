@@ -48,6 +48,9 @@ pub struct BlockchainSummary {
     total_num_user_commands: u32,
     total_num_applied_user_commands: u32,
     total_num_failed_user_commands: u32,
+    total_num_canonical_user_commands: u32,
+    total_num_applied_canonical_user_commands: u32,
+    total_num_failed_canonical_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
     db_version: String,
@@ -75,6 +78,9 @@ struct SummaryInput {
     total_num_user_commands: u32,
     total_num_applied_user_commands: u32,
     total_num_failed_user_commands: u32,
+    total_num_canonical_user_commands: u32,
+    total_num_applied_canonical_user_commands: u32,
+    total_num_failed_canonical_user_commands: u32,
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
     total_num_accounts: u32,
@@ -96,6 +102,9 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         total_num_applied_user_commands,
         total_num_failed_user_commands,
+        total_num_canonical_user_commands,
+        total_num_applied_canonical_user_commands,
+        total_num_failed_canonical_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
         total_num_accounts,
@@ -146,6 +155,9 @@ fn calculate_summary(input: SummaryInput) -> Option<BlockchainSummary> {
         total_num_user_commands,
         total_num_applied_user_commands,
         total_num_failed_user_commands,
+        total_num_canonical_user_commands,
+        total_num_applied_canonical_user_commands,
+        total_num_failed_canonical_user_commands,
         epoch_num_internal_commands,
         total_num_internal_commands,
         db_version,
@@ -197,10 +209,19 @@ pub async fn get_blockchain_summary(
             .expect("total user commands count");
         let total_num_applied_user_commands = store
             .get_applied_user_commands_count()
-            .expect("total applied duser commands count");
+            .expect("total applied user commands count");
+        let total_num_canonical_user_commands = store
+            .get_canonical_user_commands_count()
+            .expect("total canonical user commands count");
+        let total_num_applied_canonical_user_commands = store
+            .get_applied_canonical_user_commands_count()
+            .expect("total applied canonical user commands count");
+        let total_num_failed_canonical_user_commands = store
+            .get_failed_canonical_user_commands_count()
+            .expect("total failed canonical user commands count");
         let total_num_failed_user_commands = store
             .get_failed_user_commands_count()
-            .expect("total failed duser commands count");
+            .expect("total failed user commands count");
         let epoch_num_internal_commands = store
             .get_internal_commands_epoch_count(None)
             .expect("epoch internal commands count");
@@ -223,6 +244,9 @@ pub async fn get_blockchain_summary(
             total_num_user_commands,
             total_num_applied_user_commands,
             total_num_failed_user_commands,
+            total_num_canonical_user_commands,
+            total_num_applied_canonical_user_commands,
+            total_num_failed_canonical_user_commands,
             epoch_num_internal_commands,
             total_num_internal_commands,
             total_num_accounts,
