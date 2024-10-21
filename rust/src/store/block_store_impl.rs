@@ -256,6 +256,7 @@ impl BlockStore for IndexerStore {
             self.update_block_best_accounts(state_hash, &reorg_blocks)?;
             self.update_block_snarks(&reorg_blocks)?;
             self.update_block_usernames(&reorg_blocks)?;
+            self.update_user_commands(&reorg_blocks)?;
         }
 
         // set new best tip
