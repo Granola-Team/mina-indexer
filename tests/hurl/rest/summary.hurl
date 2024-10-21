@@ -9,3 +9,4 @@ HTTP 200
 
 # total data count
 jsonpath "$.totalNumCanonicalSnarks" == 64
+jsonpath "$.totalNumCanonicalInternalCommands" == 234
