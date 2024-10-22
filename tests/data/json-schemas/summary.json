@@ -71,6 +71,21 @@
     "totalNumUserCommands": {
       "type": "integer"
     },
+    "totalNumAppliedUserCommands": {
+      "type": "integer"
+    },
+    "totalNumFailedUserCommands": {
+      "type": "integer"
+    },
+    "totalNumCanonicalUserCommands": {
+      "type": "integer"
+    },
+    "totalNumAppliedCanonicalUserCommands": {
+      "type": "integer"
+    },
+    "totalNumFailedCanonicalUserCommands": {
+      "type": "integer"
+    },
     "epochNumInternalCommands": {
       "type": "integer"
     },
@@ -108,6 +123,11 @@
     "totalNumCanonicalSnarks",
     "epochNumUserCommands",
     "totalNumUserCommands",
+    "totalNumAppliedUserCommands",
+    "totalNumFailedUserCommands",
+    "totalNumCanonicalUserCommands",
+    "totalNumAppliedCanonicalUserCommands",
+    "totalNumFailedCanonicalUserCommands",
     "epochNumInternalCommands",
     "totalNumInternalCommands",
     "totalNumCanonicalInternalCommands",

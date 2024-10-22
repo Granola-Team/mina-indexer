@@ -31,5 +31,7 @@ pub trait FixedKeys {
     const TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
         "total_num_applied_canonical_user_commands_key".as_bytes();
     const TOTAL_NUM_FAILED_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
-        "total_num_applied_canonical_user_commands_key".as_bytes();
+        "total_num_failed_canonical_user_commands_key".as_bytes();
+    const TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
+        "total_num_canonical_user_commands_key".as_bytes();
 }
