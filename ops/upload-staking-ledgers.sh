@@ -22,5 +22,5 @@ MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 	sync \
 	--metadata \
 	"$1" \
-	linode:granola-mina-staking-ledgers
+	linode:staking-ledgers.minasearch.com
 RESULT='Staking ledgers uploaded.'

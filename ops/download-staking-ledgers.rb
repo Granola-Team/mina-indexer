@@ -18,7 +18,7 @@ FileUtils.mkdir_p(DEST)
 ledgers_list = "#{DEST}/../staking-ledgers.list"
 unless File.exist?(ledgers_list)
   warn "#{ledgers_list} does not exist. Fetching..."
-  cmd = "#{clone_exe} lsf linode:granola-mina-staking-ledgers"
+  cmd = "#{clone_exe} lsf linode:staking-ledgers.minasearch.com"
   warn "download-staking-ledgers issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
@@ -51,7 +51,7 @@ else
   system(
     clone_exe,
     "sync",
-    "linode:granola-mina-staking-ledgers",
+    "linode:staking-ledgers.minasearch.com",
     "--files-from-raw", "ledgers-to-fetch.list",
     DEST
   ) || abort("Files sync failed in download-mina-staking-ledgers.rb")
