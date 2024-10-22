@@ -151,7 +151,7 @@ jsonpath "$.data.feetransfers" count == 100
 jsonpath "$.data.feetransfers[0].blockHeight" == 2
 jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH"
 jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 196
-jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 196
+jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 399
 
 duration < 500
 

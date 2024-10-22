@@ -62,6 +62,7 @@ impl InternalCommandStore for IndexerStore {
 
         // increment internal command counts &
         // sort by pk, block height & global slot
+        self.increment_internal_commands_total_count(internal_cmds_with_data.len() as u32)?;
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
             let pk = int_cmd.recipient();
             self.increment_internal_commands_counts(int_cmd, epoch)?;
@@ -362,12 +363,13 @@ impl InternalCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_internal_commands_total_count(&self) -> anyhow::Result<()> {
+    fn increment_internal_commands_total_count(&self, incr: u32) -> anyhow::Result<()> {
         trace!("Incrementing internal command total");
         let old = self.get_internal_commands_total_count()?;
-        Ok(self
-            .database
-            .put(Self::TOTAL_NUM_FEE_TRANSFERS_KEY, (old + 1).to_be_bytes())?)
+        Ok(self.database.put(
+            Self::TOTAL_NUM_FEE_TRANSFERS_KEY,
+            (old + incr).to_be_bytes(),
+        )?)
     }
 
     fn get_internal_commands_pk_epoch_count(
@@ -463,8 +465,7 @@ impl InternalCommandStore for IndexerStore {
         self.increment_internal_commands_pk_total_count(receiver)?;
 
         // epoch & total counts
-        self.increment_internal_commands_epoch_count(epoch)?;
-        self.increment_internal_commands_total_count()
+        self.increment_internal_commands_epoch_count(epoch)
     }
 
     /// get canonical internal commands count
