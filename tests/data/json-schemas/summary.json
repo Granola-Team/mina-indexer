@@ -77,6 +77,9 @@
     "totalNumInternalCommands": {
       "type": "integer"
     },
+    "totalNumCanonicalInternalCommands": {
+      "type": "integer"
+    },
     "totalNumAccounts": {
       "type": "integer"
     }
@@ -107,6 +110,7 @@
     "totalNumUserCommands",
     "epochNumInternalCommands",
     "totalNumInternalCommands",
+    "totalNumCanonicalInternalCommands",
     "totalNumAccounts"
   ]
 }
