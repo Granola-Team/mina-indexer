@@ -104,7 +104,7 @@ pub trait InternalCommandStore {
     fn get_internal_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32>;
 
     /// Increment internal commands total count
-    fn increment_internal_commands_total_count(&self) -> anyhow::Result<()>;
+    fn increment_internal_commands_total_count(&self, incr: u32) -> anyhow::Result<()>;
 
     /// Get internal commands total count
     fn get_internal_commands_total_count(&self) -> anyhow::Result<u32>;
