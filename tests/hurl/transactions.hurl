@@ -705,3 +705,51 @@ jsonpath "$.data.transactions[0].blockHeight" == 119
 jsonpath "$.data.transactions[1].blockHeight" == 119
 
 duration < 100
+
+#
+# transactions bound by height sorted by global slot
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeightSort {
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_DESC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 4
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[3].blockHeight" == 119
+
+duration < 100
+
+#
+# transactions bound by height sorted by global slot
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeightSort {
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_ASC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 4
+jsonpath "$.data.transactions[0].blockHeight" == 119
+jsonpath "$.data.transactions[3].blockHeight" == 120
+
+duration < 100
