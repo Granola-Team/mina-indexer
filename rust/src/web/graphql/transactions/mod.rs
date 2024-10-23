@@ -353,13 +353,30 @@ impl TransactionsQueryRoot {
         }) {
             let query = query.expect("query input to exists");
 
-            let (min, max) = calculate_inclusive_bounds(
-                query.block_height_gte,
-                query.block_height_gt,
-                query.block_height_lte,
-                query.block_height_lt,
-                db.get_best_block_height()?.expect("best block height"),
-            )?;
+            let (min, max) = {
+                let (min_bound, max_bound) = calculate_inclusive_bounds(
+                    query.block_height_gte,
+                    query.block_height_gt,
+                    query.block_height_lte,
+                    query.block_height_lt,
+                    db.get_best_block_height()?.expect("best block height"),
+                )?;
+                match sort_by {
+                    BlockHeightAsc | BlockHeightDesc => (min_bound, max_bound),
+                    GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
+                        let min_slots = db
+                            .get_block_global_slots_from_height(min_bound)?
+                            .expect("global slots at min height");
+                        let max_slots = db
+                            .get_block_global_slots_from_height(max_bound)?
+                            .expect("global slots at max height");
+                        (
+                            min_slots.iter().min().copied().unwrap_or_default(),
+                            max_slots.iter().max().copied().unwrap_or(u32::MAX),
+                        )
+                    }
+                }
+            };
 
             let iter = match sort_by {
                 BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
