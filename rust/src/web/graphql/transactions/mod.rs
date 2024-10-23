@@ -352,49 +352,22 @@ impl TransactionsQueryRoot {
                 || q.block_height_lte.is_some()
         }) {
             let query = query.expect("query input to exists");
-            let (min, max) = {
-                let TransactionQueryInput {
-                    block_height_gt,
-                    block_height_gte,
-                    block_height_lt,
-                    block_height_lte,
-                    ..
-                } = query;
-                let min_bound = match (block_height_gte, block_height_gt) {
-                    (Some(gte), Some(gt)) => gte.max(gt + 1),
-                    (Some(gte), None) => gte,
-                    (None, Some(gt)) => gt + 1,
-                    (None, None) => 1,
-                };
-                let max_bound = match (block_height_lte, block_height_lt) {
-                    (Some(lte), Some(lt)) => lte.min(lt - 1),
-                    (Some(lte), None) => lte,
-                    (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block_height()?.expect("best block height"),
-                };
-                match sort_by {
-                    BlockHeightAsc | BlockHeightDesc => (min_bound, max_bound),
-                    GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
-                        let min_slots = db
-                            .get_block_global_slots_from_height(min_bound)?
-                            .expect("global slots at min height");
-                        let max_slots = db
-                            .get_block_global_slots_from_height(max_bound)?
-                            .expect("global slots at max height");
-                        (
-                            min_slots.iter().min().copied().unwrap_or_default(),
-                            max_slots.iter().max().copied().unwrap_or(u32::MAX),
-                        )
-                    }
-                }
-            };
+
+            let (min, max) = calculate_inclusive_bounds(
+                query.block_height_gte,
+                query.block_height_gt,
+                query.block_height_lte,
+                query.block_height_lt,
+                db.get_best_block_height()?.expect("best block height"),
+            )?;
+
             let iter = match sort_by {
                 BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
                 BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
-                    &max.to_be_bytes(),
+                    &(max + 1).to_be_bytes(),
                     Direction::Reverse,
                 )),
                 GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
@@ -402,7 +375,7 @@ impl TransactionsQueryRoot {
                     Direction::Forward,
                 )),
                 GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
-                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                    IteratorMode::From(&(max + 1).to_be_bytes(), Direction::Reverse),
                 ),
             };
 
@@ -615,6 +588,33 @@ impl TransactionsQueryRoot {
 
         Ok(transactions)
     }
+}
+
+fn calculate_inclusive_bounds(
+    block_height_gte: Option<u32>,
+    block_height_gt: Option<u32>,
+    block_height_lte: Option<u32>,
+    block_height_lt: Option<u32>,
+    best_block_height: u32,
+) -> Result<(u32, u32)> {
+    // Ensure `min_bound` is inclusive
+    let min_bound = match (block_height_gte, block_height_gt) {
+        (Some(gte), Some(gt)) => gte.max(gt.saturating_add(1)),
+        (Some(gte), None) => gte,
+        (None, Some(gt)) => gt.saturating_add(1),
+        (None, None) => 1,
+    };
+
+    // Ensure `max_bound` is inclusive
+    let max_bound = match (block_height_lte, block_height_lt) {
+        (Some(lte), Some(lt)) => lte.min(lt.saturating_sub(1)), /* lte is inclusive, lt - 1 to */
+        // make it inclusive
+        (Some(lte), None) => lte,                 // lte is inclusive
+        (None, Some(lt)) => lt.saturating_sub(1), // lt - 1 to make it inclusive
+        (None, None) => best_block_height,        // Default max
+    };
+
+    Ok((min_bound, max_bound))
 }
 
 impl Transaction {
@@ -988,5 +988,134 @@ impl TransactionQueryInput {
             }
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod calculate_inclusive_bounds_tests {
+    use super::*;
+
+    #[test]
+    fn test_bounds_with_both_gte_and_gt() {
+        let gte = Some(10);
+        let gt = Some(8);
+        let lte = None;
+        let lt = None;
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 10); // gte.max(gt + 1)
+        assert_eq!(max_bound, best_block_height); // default to best block
+                                                  // height
+    }
+
+    #[test]
+    fn test_bounds_with_only_gte() {
+        let gte = Some(15);
+        let gt = None;
+        let lte = None;
+        let lt = None;
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 15); // gte is inclusive
+        assert_eq!(max_bound, best_block_height); // default to best block
+                                                  // height
+    }
+
+    #[test]
+    fn test_bounds_with_only_gt() {
+        let gt = Some(12);
+        let gte = None;
+        let lte = None;
+        let lt = None;
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 13); // gt + 1 to make it inclusive
+        assert_eq!(max_bound, best_block_height); // default to best block
+                                                  // height
+    }
+
+    #[test]
+    fn test_bounds_with_both_lte_and_lt() {
+        let gte = None;
+        let gt = None;
+        let lte = Some(20);
+        let lt = Some(22);
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 1); // Default min bound
+        assert_eq!(max_bound, 20); // lte.min(lt - 1)
+    }
+
+    #[test]
+    fn test_bounds_with_only_lte() {
+        let gte = None;
+        let gt = None;
+        let lte = Some(30);
+        let lt = None;
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 1); // Default min bound
+        assert_eq!(max_bound, 30); // lte is inclusive
+    }
+
+    #[test]
+    fn test_bounds_with_only_lt() {
+        let gte = None;
+        let gt = None;
+        let lte = None;
+        let lt = Some(25);
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 1); // Default min bound
+        assert_eq!(max_bound, 24); // lt - 1 is inclusive
+    }
+
+    #[test]
+    fn test_bounds_with_all_parameters() {
+        let gte = Some(15);
+        let gt = Some(12);
+        let lte = Some(30);
+        let lt = Some(28);
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 15); // gte.max(gt + 1)
+        assert_eq!(max_bound, 27); // lte.min(lt - 1)
+    }
+
+    #[test]
+    fn test_bounds_with_none() {
+        let gte = None;
+        let gt = None;
+        let lte = None;
+        let lt = None;
+        let best_block_height = 100;
+
+        let (min_bound, max_bound) =
+            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+
+        assert_eq!(min_bound, 1); // Default min bound
+        assert_eq!(max_bound, best_block_height); // default to best block
+                                                  // height
     }
 }
