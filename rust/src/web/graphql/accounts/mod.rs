@@ -204,7 +204,10 @@ impl AccountQueryInput {
             }
         }
         if let Some(username_prefix) = query_username_prefix {
-            if username.map_or(true, |u| !u.starts_with(username_prefix)) {
+            if username.map_or(true, |u| {
+                !u.to_lowercase()
+                    .starts_with(&username_prefix.to_lowercase())
+            }) {
                 return false;
             }
         }
