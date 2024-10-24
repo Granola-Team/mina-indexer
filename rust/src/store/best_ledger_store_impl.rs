@@ -202,6 +202,7 @@ impl BestLedgerStore for IndexerStore {
                         },
                         ..acct
                     }),
+                    Zkapp(_diff) => todo!("zkapp diff unapply update_best_accounts"),
                 };
                 self.update_best_account(&pk, account)?;
             }
@@ -259,6 +260,7 @@ impl BestLedgerStore for IndexerStore {
                         nonce: Some(diff.nonce),
                         ..acct
                     }),
+                    Zkapp(_diff) => todo!("zkapp diff apply update_best_accounts"),
                 };
                 self.update_best_account(&pk, account)?;
             }

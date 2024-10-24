@@ -272,12 +272,8 @@ impl std::fmt::Debug for Ledger {
 }
 
 pub fn is_valid_ledger_hash(input: &str) -> bool {
-    let mut chars = input.chars();
-    let c0 = chars.next();
-    let c1 = chars.next();
-    input.len() == LedgerHash::LEN
-        && c0 == Some('j')
-        && (c1 == Some('w') || c1 == Some('x') || c1 == Some('y') || c1 == Some('z'))
+    let prefix: String = input.chars().take(2).collect();
+    input.len() == LedgerHash::LEN && LedgerHash::PREFIX.contains(&prefix.as_str())
 }
 
 #[cfg(test)]

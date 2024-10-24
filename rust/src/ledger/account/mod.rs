@@ -411,20 +411,21 @@ impl Account {
 
     /// Apply an account diff to an account
     pub fn apply_account_diff(self, diff: &AccountDiff) -> Self {
+        use AccountDiff::*;
         match diff {
-            AccountDiff::Payment(payment_diff) => self.payment(payment_diff),
-            AccountDiff::Delegation(delegation_diff) => {
+            Payment(payment_diff) => self.payment(payment_diff),
+            Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
             }
-            AccountDiff::Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
-            AccountDiff::FeeTransfer(fee_transfer_diff) => self.payment(fee_transfer_diff),
-            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                self.payment(fee_transfer_diff)
+            Zkapp(zkapp_diff) => {
+                // TODO only apply diff to matching account?
+                todo!("apply zkapp account diff {zkapp_diff:?}")
             }
-            AccountDiff::FailedTransactionNonce(failed_diff) => {
-                self.failed_transaction(failed_diff.nonce)
-            }
+            Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
+            FeeTransfer(fee_transfer_diff) => self.payment(fee_transfer_diff),
+            FeeTransferViaCoinbase(fee_transfer_diff) => self.payment(fee_transfer_diff),
+            FailedTransactionNonce(failed_diff) => self.failed_transaction(failed_diff.nonce),
         }
     }
 
@@ -434,23 +435,19 @@ impl Account {
             return None;
         }
 
+        use AccountDiff::*;
         Some(match diff {
-            AccountDiff::Payment(payment_diff) => self.payment_unapply(payment_diff),
-            AccountDiff::Delegation(delegation_diff) => {
-                self.delegation_unapply(Some(delegation_diff.nonce))
-            }
-            AccountDiff::Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
-            AccountDiff::FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
-            AccountDiff::FeeTransferViaCoinbase(fee_transfer_diff) => {
-                self.payment_unapply(fee_transfer_diff)
-            }
-            AccountDiff::FailedTransactionNonce(diff) => {
-                self.failed_transaction_unapply(if diff.nonce.0 > 0 {
-                    Some(diff.nonce - 1)
-                } else {
-                    None
-                })
-            }
+            Payment(payment_diff) => self.payment_unapply(payment_diff),
+            Delegation(delegation_diff) => self.delegation_unapply(Some(delegation_diff.nonce)),
+            Zkapp(zkapp_diff) => todo!("unapply zkapp account diff {zkapp_diff:?}"),
+            Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
+            FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
+            FeeTransferViaCoinbase(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
+            FailedTransactionNonce(diff) => self.failed_transaction_unapply(if diff.nonce.0 > 0 {
+                Some(diff.nonce - 1)
+            } else {
+                None
+            }),
         })
     }
 
