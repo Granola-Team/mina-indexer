@@ -354,13 +354,14 @@ impl TransactionsQueryRoot {
             let query = query.expect("query input to exists");
 
             let (min, max) = {
-                let (min_bound, max_bound) = calculate_inclusive_bounds(
+                let (min_bound, max_bound) = calculate_inclusive_height_bounds(
                     query.block_height_gte,
                     query.block_height_gt,
                     query.block_height_lte,
                     query.block_height_lt,
                     db.get_best_block_height()?.expect("best block height"),
                 )?;
+
                 match sort_by {
                     BlockHeightAsc | BlockHeightDesc => (min_bound, max_bound),
                     GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
@@ -378,13 +379,14 @@ impl TransactionsQueryRoot {
                 }
             };
 
+            // reverse is exclusive so we increment
             let iter = match sort_by {
                 BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
                 BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
-                    &(max + 1).to_be_bytes(),
+                    &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
                 GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
@@ -392,7 +394,7 @@ impl TransactionsQueryRoot {
                     Direction::Forward,
                 )),
                 GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
-                    IteratorMode::From(&(max + 1).to_be_bytes(), Direction::Reverse),
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
             };
 
@@ -443,50 +445,17 @@ impl TransactionsQueryRoot {
         }) {
             let query = query.expect("query input to exists");
             let (min, max) = {
-                let TransactionQueryInput {
-                    global_slot_gt,
-                    global_slot_gte,
-                    global_slot_lt,
-                    global_slot_lte,
-                    ref date_time_gt,
-                    ref date_time_gte,
-                    ref date_time_lt,
-                    ref date_time_lte,
-                    ..
-                } = query;
-                let min_bound = match (
-                    global_slot_gte.or(date_time_gte
-                        .as_ref()
-                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
-                    global_slot_gt.or(date_time_gt
-                        .as_ref()
-                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
-                ) {
-                    (Some(gte), Some(gt)) => gte.max(gt + 1),
-                    (Some(gte), None) => gte,
-                    (None, Some(gt)) => gt + 1,
-                    (None, None) => 0,
-                };
-                let min_bound = db
-                    .get_next_global_slot_produced(min_bound)?
-                    .expect("min global slot produced");
-
-                let max_bound = match (
-                    global_slot_lte.or(date_time_lte
-                        .as_ref()
-                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
-                    global_slot_lt.or(date_time_lt
-                        .as_ref()
-                        .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
-                ) {
-                    (Some(lte), Some(lt)) => lte.min(lt - 1),
-                    (Some(lte), None) => lte,
-                    (None, Some(lt)) => lt - 1,
-                    (None, None) => db
-                        .get_best_block_global_slot()?
-                        .expect("best block global slot"),
-                };
-                let max_bound = db.get_prev_global_slot_produced(max_bound)?;
+                let (min_bound, max_bound) = calculate_inclusive_slot_bounds(
+                    db,
+                    query.global_slot_gt,
+                    query.global_slot_gte,
+                    query.global_slot_lt,
+                    query.global_slot_lte,
+                    &query.date_time_gt,
+                    &query.date_time_gte,
+                    &query.date_time_lt,
+                    &query.date_time_lte,
+                )?;
 
                 match sort_by {
                     BlockHeightAsc | BlockHeightDesc => {
@@ -506,13 +475,15 @@ impl TransactionsQueryRoot {
                     }
                 }
             };
+
+            // reverse is exclusive so we increment
             let iter = match sort_by {
                 BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
                 BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
-                    &max.to_be_bytes(),
+                    &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
                 GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
@@ -520,7 +491,7 @@ impl TransactionsQueryRoot {
                     Direction::Forward,
                 )),
                 GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
-                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
             };
 
@@ -607,14 +578,14 @@ impl TransactionsQueryRoot {
     }
 }
 
-fn calculate_inclusive_bounds(
+fn calculate_inclusive_height_bounds(
     block_height_gte: Option<u32>,
     block_height_gt: Option<u32>,
     block_height_lte: Option<u32>,
     block_height_lt: Option<u32>,
     best_block_height: u32,
 ) -> Result<(u32, u32)> {
-    // Ensure `min_bound` is inclusive
+    // Ensure min bound is inclusive
     let min_bound = match (block_height_gte, block_height_gt) {
         (Some(gte), Some(gt)) => gte.max(gt.saturating_add(1)),
         (Some(gte), None) => gte,
@@ -622,14 +593,62 @@ fn calculate_inclusive_bounds(
         (None, None) => 1,
     };
 
-    // Ensure `max_bound` is inclusive
+    // Ensure max bound is inclusive
     let max_bound = match (block_height_lte, block_height_lt) {
-        (Some(lte), Some(lt)) => lte.min(lt.saturating_sub(1)), /* lte is inclusive, lt - 1 to */
-        // make it inclusive
-        (Some(lte), None) => lte,                 // lte is inclusive
-        (None, Some(lt)) => lt.saturating_sub(1), // lt - 1 to make it inclusive
-        (None, None) => best_block_height,        // Default max
+        (Some(lte), Some(lt)) => lte.min(lt.saturating_sub(1)),
+        (Some(lte), None) => lte,
+        (None, Some(lt)) => lt.saturating_sub(1),
+        (None, None) => best_block_height,
     };
+
+    Ok((min_bound, max_bound))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn calculate_inclusive_slot_bounds(
+    db: &Arc<IndexerStore>,
+    global_slot_gt: Option<u32>,
+    global_slot_gte: Option<u32>,
+    global_slot_lt: Option<u32>,
+    global_slot_lte: Option<u32>,
+    date_time_gt: &Option<DateTime>,
+    date_time_gte: &Option<DateTime>,
+    date_time_lt: &Option<DateTime>,
+    date_time_lte: &Option<DateTime>,
+) -> Result<(u32, u32)> {
+    let min_bound = match (
+        global_slot_gte.or(date_time_gte
+            .as_ref()
+            .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+        global_slot_gt.or(date_time_gt
+            .as_ref()
+            .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+    ) {
+        (Some(gte), Some(gt)) => gte.max(gt.saturating_add(1)),
+        (Some(gte), None) => gte,
+        (None, Some(gt)) => gt.saturating_add(1),
+        (None, None) => 0,
+    };
+    let min_bound = db
+        .get_next_global_slot_produced(min_bound)?
+        .expect("min global slot produced");
+
+    let max_bound = match (
+        global_slot_lte.or(date_time_lte
+            .as_ref()
+            .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+        global_slot_lt.or(date_time_lt
+            .as_ref()
+            .map(|dt| millis_to_global_slot(dt.timestamp_millis()))),
+    ) {
+        (Some(lte), Some(lt)) => lte.min(lt.saturating_sub(1)),
+        (Some(lte), None) => lte,
+        (None, Some(lt)) => lt.saturating_sub(1),
+        (None, None) => db
+            .get_best_block_global_slot()?
+            .expect("best block global slot"),
+    };
+    let max_bound = db.get_prev_global_slot_produced(max_bound)?;
 
     Ok((min_bound, max_bound))
 }
@@ -1009,7 +1028,7 @@ impl TransactionQueryInput {
 }
 
 #[cfg(test)]
-mod calculate_inclusive_bounds_tests {
+mod tests {
     use super::*;
 
     #[test]
@@ -1021,11 +1040,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 10); // gte.max(gt + 1)
-        assert_eq!(max_bound, best_block_height); // default to best block
-                                                  // height
+        assert_eq!(min_bound, 10);
+        assert_eq!(max_bound, best_block_height);
     }
 
     #[test]
@@ -1037,11 +1055,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 15); // gte is inclusive
-        assert_eq!(max_bound, best_block_height); // default to best block
-                                                  // height
+        assert_eq!(min_bound, 15);
+        assert_eq!(max_bound, best_block_height);
     }
 
     #[test]
@@ -1053,11 +1070,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 13); // gt + 1 to make it inclusive
-        assert_eq!(max_bound, best_block_height); // default to best block
-                                                  // height
+        assert_eq!(min_bound, 13);
+        assert_eq!(max_bound, best_block_height);
     }
 
     #[test]
@@ -1069,10 +1085,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 1); // Default min bound
-        assert_eq!(max_bound, 20); // lte.min(lt - 1)
+        assert_eq!(min_bound, 1);
+        assert_eq!(max_bound, 20);
     }
 
     #[test]
@@ -1084,10 +1100,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 1); // Default min bound
-        assert_eq!(max_bound, 30); // lte is inclusive
+        assert_eq!(min_bound, 1);
+        assert_eq!(max_bound, 30);
     }
 
     #[test]
@@ -1099,10 +1115,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 1); // Default min bound
-        assert_eq!(max_bound, 24); // lt - 1 is inclusive
+        assert_eq!(min_bound, 1);
+        assert_eq!(max_bound, 24);
     }
 
     #[test]
@@ -1114,10 +1130,10 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 15); // gte.max(gt + 1)
-        assert_eq!(max_bound, 27); // lte.min(lt - 1)
+        assert_eq!(min_bound, 15);
+        assert_eq!(max_bound, 27);
     }
 
     #[test]
@@ -1129,10 +1145,9 @@ mod calculate_inclusive_bounds_tests {
         let best_block_height = 100;
 
         let (min_bound, max_bound) =
-            calculate_inclusive_bounds(gte, gt, lte, lt, best_block_height).unwrap();
+            calculate_inclusive_height_bounds(gte, gt, lte, lt, best_block_height).unwrap();
 
-        assert_eq!(min_bound, 1); // Default min bound
-        assert_eq!(max_bound, best_block_height); // default to best block
-                                                  // height
+        assert_eq!(min_bound, 1);
+        assert_eq!(max_bound, best_block_height);
     }
 }
