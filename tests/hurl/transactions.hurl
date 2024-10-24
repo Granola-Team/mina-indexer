@@ -454,7 +454,7 @@ query TransactionsNonce {
   transactions(query: {canonical: true, from: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}) {
     nonce
     blockHeight
-  }  
+  }
 }
 ```
 HTTP 200
@@ -561,7 +561,7 @@ query TransactionsFailureReason {
     blockHeight
     failureReason
     hash
-  }  
+  }
 }
 ```
 HTTP 200
@@ -657,3 +657,99 @@ jsonpath "$.data.next[0].nonce" == 12
 jsonpath "$.data.next[0].block.dateTime" == "2021-03-17T00:33:00.000Z"
 
 duration < 200
+
+#
+# transactions bound by height
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeight {
+  transactions(
+    limit: 25
+    sortBy: BLOCKHEIGHT_DESC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 4
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[3].blockHeight" == 119
+
+duration < 100
+
+#
+# transactions bound by height #2
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeight {
+  transactions(
+    limit: 25
+    sortBy: BLOCKHEIGHT_DESC
+    query: { blockHeight_lt: 120, blockHeight_gte: 119 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 2
+jsonpath "$.data.transactions[0].blockHeight" == 119
+jsonpath "$.data.transactions[1].blockHeight" == 119
+
+duration < 100
+
+#
+# transactions bound by height sorted by global slot
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeightSort {
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_DESC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 4
+jsonpath "$.data.transactions[0].blockHeight" == 120
+jsonpath "$.data.transactions[3].blockHeight" == 119
+
+duration < 100
+
+#
+# transactions bound by height sorted by global slot
+#
+POST {{url}}
+```graphql
+query TransactionsBoundByHeightSort {
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_ASC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.transactions" count == 4
+jsonpath "$.data.transactions[0].blockHeight" == 119
+jsonpath "$.data.transactions[3].blockHeight" == 120
+
+duration < 100
