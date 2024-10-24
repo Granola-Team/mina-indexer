@@ -39,11 +39,7 @@ pub struct StagedLedgerDiffJson {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct StagedLedgerDiffTuple(pub StagedLedgerPreDiffV1, pub Option<StagedLedgerPreDiffV1>);
 
-// v1 pre-hardfork
 pub type StagedLedgerDiffTupleV1 = Versioned<StagedLedgerDiffTuple, 1>;
-
-// v2 post-harfork
-pub type StagedLedgerDiffTupleV2 = Versioned<StagedLedgerDiffTuple, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(StagedLedgerDiffTuple)]
@@ -60,11 +56,7 @@ pub struct StagedLedgerPreDiff {
     pub internal_command_balances: Vec<InternalCommandBalanceDataV1>,
 }
 
-// v1 pre-hardfork
 pub type StagedLedgerPreDiffV1 = Versioned2<StagedLedgerPreDiff, 1, 1>;
-
-// v2 post-hardfork
-pub type StagedLedgerPreDiffV2 = Versioned2<StagedLedgerPreDiff, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
 #[auto_from(StagedLedgerPreDiff)]
@@ -76,34 +68,49 @@ pub struct StagedLedgerPreDiffJson {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct UserCommandWithStatus {
+pub struct UserCommandWithStatus1 {
     pub data: UserCommandV1,
     pub status: TransactionStatusV1,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct UserCommandWithStatus2 {
+    pub data: UserCommandV2,
+    pub status: TransactionStatusV2,
+}
+
 // v1 pre-hardfork
-pub type UserCommandWithStatusV1 = Versioned<UserCommandWithStatus, 1>;
+pub type UserCommandWithStatusV1 = Versioned<UserCommandWithStatus1, 1>;
 
 // v2 post-hardfork
-pub type UserCommandWithStatusV2 = Versioned<UserCommandWithStatus, 2>;
+pub type UserCommandWithStatusV2 = Versioned<UserCommandWithStatus2, 2>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-#[auto_from(UserCommandWithStatus)]
+#[auto_from(UserCommandWithStatus1)]
 pub struct UserCommandWithStatusJson {
     pub data: UserCommandJson,
     pub status: TransactionStatusJson,
 }
 
+/// v1 pre-hardfork
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum UserCommand {
+pub enum UserCommand1 {
     SignedCommand(SignedCommandV1),
 }
 
+/// v2 post-hardfork
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum UserCommand2 {
+    SignedCommand(SignedCommandV2),
+    ZkappCommand(ZkappCommandV1),
+}
+
 // v1 pre-hardfork
-pub type UserCommandV1 = Versioned2<UserCommand, 1, 1>;
+pub type UserCommandV1 = Versioned2<UserCommand1, 1, 1>;
 
 // v2 post-hardfork
-pub type UserCommandV2 = Versioned2<UserCommand, 2, 1>;
+pub type UserCommandV2 = Versioned2<UserCommand2, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum UserCommandJsonProxy {
@@ -112,57 +119,76 @@ enum UserCommandJsonProxy {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
-#[auto_from(UserCommand)]
+#[auto_from(UserCommand1)]
 #[auto_from(UserCommandJsonProxy)]
 pub enum UserCommandJson {
     SignedCommand(SignedCommandJson),
-    // ZkappCommand(ZkappCommandJson),
 }
 
 impl_mina_enum_json_serde!(UserCommandJson, UserCommandJsonProxy);
 
+// Signed command versions
+// https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/signed_command.mli
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct SignedCommand {
+pub struct SignedCommand1 {
     pub payload: SignedCommandPayloadV1,
     pub signer: PublicKey2V1,
     pub signature: SignatureV1,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SignedCommand2 {
+    pub payload: SignedCommandPayloadV2,
+    pub signer: PublicKey2V1,
+    pub signature: SignatureV1,
+}
+
 // v1 pre-hardfork
-pub type SignedCommandV1 = Versioned2<SignedCommand, 1, 1>;
+pub type SignedCommandV1 = Versioned2<SignedCommand1, 1, 1>;
 
 // v2 post-hardfork
-pub type SignedCommandV2 = Versioned2<SignedCommand, 2, 1>;
+pub type SignedCommandV2 = Versioned2<SignedCommand2, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-#[auto_from(SignedCommand)]
+#[auto_from(SignedCommand1)]
 pub struct SignedCommandJson {
     pub payload: SignedCommandPayloadJson,
     pub signer: PublicKeyJson,
     pub signature: SignatureJson,
 }
 
+// Signed command payload common/body versions
+// https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/signed_command_payload.mli#L153-L156
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct SignedCommandPayload {
+pub struct SignedCommandPayload1 {
     pub common: SignedCommandPayloadCommonV1,
     pub body: SignedCommandPayloadBodyV1,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SignedCommandPayload2 {
+    pub common: SignedCommandPayloadCommonV2,
+    pub body: SignedCommandPayloadBodyV2,
+}
+
 // v1 pre-hardfork
-pub type SignedCommandPayloadV1 = Versioned2<SignedCommandPayload, 1, 1>;
+pub type SignedCommandPayloadV1 = Versioned2<SignedCommandPayload1, 1, 1>;
 
 // v2 post-hardfork
-pub type SignedCommandPayloadV2 = Versioned2<SignedCommandPayload, 2, 1>;
+pub type SignedCommandPayloadV2 = Versioned2<SignedCommandPayload2, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-#[auto_from(SignedCommandPayload)]
+#[auto_from(SignedCommandPayload1)]
 pub struct SignedCommandPayloadJson {
     pub common: SignedCommandPayloadCommonJson,
     pub body: SignedCommandPayloadBodyJson,
 }
 
+/// v1 pre-hardfork
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct SignedCommandPayloadCommon {
+pub struct SignedCommandPayloadCommon1 {
     pub fee: AmountV1,
     pub fee_token: SignedCommandFeeTokenV1,
     pub fee_payer_pk: PublicKeyV1,
@@ -171,14 +197,24 @@ pub struct SignedCommandPayloadCommon {
     pub memo: SignedCommandMemoV1,
 }
 
+/// v2 post-hardfork
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SignedCommandPayloadCommon2 {
+    pub fee: AmountV1,
+    pub fee_payer_pk: PublicKeyV1,
+    pub nonce: ExtendedU32,
+    pub valid_until: ExtendedU32,
+    pub memo: SignedCommandMemoV1,
+}
+
 // v1 pre-hardfork
-pub type SignedCommandPayloadCommonV1 = Versioned3<SignedCommandPayloadCommon, 1, 1, 1>;
+pub type SignedCommandPayloadCommonV1 = Versioned3<SignedCommandPayloadCommon1, 1, 1, 1>;
 
 // v2 post-hardfork
-pub type SignedCommandPayloadCommonV2 = Versioned3<SignedCommandPayloadCommon, 2, 1, 1>;
+pub type SignedCommandPayloadCommonV2 = Versioned3<SignedCommandPayloadCommon2, 2, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-#[auto_from(SignedCommandPayloadCommon)]
+#[auto_from(SignedCommandPayloadCommon1)]
 pub struct SignedCommandPayloadCommonJson {
     pub fee: DecimalJson,
     pub fee_token: U64Json,
@@ -189,16 +225,22 @@ pub struct SignedCommandPayloadCommonJson {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum SignedCommandPayloadBody {
+pub enum SignedCommandPayloadBody1 {
     PaymentPayload(PaymentPayloadV1),
     StakeDelegation(StakeDelegationV1),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum SignedCommandPayloadBody2 {
+    PaymentPayload(PaymentPayloadV2),
+    StakeDelegation(StakeDelegationV2),
+}
+
 // v1 pre-hardfork
-pub type SignedCommandPayloadBodyV1 = Versioned2<SignedCommandPayloadBody, 1, 1>;
+pub type SignedCommandPayloadBodyV1 = Versioned2<SignedCommandPayloadBody1, 1, 1>;
 
 // v2 post-hardfork
-pub type SignedCommandPayloadBodyV2 = Versioned2<SignedCommandPayloadBody, 2, 1>;
+pub type SignedCommandPayloadBodyV2 = Versioned2<SignedCommandPayloadBody2, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum SignedCommandPayloadBodyJsonProxy {
@@ -209,7 +251,7 @@ enum SignedCommandPayloadBodyJsonProxy {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
-#[auto_from(SignedCommandPayloadBody)]
+#[auto_from(SignedCommandPayloadBody1)]
 #[auto_from(SignedCommandPayloadBodyJsonProxy)]
 pub enum SignedCommandPayloadBodyJson {
     PaymentPayload(PaymentPayloadJson),
@@ -222,28 +264,40 @@ impl_mina_enum_json_serde_with_option!(
     false
 );
 
+// Payment payload versions
+// https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/payment_payload.mli#L4-L31
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PaymentPayload {
+pub struct PaymentPayload1 {
     pub source_pk: PublicKeyV1,
     pub receiver_pk: PublicKeyV1,
     pub token_id: ExtendedU64_3,
     pub amount: AmountV1,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PaymentPayload2 {
+    pub receiver_pk: PublicKeyV1,
+    pub amount: AmountV1,
+}
+
 // v1 per-hardfork
-pub type PaymentPayloadV1 = Versioned2<PaymentPayload, 1, 1>;
+pub type PaymentPayloadV1 = Versioned2<PaymentPayload1, 1, 1>;
 
 // v2 post-hardfork
-pub type PaymentPayloadV2 = Versioned2<PaymentPayload, 2, 1>;
+pub type PaymentPayloadV2 = Versioned2<PaymentPayload2, 2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, AutoFrom)]
-#[auto_from(PaymentPayload)]
+#[auto_from(PaymentPayload1)]
 pub struct PaymentPayloadJson {
     pub source_pk: PublicKeyJson,
     pub receiver_pk: PublicKeyJson,
     pub token_id: U64Json,
     pub amount: U64Json,
 }
+
+// Stake delegation versions
+// https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/stake_delegation.ml#L6-L31
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum StakeDelegation {
@@ -280,17 +334,12 @@ pub enum StakeDelegationJson {
 
 impl_mina_enum_json_serde!(StakeDelegationJson, StakeDelegationJsonProxy);
 
-// v1 pre-hardfork
 pub type SignedCommandFeeTokenV1 = Versioned3<u64, 1, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SignedCommandMemo(pub Vec<u8>);
 
-// v1 pre-hardfork
 pub type SignedCommandMemoV1 = Versioned<SignedCommandMemo, 1>;
-
-// v2 post-hardfork
-pub type SignedCommandMemoV2 = Versioned<SignedCommandMemo, 2>;
 
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
 #[auto_from(SignedCommandMemo)]
@@ -323,11 +372,19 @@ impl<'de> Deserialize<'de> for SignedCommandMemoJson {
     }
 }
 
-// v2 post-harfork
-pub type ZkappCommand = Versioned2<(), 1, 1>;
+// Zkapp command version
+// https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_wire_types/mina_base/mina_base_zkapp_command.mli
+
+/// v2 post-harfork
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZkappCommand {
+    // TODO use mina_blocks::v2::staged_ledger_diff::Command to implement
+}
+
+pub type ZkappCommandV1 = Versioned2<ZkappCommand, 1, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum TransactionStatus {
+pub enum TransactionStatus1 {
     Applied(
         TransactionStatusAuxiliaryDataV1,
         TransactionStatusBalanceDataV1,
@@ -338,11 +395,17 @@ pub enum TransactionStatus {
     ),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum TransactionStatus2 {
+    Applied,
+    Failed(Vec<TransactionStatusFailedTypeV1>),
+}
+
 // v1 pre-hardfork
-pub type TransactionStatusV1 = Versioned<TransactionStatus, 1>;
+pub type TransactionStatusV1 = Versioned<TransactionStatus1, 1>;
 
 // v2 post-hardfork
-pub type TransactionStatusV2 = Versioned<TransactionStatus, 2>;
+pub type TransactionStatusV2 = Versioned<TransactionStatus2, 1>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum TransactionStatusJsonProxy {
@@ -357,7 +420,7 @@ enum TransactionStatusJsonProxy {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, AutoFrom)]
-#[auto_from(TransactionStatus)]
+#[auto_from(TransactionStatus1)]
 #[auto_from(TransactionStatusJsonProxy)]
 pub enum TransactionStatusJson {
     Applied(

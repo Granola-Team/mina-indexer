@@ -132,6 +132,7 @@ async fn account_diffs() {
                     *nonce += new_nonce.0;
                 }
             }
+            AccountDiff::Zkapp(_zkapp) => todo!(),
         }
     }
 

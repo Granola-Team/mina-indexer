@@ -28,6 +28,15 @@ pub struct DelegationDiff {
     pub delegate: PublicKey,
 }
 
+/// TODO zkapp diff
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ZkappDiff {
+    pub update_type: UpdateType,
+    pub public_key: PublicKey,
+    pub amount: Amount,
+    pub diffs: Vec<PaymentDiff>,
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct CoinbaseDiff {
     pub public_key: PublicKey,
@@ -44,6 +53,7 @@ pub struct FailedTransactionNonceDiff {
 pub enum AccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
+    Zkapp(ZkappDiff),
     Coinbase(CoinbaseDiff),
     FeeTransfer(PaymentDiff),
     /// Overrides the fee transfer for SNARK work
@@ -56,6 +66,7 @@ pub enum AccountDiff {
 pub enum UnapplyAccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
+    Zkapp(ZkappDiff),
     Coinbase(CoinbaseDiff),
     FeeTransfer(PaymentDiff),
     /// Overrides the fee transfer for SNARK work
@@ -68,6 +79,7 @@ pub enum UnapplyAccountDiff {
 pub enum AccountDiffType {
     Payment(Nonce),
     Delegation(Nonce),
+    Zkapp(Nonce),
     Coinbase,
     FeeTransfer,
     FeeTransferViaCoinbase,
@@ -105,6 +117,7 @@ impl AccountDiff {
         match self {
             Self::Coinbase(diff) => UnapplyAccountDiff::Coinbase(diff),
             Self::Payment(diff) => UnapplyAccountDiff::Payment(diff),
+            Self::Zkapp(diff) => UnapplyAccountDiff::Zkapp(diff),
             Self::FeeTransfer(diff) => UnapplyAccountDiff::FeeTransfer(diff),
             Self::FeeTransferViaCoinbase(diff) => UnapplyAccountDiff::FeeTransferViaCoinbase(diff),
             Self::Delegation(diff) => UnapplyAccountDiff::Delegation(diff),
@@ -131,6 +144,7 @@ impl AccountDiff {
         match self {
             Self::Payment(payment_diff) => payment_diff.public_key.clone(),
             Self::Delegation(delegation_diff) => delegation_diff.delegator.clone(),
+            Self::Zkapp(zkapp_diff) => zkapp_diff.public_key.clone(),
             Self::Coinbase(coinbase_diff) => coinbase_diff.public_key.clone(),
             Self::FeeTransfer(fee_transfer_diff) => fee_transfer_diff.public_key.clone(),
             Self::FeeTransferViaCoinbase(fee_transfer_diff) => fee_transfer_diff.public_key.clone(),
@@ -241,6 +255,7 @@ impl AccountDiff {
                     UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
                 }
             }
+            Self::Zkapp(diff) => diff.amount.0 as i64,
         }
     }
 
@@ -296,6 +311,17 @@ impl AccountDiff {
                     update_type: UpdateType::Debit(None),
                 }),
             ]],
+            // TODO
+            AccountDiffType::Zkapp(nonce) => vec![vec![Self::Zkapp(ZkappDiff {
+                public_key: sender.into(),
+                amount: amount.into(),
+                update_type: UpdateType::Debit(Some(nonce)),
+                diffs: vec![PaymentDiff {
+                    update_type: UpdateType::Credit,
+                    public_key: receiver.into(),
+                    amount: amount.into(),
+                }],
+            })]],
         }
     }
 }
@@ -303,6 +329,8 @@ impl AccountDiff {
 impl PaymentDiff {
     pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
         use AccountDiff::*;
+
+        // TODO zkapp => Vec<Self>
         match diff {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => Some(diff),
             Coinbase(cb_diff) => Some(Self {
@@ -311,6 +339,7 @@ impl PaymentDiff {
                 amount: cb_diff.amount,
             }),
             Delegation(_) | FailedTransactionNonce(_) => None,
+            Zkapp(diff) => todo!("from_account_diff zkapp {diff:?}"),
         }
     }
 
@@ -367,6 +396,7 @@ impl std::fmt::Debug for AccountDiff {
         match self {
             Payment(pay_diff) => write!(f, "Payment:      {pay_diff:?}"),
             Delegation(del_diff) => write!(f, "Delegation:   {del_diff:?}"),
+            Zkapp(zkapp_diff) => write!(f, "Zkapp:        {zkapp_diff:?}"),
             Coinbase(coin_diff) => write!(f, "Coinbase:     {coin_diff:?}"),
             FeeTransfer(pay_diff) => write!(f, "Fee transfer: {pay_diff:?}"),
             FeeTransferViaCoinbase(pay_diff) => {
