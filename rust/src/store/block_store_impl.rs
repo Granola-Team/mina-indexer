@@ -664,7 +664,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting number of blocks at public key {pk}");
         Ok(self
             .database
-            .get_cf(self.blocks_cf(), pk.0.as_bytes())?
+            .get_cf(self.blocks_pk_count_cf(), pk.0.as_bytes())?
             .map_or(0, from_be_bytes))
     }
 
@@ -679,7 +679,7 @@ impl BlockStore for IndexerStore {
         // increment num blocks at public key
         let num_blocks_at_pk = self.get_num_blocks_at_public_key(pk)?;
         batch.put_cf(
-            self.blocks_cf(),
+            self.blocks_pk_count_cf(),
             pk.0.as_bytes(),
             (num_blocks_at_pk + 1).to_be_bytes(),
         );
