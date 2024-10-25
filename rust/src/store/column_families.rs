@@ -83,6 +83,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing per epoch per account slots produced
     fn block_pk_epoch_slots_produced_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing the number of blocks for a specified public key
+    fn blocks_pk_count_cf(&self) -> &ColumnFamily;
+
     //////////////////////////
     // Canonicity store CFs //
     //////////////////////////
