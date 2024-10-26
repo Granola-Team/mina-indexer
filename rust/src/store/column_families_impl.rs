@@ -201,6 +201,20 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-pk-epoch-slots-produced column family exists")
     }
 
+    /// CF for storing the number of blocks for a specified public key
+    /// ```
+    /// key: pk
+    /// val: count
+    /// where
+    /// - pk:    [PublicKey] bytes
+    /// - count: [u32] BE bytes
+    /// ```
+    fn blocks_pk_count_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-pk-count")
+            .expect("blocks-pk-count column family exists")
+    }
+
     ////////////////////////////
     // User command store CFs //
     ////////////////////////////

@@ -4,6 +4,7 @@ use mina_indexer::{
         parser::BlockParser,
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
+        BlockHash,
     },
     constants::*,
     store::IndexerStore,
@@ -50,5 +51,31 @@ async fn add_and_get() -> anyhow::Result<()> {
     println!("Number of blocks: {n}");
     println!("To insert all:    {add_time:?}");
     println!("To fetch all:     {:?}\n", fetching.elapsed());
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_invalid() -> anyhow::Result<()> {
+    let store_dir = setup_new_db_dir("block-store-db")?;
+    let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
+    let db = IndexerStore::new(store_dir.path())?;
+    let mut bp = BlockParser::new_with_canonical_chain_discovery(
+        blocks_dir,
+        PcbVersion::V1,
+        MAINNET_CANONICAL_THRESHOLD,
+        false,
+        BLOCK_REPORTING_FREQ_NUM,
+    )
+    .await?;
+
+    while let Some((block, block_bytes)) = bp.next_block().await? {
+        let block: PrecomputedBlock = block.into();
+        db.add_block(&block, block_bytes)?;
+    }
+
+    db.get_block(&BlockHash(
+        "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
+    ))?;
+
     Ok(())
 }
