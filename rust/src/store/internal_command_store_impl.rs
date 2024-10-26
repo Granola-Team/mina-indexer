@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use log::{info, trace};
+use log::trace;
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
@@ -130,7 +130,7 @@ impl InternalCommandStore for IndexerStore {
         state_hash: &BlockHash,
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
-        info!("Getting internal command block {state_hash} index {index}");
+        trace!("Getting internal command block {state_hash} index {index}");
         Ok(self
             .database
             .get_cf(
@@ -164,7 +164,7 @@ impl InternalCommandStore for IndexerStore {
         pk: &PublicKey,
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
-        info!("Getting internal command pk {pk} index {index}");
+        trace!("Getting internal command pk {pk} index {index}");
         Ok(self
             .database
             .get_cf(
