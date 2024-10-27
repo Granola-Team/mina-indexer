@@ -37,8 +37,12 @@ pub struct LedgerDiff {
 impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
+        let mut account_diffs = vec![];
+
+        // transaction fees
         let mut account_diff_fees: Vec<Vec<AccountDiff>> =
             AccountDiff::from_block_fees(precomputed_block);
+
         // applied user commands
         let mut account_diff_txns: Vec<Vec<AccountDiff>> = precomputed_block
             .commands()
@@ -56,13 +60,14 @@ impl LedgerDiff {
                 }
             })
             .collect::<Vec<_>>();
+
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(precomputed_block);
         if coinbase.has_fee_transfer() {
             coinbase.account_diffs_coinbase_mut(&mut account_diff_fees);
         }
 
-        let mut account_diffs = Vec::new();
+        // apply in order: user commands, coinbase, fees
         account_diffs.append(&mut account_diff_txns);
         if coinbase.is_coinbase_applied() {
             account_diffs.push(coinbase.as_account_diff()[0].clone());

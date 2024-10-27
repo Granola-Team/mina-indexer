@@ -2,16 +2,12 @@ use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
     block::store::BlockStore,
     command::{
-        decode_memo,
-        signed::{SignedCommand, SignedCommandWithData, TxnHash},
+        signed::{SignedCommandWithData, TxnHash},
         store::UserCommandStore,
         CommandStatusData,
     },
     constants::millis_to_global_slot,
     ledger::public_key::PublicKey,
-    protocol::serialization_types::staged_ledger_diff::{
-        SignedCommandPayloadBody, StakeDelegation,
-    },
     store::IndexerStore,
     utility::store::{
         command::user::{
@@ -684,59 +680,33 @@ impl TransactionWithoutBlock {
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
     ) -> Self {
+        let receiver = cmd.command.receiver_pk();
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
             CommandStatusData::Failed(failed_types, _) => {
                 failed_types.first().map(|f| f.to_string())
             }
         };
-        let signed_cmd = match cmd.command {
-            SignedCommand::V1(v1) => v1.t.t,
-            SignedCommand::V2(v2) => v2.t.t,
-        };
+        let is_applied = failure_reason.is_none();
 
-        let payload = signed_cmd.payload;
-        let common = payload.t.t.common.t.t.t;
-        let token = common.fee_token.t.t.t;
-        let nonce = common.nonce.t.t as u32;
-        let fee = common.fee.t.t;
-        let (sender, receiver, kind, token_id, amount) = {
-            match payload.t.t.body.t.t {
-                SignedCommandPayloadBody::PaymentPayload(payload) => (
-                    payload.t.t.source_pk,
-                    payload.t.t.receiver_pk,
-                    "PAYMENT",
-                    token,
-                    payload.t.t.amount.t.t,
-                ),
-                SignedCommandPayloadBody::StakeDelegation(payload) => {
-                    let StakeDelegation::SetDelegate {
-                        delegator,
-                        new_delegate,
-                    } = payload.t;
-                    (delegator, new_delegate, "STAKE_DELEGATION", token, 0)
-                }
-            }
-        };
-        let receiver = PublicKey::from(receiver).0;
         Self {
-            amount,
+            canonical,
+            is_applied,
+            failure_reason,
+            amount: cmd.command.amount(),
             block_height: cmd.blockchain_length,
             global_slot: cmd.global_slot_since_genesis,
-            canonical,
-            is_applied: failure_reason.is_none(),
-            failure_reason,
-            fee,
-            from: PublicKey::from(sender).0,
+            fee: cmd.command.fee(),
+            from: cmd.command.source_pk().0,
             hash: cmd.tx_hash.to_string(),
-            kind: kind.to_string(),
-            memo: decode_memo(&common.memo.t.0),
-            nonce,
+            kind: cmd.command.kind().to_string(),
+            memo: cmd.command.memo(),
+            nonce: cmd.command.nonce().0,
             receiver: PK {
-                public_key: receiver.to_owned(),
+                public_key: receiver.0.to_owned(),
             },
-            to: receiver,
-            token: Some(token_id),
+            to: receiver.0,
+            token: cmd.command.fee_token(),
             epoch_num_user_commands,
             total_num_user_commands,
         }
