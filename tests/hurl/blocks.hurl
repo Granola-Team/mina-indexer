@@ -1,6 +1,6 @@
-# 
+#
 # Blocks canonical height ascending query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -45,9 +45,9 @@ jsonpath "$.data.blocks[119].snarkFees" == "0"
 
 duration < 1000
 
-# 
+#
 # Blocks non-canonical height descending query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -77,9 +77,9 @@ jsonpath "$.data.blocks[83].canonical" == false
 
 duration < 1000
 
-# 
+#
 # Blocks creator account  query (default sort_by: BLOCKHEIGHT_DESC)
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -117,9 +117,9 @@ jsonpath "$.data.blocks[2].blockHeight" == 5
 
 duration < 2000
 
-# 
+#
 # Blocks coinbase receiver height ascending query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -162,9 +162,9 @@ jsonpath "$.data.blocks[4].blockHeight" == 84
 
 duration < 2000
 
-# 
+#
 # Blocks specific height query (ordered canonical first)
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -201,9 +201,9 @@ jsonpath "$.data.blocks[3].canonical" == false
 
 duration < 2000
 
-# 
+#
 # Blocks global slot query (ordered canonical first)
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -238,9 +238,9 @@ jsonpath "$.data.blocks[2].canonical" == false
 
 duration < 2000
 
-# 
+#
 # Blocks state hash transactions, fee transfers, user commands query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -326,9 +326,9 @@ jsonpath "$.data.blocks[0].transactions.userCommands[3].blockHeight" == 3
 
 duration < 2000
 
-# 
+#
 # Blocks state hash SNARK jobs query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -371,9 +371,9 @@ jsonpath "$.data.blocks[0].snarkJobs[63].fee" == 0
 
 duration < 2000
 
-# 
+#
 # Blocks canonical block height bounded ascending query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -407,9 +407,9 @@ jsonpath "$.data.blocks[39].canonical" == true
 
 duration < 2000
 
-# 
+#
 # Blocks canonical global slot bounded query
-# 
+#
 
 POST {{url}}
 ```graphql
@@ -508,7 +508,7 @@ POST {{url}}
 ```graphql
 {
   blocks(
-    limit: $limit
+    limit: 10
     sortBy: BLOCKHEIGHT_DESC
     query: { canonical: true, blockHeight_lte: 100 }
   ) {
