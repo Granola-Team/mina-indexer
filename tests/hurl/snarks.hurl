@@ -4,8 +4,8 @@
 
 POST {{url}}
 ```graphql
-query Snarks($limit: Int = 10, $sort_by: SnarkSortByInput!, $query: SnarkQueryInput!) {
-  snarks(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  snarks(limit: 10, sortBy: BLOCKHEIGHT_DESC, query: { canonical: true }) {
     canonical
     blockHeight
     prover
@@ -14,14 +14,6 @@ query Snarks($limit: Int = 10, $sort_by: SnarkSortByInput!, $query: SnarkQueryIn
     block {
       stateHash
     }
-  }
-}
-
-variables {
-  "limit": 10,
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "query": {
-    "canonical": true
   }
 }
 ```
@@ -56,7 +48,7 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  snarks(query: {canonical: true, blockHeight: 111}, limit: 1000) {
+  snarks(limit: 1000, query: { canonical: true, blockHeight: 111 }) {
     blockHeight
     canonical
     dateTime
@@ -94,8 +86,15 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  snarks(query: {canonical: true, block: {stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"}}) {
-		blockHeight
+  snarks(
+    query: {
+      canonical: true
+      block: {
+        stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
+      }
+    }
+  ) {
+    blockHeight
     block {
       stateHash
     }
@@ -129,7 +128,13 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  snarks(query: {prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h", canonical: true}, limit: 100) {
+  snarks(
+    limit: 100
+    query: {
+      prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+      canonical: true
+    }
+  ) {
     prover
     canonical
     blockHeight
@@ -161,7 +166,7 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  snarks(query: {canonical: true, blockHeight_lte: 120}, limit: 1000) {
+  snarks(limit: 1000, query: { canonical: true, blockHeight_lte: 120 }) {
     blockHeight
   }
 }
@@ -183,8 +188,16 @@ duration < 500
 
 POST {{url}}
 ```graphql
-query snarksAccountQuery($snarks_sort_by: SnarkSortByInput!, $snarks_limit: Int = 3, $snarks_query: SnarkQueryInput!) {
-    snarks(sortBy: $snarks_sort_by, limit: $snarks_limit, query: $snarks_query) {
+{
+  snarks(
+    limit: 100
+    sortBy: BLOCKHEIGHT_ASC
+    query: {
+      prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+      canonical: true
+      blockHeight_lte: 120
+    }
+  ) {
     canonical
     blockHeight
     block {
@@ -193,16 +206,6 @@ query snarksAccountQuery($snarks_sort_by: SnarkSortByInput!, $snarks_limit: Int 
     fee
     dateTime
     prover
-  }
-}
-
-variables {
-  "snarks_sort_by":"BLOCKHEIGHT_ASC",
-  "snarks_limit":100,
-  "snarks_query":{
-    "prover":"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h",
-    "canonical":true,
-    "blockHeight_lte": 120
   }
 }
 ```
@@ -225,21 +228,19 @@ duration < 500
 
 POST {{url}}
 ```graphql
-query SnarksQuery($sort_by: SnarkSortByInput, $limit: Int = 10, $query: SnarkQueryInput) {
-  snarks(sortBy: $sort_by, limit: $limit, query: $query) {
+{
+  snarks(
+    limit: 100
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      prover: "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
+      canonical: true
+      blockHeight_lte: 111
+    }
+  ) {
     blockHeight
     prover
     canonical
-  }
-}
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 100,
-  "query": {
-    "prover": "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h",
-    "canonical": true,
-    "blockHeight_lte": 111
   }
 }
 ```

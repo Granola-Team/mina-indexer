@@ -4,8 +4,10 @@
 
 POST {{url}}
 ```graphql
-query TransactionQuery {
-  transaction(query: {hash: "CkpaJFpf2q9syHb6dmufSNUii4b5iHvPyakoWgNzKnU7AQ68fzY1P"}) {
+{
+  transaction(
+    query: { hash: "CkpaJFpf2q9syHb6dmufSNUii4b5iHvPyakoWgNzKnU7AQ68fzY1P" }
+  ) {
     epoch_num_user_commands
     total_num_user_commands
     block {

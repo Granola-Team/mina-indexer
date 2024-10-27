@@ -4,8 +4,12 @@
 
 POST {{url}}
 ```graphql
-query Feetransfers($limit: Int = 10, $sort_by: FeetransferSortByInput!, $query: FeetransferQueryInput!) {
-  feetransfers(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  feetransfers(
+    limit: 101
+    sortBy: BLOCKHEIGHT_DESC
+    query: { canonical: true }
+  ) {
     stateHash
     recipient
     fee
@@ -13,14 +17,6 @@ query Feetransfers($limit: Int = 10, $sort_by: FeetransferSortByInput!, $query: 
     blockHeight
     canonical
     dateTime
-  }
-}
-
-variables {
-  "limit": 101,
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "query": {
-    "canonical": true
   }
 }
 ```
@@ -57,7 +53,15 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  feetransfers(sortBy: BLOCKHEIGHT_DESC, query: {blockStateHash: {stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"}, canonical: true}) {
+  feetransfers(
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      blockStateHash: {
+        stateHash: "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+      }
+      canonical: true
+    }
+  ) {
     recipient
     type
     blockStateHash {
@@ -87,12 +91,12 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query InternalCommandsQuery(
-  $sort_by: FeetransferSortByInput!
-  $limit: Int = 10
-  $query: FeetransferQueryInput!
-) {
-  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
+{
+  feetransfers(
+    limit: 100
+    sortBy: BLOCKHEIGHT_DESC
+    query: { canonical: true, blockHeight_lte: 120 }
+  ) {
     blockHeight
     blockStateHash {
       stateHash
@@ -102,15 +106,6 @@ query InternalCommandsQuery(
     type
     dateTime
     canonical
-  }
-}
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 100,
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 120
   }
 }
 ```
@@ -131,7 +126,7 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  feetransfers(sortBy: "BLOCKHEIGHT_ASC", limit: 100) {
+  feetransfers(limit: 100, sortBy: BLOCKHEIGHT_ASC) {
     blockHeight
     blockStateHash {
       stateHash
@@ -161,12 +156,18 @@ duration < 500
 
 POST {{url}}
 ```graphql
-query InternalCommandsQuery(
-  $sort_by: FeetransferSortByInput!
-  $limit: Int = 10
-  $query: FeetransferQueryInput!
-) {
-  feetransfers(sortBy: $sort_by, limit: $limit, query: $query) {
+{
+  feetransfers(
+    limit: 100
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      canonical: true
+      blockHeight_lte: 100
+      blockStateHash: {
+        stateHash: "3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66"
+      }
+    }
+  ) {
     blockHeight
     blockStateHash {
       stateHash
@@ -176,18 +177,6 @@ query InternalCommandsQuery(
     type
     dateTime
     canonical
-  }
-}
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 100,
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 100,
-    "blockStateHash": {
-      "stateHash": "3NKrnCRmvomXqor8pnqrUsLv4XcofJBu8VWqAsWRirGNPszo1a66"
-    }
   }
 }
 ```
@@ -202,23 +191,20 @@ jsonpath "$.data.feetransfers" count == 0
 
 POST {{url}}
 ```graphql
-query Feetransfers($limit: Int = 10, $sort_by: FeetransferSortByInput!, $query: FeetransferQueryInput!) {
-  feetransfers(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  feetransfers(
+    limit: 25
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      recipient: "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+      canonical: true
+      blockHeight_lte: 100
+    }
+  ) {
     recipient
     blockHeight
   }
 }
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 25,
-  "query": {
-    "recipient": "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA",
-    "canonical": true,
-    "blockHeight_lte": 100
-  }
-}
-
 ```
 HTTP 200
 [Asserts]
@@ -239,23 +225,20 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query Feetransfers($limit: Int = 10, $sort_by: FeetransferSortByInput!, $query: FeetransferQueryInput!) {
-  feetransfers(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  feetransfers(
+    limit: 4
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      recipient: "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
+      canonical: true
+      blockHeight_lte: 120
+    }
+  ) {
     recipient
     blockHeight
   }
 }
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "limit": 4,
-  "query": {
-    "recipient": "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf",
-    "canonical": true,
-    "blockHeight_lte": 120
-  }
-}
-
 ```
 HTTP 200
 [Asserts]

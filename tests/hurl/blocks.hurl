@@ -4,8 +4,8 @@
 
 POST {{url}}
 ```graphql
-query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryInput!) {
-  blocks(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  blocks(limit: 120, sortBy: BLOCKHEIGHT_ASC, query: { canonical: true }) {
     stateHash
     txFees
     blockHeight
@@ -14,14 +14,6 @@ query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryIn
     dateTime
     receivedTime
     snarkFees
-  }
-}
-
-variables {
-  "limit": 120,
-  "sort_by": "BLOCKHEIGHT_ASC",
-  "query": {
-    "canonical": true
   }
 }
 ```
@@ -60,11 +52,11 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(limit: 100, sortBy: "BLOCKHEIGHT_DESC", query: {canonical: false}) {
+  blocks(limit: 100, sortBy: BLOCKHEIGHT_DESC, query: { canonical: false }) {
     stateHash
     blockHeight
     canonical
-  } 
+  }
 }
 ```
 HTTP 200
@@ -92,7 +84,13 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {creatorAccount: {publicKey: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"}}) {
+  blocks(
+    query: {
+      creatorAccount: {
+        publicKey: "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"
+      }
+    }
+  ) {
     stateHash
     blockHeight
     winnerAccount {
@@ -126,7 +124,14 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {coinbaseReceiver: {public_key: "B62qnXMPtWdK4hRyaemZrvNoDGe3pMQNeubQemMZVXetuEY6MfgYszF"}}, sortBy: "BLOCKHEIGHT_ASC") {
+  blocks(
+    sortBy: BLOCKHEIGHT_ASC
+    query: {
+      coinbaseReceiver: {
+        public_key: "B62qnXMPtWdK4hRyaemZrvNoDGe3pMQNeubQemMZVXetuEY6MfgYszF"
+      }
+    }
+  ) {
     stateHash
     blockHeight
   }
@@ -164,7 +169,7 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {blockHeight: 6}) {
+  blocks(query: { blockHeight: 6 }) {
     stateHash
     canonical
     blockHeight
@@ -203,7 +208,9 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {protocolState: {consensusState: {slotSinceGenesis: 169}}}) {
+  blocks(
+    query: { protocolState: { consensusState: { slotSinceGenesis: 169 } } }
+  ) {
     stateHash
     canonical
     blockHeight
@@ -238,7 +245,9 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {stateHash: "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R"}) {
+  blocks(
+    query: { stateHash: "3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R" }
+  ) {
     stateHash
     transactions {
       coinbase
@@ -324,7 +333,9 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {stateHash: "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm"}) {
+  blocks(
+    query: { stateHash: "3NLj4yaEa4kGamq93k8ZMqbiZWuR26USzzndXVGoBupEZRQ6zJjm" }
+  ) {
     snarkJobs {
       blockHeight
       blockStateHash
@@ -366,21 +377,15 @@ duration < 2000
 
 POST {{url}}
 ```graphql
-query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryInput!) {
-  blocks(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  blocks(
+    limit: 100
+    sortBy: BLOCKHEIGHT_DESC
+    query: { canonical: true, blockHeight_lte: 50, blockHeight_gt: 10 }
+  ) {
     stateHash
     blockHeight
     canonical
-  }
-}
-
-variables {
-  "limit": 100,
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 50,
-    "blockHeight_gt": 10
   }
 }
 ```
@@ -408,29 +413,20 @@ duration < 2000
 
 POST {{url}}
 ```graphql
-query Blocks(
-  $query: BlockQueryInput!
-  $limit: Int = 10
-  $sort_by: BlockSortByInput!
-) {
-  blocks(limit: $limit, query: $query, sortBy: $sort_by ) {
+{
+  blocks(
+    limit: 100
+    sortBy: BLOCKHEIGHT_ASC
+    query: {
+      canonical: true
+      protocolState: {
+        consensusState: { slotSinceGenesis_lte: 100, slotSinceGenesis_gt: 9 }
+      }
+    }
+  ) {
     stateHash
     blockHeight
     canonical
-  }
-}
-
-variables {
-  "limit": 100,
-  "sort_by": "BLOCKHEIGHT_ASC",
-  "query": {
-    "canonical": true,
-    "protocolState": {
-      "consensusState": {
-        "slotSinceGenesis_lte": 100,
-        "slotSinceGenesis_gt": 9
-      }
-    }
   }
 }
 ```
@@ -479,7 +475,12 @@ duration < 2000
 POST {{url}}
 ```graphql
 {
-  blocks(query: {canonical: true, protocolState: { consensusState: {slotSinceGenesis : 173}}}) {
+  blocks(
+    query: {
+      canonical: true
+      protocolState: { consensusState: { slotSinceGenesis: 173 } }
+    }
+  ) {
     stateHash
     canonical
     protocolState {
@@ -505,17 +506,13 @@ duration < 200
 
 POST {{url}}
 ```graphql
-query Blocks($limit: Int = 10, $sort_by: BlockSortByInput!, $query: BlockQueryInput!) {
-  blocks(limit: $limit, sortBy: $sort_by, query: $query ) {
+{
+  blocks(
+    limit: $limit
+    sortBy: BLOCKHEIGHT_DESC
+    query: { canonical: true, blockHeight_lte: 100 }
+  ) {
     stateHash
-  }
-}
-
-variables {
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 100
   }
 }
 ```
@@ -531,22 +528,13 @@ jsonpath "$.data.blocks" count == 10
 
 POST {{url}}
 ```graphql
-query BlocksQuery(
-  $query: BlockQueryInput!
-  $limit: Int = 10
-  $sort_by: BlockSortByInput!
-) {
-  blocks(query: $query, limit: $limit, sortBy: $sort_by) {
+{
+  blocks(
+    limit: 50
+    sortBy: BLOCKHEIGHT_DESC
+    query: { canonical: true, blockHeight_lte: 100 }
+  ) {
     stateHash
-  }
-}
-
-variables {
-  "limit": 50,
-  "sort_by": "BLOCKHEIGHT_DESC",
-  "query": {
-    "canonical": true,
-    "blockHeight_lte": 100
   }
 }
 ```
@@ -562,7 +550,7 @@ jsonpath "$.data.blocks" count == 50
 
 POST {{url}}
 ```graphql
-query Blocks {
+{
   blocks(limit: 1) {
     epoch_num_blocks
     epoch_num_canonical_blocks
@@ -596,10 +584,11 @@ duration < 200
 
 POST {{url}}
 ```graphql
-query Blocks {
-  blocks(limit: 10, query: {
-    stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK"
-  }) {
+{
+  blocks(
+    limit: 10
+    query: { stateHash: "3NL33j16AWm3Jhjj1Ud25E54hu7HpUq4WBQcAiijEKMfXqwFJwzK" }
+  ) {
     block_num_snarks
     block_num_user_commands
     block_num_internal_commands
@@ -624,11 +613,10 @@ jsonpath "$.data.blocks[0].block_num_internal_commands" == 2
 POST {{url}}
 ```graphql
 {
-  blocks(limit: 10, query: {canonical: false}) {
+  blocks(limit: 10, query: { canonical: false }) {
     stateHash
     blockHeight
     canonical
-    
   }
 }
 ```
@@ -671,7 +659,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(limit: 10, query: {unique_block_producers_last_n_blocks: 10}) {
+  blocks(limit: 10, query: { unique_block_producers_last_n_blocks: 10 }) {
     num_unique_block_producers_last_n_blocks
   }
 }

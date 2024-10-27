@@ -4,8 +4,8 @@
 
 POST {{url}}
 ```graphql
-query Accounts {
-  topSnarkers(limit: 100, query: {epoch: 0}) {
+{
+  topSnarkers(limit: 100, query: { epoch: 0 }) {
     public_key
     username
     total_fees

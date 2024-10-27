@@ -4,22 +4,18 @@
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $sort_by: StagedLedgerSortByInput!, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, sortBy: $sort_by, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 100
+    sortBy: BALANCE_DESC
+    query: { stateHash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ" }
+  ) {
     balance
     balance_nanomina
     delegate
     nonce
     public_key
     username
-  }
-}
-
-variables {
-  "limit": 100,
-  "sort_by": "BALANCE_DESC",
-  "query": {
-    "stateHash": "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
   }
 }
 ```
@@ -51,22 +47,18 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $sort_by: StagedLedgerSortByInput!, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, sortBy: $sort_by, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 100
+    sortBy: BALANCE_DESC
+    query: { ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee" }
+  ) {
     balance
     balance_nanomina
     delegate
     nonce
     public_key
     username
-  }
-}
-
-variables {
-  "limit": 100,
-  "sort_by": "BALANCE_DESC",
-  "query": {
-    "ledgerHash": "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"
   }
 }
 ```
@@ -98,20 +90,18 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 10
+    query: {
+      publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+      stateHash: "3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY"
+    }
+  ) {
     balance
     balance_nanomina
     nonce
     public_key
-  }
-}
-
-variables {
-  "limit": 10,
-  "query": {
-    "publicKey": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-    "stateHash": "3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY"
   }
 }
 ```
@@ -133,20 +123,18 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 10
+    query: {
+      publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+      blockchain_length: 12
+    }
+  ) {
     balance
     balance_nanomina
     nonce
     public_key
-  }
-}
-
-variables {
-  "limit": 10,
-  "query": {
-    "publicKey": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-    "blockchain_length": 12
   }
 }
 ```
@@ -168,20 +156,18 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 10
+    query: {
+      publicKey: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+      ledgerHash: "jwVZUkFNgb5fBf6ZRBtYXrwWs32erEyPTLXzdduGNhH6F71wjan"
+    }
+  ) {
     balance
     balance_nanomina
     nonce
     public_key
-  }
-}
-
-variables {
-  "limit": 10,
-  "query": {
-    "publicKey": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
-    "ledgerHash": "jwVZUkFNgb5fBf6ZRBtYXrwWs32erEyPTLXzdduGNhH6F71wjan"
   }
 }
 ```
@@ -203,17 +189,15 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StagedLedgerAccounts($limit: Int, $query: StagedLedgerQueryInput!) {
-  stagedLedgerAccounts(limit: $limit, query: $query) {
+{
+  stagedLedgerAccounts(
+    limit: 10
+    query: {
+      publicKey: "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd"
+      ledgerHash: "jwVZUkFNgb5fBf6ZRBtYXrwWs32erEyPTLXzdduGNhH6F71wjan"
+    }
+  ) {
     balance_nanomina
-  }
-}
-
-variables {
-  "limit": 10,
-  "query": {
-    "publicKey": "B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd",
-    "ledgerHash": "jwVZUkFNgb5fBf6ZRBtYXrwWs32erEyPTLXzdduGNhH6F71wjan"
   }
 }
 ```

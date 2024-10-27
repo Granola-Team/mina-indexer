@@ -10,6 +10,7 @@ Files in this directory:
 ./deploy.rb
 ./download-mina-blocks.rb
 ./download-staking-ledgers.rb
+./format-graphql-in-hurl-files.rb
 ./granola-rclone.rb
 ./hashes.list
 ./indexer-ledger-normalizer.rb
@@ -46,6 +47,9 @@ Files in this directory:
   Downloads Mina staking ledgers stored in the Granola cloud object storage
   bucket by using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY`
   etc.). See the instructions at the top of the script.
+
+./format-graphql-in-hurl-files.rb
+  Standardize formatting of GraphQL in `hurl` files .
 
 ./granola-rclone.rb
   Utility to wrap `rclone`. (See https://rclone.org)

@@ -56,6 +56,7 @@
       developmentDependencies = with pkgs;
         [
           alejandra
+          biome
           cargo-audit
           cargo-machete
           curl

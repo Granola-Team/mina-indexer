@@ -4,8 +4,8 @@
 
 POST {{url}}
 ```graphql
-query Accounts {
-  topStakers(limit: 3, query: {epoch: 0}) {
+{
+  topStakers(limit: 3, query: { epoch: 0 }) {
     public_key
     username
     num_blocks_produced

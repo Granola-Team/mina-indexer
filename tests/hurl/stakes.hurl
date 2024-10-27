@@ -4,8 +4,15 @@
 
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
-  stakes(limit: $limit, sortBy: $sort_by, query: $query) {
+{
+  stakes(
+    limit: 2
+    sortBy: BALANCE_DESC
+    query: {
+      epoch: 42
+      public_key: "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
+    }
+  ) {
     balance
     balanceNanomina
     chainId
@@ -22,15 +29,6 @@ query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryIn
       totalDelegated
       delegates
     }
-  }
-}
-
-variables {
-  "limit": 2,
-  "sort_by": "BALANCE_DESC",
-  "query": {
-    "epoch": 42,
-    "public_key": "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
   }
 }
 ```
@@ -66,8 +64,15 @@ duration < 12000
 
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryInput!) {
-  stakes(limit: $limit, sortBy: $sort_by, query: $query) {
+{
+  stakes(
+    limit: 2
+    sortBy: BALANCE_DESC
+    query: {
+      ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"
+      delegate: "B62qrxNgwAdhGYZv1BXQRt2HgopUceFyrtXZMikwsuaHu5FigRJjhwY"
+    }
+  ) {
     timing {
       cliff_amount
       cliff_time
@@ -75,15 +80,6 @@ query StakesQuery($limit: Int, $sort_by: StakeSortByInput!, $query: StakeQueryIn
       vesting_increment
       vesting_period
     }
-  }
-}
-
-variables {
-  "limit": 2,
-  "sort_by": "BALANCE_DESC",
-  "query": {
-    "ledgerHash": "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH",
-    "delegate": "B62qrxNgwAdhGYZv1BXQRt2HgopUceFyrtXZMikwsuaHu5FigRJjhwY"
   }
 }
 ```
@@ -112,7 +108,13 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 42, public_key: "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"} limit: 1) {
+  stakes(
+    limit: 1
+    query: {
+      epoch: 42
+      public_key: "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"
+    }
+  ) {
     delegationTotals {
       totalStakePercentage
     }
@@ -137,7 +139,13 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 0, public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"}, limit: 1) {
+  stakes(
+    limit: 1
+    query: {
+      epoch: 0
+      public_key: "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+    }
+  ) {
     pk_epoch_num_blocks
     pk_total_num_blocks
     pk_epoch_num_supercharged_blocks
@@ -197,7 +205,10 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"}, limit: 0) {
+  stakes(
+    limit: 0
+    query: { ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH" }
+  ) {
     epoch
   }
 }
@@ -218,19 +229,15 @@ duration < 200
 
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $query: StakeQueryInput!) {
-  stakes(limit: $limit, query: $query) {
+{
+  stakes(
+    limit: 10
+    query: { ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH" }
+  ) {
     pk
     balance
     balanceNanomina
     username
-  }
-}
-
-variables {
-  "limit": 10,
-  "query": {
-    "ledgerHash": "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"
   }
 }
 ```
@@ -261,7 +268,7 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 42}, sortBy: STAKE_DESC, limit: 5) {
+  stakes(limit: 5, sortBy: STAKE_DESC, query: { epoch: 42 }) {
     delegationTotals {
       totalStakePercentage
     }
@@ -287,7 +294,12 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 42, public_key: "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"}) {
+  stakes(
+    query: {
+      epoch: 42
+      public_key: "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"
+    }
+  ) {
     public_key
     balance
     nonce
@@ -311,7 +323,13 @@ duration < 10000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 0, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
+  stakes(
+    limit: 1
+    query: {
+      epoch: 0
+      ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"
+    }
+  ) {
     epoch
   }
 }
@@ -331,7 +349,13 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  stakes(query: {epoch: 1, ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"}, limit: 1) {
+  stakes(
+    limit: 1
+    query: {
+      epoch: 1
+      ledgerHash: "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"
+    }
+  ) {
     epoch
     epoch_num_accounts
   }
@@ -352,19 +376,11 @@ duration < 1000
 
 POST {{url}}
 ```graphql
-query StakesQuery($limit: Int, $query: StakeQueryInput!) {
-  stakes(limit: $limit, query: $query) {
+{
+  stakes(limit: 3, query: { epoch: 1, stake_lte: "24333327.26190242" }) {
     delegationTotals {
       totalDelegated
     }
-  }
-}
-
-variables {
-  "limit": 3,
-  "query": {
-    "epoch": 1,
-    "stake_lte": "24333327.26190242"
   }
 }
 ```
