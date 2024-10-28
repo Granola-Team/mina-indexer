@@ -66,33 +66,30 @@ pub async fn get_blocks(
     }
 
     if let Ok(Some(best_tip)) = db.get_best_block() {
-        let mut best_chain: Box<Vec<PrecomputedBlock>> = Box::new(vec![best_tip.clone()]);
+        let mut best_chain: Vec<PrecomputedBlockWithCanonicity> =
+            Vec::with_capacity(limit as usize);
+
+        // Process best tip
+        if let Ok(Some(canonicity)) = db.get_block_canonicity(&best_tip.state_hash()) {
+            best_chain.push(PrecomputedBlock::with_canonicity(&best_tip, canonicity));
+        }
+
         let mut parent_state_hash = best_tip.previous_state_hash();
 
-        loop {
-            if best_chain.len() == limit as usize {
-                break;
-            }
-
+        while best_chain.len() < limit as usize {
             if let Ok(Some((block, _))) = db.get_block(&parent_state_hash) {
-                parent_state_hash = block.previous_state_hash();
-                best_chain.push(block);
+                if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
+                    best_chain.push(PrecomputedBlock::with_canonicity(&block, canonicity));
+                    parent_state_hash = block.previous_state_hash();
+                } else {
+                    break;
+                }
             } else {
                 // No parent
                 break;
             }
         }
 
-        let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
-            .iter()
-            .flat_map(|block| {
-                if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
-                    Some(PrecomputedBlock::with_canonicity(block, canonicity))
-                } else {
-                    None
-                }
-            })
-            .collect();
         return HttpResponse::Ok()
             .content_type(ContentType::json())
             .body(format_blocks(best_chain));
